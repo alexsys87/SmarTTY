@@ -75,8 +75,8 @@
 ```powershell
 git clone https://github.com/alexsys87/SmarTTY.git
 cd SmarTTY
-dotnet restore .\SmarTTY.csproj
-dotnet build .\SmarTTY.csproj -c Release
+msbuild SmarTTY.csproj -t:Restore -p:Configuration=Release
+msbuild SmarTTY.csproj -p:Configuration=Release
 .\bin\Release\net48\SmarTTY.exe
 ```
 
@@ -84,10 +84,12 @@ dotnet build .\SmarTTY.csproj -c Release
 
 ```powershell
 dotnet add package SSH.NET --version 2026.0.0
-dotnet build .\SmarTTY.csproj -c Release
+msbuild SmarTTY.csproj -p:Configuration=Release
 ```
 
 Для загрузки пакета нужен доступ к NuGet; при ошибках сети или источника пакетов сначала устраните их.
+
+Сборка выполняется через `msbuild` из Visual Studio, а не через `dotnet build`. Команда `dotnet build` для этого проекта падает с ошибками MSB3822/MSB3823: задача `GenerateResource` из .NET SDK не умеет встраивать нестроковые ресурсы (изображения и значки из `.resx` файлов Windows Forms) при целевом фреймворке `net48`. `msbuild` использует тот же путь встраивания ресурсов, что и Visual Studio.
 
 Альтернатива: откройте `SmarTTY.sln` в Visual Studio, восстановите пакеты NuGet, выберите `Release` и соберите решение. При переносе сборки копируйте всю выходную папку, а не только `SmarTTY.exe`.
 
