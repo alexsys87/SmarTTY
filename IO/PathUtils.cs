@@ -1,5 +1,4 @@
 ﻿using SmarTTY.Utilities;
-using Sysprogs.Core.Tools;
 using System;
 using System.Collections.Generic;
 using System.IO;

@@ -1,4 +1,4 @@
-﻿using Sysprogs.Core.Tools;
+﻿using SmarTTY.Utilities;
 using System;
 
 namespace SmarTTY.Sync;

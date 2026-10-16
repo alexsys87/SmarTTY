@@ -180,3 +180,21 @@ Forms/QtRaspberryCrossToolForm.Designer.cs
 Forms/QtRaspberryCrossToolForm.cs
 Forms/QtRaspberryCrossToolForm.resx
 VisualTTY/SysrootInfo.cs
+
+## Удалено при чистке артефактов декомпиляции:
+# Сгенерированные компилятором / неиспользуемые файлы
+ProbeResult`2.cs                       (анонимный тип компилятора; заменён обычным циклом в GUI/PackageManagerWindow.xaml.cs)
+InsertionOrderedMap`2.cs               (нигде не использовался, вместе с перегрузками GetOrInsert/GetOrInsertNew в DataExtensions)
+GeneratedInternalTypeHelper.cs         (генерируется PresentationBuildTasks автоматически)
+SysprogsGUI/Properties/Resources.cs    (пустой класс ресурсов без .resx)
+Sysprogs/Core/CollectionHelpers.cs     (не использовался)
+IO/Archives/ZipReader.cs               (не использовался)
+Utilities/Crc32.cs                     (использовался только в ZipReader)
+ReentrancyCounter.cs                   (не использовался)
+TextEditing/ITextSource.cs             (не использовался)
+TextEditing/ILineCollection.cs         (использовался только в ITextSource)
+Utilities/DrawingContextExtensions.cs  (не использовался)
+Utilities/StreamSocketExtensions.cs    (не использовался)
+# Перенесено
+SysprogsCore/DirectoryStatistics.cs    -> Sync/DirectoryStatistics.cs (namespace SmarTTY.Sync)
+Sysprogs/Core/Tools/DataExtensions.cs  -> Utilities/DataExtensions.cs (namespace SmarTTY.Utilities, оставлены только используемые методы)

@@ -1,5 +1,5 @@
 ﻿
-namespace SysprogsCore;
+namespace SmarTTY.Sync;
 
 public class DirectoryStatistics
 {
