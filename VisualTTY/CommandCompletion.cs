@@ -1,4 +1,6 @@
-﻿using System.Text.RegularExpressions;
+﻿using System;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace VisualTTY;
 
@@ -28,6 +30,7 @@ public class CommandCompletion
     }
 
     private Regex _Regex;
+    private bool _invalidRegex;
 
     public string Command;
 
@@ -45,34 +48,44 @@ public class CommandCompletion
         }
         set
         {
+            _Regex = null;
+            _invalidRegex = false;
+            if (value == null)
+            {
+                return;
+            }
             try
             {
-                if (value == null)
-                {
-                    _Regex = null;
-                }
-                else
-                {
-                    _Regex = new Regex(value);
-                }
+                _Regex = new Regex(value, RegexOptions.None, TimeSpan.FromMilliseconds(100));
             }
-            catch
+            catch (ArgumentException ex)
             {
-                _Regex = null;
+                // Do not turn a broken restricted rule into an unrestricted command rule.
+                _invalidRegex = true;
+                Trace.TraceWarning("Ignoring invalid command completion regex: " + ex.Message);
             }
         }
     }
 
     public bool IsMatch(string cmdLine)
     {
-        if (cmdLine == null)
+        if (cmdLine == null || _invalidRegex)
         {
             return false;
         }
         if (_Regex != null)
         {
-            return _Regex.IsMatch(cmdLine);
+            try
+            {
+                return _Regex.IsMatch(cmdLine);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                _invalidRegex = true;
+                Trace.TraceWarning("Disabled a command completion regex after a match timeout.");
+                return false;
+            }
         }
-        return cmdLine.StartsWith(Command + " ");
+        return !string.IsNullOrWhiteSpace(Command) && cmdLine.StartsWith(Command + " ");
     }
 }
