@@ -80,7 +80,7 @@ internal class TarSyncEngine : CommandSyncEngine
             shellLauncher = _customization?.GetLauncher(text);
         }
         LocalFileSystem.FileStamp[] array = new LocalFileSystem.FileStamp[list3.Count];
-        if (_session.RunCommandChecked("mkdir -p \"" + _settings.RemotePath + "\"", flag: true) == null)
+        if (_session.RunCommandChecked("mkdir -p \"" + _settings.RemotePath + "\"", requireSuccess: true) == null)
         {
             throw new Exception("Failed to create " + _settings.RemotePath);
         }
@@ -163,7 +163,7 @@ internal class TarSyncEngine : CommandSyncEngine
             {
                 case SyncPlan.ActionType.CreateAndEnterDirectory:
                     {
-                        DateTime dateTime = ((syncAction.Argument != 0) ? LibSsh2Session.UnixEpoch.AddSeconds(syncAction.Argument) : DateTime.UtcNow.AddSeconds(-5.0));
+                        DateTime dateTime = ((syncAction.Argument != 0) ? SshSession.UnixEpoch.AddSeconds(syncAction.Argument) : DateTime.UtcNow.AddSeconds(-5.0));
                         stream.Write(tarWriter.CreateHeader(relativeRemotePath.Combine(syncAction.Path).Path, flag: true, 0L, dateTime.AddSeconds(_settings.ClockOffset.Seconds), out num7), 0, 512);
                         goto case SyncPlan.ActionType.EnterDirectory;
                     }

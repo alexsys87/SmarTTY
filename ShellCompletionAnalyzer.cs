@@ -70,14 +70,14 @@ public class ShellCompletionAnalyzer : IDisposable
     {
         try
         {
-            _history = _sshSession.RunCommandChecked("cat " + _context.VTSettings.CompletionTriggers.HistoryFileName, flag: true);
+            _history = _sshSession.RunCommandChecked("cat " + _context.VTSettings.CompletionTriggers.HistoryFileName, requireSuccess: true);
         }
         catch
         {
         }
         try
         {
-            _pathDirs = SplitPath(_sshSession.RunCommandChecked("echo $PATH", flag: true, "xterm"));
+            _pathDirs = SplitPath(_sshSession.RunCommandChecked("echo $PATH", requireSuccess: true, "xterm"));
             CollectExecutables(_pathDirs);
         }
         catch
@@ -105,7 +105,7 @@ public class ShellCompletionAnalyzer : IDisposable
         if (array.Length != 0)
         {
             string text = "find -L " + string.Join(" ", array.Select((string text3) => "\"" + text3 + "\"").ToArray()) + " -maxdepth 1 -perm -111 -type f";
-            list = _sshSession.RunCommandChecked(text, flag: false);
+            list = _sshSession.RunCommandChecked(text, requireSuccess: false);
             if (list == null)
             {
                 throw new Exception("Failed to list files in $PATH");
@@ -234,7 +234,7 @@ public class ShellCompletionAnalyzer : IDisposable
         List<string> list = _pathDirs ?? new List<string>();
         if (list.FirstOrDefault((string text) => !text.StartsWith("/")) != null || list.Count == 0 || sshTerminalControl.HasEnvironment)
         {
-            list = _sshSession.RunCommandChecked(sshTerminalControl.BuildRemoteCommand("echo $PATH"), flag: true, "xterm");
+            list = _sshSession.RunCommandChecked(sshTerminalControl.BuildRemoteCommand("echo $PATH"), requireSuccess: true, "xterm");
         }
         List<string> list2 = SplitPath(list);
         return CollectExecutables(list2);

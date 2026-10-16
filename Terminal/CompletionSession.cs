@@ -250,7 +250,7 @@ internal class CompletionSession : IDisposable
                 else
                 {
                     string text = LsOutputParser.LsParser.BuildListCommand(listingTarget.Directory, flag: false, flag2: false);
-                    IEnumerable<LsOutputParser.LsEntry> enumerable = _terminal.Session.RunCommandChecked(_terminal.BuildRemoteCommand(text, false), flag: true, "xterm")?.Select((string text2) => LsOutputParser.LsParser.ParseLine(text2))?.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.Name != null && lsEntry.Name != ".");
+                    IEnumerable<LsOutputParser.LsEntry> enumerable = _terminal.Session.RunCommandChecked(_terminal.BuildRemoteCommand(text, false), requireSuccess: true, "xterm")?.Select((string text2) => LsOutputParser.LsParser.ParseLine(text2))?.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.Name != null && lsEntry.Name != ".");
                     if (enumerable == null)
                     {
                         throw new Exception("Failed to list " + listingTarget.Directory);

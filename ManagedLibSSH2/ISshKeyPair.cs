@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using Renci.SshNet;
+using System.IO;
 
 namespace ManagedLibSSH2;
 
@@ -8,9 +9,13 @@ public interface ISshKeyPair
 
     string ContainerName { get; }
 
-    ISshSigner[] Signers { get; }
-
     byte[] GetPublicKeyBlob();
+
+    /// <summary>
+    /// Creates the private key in the form used by SSH.NET for public key authentication
+    /// (dispose it after use if it implements IDisposable).
+    /// </summary>
+    IPrivateKeySource CreatePrivateKeySource();
 
     void ExportPrivateKey(FileStream fileStream);
 

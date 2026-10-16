@@ -6,17 +6,16 @@ public class SshKeyFactory
 {
     public readonly string containerPrefix;
 
-    public SshKeyFactory(string text)
+    public SshKeyFactory(string containerPrefix)
     {
-        containerPrefix = text;
+        this.containerPrefix = containerPrefix;
     }
 
-    public ISshKeyPair CreateKey(PublicKeyType publicKeyType, bool flag = true)
+    public ISshKeyPair CreateKey(PublicKeyType publicKeyType, bool create = true)
     {
         return publicKeyType switch
         {
-            PublicKeyType.DSA => (ISshKeyPair)new DsaSshKey(this.containerPrefix + "dsa", flag),
-            PublicKeyType.RSA => new RsaSshKey(this.containerPrefix + "rsa", 2048, flag),
+            PublicKeyType.RSA => new RsaSshKey(containerPrefix + "rsa", 2048, create),
             _ => throw new ArgumentException("Invalid SSH key type: " + publicKeyType),
         };
     }

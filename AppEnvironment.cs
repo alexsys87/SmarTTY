@@ -19,7 +19,7 @@ public static class AppEnvironment
         return Registry.CurrentUser.CreateSubKey("SOFTWARE\\Sysprogs\\SmarTTY\\Settings");
     }
 
-    public static string GetCurrentDirectory(TerminalEmulatorControl terminalEmulatorControl, LibSsh2Session libSsh2Session, ref string text5)
+    public static string GetCurrentDirectory(TerminalEmulatorControl terminalEmulatorControl, SshSession sshSession, ref string text5)
     {
         if (terminalEmulatorControl is SshTerminalControl sshTerminalControl)
         {
@@ -47,7 +47,7 @@ public static class AppEnvironment
                 {
                     string text4 = text3.Substring(num + 1, text3.Length - num - 3);
                     int num2 = text4.LastIndexOf(' ');
-                    if (num2 != -1 && text4.Substring(num2 + 1) == libSsh2Session.UserName)
+                    if (num2 != -1 && text4.Substring(num2 + 1) == sshSession.UserName)
                     {
                         text4 = "~";
                     }
@@ -57,13 +57,13 @@ public static class AppEnvironment
         }
         if (text2 != null && text2.StartsWith("~"))
         {
-            QueryHomeDirectory(libSsh2Session, ref text5);
+            QueryHomeDirectory(sshSession, ref text5);
             text2 = ((text5 != null) ? (text5 + text2.Substring(1)) : null);
         }
         return text2;
     }
 
-    public static void QueryHomeDirectory(LibSsh2Session libSsh2Session, ref string text)
+    public static void QueryHomeDirectory(SshSession sshSession, ref string text)
     {
         if (text != null)
         {
@@ -71,7 +71,7 @@ public static class AppEnvironment
         }
         try
         {
-            using SshShellChannel sshShellChannel = libSsh2Session.OpenShellChannel("pwd");
+            using SshShellChannel sshShellChannel = sshSession.OpenShellChannel("pwd");
             using StreamReader streamReader = new StreamReader(sshShellChannel.Output);
             text = streamReader.ReadLine();
         }

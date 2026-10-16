@@ -171,7 +171,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                 scpChannelStream.Write(bytes, 0, bytes.Length);
             }
             string text3 = $"cat \"{text}\" > \"{RemotePath}\"";
-            if (_context.Session.RunCommandChecked(text3, flag: true) != null)
+            if (_context.Session.RunCommandChecked(text3, requireSuccess: true) != null)
             {
                 ((EditableTextBrowser)this).IsModified = false;
                 return;
@@ -202,7 +202,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
         finally
         {
-            _context.Session.RunCommandChecked("rm \"" + text + "\"", flag: true);
+            _context.Session.RunCommandChecked("rm \"" + text + "\"", requireSuccess: true);
         }
     }
 }

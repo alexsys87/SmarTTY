@@ -351,7 +351,7 @@ public class SshTerminalControl : TerminalEmulatorControl
     public SshTerminalControl(ITerminalSessionContext terminalSessionContext, string text2 = null)
     {
         _context = terminalSessionContext;
-        _homeDirectory = (_currentDirectory = terminalSessionContext.Session.RunCommandChecked("pwd", flag: true)?.Where((string text) => text != "")?.LastOrDefault());
+        _homeDirectory = (_currentDirectory = terminalSessionContext.Session.RunCommandChecked("pwd", requireSuccess: true)?.Where((string text) => text != "")?.LastOrDefault());
         if (text2 != null)
         {
             _currentDirectory = text2;

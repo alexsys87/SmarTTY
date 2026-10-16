@@ -1,16 +1,14 @@
 ﻿using ManagedLibSSH2;
+using Renci.SshNet.Common;
 using SmarTTY.Forms;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.Design;
-using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Threading;
@@ -39,34 +37,9 @@ public partial class SshConnector : Component
     {
         public Thread Thread;
 
-        private TcpClient _tcpClient;
-
         public bool Cancelled;
 
         public EventWaitHandle CancelEvent = new ManualResetEvent(initialState: false);
-
-        public Socket GetSocket()
-        {
-            if (_tcpClient != null)
-            {
-                return _tcpClient.Client;
-            }
-            return null;
-        }
-
-        public void Connect(IPAddress[] items, int value2)
-        {
-            if (items == null || items.Length == 0)
-            {
-                throw new Exception("Cannot connect to a host with no IP address");
-            }
-            if (_tcpClient != null)
-            {
-                _tcpClient.Close();
-            }
-            _tcpClient = new TcpClient(items[0].AddressFamily);
-            _tcpClient.Connect(items, value2);
-        }
 
         public void Dispose()
         {
@@ -74,11 +47,6 @@ public partial class SshConnector : Component
             if (CancelEvent != null)
             {
                 CancelEvent.Set();
-            }
-            if (_tcpClient != null)
-            {
-                _tcpClient.Close();
-                _tcpClient = null;
             }
             if (Thread != null)
             {
@@ -94,11 +62,6 @@ public partial class SshConnector : Component
                 CancelEvent.Close();
                 CancelEvent = null;
             }
-        }
-
-        public void DetachClient()
-        {
-            _tcpClient = null;
         }
     }
 
@@ -221,7 +184,6 @@ public partial class SshConnector : Component
         {
             sshConnectionSettings.UpdateLastConnectionTime();
             Connected?.Invoke(this, sshSession, sshConnectionSettings);
-            _currentAttempt?.DetachClient();
         }
     }
 
@@ -263,7 +225,7 @@ public partial class SshConnector : Component
         return flag;
     }
 
-    private void Authenticate(LibSsh2Session libSsh2Session, SSHConnectionSettings sshConnectionSettings, string text, ref bool flag4)
+    private void Authenticate(SshSession session, SSHConnectionSettings sshConnectionSettings, string text, ref bool flag4)
     {
         bool flag = false;
         while (true)
@@ -275,18 +237,10 @@ public partial class SshConnector : Component
                 case AuthType.PublicKey:
                     {
                         SshKeyFactory sshKeyFactory = AppEnvironment.KeyFactory;
-                        bool flag3 = libSsh2Session.AuthenticateWithPublicKey(sshConnectionSettings.UserName, sshKeyFactory.CreateKey(sshConnectionSettings.KeyType.ResolveAuto(PublicKeyType.RSA)));
+                        bool flag3 = session.AuthenticateWithPublicKey(sshConnectionSettings.UserName, sshKeyFactory.CreateKey(sshConnectionSettings.KeyType.ResolveAuto(PublicKeyType.RSA)));
                         if ((sshConnectionSettings.KeyType == PublicKeyType.Auto) & flag3)
                         {
                             sshConnectionSettings.KeyType = PublicKeyType.RSA;
-                        }
-                        if (!flag3 && sshConnectionSettings.KeyType == PublicKeyType.Auto)
-                        {
-                            flag3 = libSsh2Session.AuthenticateWithPublicKey(sshConnectionSettings.UserName, sshKeyFactory.CreateKey(PublicKeyType.DSA));
-                            if (flag3)
-                            {
-                                sshConnectionSettings.KeyType = PublicKeyType.DSA;
-                            }
                         }
                         if (!flag3)
                         {
@@ -303,7 +257,7 @@ public partial class SshConnector : Component
                 case AuthType.OpenSSHKey:
                     {
                         bool flag2 = false;
-                        if (libSsh2Session.AuthenticateWithKeyFile(sshConnectionSettings.UserName, out flag2, sshConnectionSettings.ExplicitKeyFile, text))
+                        if (session.AuthenticateWithKeyFile(sshConnectionSettings.UserName, out flag2, sshConnectionSettings.ExplicitKeyFile, text))
                         {
                             return;
                         }
@@ -344,7 +298,7 @@ public partial class SshConnector : Component
                         {
                         }
                     }
-                    if (libSsh2Session.Authenticate(sshConnectionSettings.UserName, text ?? ""))
+                    if (session.Authenticate(sshConnectionSettings.UserName, text ?? ""))
                     {
                         if (flag && sshConnectionSettings.EncryptedSavedPassword != null && text != null)
                         {
@@ -372,7 +326,7 @@ public partial class SshConnector : Component
         }
     }
 
-    private bool ConfirmNewHostKey(SSHConnectionSettings sshConnectionSettings, LibSsh2Session.HostKeyInfo hostKeyInfo)
+    private bool ConfirmNewHostKey(SSHConnectionSettings sshConnectionSettings, SshSession.HostKeyInfo hostKeyInfo)
     {
         if (IsOffUiThread)
         {
@@ -403,7 +357,7 @@ public partial class SshConnector : Component
         return NewHostKeyForm.Confirm(sshConnectionSettings, text);
     }
 
-    private bool ConfirmHostKeyMismatch(SSHConnectionSettings sshConnectionSettings, LibSsh2Session.HostKeyInfo hostKeyInfo, string text)
+    private bool ConfirmHostKeyMismatch(SSHConnectionSettings sshConnectionSettings, SshSession.HostKeyInfo hostKeyInfo, string text)
     {
         if (sshConnectionSettings.SuppressKeyMismatchWarning)
         {
@@ -414,22 +368,6 @@ public partial class SshConnector : Component
             return (bool)InvokeOnUiWithResult((Func<bool>)(() => ConfirmHostKeyMismatch(sshConnectionSettings, hostKeyInfo, text)));
         }
         return HostKeyMismatchForm.Confirm(sshConnectionSettings, text);
-    }
-
-    private IPAddress[] ResolveHost(string text, ConnectionAttempt connectionAttempt)
-    {
-        if (IPAddress.TryParse(text, out var address))
-        {
-            return new IPAddress[1] { address };
-        }
-        ReportStatus(connectionAttempt, "Looking up host...");
-        IAsyncResult asyncResult = Dns.BeginGetHostEntry(text, null, null);
-        WaitHandle.WaitAny(new WaitHandle[2] { asyncResult.AsyncWaitHandle, connectionAttempt.CancelEvent });
-        if (!asyncResult.IsCompleted)
-        {
-            throw new Exception("Cannot lookup host address");
-        }
-        return Dns.EndGetHostEntry(asyncResult).AddressList;
     }
 
     private void ConnectWorker(SSHConnectionSettings sshConnectionSettings, string text3, ConnectionAttempt connectionAttempt, bool flag, bool flag2)
@@ -445,43 +383,51 @@ public partial class SshConnector : Component
                 num = result;
                 text = text.Substring(0, num2);
             }
-            if (string.IsNullOrEmpty(sshConnectionSettings.ProxyServer))
+            ReportStatus(connectionAttempt, "Connecting...");
+            KnownHostKeyStore knownHostKeyStore = new KnownHostKeyStore();
+            KnownHostKey knownHostKey = knownHostKeyStore.Find(sshConnectionSettings.HostName);
+            SshConnectionParameters sshConnectionParameters = new SshConnectionParameters
             {
-                IPAddress[] array = ResolveHost(text, connectionAttempt);
-                ReportStatus(connectionAttempt, "Connecting...");
-                connectionAttempt.Connect(array, num);
-            }
-            else
+                Host = text,
+                Port = num,
+                DisplayHostName = sshConnectionSettings.HostName,
+                UserName = sshConnectionSettings.UserName,
+                EnableCompression = sshConnectionSettings.EnableCompression,
+                EnableOnTheFlyTar = sshConnectionSettings.EnableOnTheFlyTAR,
+                PreferredHostKeyType = NormalizeKeyType(knownHostKey?.KeyType)
+            };
+            string text4 = sshConnectionSettings.ProxyAuth;
+            while (true)
             {
-                IPAddress[] array2 = ResolveHost(sshConnectionSettings.ProxyServer, connectionAttempt);
-                ReportStatus(connectionAttempt, "Connecting...");
-                connectionAttempt.Connect(array2, sshConnectionSettings.ProxyPort);
-                string text4 = sshConnectionSettings.ProxyAuth;
-                string text5;
-                while (!ProxyConnect(connectionAttempt, num, text, text4, out text5))
+                if (!string.IsNullOrEmpty(sshConnectionSettings.ProxyServer))
                 {
-                    ReportStatus(connectionAttempt, "Reconnecting...");
+                    sshConnectionParameters.ProxyHost = sshConnectionSettings.ProxyServer;
+                    sshConnectionParameters.ProxyPort = sshConnectionSettings.ProxyPort;
+                    SplitProxyCredentials(text4, out sshConnectionParameters.ProxyUserName, out sshConnectionParameters.ProxyPassword);
+                }
+                try
+                {
+                    sshSession = new SshSession(sshConnectionParameters, connectionAttempt.CancelEvent);
+                    break;
+                }
+                catch (ProxyException ex) when (ex.Message.Contains("407"))
+                {
                     bool flag3 = false;
                     InvokeOnUi(() =>
                     {
-                        ProxyCredentialsRequested(this, text5, ref text4, ref flag3);
+                        ProxyCredentialsRequested(this, sshConnectionSettings.ProxyServer, ref text4, ref flag3);
                     });
-                    if (flag3)
+                    if (!flag3)
                     {
-                        connectionAttempt.Connect(array2, sshConnectionSettings.ProxyPort);
-                        continue;
+                        throw new OperationCanceledException();
                     }
-                    throw new OperationCanceledException();
+                    ReportStatus(connectionAttempt, "Reconnecting...");
                 }
             }
-            ReportStatus(connectionAttempt, "Handshaking...");
-            sshSession = new SshSession(connectionAttempt.GetSocket(), sshConnectionSettings.HostName, 22, sshConnectionSettings.EnableCompression, sshConnectionSettings.EnableOnTheFlyTAR);
             ReportStatus(connectionAttempt, "Checking key...");
-            LibSsh2Session.HostKeyInfo hostKeyInfo = sshSession.GetHostKey();
+            SshSession.HostKeyInfo hostKeyInfo = sshSession.GetHostKey();
             if (!sshConnectionSettings.BypassHostKeyCheck)
             {
-                KnownHostKeyStore knownHostKeyStore = new KnownHostKeyStore();
-                KnownHostKey knownHostKey = knownHostKeyStore.Find(sshConnectionSettings.HostName);
                 if (knownHostKey == null)
                 {
                     if (flag2 || ConfirmNewHostKey(sshConnectionSettings, hostKeyInfo))
@@ -493,10 +439,11 @@ public partial class SshConnector : Component
                 else
                 {
                     byte[] array3 = Convert.FromBase64String(knownHostKey.KeyBase64);
-                    if (knownHostKey.KeyType != hostKeyInfo.Algorithm || !PasswordProtector.BytesEqual(array3, hostKeyInfo.KeyData))
+                    string text5 = NormalizeKeyType(knownHostKey.KeyType);
+                    if (text5 != hostKeyInfo.Algorithm || !PasswordProtector.BytesEqual(array3, hostKeyInfo.KeyData))
                     {
                         string text2 = null;
-                        if (knownHostKey.KeyType != hostKeyInfo.Algorithm)
+                        if (text5 != hostKeyInfo.Algorithm)
                         {
                             text2 = "Key type changed from " + knownHostKey.KeyType + " to " + hostKeyInfo.Algorithm;
                         }
@@ -544,68 +491,35 @@ public partial class SshConnector : Component
         }
     }
 
-    private bool ProxyConnect(ConnectionAttempt connectionAttempt, int value2, string text4, string text5, out string text6)
+    // Older versions stored host key types unknown to them as libssh2 type numbers.
+    private static string NormalizeKeyType(string text)
     {
-        ReportStatus(connectionAttempt, "HTTP CONNECT...");
-        text5 = (string.IsNullOrEmpty(text5) ? "" : $"Proxy-Authorization: Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes(text5))}\r\n");
-        string text = string.Format("CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\n{2}\r\n", text4, value2, text5);
-        connectionAttempt.GetSocket().Send(Encoding.UTF8.GetBytes(text));
-        List<byte> list = new List<byte>();
-        byte[] array = new byte[1];
-        byte[] array2 = new byte[4] { 13, 10, 13, 10 };
-        int num = 0;
-        while (connectionAttempt.GetSocket().Receive(array) >= 1)
+        return text switch
         {
-            list.Add(array[0]);
-            if (array[0] == array2[num])
-            {
-                num++;
-                if (num >= array2.Length)
-                {
-                    break;
-                }
-            }
-            else
-            {
-                num = 0;
-            }
-        }
-        string[] array3 = Encoding.UTF8.GetString(list.ToArray()).Split(new char[2] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-        if (array3.Length < 1)
+            "4" => "ecdsa-sha2-nistp384",
+            "5" => "ecdsa-sha2-nistp521",
+            "6" => "ssh-ed25519",
+            _ => text,
+        };
+    }
+
+    // Proxy credentials are stored as "user:password".
+    private static void SplitProxyCredentials(string text, out string userName, out string password)
+    {
+        userName = null;
+        password = null;
+        if (string.IsNullOrEmpty(text))
         {
-            throw new Exception("Unrecognized reply from proxy");
+            return;
         }
-        text6 = null;
-        string[] array4 = array3;
-        foreach (string text2 in array4)
+        int num = text.IndexOf(':');
+        if (num == -1)
         {
-            string text3 = "Proxy-Authenticate:".ToLower();
-            if (text2.ToLower().StartsWith(text3))
-            {
-                string input = text2.Substring(text3.Length).Trim();
-                Match match = new Regex("realm[ \t]*=[ \t]*\"([^\"]+)\"", RegexOptions.IgnoreCase).Match(input);
-                if (match.Success)
-                {
-                    text6 = match.Groups[1].ToString();
-                }
-            }
+            userName = text;
+            return;
         }
-        array3[0].IndexOf(' ');
-        Match match2 = new Regex("^HTTP/[0-9\\.]+ ([0-9]+) .*$").Match(array3[0]);
-        if (!match2.Success)
-        {
-            throw new Exception(array3[0]);
-        }
-        int num3 = int.Parse(match2.Groups[1].ToString());
-        if (num3 == 407)
-        {
-            return false;
-        }
-        if (num3 / 100 != 2)
-        {
-            throw new Exception(array3[0]);
-        }
-        return true;
+        userName = text.Substring(0, num);
+        password = text.Substring(num + 1);
     }
 
     public void ConnectAsync(SSHConnectionSettings sshConnectionSettings, string text, bool flag)

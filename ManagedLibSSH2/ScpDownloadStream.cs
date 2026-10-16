@@ -1,110 +1,113 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Threading;
+using System.Globalization;
+using System.IO;
 
 namespace ManagedLibSSH2;
 
-public class ScpDownloadStream : ScpChannelStream, IChannelPoller, IAsyncChannel
+/// <summary>
+/// Downloads a single file via "scp -p -f"; <see cref="Length"/> and the timestamps are known once the stream is open.
+/// </summary>
+public class ScpDownloadStream : ScpChannelStream
 {
+    /// <summary>
+    /// Not transferred by SCP; always <see cref="SshSession.UnixEpoch"/>.
+    /// </summary>
     public readonly DateTime ChangeTime;
 
     public readonly DateTime ModifyTime;
 
     public readonly DateTime AccessTime;
 
-    private object _pollerToken;
+    private bool _endReceived;
 
-    private object _syncRoot = new object();
-
-    private bool _eofNotified;
-
-    public bool PollingEnabled
+    private ScpDownloadStream(SshShellChannel channel, long length, DateTime modifyTime, DateTime accessTime)
+        : base(channel, canRead: true, length)
     {
-        get
+        ChangeTime = SshSession.UnixEpoch;
+        ModifyTime = modifyTime;
+        AccessTime = accessTime;
+    }
+
+    internal static ScpDownloadStream Open(SshSession session, string path)
+    {
+        SshShellChannel channel = session.OpenShellChannel("scp -p -f " + QuotePath(path));
+        try
         {
-            return _pollerToken != null;
-        }
-        set
-        {
-            lock (_syncRoot)
+            DateTime modifyTime = SshSession.UnixEpoch;
+            DateTime accessTime = SshSession.UnixEpoch;
+            SendAck(channel);
+            while (true)
             {
-                if (PollingEnabled != value)
+                int type = ReadByte(channel);
+                if (type == -1)
                 {
-                    if (value)
-                    {
-                        _pollerToken = _session.AddPoller(this);
-                        return;
-                    }
-                    _session.RemovePoller(_pollerToken);
-                    _pollerToken = null;
+                    throw new IOException("The remote scp command exited unexpectedly. Please check that scp is installed on the target.");
+                }
+                string line = ReadLine(channel);
+                string[] fields = line.Split(' ');
+                switch (type)
+                {
+                    case 1:
+                    case 2:
+                        throw new RemoteOperationException(line.Trim());
+                    case 'T':
+                        // T<mtime> 0 <atime> 0
+                        modifyTime = SshSession.UnixEpoch.AddSeconds(long.Parse(fields[0], CultureInfo.InvariantCulture));
+                        accessTime = SshSession.UnixEpoch.AddSeconds(long.Parse(fields[2], CultureInfo.InvariantCulture));
+                        SendAck(channel);
+                        break;
+                    case 'C':
+                        // C<mode> <size> <name>
+                        SendAck(channel);
+                        return new ScpDownloadStream(channel, long.Parse(fields[1], CultureInfo.InvariantCulture), modifyTime, accessTime);
+                    case 'D':
+                        throw new RemoteOperationException(path + " is a directory");
+                    default:
+                        throw new IOException("Unexpected SCP reply: " + ((char)type + line).Trim());
                 }
             }
         }
+        catch
+        {
+            channel.Dispose();
+            throw;
+        }
     }
 
-    public event DataReceivedHandler DataReceived;
-
-    public event ChannelEventHandler Finished;
-
-    internal ScpDownloadStream(LibSsh2Session libSsh2Session, IntPtr handle, LibSsh2.ScpFileStat scpFileStat)
-        : base(libSsh2Session, handle, flag: true, scpFileStat.Size)
+    public override int Read(byte[] buffer, int offset, int count)
     {
-        ChangeTime = new DateTime(1970, 1, 1).AddSeconds(scpFileStat.ChangeTime);
-        ModifyTime = new DateTime(1970, 1, 1).AddSeconds(scpFileStat.ModifyTime);
-        AccessTime = new DateTime(1970, 1, 1).AddSeconds(scpFileStat.AccessTime);
+        long remaining = Length - _bytesTransferred;
+        if (count > remaining)
+        {
+            count = (int)remaining;
+        }
+        int done = 0;
+        while (done < count)
+        {
+            int read = _channel.Output.Read(buffer, offset + done, count - done);
+            if (read <= 0)
+            {
+                break;
+            }
+            done += read;
+            if (AbortOnShortRead)
+            {
+                break;
+            }
+        }
+        _bytesTransferred += done;
+        return done;
     }
 
-    private void Poll(ref byte[] buffer, ref bool flag, ref int value2, List<ThreadStart> list)
+    protected override void FinishTransfer()
     {
-        int num = _session.ReadChannelNoWait(base._channelHandle, 0, buffer);
-        if (num == -43)
-        {
-            flag = true;
-        }
-        if (num > 0)
-        {
-            value2 += num;
-        }
-        if (num >= 0 && this.DataReceived != null)
-        {
-            try
-            {
-                this.DataReceived(this, buffer, 0, num, 0);
-            }
-            catch (Exception)
-            {
-            }
-        }
-        if (LibSsh2.ChannelEof(base._channelHandle) <= 0 || _eofNotified)
+        if (_bytesTransferred != Length || _endReceived)
         {
             return;
         }
-        if (Finished != null)
-        {
-            if (list != null)
-            {
-                list.Add(() =>
-                {
-                    Finished(this);
-                });
-            }
-            else
-            {
-                Finished(this);
-            }
-        }
-        _eofNotified = true;
-        value2++;
-    }
-
-    void IChannelPoller.PollChannel(ref byte[] buffer, ref bool flag, ref int value2, List<ThreadStart> list)
-    {
-        this.Poll(ref buffer, ref flag, ref value2, list);
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        PollingEnabled = false;
+        // After the data the source sends its status byte and waits for our acknowledgement.
+        _endReceived = true;
+        ReadAck(_channel);
+        SendAck(_channel);
     }
 }
