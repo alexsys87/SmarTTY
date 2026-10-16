@@ -1,4 +1,4 @@
-﻿using ManagedLibSSH2;
+﻿using SmarTTY.Ssh;
 using VisualTTY;
 
 namespace SmarTTY;

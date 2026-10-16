@@ -1,4 +1,4 @@
-﻿using ManagedLibSSH2;
+﻿using SmarTTY.Ssh;
 using Renci.SshNet.Common;
 using SmarTTY.Forms;
 using System;

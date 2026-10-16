@@ -1,4 +1,4 @@
-﻿using ManagedLibSSH2.QuickSync;
+﻿using SmarTTY.Ssh.QuickSync;
 using Microsoft.Win32.SafeHandles;
 using SmarTTY.Native;
 using SmarTTY.Utilities;

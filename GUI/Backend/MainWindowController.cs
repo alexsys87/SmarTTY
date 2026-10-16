@@ -1,4 +1,4 @@
-﻿using ManagedLibSSH2;
+﻿using SmarTTY.Ssh;
 using Microsoft.Win32;
 using SmarTTY.Controls;
 using SmarTTY.Forms;

@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- SSH.NET channel internals are used via reflection (ManagedLibSSH2/SshNetChannel.cs): check them when updating. -->
+    <!-- SSH.NET channel internals are used via reflection (Ssh/SshNetChannel.cs): check them when updating. -->
     <PackageReference Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 
