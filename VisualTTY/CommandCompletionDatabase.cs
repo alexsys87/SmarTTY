@@ -48,7 +48,10 @@ public class CommandCompletionDatabase
                 return ReadDatabase(file);
             }
         }
-        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
+        // InvalidDataException signals a damaged gzip stream. It derives from SystemException,
+        // so it is not covered by IOException and must be listed explicitly.
+        catch (Exception ex) when (ex is IOException || ex is InvalidDataException ||
+                                   ex is UnauthorizedAccessException ||
                                    ex is InvalidOperationException || ex is XmlException ||
                                    ex is SecurityException || ex is ArgumentException)
         {
