@@ -143,25 +143,29 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
         {
             try
             {
-                ProbeResult<ILinuxPackageManagerClient, int> probeResult = (from t11 in _Clients.Select((ILinuxPackageManagerClient linuxPackageManagerClient) =>
+                ILinuxPackageManagerClient bestClient = null;
+                int bestScore = 0;
+                foreach (ILinuxPackageManagerClient client in _Clients)
+                {
+                    int score = -1;
+                    try
                     {
-                        int num2 = -1;
-                        try
-                        {
-                            num2 = linuxPackageManagerClient.Probe(_Session);
-                        }
-                        catch
-                        {
-                        }
-                        return new ProbeResult<ILinuxPackageManagerClient, int>(linuxPackageManagerClient, num2);
-                    }).ToArray()
-                                                                            orderby -t11.Score
-                                                                            select t11).First();
-                if (probeResult.Score <= 0)
+                        score = client.Probe(_Session);
+                    }
+                    catch
+                    {
+                    }
+                    if (score > bestScore)
+                    {
+                        bestClient = client;
+                        bestScore = score;
+                    }
+                }
+                if (bestClient == null)
                 {
                     throw new Exception("Could not detect the package manager on the remote host");
                 }
-                _Client = probeResult.Client;
+                _Client = bestClient;
                 ProgressText = "Querying package list...";
                 _AllPackages = _Client.QueryAllPackages(_Session);
                 if (_AllPackages == null)

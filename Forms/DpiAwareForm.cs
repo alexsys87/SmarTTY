@@ -1,5 +1,5 @@
 ﻿using SmarTTY.Controls;
-using Sysprogs.Core.Tools;
+using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;

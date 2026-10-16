@@ -1,7 +1,7 @@
 ﻿using ManagedLibSSH2;
 using ManagedLibSSH2.QuickSync;
 using SmarTTY.IO;
-using Sysprogs.Core.Tools;
+using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
 using System.IO;

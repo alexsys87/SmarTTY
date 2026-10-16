@@ -1,6 +1,5 @@
 ﻿using ManagedLibSSH2;
 using ManagedLibSSH2.QuickSync;
-using SysprogsCore;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
