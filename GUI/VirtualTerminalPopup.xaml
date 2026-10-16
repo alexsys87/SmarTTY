@@ -1,0 +1,186 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="SmarTTY.GUI.VirtualTerminalPopup" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:SmarTTY.GUI" MinWidth="200" MaxHeight="300">
+  <FrameworkElement.Resources>
+    <ResourceDictionary>
+      <ToolTip x:Key="hint" Placement="Right">
+        <ContentPresenter Content="{Binding}">
+          <ContentPresenter.ContentTemplateSelector>
+            <local:TooltipTemplateSelector>
+              <local:TooltipTemplateSelector.FullPathInfo>
+                <DataTemplate>
+                  <Grid>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Full path:" />
+                    <TextBlock Grid.Row="1" FontWeight="Bold" Text="{Binding FullPath}" />
+                  </Grid>
+                </DataTemplate>
+              </local:TooltipTemplateSelector.FullPathInfo>
+              <local:TooltipTemplateSelector.OptionInfo>
+                <DataTemplate>
+                  <Grid>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock FontWeight="Bold" Text="{Binding Description.Summary}" />
+                    <TextBlock Grid.Row="1" Margin="10 0 0 0" Text="{Binding Description.Info}" />
+                  </Grid>
+                </DataTemplate>
+              </local:TooltipTemplateSelector.OptionInfo>
+              <local:TooltipTemplateSelector.FileInfo>
+                <DataTemplate>
+                  <Grid>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Full path:" />
+                    <TextBlock Grid.Row="1" FontWeight="Bold" Text="{Binding FullPath}" />
+                  </Grid>
+                </DataTemplate>
+              </local:TooltipTemplateSelector.FileInfo>
+            </local:TooltipTemplateSelector>
+          </ContentPresenter.ContentTemplateSelector>
+        </ContentPresenter>
+      </ToolTip>
+    </ResourceDictionary>
+  </FrameworkElement.Resources>
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <Grid Margin="2">
+      <FrameworkElement.Style>
+        <Style TargetType="{x:Type Grid}">
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding Title}" Value="{x:Null}">
+              <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </FrameworkElement.Style>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Image Width="16" Height="16" Margin="5">
+        <FrameworkElement.Style>
+          <Style TargetType="{x:Type Image}">
+            <Style.Triggers>
+              <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                  <Condition Value="History" Binding="{Binding Icon}" />
+                  <Condition Value="true" Binding="{Binding IsDarkTheme}" />
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Source" Value="../icons/MainWindow/history_dark.png" />
+              </MultiDataTrigger>
+              <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                  <Condition Value="History" Binding="{Binding Icon}" />
+                  <Condition Value="false" Binding="{Binding IsDarkTheme}" />
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Source" Value="../icons/MainWindow/history_light.png" />
+              </MultiDataTrigger>
+            </Style.Triggers>
+          </Style>
+        </FrameworkElement.Style>
+      </Image>
+      <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Title}" />
+    </Grid>
+    <ListBox Grid.Row="1" Grid.IsSharedSizeScope="True" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" SelectedIndex="{Binding SelectedIndex}" SelectionChanged="ListBox_SelectionChanged" PreviewMouseDown="ListBox_PreviewMouseDown">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" SharedSizeGroup="CompletionItemName" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Image Width="16" Height="16" Margin="2">
+              <FrameworkElement.Style>
+                <Style TargetType="{x:Type Image}">
+                  <Style.Triggers>
+                    <DataTrigger Value="None" Binding="{Binding Icon}">
+                      <Setter Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                    <DataTrigger Value="File" Binding="{Binding Icon}">
+                      <Setter Property="Source" Value="../icons/MainWindow/document_flat.png" />
+                    </DataTrigger>
+                    <DataTrigger Value="Directory" Binding="{Binding Icon}">
+                      <Setter Property="Source" Value="../icons/MainWindow/folder_flat.png" />
+                    </DataTrigger>
+                    <DataTrigger Value="Command" Binding="{Binding Icon}">
+                      <Setter Property="Source" Value="../icons/term16.png" />
+                    </DataTrigger>
+                    <DataTrigger Value="Flag" Binding="{Binding Icon}">
+                      <Setter Property="Source" Value="../icons/gear16.png" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </FrameworkElement.Style>
+            </Image>
+            <TextBlock TextWrapping="Wrap" MaxWidth="600" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Text}" />
+            <TextBlock TextWrapping="Wrap" Grid.Column="2" VerticalAlignment="Center" Opacity="0.75" Margin="10 0 0 0" Text="{Binding ExtraText}">
+              <FrameworkElement.Style>
+                <Style TargetType="{x:Type TextBlock}">
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding ExtraText}" Value="{x:Null}">
+                      <Setter Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </FrameworkElement.Style>
+            </TextBlock>
+            <ContentControl Grid.Column="3">
+              <FrameworkElement.Style>
+                <Style TargetType="{x:Type ContentControl}">
+                  <Setter Property="Visibility" Value="Hidden" />
+                  <Style.Triggers>
+                    <DataTrigger Value="true" Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type ListBoxItem}}}">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                    <DataTrigger Value="None" Binding="{Binding ShortcutIcon}">
+                      <Setter Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </FrameworkElement.Style>
+              <Button Style="{DynamicResource DynamicButton}" Margin="5 0 0 0" ToolTip="{Binding ShortcutTip}" Click="ShortcutButton_Click">
+                <Image Width="16" Height="16">
+                  <FrameworkElement.Style>
+                    <Style TargetType="{x:Type Image}">
+                      <Style.Triggers>
+                        <DataTrigger Value="Open" Binding="{Binding ShortcutIcon}">
+                          <Setter Property="Source" Value="../icons/MainWindow/open_flat.png" />
+                        </DataTrigger>
+                        <DataTrigger Value="Go" Binding="{Binding ShortcutIcon}">
+                          <Setter Property="Source" Value="../icons/MainWindow/go16.png" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </FrameworkElement.Style>
+                </Image>
+              </Button>
+            </ContentControl>
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ListBox>
+    <TextBlock Grid.Row="1" FontStyle="Italic" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="2 1 5 1" Text="{Binding NoItemsHint}">
+      <FrameworkElement.Style>
+        <Style TargetType="{x:Type TextBlock}">
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding NoItemsHint}" Value="{x:Null}">
+              <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </FrameworkElement.Style>
+    </TextBlock>
+  </Grid>
+</UserControl>

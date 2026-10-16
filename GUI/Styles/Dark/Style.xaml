@@ -1,0 +1,282 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:gui="clr-namespace:SmarTTY.GUI" xmlns:styles="clr-namespace:SmarTTY.GUI.Styles" xmlns:local="clr-namespace:SmarTTY.GUI.Styles.Dark">
+  <ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary Source="Colors.xaml" />
+    <ResourceDictionary Source="TabControl.xaml" />
+    <ResourceDictionary Source="Menu.xaml" />
+    <ResourceDictionary Source="ScrollBar.xaml" />
+    <ResourceDictionary Source="ToolBar.xaml" />
+    <ResourceDictionary Source="ListView.xaml" />
+    <ResourceDictionary Source="CheckBox.xaml" />
+    <ResourceDictionary Source="RadioButton.xaml" />
+    <ResourceDictionary Source="GroupBox.xaml" />
+  </ResourceDictionary.MergedDictionaries>
+  <Style x:Key="{x:Type TextBox}" TargetType="{x:Type TextBox}" BasedOn="{StaticResource DarkTextBox}" />
+  <Style x:Key="ThemedTextBox" TargetType="{x:Type TextBox}" BasedOn="{StaticResource DarkTextBox}" />
+  <Style x:Key="DarkPasswordBox" TargetType="{x:Type PasswordBox}">
+    <Setter Property="Background" Value="{StaticResource ActiveColor}" />
+    <Setter Property="Foreground" Value="{StaticResource ActiveTextColor}" />
+    <Setter Property="BorderBrush" Value="{StaticResource HighlightColor}" />
+  </Style>
+  <Style x:Key="MainWindowOuterTabControl" TargetType="{x:Type TabControl}" BasedOn="{StaticResource MainWindowTabControl}">
+    <Setter Property="Background" Value="{StaticResource InactiveColor}" />
+  </Style>
+  <Style x:Key="{x:Type CheckBox}" TargetType="{x:Type CheckBox}" BasedOn="{StaticResource DarkCheckBox}" />
+  <Style x:Key="MainWindowInnerTabControl" TargetType="{x:Type TabControl}" BasedOn="{StaticResource MainWindowTabControl}">
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{StaticResource InactiveColor}" />
+    <Setter Property="BorderBrush" Value="{StaticResource HighlightColor}" />
+  </Style>
+  <Style x:Key="{x:Type StatusBar}" TargetType="{x:Type StatusBar}">
+    <Setter Property="Background" Value="{StaticResource HighlightColor}" />
+    <Setter Property="Foreground" Value="{StaticResource ActiveTextColor}" />
+    <Setter Property="TextBlock.Foreground" Value="{StaticResource ActiveTextColor}" />
+  </Style>
+  <Style x:Key="DarkListBoxItem" TargetType="{x:Type ListBoxItem}">
+    <Setter Property="AutomationProperties.AutomationId" Value="{Binding}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="{x:Type ListBoxItem}">
+          <Border Name="OuterBorder" Padding="3" Margin="1 0 1 0" Background="{Binding Path=Background, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=ListBox}}">
+            <ContentPresenter />
+          </Border>
+          <ControlTemplate.Triggers>
+            <MultiTrigger>
+              <MultiTrigger.Conditions>
+                <Condition Property="UIElement.IsMouseOver" Value="True" />
+                <Condition Property="ListBoxItem.IsSelected" Value="False" />
+              </MultiTrigger.Conditions>
+              <Setter TargetName="OuterBorder" Property="Border.Background" Value="#786737" />
+            </MultiTrigger>
+            <Trigger Property="ListBoxItem.IsSelected" Value="True">
+              <Setter TargetName="OuterBorder" Property="Border.Background" Value="#7A6325" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="FrameworkElement.FocusVisualStyle" Value="{x:Null}" />
+  </Style>
+  <Style x:Key="DarkListBox" TargetType="{x:Type ListBox}">
+    <Setter Property="BorderBrush" Value="{StaticResource HighlightColor}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{StaticResource ActiveColor}" />
+    <Setter Property="Foreground" Value="{StaticResource ActiveTextColor}" />
+    <Setter Property="TextBlock.Foreground" Value="{StaticResource ActiveTextColor}" />
+    <Setter Property="ItemContainerStyle" Value="{StaticResource DarkListBoxItem}" />
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+    <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+    <Setter Property="Stylus.IsFlicksEnabled" Value="False" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="{x:Type ListBox}">
+          <Border Name="Bd" BorderBrush="{TemplateBinding Control.BorderBrush}" BorderThickness="{TemplateBinding Control.BorderThickness}" Background="{TemplateBinding Control.Background}" Padding="1" SnapsToDevicePixels="True">
+            <ScrollViewer Focusable="False" Padding="{TemplateBinding Control.Padding}">
+              <ItemsPresenter SnapsToDevicePixels="{TemplateBinding UIElement.SnapsToDevicePixels}" />
+            </ScrollViewer>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Bd" Property="Border.Background" Value="{StaticResource ActiveColor}" />
+              <Setter TargetName="Bd" Property="Border.BorderBrush" Value="{StaticResource HighlightColor}" />
+            </Trigger>
+            <MultiTrigger>
+              <MultiTrigger.Conditions>
+                <Condition Property="ItemsControl.IsGrouping" Value="True" />
+              </MultiTrigger.Conditions>
+              <Setter Property="ScrollViewer.CanContentScroll" Value="False" />
+            </MultiTrigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="{x:Type Popup}" TargetType="{x:Type Popup}">
+    <Style.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type Border}" TargetType="{x:Type Border}">
+          <Setter Property="Background" Value="{StaticResource ActiveColor}" />
+          <Setter Property="BorderBrush" Value="{StaticResource HighlightColor}" />
+          <Setter Property="TextBlock.Foreground" Value="{StaticResource ActiveTextColor}" />
+        </Style>
+        <Style x:Key="{x:Type ListBox}" TargetType="{x:Type ListBox}" BasedOn="{StaticResource DarkListBox}" />
+        <Style x:Key="{x:Type CheckBox}" TargetType="{x:Type CheckBox}">
+          <Setter Property="Foreground" Value="{StaticResource ActiveTextColor}" />
+        </Style>
+        <Style x:Key="{x:Type ScrollBar}" TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource MainWindowScrollBar}" />
+      </ResourceDictionary>
+    </Style.Resources>
+    <Setter Property="TextBlock.Foreground" Value="{StaticResource ActiveTextColor}" />
+  </Style>
+  <Style x:Key="{x:Type ToolTip}" TargetType="{x:Type ToolTip}">
+    <Style.Resources>
+      <ResourceDictionary />
+    </Style.Resources>
+    <Setter Property="Background" Value="{StaticResource HighlightColor}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ActiveColor}" />
+    <Setter Property="TextBlock.Foreground" Value="{StaticResource ActiveTextColor}" />
+  </Style>
+  <Style x:Key="DynamicToggleButtonDark" TargetType="{x:Type ToggleButton}">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="{x:Type ToggleButton}">
+          <Border Background="{TemplateBinding Control.Background}" BorderBrush="{TemplateBinding Control.BorderBrush}" BorderThickness="{TemplateBinding Control.BorderThickness}" Height="Auto" Width="Auto" Padding="2 0 2 0">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Background" Value="{Binding Path=Background, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Control}}}" />
+    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" />
+    <Setter Property="BorderBrush" Value="{Binding Path=Background, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Control}}}" />
+    <Setter Property="Margin" Value="1 0 1 0" />
+    <Style.Triggers>
+      <MultiTrigger>
+        <MultiTrigger.Conditions>
+          <Condition Property="UIElement.IsMouseOver" Value="True" />
+          <Condition Property="IsPressed" Value="False" />
+        </MultiTrigger.Conditions>
+        <MultiTrigger.Setters>
+          <Setter Property="Background" Value="#68644B" />
+          <Setter Property="BorderBrush" Value="#61522B" />
+        </MultiTrigger.Setters>
+      </MultiTrigger>
+      <Trigger Property="IsPressed" Value="True">
+        <Setter Property="Background" Value="#645F3E" />
+        <Setter Property="BorderBrush" Value="#63542C" />
+      </Trigger>
+      <Trigger Property="ToggleButton.IsChecked" Value="True">
+        <Setter Property="Background" Value="#645F3E" />
+        <Setter Property="BorderBrush" Value="#63542C" />
+      </Trigger>
+      <Trigger Property="IsEnabled" Value="False">
+        <Setter Property="UIElement.Opacity" Value="0.5" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="DynamicButtonDark" TargetType="{x:Type Button}">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="{x:Type Button}">
+          <Border Background="{TemplateBinding Control.Background}" BorderBrush="{TemplateBinding Control.BorderBrush}" BorderThickness="{TemplateBinding Control.BorderThickness}" Height="Auto" Width="Auto" Padding="2">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Background" Value="{Binding Path=Background, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Control}}}" />
+    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" />
+    <Setter Property="BorderBrush" Value="{Binding Path=Background, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Control}}}" />
+    <Setter Property="Margin" Value="1 0 1 0" />
+    <Style.Triggers>
+      <MultiTrigger>
+        <MultiTrigger.Conditions>
+          <Condition Property="UIElement.IsMouseOver" Value="True" />
+          <Condition Property="IsPressed" Value="False" />
+        </MultiTrigger.Conditions>
+        <MultiTrigger.Setters>
+          <Setter Property="Background" Value="#68644B" />
+          <Setter Property="BorderBrush" Value="#61522B" />
+        </MultiTrigger.Setters>
+      </MultiTrigger>
+      <Trigger Property="IsPressed" Value="True">
+        <Setter Property="Background" Value="#645F3E" />
+        <Setter Property="BorderBrush" Value="#63542C" />
+      </Trigger>
+      <Trigger Property="IsEnabled" Value="False">
+        <Setter Property="UIElement.Opacity" Value="0.5" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="ToolBarGridStyle" TargetType="{x:Type Grid}">
+    <Style.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type ToggleButton}" TargetType="{x:Type ToggleButton}" BasedOn="{StaticResource DynamicToggleButtonDark}" />
+        <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}" BasedOn="{StaticResource DynamicButtonDark}" />
+      </ResourceDictionary>
+    </Style.Resources>
+  </Style>
+  <Style x:Key="{x:Type gui:MainWindow}" TargetType="{x:Type gui:MainWindow}">
+    <Style.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type Menu}" TargetType="{x:Type Menu}" BasedOn="{StaticResource MainWindowMenu}">
+          <Style.Resources>
+            <ResourceDictionary>
+              <Style x:Key="{x:Type MenuItem}" TargetType="{x:Type MenuItem}" BasedOn="{StaticResource {x:Type MenuItem}}">
+                <Style.Resources>
+                  <ResourceDictionary>
+                    <Style x:Key="{x:Type MenuItem}" TargetType="{x:Type MenuItem}" BasedOn="{StaticResource MainWindowMenuItem}" />
+                    <Style x:Key="{x:Type Border}" TargetType="{x:Type Border}">
+                      <Setter Property="gui:AttachedProperties.MenuPopupBackgroundOverride" Value="{StaticResource HighlightColor}" />
+                    </Style>
+                  </ResourceDictionary>
+                </Style.Resources>
+              </Style>
+            </ResourceDictionary>
+          </Style.Resources>
+        </Style>
+      </ResourceDictionary>
+    </Style.Resources>
+    <Setter Property="TextBlock.Foreground" Value="{StaticResource ActiveTextColor}" />
+    <Setter Property="Background" Value="{StaticResource InactiveColor}" />
+  </Style>
+  <Style x:Key="HorizontalListBox" TargetType="{x:Type ListBox}" BasedOn="{StaticResource DarkListBox}">
+    <Setter Property="ItemsPanel">
+      <Setter.Value>
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="SecondaryWindowStyle" TargetType="{x:Type Window}">
+    <Setter Property="TextBlock.Foreground" Value="{StaticResource ActiveTextColor}" />
+    <Setter Property="Background" Value="{StaticResource InactiveColor}" />
+    <Style.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type ListBox}" TargetType="{x:Type ListBox}" BasedOn="{StaticResource DarkListBox}" />
+        <Style x:Key="ConnectionPickerListBox" TargetType="{x:Type ListBox}" BasedOn="{StaticResource DarkListBox}">
+          <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" />
+        </Style>
+        <Style x:Key="{x:Type PasswordBox}" TargetType="{x:Type PasswordBox}" BasedOn="{StaticResource DarkPasswordBox}" />
+        <Style x:Key="{x:Type GroupBox}" TargetType="{x:Type GroupBox}" BasedOn="{StaticResource DarkGroupBox}" />
+        <Style x:Key="{x:Type RadioButton}" TargetType="{x:Type RadioButton}" BasedOn="{StaticResource DarkRadioButton}" />
+      </ResourceDictionary>
+    </Style.Resources>
+  </Style>
+  <Style x:Key="{x:Type GridSplitter}" TargetType="{x:Type GridSplitter}">
+    <Setter Property="Background" Value="{StaticResource HighlightColor}" />
+  </Style>
+  <Style x:Key="DockHeaderStyle" TargetType="{x:Type Border}">
+    <Setter Property="Background" Value="#706000" />
+  </Style>
+  <Style x:Key="{x:Type ToolBar}" TargetType="{x:Type ToolBar}" BasedOn="{StaticResource DarkToolbar}">
+    <Style.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}" BasedOn="{StaticResource DynamicButtonDark}" />
+        <Style x:Key="{x:Type ToggleButton}" TargetType="{x:Type ToggleButton}" BasedOn="{StaticResource DynamicToggleButtonDark}" />
+      </ResourceDictionary>
+    </Style.Resources>
+  </Style>
+  <Style x:Key="{x:Type ListView}" TargetType="{x:Type ListView}" BasedOn="{StaticResource DarkListView}">
+    <Style.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type GridViewColumnHeader}" TargetType="{x:Type GridViewColumnHeader}" BasedOn="{StaticResource GarkGridViewHeader}" />
+        <Style x:Key="{x:Type ScrollBar}" TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource MainWindowScrollBar}" />
+      </ResourceDictionary>
+    </Style.Resources>
+  </Style>
+  <SolidColorBrush x:Key="{x:Static styles:StyleKeys.HyperlinkColor}">#64B1FD</SolidColorBrush>
+  <SolidColorBrush x:Key="{x:Static styles:StyleKeys.ActiveHyperlinkColor}">#AFD4F9</SolidColorBrush>
+  <SolidColorBrush x:Key="{x:Static styles:StyleKeys.MainWindowText}">White</SolidColorBrush>
+  <SolidColorBrush x:Key="{x:Static styles:StyleKeys.DynamicButtonHoverBackground}">#68644B</SolidColorBrush>
+  <SolidColorBrush x:Key="{x:Static styles:StyleKeys.DynamicButtonHoverBorder}">#61522B</SolidColorBrush>
+  <SolidColorBrush x:Key="{x:Static styles:StyleKeys.DynamicButtonPressedBackground}">#645F3E</SolidColorBrush>
+  <SolidColorBrush x:Key="{x:Static styles:StyleKeys.DynamicButtonPressedBorder}">#63542C</SolidColorBrush>
+</ResourceDictionary>

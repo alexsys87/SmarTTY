@@ -1,0 +1,646 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" xmlns:styles="clr-namespace:SmarTTY.GUI.Styles" Width="800" Height="600" ResizeMode="CanResizeWithGrip" SnapsToDevicePixels="True" AllowDrop="True" Title="{Binding Path=ActiveSession.TitleWithStatus, StringFormat=SmarTTY - {0}}">
+  <FrameworkElement.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="styles.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </FrameworkElement.Resources>
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <FrameworkElement.Resources>
+      <ResourceDictionary>
+        <Style x:Key="TabHeaderImage" TargetType="{x:Type Image}">
+          <Setter Property="Margin" Value="0 0 5 0" />
+          <Style.Triggers>
+            <DataTrigger Value="VirtualTerminal" Binding="{Binding Icon}">
+              <Setter Property="Source" Value="../icons/term16v.png" />
+            </DataTrigger>
+            <DataTrigger Value="Terminal" Binding="{Binding Icon}">
+              <Setter Property="Source" Value="../icons/term16.png" />
+            </DataTrigger>
+            <DataTrigger Value="Add" Binding="{Binding Icon}">
+              <Setter Property="Source" Value="../icons/MainWindow/add16.png" />
+            </DataTrigger>
+            <DataTrigger Value="New" Binding="{Binding Icon}">
+              <Setter Property="Source" Value="../icons/MainWindow/new16.png" />
+            </DataTrigger>
+            <DataTrigger Value="Editor" Binding="{Binding Icon}">
+              <Setter Property="Source" Value="../icons/MainWindow/editor.png" />
+            </DataTrigger>
+            <DataTrigger Value="Open" Binding="{Binding Icon}">
+              <Setter Property="Source" Value="../icons/MainWindow/open16.png" />
+            </DataTrigger>
+            <DataTrigger Value="AddVirtual" Binding="{Binding Icon}">
+              <Setter Property="Source" Value="../icons/event16.png" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Title}" Value="{x:Null}">
+              <Setter Property="Margin" Value="0" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+        <Style x:Key="TabCloseButton" TargetType="{x:Type Button}">
+          <Setter Property="Template">
+            <Setter.Value>
+              <ControlTemplate>
+                <Image Name="Image" Width="8" Height="8" Source="../icons/MainWindow/close8.png" />
+                <ControlTemplate.Triggers>
+                  <Trigger Property="UIElement.IsMouseOver" Value="True">
+                    <Setter TargetName="Image" Property="Image.Source" Value="../icons/MainWindow/close8red.png" />
+                  </Trigger>
+                </ControlTemplate.Triggers>
+              </ControlTemplate>
+            </Setter.Value>
+          </Setter>
+          <Setter Property="Background" Value="{DynamicResource {x:Static styles:StyleKeys.ActiveTabBackground}}" />
+          <Setter Property="BorderThickness" Value="0" />
+          <Setter Property="FrameworkElement.ToolTip" Value="Close" />
+                    <EventSetter Event="Click" Handler="CloseTabButton_Click" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Title}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+        <Style x:Key="TitleText" TargetType="{x:Type TextBlock}">
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding Title}" Value="{x:Null}">
+              <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </ResourceDictionary>
+    </FrameworkElement.Resources>
+    <Menu Grid.Row="0" Padding="0 2 0 2" Visibility="{Binding MainMenuVisibility}">
+      <MenuItem Header="_File">
+        <MenuItem Header="_New Tab" Click="NewTab_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/add16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_Open a remote file" Click="OpenFile_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/open16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="{Binding RemoteFileSaveHeader}" Visibility="{Binding SaveCommandVisibility}" Click="SaveFile_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/save16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Open _another session" Click="NewSession_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/term16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_Close current tab" Click="CloseTab_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/closetab.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_Replay log" Visibility="{Binding DebugVisibility}" Click="ReplayLog_Click" />
+        <MenuItem Header="_Log all terminal output to a file" Visibility="{Binding DebugVisibility}" Click="MakeLog_Click" />
+        <MenuItem Header="E_xit" Click="Exit_Click" />
+      </MenuItem>
+      <MenuItem Header="_Edit">
+        <MenuItem Header="_Copy" Click="Copy_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/copy.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_Paste" Click="Paste_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/paste.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_Find" Click="Find_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/FindHS.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Copy _All" Click="CopyAll_Click" />
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem Header="_SCP Transfers" Click="SCPTransfers_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/transfers.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_File List" IsCheckable="True" IsChecked="{Binding Path=ActiveSession.ActiveTab.FileExplorer.IsVisible}" Visibility="{Binding Path=ActiveSession.ActiveTab.FileExplorer.MenuCommandVisibility, FallbackValue=Collapsed}" />
+        <MenuItem Header="_Close tab when shell exits" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.AutoCloseTabs}" />
+        <MenuItem Header="Auto-_wrap lines" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.AutoWrapLines}" />
+        <MenuItem Header="_Minimalistic mode" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.MinimalisticMode}" />
+        <MenuItem Header="_Full-screen mode" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.FullScreenMode}" />
+      </MenuItem>
+      <MenuItem Header="S_CP">
+        <MenuItem Header="_Download a file" Click="Download_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/download.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_One-click download" Click="QuickDownload_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/qdownload.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_Upload a file" Click="Upload_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/upload.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Download a directory" Click="DownloadDir_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/getdir.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Upload a directory" Click="UploadDir_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/updir.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+      </MenuItem>
+      <MenuItem Header="_Tools">
+        <MenuItem Header="Manage Linux _Packages" Click="ManagePackages_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/archive16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_Public key authentication" Click="PublicKey_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/pubkey.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_Settings" Click="Settings_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/settings.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+      </MenuItem>
+      <MenuItem Header="_Help">
+        <MenuItem Header="_About..." Click="About_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/help.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+      </MenuItem>
+    </Menu>
+    <Grid Row="1">
+      <FrameworkElement.Resources>
+        <ResourceDictionary>
+          <Style x:Key="DockedContentWithHeader" TargetType="{x:Type ContentControl}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ContentControl}">
+                  <Grid>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Style="{DynamicResource DockHeaderStyle}" Margin="1">
+                      <Grid Margin="5 1 5 1">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Title}" />
+                        <StackPanel Orientation="Horizontal" Grid.Column="1" HorizontalAlignment="Right">
+                          <Button Style="{StaticResource TabCloseButton}" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                    <ContentControl Grid.Row="1" Content="{Binding Path=Content, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type ContentControl}}}" />
+                  </Grid>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+              <DataTrigger Value="true" Binding="{Binding IsVisible}">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </ResourceDictionary>
+      </FrameworkElement.Resources>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Name="FilesColumn" Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*" />
+        <RowDefinition Name="SCPRow" Height="Auto" />
+      </Grid.RowDefinitions>
+      <ContentControl Name="FileDock" Style="{StaticResource DockedContentWithHeader}" Margin="0 0 0 2" DataContext="{Binding Path=ActiveSession.ActiveTab.FileExplorer}" IsVisibleChanged="FilesVisibleChanged">
+        <local:FileListControl FileActionRequested="FileListControl_FileActionRequested" FocusRequested="FileListControl_FocusRequested" />
+      </ContentControl>
+      <GridSplitter Width="2" VerticalAlignment="Stretch" HorizontalAlignment="Right" Panel.ZIndex="1" ResizeDirection="Columns" Visibility="{Binding Path=Visibility, ElementName=FileDock}" />
+      <TabControl Name="OuterTabControl" Grid.Column="1" Grid.Row="0" Style="{DynamicResource MainWindowOuterTabControl}" TabStripPlacement="{Binding SessionHeaderLocation}" ItemsSource="{Binding AllSessions}" SelectedIndex="{Binding ActiveSessionIndex}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Grid>
+              <Grid Margin="10 2 10 2">
+                <FrameworkElement.Style>
+                  <Style TargetType="{x:Type Grid}">
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Session}" Value="{x:Null}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </FrameworkElement.Style>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition />
+                  <ColumnDefinition />
+                  <ColumnDefinition />
+                </Grid.ColumnDefinitions>
+                <Image Width="16" Height="16" Style="{StaticResource TabHeaderImage}" />
+                <Image Width="9" Height="9" Margin="0 0 5 0" VerticalAlignment="Bottom" HorizontalAlignment="Right" Source="../icons/MainWindow/err9.png">
+                  <FrameworkElement.Style>
+                    <Style TargetType="{x:Type Image}">
+                      <Style.Triggers>
+                        <DataTrigger Value="false" Binding="{Binding IsInactive}">
+                          <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </FrameworkElement.Style>
+                </Image>
+                <Button Grid.Column="2" Style="{StaticResource TabCloseButton}" />
+                <TextBlock Grid.Column="1" Style="{StaticResource TitleText}" Text="{Binding Title}" />
+              </Grid>
+              <ToggleButton Checked="ToggleButton_Checked" Unchecked="ToggleButton_Unchecked">
+                <FrameworkElement.Style>
+                  <Style TargetType="{x:Type ToggleButton}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Session}" Value="{x:Null}">
+                        <Setter Property="Visibility" Value="Visible" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </FrameworkElement.Style>
+                <Control.Template>
+                  <ControlTemplate>
+                    <Image Width="16" Height="16" Source="../icons/MainWindow/new16.png" Margin="5 0 5 0" ToolTip="Connect to another target" />
+                  </ControlTemplate>
+                </Control.Template>
+              </ToggleButton>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+        <TabControl.ContentTemplate>
+          <DataTemplate>
+            <Grid>
+              <ContentControl>
+                <FrameworkElement.Style>
+                  <Style TargetType="{x:Type ContentControl}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Fixer}" Value="{x:Null}">
+                        <Setter Property="Visibility" Value="Visible" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </FrameworkElement.Style>
+                <TabControl Panel.ZIndex="0" Style="{DynamicResource MainWindowInnerTabControl}" TabStripPlacement="{Binding Path=DataContext.TabHeaderLocation, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding ActiveTabIndex}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Grid ToolTip="{Binding ToolTip}">
+                        <Grid Margin="10 2 10 2">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                          </Grid.ColumnDefinitions>
+                          <FrameworkElement.Style>
+                            <Style TargetType="{x:Type Grid}">
+                              <Style.Triggers>
+                                <DataTrigger Value="true" Binding="{Binding IsNewSessionShortcut}">
+                                  <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </FrameworkElement.Style>
+                          <Image Width="16" Height="16" Style="{StaticResource TabHeaderImage}" />
+                          <TextBlock Grid.Column="1" Margin="0 0 10 0" Style="{StaticResource TitleText}" Text="{Binding Title}" />
+                          <Button Grid.Column="2" Style="{StaticResource TabCloseButton}" />
+                        </Grid>
+                        <ToggleButton Checked="ToggleButton_Checked" Unchecked="ToggleButton_Unchecked">
+                          <FrameworkElement.Style>
+                            <Style TargetType="{x:Type ToggleButton}">
+                              <Setter Property="Visibility" Value="Collapsed" />
+                              <Style.Triggers>
+                                <DataTrigger Value="true" Binding="{Binding IsNewSessionShortcut}">
+                                  <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </FrameworkElement.Style>
+                          <Control.Template>
+                            <ControlTemplate>
+                              <Image Width="16" Height="16" Source="../icons/MainWindow/new16.png" Margin="5 0 5 0" />
+                            </ControlTemplate>
+                          </Control.Template>
+                        </ToggleButton>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                  <TabControl.ContentTemplate>
+                    <DataTemplate>
+                      <Grid>
+                        <Grid.RowDefinitions>
+                          <RowDefinition Height="Auto" />
+                          <RowDefinition Height="*" />
+                          <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.ColumnSpan="2" DataContext="{Binding Searcher}" FocusManager.FocusedElement="{Binding ElementName=txtSearch}" IsVisibleChanged="Border_IsVisibleChanged">
+                          <FrameworkElement.Style>
+                            <Style TargetType="{x:Type Border}">
+                              <Style.Triggers>
+                                <DataTrigger Value="false" Binding="{Binding IsVisible, FallbackValue=false}">
+                                  <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </FrameworkElement.Style>
+                          <Grid Margin="2" Style="{DynamicResource ToolBarGridStyle}" TextBlock.Foreground="{Binding Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Find: " VerticalAlignment="Center" />
+                            <TextBox Name="txtSearch" Grid.Column="1" VerticalContentAlignment="Center" VerticalAlignment="Center" Text="{Binding SearchedText, UpdateSourceTrigger=PropertyChanged}" KeyDown="txtSearch_KeyDown" />
+                            <ToggleButton Grid.Column="2" ToolTip="Case-sensitive search" IsChecked="{Binding CaseSensitive}" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}">
+                              <TextBlock Text="Aa" />
+                            </ToggleButton>
+                            <Button Grid.Column="3" Click="SearchUp_Click">
+                              <Image Width="16" Height="16" Source="../icons/MainWindow/go-up-search.png" />
+                            </Button>
+                            <Button Grid.Column="4" Click="SearchDown_Click">
+                              <Image Width="16" Height="16" Source="../icons/MainWindow/go-down-search.png" />
+                            </Button>
+                            <Button Grid.Column="5" Margin="5 0 0 0" Click="CloseSearch_Click">
+                              <Image Width="16" Height="16" Source="../icons/delete16.png" />
+                            </Button>
+                          </Grid>
+                        </Border>
+                        <ContentControl Grid.Row="1" Content="{Binding Control}" />
+                        <ContentControl Grid.Row="1" Grid.Column="1" Grid.RowSpan="2" Content="{Binding VerticalScrollBar}" />
+                        <ContentControl Grid.Row="2" Grid.ColumnSpan="2" Content="{Binding HorizontalScrollBar}" />
+                      </Grid>
+                    </DataTemplate>
+                  </TabControl.ContentTemplate>
+                </TabControl>
+              </ContentControl>
+              <local:ConnectionClosedPopup VerticalAlignment="Center" HorizontalAlignment="Center" Panel.ZIndex="1" DataContext="{Binding Fixer}" TextBlock.Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}">
+                <FrameworkElement.Style>
+                  <Style TargetType="{x:Type local:ConnectionClosedPopup}">
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding}" Value="{x:Null}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </FrameworkElement.Style>
+              </local:ConnectionClosedPopup>
+            </Grid>
+          </DataTemplate>
+        </TabControl.ContentTemplate>
+      </TabControl>
+      <GridSplitter Grid.Row="1" Grid.ColumnSpan="2" Height="2" VerticalAlignment="Top" Panel.ZIndex="1" ResizeDirection="Rows" HorizontalAlignment="Stretch" Visibility="{Binding Path=Visibility, ElementName=TransferDock}" />
+      <ContentControl Name="TransferDock" Style="{StaticResource DockedContentWithHeader}" Grid.Row="1" Grid.ColumnSpan="2" Margin="0 2 0 0" DataContext="{Binding Path=ActiveSession.SCPController}" IsVisibleChanged="SCPVisibleChanged">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <ToolBar>
+            <ToggleButton ToolTip="Pause All" Style="{DynamicResource DynamicToggleButtonStyle}" IsChecked="{Binding IsPaused}">
+              <Image Width="16" Height="16" Source="../icons/transfers/pause16.png" />
+            </ToggleButton>
+            <Button ToolTip="Remove completed" Style="{DynamicResource DynamicButton}" Click="RemoveCompleted_Click">
+              <Image Width="16" Height="16" Source="../icons/transfers/removecomp.png" />
+            </Button>
+          </ToolBar>
+          <ListView Name="TransferList" Grid.Row="1" ItemsSource="{Binding ActiveTransfers}" KeyDown="ListView_KeyDown" SelectionChanged="TransferList_SelectionChanged">
+            <FrameworkElement.ContextMenu>
+              <ContextMenu Name="xferMenu" Visibility="Collapsed">
+                <MenuItem Name="cmdCancel" Header="_Cancel download(s)" Click="SelectedXfers_Cancel" />
+                <MenuItem Name="cmdRetry" Header="_Retry download(s)" Click="SelectedXfers_Retry" />
+                <MenuItem Header="Open local file" Click="SelectedXfers_OpenLocal" />
+                <MenuItem Header="Open containing folder" Click="SelectedXfers_OpenFolder" />
+                <MenuItem Header="Copy local file path" Click="SelectedXfers_CopyLocalPath" />
+              </ContextMenu>
+            </FrameworkElement.ContextMenu>
+            <ListView.View>
+              <GridView>
+                <GridView.Columns>
+                  <GridViewColumn Header="Local file">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <Image Width="16" Height="16" Panel.ZIndex="0">
+                            <FrameworkElement.Style>
+                              <Style TargetType="{x:Type Image}">
+                                <Style.Triggers>
+                                  <DataTrigger Value="Up" Binding="{Binding Path=Images.Main}">
+                                    <Setter Property="Source" Value="../icons/transfers/up.png" />
+                                  </DataTrigger>
+                                  <DataTrigger Value="Down" Binding="{Binding Path=Images.Main}">
+                                    <Setter Property="Source" Value="../icons/transfers/down.png" />
+                                  </DataTrigger>
+                                  <DataTrigger Value="Done" Binding="{Binding Path=Images.Main}">
+                                    <Setter Property="Source" Value="../icons/transfers/check.png" />
+                                  </DataTrigger>
+                                  <DataTrigger Value="Error" Binding="{Binding Path=Images.Main}">
+                                    <Setter Property="Source" Value="../icons/transfers/delete16.png" />
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </FrameworkElement.Style>
+                          </Image>
+                          <Image Width="9" Height="9" Panel.ZIndex="1" VerticalAlignment="Bottom" HorizontalAlignment="Right">
+                            <FrameworkElement.Style>
+                              <Style TargetType="{x:Type Image}">
+                                <Style.Triggers>
+                                  <DataTrigger Value="Clock" Binding="{Binding Path=Images.Overlay}">
+                                    <Setter Property="Source" Value="../icons/transfers/clock9.png" />
+                                  </DataTrigger>
+                                  <DataTrigger Value="Pause" Binding="{Binding Path=Images.Overlay}">
+                                    <Setter Property="Source" Value="../icons/transfers/pause9.png" />
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </FrameworkElement.Style>
+                          </Image>
+                          <TextBlock Grid.Column="1" Margin="2 0 0 0" Text="{Binding LocalFile}" />
+                        </Grid>
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Remote file" DisplayMemberBinding="{Binding RemoteFile}" />
+                  <GridViewColumn Header="Size" DisplayMemberBinding="{Binding Size}" />
+                  <GridViewColumn Header="Transfer rate" DisplayMemberBinding="{Binding TransferRate}" />
+                  <GridViewColumn Header="Progress" Width="100" x:Name="WidthColumn">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <Grid HorizontalAlignment="Stretch" Margin="0 0 -10 0" Width="{Binding Path=ActualWidth, ElementName=WidthColumn}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+                          <ProgressBar Maximum="1" HorizontalAlignment="Stretch" Height="10" Width="Auto" Margin="2" MinWidth="10" Value="{Binding Progress, Mode=OneWay}" Visibility="{Binding ProgressVisibility}" />
+                          <Button Style="{StaticResource DynamicButton}" Grid.Column="1" Visibility="{Binding CancelVisibility}" Click="CancelTransfer">
+                            <Image Width="16" Height="16" Source="../icons/delete16.png" />
+                          </Button>
+                        </Grid>
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                </GridView.Columns>
+              </GridView>
+            </ListView.View>
+          </ListView>
+        </Grid>
+      </ContentControl>
+    </Grid>
+    <Popup Name="NewConnectionPopup" Placement="Relative" StaysOpen="False" Closed="NewConnectionPopup_Closed">
+      <Border BorderThickness="1" Padding="0">
+        <Grid DataContext="{Binding NewConnectionController}">
+          <Grid.RowDefinitions>
+            <RowDefinition />
+            <RowDefinition />
+            <RowDefinition />
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition />
+            <ColumnDefinition />
+            <ColumnDefinition />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Open another session " Margin="0 0 15 0" VerticalAlignment="Center" />
+          <TextBlock Text="filter: " Grid.Column="1" VerticalAlignment="Center" />
+          <TextBox Grid.Column="2" MinWidth="100" Margin="5" Text="{Binding Path=Filter, UpdateSourceTrigger=PropertyChanged}" />
+          <ContentControl Grid.Row="1" Grid.ColumnSpan="3">
+            <FrameworkElement.Style>
+              <Style TargetType="{x:Type ContentControl}">
+                <Setter Property="IsEnabled" Value="False" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Path=ProgressText}" Value="{x:Null}">
+                    <Setter Property="IsEnabled" Value="True" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </FrameworkElement.Style>
+            <ListBox Name="lstConnections" ItemsSource="{Binding Path=FilteredSettings}" SelectionChanged="NewConnectionSelected">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid>
+                    <FrameworkElement.Style>
+                      <Style TargetType="{x:Type Grid}">
+                        <Style.Triggers>
+                          <DataTrigger Value="true" Binding="{Binding IsInactive}">
+                            <Setter Property="UIElement.Opacity" Value="0.5" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </FrameworkElement.Style>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="ConnectionDetail" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Image Width="48" Height="48" Grid.RowSpan="4" Margin="0 0 5 0" Panel.ZIndex="0" Source="{Binding Image}" />
+                    <TextBlock Grid.Column="2" Grid.Row="1" FontWeight="Bold" Margin="0" Text="{Binding Title}" />
+                    <Grid Column="2" Row="2">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <Image Width="16" Height="16">
+                        <FrameworkElement.Style>
+                          <Style TargetType="{x:Type Image}">
+                            <Style.Triggers>
+                              <DataTrigger Value="Lock" Binding="{Binding TypeImage}">
+                                <Setter Property="Source" Value="../Icons/lock16.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="OpenLock" Binding="{Binding TypeImage}">
+                                <Setter Property="Source" Value="../Icons/unlock16.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="SerialPort" Binding="{Binding TypeImage}">
+                                <Setter Property="Source" Value="../Icons/com16.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="USB" Binding="{Binding TypeImage}">
+                                <Setter Property="Source" Value="../Icons/usb16.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Terminal" Binding="{Binding TypeImage}">
+                                <Setter Property="Source" Value="../Icons/term16.png" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </FrameworkElement.Style>
+                      </Image>
+                      <TextBlock Grid.Column="1" Margin="2 0 0 0" Text="{Binding Detail1}" />
+                    </Grid>
+                    <TextBlock Grid.Row="3" Grid.Column="2" Opacity="0.7" Text="{Binding Detail2}">
+                      <FrameworkElement.Style>
+                        <Style TargetType="{x:Type TextBlock}">
+                          <Style.Triggers>
+                            <DataTrigger Value="true" Binding="{Binding HasBaudRate}">
+                              <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </FrameworkElement.Style>
+                    </TextBlock>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ListBox>
+          </ContentControl>
+          <TextBlock Grid.Row="2" Grid.ColumnSpan="3" Margin="5 0 0 0" Text="{Binding ProgressText}">
+            <FrameworkElement.Style>
+              <Style TargetType="{x:Type TextBlock}">
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding ProgressText}" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </FrameworkElement.Style>
+          </TextBlock>
+        </Grid>
+      </Border>
+    </Popup>
+    <StatusBar Grid.Row="2" DataContext="{Binding ToolStrip}" Visibility="{Binding StatusBarVisibility}">
+      <TextBlock Text="{Binding Path=Status1}" />
+      <ProgressBar Width="200" Height="12" Maximum="1" Visibility="{Binding ProgressVisibility}" Value="{Binding Progress}" />
+      <StatusBarItem HorizontalContentAlignment="Right" Margin="0 0 20 0">
+        <TextBlock Text="{Binding Status2}" />
+      </StatusBarItem>
+    </StatusBar>
+  </Grid>
+</Window>

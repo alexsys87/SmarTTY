@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="SmarTTY.GUI.ConnectionClosedPopup" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:SmarTTY.GUI">
+  <Grid Margin="5">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <FrameworkElement.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
+          <Setter Property="VerticalAlignment" Value="Center" />
+          <Setter Property="Padding" Value="5 2 5 2" />
+        </Style>
+      </ResourceDictionary>
+    </FrameworkElement.Resources>
+    <TextBlock Text="Connection closed" Grid.ColumnSpan="2" HorizontalAlignment="Center" FontSize="24" FontWeight="Bold" />
+    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding HostName, StringFormat=The connection to {0} has been closed. Please select an action:}" />
+    <Image Width="64" Height="64" Grid.Row="2" Grid.RowSpan="3" Source="../icons/MainWindow/busy.png" Margin="8" />
+    <Button Content="Try reconnecting to host" Grid.Column="1" Grid.Row="2" Click="Reconnect" />
+    <Button Content="Close session" Grid.Column="1" Grid.Row="3" Click="Close" />
+    <Button Content="Ignore" Grid.Column="1" Grid.Row="4" Click="Ignore" />
+    <Grid Row="5" ColumnSpan="2" Margin="0 10 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <FrameworkElement.Style>
+        <Style TargetType="{x:Type Grid}">
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding Path=Reconnector.ProgressText}" Value="{x:Null}">
+              <Setter Property="Visibility" Value="Hidden" />
+            </DataTrigger>
+            <DataTrigger Value="Error" Binding="{Binding Path=Reconnector.ProgressText}">
+              <Setter Property="Visibility" Value="Hidden" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </FrameworkElement.Style>
+      <TextBlock VerticalAlignment="Center" Text="{Binding Path=Reconnector.ProgressText}" />
+      <ProgressBar IsIndeterminate="True" Margin="5 0 0 0" Grid.Column="1" />
+    </Grid>
+  </Grid>
+</UserControl>
