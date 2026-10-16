@@ -4,7 +4,7 @@
     <AssemblyName>SmarTTY</AssemblyName>
     <RootNamespace>SmarTTY</RootNamespace>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net40</TargetFramework>
+    <TargetFramework>net48</TargetFramework>
     <PlatformTarget>x86</PlatformTarget>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
