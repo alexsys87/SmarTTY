@@ -190,7 +190,7 @@ public partial class PublicKeyManagerForm
 		btnClose.Text = "Close";
 		btnClose.UseVisualStyleBackColor = true;
 		picRemoteSettings.Cursor = Cursors.Hand;
-		picRemoteSettings.Image = Resources.locked;
+		picRemoteSettings.Image = (Image)resources.GetObject("locked");
 		picRemoteSettings.Location = new Point(6, 22);
 		picRemoteSettings.Name = "PicRemoteSettings";
 		picRemoteSettings.Size = new Size(128, 128);
