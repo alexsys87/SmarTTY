@@ -370,9 +370,31 @@ public partial class HexTerminalControl : DpiAwareControl
         }
     }
 
+    public bool HasSelection => ((ReadonlyTextBrowser)termHex).HasSelection || ((ReadonlyTextBrowser)termText).HasSelection;
+
+    public void CopySelection()
+    {
+        // Selection is mirrored between both views, so copy from the focused one (hex view by default)
+        TerminalEmulatorBase source = termText.Focused ? termText : termHex;
+        if (!((ReadonlyTextBrowser)source).HasSelection)
+        {
+            source = source == termHex ? termText : termHex;
+        }
+        if (((ReadonlyTextBrowser)source).HasSelection)
+        {
+            source.CopySelection(flag: false);
+        }
+    }
+
     private void termHex_KeyPress(object sender, KeyPressEventArgs e)
     {
         OnKeyPress(e);
+    }
+
+    private void termView_KeyDown(object sender, KeyEventArgs e)
+    {
+        // Let the owner handle clipboard shortcuts typed inside the inner views
+        OnKeyDown(e);
     }
 
     private void termText_Scroll(object sender, ScrollEventArgs e)
