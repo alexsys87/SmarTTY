@@ -342,7 +342,6 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             Session = session,
             ConfirmOverwrite = MessageBoxes.AskWarn
         };
-        session.X11Connector = _Controller.CreateX11Connection;
         session.ConnectionLost += (object obj, EventArgs e10) =>
         {
             _Controller.BeginInvoke(() =>
@@ -679,6 +678,6 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public string[] RunCommand(string command)
     {
-        return Session.RunCommandChecked(command, flag: true)?.ToArray();
+        return Session.RunCommandChecked(command, requireSuccess: true)?.ToArray();
     }
 }

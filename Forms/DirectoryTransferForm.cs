@@ -15,7 +15,7 @@ namespace SmarTTY.Forms;
 public partial class DirectoryTransferForm : DpiAwareForm
 {
 
-    private LibSsh2Session _session;
+    private SshSession _session;
 
     private bool _isUpload;
 
@@ -55,10 +55,10 @@ public partial class DirectoryTransferForm : DpiAwareForm
 
     public bool IsUpload => _isUpload;
 
-    public DirectoryTransferForm(LibSsh2Session libSsh2Session, bool flag)
+    public DirectoryTransferForm(SshSession sshSession, bool flag)
     {
         InitializeComponent();
-        this._session = libSsh2Session;
+        this._session = sshSession;
         _isUpload = flag;
         if (flag)
         {

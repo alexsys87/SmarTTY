@@ -52,7 +52,7 @@ internal class KnownHostKeyStore
         }
     }
 
-    public void Update(string text, LibSsh2Session.HostKeyInfo hostKeyInfo)
+    public void Update(string text, SshSession.HostKeyInfo hostKeyInfo)
     {
         foreach (KnownHostKey item in this._keys)
         {

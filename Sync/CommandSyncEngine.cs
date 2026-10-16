@@ -109,7 +109,7 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                     _flavor = StatCommandBuilder.DetectFlavor((string text2) =>
                     {
                         _engine._events?.OnLog(new SyncLogMessage.RunCommandMessage(text2));
-                        return _session.RunCommandChecked(text2, flag: true);
+                        return _session.RunCommandChecked(text2, requireSuccess: true);
                     });
                 }
                 catch

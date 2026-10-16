@@ -25,7 +25,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
 
     private class ListOperation : IDisposable
     {
-        public readonly LibSsh2Session Session;
+        public readonly SshSession Session;
 
         private List<byte> _AllData = new List<byte>();
 
@@ -35,7 +35,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
 
         private FileExplorer _Explorer;
 
-        public ListOperation(string directory, LibSsh2Session session, FileExplorer explorer)
+        public ListOperation(string directory, SshSession session, FileExplorer explorer)
         {
             Session = session;
             _Directory = directory;

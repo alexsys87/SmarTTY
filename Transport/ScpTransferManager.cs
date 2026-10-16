@@ -60,7 +60,7 @@ public class ScpTransferManager : IDisposable
 
     private Semaphore _uploadSignal = new Semaphore(0, int.MaxValue);
 
-    public LibSsh2Session Session;
+    public SshSession Session;
 
     private bool _notPaused = true;
 

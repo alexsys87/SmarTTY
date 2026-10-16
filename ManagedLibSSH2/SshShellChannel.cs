@@ -1,11 +1,165 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 
 namespace ManagedLibSSH2;
 
-public class SshShellChannel : SshChannelBase, IChannelPoller, IAsyncChannel
+/// <summary>
+/// An SSH session channel running a shell or a command, optionally with a PTY.
+/// Received data is either buffered for the blocking <see cref="Output"/>/<see cref="Error"/> streams
+/// or, when <see cref="PollingEnabled"/> is set, delivered through <see cref="DataReceived"/>
+/// on the session's event thread.
+/// </summary>
+public class SshShellChannel : IAsyncChannel, IDisposable
 {
+    public class ChannelStream : Stream
+    {
+        private readonly SshShellChannel _channel;
+
+        private readonly int _streamId;
+
+        private readonly bool _canWrite;
+
+        public bool ReadFully;
+
+        public override bool CanRead => !_canWrite;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => _canWrite;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        internal ChannelStream(SshShellChannel channel, int streamId, bool canWrite)
+        {
+            _channel = channel;
+            _streamId = streamId;
+            _canWrite = canWrite;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (!ReadFully)
+            {
+                return _channel.ReadStream(_streamId, buffer, offset, count);
+            }
+            int done = 0;
+            while (done < count)
+            {
+                int read = _channel.ReadStream(_streamId, buffer, offset + done, count - done);
+                if (read <= 0)
+                {
+                    break;
+                }
+                done += read;
+            }
+            return done;
+        }
+
+        // Any stream of the channel writes to the remote stdin (the old API allowed writing via Output too).
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            _channel.WriteData(buffer, offset, count);
+        }
+    }
+
+    /// <summary>
+    /// FIFO of received chunks for one stream (stdout or stderr).
+    /// </summary>
+    private class ChunkQueue
+    {
+        private readonly Queue<byte[]> _chunks = new Queue<byte[]>();
+
+        private int _offset;
+
+        public bool IsEmpty => _chunks.Count == 0;
+
+        public void Add(byte[] chunk)
+        {
+            _chunks.Enqueue(chunk);
+        }
+
+        public int Read(byte[] buffer, int offset, int count)
+        {
+            byte[] chunk = _chunks.Peek();
+            int done = Math.Min(count, chunk.Length - _offset);
+            Buffer.BlockCopy(chunk, _offset, buffer, offset, done);
+            _offset += done;
+            if (_offset == chunk.Length)
+            {
+                _chunks.Dequeue();
+                _offset = 0;
+            }
+            return done;
+        }
+
+        public byte[] TakeChunk()
+        {
+            byte[] chunk = _chunks.Dequeue();
+            if (_offset != 0)
+            {
+                byte[] rest = new byte[chunk.Length - _offset];
+                Buffer.BlockCopy(chunk, _offset, rest, 0, rest.Length);
+                chunk = rest;
+                _offset = 0;
+            }
+            return chunk;
+        }
+    }
+
+    private const int StdoutStreamId = 0;
+
+    private const int StderrStreamId = 1;
+
+    // How long ExitStatus waits for the exit-status message once the remote side has sent EOF.
+    private static readonly TimeSpan ExitStatusTimeout = TimeSpan.FromSeconds(10);
+
+    private readonly SshSession _session;
+
+    private readonly SshNetChannel _channel;
+
+    private readonly object _sync = new object();
+
+    private readonly ChunkQueue[] _queues = new ChunkQueue[2] { new ChunkQueue(), new ChunkQueue() };
+
+    private ExtendedDataMode _extendedDataMode;
+
+    private bool _polling;
+
+    private bool _eofReceived;
+
+    private bool _closed;
+
+    private bool _eofSent;
+
+    private bool _disposed;
+
+    private int _finishedRaised;
+
+    private int? _exitStatus;
+
+    private string _exitSignal;
 
     public readonly ChannelStream Input;
 
@@ -15,64 +169,42 @@ public class SshShellChannel : SshChannelBase, IChannelPoller, IAsyncChannel
 
     public readonly string TerminalType;
 
-    private object _pollerToken;
-
-    private object _syncRoot = new object();
-
-    private bool _eofNotified;
-
-    private int _closedNotified;
-
-    private ExtendedDataMode _extendedDataMode;
-
-    public ChannelStream ActiveErrorStream
-    {
-        get
-        {
-            if (ReadStderrOnRead)
-            {
-                return null;
-            }
-            return Error;
-        }
-    }
+    public SshSession Session => _session;
 
     public bool PollingEnabled
     {
         get
         {
-            return _pollerToken != null;
+            lock (_sync)
+            {
+                return _polling;
+            }
         }
         set
         {
-            bool flag = false;
-            lock (_syncRoot)
+            lock (_sync)
             {
-                if (PollingEnabled == value)
+                if (_polling == value)
                 {
                     return;
                 }
-                if (value)
+                _polling = value;
+                if (!value)
                 {
-                    _pollerToken = base._session.AddPoller(this);
-                    flag = true;
+                    return;
                 }
-                else
+                // Hand the data buffered so far to the event handlers, then continue with live data.
+                for (int streamId = 0; streamId < _queues.Length; streamId++)
                 {
-                    base._session.RemovePoller(_pollerToken);
-                    _pollerToken = null;
+                    while (!_queues[streamId].IsEmpty)
+                    {
+                        DispatchData(_queues[streamId].TakeChunk(), streamId);
+                    }
                 }
-            }
-            if (flag)
-            {
-                byte[] buffer = new byte[262144];
-                bool flag2 = false;
-                int value2 = 0;
-                base._session.ExecuteNonBlocking(() =>
+                if (_closed)
                 {
-                    ((IChannelPoller)this).PollChannel(ref buffer, ref flag2, ref value2, (List<ThreadStart>)null);
-                    return 0;
-                });
+                    DispatchFinished();
+                }
             }
         }
     }
@@ -81,198 +213,347 @@ public class SshShellChannel : SshChannelBase, IChannelPoller, IAsyncChannel
     {
         get
         {
-            return _extendedDataMode;
+            lock (_sync)
+            {
+                return _extendedDataMode;
+            }
         }
         set
         {
-            lock (_syncRoot)
+            lock (_sync)
             {
-                if (value != _extendedDataMode)
-                {
-                    _extendedDataMode = value;
-                    int num = base._session.ExecuteBlocking(() => LibSsh2.ChannelHandleExtendedData2(base._channelHandle, (int)value));
-                    if (num != 0)
-                    {
-                        throw new LibSsh2Exception(num);
-                    }
-                }
+                _extendedDataMode = value;
             }
         }
     }
 
-    public int ExitStatus => LibSsh2.ChannelGetExitStatus(base._channelHandle);
-
+    /// <summary>
+    /// When set, reading <see cref="Output"/> also delivers pending stderr data via <see cref="DataReceived"/>
+    /// on the reading thread, so stderr does not get stuck while the caller consumes stdout.
+    /// </summary>
     public bool ReadStderrOnRead { get; set; }
+
+    /// <summary>
+    /// Exit code of the remote command; -1 if it was terminated by a signal, 0 if the server reported nothing.
+    /// </summary>
+    public int ExitStatus
+    {
+        get
+        {
+            lock (_sync)
+            {
+                // exit-status may arrive slightly after EOF; give it a chance before reporting.
+                DateTime deadline = DateTime.UtcNow + ExitStatusTimeout;
+                while (_eofReceived && !_closed && _exitStatus == null && _exitSignal == null)
+                {
+                    TimeSpan remaining = deadline - DateTime.UtcNow;
+                    if (remaining <= TimeSpan.Zero)
+                    {
+                        break;
+                    }
+                    Monitor.Wait(_sync, remaining);
+                }
+                if (_exitStatus.HasValue)
+                {
+                    return _exitStatus.Value;
+                }
+                return (_exitSignal != null) ? (-1) : 0;
+            }
+        }
+    }
+
+    public bool IsEof
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _eofReceived && _queues[StdoutStreamId].IsEmpty && _queues[StderrStreamId].IsEmpty;
+            }
+        }
+    }
 
     public event DataReceivedHandler DataReceived;
 
-    public event ChannelEventHandler EofReceived;
-
     public event ChannelEventHandler Finished;
 
-    public int ReadAnyStream(byte[] buffer, int value2, int value3, out bool flag)
+    /// <summary>
+    /// Opens a session channel and starts <paramref name="command"/> (or a shell if it is null),
+    /// requesting a PTY of type <paramref name="terminalType"/> if it is not null.
+    /// </summary>
+    internal SshShellChannel(SshSession session, SshNetChannel channel, string command, string terminalType, ExtendedDataMode extendedDataMode)
     {
-        int result = base._session.ReadChannelRange(base._channelHandle, 1, 0, buffer, value2, value3, out var num);
-        flag = num == 1;
-        return result;
-    }
-
-    internal SshShellChannel(LibSsh2Session libSsh2Session, IntPtr handle, string text, string text2, bool flag, ExtendedDataMode extendedDataMode)
-        : base(libSsh2Session, handle)
-    {
-        if (text2 != null)
+        _session = session;
+        _channel = channel;
+        _extendedDataMode = extendedDataMode;
+        TerminalType = terminalType;
+        Input = new ChannelStream(this, StdoutStreamId, canWrite: true);
+        Output = new ChannelStream(this, StdoutStreamId, canWrite: false);
+        Error = new ChannelStream(this, StderrStreamId, canWrite: false);
+        _channel.Subscribe(OnChannelData, OnChannelExtendedData, OnChannelEof, OnChannelClosed, OnExitStatus, OnExitSignal, OnChannelException);
+        try
         {
-            RequestPty(80, 25, text2);
-        }
-        TerminalType = text2;
-        if (flag)
-        {
-            RequestX11Forwarding(0);
-        }
-        ExtendedDataMode = extendedDataMode;
-        libSsh2Session.StartShellOrExec(base._channelHandle, text);
-        Input = new ChannelStream(this, 0, flag: true);
-        Output = new ChannelStream(this, 0, flag: false);
-        Error = new ChannelStream(this, 1, flag: false);
-    }
-
-    private int RequestX11Forwarding(int value2)
-    {
-        return base._session.ExecuteBlocking(() => LibSsh2.ChannelX11ReqEx(base._channelHandle, 0, null, null, value2));
-    }
-
-    private void RequestPty(int value2, int value3, string text = "ansi", string text2 = null, int value4 = 0, int value5 = 0)
-    {
-        base._session.WaitBeforePtyRequest();
-        int num = base._session.ExecuteBlocking(() => LibSsh2.ChannelRequestPtyEx(base._channelHandle, text, text.Length, text2, (text2 != null) ? text2.Length : 0, value2, value3, value4, value5));
-        if (num != 0)
-        {
-            throw new PtyRequestFailedException(new LibSsh2Exception(num));
-        }
-        base._session.MarkPtyRequested();
-    }
-
-    public void ResizePty(int value2, int value3, int value4 = 0, int value5 = 0)
-    {
-        int num = base._session.ExecuteBlocking(() => LibSsh2.ChannelRequestPtySizeEx(base._channelHandle, value2, value3, value4, value5));
-        if (num != 0)
-        {
-            throw new LibSsh2Exception(num);
-        }
-    }
-
-    private void Poll(ref byte[] buffer, ref bool flag, ref int value2, List<ThreadStart> list)
-    {
-        int num;
-        do
-        {
-            num = base._session.ReadChannelNoWait(base._channelHandle, 0, buffer);
-            if (num == -43)
+            _session.RegisterChannel(this);
+            _channel.Open();
+            if (terminalType != null && !_channel.SendPseudoTerminalRequest(terminalType, 80, 25))
             {
-                flag = true;
+                throw new PtyRequestFailedException();
             }
-            if (num > 0)
+            bool started = (command != null) ? _channel.SendExecRequest(command) : _channel.SendShellRequest();
+            if (!started)
             {
-                value2 += num;
+                throw new RemoteOperationException((command != null) ? ("The server refused to run '" + command + "'") : "The server refused to start a shell");
             }
-            if (num >= 0 && DataReceived != null)
+        }
+        catch
+        {
+            _session.UnregisterChannel(this);
+            _channel.Dispose();
+            throw;
+        }
+    }
+
+    internal void OnConnectionClosed()
+    {
+        MarkClosed();
+    }
+
+    private void OnChannelData(ArraySegment<byte> data)
+    {
+        OnData(StdoutStreamId, data);
+    }
+
+    private void OnChannelExtendedData(ArraySegment<byte> data)
+    {
+        OnData(StderrStreamId, data);
+    }
+
+    // Called on the SSH.NET receive thread; must not block.
+    private void OnData(int streamId, ArraySegment<byte> data)
+    {
+        // The segment may point into a reused receive buffer, so it is copied right away.
+        byte[] chunk = new byte[data.Count];
+        Buffer.BlockCopy(data.Array, data.Offset, chunk, 0, data.Count);
+        _session.AddReceivedBytes(chunk.Length);
+        lock (_sync)
+        {
+            if (streamId == StderrStreamId)
             {
-                try
+                if (_extendedDataMode == ExtendedDataMode.Ignore)
                 {
-                    DataReceived(this, buffer, 0, num, 0);
+                    return;
                 }
-                catch
+                if (_extendedDataMode == ExtendedDataMode.Merge)
                 {
+                    streamId = StdoutStreamId;
                 }
             }
-        }
-        while (num > 0);
-        if (_extendedDataMode == ExtendedDataMode.Normal)
-        {
-            do
+            if (_polling)
             {
-                num = base._session.ReadChannelNoWait(base._channelHandle, 1, buffer);
-                if (num > 0)
-                {
-                    value2 += num;
-                }
-                if (num >= 0 && DataReceived != null)
-                {
-                    try
-                    {
-                        DataReceived(this, buffer, 0, num, 1);
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
+                DispatchData(chunk, streamId);
+                return;
             }
-            while (num > 0);
-        }
-        if (!this._eofNotified && LibSsh2.ChannelEof(base._channelHandle) > 0)
-        {
-            if (EofReceived != null)
-            {
-                EofReceived(this);
-            }
-            this._eofNotified = true;
-            value2++;
-        }
-        if (_closedNotified != 0 || LibSsh2.ChannelWaitClosed(base._channelHandle) < 0)
-        {
-            return;
-        }
-        if (Interlocked.Exchange(ref _closedNotified, 1) == 0 && Finished != null)
-        {
-            if (list != null)
-            {
-                list.Add(() =>
-                {
-                    Finished(this);
-                });
-            }
-            else
-            {
-                Finished(this);
-            }
-        }
-        value2++;
-    }
-
-    void IChannelPoller.PollChannel(ref byte[] buffer, ref bool flag, ref int value2, List<ThreadStart> list)
-    {
-        this.Poll(ref buffer, ref flag, ref value2, list);
-    }
-
-    public override void Dispose()
-    {
-        base.Dispose();
-        PollingEnabled = false;
-        if (Interlocked.Exchange(ref _closedNotified, 1) == 0 && Finished != null)
-        {
-            Finished(this);
+            _queues[streamId].Add(chunk);
+            Monitor.PulseAll(_sync);
         }
     }
 
-    protected override int ReadStream(int value2, byte[] buffer, int value3, int value4)
+    private void OnChannelEof()
     {
-        if (value2 == 0 && ReadStderrOnRead)
+        lock (_sync)
         {
-            int num;
-            while (true)
+            _eofReceived = true;
+            Monitor.PulseAll(_sync);
+        }
+    }
+
+    private void OnChannelClosed()
+    {
+        MarkClosed();
+    }
+
+    private void OnExitStatus(int exitStatus)
+    {
+        lock (_sync)
+        {
+            _exitStatus = exitStatus;
+            Monitor.PulseAll(_sync);
+        }
+    }
+
+    private void OnExitSignal(string signalName)
+    {
+        lock (_sync)
+        {
+            _exitSignal = signalName;
+            Monitor.PulseAll(_sync);
+        }
+    }
+
+    private void OnChannelException(Exception exception)
+    {
+        MarkClosed();
+    }
+
+    private void MarkClosed()
+    {
+        lock (_sync)
+        {
+            _eofReceived = true;
+            _closed = true;
+            Monitor.PulseAll(_sync);
+            if (_polling)
             {
-                num = base._session.ReadChannelRange(base._channelHandle, 1, 0, buffer, value3, value4, out var num2);
-                if (num <= 0 || num2 != 1)
+                DispatchFinished();
+            }
+        }
+    }
+
+    // Must be called under _sync so that events keep the order in which the data arrived.
+    private void DispatchData(byte[] chunk, int streamId)
+    {
+        _session.Dispatch(() =>
+        {
+            DataReceived?.Invoke(this, chunk, 0, chunk.Length, streamId);
+        });
+    }
+
+    private void DispatchFinished()
+    {
+        _session.Dispatch(RaiseFinished);
+    }
+
+    private void RaiseFinished()
+    {
+        if (Interlocked.Exchange(ref _finishedRaised, 1) == 0)
+        {
+            Finished?.Invoke(this);
+        }
+    }
+
+    private int ReadStream(int streamId, byte[] buffer, int offset, int count)
+    {
+        if (count == 0)
+        {
+            return 0;
+        }
+        while (true)
+        {
+            byte[] stderrChunk = null;
+            lock (_sync)
+            {
+                if (streamId == StdoutStreamId && ReadStderrOnRead && !_queues[StderrStreamId].IsEmpty)
                 {
-                    break;
+                    stderrChunk = _queues[StderrStreamId].TakeChunk();
                 }
-                if (DataReceived != null)
+                else if (!_queues[streamId].IsEmpty)
                 {
-                    DataReceived(this, buffer, value3, num, num2);
+                    return _queues[streamId].Read(buffer, offset, count);
+                }
+                else if (_eofReceived)
+                {
+                    return 0;
+                }
+                else
+                {
+                    Monitor.Wait(_sync);
+                    continue;
                 }
             }
-            return num;
+            DataReceived?.Invoke(this, stderrChunk, 0, stderrChunk.Length, StderrStreamId);
         }
-        return base.ReadStream(value2, buffer, value3, value4);
+    }
+
+    private void WriteData(byte[] buffer, int offset, int count)
+    {
+        lock (_sync)
+        {
+            if (_closed || _eofSent)
+            {
+                throw new IOException("Cannot write to a closed SSH channel");
+            }
+        }
+        _channel.SendData(buffer, offset, count);
+        _session.AddSentBytes(count);
+    }
+
+    public void ResizePty(int columns, int rows)
+    {
+        _channel.SendWindowChangeRequest((uint)Math.Max(columns, 1), (uint)Math.Max(rows, 1));
+    }
+
+    public void Flush(int streamId)
+    {
+    }
+
+    public void SendEof()
+    {
+        lock (_sync)
+        {
+            if (_eofSent || _closed)
+            {
+                return;
+            }
+            _eofSent = true;
+        }
+        _channel.SendEof();
+    }
+
+    public void WaitEof()
+    {
+        lock (_sync)
+        {
+            while (!_eofReceived)
+            {
+                Monitor.Wait(_sync);
+            }
+        }
+    }
+
+    public void WaitClosed()
+    {
+        lock (_sync)
+        {
+            while (!_closed)
+            {
+                Monitor.Wait(_sync);
+            }
+        }
+    }
+
+    public bool TryWaitClosed()
+    {
+        lock (_sync)
+        {
+            return _closed;
+        }
+    }
+
+    public virtual void Dispose()
+    {
+        lock (_sync)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+            _polling = false;
+        }
+        _session.UnregisterChannel(this);
+        try
+        {
+            _channel.Dispose();
+        }
+        catch
+        {
+        }
+        lock (_sync)
+        {
+            _eofReceived = true;
+            _closed = true;
+            Monitor.PulseAll(_sync);
+        }
+        RaiseFinished();
     }
 }

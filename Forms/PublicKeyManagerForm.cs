@@ -12,7 +12,7 @@ namespace SmarTTY.Forms;
 public partial class PublicKeyManagerForm : DpiAwareForm
 {
 
-    private LibSsh2Session _session;
+    private SshSession _session;
 
     private string _authorizedKeyLine;
 
@@ -20,14 +20,14 @@ public partial class PublicKeyManagerForm : DpiAwareForm
 
     private ISshKeyPair _keyPair;
 
-    public PublicKeyManagerForm(LibSsh2Session libSsh2Session, SSHConnectionSettings sshConnectionSettings)
+    public PublicKeyManagerForm(SshSession sshSession, SSHConnectionSettings sshConnectionSettings)
     {
         InitializeComponent();
-        txtHost.Text = libSsh2Session.HostName;
-        txtUser.Text = libSsh2Session.UserName;
+        txtHost.Text = sshSession.HostName;
+        txtUser.Text = sshSession.UserName;
         _settings = sshConnectionSettings;
         _keyPair = AppEnvironment.KeyFactory.CreateKey(sshConnectionSettings.KeyType.ResolveAuto(PublicKeyType.RSA));
-        _session = libSsh2Session;
+        _session = sshSession;
         this.ShowKey();
     }
 

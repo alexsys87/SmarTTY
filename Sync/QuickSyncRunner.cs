@@ -312,7 +312,7 @@ public class QuickSyncRunner
                 {
                     throw new ArgumentException("Direction");
                 }
-                SyncPlan.UploadPlanner uploadPlanner = new SyncPlan.UploadPlanner(flag: remoteFileSet.Root.Files.Count <= 0 && remoteFileSet.Root.SubDirectories.Count <= 0 && remoteFileSet.Root.Symlinks.Count <= 0 && sshSession.RunCommandChecked("test -d \"" + syncSettings.RemotePath + "\"", flag: true) == null, syncSettings: syncSettings, remoteFileSet: remoteFileSet, localFileCache: localFileCache, syncCustomization: syncCustomization);
+                SyncPlan.UploadPlanner uploadPlanner = new SyncPlan.UploadPlanner(flag: remoteFileSet.Root.Files.Count <= 0 && remoteFileSet.Root.SubDirectories.Count <= 0 && remoteFileSet.Root.Symlinks.Count <= 0 && sshSession.RunCommandChecked("test -d \"" + syncSettings.RemotePath + "\"", requireSuccess: true) == null, syncSettings: syncSettings, remoteFileSet: remoteFileSet, localFileCache: localFileCache, syncCustomization: syncCustomization);
                 uploadPlanner.Warning += (QuickSyncWarning quickSyncWarning, Exception exception) =>
                 {
                     syncEvents?.OnWarning(new SyncWarning
@@ -473,33 +473,33 @@ public class QuickSyncRunner
         if (sshSession.Tag == null && !flag)
         {
             string text = this._helperLocator?.FindHelper(sshSession.HostName);
-            if (text != null && sshSession.RunCommandChecked("test -f \"" + text + "\"", flag: true) != null)
+            if (text != null && sshSession.RunCommandChecked("test -f \"" + text + "\"", requireSuccess: true) != null)
             {
                 sshSession.Tag = text;
             }
             else
             {
                 string text2 = "SysprogsSync-v1.2";
-                if (sshSession.RunCommandChecked("which -f \"" + text2 + "\"", flag: true) != null || sshSession.RunCommandChecked("which \"" + text2 + "\"", flag: true) != null)
+                if (sshSession.RunCommandChecked("which -f \"" + text2 + "\"", requireSuccess: true) != null || sshSession.RunCommandChecked("which \"" + text2 + "\"", requireSuccess: true) != null)
                 {
                     sshSession.Tag = text2;
                 }
                 else
                 {
-                    string text3 = sshSession.RunCommandChecked("pwd", flag: true)?.FirstOrDefault((string text5) => text5.StartsWith("/"));
+                    string text3 = sshSession.RunCommandChecked("pwd", requireSuccess: true)?.FirstOrDefault((string text5) => text5.StartsWith("/"));
                     if (text3 == null)
                     {
                         text3 = RemotePathUtils.GetDirectoryName(sshSession.GetTempPath("test"));
                     }
                     text = text3 + "/.SysprogsSync/" + text2;
-                    if (text != null && sshSession.RunCommandChecked("test -f \"" + text + "\"", flag: true) != null)
+                    if (text != null && sshSession.RunCommandChecked("test -f \"" + text + "\"", requireSuccess: true) != null)
                     {
                         sshSession.Tag = text;
                     }
                     else
                     {
                         string text4 = text3 + "/.SysprogsSync";
-                        sshSession.RunCommandChecked("mkdir -p \"" + text4 + "\"", flag: false);
+                        sshSession.RunCommandChecked("mkdir -p \"" + text4 + "\"", requireSuccess: false);
                         text = text4 + "/SysprogsSync-v1.2";
                         HelperBuilder helperBuilder = new HelperBuilder(sshSession, this._helperSourcePath, text);
                         try

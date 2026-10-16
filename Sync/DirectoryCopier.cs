@@ -113,7 +113,7 @@ public class DirectoryCopier
         public DateTime Time;
     }
 
-    private LibSsh2Session _session;
+    private SshSession _session;
 
     private string _tempPath;
 
@@ -141,9 +141,9 @@ public class DirectoryCopier
 
     public event Action<object, string> Log;
 
-    public DirectoryCopier(LibSsh2Session libSsh2Session, string text = "/tmp")
+    public DirectoryCopier(SshSession sshSession, string text = "/tmp")
     {
-        _session = libSsh2Session;
+        _session = sshSession;
         _tempPath = text;
     }
 
@@ -252,7 +252,7 @@ public class DirectoryCopier
                     break;
                 }
             }
-            this._session.RunCommandChecked($"rm \"{arg}\"", flag: false);
+            this._session.RunCommandChecked($"rm \"{arg}\"", requireSuccess: false);
         }
         if (!string.IsNullOrEmpty(text4) && directoryStatistics != null)
         {
@@ -266,7 +266,7 @@ public class DirectoryCopier
     {
         List<string> list = new List<string>();
         List<string> list2 = new List<string>();
-        List<string> list3 = this._session.RunCommandChecked("ls -1ALF \"" + text2 + "\"", flag: true);
+        List<string> list3 = this._session.RunCommandChecked("ls -1ALF \"" + text2 + "\"", requireSuccess: true);
         if (list3 == null)
         {
             if (Log != null)
@@ -622,7 +622,7 @@ public class DirectoryCopier
         }
         try
         {
-            this._session.RunCommandChecked("mkdir \"" + text2 + "\"", flag: true);
+            this._session.RunCommandChecked("mkdir \"" + text2 + "\"", requireSuccess: true);
             do
             {
                 if (findData.FileName == "." || findData.FileName == "..")
@@ -665,7 +665,7 @@ public class DirectoryCopier
 
     public void CountLocalFiles(string text, ref int value2, ref long value3, string text2)
     {
-        if (TarOverwrite != null && this._session.RunCommandChecked("test -f '" + text + "'", flag: true) != null)
+        if (TarOverwrite != null && this._session.RunCommandChecked("test -f '" + text + "'", requireSuccess: true) != null)
         {
             bool flag = false;
             TarOverwrite(text, ref flag);
@@ -777,21 +777,21 @@ public class DirectoryCopier
         }
     }
 
-    public static long CopyBetweenHosts(LibSsh2Session libSsh2Session, string text5, LibSsh2Session libSsh2Session2, string text6, Action<object, string> callback)
+    public static long CopyBetweenHosts(SshSession sshSession, string text5, SshSession sshSession2, string text6, Action<object, string> callback)
     {
         string text = TarCommands.GetCreateCommand(text5, flag: false);
         string text2 = TarCommands.GetExtractCommand(text6, flag: false);
         string text3 = $"mkdir -p \"{text6}\"";
         long num = 0L;
-        libSsh2Session2.RunCommandChecked(text3, flag: false);
+        sshSession2.RunCommandChecked(text3, requireSuccess: false);
         bool flag = false;
         OutputCollector outputCollector = new OutputCollector();
-        using (SshShellChannel sshShellChannel = libSsh2Session.OpenShellChannel(text))
+        using (SshShellChannel sshShellChannel = sshSession.OpenShellChannel(text))
         {
             sshShellChannel.DataReceived += outputCollector.OnDataReceived;
             sshShellChannel.ReadStderrOnRead = true;
             sshShellChannel.Output.ReadFully = true;
-            using (SshShellChannel sshShellChannel2 = libSsh2Session2.OpenShellChannel(text2))
+            using (SshShellChannel sshShellChannel2 = sshSession2.OpenShellChannel(text2))
             {
                 sshShellChannel2.DataReceived += outputCollector.OnDataReceived;
                 sshShellChannel2.ReadStderrOnRead = true;

@@ -668,18 +668,8 @@ public class MainWindowController : INotifyPropertyChanged
                     }
                     Progress = (double)valueOrDefault.TotalDone * 1.0 / (double)valueOrDefault.TotalSize;
                 }
-                LibSsh2Session.SessionStats sessionStats = activeSession.Session.Statistics;
+                SshSession.SessionStats sessionStats = activeSession.Session.Statistics;
                 Status2 = $"{StringUtils.FormatSize(sessionStats.BytesSent)}B sent, {StringUtils.FormatSize(sessionStats.BytesReceived)}B received";
-                foreach (SessionWrapper allSession in _Controller.AllSessions)
-                {
-                    try
-                    {
-                        allSession.Session?.SendKeepAlive();
-                    }
-                    catch
-                    {
-                    }
-                }
             }
             catch (Exception ex)
             {
