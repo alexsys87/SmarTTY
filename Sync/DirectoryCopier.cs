@@ -1,5 +1,5 @@
-﻿using ManagedLibSSH2;
-using ManagedLibSSH2.QuickSync;
+﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh.QuickSync;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

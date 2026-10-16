@@ -1,4 +1,4 @@
-﻿using ManagedLibSSH2.QuickSync;
+﻿using SmarTTY.Ssh.QuickSync;
 using System;
 
 namespace SmarTTY.Sync;

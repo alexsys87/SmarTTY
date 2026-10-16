@@ -1,4 +1,4 @@
-﻿using ManagedLibSSH2;
+﻿using SmarTTY.Ssh;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

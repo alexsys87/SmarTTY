@@ -1,4 +1,4 @@
-﻿using ManagedLibSSH2;
+﻿using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.GUI.Backend;
 using SmarTTY.Transport;
