@@ -477,6 +477,51 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
     }
 
+    private void copyToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        CopySelection();
+    }
+
+    public void CopySelection()
+    {
+        if (HexMode)
+        {
+            hexTerminalControl1.CopySelection();
+        }
+        else if (((ReadonlyTextBrowser)terminalEmulatorControl1).HasSelection)
+        {
+            terminalEmulatorControl1.CopySelection(flag: false);
+        }
+    }
+
+    private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
+    {
+        copyToolStripMenuItem.Enabled = HexMode ? hexTerminalControl1.HasSelection : ((ReadonlyTextBrowser)terminalEmulatorControl1).HasSelection;
+    }
+
+    private void OnTerminalKeyDown(object sender, KeyEventArgs e)
+    {
+        // Ctrl+C is sent to the device (e.g. SIGINT for a Linux console), so clipboard
+        // operations use Ctrl+Shift+C / Ctrl+Shift+V like in common Linux terminals.
+        // The HEX view never sends Ctrl+C to the device, so plain Ctrl+C copies there as well.
+        bool copy = e.Control && !e.Alt && e.KeyCode == Keys.C && (e.Shift || HexMode);
+        bool paste = e.Control && e.Shift && !e.Alt && e.KeyCode == Keys.V;
+        if (copy)
+        {
+            CopySelection();
+        }
+        else if (paste)
+        {
+            pasteToolStripMenuItem_Click(sender, e);
+        }
+        else
+        {
+            return;
+        }
+        e.Handled = true;
+        e.SuppressKeyPress = true;
+    }
+
     private void pasteToolStripMenuItem_Click(object sender, EventArgs e)
     {
         try

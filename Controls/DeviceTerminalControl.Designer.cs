@@ -52,6 +52,8 @@ public partial class DeviceTerminalControl
 
 	private ContextMenuStrip contextMenuStrip1;
 
+	private ToolStripMenuItem copyToolStripMenuItem;
+
 	private ToolStripMenuItem copyAllToolStripMenuItem;
 
 	private ToolStripMenuItem pasteToolStripMenuItem;
@@ -111,6 +113,7 @@ public partial class DeviceTerminalControl
 		lblBaudRate = new ToolStripLabel();
 		cbBaudRate = new ToolStripComboBox();
 		contextMenuStrip1 = new ContextMenuStrip(components);
+		copyToolStripMenuItem = new ToolStripMenuItem();
 		copyAllToolStripMenuItem = new ToolStripMenuItem();
 		pasteToolStripMenuItem = new ToolStripMenuItem();
 		_openFileDialog = new OpenFileDialog();
@@ -269,17 +272,25 @@ public partial class DeviceTerminalControl
 		cbBaudRate.SelectedIndexChanged += cbBaudRate_SelectedIndexChanged;
 		cbBaudRate.Leave += cbBaudRate_Leave;
 		cbBaudRate.KeyDown += cbBaudRate_KeyDown;
-		contextMenuStrip1.Items.AddRange(new ToolStripItem[2] { copyAllToolStripMenuItem, pasteToolStripMenuItem });
+		contextMenuStrip1.Items.AddRange(new ToolStripItem[3] { copyToolStripMenuItem, copyAllToolStripMenuItem, pasteToolStripMenuItem });
 		contextMenuStrip1.Name = "contextMenuStrip1";
-		contextMenuStrip1.Size = new Size(118, 48);
+		contextMenuStrip1.Size = new Size(200, 70);
+		contextMenuStrip1.Opening += contextMenuStrip1_Opening;
+		copyToolStripMenuItem.Image = SmarTTY.Properties.Resources.CopyHS;
+		copyToolStripMenuItem.Name = "copyToolStripMenuItem";
+		copyToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+C";
+		copyToolStripMenuItem.Size = new Size(199, 22);
+		copyToolStripMenuItem.Text = "Copy";
+		copyToolStripMenuItem.Click += copyToolStripMenuItem_Click;
 		copyAllToolStripMenuItem.Image = (Image)resources.GetObject("copyAllToolStripMenuItem.Image");
 		copyAllToolStripMenuItem.Name = "copyAllToolStripMenuItem";
-		copyAllToolStripMenuItem.Size = new Size(117, 22);
+		copyAllToolStripMenuItem.Size = new Size(199, 22);
 		copyAllToolStripMenuItem.Text = "Copy all";
 		copyAllToolStripMenuItem.Click += copyAllToolStripMenuItem_Click;
 		pasteToolStripMenuItem.Image = (Image)resources.GetObject("pasteToolStripMenuItem.Image");
 		pasteToolStripMenuItem.Name = "pasteToolStripMenuItem";
-		pasteToolStripMenuItem.Size = new Size(117, 22);
+		pasteToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+V";
+		pasteToolStripMenuItem.Size = new Size(199, 22);
 		pasteToolStripMenuItem.Text = "Paste";
 		pasteToolStripMenuItem.Click += pasteToolStripMenuItem_Click;
 		_openFileDialog.Filter = "All files|*.*";
@@ -294,6 +305,7 @@ public partial class DeviceTerminalControl
 		hexTerminalControl1.Size = new Size(634, 236);
 		hexTerminalControl1.TabIndex = 4;
 		hexTerminalControl1.KeyPress += hexTerminalControl1_KeyPress;
+		hexTerminalControl1.KeyDown += OnTerminalKeyDown;
 		terminalEmulatorControl1.ActiveBufferIndex = 0;
 		terminalEmulatorControl1.AutoScroll = true;
 		terminalEmulatorControl1.AutoWrap = true;
@@ -343,6 +355,7 @@ public partial class DeviceTerminalControl
 		terminalEmulatorControl1.VerticalScrollBarVisible = true;
 		terminalEmulatorControl1.Dispatcher = null;
 		terminalEmulatorControl1.DataEntered += OnTerminalDataEntered;
+		terminalEmulatorControl1.KeyDown += OnTerminalKeyDown;
 		Controls.Add(toolStrip1);
 		Controls.Add(hexTerminalControl1);
 		Controls.Add(terminalEmulatorControl1);

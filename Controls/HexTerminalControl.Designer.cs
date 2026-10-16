@@ -68,6 +68,7 @@ public partial class HexTerminalControl
 		((ReadonlyTextBrowser)termHex).SelectionChanged += SyncSelectionToText;
 		termHex.Scroll += termHex_Scroll;
 		termHex.KeyPress += termHex_KeyPress;
+		termHex.KeyDown += termView_KeyDown;
 		termText.ActiveBufferIndex = 0;
 		termText.AutoScroll = true;
 		termText.AutoWrap = false;
@@ -103,6 +104,7 @@ public partial class HexTerminalControl
 		((ReadonlyTextBrowser)termText).SelectionChanged += SyncSelectionToHex;
 		termText.Scroll += termText_Scroll;
 		termText.KeyPress += termHex_KeyPress;
+		termText.KeyDown += termView_KeyDown;
 		_resizeTimer.Tick += OnResizeTimer;
 		AutoScaleDimensions = new SizeF(6f, 13f);
 		Controls.Add(termHex);
