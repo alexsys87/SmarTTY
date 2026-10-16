@@ -1,0 +1,158 @@
+<?xml version="1.0"?>
+<TerminalKeyLayout xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Name>XTerm</Name>
+  <Entries>
+  <!-- Old-style codes for function keys
+    <Entry><KeyCode>F1</KeyCode><EscapeSequence>[11~</EscapeSequence></Entry>
+    <Entry><KeyCode>F2</KeyCode><EscapeSequence>[12~</EscapeSequence></Entry>
+    <Entry><KeyCode>F3</KeyCode><EscapeSequence>[13~</EscapeSequence></Entry>
+    <Entry><KeyCode>F4</KeyCode><EscapeSequence>[14~</EscapeSequence></Entry>
+  -->
+	
+    <Entry><KeyCode>F1</KeyCode><EscapeSequence>OP</EscapeSequence></Entry>
+    <Entry><KeyCode>F2</KeyCode><EscapeSequence>OQ</EscapeSequence></Entry>
+    <Entry><KeyCode>F3</KeyCode><EscapeSequence>OR</EscapeSequence></Entry>
+    <Entry><KeyCode>F4</KeyCode><EscapeSequence>OS</EscapeSequence></Entry>
+
+    <Entry><KeyCode>F5</KeyCode><EscapeSequence>[15~</EscapeSequence></Entry>
+    <Entry><KeyCode>F6</KeyCode><EscapeSequence>[17~</EscapeSequence></Entry>
+    <Entry><KeyCode>F7</KeyCode><EscapeSequence>[18~</EscapeSequence></Entry>
+    <Entry><KeyCode>F8</KeyCode><EscapeSequence>[19~</EscapeSequence></Entry>
+    <Entry><KeyCode>F9</KeyCode><EscapeSequence>[20~</EscapeSequence></Entry>
+    <Entry><KeyCode>F10</KeyCode><EscapeSequence>[21~</EscapeSequence></Entry>
+    <Entry><KeyCode>F11</KeyCode><EscapeSequence>[23~</EscapeSequence></Entry>
+    <Entry><KeyCode>F12</KeyCode><EscapeSequence>[24~</EscapeSequence></Entry>
+
+	<!-- Direction keys -->
+    <Entry><KeyCode>Up</KeyCode><EscapeSequence>[A</EscapeSequence></Entry>
+    <Entry><KeyCode>Down</KeyCode><EscapeSequence>[B</EscapeSequence></Entry>
+    <Entry><KeyCode>Right</KeyCode><EscapeSequence>[C</EscapeSequence></Entry>
+    <Entry><KeyCode>Left</KeyCode><EscapeSequence>[D</EscapeSequence></Entry>
+    <Entry><KeyCode>Home</KeyCode><EscapeSequence>[H</EscapeSequence></Entry>
+    <Entry><KeyCode>End</KeyCode><EscapeSequence>[F</EscapeSequence></Entry>
+
+	<!-- Other keys -->
+    <Entry><KeyCode>Insert</KeyCode><EscapeSequence>[2~</EscapeSequence></Entry>
+    <Entry><KeyCode>Delete</KeyCode><EscapeSequence>[3~</EscapeSequence></Entry>
+    <Entry><KeyCode>PageUp</KeyCode><EscapeSequence>[5~</EscapeSequence></Entry>
+    <Entry><KeyCode>PageDown</KeyCode><EscapeSequence>[6~</EscapeSequence></Entry>
+	
+    <Entry><KeyCode>Clear</KeyCode><EscapeSequence>[G</EscapeSequence></Entry>
+	
+  </Entries>
+
+  <AppModeCursorKeys>
+    <Entry><KeyCode>Up</KeyCode><EscapeSequence>OA</EscapeSequence></Entry>
+    <Entry><KeyCode>Down</KeyCode><EscapeSequence>OB</EscapeSequence></Entry>
+    <Entry><KeyCode>Right</KeyCode><EscapeSequence>OC</EscapeSequence></Entry>
+    <Entry><KeyCode>Left</KeyCode><EscapeSequence>OD</EscapeSequence></Entry>
+    <Entry><KeyCode>Home</KeyCode><EscapeSequence>OH</EscapeSequence></Entry>
+    <Entry><KeyCode>End</KeyCode><EscapeSequence>OF</EscapeSequence></Entry>
+  </AppModeCursorKeys>
+
+  <AppModeNumPadKeys>
+    <Entry><KeyCode>Insert</KeyCode><EscapeSequence>Op</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad0</KeyCode><EscapeSequence>Op</EscapeSequence></Entry>
+	
+    <Entry><KeyCode>Delete</KeyCode><EscapeSequence>On</EscapeSequence></Entry>
+    <Entry><KeyCode>Decimal</KeyCode><EscapeSequence>On</EscapeSequence></Entry>
+	
+    <Entry><KeyCode>End</KeyCode><EscapeSequence>Oq</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad1</KeyCode><EscapeSequence>Oq</EscapeSequence></Entry>
+
+    <Entry><KeyCode>Down</KeyCode><EscapeSequence>Or</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad2</KeyCode><EscapeSequence>Or</EscapeSequence></Entry>
+
+    <Entry><KeyCode>PageDown</KeyCode><EscapeSequence>Os</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad3</KeyCode><EscapeSequence>Os</EscapeSequence></Entry>
+
+    <Entry><KeyCode>Left</KeyCode><EscapeSequence>Ot</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad4</KeyCode><EscapeSequence>Ot</EscapeSequence></Entry>
+    
+	<Entry><KeyCode>Clear</KeyCode><EscapeSequence>Ou</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad5</KeyCode><EscapeSequence>Ou</EscapeSequence></Entry>
+
+    <Entry><KeyCode>Right</KeyCode><EscapeSequence>Ov</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad6</KeyCode><EscapeSequence>Ov</EscapeSequence></Entry>
+
+    <Entry><KeyCode>Home</KeyCode><EscapeSequence>Ow</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad7</KeyCode><EscapeSequence>Ow</EscapeSequence></Entry>
+
+    <Entry><KeyCode>Up</KeyCode><EscapeSequence>Ox</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad8</KeyCode><EscapeSequence>Ox</EscapeSequence></Entry>
+	
+    <Entry><KeyCode>PageUp</KeyCode><EscapeSequence>Oy</EscapeSequence></Entry>
+    <Entry><KeyCode>NumPad9</KeyCode><EscapeSequence>Oy</EscapeSequence></Entry>
+
+	
+    <Entry><KeyCode>NumLock</KeyCode><EscapeSequence>OP</EscapeSequence></Entry>
+    <Entry><KeyCode>Divide</KeyCode><EscapeSequence>OQ</EscapeSequence></Entry>
+    <Entry><KeyCode>Multiply</KeyCode><EscapeSequence>OR</EscapeSequence></Entry>
+    <Entry><KeyCode>Subtract</KeyCode><EscapeSequence>OS</EscapeSequence></Entry>
+    <Entry><KeyCode>Add</KeyCode><EscapeSequence>Ol</EscapeSequence></Entry>
+
+    <Entry><KeyCode>Enter</KeyCode><EscapeSequence>OM</EscapeSequence></Entry>
+  </AppModeNumPadKeys>
+	
+	<NumPadKeyCodesNonExtended>
+		<!-- Numpad keys with NumLock on -->
+		<Keys>NumPad0</Keys>
+		<Keys>NumPad1</Keys>
+		<Keys>NumPad2</Keys>
+		<Keys>NumPad3</Keys>
+		<Keys>NumPad4</Keys>
+		<Keys>NumPad5</Keys>
+		<Keys>NumPad6</Keys>
+		<Keys>NumPad7</Keys>
+		<Keys>NumPad8</Keys>
+		<Keys>NumPad9</Keys>
+
+		<!-- Numpad keys (regardless of NumLock status) -->
+		<Keys>NumLock</Keys>
+		<Keys>Divide</Keys>
+		<Keys>Multiply</Keys>
+		<Keys>Subtract</Keys>
+		<Keys>Add</Keys>
+		<Keys>Decimal</Keys>
+
+		<!-- Numpad keys with NumLock off -->
+		<Keys>Insert</Keys>
+		<Keys>Delete</Keys>
+		<Keys>End</Keys>
+		<Keys>Down</Keys>
+		<Keys>PageDown</Keys>
+		<Keys>Left</Keys>
+		<Keys>Clear</Keys>
+		<Keys>Right</Keys>
+		<Keys>Home</Keys>
+		<Keys>Up</Keys>
+		<Keys>PageUp</Keys>
+		
+	</NumPadKeyCodesNonExtended>
+
+	<NumPadKeyCodesExtended>
+		<!-- Numpad keys with NumLock on -->
+		<Keys>NumPad0</Keys>
+		<Keys>NumPad1</Keys>
+		<Keys>NumPad2</Keys>
+		<Keys>NumPad3</Keys>
+		<Keys>NumPad4</Keys>
+		<Keys>NumPad5</Keys>
+		<Keys>NumPad6</Keys>
+		<Keys>NumPad7</Keys>
+		<Keys>NumPad8</Keys>
+		<Keys>NumPad9</Keys>
+		
+		<!-- Numpad keys (regardless of NumLock status) -->
+		<Keys>NumLock</Keys>
+		<Keys>Divide</Keys>
+		<Keys>Multiply</Keys>
+		<Keys>Subtract</Keys>
+		<Keys>Add</Keys>
+		<Keys>Decimal</Keys>
+
+		<!-- Numpad Enter -->
+		<Keys>Enter</Keys>
+	</NumPadKeyCodesExtended>
+	
+</TerminalKeyLayout>

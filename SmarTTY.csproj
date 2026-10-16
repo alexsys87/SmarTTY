@@ -1,0 +1,356 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>SmarTTY</AssemblyName>
+    <RootNamespace>SmarTTY</RootNamespace>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net40</TargetFramework>
+    <PlatformTarget>x86</PlatformTarget>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <NoWarn>$(NoWarn);CS0649;CS0169;CS0414;CS0197;CS1690;CS0108;CS0109</NoWarn>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <StartupObject>SmarTTY.Program</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="VisualTTY\XTermKeys.xml" LogicalName="VisualTTY.XTermKeys.xml" />
+    <Resource Include="icons\**\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Controls\ArgumentLabel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\CodeEditorPP.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\DeviceTerminalControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\DoubleBufferedListView.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Controls\DpiAwareControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\DynamicTreeBrowser.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\EditableTextBrowser.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\HexTerminalControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\IndefiniteWaitControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\ReadonlySmartScrollBrowser.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\ReadonlyTextBrowser.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\RemoteFileEditor.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\SshTerminalControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\SuggestionListView.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Controls\TerminalEmulatorBase.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\TerminalEmulatorControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\TextEditorControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\TextHintControl.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Forms\AboutForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\DeviceTerminalHostForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\DirectoryTransferForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\DpiAwareForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\FormBase.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\HostKeyMismatchForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\LogReplayForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\MinimalisticModeNotificationForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\NewHostKeyForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\OKCancelFormBase.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\PaletteEditForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\PasswordRequestForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\ProxyAuthForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\PublicKeyManagerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\RemoteFolderBrowserForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\RemoteFolderDialog.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Forms\RemoteOpenFileDialog.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Forms\RemoteOpenFileForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\SCPDownloadForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\SCPUploadForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\SerialPortSettingsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\SudoConfirmationForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\SuggestionListForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\TextHintForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Forms\TransferErrorForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="SshConnector.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Terminal\TerminalEventDispatcher.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="App.Designer.cs">
+      <DependentUpon>App.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\ArgumentLabel.Designer.cs">
+      <DependentUpon>ArgumentLabel.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\CodeEditorPP.Designer.cs">
+      <DependentUpon>CodeEditorPP.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\DeviceTerminalControl.Designer.cs">
+      <DependentUpon>DeviceTerminalControl.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\DoubleBufferedListView.Designer.cs">
+      <DependentUpon>DoubleBufferedListView.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\DpiAwareControl.Designer.cs">
+      <DependentUpon>DpiAwareControl.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\DynamicTreeBrowser.Designer.cs">
+      <DependentUpon>DynamicTreeBrowser.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\EditableTextBrowser.Designer.cs">
+      <DependentUpon>EditableTextBrowser.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\HexTerminalControl.Designer.cs">
+      <DependentUpon>HexTerminalControl.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\IndefiniteWaitControl.Designer.cs">
+      <DependentUpon>IndefiniteWaitControl.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\ReadonlySmartScrollBrowser.Designer.cs">
+      <DependentUpon>ReadonlySmartScrollBrowser.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\ReadonlyTextBrowser.Designer.cs">
+      <DependentUpon>ReadonlyTextBrowser.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\RemoteFileEditor.Designer.cs">
+      <DependentUpon>RemoteFileEditor.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\SuggestionListView.Designer.cs">
+      <DependentUpon>SuggestionListView.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\TerminalEmulatorBase.Designer.cs">
+      <DependentUpon>TerminalEmulatorBase.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\TerminalEmulatorControl.Designer.cs">
+      <DependentUpon>TerminalEmulatorControl.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\TextEditorControl.Designer.cs">
+      <DependentUpon>TextEditorControl.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Controls\TextHintControl.Designer.cs">
+      <DependentUpon>TextHintControl.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\AboutForm.Designer.cs">
+      <DependentUpon>AboutForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\DeviceTerminalHostForm.Designer.cs">
+      <DependentUpon>DeviceTerminalHostForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\DirectoryTransferForm.Designer.cs">
+      <DependentUpon>DirectoryTransferForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\DpiAwareForm.Designer.cs">
+      <DependentUpon>DpiAwareForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\FormBase.Designer.cs">
+      <DependentUpon>FormBase.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\HostKeyMismatchForm.Designer.cs">
+      <DependentUpon>HostKeyMismatchForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\LogReplayForm.Designer.cs">
+      <DependentUpon>LogReplayForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\MinimalisticModeNotificationForm.Designer.cs">
+      <DependentUpon>MinimalisticModeNotificationForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\NewHostKeyForm.Designer.cs">
+      <DependentUpon>NewHostKeyForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\OKCancelFormBase.Designer.cs">
+      <DependentUpon>OKCancelFormBase.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\PaletteEditForm.Designer.cs">
+      <DependentUpon>PaletteEditForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\PasswordRequestForm.Designer.cs">
+      <DependentUpon>PasswordRequestForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\ProxyAuthForm.Designer.cs">
+      <DependentUpon>ProxyAuthForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\PublicKeyManagerForm.Designer.cs">
+      <DependentUpon>PublicKeyManagerForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\RemoteFolderBrowserForm.Designer.cs">
+      <DependentUpon>RemoteFolderBrowserForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\RemoteFolderDialog.Designer.cs">
+      <DependentUpon>RemoteFolderDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\RemoteOpenFileDialog.Designer.cs">
+      <DependentUpon>RemoteOpenFileDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\RemoteOpenFileForm.Designer.cs">
+      <DependentUpon>RemoteOpenFileForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\SCPDownloadForm.Designer.cs">
+      <DependentUpon>SCPDownloadForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\SCPUploadForm.Designer.cs">
+      <DependentUpon>SCPUploadForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\SerialPortSettingsForm.Designer.cs">
+      <DependentUpon>SerialPortSettingsForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\SudoConfirmationForm.Designer.cs">
+      <DependentUpon>SudoConfirmationForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\SuggestionListForm.Designer.cs">
+      <DependentUpon>SuggestionListForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\TextHintForm.Designer.cs">
+      <DependentUpon>TextHintForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Forms\TransferErrorForm.Designer.cs">
+      <DependentUpon>TransferErrorForm.cs</DependentUpon>
+    </Compile>
+    <Compile Update="SshConnector.Designer.cs">
+      <DependentUpon>SshConnector.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Terminal\TerminalEventDispatcher.Designer.cs">
+      <DependentUpon>TerminalEventDispatcher.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="CodeEditPP\Properties\Resources.resx">
+      <DependentUpon>Resources.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Controls\DeviceTerminalControl.resx">
+      <DependentUpon>DeviceTerminalControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Controls\IndefiniteWaitControl.resx">
+      <DependentUpon>IndefiniteWaitControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\AboutForm.resx">
+      <DependentUpon>AboutForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\DeviceTerminalHostForm.resx">
+      <DependentUpon>DeviceTerminalHostForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\DirectoryTransferForm.resx">
+      <DependentUpon>DirectoryTransferForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\HostKeyMismatchForm.resx">
+      <DependentUpon>HostKeyMismatchForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\NewHostKeyForm.resx">
+      <DependentUpon>NewHostKeyForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\PasswordRequestForm.resx">
+      <DependentUpon>PasswordRequestForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\ProxyAuthForm.resx">
+      <DependentUpon>ProxyAuthForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\PublicKeyManagerForm.resx">
+      <DependentUpon>PublicKeyManagerForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\RemoteFolderBrowserForm.resx">
+      <DependentUpon>RemoteFolderBrowserForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\RemoteOpenFileForm.resx">
+      <DependentUpon>RemoteOpenFileForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\SCPDownloadForm.resx">
+      <DependentUpon>SCPDownloadForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Forms\SCPUploadForm.resx">
+      <DependentUpon>SCPUploadForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <DependentUpon>Resources.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Update="VisualTTY\Properties\Resources.resx">
+      <DependentUpon>Resources.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>
