@@ -80,6 +80,15 @@ dotnet build .\SmarTTY.csproj -c Release
 .\bin\Release\net48\SmarTTY.exe
 ```
 
+Если зависимость `SSH.NET` не подтянулась, выполните из каталога проекта (рядом с `SmarTTY.csproj`) и повторите сборку:
+
+```powershell
+dotnet add package SSH.NET --version 2026.0.0
+dotnet build .\SmarTTY.csproj -c Release
+```
+
+Для загрузки пакета нужен доступ к NuGet; при ошибках сети или источника пакетов сначала устраните их.
+
 Альтернатива: откройте `SmarTTY.sln` в Visual Studio, восстановите пакеты NuGet, выберите `Release` и соберите решение. При переносе сборки копируйте всю выходную папку, а не только `SmarTTY.exe`.
 
 Для SSH нужен доступный SSH-сервер и учётная запись на нём. Файловые функции и Smart Terminal рассчитаны на Unix/Linux-окружение с shell и стандартными командами. Для SCP необходима удалённая команда `scp`, для потоковой передачи каталогов — `tar`; для Smart Terminal по умолчанию используется `bash`. Ограниченная shell или SFTP-only доступ могут не поддерживать эти функции.
