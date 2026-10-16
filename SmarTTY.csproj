@@ -17,6 +17,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Standalone regression harnesses are not part of the Windows application. -->
+    <Compile Remove="tests\**\*.cs" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml" />
   </ItemGroup>
