@@ -191,8 +191,6 @@ Sysprogs/Core/CollectionHelpers.cs     (не использовался)
 IO/Archives/ZipReader.cs               (не использовался)
 Utilities/Crc32.cs                     (использовался только в ZipReader)
 ReentrancyCounter.cs                   (не использовался)
-TextEditing/ITextSource.cs             (не использовался)
-TextEditing/ILineCollection.cs         (использовался только в ITextSource)
 Utilities/DrawingContextExtensions.cs  (не использовался)
 Utilities/StreamSocketExtensions.cs    (не использовался)
 # Перенесено
