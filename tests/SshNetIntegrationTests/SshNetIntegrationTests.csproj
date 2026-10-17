@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <RootNamespace>SmarTTY.Ssh.Tests</RootNamespace>
+    <AssemblyName>SshNetIntegrationTests</AssemblyName>
+    <!-- RsaSshKey.cs uses the Windows CSP; the linked production sources also compile on non-Windows test runners. -->
+    <NoWarn>$(NoWarn);CA1416;CS0649</NoWarn>
+    <!--
+      SmarTTY.csproj is the single place that declares the SSH.NET version, so the tests always
+      run against the same library as the application instead of a copy that can drift.
+    -->
+    <SmarTTYProjectFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../SmarTTY.csproj'))</SmarTTYProjectFile>
+    <SmarTTYProjectText>$([System.IO.File]::ReadAllText('$(SmarTTYProjectFile)'))</SmarTTYProjectText>
+    <SmarTTY_SshNetVersion>$([System.Text.RegularExpressions.Regex]::Match('$(SmarTTYProjectText)', 'Include="SSH\.NET"\s+Version="([^"]+)"').Groups[1].Value)</SmarTTY_SshNetVersion>
+  </PropertyGroup>
+
+  <Target Name="EnsureSshNetVersion" BeforeTargets="CollectPackageReferences">
+    <Error Condition="'$(SmarTTY_SshNetVersion)' == ''" Text="Could not read the SSH.NET version from $(SmarTTYProjectFile)." />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="SSH.NET" Version="$(SmarTTY_SshNetVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The production SSH layer is linked directly, as in tests/CommandCompletionDatabaseTests. -->
+    <Compile Include="../../Ssh/*.cs" LinkBase="Ssh" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="IO/RemotePathUtils.cs" />
+    <Compile Include="../../IProjectAwareException.cs" Link="IProjectAwareException.cs" />
+  </ItemGroup>
+
+</Project>

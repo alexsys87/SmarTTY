@@ -26,6 +26,28 @@ jobs:
       - name: Run command completion database checks
         run: dotnet run --project tests/CommandCompletionDatabaseTests -c Release
 
+  sshnet:
+    name: SSH.NET integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install OpenSSH server
+        run: sudo apt-get update && sudo apt-get install -y openssh-server
+
+      - name: Run SSH.NET integration tests
+        env:
+          SMARTTY_SSH_TEST_REQUIRED: 1
+        run: |
+          eval "$(tests/SshNetIntegrationTests/setup-sshd.sh)"
+          dotnet run --project tests/SshNetIntegrationTests -c Release
+
   build:
     name: Build SmarTTY (Release)
     runs-on: windows-latest
