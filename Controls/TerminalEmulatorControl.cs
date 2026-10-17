@@ -1258,7 +1258,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
         else if ((Control.ModifierKeys & Keys.Alt) != Keys.Alt && AppSettings != null && AppSettings.EmulateDirectionKeysWithMouseWheel)
         {
-            string text = _keyMap.GetEscapeSequence((e.Delta < 0) ? Keys.Down : Keys.Up, _applicationKeypad, this._applicationCursorKeys, flag3: false);
+            string text = _keyMap.GetEscapeSequence((e.Delta < 0) ? Keys.Down : Keys.Up, _applicationKeypad, this._applicationCursorKeys, isNumPadKey: false);
             if (text != null)
             {
                 text = text.Insert(0, "\u001b");

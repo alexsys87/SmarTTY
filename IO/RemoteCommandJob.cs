@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -43,23 +43,23 @@ public class RemoteCommandJob : IRemoteCommand, IDisposable
         sshShellChannel.PollingEnabled = true;
     }
 
-    private void OnDataReceived(object obj, byte[] buffer, int value2, int value3, int value4)
+    private void OnDataReceived(object sender, byte[] buffer, int offset, int length, int dataType)
     {
-        if (value4 == 0)
+        if (dataType == 0)
         {
-            int num = this._stdout.Length;
-            Array.Resize(ref this._stdout, num + value3);
-            Array.Copy(buffer, value2, this._stdout, num, value3);
+            int oldLen = this._stdout.Length;
+            Array.Resize(ref this._stdout, oldLen + length);
+            Array.Copy(buffer, offset, this._stdout, oldLen, length);
         }
         else
         {
-            int num2 = this._stderr.Length;
-            Array.Resize(ref this._stderr, num2 + value3);
-            Array.Copy(buffer, value2, this._stderr, num2, value3);
+            int oldLen = this._stderr.Length;
+            Array.Resize(ref this._stderr, oldLen + length);
+            Array.Copy(buffer, offset, this._stderr, oldLen, length);
         }
     }
 
-    private void OnFinished(object obj)
+    private void OnFinished(object sender)
     {
         _exitCode = _channel.ExitStatus;
         _exitedEvent.Set();
@@ -67,9 +67,9 @@ public class RemoteCommandJob : IRemoteCommand, IDisposable
         _channel = null;
     }
 
-    public bool WaitForExit(int value2)
+    public bool WaitForExit(int timeoutMs)
     {
-        return _exitedEvent.WaitOne(value2, exitContext: false);
+        return _exitedEvent.WaitOne(timeoutMs, exitContext: false);
     }
 
     private List<string> SplitLines(byte[] buffer)
@@ -78,18 +78,18 @@ public class RemoteCommandJob : IRemoteCommand, IDisposable
         {
             return null;
         }
-        List<string> list = new List<string>();
+        List<string> lines = new List<string>();
         using StreamReader streamReader = new StreamReader(new MemoryStream(buffer));
         while (true)
         {
-            string text = streamReader.ReadLine();
-            if (text == null)
+            string line = streamReader.ReadLine();
+            if (line == null)
             {
                 break;
             }
-            list.Add(text);
+            lines.Add(line);
         }
-        return list;
+        return lines;
     }
 
     public void Dispose()
@@ -97,9 +97,9 @@ public class RemoteCommandJob : IRemoteCommand, IDisposable
         _channel?.Dispose();
     }
 
-    public void SendInput(string text)
+    public void SendInput(string input)
     {
-        byte[] bytes = Encoding.UTF8.GetBytes(text);
+        byte[] bytes = Encoding.UTF8.GetBytes(input);
         _channel.Input.Write(bytes, 0, bytes.Length);
     }
 

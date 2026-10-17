@@ -1,4 +1,4 @@
-﻿using SmarTTY.Completion;
+using SmarTTY.Completion;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -56,10 +56,10 @@ internal partial class SuggestionListForm : Form
         return true;
     }
 
-    public SuggestionListForm(ICompletionHost completionHost, bool flag)
+    public SuggestionListForm(ICompletionHost completionHost, bool allowSorting)
     {
         InitializeComponent();
-        listView1.Sorting = (flag ? SortOrder.Ascending : SortOrder.None);
+        listView1.Sorting = (allowSorting ? SortOrder.Ascending : SortOrder.None);
         listView1.Host = completionHost;
         if (!IsWindows())
         {
@@ -71,37 +71,37 @@ internal partial class SuggestionListForm : Form
     internal void SetSource(ISuggestionSource suggestionSource)
     {
         _imageList.Images.Clear();
-        foreach (Image item in suggestionSource.Images)
+        foreach (Image img in suggestionSource.Images)
         {
-            _imageList.Images.Add(item);
+            _imageList.Images.Add(img);
         }
         _allItems = new List<ListViewItem>();
-        foreach (ISuggestion item2 in suggestionSource.Items)
+        foreach (ISuggestion suggestion in suggestionSource.Items)
         {
-            ListViewItem listViewItem = new ListViewItem(item2.DisplayName);
-            if (item2.IsBold)
+            ListViewItem listViewItem = new ListViewItem(suggestion.DisplayName);
+            if (suggestion.IsBold)
             {
                 listViewItem.Font = new Font(listViewItem.Font, FontStyle.Bold);
             }
-            listViewItem.ImageIndex = item2.ImageIndex;
-            listViewItem.StateImageIndex = item2.ImageIndex;
-            listViewItem.SubItems.Add(item2.DetailText);
-            listViewItem.Tag = item2;
+            listViewItem.ImageIndex = suggestion.ImageIndex;
+            listViewItem.StateImageIndex = suggestion.ImageIndex;
+            listViewItem.SubItems.Add(suggestion.DetailText);
+            listViewItem.Tag = suggestion;
             listView1.Items.Add(listViewItem);
             _allItems.Add(listViewItem);
         }
         listView1.Sort();
     }
 
-    private void SelectIndex(int value2)
+    private void SelectIndex(int index)
     {
         listView1.SelectedIndices.Clear();
-        if (value2 < listView1.Items.Count)
+        if (index < listView1.Items.Count)
         {
-            ListViewItem listViewItem = listView1.Items[value2];
-            bool selected = (listView1.Items[value2].Focused = true);
+            ListViewItem listViewItem = listView1.Items[index];
+            bool selected = (listView1.Items[index].Focused = true);
             listViewItem.Selected = selected;
-            listView1.Items[value2].EnsureVisible();
+            listView1.Items[index].EnsureVisible();
         }
     }
 
@@ -113,38 +113,38 @@ internal partial class SuggestionListForm : Form
 
     private string[] SplitWords(string text)
     {
-        int num = 0;
-        List<string> list = new List<string>();
-        int num2;
-        for (num2 = 0; num2 < text.Length; num2++)
+        int start = 0;
+        List<string> words = new List<string>();
+        int i;
+        for (i = 0; i < text.Length; i++)
         {
-            if (char.IsUpper(text[num2]) || num2 == 0 || char.IsDigit(text[num2]))
+            if (char.IsUpper(text[i]) || i == 0 || char.IsDigit(text[i]))
             {
-                if (num < num2)
+                if (start < i)
                 {
-                    list.Add(text.Substring(num, num2 - num));
+                    words.Add(text.Substring(start, i - start));
                 }
-                num = num2;
+                start = i;
             }
-            else if (text[num2] == '_')
+            else if (text[i] == '_')
             {
-                if (num < num2)
+                if (start < i)
                 {
-                    list.Add(text.Substring(num, num2 - num));
+                    words.Add(text.Substring(start, i - start));
                 }
-                for (num = num2 + 1; num < text.Length && text[num] != '_'; num++)
+                for (start = i + 1; start < text.Length && text[start] != '_'; start++)
                 {
                 }
             }
         }
-        if (num < num2)
+        if (start < i)
         {
-            list.Add(text.Substring(num, num2 - num));
+            words.Add(text.Substring(start, i - start));
         }
-        return list.ToArray();
+        return words.ToArray();
     }
 
-    private void ResetFilter(string text)
+    private void ResetFilter(string prefix)
     {
         if (!_isFiltered)
         {
@@ -157,163 +157,161 @@ internal partial class SuggestionListForm : Form
             item.ForeColor = listView1.ForeColor;
             listView1.Items.Add(item);
         }
-        SelectMatch(text, flag: false);
+        SelectMatch(prefix, allowSubstrings: false);
     }
 
-    private void AddSubstringMatches(string text, List<ListViewItem> list)
+    private void AddSubstringMatches(string filterText, List<ListViewItem> matches)
     {
-        for (int num = 0; num < listView1.Items.Count; num++)
+        for (int i = 0; i < listView1.Items.Count; i++)
         {
-            if (listView1.Items[num].Text.IndexOf(text) != -1 && !list.Contains(listView1.Items[num]))
+            if (listView1.Items[i].Text.IndexOf(filterText) != -1 && !matches.Contains(listView1.Items[i]))
             {
-                list.Add(listView1.Items[num]);
+                matches.Add(listView1.Items[i]);
             }
         }
-        for (int num2 = 0; num2 < listView1.Items.Count; num2++)
+        for (int i = 0; i < listView1.Items.Count; i++)
         {
-            if (listView1.Items[num2].Text.IndexOf(text, StringComparison.CurrentCultureIgnoreCase) != -1 && !list.Contains(listView1.Items[num2]))
+            if (listView1.Items[i].Text.IndexOf(filterText, StringComparison.CurrentCultureIgnoreCase) != -1 && !matches.Contains(listView1.Items[i]))
             {
-                list.Add(listView1.Items[num2]);
+                matches.Add(listView1.Items[i]);
             }
         }
     }
 
-    private ListViewItem AddAbbreviationMatches(string text4, List<ListViewItem> list5)
+    private ListViewItem AddAbbreviationMatches(string prefix, List<ListViewItem> matches)
     {
-        List<ListViewItem> list = new List<ListViewItem>();
-        List<ListViewItem> list2 = new List<ListViewItem>();
-        List<ListViewItem> list3 = new List<ListViewItem>();
-        List<ListViewItem> list4 = new List<ListViewItem>();
-        for (int num = 0; num < listView1.Items.Count; num++)
+        List<ListViewItem> exactAbbrev = new List<ListViewItem>();
+        List<ListViewItem> prefixAbbrev = new List<ListViewItem>();
+        List<ListViewItem> exactWord = new List<ListViewItem>();
+        List<ListViewItem> prefixWord = new List<ListViewItem>();
+        for (int i = 0; i < listView1.Items.Count; i++)
         {
-            string[] array = SplitWords(listView1.Items[num].Text);
-            string text = "";
-            string[] array2 = array;
-            foreach (string text2 in array2)
+            string[] words = SplitWords(listView1.Items[i].Text);
+            string abbrev = "";
+            foreach (string word in words)
             {
-                text += char.ToUpper(text2[0]);
+                abbrev += char.ToUpper(word[0]);
             }
-            array2 = array;
-            foreach (string text3 in array2)
+            foreach (string word in words)
             {
-                if (StringComparer.CurrentCultureIgnoreCase.Compare(text3, text4) == 0)
+                if (StringComparer.CurrentCultureIgnoreCase.Compare(word, prefix) == 0)
                 {
-                    list3.Add(listView1.Items[num]);
+                    exactWord.Add(listView1.Items[i]);
                 }
-                if (text3.StartsWith(text4, StringComparison.CurrentCultureIgnoreCase))
+                if (word.StartsWith(prefix, StringComparison.CurrentCultureIgnoreCase))
                 {
-                    list4.Add(listView1.Items[num]);
+                    prefixWord.Add(listView1.Items[i]);
                 }
             }
-            if (text == text4)
+            if (abbrev == prefix)
             {
-                list.Add(listView1.Items[num]);
+                exactAbbrev.Add(listView1.Items[i]);
             }
-            if (text.StartsWith(text4))
+            if (abbrev.StartsWith(prefix))
             {
-                list2.Add(listView1.Items[num]);
-            }
-        }
-        ListViewItem result = null;
-        if (list.Count > 0)
-        {
-            result = list[0];
-        }
-        else if (list3.Count > 0)
-        {
-            result = list3[0];
-        }
-        foreach (ListViewItem item in list)
-        {
-            if (!list5.Contains(item))
-            {
-                list5.Add(item);
+                prefixAbbrev.Add(listView1.Items[i]);
             }
         }
-        foreach (ListViewItem item2 in list2)
+        ListViewItem bestMatch = null;
+        if (exactAbbrev.Count > 0)
         {
-            if (!list5.Contains(item2))
+            bestMatch = exactAbbrev[0];
+        }
+        else if (exactWord.Count > 0)
+        {
+            bestMatch = exactWord[0];
+        }
+        foreach (ListViewItem item in exactAbbrev)
+        {
+            if (!matches.Contains(item))
             {
-                list5.Add(item2);
+                matches.Add(item);
             }
         }
-        foreach (ListViewItem item3 in list3)
+        foreach (ListViewItem item in prefixAbbrev)
         {
-            if (!list5.Contains(item3))
+            if (!matches.Contains(item))
             {
-                list5.Add(item3);
+                matches.Add(item);
             }
         }
-        foreach (ListViewItem item4 in list4)
+        foreach (ListViewItem item in exactWord)
         {
-            if (!list5.Contains(item4))
+            if (!matches.Contains(item))
             {
-                list5.Add(item4);
+                matches.Add(item);
             }
         }
-        return result;
+        foreach (ListViewItem item in prefixWord)
+        {
+            if (!matches.Contains(item))
+            {
+                matches.Add(item);
+            }
+        }
+        return bestMatch;
     }
 
-    internal void SelectMatch(string text2, bool flag)
+    internal void SelectMatch(string prefix, bool allowSubstrings)
     {
-        int num = 0;
-        for (int num2 = 0; num2 < listView1.Items.Count; num2++)
+        int nearestIdx = 0;
+        for (int i = 0; i < listView1.Items.Count; i++)
         {
-            if (Comparer.Compare(listView1.Items[num2].Text, text2) == 0)
+            if (Comparer.Compare(listView1.Items[i].Text, prefix) == 0)
             {
-                SelectIndex(num2);
-                ResetFilter(text2);
+                SelectIndex(i);
+                ResetFilter(prefix);
                 return;
             }
         }
-        for (int num3 = 0; num3 < listView1.Items.Count; num3++)
+        for (int i = 0; i < listView1.Items.Count; i++)
         {
-            string text = listView1.Items[num3].Text;
-            if (Comparer.Compare(text, text2) < 0)
+            string itemText = listView1.Items[i].Text;
+            if (Comparer.Compare(itemText, prefix) < 0)
             {
-                num = num3;
+                nearestIdx = i;
             }
-            if (text.Length >= text2.Length && Comparer.Compare(text.Substring(0, text2.Length), text2) == 0)
+            if (itemText.Length >= prefix.Length && Comparer.Compare(itemText.Substring(0, prefix.Length), prefix) == 0)
             {
-                SelectIndex(num3);
-                ResetFilter(text2);
+                SelectIndex(i);
+                ResetFilter(prefix);
                 return;
             }
         }
-        List<ListViewItem> list = new List<ListViewItem>();
-        ListViewItem listViewItem = null;
-        if (flag)
+        List<ListViewItem> matches = new List<ListViewItem>();
+        ListViewItem bestMatch = null;
+        if (allowSubstrings)
         {
-            listViewItem = AddAbbreviationMatches(text2, list);
-            AddSubstringMatches(text2, list);
+            bestMatch = AddAbbreviationMatches(prefix, matches);
+            AddSubstringMatches(prefix, matches);
         }
-        int num4 = 0;
-        if (listViewItem != null)
+        int topCount = 0;
+        if (bestMatch != null)
         {
-            list.Remove(listViewItem);
-            list.Insert(0, listViewItem);
+            matches.Remove(bestMatch);
+            matches.Insert(0, bestMatch);
         }
-        if (list.Count != 0)
+        if (matches.Count != 0)
         {
-            foreach (ListViewItem item in list)
+            foreach (ListViewItem item in matches)
             {
                 item.Remove();
             }
-            foreach (ListViewItem item2 in list)
+            foreach (ListViewItem item in matches)
             {
-                listView1.Items.Insert(num4++, item2);
+                listView1.Items.Insert(topCount++, item);
             }
             SelectIndex(0);
-            for (int num5 = 0; num5 < listView1.Items.Count; num5++)
+            for (int i = 0; i < listView1.Items.Count; i++)
             {
-                listView1.Items[num5].ForeColor = ((num5 < num4) ? Color.Black : Color.DarkGray);
+                listView1.Items[i].ForeColor = ((i < topCount) ? Color.Black : Color.DarkGray);
             }
             this._isFiltered = true;
         }
         else
         {
-            ResetFilter(text2);
-            SelectIndex(num);
+            ResetFilter(prefix);
+            SelectIndex(nearestIdx);
         }
     }
 
@@ -323,7 +321,7 @@ internal partial class SuggestionListForm : Form
         {
             Hide();
         }
-        NotifyHost(flag: false);
+        NotifyHost(active: false);
     }
 
     protected override void OnVisibleChanged(EventArgs e)
@@ -339,21 +337,21 @@ internal partial class SuggestionListForm : Form
             return;
         }
         _suppressDeactivate = true;
-        string text = (listView1.Items[listView1.SelectedIndices[0]].Tag as ISuggestion).HintText;
-        if (text != "")
+        string hintText = (listView1.Items[listView1.SelectedIndices[0]].Tag as ISuggestion).HintText;
+        if (hintText != "")
         {
-            string text2 = (listView1.Items[listView1.SelectedIndices[0]].Tag as ISuggestion).HintDescription;
-            if (text2 == null)
+            string hintDesc = (listView1.Items[listView1.SelectedIndices[0]].Tag as ISuggestion).HintDescription;
+            if (hintDesc == null)
             {
                 _hintForm.ShowDescription = false;
             }
             else
             {
-                _hintForm.Description = text2;
+                _hintForm.Description = hintDesc;
             }
         }
-        _hintForm.SignatureText = text;
-        if (text == "")
+        _hintForm.SignatureText = hintText;
+        if (hintText == "")
         {
             if (_hintForm.Visible)
             {
@@ -362,7 +360,7 @@ internal partial class SuggestionListForm : Form
         }
         else
         {
-            _hintForm.ShowBeside(this, listView1.Items[listView1.SelectedIndices[0]].Position.Y, flag: true);
+            _hintForm.ShowBeside(this, listView1.Items[listView1.SelectedIndices[0]].Position.Y, isVertical: true);
             Activate();
             FocusList();
         }
@@ -377,24 +375,24 @@ internal partial class SuggestionListForm : Form
         }
     }
 
-    public void SetSize(int value2, int value3, int value4)
+    public void SetSize(int contentWidth, int detailWidth, int maxHeight)
     {
         if (_imageList.Images.Count > 0)
         {
-            value2 += _imageList.Images[0].Width + 5;
+            contentWidth += _imageList.Images[0].Width + 5;
         }
-        listView1.Columns[0].Width = value2 + 10;
-        Width = value2 + 35;
-        if (value3 == 0)
+        listView1.Columns[0].Width = contentWidth + 10;
+        Width = contentWidth + 35;
+        if (detailWidth == 0)
         {
             listView1.Columns[1].Width = 0;
         }
-        int num = Font.Height * listView1.Items.Count;
-        if (num > value4)
+        int totalHeight = Font.Height * listView1.Items.Count;
+        if (totalHeight > maxHeight)
         {
-            num = value4;
+            totalHeight = maxHeight;
         }
-        Height = num + 20;
+        Height = totalHeight + 20;
     }
 
     public void AcceptSelected()
@@ -404,20 +402,20 @@ internal partial class SuggestionListForm : Form
 
     private void SuggestionListForm_Activated(object sender, EventArgs e)
     {
-        NotifyHost(flag: true);
+        NotifyHost(active: true);
     }
 
     private void SuggestionListForm_FormClosed(object sender, FormClosedEventArgs e)
     {
-        NotifyHost(flag: false);
+        NotifyHost(active: false);
     }
 
-    internal void NotifyHost(bool flag)
+    internal void NotifyHost(bool active)
     {
-        if (flag != _hostNotified)
+        if (active != _hostNotified)
         {
-            listView1.Host.SetPopupActive(flag);
-            _hostNotified = flag;
+            listView1.Host.SetPopupActive(active);
+            _hostNotified = active;
         }
     }
 }

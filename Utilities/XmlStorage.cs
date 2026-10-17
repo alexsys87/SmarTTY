@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -33,9 +33,9 @@ public class XmlStorage
                 {
                     return false;
                 }
-                for (int num = 0; num < items.Length; num++)
+                for (int i = 0; i < items.Length; i++)
                 {
-                    if (items[num] != ExtraTypes[num])
+                    if (items[i] != ExtraTypes[i])
                     {
                         return false;
                     }
@@ -66,69 +66,69 @@ public class XmlStorage
     {
         lock (_cache)
         {
-            if (!_cache.TryGetValue(type, out var value))
+            if (!_cache.TryGetValue(type, out var entry))
             {
-                value = (_cache[type] = new SerializerEntry(type));
+                entry = (_cache[type] = new SerializerEntry(type));
             }
             if (items == null || items.Length == 0)
             {
-                return value.Serializer;
+                return entry.Serializer;
             }
-            if (value.Variants == null)
+            if (entry.Variants == null)
             {
-                value.Variants = new List<SerializerEntry.TypedSerializer>();
+                entry.Variants = new List<SerializerEntry.TypedSerializer>();
             }
-            foreach (SerializerEntry.TypedSerializer item in value.Variants)
+            foreach (SerializerEntry.TypedSerializer typedSerializer in entry.Variants)
             {
-                if (item.MatchesExtraTypes(items))
+                if (typedSerializer.MatchesExtraTypes(items))
                 {
-                    return item.Serializer;
+                    return typedSerializer.Serializer;
                 }
             }
-            SerializerEntry.TypedSerializer typedSerializer = new SerializerEntry.TypedSerializer(type, items);
-            value.Variants.Add(typedSerializer);
-            return typedSerializer.Serializer;
+            SerializerEntry.TypedSerializer newTypedSerializer = new SerializerEntry.TypedSerializer(type, items);
+            entry.Variants.Add(newTypedSerializer);
+            return newTypedSerializer.Serializer;
         }
     }
 
-    public static _Ty LoadFromFile<_Ty>(string text2, params Type[] items)
+    public static _Ty LoadFromFile<_Ty>(string filePath, params Type[] items)
     {
         XmlSerializer xmlSerializer = GetSerializer(typeof(_Ty), items);
-        if (!text2.EndsWith(".gz", StringComparison.InvariantCultureIgnoreCase) && File.Exists(text2))
+        if (!filePath.EndsWith(".gz", StringComparison.InvariantCultureIgnoreCase) && File.Exists(filePath))
         {
-            using (FileStream stream = File.OpenRead(text2))
+            using (FileStream fileStream = File.OpenRead(filePath))
             {
                 try
                 {
-                    return (_Ty)xmlSerializer.Deserialize(stream);
+                    return (_Ty)xmlSerializer.Deserialize(fileStream);
                 }
-                catch (XmlException ex)
+                catch (XmlException xmlEx)
                 {
-                    throw new XmlException("Error parsing " + text2 + ": " + ex.Message, ex);
+                    throw new XmlException("Error parsing " + filePath + ": " + xmlEx.Message, xmlEx);
                 }
             }
         }
-        string text = text2;
-        if (!text.EndsWith(".gz", StringComparison.InvariantCultureIgnoreCase))
+        string gzFilePath = filePath;
+        if (!gzFilePath.EndsWith(".gz", StringComparison.InvariantCultureIgnoreCase))
         {
-            text += ".gz";
+            gzFilePath += ".gz";
         }
-        if (File.Exists(text))
+        if (File.Exists(gzFilePath))
         {
-            using (FileStream stream2 = File.OpenRead(text))
+            using (FileStream gzFileStream = File.OpenRead(gzFilePath))
             {
-                using GZipStream stream3 = new GZipStream(stream2, CompressionMode.Decompress);
+                using GZipStream gzipStream = new GZipStream(gzFileStream, CompressionMode.Decompress);
                 try
                 {
-                    return (_Ty)xmlSerializer.Deserialize(stream3);
+                    return (_Ty)xmlSerializer.Deserialize(gzipStream);
                 }
-                catch (XmlException ex2)
+                catch (XmlException gzXmlEx)
                 {
-                    throw new XmlException("Error parsing " + text + ": " + ex2.Message, ex2);
+                    throw new XmlException("Error parsing " + gzFilePath + ": " + gzXmlEx.Message, gzXmlEx);
                 }
             }
         }
-        throw new Exception(text2 + " does not exist!");
+        throw new Exception(filePath + " does not exist!");
     }
 
     public static _Ty LoadFromBytes<_Ty>(byte[] buffer, params Type[] items)
@@ -143,11 +143,11 @@ public class XmlStorage
         return (_Ty)GetSerializer(typeof(_Ty), items).Deserialize(stream);
     }
 
-    public static void SaveToFile(object obj, string text, params Type[] items)
+    public static void SaveToFile(object item, string filePath, params Type[] items)
     {
-        XmlSerializer xmlSerializer = GetSerializer(obj.GetType(), items);
-        using FileStream stream = File.Create(text);
-        xmlSerializer.Serialize(stream, obj);
+        XmlSerializer xmlSerializer = GetSerializer(item.GetType(), items);
+        using FileStream stream = File.Create(filePath);
+        xmlSerializer.Serialize(stream, item);
     }
 
     public static void SaveToStream(object obj, Stream stream, params Type[] items)
@@ -192,54 +192,54 @@ public class XmlStorage
         return stringWriter.ToString();
     }
 
-    public static _Ty Deserialize<_Ty>(string text, params Type[] items)
+    public static _Ty Deserialize<_Ty>(string xmlString, params Type[] items)
     {
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(xmlString))
         {
             return default;
         }
         XmlSerializer xmlSerializer = GetSerializer(typeof(_Ty), items);
-        using StringReader textReader = new StringReader(text);
+        using StringReader textReader = new StringReader(xmlString);
         return (_Ty)xmlSerializer.Deserialize(textReader);
     }
 
-    public static void SaveToAppData<_Ty>(_Ty item, string text, string text2, string text3) where _Ty : SerializableObjectWithFileNameTracking
+    public static void SaveToAppData<_Ty>(_Ty item, string subfolder, string namePrefix, string extension) where _Ty : SerializableObjectWithFileNameTracking
     {
         if (item.SavedFileName == null)
         {
             string folderPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            folderPath = Path.Combine(folderPath, text);
+            folderPath = Path.Combine(folderPath, subfolder);
             Directory.CreateDirectory(folderPath);
-            char[] array = text2.ToCharArray();
-            for (int num = 0; num < array.Length; num++)
+            char[] sanitizedChars = namePrefix.ToCharArray();
+            for (int i = 0; i < sanitizedChars.Length; i++)
             {
-                if ("/\\@:<>*?[].".IndexOf(array[num]) != -1)
+                if ("/\\@:<>*?[].".IndexOf(sanitizedChars[i]) != -1)
                 {
-                    array[num] = '_';
+                    sanitizedChars[i] = '_';
                 }
             }
-            item.SavedFileName = Path.Combine(folderPath, new string(array) + text3);
+            item.SavedFileName = Path.Combine(folderPath, new string(sanitizedChars) + extension);
         }
         SaveToFile(item, item.SavedFileName);
     }
 
-    public static List<_Ty> LoadAllFromAppData<_Ty>(string text2, string text3) where _Ty : SerializableObjectWithFileNameTracking
+    public static List<_Ty> LoadAllFromAppData<_Ty>(string subfolder, string extension) where _Ty : SerializableObjectWithFileNameTracking
     {
-        List<_Ty> list = new List<_Ty>();
+        List<_Ty> itemsList = new List<_Ty>();
         try
         {
             XmlSerializer xmlSerializer = new XmlSerializer(typeof(_Ty));
-            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), text2);
+            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), subfolder);
             Directory.CreateDirectory(path);
-            string[] files = Directory.GetFiles(path, "*" + text3);
-            foreach (string text in files)
+            string[] filePaths = Directory.GetFiles(path, "*" + extension);
+            foreach (string filePath in filePaths)
             {
                 try
                 {
-                    using FileStream stream = File.OpenRead(text);
-                    _Ty value = (_Ty)xmlSerializer.Deserialize(stream);
-                    value.SavedFileName = text;
-                    list.Add(value);
+                    using FileStream stream = File.OpenRead(filePath);
+                    _Ty deserializedItem = (_Ty)xmlSerializer.Deserialize(stream);
+                    deserializedItem.SavedFileName = filePath;
+                    itemsList.Add(deserializedItem);
                 }
                 catch
                 {
@@ -249,6 +249,6 @@ public class XmlStorage
         catch
         {
         }
-        return list;
+        return itemsList;
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -113,24 +113,24 @@ internal class WindowsCaret : ICaret
     }
 
     [DllImport("User32")]
-    private static extern bool CreateCaret(IntPtr handle, IntPtr handle2, int value2, int value3);
+    private static extern bool CreateCaret(IntPtr hWnd, IntPtr hBitmap, int width, int height);
 
     [DllImport("User32", SetLastError = true)]
-    private static extern bool ShowCaret(IntPtr handle);
+    private static extern bool ShowCaret(IntPtr hWnd);
 
     [DllImport("User32")]
     private static extern bool DestroyCaret();
 
     [DllImport("User32")]
-    private static extern bool SetCaretPos(int value2, int value3);
+    private static extern bool SetCaretPos(int x, int y);
 
-    public WindowsCaret(ICaretHost caretHost, int value2, int value3)
+    public WindowsCaret(ICaretHost caretHost, int x, int y)
     {
         _control = caretHost.HostControl;
         _control.GotFocus += OnGotFocus;
         _control.LostFocus += OnLostFocus;
-        this._x = value2;
-        this._y = value3;
+        this._x = x;
+        this._y = y;
         _yOffset = 0;
         _enabled = true;
     }
@@ -165,10 +165,10 @@ internal class WindowsCaret : ICaret
         }
     }
 
-    public void MoveTo(int value2, int value3)
+    public void MoveTo(int x, int y)
     {
-        this._x = value2;
-        this._y = value3;
+        this._x = x;
+        this._y = y;
         if (_created)
         {
             SetCaretPos(this._x, this._y + _yOffset);
@@ -219,30 +219,30 @@ internal class WindowsCaret : ICaret
     {
         if (!_created)
         {
-            int num = 0;
+            int caretWidth = 0;
             if (_width != 0)
             {
-                num = _width;
+                caretWidth = _width;
             }
             else if (_overwriteMode || _underlineStyle)
             {
-                num = (int)Graphics.FromHwnd(_control.Handle).MeasureString(new string('O', 10), _control.Font).Width / 10;
+                caretWidth = (int)Graphics.FromHwnd(_control.Handle).MeasureString(new string('O', 10), _control.Font).Width / 10;
             }
-            int num2 = _height;
-            if (num2 == 0)
+            int caretHeight = _height;
+            if (caretHeight == 0)
             {
-                num2 = _control.Font.Height;
+                caretHeight = _control.Font.Height;
             }
             if (_underlineStyle)
             {
-                num2 = 2;
-                _yOffset = _control.Font.Height - num2;
+                caretHeight = 2;
+                _yOffset = _control.Font.Height - caretHeight;
             }
             else
             {
                 _yOffset = 0;
             }
-            CreateCaret(_control.Handle, IntPtr.Zero, num, num2);
+            CreateCaret(_control.Handle, IntPtr.Zero, caretWidth, caretHeight);
             SetCaretPos(_x, _y + _yOffset);
             _created = true;
         }

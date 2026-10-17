@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using SmarTTY.IO;
 using System.Linq;
 using System.Text;
@@ -35,12 +35,12 @@ internal class CommandRun
 
         public bool IsActive => State == CommandRun.CandidateState.Position;
 
-        public LinkCandidate(SshTerminalControl sshTerminalControl, string text, char ch)
+        public LinkCandidate(SshTerminalControl sshTerminalControl, string workingDirectory, char firstChar)
         {
             _terminal = sshTerminalControl;
-            this._workingDirectory = text;
-            _path.Append(ch);
-            State = ((ch == '/') ? CommandRun.CandidateState.AbsolutePath : CommandRun.CandidateState.Word);
+            this._workingDirectory = workingDirectory;
+            _path.Append(firstChar);
+            State = ((firstChar == '/') ? CommandRun.CandidateState.AbsolutePath : CommandRun.CandidateState.Word);
         }
 
         public void Activate()
@@ -69,15 +69,15 @@ internal class CommandRun
             {
                 return false;
             }
-            if (int.TryParse(_numberBuffer, out var result))
+            if (int.TryParse(_numberBuffer, out var parsedNumber))
             {
                 if (!_line.HasValue)
                 {
-                    _line = result - 1;
+                    _line = parsedNumber - 1;
                 }
                 else
                 {
-                    _column = result - 1;
+                    _column = parsedNumber - 1;
                 }
             }
             _numberBuffer = null;
@@ -150,11 +150,11 @@ internal class CommandRun
 
         private LinkCandidate ReadChar(char ch)
         {
-            char ch2 = _previousChar;
+            char prevChar = _previousChar;
             _previousChar = ch;
             if (_current == null)
             {
-                if (IsPathChar(ch) && ch2 != '/')
+                if (IsPathChar(ch) && prevChar != '/')
                 {
                     return _current = new LinkCandidate(_run._terminal, _run.WorkingDirectory, ch);
                 }
@@ -167,22 +167,22 @@ internal class CommandRun
             return _current;
         }
 
-        public TerminalEmulatorBase.LinkCell[] Scan(string text)
+        public TerminalEmulatorBase.LinkCell[] Scan(string lineText)
         {
-            char[] array = text.ToArray();
-            LinkCandidate[] array2 = array.Select(ReadChar).ToArray();
-            for (int num = 0; num < array2.Length; num++)
+            char[] charArray = lineText.ToArray();
+            LinkCandidate[] candidateArray = charArray.Select(ReadChar).ToArray();
+            for (int i = 0; i < candidateArray.Length; i++)
             {
-                if (array2[num] != null && array2[num].State == CandidateState.Rejected)
+                if (candidateArray[i] != null && candidateArray[i].State == CandidateState.Rejected)
                 {
-                    array2[num] = null;
+                    candidateArray[i] = null;
                 }
-                else if (array[num] == ':' && (num >= array2.Length - 1 || array2[num + 1] == null || array2[num + 1].State == CandidateState.Rejected))
+                else if (charArray[i] == ':' && (i >= candidateArray.Length - 1 || candidateArray[i + 1] == null || candidateArray[i + 1].State == CandidateState.Rejected))
                 {
-                    array2[num] = null;
+                    candidateArray[i] = null;
                 }
             }
-            return array2.Select((LinkCandidate linkCandidate) => new TerminalEmulatorBase.LinkCell
+            return candidateArray.Select((LinkCandidate linkCandidate) => new TerminalEmulatorBase.LinkCell
             {
                 Target = linkCandidate
             }).ToArray();
@@ -206,12 +206,12 @@ internal class CommandRun
 
     public int UnusedValue { get; private set; }
 
-    public CommandRun(SshTerminalControl sshTerminalControl, string text, string text2, int value2)
+    public CommandRun(SshTerminalControl sshTerminalControl, string commandText, string workingDirectory, int startLine)
     {
         _terminal = sshTerminalControl;
-        WorkingDirectory = text2;
-        CommandText = text;
-        this.StartLine = value2;
+        WorkingDirectory = workingDirectory;
+        CommandText = commandText;
+        this.StartLine = startLine;
     }
 
     private static bool IsPathChar(char ch)

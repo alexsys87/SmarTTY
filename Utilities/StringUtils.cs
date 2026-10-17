@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -20,7 +20,7 @@ public static class StringUtils
         AllSuffixes = 14
     }
 
-    public delegate string PlaceholderResolver(string text, string text2);
+    public delegate string PlaceholderResolver(string name, string option);
 
     public struct FirstTokenSplit
     {
@@ -29,18 +29,18 @@ public static class StringUtils
         public string Rest;
     }
 
-    public static string AfterFirst(string text, char ch, string text2 = null)
+    public static string AfterFirst(string text, char ch, string defaultValue = null)
     {
         if (text == null)
         {
             return null;
         }
-        int num = text.IndexOf(ch);
-        if (num == -1)
+        int index = text.IndexOf(ch);
+        if (index == -1)
         {
-            return text2;
+            return defaultValue;
         }
-        return text.Substring(num + 1);
+        return text.Substring(index + 1);
     }
 
     public static IEnumerable<int> IndexesOf(string text, char ch)
@@ -48,199 +48,199 @@ public static class StringUtils
         int startIndex = 0;
         while (true)
         {
-            int num = text.IndexOf(ch, startIndex);
-            if (num != -1)
+            int index = text.IndexOf(ch, startIndex);
+            if (index != -1)
             {
-                yield return num;
-                startIndex = num + 1;
+                yield return index;
+                startIndex = index + 1;
                 continue;
             }
             break;
         }
     }
 
-    public static string AfterLast(string text, char ch, string text2 = null)
+    public static string AfterLast(string text, char ch, string defaultValue = null)
     {
         if (text == null)
         {
             return null;
         }
-        int num = text.LastIndexOf(ch);
-        if (num == -1)
+        int index = text.LastIndexOf(ch);
+        if (index == -1)
         {
-            return text2;
+            return defaultValue;
         }
-        return text.Substring(num + 1);
+        return text.Substring(index + 1);
     }
 
-    public static string BeforeFirst(string text, char ch, string text2 = null)
+    public static string BeforeFirst(string text, char ch, string defaultValue = null)
     {
         if (text == null)
         {
             return null;
         }
-        int num = text.IndexOf(ch);
-        if (num == -1)
+        int index = text.IndexOf(ch);
+        if (index == -1)
         {
-            return text2;
+            return defaultValue;
         }
-        return text.Substring(0, num);
+        return text.Substring(0, index);
     }
 
-    public static string BeforeLast(string text, char ch, string text2 = null)
+    public static string BeforeLast(string text, char ch, string defaultValue = null)
     {
         if (text == null)
         {
             return null;
         }
-        int num = text.LastIndexOf(ch);
-        if (num == -1)
+        int index = text.LastIndexOf(ch);
+        if (index == -1)
         {
-            return text2;
+            return defaultValue;
         }
-        return text.Substring(0, num);
+        return text.Substring(0, index);
     }
 
-    public static string FormatSize(long value2, bool flag = false)
+    public static string FormatSize(long byteCount, bool appendUnit = false)
     {
-        string text = "";
-        if (value2 > 10737418240L)
+        string suffix = "";
+        if (byteCount > 10737418240L)
         {
-            value2 /= 1073741824;
-            text = "G";
+            byteCount /= 1073741824;
+            suffix = "G";
         }
-        if (value2 > 10485760)
+        if (byteCount > 10485760)
         {
-            value2 /= 1048576;
-            text = "M";
+            byteCount /= 1048576;
+            suffix = "M";
         }
-        else if (value2 > 10240)
+        else if (byteCount > 10240)
         {
-            value2 /= 1024;
-            text = "K";
+            byteCount /= 1024;
+            suffix = "K";
         }
-        if (flag)
+        if (appendUnit)
         {
-            text = ((!(text == "")) ? (text + "B") : " bytes");
+            suffix = ((!(suffix == "")) ? (suffix + "B") : " bytes");
         }
-        return value2 + text;
+        return byteCount + suffix;
     }
 
-    private static void TryReduceUnit(ref ulong value2, ref string text, ulong value3, string text2, NumberFormatOptions numberFormatOptions, NumberFormatOptions numberFormatOptions2)
+    private static void TryReduceUnit(ref ulong value, ref string suffix, ulong threshold, string unitSuffix, NumberFormatOptions numberFormatOptions, NumberFormatOptions targetOption)
     {
-        if (string.IsNullOrEmpty(text2) && (numberFormatOptions & numberFormatOptions2) != NumberFormatOptions.None && value2 % value3 == 0L)
+        if (string.IsNullOrEmpty(suffix) && (numberFormatOptions & targetOption) != NumberFormatOptions.None && value % threshold == 0L)
         {
-            value2 /= value3;
-            text = text2;
+            value /= threshold;
+            suffix = unitSuffix;
         }
     }
 
-    public static string FormatNumber(ulong value2, NumberFormatOptions numberFormatOptions)
+    public static string FormatNumber(ulong number, NumberFormatOptions numberFormatOptions)
     {
-        string text = null;
-        if (value2 == 0L)
+        string suffix = null;
+        if (number == 0L)
         {
             return "0";
         }
-        TryReduceUnit(ref value2, ref text, 1073741824uL, "G", numberFormatOptions, NumberFormatOptions.Giga);
-        TryReduceUnit(ref value2, ref text, 1048576uL, "M", numberFormatOptions, NumberFormatOptions.Mega);
-        TryReduceUnit(ref value2, ref text, 1024uL, "K", numberFormatOptions, NumberFormatOptions.Kilo);
+        TryReduceUnit(ref number, ref suffix, 1073741824uL, "G", numberFormatOptions, NumberFormatOptions.Giga);
+        TryReduceUnit(ref number, ref suffix, 1048576uL, "M", numberFormatOptions, NumberFormatOptions.Mega);
+        TryReduceUnit(ref number, ref suffix, 1024uL, "K", numberFormatOptions, NumberFormatOptions.Kilo);
         if ((numberFormatOptions & NumberFormatOptions.Hex) != 0)
         {
-            return $"0x{value2:X}" + text;
+            return $"0x{number:X}" + suffix;
         }
-        return value2 + text;
+        return number + suffix;
     }
 
-    public static string ReadNullTerminated(byte[] buffer, int value2, Encoding encoding)
+    public static string ReadNullTerminated(byte[] buffer, int startIndex, Encoding encoding)
     {
-        int num;
-        for (num = value2; num < buffer.Length && buffer[num] != 0; num++)
+        int end;
+        for (end = startIndex; end < buffer.Length && buffer[end] != 0; end++)
         {
         }
-        return encoding.GetString(buffer, value2, num - value2);
+        return encoding.GetString(buffer, startIndex, end - startIndex);
     }
 
-    public static KeyValuePair<string, string> SplitAtFirst(string text, char ch, string text2 = null, string text3 = null)
+    public static KeyValuePair<string, string> SplitAtFirst(string text, char ch, string defaultKey = null, string defaultValue = null)
     {
-        int num = text?.IndexOf(ch) ?? (-1);
-        if (num == -1)
+        int index = text?.IndexOf(ch) ?? (-1);
+        if (index == -1)
         {
-            return new KeyValuePair<string, string>(text2, text3);
+            return new KeyValuePair<string, string>(defaultKey, defaultValue);
         }
-        return new KeyValuePair<string, string>(text.Substring(0, num), text.Substring(num + 1));
+        return new KeyValuePair<string, string>(text.Substring(0, index), text.Substring(index + 1));
     }
 
-    public static KeyValuePair<string, string> SplitAtLast(string text, char ch, string text2 = null, string text3 = null)
+    public static KeyValuePair<string, string> SplitAtLast(string text, char ch, string defaultKey = null, string defaultValue = null)
     {
-        int num = text?.LastIndexOf(ch) ?? (-1);
-        if (num == -1)
+        int index = text?.LastIndexOf(ch) ?? (-1);
+        if (index == -1)
         {
-            return new KeyValuePair<string, string>(text2, text3);
+            return new KeyValuePair<string, string>(defaultKey, defaultValue);
         }
-        return new KeyValuePair<string, string>(text.Substring(0, num), text.Substring(num + 1));
+        return new KeyValuePair<string, string>(text.Substring(0, index), text.Substring(index + 1));
     }
 
-    public static string ExpandPlaceholders(string text3, PlaceholderResolver callback, char ch = ':')
+    public static string ExpandPlaceholders(string format, PlaceholderResolver callback, char ch = ':')
     {
-        if (text3 == null)
+        if (format == null)
         {
             return null;
         }
-        int num = 0;
-        int num2 = -1;
+        int braceDepth = 0;
+        int placeholderStart = -1;
         StringBuilder stringBuilder = new StringBuilder();
-        for (int num3 = 0; num3 < text3.Length; num3++)
+        for (int i = 0; i < format.Length; i++)
         {
-            if (text3[num3] == '}' && num3 < text3.Length - 1 && text3[num3 + 1] == '}')
+            if (format[i] == '}' && i < format.Length - 1 && format[i + 1] == '}')
             {
-                stringBuilder.Append(text3[num3]);
-                num3++;
+                stringBuilder.Append(format[i]);
+                i++;
             }
-            else if (text3[num3] == '{' && num3 < text3.Length - 1 && text3[num3 + 1] == '{')
+            else if (format[i] == '{' && i < format.Length - 1 && format[i + 1] == '{')
             {
-                stringBuilder.Append(text3[num3]);
-                num3++;
+                stringBuilder.Append(format[i]);
+                i++;
             }
-            else if (text3[num3] == '{')
+            else if (format[i] == '{')
             {
-                if (num == 0)
+                if (braceDepth == 0)
                 {
-                    num2 = num3;
+                    placeholderStart = i;
                 }
-                num++;
+                braceDepth++;
             }
-            else if (text3[num3] == '}')
+            else if (format[i] == '}')
             {
-                if (num <= 0)
+                if (braceDepth <= 0)
                 {
                     throw new Exception("Unexpected '}' in format string");
                 }
-                if (--num == 0)
+                if (--braceDepth == 0)
                 {
-                    string text = text3.Substring(num2 + 1, num3 - num2 - 1);
-                    int num4 = -2;
+                    string placeholderName = format.Substring(placeholderStart + 1, i - placeholderStart - 1);
+                    int separatorIndex = -2;
                     do
                     {
-                        num4 = text.IndexOf(ch, num4 + 2);
+                        separatorIndex = placeholderName.IndexOf(ch, separatorIndex + 2);
                     }
-                    while (num4 != -1 && num4 < text.Length - 2 && text[num4 + 1] == ch);
-                    string text2 = null;
-                    if (num4 != -1)
+                    while (separatorIndex != -1 && separatorIndex < placeholderName.Length - 2 && placeholderName[separatorIndex + 1] == ch);
+                    string placeholderOption = null;
+                    if (separatorIndex != -1)
                     {
-                        text2 = text.Substring(num4 + 1);
-                        text = text.Substring(0, num4);
+                        placeholderOption = placeholderName.Substring(separatorIndex + 1);
+                        placeholderName = placeholderName.Substring(0, separatorIndex);
                     }
-                    if (text.Contains("{"))
+                    if (placeholderName.Contains("{"))
                     {
-                        text = ExpandPlaceholders(text, callback, ch);
+                        placeholderName = ExpandPlaceholders(placeholderName, callback, ch);
                     }
-                    stringBuilder.Append(callback(text, text2));
+                    stringBuilder.Append(callback(placeholderName, placeholderOption));
                 }
             }
-            else if (num == 0)
+            else if (braceDepth == 0)
             {
-                stringBuilder.Append(text3[num3]);
+                stringBuilder.Append(format[i]);
             }
         }
         return stringBuilder.ToString();
@@ -248,23 +248,23 @@ public static class StringUtils
 
     public static int CommonPrefixLength(string text, string text2)
     {
-        int num = Math.Min(text.Length, text2.Length);
-        for (int num2 = 0; num2 < num; num2++)
+        int limit = Math.Min(text.Length, text2.Length);
+        for (int i = 0; i < limit; i++)
         {
-            if (char.ToLower(text[num2]) != char.ToLower(text2[num2]))
+            if (char.ToLower(text[i]) != char.ToLower(text2[i]))
             {
-                return num2;
+                return i;
             }
         }
-        return num;
+        return limit;
     }
 
-    public static string FormatList(string text, IEnumerable items, string text2)
+    public static string FormatList(string header, IEnumerable items, string footer)
     {
         StringBuilder stringBuilder = new StringBuilder();
-        if (!string.IsNullOrEmpty(text))
+        if (!string.IsNullOrEmpty(header))
         {
-            stringBuilder.Append(text);
+            stringBuilder.Append(header);
         }
         if (items != null)
         {
@@ -274,10 +274,10 @@ public static class StringUtils
                 stringBuilder.Append(item.ToString());
             }
         }
-        if (!string.IsNullOrEmpty(text2))
+        if (!string.IsNullOrEmpty(footer))
         {
             stringBuilder.Append("\r\n");
-            stringBuilder.Append(text2);
+            stringBuilder.Append(footer);
         }
         return stringBuilder.ToString();
     }
@@ -288,32 +288,32 @@ public static class StringUtils
         {
             return "";
         }
-        for (int num = 0; num < text.Length; num++)
+        for (int i = 0; i < text.Length; i++)
         {
-            if (text[num] != '\t' && text[num] != ' ')
+            if (text[i] != '\t' && text[i] != ' ')
             {
-                return text.Substring(0, num);
+                return text.Substring(0, i);
             }
         }
         return text;
     }
 
-    public static string JoinStrings(string text, IEnumerable<string> items)
+    public static string JoinStrings(string separator, IEnumerable<string> items)
     {
         if (items == null)
         {
             return null;
         }
-        return string.Join(text, items.ToArray());
+        return string.Join(separator, items.ToArray());
     }
 
-    public static string JoinLines(IEnumerable<string> items, string text2 = "")
+    public static string JoinLines(IEnumerable<string> items, string prefix = "")
     {
         if (items == null)
         {
             return null;
         }
-        return string.Join("\r\n", items.Select((string text) => text2 + text).ToArray());
+        return string.Join("\r\n", items.Select((string line) => prefix + line).ToArray());
     }
 
     public static string JoinNonEmpty(params string[] items)
@@ -321,75 +321,75 @@ public static class StringUtils
         return string.Join(" ", items.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
     }
 
-    public static string JoinNonEmptyWith(string text, params string[] items)
+    public static string JoinNonEmptyWith(string separator, params string[] items)
     {
-        return string.Join(text, items.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
+        return string.Join(separator, items.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
     }
 
     public static List<string> SplitCommandLine(string text)
     {
-        int num = 0;
-        bool flag = false;
-        List<string> list = new List<string>();
+        int tokenStart = 0;
+        bool inQuotes = false;
+        List<string> result = new List<string>();
         if (text == null)
         {
-            return list;
+            return result;
         }
-        for (int num2 = 0; num2 < text.Length; num2++)
+        for (int i = 0; i < text.Length; i++)
         {
-            if (text[num2] == '"')
+            if (text[i] == '"')
             {
-                flag = !flag;
+                inQuotes = !inQuotes;
             }
-            else if (text[num2] == ' ' && !flag)
+            else if (text[i] == ' ' && !inQuotes)
             {
-                if (num2 != num)
+                if (i != tokenStart)
                 {
-                    list.Add(text.Substring(num, num2 - num));
+                    result.Add(text.Substring(tokenStart, i - tokenStart));
                 }
-                num = num2 + 1;
+                tokenStart = i + 1;
             }
         }
-        if (num != text.Length)
+        if (tokenStart != text.Length)
         {
-            list.Add(text.Substring(num));
+            result.Add(text.Substring(tokenStart));
         }
-        return list;
+        return result;
     }
 
-    public static string SplitCamelCase(string text2)
+    public static string SplitCamelCase(string input)
     {
-        string text = text2;
-        for (int num = 0; num < text.Length; num++)
+        string result = input;
+        for (int i = 0; i < result.Length; i++)
         {
-            if (num > 0 && char.IsUpper(text[num]))
+            if (i > 0 && char.IsUpper(result[i]))
             {
-                text = text.Insert(num++, " ");
-                text = text.Substring(0, num) + char.ToLower(text[num]) + text.Substring(num + 1);
+                result = result.Insert(i++, " ");
+                result = result.Substring(0, i) + char.ToLower(result[i]) + result.Substring(i + 1);
             }
         }
-        return text;
+        return result;
     }
 
-    public static string Pluralize(long value2, string text2, bool flag = false)
+    public static string Pluralize(long count, string noun, bool isSizeFormat = false)
     {
-        string text = (flag ? FormatSize(value2) : value2.ToString());
-        if (value2 == 1)
+        string formattedCount = (isSizeFormat ? FormatSize(count) : count.ToString());
+        if (count == 1)
         {
-            return text + " " + text2;
+            return formattedCount + " " + noun;
         }
-        return text + " " + text2 + "s";
+        return formattedCount + " " + noun + "s";
     }
 
-    public static bool TryParseNumber(string text, out ulong value2)
+    public static bool TryParseNumber(string text, out ulong result)
     {
-        ulong? num = ParseNumber(text);
-        if (num.HasValue)
+        ulong? number = ParseNumber(text);
+        if (number.HasValue)
         {
-            value2 = num.Value;
+            result = number.Value;
             return true;
         }
-        value2 = 0uL;
+        result = 0uL;
         return false;
     }
 
@@ -399,10 +399,10 @@ public static class StringUtils
         {
             return null;
         }
-        int num = text.IndexOf(' ');
-        if (num != -1)
+        int spaceIndex = text.IndexOf(' ');
+        if (spaceIndex != -1)
         {
-            text = text.Substring(0, num);
+            text = text.Substring(0, spaceIndex);
         }
         ulong result;
         if (text.StartsWith("0x", StringComparison.InvariantCultureIgnoreCase))
@@ -427,18 +427,18 @@ public static class StringUtils
         {
             return null;
         }
-        ulong num = char.ToUpper(text[text.Length - 1]) switch
+        ulong multiplier = char.ToUpper(text[text.Length - 1]) switch
         {
             'K' => 1024uL,
             'M' => 1048576uL,
             'G' => 1073741824uL,
             _ => 1uL,
         };
-        if (num != 1)
+        if (multiplier != 1)
         {
             text = text.Substring(0, text.Length - 1);
         }
-        return ParseNumber(text) * num;
+        return ParseNumber(text) * multiplier;
     }
 
     public static FirstTokenSplit SplitFirstToken(string text)
@@ -450,8 +450,8 @@ public static class StringUtils
         text = text.Trim();
         if (text.StartsWith("\""))
         {
-            int num = text.IndexOf("\"", 1);
-            if (num == -1)
+            int closingQuoteIndex = text.IndexOf("\"", 1);
+            if (closingQuoteIndex == -1)
             {
                 return new FirstTokenSplit
                 {
@@ -460,12 +460,12 @@ public static class StringUtils
             }
             return new FirstTokenSplit
             {
-                First = text.Substring(1, num - 1).Trim(),
-                Rest = text.Substring(num + 1).Trim()
+                First = text.Substring(1, closingQuoteIndex - 1).Trim(),
+                Rest = text.Substring(closingQuoteIndex + 1).Trim()
             };
         }
-        int num2 = text.IndexOf(" ");
-        if (num2 == -1)
+        int spaceIndex = text.IndexOf(" ");
+        if (spaceIndex == -1)
         {
             return new FirstTokenSplit
             {
@@ -474,8 +474,8 @@ public static class StringUtils
         }
         return new FirstTokenSplit
         {
-            First = text.Substring(0, num2).Trim(),
-            Rest = text.Substring(num2 + 1).Trim()
+            First = text.Substring(0, spaceIndex).Trim(),
+            Rest = text.Substring(spaceIndex + 1).Trim()
         };
     }
 
@@ -511,20 +511,20 @@ public static class StringUtils
         return Regex.Unescape(text.Substring(1, text.Length - 2));
     }
 
-    public static string SafeSubstring(this string text, int value2, int value3)
+    public static string SafeSubstring(this string text, int startIndex, int length)
     {
         if (text == null)
         {
             return null;
         }
-        if (value2 < 0 || value2 > text.Length)
+        if (startIndex < 0 || startIndex > text.Length)
         {
             return null;
         }
-        if (value3 < 0 || value2 + value3 < 0 || value2 + value3 > text.Length)
+        if (length < 0 || startIndex + length < 0 || startIndex + length > text.Length)
         {
             return null;
         }
-        return text.Substring(value2, value3);
+        return text.Substring(startIndex, length);
     }
 }

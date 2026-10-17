@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.Ssh.QuickSync;
 using SmarTTY.IO;
 using SmarTTY.Utilities;
@@ -14,8 +14,8 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 {
     public class SysprogsSyncException : Exception
     {
-        public SysprogsSyncException(string text)
-            : base(text)
+        public SysprogsSyncException(string message)
+            : base(message)
         {
         }
     }
@@ -24,7 +24,7 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
     {
         Download,
         Upload,
-        Value2
+        Sync
     }
 
     private enum RemoteCommand
@@ -69,12 +69,12 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 
             public long ModifiedTime { get; }
 
-            public SysprogsSyncFileStream(SysprogsSyncFileSource sysprogsSyncFileSource, LocalFileSystem.FileStamp fileStamp, int value2)
+            public SysprogsSyncFileStream(SysprogsSyncFileSource sysprogsSyncFileSource, LocalFileSystem.FileStamp fileStamp, int errorCode)
             {
                 this._source = sysprogsSyncFileSource;
                 ModifiedTime = fileStamp.LastWriteFileTime;
-                this.ErrorCode = value2;
-                if (value2 != 0)
+                this.ErrorCode = errorCode;
+                if (errorCode != 0)
                 {
                     _finished = true;
                 }
@@ -94,18 +94,18 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
                 {
                     return 0;
                 }
-                int num = _source._reader.ReadInt32();
-                if (buffer == null || buffer.Length < num)
+                int chunkSize = _source._reader.ReadInt32();
+                if (buffer == null || buffer.Length < chunkSize)
                 {
-                    buffer = new byte[num];
+                    buffer = new byte[chunkSize];
                 }
-                if (num == 0)
+                if (chunkSize == 0)
                 {
                     _finished = true;
                     _source._transferActive = false;
                 }
-                _source._reader.ReadBytes(buffer, num);
-                return num;
+                _source._reader.ReadBytes(buffer, chunkSize);
+                return chunkSize;
             }
         }
 
@@ -122,29 +122,29 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 
         public void Dispose()
         {
-            int num = _reader.ReadInt32();
-            if (num != 1162760004)
+            int marker = _reader.ReadInt32();
+            if (marker != 1162760004)
             {
-                throw new Exception("Expected end of remote SysprogsSync stream, got " + num);
+                throw new Exception("Expected end of remote SysprogsSync stream, got " + marker);
             }
         }
 
-        public IRemoteFileStream OpenFile(int value2)
+        public IRemoteFileStream OpenFile(int fileId)
         {
             if (_transferActive)
             {
                 throw new Exception("The previous file transfer is still in progress");
             }
             this._reader.ReadBytes(_headerBuffer, 12);
-            int num = BitConverter.ToInt32(_headerBuffer, 0);
-            if (num != value2)
+            int receivedFileId = BitConverter.ToInt32(_headerBuffer, 0);
+            if (receivedFileId != fileId)
             {
-                throw new Exception($"Remote SysprogsSync sent unexpected fileID: {num}, expected {value2}");
+                throw new Exception($"Remote SysprogsSync sent unexpected fileID: {receivedFileId}, expected {fileId}");
             }
-            int num2 = BitConverter.ToInt32(_headerBuffer, 4);
+            int errorCode = BitConverter.ToInt32(_headerBuffer, 4);
             LocalFileSystem.FileStamp fileStamp = new LocalFileSystem.FileStamp(0L, BitConverter.ToInt32(_headerBuffer, 8));
-            _transferActive = num2 == 0;
-            return new SysprogsSyncFileStream(this, fileStamp, num2);
+            _transferActive = errorCode == 0;
+            return new SysprogsSyncFileStream(this, fileStamp, errorCode);
         }
     }
 
@@ -164,31 +164,31 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 
         private long _totalSent;
 
-        public SysprogsSyncWriter(SshShellChannel sshShellChannel, int value2, ISyncEvents syncEvents, int value3)
+        public SysprogsSyncWriter(SshShellChannel sshShellChannel, int bufferSize, ISyncEvents syncEvents, int clockOffset)
         {
             _events = syncEvents;
-            _timeOffset = value3;
+            _timeOffset = clockOffset;
             _channel = sshShellChannel;
-            this._chunk = new byte[value2];
+            this._chunk = new byte[bufferSize];
         }
 
-        private void WriteBuffered(byte[] buffer, int value2 = 0, int value3 = -1)
+        private void WriteBuffered(byte[] buffer, int offset = 0, int count = -1)
         {
-            if (value3 == -1)
+            if (count == -1)
             {
-                value3 = buffer.Length;
+                count = buffer.Length;
             }
-            while (value3 > 0)
+            while (count > 0)
             {
-                if (value3 >= _buffer.Length && _bufferedBytes == 0)
+                if (count >= _buffer.Length && _bufferedBytes == 0)
                 {
-                    _channel.Output.Write(buffer, value2, value3);
+                    _channel.Output.Write(buffer, offset, count);
                     break;
                 }
-                while (_bufferedBytes < _buffer.Length && value3 > 0)
+                while (_bufferedBytes < _buffer.Length && count > 0)
                 {
-                    _buffer[_bufferedBytes++] = buffer[value2++];
-                    value3--;
+                    _buffer[_bufferedBytes++] = buffer[offset++];
+                    count--;
                 }
                 if (_bufferedBytes == _buffer.Length)
                 {
@@ -212,10 +212,10 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
             Flush();
         }
 
-        public void WriteCommand(RemoteCommand remoteCommand, string text)
+        public void WriteCommand(RemoteCommand remoteCommand, string arg)
         {
             this.WriteBuffered(new byte[1] { (byte)remoteCommand });
-            WriteString(text);
+            WriteString(arg);
         }
 
         public void WriteCommand(RemoteCommand remoteCommand)
@@ -223,46 +223,46 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
             this.WriteBuffered(new byte[1] { (byte)remoteCommand });
         }
 
-        public void WriteString(string text)
+        public void WriteString(string value)
         {
-            byte[] bytes = Encoding.UTF8.GetBytes(text ?? "");
+            byte[] bytes = Encoding.UTF8.GetBytes(value ?? "");
             WriteInt(bytes.Length);
             this.WriteBuffered(bytes, 0, bytes.Length);
         }
 
-        public void WriteInt(int value2)
+        public void WriteInt(int value)
         {
-            this.WriteBuffered(BitConverter.GetBytes(value2));
+            this.WriteBuffered(BitConverter.GetBytes(value));
         }
 
-        public LocalFileSystem.FileStamp SendFile(string text, LocalPath localPath, ref TransferStatistics transferStatistics)
+        public LocalFileSystem.FileStamp SendFile(string remotePath, LocalPath localPath, ref TransferStatistics transferStatistics)
         {
             using LocalFileSystem.NativeFile nativeFile = LocalFileSystem.OpenFile(localPath, LocalFileSystem.FileOpenMode.Open);
-            long num = nativeFile.GetLastWriteTime();
-            LocalFileSystem.FileStamp fileStamp = new LocalFileSystem.FileStamp(0L, num);
-            long num2 = 0L;
+            long writeTime = nativeFile.GetLastWriteTime();
+            LocalFileSystem.FileStamp fileStamp = new LocalFileSystem.FileStamp(0L, writeTime);
+            long totalBytes = 0L;
             this.WriteCommand(SysprogsSyncEngine.RemoteCommand.SendFile);
             WriteInt(fileStamp.UnixSeconds + _timeOffset);
-            int num3 = _events?.PermissionProvider?.GetFilePermissions(localPath) ?? 493;
-            WriteInt(num3);
-            WriteString(text);
+            int permissions = _events?.PermissionProvider?.GetFilePermissions(localPath) ?? 493;
+            WriteInt(permissions);
+            WriteString(remotePath);
             while (true)
             {
                 try
                 {
-                    int num4 = nativeFile.Read(this._chunk, this._chunk.Length);
-                    num2 += num4;
-                    WriteInt(num4);
-                    if (num4 == 0)
+                    int bytesRead = nativeFile.Read(this._chunk, this._chunk.Length);
+                    totalBytes += bytesRead;
+                    WriteInt(bytesRead);
+                    if (bytesRead == 0)
                     {
                         transferStatistics.CopiedFiles++;
-                        return new LocalFileSystem.FileStamp(num2, fileStamp.LastWriteFileTime);
+                        return new LocalFileSystem.FileStamp(totalBytes, fileStamp.LastWriteFileTime);
                     }
-                    this.WriteBuffered(this._chunk, 0, num4);
-                    _totalSent += num4;
+                    this.WriteBuffered(this._chunk, 0, bytesRead);
+                    _totalSent += bytesRead;
                     _events?.OnProgress(new SyncProgress
                     {
-                        CurrentFile = text,
+                        CurrentFile = remotePath,
                         Transferred = _totalSent,
                         Total = transferStatistics.TotalBytes,
                         Stage = SyncStage.Transferring
@@ -305,20 +305,20 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
             sshShellChannel.PollingEnabled = true;
         }
 
-        private void OnFinished(object obj)
+        private void OnFinished(object sender)
         {
             _exitEvent.Set();
         }
 
-        internal void OnDataReceived(object obj, byte[] buffer, int value2, int value3, int value4)
+        internal void OnDataReceived(object sender, byte[] buffer, int offset, int count, int dataType)
         {
             try
             {
-                if (value4 == 1)
+                if (dataType == 1)
                 {
-                    foreach (string item in this._lineSplitter.Feed(buffer, value2, value3))
+                    foreach (string line in this._lineSplitter.Feed(buffer, offset, count))
                     {
-                        StderrLine?.Invoke(item);
+                        StderrLine?.Invoke(line);
                     }
                     return;
                 }
@@ -326,38 +326,38 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
                 {
                     return;
                 }
-                for (int num = 0; num < value3; num++)
+                for (int i = 0; i < count; i++)
                 {
-                    _pending.Add(buffer[value2 + num]);
+                    _pending.Add(buffer[offset + i]);
                 }
-                int num2 = 0;
-                while (num2 < _pending.Count && !_corrupted)
+                int idx = 0;
+                while (idx < _pending.Count && !_corrupted)
                 {
-                    byte[] value = _pending.ToArray();
-                    switch ((RemoteReply)_pending[num2])
+                    byte[] data = _pending.ToArray();
+                    switch ((RemoteReply)_pending[idx])
                     {
                         case RemoteReply.ActionDone:
-                            num2 += 4;
+                            idx += 4;
                             break;
                         case RemoteReply.ActionFailed:
-                            num2 += 12;
-                            if (num2 <= _pending.Count)
+                            idx += 12;
+                            if (idx <= _pending.Count)
                             {
-                                int arg = BitConverter.ToInt32(value, num2 - 8);
-                                int arg2 = BitConverter.ToInt32(value, num2 - 4);
-                                ActionFailedReceived?.Invoke(arg, arg2);
+                                int actionIndex = BitConverter.ToInt32(data, idx - 8);
+                                int errorCode = BitConverter.ToInt32(data, idx - 4);
+                                ActionFailedReceived?.Invoke(actionIndex, errorCode);
                             }
                             break;
                         default:
                             _corrupted = true;
                             OutputCorrupt?.Invoke();
-                            num2++;
+                            idx++;
                             break;
                     }
                 }
-                if (num2 > 0)
+                if (idx > 0)
                 {
-                    _pending.RemoveRange(0, num2);
+                    _pending.RemoveRange(0, idx);
                 }
             }
             catch (Exception ex)
@@ -367,17 +367,17 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
             }
         }
 
-        public void WaitForExit(int value2)
+        public void WaitForExit(int timeoutMs)
         {
             _lastActivity = DateTime.Now;
             do
             {
-                if (_exitEvent.WaitOne(value2 / 2))
+                if (_exitEvent.WaitOne(timeoutMs / 2))
                 {
                     return;
                 }
             }
-            while (!((DateTime.Now - _lastActivity).TotalMilliseconds > (double)value2));
+            while (!((DateTime.Now - _lastActivity).TotalMilliseconds > (double)timeoutMs));
             throw new Exception("Remote SysprogsSync session did not exit within the timeout");
         }
     }
@@ -405,14 +405,14 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
         return "SysprogsSync synchronization engine";
     }
 
-    public SysprogsSyncEngine(SshSession sshSession, SyncSettings syncSettings, ISyncEvents syncEvents, ILocalFileCache localFileCache, SyncTuning syncTuning, string text, ISyncCustomization syncCustomization)
+    public SysprogsSyncEngine(SshSession sshSession, SyncSettings syncSettings, ISyncEvents syncEvents, ILocalFileCache localFileCache, SyncTuning syncTuning, string helperPath, ISyncCustomization syncCustomization)
     {
         _session = sshSession;
         Tuning = syncTuning;
         this._settings = syncSettings;
         _events = syncEvents;
         _cache = localFileCache;
-        this._helperPath = text;
+        this._helperPath = helperPath;
         IShellLauncher shellLauncher = null;
         if ((syncSettings.Options & SyncOptions.UseLauncher) != 0)
         {
@@ -445,86 +445,86 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
         return result;
     }
 
-    public void Upload(List<SyncPlan.SyncAction> list2, List<LocalPath> list3, ref TransferStatistics transferStatistics)
+    public void Upload(List<SyncPlan.SyncAction> actions, List<LocalPath> localPaths, ref TransferStatistics transferStatistics)
     {
         if (!_uploadStarted)
         {
-            List<byte> list = new List<byte>();
-            list.AddRange(new byte[1] { 2 });
-            SysprogsSyncEngine.AppendString(list, _settings.RemotePath);
-            _channel.Input.Write(list.ToArray(), 0, list.Count);
+            List<byte> headerBytes = new List<byte>();
+            headerBytes.AddRange(new byte[1] { 2 });
+            SysprogsSyncEngine.AppendString(headerBytes, _settings.RemotePath);
+            _channel.Input.Write(headerBytes.ToArray(), 0, headerBytes.Count);
             _uploadStarted = true;
         }
-        LocalFileSystem.FileStamp[] items = null;
-        Dictionary<int, KeyValuePair<string, string>> dictionary = null;
+        LocalFileSystem.FileStamp[] fileStamps = null;
+        Dictionary<int, KeyValuePair<string, string>> symlinkDict = null;
         if (_cache != null && _settings.QuickSyncOverwriteTrigger == QuickSyncOverwriteTrigger.LocalCache)
         {
-            items = new LocalFileSystem.FileStamp[list3.Count];
-            dictionary = new Dictionary<int, KeyValuePair<string, string>>();
+            fileStamps = new LocalFileSystem.FileStamp[localPaths.Count];
+            symlinkDict = new Dictionary<int, KeyValuePair<string, string>>();
         }
-        SysprogsSyncOutputParser sysprogsSyncOutputParser = new SysprogsSyncOutputParser(this, _channel);
-        sysprogsSyncOutputParser.StderrLine += (string text2) =>
+        SysprogsSyncOutputParser outputParser = new SysprogsSyncOutputParser(this, _channel);
+        outputParser.StderrLine += (string line) =>
         {
             _events?.OnWarning(new SyncWarning
             {
-                Warning = new QuickSyncWarning(QuickSyncWarningType.StderrLine, text2, 0)
+                Warning = new QuickSyncWarning(QuickSyncWarningType.StderrLine, line, 0)
             });
         };
-        sysprogsSyncOutputParser.OutputCorrupt += () =>
+        outputParser.OutputCorrupt += () =>
         {
             _events?.OnWarning(new SyncWarning
             {
                 Warning = new QuickSyncWarning(QuickSyncWarningType.RemoteOutputCorrupt, null, 0)
             });
         };
-        sysprogsSyncOutputParser.ActionFailedReceived += (int num3, int num4) =>
+        outputParser.ActionFailedReceived += (int actionIdx, int errorCode) =>
         {
-            if (num3 >= 0 && num3 < list2.Count)
+            if (actionIdx >= 0 && actionIdx < actions.Count)
             {
-                if (items != null)
+                if (fileStamps != null)
                 {
-                    if (list2[num3].Type == SyncPlan.ActionType.TransferFile)
+                    if (actions[actionIdx].Type == SyncPlan.ActionType.TransferFile)
                     {
-                        items[list2[num3].Argument] = default;
+                        fileStamps[actions[actionIdx].Argument] = default;
                     }
-                    else if (list2[num3].Type == SyncPlan.ActionType.CreateRemoteSymlink)
+                    else if (actions[actionIdx].Type == SyncPlan.ActionType.CreateRemoteSymlink)
                     {
-                        lock (dictionary)
+                        lock (symlinkDict)
                         {
-                            dictionary.Remove(num3);
+                            symlinkDict.Remove(actionIdx);
                         }
                     }
                 }
                 _events?.OnWarning(new SyncWarning
                 {
-                    Warning = new QuickSyncWarning(GetWarningType(list2[num3].Type), list2[num3].Path, num4)
+                    Warning = new QuickSyncWarning(GetWarningType(actions[actionIdx].Type), actions[actionIdx].Path, errorCode)
                 });
             }
         };
-        using (SysprogsSyncWriter sysprogsSyncWriter = new SysprogsSyncWriter(_channel, Tuning.BufferSize, _events, _settings.ClockOffset.Seconds))
+        using (SysprogsSyncWriter syncWriter = new SysprogsSyncWriter(_channel, Tuning.BufferSize, _events, _settings.ClockOffset.Seconds))
         {
-            int num = -1;
-            foreach (SyncPlan.SyncAction item in list2)
+            int currentActionIdx = -1;
+            foreach (SyncPlan.SyncAction action in actions)
             {
-                num++;
-                switch (item.Type)
+                currentActionIdx++;
+                switch (action.Type)
                 {
                     case SyncPlan.ActionType.CreateAndEnterDirectory:
-                        sysprogsSyncWriter.WriteCommand(RemoteCommand.CreateAndEnterDirectory, item.Path);
+                        syncWriter.WriteCommand(RemoteCommand.CreateAndEnterDirectory, action.Path);
                         break;
                     case SyncPlan.ActionType.EnterDirectory:
-                        sysprogsSyncWriter.WriteCommand(RemoteCommand.EnterDirectory, item.Path);
+                        syncWriter.WriteCommand(RemoteCommand.EnterDirectory, action.Path);
                         break;
                     case SyncPlan.ActionType.GoToParentDirectory:
-                        sysprogsSyncWriter.WriteCommand(RemoteCommand.GoToParent);
+                        syncWriter.WriteCommand(RemoteCommand.GoToParent);
                         break;
                     case SyncPlan.ActionType.TransferFile:
                         try
                         {
-                            LocalFileSystem.FileStamp fileStamp = sysprogsSyncWriter.SendFile(item.Path, list3[item.Argument], ref transferStatistics);
-                            if (items != null)
+                            LocalFileSystem.FileStamp fileStamp = syncWriter.SendFile(action.Path, localPaths[action.Argument], ref transferStatistics);
+                            if (fileStamps != null)
                             {
-                                items[item.Argument] = fileStamp;
+                                fileStamps[action.Argument] = fileStamp;
                             }
                         }
                         catch (Exception ex)
@@ -532,62 +532,62 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
                             _events?.OnWarning(new SyncWarning
                             {
                                 Exception = ex,
-                                Warning = new QuickSyncWarning(QuickSyncWarningType.CannotReadLocalFile, list3[item.Argument].FullPath, 0)
+                                Warning = new QuickSyncWarning(QuickSyncWarningType.CannotReadLocalFile, localPaths[action.Argument].FullPath, 0)
                             });
                         }
                         break;
                     case SyncPlan.ActionType.DeleteTargetFile:
-                        sysprogsSyncWriter.WriteCommand(RemoteCommand.DeleteFile, item.Path);
+                        syncWriter.WriteCommand(RemoteCommand.DeleteFile, action.Path);
                         break;
                     case SyncPlan.ActionType.DeleteEmptyTargetDirectory:
-                        sysprogsSyncWriter.WriteCommand(RemoteCommand.DeleteEmptyDirectory, item.Path);
+                        syncWriter.WriteCommand(RemoteCommand.DeleteEmptyDirectory, action.Path);
                         break;
                     case SyncPlan.ActionType.DeleteTargetDirectoryRecursively:
-                        sysprogsSyncWriter.WriteCommand(RemoteCommand.DeleteDirectoryRecursively, item.Path);
+                        syncWriter.WriteCommand(RemoteCommand.DeleteDirectoryRecursively, action.Path);
                         break;
                     case SyncPlan.ActionType.CreateRemoteSymlink:
                         {
-                            KeyValuePair<string, string> value = StringUtils.SplitAtFirst(item.Path, '\n');
-                            if (value.Key == null || value.Value == null)
+                            KeyValuePair<string, string> symlinkPair = StringUtils.SplitAtFirst(action.Path, '\n');
+                            if (symlinkPair.Key == null || symlinkPair.Value == null)
                             {
-                                throw new Exception("Invalid queued symlink: " + item.Path);
+                                throw new Exception("Invalid queued symlink: " + action.Path);
                             }
-                            string text = RemotePathUtils.GetFileName(value.Key);
-                            if (dictionary != null)
+                            string fileName = RemotePathUtils.GetFileName(symlinkPair.Key);
+                            if (symlinkDict != null)
                             {
-                                lock (dictionary)
+                                lock (symlinkDict)
                                 {
-                                    dictionary[num] = value;
+                                    symlinkDict[currentActionIdx] = symlinkPair;
                                 }
                             }
-                            sysprogsSyncWriter.WriteCommand(RemoteCommand.CreateSymlink, text);
-                            sysprogsSyncWriter.WriteString(value.Value);
+                            syncWriter.WriteCommand(RemoteCommand.CreateSymlink, fileName);
+                            syncWriter.WriteString(symlinkPair.Value);
                             break;
                         }
                     case SyncPlan.ActionType.PrintStderrMessage:
-                        sysprogsSyncWriter.WriteCommand(RemoteCommand.PrintMessage, item.Path);
+                        syncWriter.WriteCommand(RemoteCommand.PrintMessage, action.Path);
                         break;
                 }
             }
-            sysprogsSyncWriter.WriteCommand(RemoteCommand.End);
-            sysprogsSyncWriter.Flush();
-            sysprogsSyncOutputParser.WaitForExit(Tuning.ExitTimeoutMs);
+            syncWriter.WriteCommand(RemoteCommand.End);
+            syncWriter.Flush();
+            outputParser.WaitForExit(Tuning.ExitTimeoutMs);
         }
-        if (items == null)
+        if (fileStamps == null)
         {
             return;
         }
-        for (int num2 = 0; num2 < items.Length; num2++)
+        for (int i = 0; i < fileStamps.Length; i++)
         {
-            if (items[num2].HasTimestamp)
+            if (fileStamps[i].HasTimestamp)
             {
-                _cache.StoreFileStamp(num2, items[num2]);
+                _cache.StoreFileStamp(i, fileStamps[i]);
             }
         }
-        LocalPath localPath = LocalPath.FromUserPath(_settings.LocalPath);
-        foreach (KeyValuePair<int, KeyValuePair<string, string>> item2 in dictionary)
+        LocalPath baseLocalPath = LocalPath.FromUserPath(_settings.LocalPath);
+        foreach (KeyValuePair<int, KeyValuePair<string, string>> kvp in symlinkDict)
         {
-            _cache.StoreSymlink(localPath.Combine(item2.Value.Key), item2.Value.Value);
+            _cache.StoreSymlink(baseLocalPath.Combine(kvp.Value.Key), kvp.Value.Value);
         }
     }
 
@@ -614,45 +614,45 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
         }
     }
 
-    public IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> items)
+    public IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> actions)
     {
         if (!_fileSetRead)
         {
             throw new Exception("Remote SysprogsSync instance is not ready to receive the file list");
         }
-        List<byte> list = new List<byte>();
-        foreach (SyncPlan.SyncAction item in items)
+        List<byte> bytesList = new List<byte>();
+        foreach (SyncPlan.SyncAction action in actions)
         {
-            if (item.Type == SyncPlan.ActionType.TransferFile)
+            if (action.Type == SyncPlan.ActionType.TransferFile)
             {
-                list.AddRange(BitConverter.GetBytes(item.Argument));
+                bytesList.AddRange(BitConverter.GetBytes(action.Argument));
             }
         }
-        int value = Tuning.BufferSize;
-        _channel.Input.Write(BitConverter.GetBytes(value), 0, 4);
-        _channel.Input.Write(BitConverter.GetBytes(list.Count), 0, 4);
-        _channel.Input.Write(list.ToArray(), 0, list.Count);
+        int bufferSize = Tuning.BufferSize;
+        _channel.Input.Write(BitConverter.GetBytes(bufferSize), 0, 4);
+        _channel.Input.Write(BitConverter.GetBytes(bytesList.Count), 0, 4);
+        _channel.Input.Write(bytesList.ToArray(), 0, bytesList.Count);
         return new SysprogsSyncFileSource(_channel);
     }
 
     private static void WaitForReady(SshShellChannel sshShellChannel)
     {
-        byte[] bytes = Encoding.UTF8.GetBytes("SysprogsSync v1.2 Ready\n");
-        List<byte> list = new List<byte>();
-        byte[] array = new byte[1];
+        byte[] readyMarker = Encoding.UTF8.GetBytes("SysprogsSync v1.2 Ready\n");
+        List<byte> readBytes = new List<byte>();
+        byte[] singleByte = new byte[1];
         do
         {
-            if (sshShellChannel.Output.Read(array, 0, 1) != 1)
+            if (sshShellChannel.Output.Read(singleByte, 0, 1) != 1)
             {
                 throw new Exception("Remote SysprogsSync instance exited unexpectedly");
             }
-            list.Add(array[0]);
-            while (list.Count > bytes.Length)
+            readBytes.Add(singleByte[0]);
+            while (readBytes.Count > readyMarker.Length)
             {
-                list.RemoveAt(0);
+                readBytes.RemoveAt(0);
             }
         }
-        while (!list.SequenceEqual(bytes));
+        while (!readBytes.SequenceEqual(readyMarker));
     }
 
     private void SendDownloadRequest(SshShellChannel sshShellChannel)
@@ -673,15 +673,15 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
         list.AddRange(BitConverter.GetBytes(_settings.DirectoryFilters?.Length ?? QuickSyncFilter.AllArray.Length));
         list.AddRange(BitConverter.GetBytes(_settings.FileFilters?.Length ?? QuickSyncFilter.AllArray.Length));
         SysprogsSyncEngine.AppendString(list, _settings.RemotePath);
-        QuickSyncFilter[] array = _settings.DirectoryFilters ?? QuickSyncFilter.AllArray;
-        foreach (QuickSyncFilter quickSyncFilter in array)
+        QuickSyncFilter[] dirFilters = _settings.DirectoryFilters ?? QuickSyncFilter.AllArray;
+        foreach (QuickSyncFilter filter in dirFilters)
         {
-            AppendFilter(list, quickSyncFilter);
+            AppendFilter(list, filter);
         }
-        array = _settings.FileFilters ?? QuickSyncFilter.AllArray;
-        foreach (QuickSyncFilter quickSyncFilter2 in array)
+        QuickSyncFilter[] fileFilters = _settings.FileFilters ?? QuickSyncFilter.AllArray;
+        foreach (QuickSyncFilter filter in fileFilters)
         {
-            AppendFilter(list, quickSyncFilter2);
+            AppendFilter(list, filter);
         }
         sshShellChannel.Input.Write(list.ToArray(), 0, list.Count);
     }
@@ -692,9 +692,9 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
         SysprogsSyncEngine.AppendString(list, quickSyncFilter.Regex?.ToString() ?? ".*");
     }
 
-    private static void AppendString(List<byte> list, string text)
+    private static void AppendString(List<byte> list, string str)
     {
-        byte[] bytes = Encoding.UTF8.GetBytes(text);
+        byte[] bytes = Encoding.UTF8.GetBytes(str);
         list.AddRange(BitConverter.GetBytes(bytes.Length));
         list.AddRange(bytes);
     }

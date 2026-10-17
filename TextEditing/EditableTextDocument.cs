@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace SmarTTY.TextEditing;
 
@@ -28,53 +28,53 @@ public class EditableTextDocument : MutableTextDocument
         }
     }
 
-    public TextPosition InsertText(TextPosition textPosition, string text2, bool flag = false)
+    public TextPosition InsertText(TextPosition position, string text, bool inheritLineEnding = false)
     {
-        if (text2.IndexOfAny(TextDocument._lineBreakChars) == -1)
+        if (text.IndexOfAny(TextDocument._lineBreakChars) == -1)
         {
-            base.ReplaceInLine(textPosition.Line, textPosition.Column, 0, text2);
-            return new TextPosition(textPosition.Column + text2.Length, textPosition.Line);
+            base.ReplaceInLine(position.Line, position.Column, 0, text);
+            return new TextPosition(position.Column + text.Length, position.Line);
         }
-        List<DocumentLine> list = TextDocument.SplitLines(text2);
-        if (list.Count < 1)
+        List<DocumentLine> insertedLines = TextDocument.SplitLines(text);
+        if (insertedLines.Count < 1)
         {
-            return textPosition;
+            return position;
         }
-        if (flag && textPosition.Line >= 0 && textPosition.Line < Lines.Count)
+        if (inheritLineEnding && position.Line >= 0 && position.Line < Lines.Count)
         {
-            LineEnding lineEnding = Lines[textPosition.Line].Ending;
-            foreach (DocumentLine item in list)
+            LineEnding lineEnding = Lines[position.Line].Ending;
+            foreach (DocumentLine line in insertedLines)
             {
-                item.Ending = lineEnding;
+                line.Ending = lineEnding;
             }
         }
         if (Lines.Count == 1 && Lines[0].GetText().Length == 0)
         {
             Lines.Clear();
         }
-        SplitLine(textPosition.Line, textPosition.Column, list[0].Ending);
-        base.ReplaceInLine(textPosition.Line, textPosition.Column, 0, list[0].GetText(), list[0].Ending);
-        for (int num = 1; num < list.Count - 1; num++)
+        SplitLine(position.Line, position.Column, insertedLines[0].Ending);
+        base.ReplaceInLine(position.Line, position.Column, 0, insertedLines[0].GetText(), insertedLines[0].Ending);
+        for (int i = 1; i < insertedLines.Count - 1; i++)
         {
-            InsertLine(++textPosition.Line, list[num].GetText(), list[num].Ending);
+            InsertLine(++position.Line, insertedLines[i].GetText(), insertedLines[i].Ending);
         }
-        string text = list[list.Count - 1].GetText();
-        if (textPosition.Line + 1 == Lines.Count)
+        string lastLineText = insertedLines[insertedLines.Count - 1].GetText();
+        if (position.Line + 1 == Lines.Count)
         {
-            InsertLine(textPosition.Line + 1, text, list[list.Count - 1].Ending);
+            InsertLine(position.Line + 1, lastLineText, insertedLines[insertedLines.Count - 1].Ending);
         }
         else
         {
-            base.ReplaceInLine(textPosition.Line + 1, 0, 0, text, list[0].Ending);
+            base.ReplaceInLine(position.Line + 1, 0, 0, lastLineText, insertedLines[0].Ending);
         }
-        return new TextPosition(list[list.Count - 1].GetText().Length, textPosition.Line + 1);
+        return new TextPosition(insertedLines[insertedLines.Count - 1].GetText().Length, position.Line + 1);
     }
 
     public void SetLineEnding(LineEnding lineEnding)
     {
-        foreach (DocumentLine item in Lines)
+        foreach (DocumentLine line in Lines)
         {
-            item.Ending = lineEnding;
+            line.Ending = lineEnding;
         }
     }
 }

@@ -1,11 +1,10 @@
-﻿
 namespace SmarTTY.Ssh;
 
-public struct RemoteFileContext(string text, string text2, string text3)
+public struct RemoteFileContext(string path, string hostName, string userName)
 {
-    public readonly string Path = text;
+    public readonly string Path = path;
 
-    public readonly string HostName = text2;
+    public readonly string HostName = hostName;
 
-    public readonly string UserName = text3;
+    public readonly string UserName = userName;
 }

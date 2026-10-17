@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.Ssh.QuickSync;
 using SmarTTY.IO;
 using SmarTTY.Utilities;
@@ -32,17 +32,17 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
 
             public bool IsIncluded;
 
-            public ScanDirectory(RemoteFileSet.RemoteDirectory remoteDirectory, RelativeRemotePath relativeRemotePath, string text, int value2 = 0)
+            public ScanDirectory(RemoteFileSet.RemoteDirectory remoteDirectory, RelativeRemotePath relativeRemotePath, string fullPath, int deviceId = 0)
             {
                 this.RemoteDirectory = remoteDirectory;
-                this.DeviceId = value2;
+                this.DeviceId = deviceId;
                 RelativePath = relativeRemotePath;
-                FullPath = text;
+                FullPath = fullPath;
             }
 
-            public ScanDirectory CreateChild(string text, int value2, string text2 = null)
+            public ScanDirectory CreateChild(string childName, int deviceId, string fullPath = null)
             {
-                return new ScanDirectory(new RemoteFileSet.RemoteDirectory(this.RemoteDirectory, text), RelativePath.Combine(text), text2 ?? (FullPath.TrimEnd('/') + "/" + text), value2);
+                return new ScanDirectory(new RemoteFileSet.RemoteDirectory(this.RemoteDirectory, childName), RelativePath.Combine(childName), fullPath ?? (FullPath.TrimEnd('/') + "/" + childName), deviceId);
             }
         }
 
@@ -56,11 +56,11 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
 
             public string ResolvedPath => RemotePathUtils.NormalizeUnix(RemotePathUtils.Combine(Parent.FullPath, Target));
 
-            public PendingSymlink(ScanDirectory scanDirectory, string text, string text2)
+            public PendingSymlink(ScanDirectory scanDirectory, string name, string target)
             {
                 Parent = scanDirectory;
-                this.Name = text;
-                this.Target = text2;
+                this.Name = name;
+                this.Target = target;
             }
         }
 
@@ -78,11 +78,11 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
 
         public List<DownloadEntry> Files = new List<DownloadEntry>();
 
-        public RemoteTreeScanner(string text, CommandSyncEngine commandSyncEngine)
+        public RemoteTreeScanner(string rootPath, CommandSyncEngine commandSyncEngine)
         {
             this._session = commandSyncEngine._session;
             _engine = commandSyncEngine;
-            this._rootPath = text;
+            this._rootPath = rootPath;
             _settings = commandSyncEngine._settings;
         }
 
@@ -90,9 +90,9 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
         {
         }
 
-        private List<string> RunCommand(string text, bool flag = true)
+        private List<string> RunCommand(string command, bool requireSuccess = true)
         {
-            return _engine.RunCommand(text, flag);
+            return _engine.RunCommand(command, requireSuccess);
         }
 
         public void Scan(RemoteFileSet.RemoteDirectory remoteDirectory)
@@ -106,10 +106,10 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
             {
                 try
                 {
-                    _flavor = StatCommandBuilder.DetectFlavor((string text2) =>
+                    _flavor = StatCommandBuilder.DetectFlavor((string cmd) =>
                     {
-                        _engine._events?.OnLog(new SyncLogMessage.RunCommandMessage(text2));
-                        return _session.RunCommandChecked(text2, requireSuccess: true);
+                        _engine._events?.OnLog(new SyncLogMessage.RunCommandMessage(cmd));
+                        return _session.RunCommandChecked(cmd, requireSuccess: true);
                     });
                 }
                 catch
@@ -118,82 +118,82 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                 }
             }
             StatCommandBuilder statCommandBuilder = new StatCommandBuilder(_flavor);
-            string text = statCommandBuilder.GetStatCommand(this._rootPath, flag: true);
-            StatCommandBuilder.StatEntry statEntry2 = RunCommand(text)?.Select((string text2) => statCommandBuilder.ParseEntry(text2)).FirstOrDefault((StatCommandBuilder.StatEntry statEntry) => statEntry.Name != null) ?? default(StatCommandBuilder.StatEntry);
-            List<ScanDirectory> list = new List<ScanDirectory>();
-            List<PendingSymlink> list2 = new List<PendingSymlink>();
-            list.Add(new ScanDirectory(remoteDirectory, new RelativeRemotePath(""), this._rootPath, statEntry2.DeviceId));
-            while (list.Count > 0 || list2.Count > 0)
+            string statCmd = statCommandBuilder.GetStatCommand(this._rootPath, followSymlinks: true);
+            StatCommandBuilder.StatEntry rootEntry = RunCommand(statCmd)?.Select((string line) => statCommandBuilder.ParseEntry(line)).FirstOrDefault((StatCommandBuilder.StatEntry statEntry) => statEntry.Name != null) ?? default(StatCommandBuilder.StatEntry);
+            List<ScanDirectory> pendingDirs = new List<ScanDirectory>();
+            List<PendingSymlink> pendingLinks = new List<PendingSymlink>();
+            pendingDirs.Add(new ScanDirectory(remoteDirectory, new RelativeRemotePath(""), this._rootPath, rootEntry.DeviceId));
+            while (pendingDirs.Count > 0 || pendingLinks.Count > 0)
             {
-                list = ScanDirectories(statCommandBuilder, list, list2);
+                pendingDirs = ScanDirectories(statCommandBuilder, pendingDirs, pendingLinks);
                 _engine._events?.OnProgress(new SyncProgress
                 {
                     Stage = SyncStage.BuildingFileList
                 });
-                if (list.Count == 0)
+                if (pendingDirs.Count == 0)
                 {
-                    ResolveSymlinks(list2, statCommandBuilder, list);
-                    list2.Clear();
+                    ResolveSymlinks(pendingLinks, statCommandBuilder, pendingDirs);
+                    pendingLinks.Clear();
                 }
             }
         }
 
-        private void ResolveSymlinks(List<PendingSymlink> list4, StatCommandBuilder statCommandBuilder, List<ScanDirectory> list5)
+        private void ResolveSymlinks(List<PendingSymlink> pendingLinks, StatCommandBuilder statCommandBuilder, List<ScanDirectory> outPendingDirs)
         {
-            string text = Guid.NewGuid().ToString();
+            string marker = Guid.NewGuid().ToString();
             MemoryStream memoryStream = new MemoryStream();
             using StreamWriter streamWriter = new StreamWriter(memoryStream)
             {
                 NewLine = "\n"
             };
-            streamWriter.WriteLine("echo " + text);
-            for (int num = 0; num < list4.Count; num++)
+            streamWriter.WriteLine("echo " + marker);
+            for (int i = 0; i < pendingLinks.Count; i++)
             {
-                streamWriter.WriteLine($"echo ---link#{num}");
-                streamWriter.WriteLine(statCommandBuilder.GetStatCommand(list4[num].ResolvedPath, flag: true) + $" || echo badlink:{num}");
+                streamWriter.WriteLine($"echo ---link#{i}");
+                streamWriter.WriteLine(statCommandBuilder.GetStatCommand(pendingLinks[i].ResolvedPath, followSymlinks: true) + $" || echo badlink:{i}");
             }
             streamWriter.Flush();
-            List<string> list = this._engine.RunScript(text, memoryStream.ToArray());
-            bool flag = false;
-            int result = -1;
-            foreach (string item2 in list)
+            List<string> scriptOutput = this._engine.RunScript(marker, memoryStream.ToArray());
+            bool markerSeen = false;
+            int currentLinkIndex = -1;
+            foreach (string line in scriptOutput)
             {
-                if (!flag)
+                if (!markerSeen)
                 {
-                    if (!(item2 != text))
+                    if (!(line != marker))
                     {
-                        flag = true;
+                        markerSeen = true;
                     }
                 }
-                else if (item2.StartsWith("---link#"))
+                else if (line.StartsWith("---link#"))
                 {
-                    if (!int.TryParse(item2.Substring(8), out result))
+                    if (!int.TryParse(line.Substring(8), out currentLinkIndex))
                     {
-                        result = -1;
+                        currentLinkIndex = -1;
                     }
                 }
                 else
                 {
-                    if (result < 0 || result >= list4.Count)
+                    if (currentLinkIndex < 0 || currentLinkIndex >= pendingLinks.Count)
                     {
                         continue;
                     }
-                    if (item2.StartsWith("badlink:") && int.TryParse(item2.Substring(8), out var result2) && result2 == result)
+                    if (line.StartsWith("badlink:") && int.TryParse(line.Substring(8), out var badIndex) && badIndex == currentLinkIndex)
                     {
                         this._engine._events?.OnWarning(new SyncWarning
                         {
-                            Warning = new QuickSyncWarning(QuickSyncWarningType.UnreadableSourceSymlink, list4[result2].Parent.RelativePath.Combine(list4[result2].Name).Path, 0)
+                            Warning = new QuickSyncWarning(QuickSyncWarningType.UnreadableSourceSymlink, pendingLinks[badIndex].Parent.RelativePath.Combine(pendingLinks[badIndex].Name).Path, 0)
                         });
                         continue;
                     }
-                    PendingSymlink pendingSymlink = list4[result];
-                    StatCommandBuilder.StatEntry statEntry = statCommandBuilder.ParseEntry(item2);
+                    PendingSymlink pendingSymlink = pendingLinks[currentLinkIndex];
+                    StatCommandBuilder.StatEntry statEntry = statCommandBuilder.ParseEntry(line);
                     statEntry.ModifiedTime -= _settings.ClockOffset.Seconds;
                     if (statEntry.Kind == StatCommandBuilder.StatEntryKind.Directory)
                     {
                         if (CommandSyncEngine.IsIncluded(pendingSymlink.Parent.RelativePath.Combine(pendingSymlink.Name).Path, _settings.DirectoryFilters))
                         {
-                            ScanDirectory value;
+                            ScanDirectory visitedDir;
                             if (this._engine.IsUpload)
                             {
                                 pendingSymlink.Parent.RemoteDirectory.Symlinks.Add(new RemoteFileSet.RemoteDirectory.RemoteSymlink
@@ -203,32 +203,32 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                                     Target = pendingSymlink.Target
                                 });
                             }
-                            else if (_visited.TryGetValue(pendingSymlink.ResolvedPath, out value))
+                            else if (_visited.TryGetValue(pendingSymlink.ResolvedPath, out visitedDir))
                             {
-                                List<RemoteFileSet.RemoteDirectory.RemoteSymlink> list2 = pendingSymlink.Parent.RemoteDirectory.Symlinks;
-                                RemoteFileSet.RemoteDirectory.RemoteSymlink item = new RemoteFileSet.RemoteDirectory.RemoteSymlink
+                                List<RemoteFileSet.RemoteDirectory.RemoteSymlink> symlinksList = pendingSymlink.Parent.RemoteDirectory.Symlinks;
+                                RemoteFileSet.RemoteDirectory.RemoteSymlink symlinkItem = new RemoteFileSet.RemoteDirectory.RemoteSymlink
                                 {
                                     IsDirectory = true,
                                     Name = pendingSymlink.Name
                                 };
-                                RelativeRemotePath relativeRemotePath = pendingSymlink.Parent.RelativePath;
-                                string text2 = "/" + relativeRemotePath.ToString();
-                                relativeRemotePath = value.RelativePath;
-                                item.Target = RemotePathUtils.GetRelativePath(text2, "/" + relativeRemotePath.ToString(), flag: false);
-                                list2.Add(item);
+                                RelativeRemotePath parentRelPath = pendingSymlink.Parent.RelativePath;
+                                string currPath = "/" + parentRelPath.ToString();
+                                parentRelPath = visitedDir.RelativePath;
+                                symlinkItem.Target = RemotePathUtils.GetRelativePath(currPath, "/" + parentRelPath.ToString(), allowAbsoluteFallback: false);
+                                symlinksList.Add(symlinkItem);
                             }
                             else
                             {
                                 ScanDirectory scanDirectory = pendingSymlink.Parent.CreateChild(pendingSymlink.Name, statEntry.DeviceId, pendingSymlink.ResolvedPath);
                                 pendingSymlink.Parent.RemoteDirectory.SubDirectories.Add(scanDirectory.RemoteDirectory);
-                                list5.Add(scanDirectory);
+                                outPendingDirs.Add(scanDirectory);
                             }
                         }
                     }
                     else if (statEntry.Kind == StatCommandBuilder.StatEntryKind.File && pendingSymlink.Parent.IsIncluded && CommandSyncEngine.IsIncluded(RemotePathUtils.GetFileName(pendingSymlink.Name), _settings.FileFilters))
                     {
-                        string text3 = pendingSymlink.ResolvedPath;
-                        ScanDirectory value2;
+                        string resolvedPath = pendingSymlink.ResolvedPath;
+                        ScanDirectory parentVisited;
                         if (this._engine.IsUpload)
                         {
                             pendingSymlink.Parent.RemoteDirectory.Symlinks.Add(new RemoteFileSet.RemoteDirectory.RemoteSymlink
@@ -238,19 +238,19 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                                 Target = pendingSymlink.Target
                             });
                         }
-                        else if (_visited.TryGetValue(RemotePathUtils.GetDirectoryName(text3), out value2) && value2.IsIncluded && CommandSyncEngine.IsIncluded(RemotePathUtils.GetFileName(pendingSymlink.Target), _settings.FileFilters))
+                        else if (_visited.TryGetValue(RemotePathUtils.GetDirectoryName(resolvedPath), out parentVisited) && parentVisited.IsIncluded && CommandSyncEngine.IsIncluded(RemotePathUtils.GetFileName(pendingSymlink.Target), _settings.FileFilters))
                         {
-                            List<RemoteFileSet.RemoteDirectory.RemoteSymlink> list3 = pendingSymlink.Parent.RemoteDirectory.Symlinks;
-                            RemoteFileSet.RemoteDirectory.RemoteSymlink item = new RemoteFileSet.RemoteDirectory.RemoteSymlink
+                            List<RemoteFileSet.RemoteDirectory.RemoteSymlink> symlinksList = pendingSymlink.Parent.RemoteDirectory.Symlinks;
+                            RemoteFileSet.RemoteDirectory.RemoteSymlink symlinkItem = new RemoteFileSet.RemoteDirectory.RemoteSymlink
                             {
                                 IsDirectory = false,
                                 Name = pendingSymlink.Name
                             };
-                            RelativeRemotePath relativeRemotePath2 = pendingSymlink.Parent.RelativePath;
-                            string text4 = "/" + relativeRemotePath2.ToString();
-                            relativeRemotePath2 = value2.RelativePath;
-                            item.Target = RemotePathUtils.GetRelativePath(text4, "/" + relativeRemotePath2.ToString() + "/" + RemotePathUtils.GetFileName(pendingSymlink.Target), flag: false);
-                            list3.Add(item);
+                            RelativeRemotePath parentRelPath = pendingSymlink.Parent.RelativePath;
+                            string currPath = "/" + parentRelPath.ToString();
+                            parentRelPath = parentVisited.RelativePath;
+                            symlinkItem.Target = RemotePathUtils.GetRelativePath(currPath, "/" + parentRelPath.ToString() + "/" + RemotePathUtils.GetFileName(pendingSymlink.Target), allowAbsoluteFallback: false);
+                            symlinksList.Add(symlinkItem);
                         }
                         else
                         {
@@ -263,7 +263,7 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                             });
                             Files.Add(new DownloadEntry
                             {
-                                RemotePath = text3,
+                                RemotePath = resolvedPath,
                                 ModifiedSeconds = statEntry.ModifiedSeconds
                             });
                         }
@@ -272,62 +272,62 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
             }
         }
 
-        private List<ScanDirectory> ScanDirectories(StatCommandBuilder statCommandBuilder, List<ScanDirectory> list4, List<PendingSymlink> list5)
+        private List<ScanDirectory> ScanDirectories(StatCommandBuilder statCommandBuilder, List<ScanDirectory> dirsToScan, List<PendingSymlink> pendingLinks)
         {
-            List<ScanDirectory> list = new List<ScanDirectory>();
-            string text = Guid.NewGuid().ToString();
+            List<ScanDirectory> nextDirsToScan = new List<ScanDirectory>();
+            string marker = Guid.NewGuid().ToString();
             MemoryStream memoryStream = new MemoryStream();
             using StreamWriter streamWriter = new StreamWriter(memoryStream)
             {
                 NewLine = "\n"
             };
-            streamWriter.WriteLine("echo " + text);
-            foreach (ScanDirectory item2 in list4)
+            streamWriter.WriteLine("echo " + marker);
+            foreach (ScanDirectory dir in dirsToScan)
             {
-                string text2 = item2.FullPath;
-                _visited[text2] = item2;
-                streamWriter.WriteLine("echo --dir:" + text2);
-                streamWriter.WriteLine(statCommandBuilder.GetListCommand(text2));
+                string dirPath = dir.FullPath;
+                _visited[dirPath] = dir;
+                streamWriter.WriteLine("echo --dir:" + dirPath);
+                streamWriter.WriteLine(statCommandBuilder.GetListCommand(dirPath));
             }
             streamWriter.Flush();
-            List<string> list2 = this._engine.RunScript(text, memoryStream.ToArray());
-            bool flag = false;
-            ScanDirectory scanDirectory = null;
-            foreach (string item3 in list2)
+            List<string> scriptOutput = this._engine.RunScript(marker, memoryStream.ToArray());
+            bool markerSeen = false;
+            ScanDirectory currentDir = null;
+            foreach (string line in scriptOutput)
             {
-                if (!flag)
+                if (!markerSeen)
                 {
-                    if (!(item3 != text))
+                    if (!(line != marker))
                     {
-                        flag = true;
+                        markerSeen = true;
                     }
                 }
-                else if (item3.StartsWith("--dir:"))
+                else if (line.StartsWith("--dir:"))
                 {
-                    scanDirectory = _visited.GetOrDefault(item3.Substring(6).Trim());
-                    if (scanDirectory != null)
+                    currentDir = _visited.GetOrDefault(line.Substring(6).Trim());
+                    if (currentDir != null)
                     {
-                        scanDirectory.IsIncluded = CommandSyncEngine.IsIncluded((scanDirectory.RelativePath.Path + "/.").TrimStart('/'), _settings.DirectoryFilters);
+                        currentDir.IsIncluded = CommandSyncEngine.IsIncluded((currentDir.RelativePath.Path + "/.").TrimStart('/'), _settings.DirectoryFilters);
                     }
                 }
                 else
                 {
-                    if (scanDirectory == null)
+                    if (currentDir == null)
                     {
                         continue;
                     }
-                    StatCommandBuilder.StatEntry statEntry = statCommandBuilder.ParseEntry(item3);
+                    StatCommandBuilder.StatEntry statEntry = statCommandBuilder.ParseEntry(line);
                     if (statEntry.Name == "." || statEntry.Name == "..")
                     {
                         continue;
                     }
-                    string key = scanDirectory.FullPath + "/" + statEntry.Name;
+                    string entryPath = currentDir.FullPath + "/" + statEntry.Name;
                     switch (statEntry.Kind)
                     {
                         case StatCommandBuilder.StatEntryKind.File:
-                            if (scanDirectory.IsIncluded && CommandSyncEngine.IsIncluded(statEntry.Name, _settings.FileFilters))
+                            if (currentDir.IsIncluded && CommandSyncEngine.IsIncluded(statEntry.Name, _settings.FileFilters))
                             {
-                                scanDirectory.RemoteDirectory.Files.Add(new RemoteFileSet.RemoteFileEntry
+                                currentDir.RemoteDirectory.Files.Add(new RemoteFileSet.RemoteFileEntry
                                 {
                                     Id = Files.Count,
                                     Name = statEntry.Name,
@@ -336,7 +336,7 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                                 });
                                 Files.Add(new DownloadEntry
                                 {
-                                    RemotePath = key,
+                                    RemotePath = entryPath,
                                     ModifiedSeconds = statEntry.ModifiedSeconds
                                 });
                             }
@@ -344,36 +344,36 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                         case StatCommandBuilder.StatEntryKind.Symlink:
                             if (statEntry.LinkTarget != null)
                             {
-                                list5.Add(new PendingSymlink(scanDirectory, statEntry.Name, statEntry.LinkTarget));
+                                pendingLinks.Add(new PendingSymlink(currentDir, statEntry.Name, statEntry.LinkTarget));
                             }
                             break;
                         case StatCommandBuilder.StatEntryKind.Directory:
                             {
-                                if (!CommandSyncEngine.IsIncluded(scanDirectory.RelativePath.Combine(statEntry.Name).Path, _settings.DirectoryFilters))
+                                if (!CommandSyncEngine.IsIncluded(currentDir.RelativePath.Combine(statEntry.Name).Path, _settings.DirectoryFilters))
                                 {
                                     break;
                                 }
-                                if (_visited.TryGetValue(key, out var value))
+                                if (_visited.TryGetValue(entryPath, out var visitedChild))
                                 {
-                                    List<RemoteFileSet.RemoteDirectory.RemoteSymlink> list3 = scanDirectory.RemoteDirectory.Symlinks;
-                                    RemoteFileSet.RemoteDirectory.RemoteSymlink item = new RemoteFileSet.RemoteDirectory.RemoteSymlink
+                                    List<RemoteFileSet.RemoteDirectory.RemoteSymlink> symlinksList = currentDir.RemoteDirectory.Symlinks;
+                                    RemoteFileSet.RemoteDirectory.RemoteSymlink symlinkItem = new RemoteFileSet.RemoteDirectory.RemoteSymlink
                                     {
                                         IsDirectory = true,
                                         Name = statEntry.Name
                                     };
-                                    RelativeRemotePath relativeRemotePath = scanDirectory.RelativePath;
-                                    string text3 = "/" + relativeRemotePath.ToString();
-                                    relativeRemotePath = value.RelativePath;
-                                    item.Target = RemotePathUtils.GetRelativePath(text3, "/" + relativeRemotePath.ToString(), flag: false);
-                                    list3.Add(item);
+                                    RelativeRemotePath relPath = currentDir.RelativePath;
+                                    string currPath = "/" + relPath.ToString();
+                                    relPath = visitedChild.RelativePath;
+                                    symlinkItem.Target = RemotePathUtils.GetRelativePath(currPath, "/" + relPath.ToString(), allowAbsoluteFallback: false);
+                                    symlinksList.Add(symlinkItem);
                                 }
                                 else
                                 {
-                                    ScanDirectory scanDirectory2 = scanDirectory.CreateChild(statEntry.Name, statEntry.DeviceId);
-                                    scanDirectory.RemoteDirectory.SubDirectories.Add(scanDirectory2.RemoteDirectory);
-                                    if ((_settings.Options & SyncOptions.OneFileSystem) != SyncOptions.OneFileSystem || scanDirectory.DeviceId == 0 || statEntry.DeviceId == scanDirectory.DeviceId)
+                                    ScanDirectory childDir = currentDir.CreateChild(statEntry.Name, statEntry.DeviceId);
+                                    currentDir.RemoteDirectory.SubDirectories.Add(childDir.RemoteDirectory);
+                                    if ((_settings.Options & SyncOptions.OneFileSystem) != SyncOptions.OneFileSystem || currentDir.DeviceId == 0 || statEntry.DeviceId == currentDir.DeviceId)
                                     {
-                                        list.Add(scanDirectory2);
+                                        nextDirsToScan.Add(childDir);
                                     }
                                 }
                                 break;
@@ -381,7 +381,7 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                     }
                 }
             }
-            return list;
+            return nextDirsToScan;
         }
     }
 
@@ -418,68 +418,68 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
         Tuning = syncTuning;
     }
 
-    public static bool IsIncluded(string text, QuickSyncFilter[] items)
+    public static bool IsIncluded(string path, QuickSyncFilter[] filters)
     {
-        return QuickSyncRunner.IsIncluded(text, items);
+        return QuickSyncRunner.IsIncluded(path, filters);
     }
 
     public virtual void Dispose()
     {
     }
 
-    protected List<string> RunCommand(string text2, bool flag = true)
+    protected List<string> RunCommand(string command, bool requireSuccess = true)
     {
-        _events?.OnLog(new SyncLogMessage.RunCommandMessage(text2));
+        _events?.OnLog(new SyncLogMessage.RunCommandMessage(command));
         LineSplitter lineSplitter = new LineSplitter();
         try
         {
             IShellLauncher shellLauncher = null;
             if ((_settings.Options & SyncOptions.UseLauncher) != 0)
             {
-                shellLauncher = _customization?.GetLauncher(text2);
+                shellLauncher = _customization?.GetLauncher(command);
             }
-            using SshShellChannel sshShellChannel = _session.OpenShellChannel(shellLauncher?.Command ?? text2);
+            using SshShellChannel sshShellChannel = _session.OpenShellChannel(shellLauncher?.Command ?? command);
             shellLauncher?.Prepare(sshShellChannel, "File synchronization");
-            sshShellChannel.DataReceived += (object obj, byte[] array, int num2, int num3, int num) =>
+            sshShellChannel.DataReceived += (object sender, byte[] buffer, int offset, int count, int dataType) =>
             {
-                if (num == 1)
+                if (dataType == 1)
                 {
-                    foreach (string item in lineSplitter.Feed(array, num2, num3))
+                    foreach (string line in lineSplitter.Feed(buffer, offset, count))
                     {
                         _events.OnWarning(new SyncWarning
                         {
-                            Warning = new QuickSyncWarning(QuickSyncWarningType.StderrLine, item, 0)
+                            Warning = new QuickSyncWarning(QuickSyncWarningType.StderrLine, line, 0)
                         });
                     }
                 }
             };
             sshShellChannel.ReadStderrOnRead = true;
-            List<string> list = new List<string>();
+            List<string> lines = new List<string>();
             using (StreamReader streamReader = new StreamReader(sshShellChannel.Output))
             {
                 while (true)
                 {
-                    string text = streamReader.ReadLine();
-                    if (text != null)
+                    string line = streamReader.ReadLine();
+                    if (line != null)
                     {
-                        list.Add(text);
+                        lines.Add(line);
                         continue;
                     }
                     break;
                 }
             }
             sshShellChannel.WaitClosed();
-            if ((sshShellChannel.ExitStatus != 0) & flag)
+            if ((sshShellChannel.ExitStatus != 0) & requireSuccess)
             {
                 return null;
             }
-            return list;
+            return lines;
         }
         catch (Exception ex)
         {
             _events.OnWarning(new SyncWarning
             {
-                Warning = new QuickSyncWarning(QuickSyncWarningType.RemoteCommandFailed, text2, 0),
+                Warning = new QuickSyncWarning(QuickSyncWarningType.RemoteCommandFailed, command, 0),
                 Exception = ex
             });
             return null;
@@ -488,40 +488,40 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
 
     public RemoteFileSet GetRemoteFileSet()
     {
-        RemoteFileSet.RemoteDirectory remoteDirectory = new RemoteFileSet.RemoteDirectory(null, null);
+        RemoteFileSet.RemoteDirectory rootDir = new RemoteFileSet.RemoteDirectory(null, null);
         using (RemoteTreeScanner remoteTreeScanner = new RemoteTreeScanner(_settings.RemotePath, this))
         {
-            remoteTreeScanner.Scan(remoteDirectory);
+            remoteTreeScanner.Scan(rootDir);
             DownloadList = remoteTreeScanner.Files;
         }
         return new RemoteFileSet
         {
-            Root = remoteDirectory
+            Root = rootDir
         };
     }
 
-    protected List<string> RunScript(string text2, byte[] buffer)
+    protected List<string> RunScript(string scriptName, byte[] buffer)
     {
-        string text = _session.GetTempPath("SysprogsSyncFallback-" + text2);
+        string remoteTempPath = _session.GetTempPath("SysprogsSyncFallback-" + scriptName);
         try
         {
-            using (ScpChannelStream scpChannelStream = _session.OpenUpload(text, buffer.Length))
+            using (ScpChannelStream scpChannelStream = _session.OpenUpload(remoteTempPath, buffer.Length))
             {
                 scpChannelStream.Write(buffer, 0, buffer.Length);
             }
             _events?.OnLog(new SyncLogMessage.RunScriptMessage(buffer));
-            return RunCommand("sh \"" + text + "\"", flag: false) ?? new List<string>();
+            return RunCommand("sh \"" + remoteTempPath + "\"", requireSuccess: false) ?? new List<string>();
         }
         finally
         {
             if (!Tuning.KeepTempScripts)
             {
-                RunCommand("rm \"" + text + "\"");
+                RunCommand("rm \"" + remoteTempPath + "\"");
             }
         }
     }
 
-    public abstract IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> items);
+    public abstract IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> actions);
 
-    public abstract void Upload(List<SyncPlan.SyncAction> list, List<LocalPath> list2, ref TransferStatistics transferStatistics);
+    public abstract void Upload(List<SyncPlan.SyncAction> actions, List<LocalPath> localPaths, ref TransferStatistics transferStatistics);
 }

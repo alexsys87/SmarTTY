@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using System;
 using System.Drawing;
 using System.IO;
@@ -47,25 +47,25 @@ public partial class PublicKeyManagerForm : DpiAwareForm
         new Thread(CheckKeyStatus).Start(false);
     }
 
-    private void CheckKeyStatus(object obj)
+    private void CheckKeyStatus(object updateSettingsObj)
     {
-        bool flag = (bool)obj;
-        bool flag2 = false;
+        bool updateSettings = (bool)updateSettingsObj;
+        bool isAuthorized = false;
         try
         {
-            flag2 = AuthorizedKeysManager.IsKeyAuthorized(_session, _keyPair.GetPublicKeyBlob());
+            isAuthorized = AuthorizedKeysManager.IsKeyAuthorized(_session, _keyPair.GetPublicKeyBlob());
         }
         catch
         {
         }
         BeginInvoke((ThreadStart)(() =>
         {
-            if (flag2)
+            if (isAuthorized)
             {
                 txtKeyStatus.Text = "accepted";
                 txtKeyStatus.ForeColor = Color.DarkGreen;
                 picRemoteSettings.Image = Resources.unlocked;
-                if (flag && _settings != null)
+                if (updateSettings && _settings != null)
                 {
                     _settings.AuthenticationType = AuthType.PublicKey;
                 }
@@ -75,14 +75,14 @@ public partial class PublicKeyManagerForm : DpiAwareForm
                 txtKeyStatus.Text = "not accepted";
                 txtKeyStatus.ForeColor = Color.Red;
                 picRemoteSettings.Image = Resources.locked;
-                if (flag && _settings != null)
+                if (updateSettings && _settings != null)
                 {
                     _settings.AuthenticationType = AuthType.Password;
                 }
             }
-            btnAccept.Enabled = !flag2;
-            btnStopAccepting.Enabled = flag2;
-            if (flag && _settings != null)
+            btnAccept.Enabled = !isAuthorized;
+            btnStopAccepting.Enabled = isAuthorized;
+            if (updateSettings && _settings != null)
             {
                 try
                 {

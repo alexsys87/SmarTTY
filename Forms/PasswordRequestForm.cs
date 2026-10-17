@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using VisualTTY;
@@ -9,17 +9,17 @@ public partial class PasswordRequestForm : DpiAwareForm
 {
     private SSHConnectionSettings _sshConnectionSettings;
 
-    private PasswordRequestForm(SSHConnectionSettings sshConnectionSettings, string text, bool flag)
+    private PasswordRequestForm(SSHConnectionSettings sshConnectionSettings, string previousPassword, bool isPassphrase)
     {
         this.InitializeComponent();
         _sshConnectionSettings = sshConnectionSettings;
-        if (flag)
+        if (isPassphrase)
         {
             lblHeading.Text = "Passphrase required for your keyfile";
             lblPasswordDesc.Text = "Passphrase:";
             Text = "Enter SSH Passphrase";
         }
-        else if (text != null)
+        else if (previousPassword != null)
         {
             lblHeading.Text = "Password not accepted";
         }
@@ -36,20 +36,20 @@ public partial class PasswordRequestForm : DpiAwareForm
         }
     }
 
-    public static bool ShowPrompt(SSHConnectionSettings sshConnectionSettings, ref string text, bool flag, bool flag2)
+    public static bool ShowPrompt(SSHConnectionSettings sshConnectionSettings, ref string password, bool isPassphrase, bool isSudo)
     {
-        PasswordRequestForm passwordRequestForm = new PasswordRequestForm(sshConnectionSettings, text, flag);
-        passwordRequestForm.TopMost = flag2;
+        PasswordRequestForm passwordRequestForm = new PasswordRequestForm(sshConnectionSettings, password, isPassphrase);
+        passwordRequestForm.TopMost = isSudo;
         if (passwordRequestForm.ShowModal() != DialogResult.OK)
         {
             return false;
         }
-        text = passwordRequestForm.txtPassword.Text;
+        password = passwordRequestForm.txtPassword.Text;
         return true;
     }
 
     [DllImport("User32")]
-    private static extern int SetForegroundWindow(IntPtr handle);
+    private static extern int SetForegroundWindow(IntPtr hWnd);
 
     private void OnUnusedEvent(object sender, EventArgs e)
     {

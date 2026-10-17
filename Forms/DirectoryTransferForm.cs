@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.IO;
 using SmarTTY.Sync;
 using SmarTTY.Utilities;
@@ -55,12 +55,12 @@ public partial class DirectoryTransferForm : DpiAwareForm
 
     public bool IsUpload => _isUpload;
 
-    public DirectoryTransferForm(SshSession sshSession, bool flag)
+    public DirectoryTransferForm(SshSession sshSession, bool isUpload)
     {
         InitializeComponent();
         this._session = sshSession;
-        _isUpload = flag;
-        if (flag)
+        _isUpload = isUpload;
+        if (isUpload)
         {
             pictureBox1.Visible = false;
             pictureBox2.Visible = true;
@@ -76,80 +76,80 @@ public partial class DirectoryTransferForm : DpiAwareForm
         }
     }
 
-    private void SwapControls(Control control, Control control2)
+    private void SwapControls(Control control1, Control control2)
     {
-        Point location = control.Location;
-        control.Location = control2.Location;
+        Point location = control1.Location;
+        control1.Location = control2.Location;
         control2.Location = location;
-        int num = control.TabIndex;
-        control.TabIndex = control2.TabIndex;
-        control2.TabIndex = num;
+        int tabIndex = control1.TabIndex;
+        control1.TabIndex = control2.TabIndex;
+        control2.TabIndex = tabIndex;
     }
 
     private void btnDownload_Click(object sender, EventArgs e)
     {
-        string text = txtRemoteDir.Text;
-        string text2 = txtLocalDir.Text;
-        bool flag2 = rbTar.Checked;
-        if (string.IsNullOrEmpty(text2))
+        string remoteDir = txtRemoteDir.Text;
+        string localDir = txtLocalDir.Text;
+        bool useTar = rbTar.Checked;
+        if (string.IsNullOrEmpty(localDir))
         {
             MessageBox.Show("Local directory cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             return;
         }
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(remoteDir))
         {
             MessageBox.Show("Remote directory cannot be empty", "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             return;
         }
-        if (_isUpload && !Directory.Exists(text2))
+        if (_isUpload && !Directory.Exists(localDir))
         {
-            MessageBox.Show(text2 + " is not a valid directory", "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(localDir + " is not a valid directory", "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             return;
         }
         _cancelRequested = false;
         new Thread(() =>
         {
-            RunTransfer(text, text2, flag2);
+            RunTransfer(remoteDir, localDir, useTar);
         }).Start();
         TextBox textBox = txtLocalDir;
         TextBox textBox2 = txtRemoteDir;
         Button button = btnDownload;
         RadioButton radioButton = rbTar;
-        bool flag = (rbSCP.Enabled = false);
-        bool flag3 = (radioButton.Enabled = flag);
+        bool disabledState = (rbSCP.Enabled = false);
+        bool flag3 = (radioButton.Enabled = disabledState);
         bool flag5 = (button.Enabled = flag3);
         bool enabled = (textBox2.Enabled = flag5);
         textBox.Enabled = enabled;
         progressBar1.Visible = true;
     }
 
-    private void RunTransfer(string text, string text2, bool flag2)
+    private void RunTransfer(string remoteDir, string localDir, bool useTar)
     {
         DirectoryCopier directoryCopier = new DirectoryCopier(this._session);
-        directoryCopier.UseTar = flag2;
+        directoryCopier.UseTar = useTar;
         directoryCopier.Progress += this.OnProgress;
         directoryCopier.Log += OnLog;
-        bool flag4 = false;
+        bool completed = false;
         _errorLog.Length = 0;
         Exception exception = null;
         try
         {
             if (_isUpload)
             {
-                directoryCopier.Upload(text2, text);
+                directoryCopier.Upload(localDir, remoteDir);
             }
             else
             {
-                directoryCopier.Download(text, text2);
+                directoryCopier.Download(remoteDir, localDir);
             }
-            flag4 = true;
+            completed = true;
         }
         catch (OperationCanceledException)
         {
         }
-        catch (Exception ex2)
+        catch (Exception ex)
         {
-            exception = ex2;
+            exception = ex;
         }
         try
         {
@@ -161,8 +161,8 @@ public partial class DirectoryTransferForm : DpiAwareForm
                 TextBox textBox2 = txtRemoteDir;
                 Button button = btnDownload;
                 RadioButton radioButton = rbTar;
-                bool flag = (rbSCP.Enabled = true);
-                bool flag3 = (radioButton.Enabled = flag);
+                bool enabledState = (rbSCP.Enabled = true);
+                bool flag3 = (radioButton.Enabled = enabledState);
                 bool flag5 = (button.Enabled = flag3);
                 bool enabled = (textBox2.Enabled = flag5);
                 textBox.Enabled = enabled;
@@ -175,7 +175,7 @@ public partial class DirectoryTransferForm : DpiAwareForm
                 {
                     MessageBox.Show("Cannot transfer a directory: " + exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
                 }
-                if (flag4 || _closeRequested)
+                if (completed || _closeRequested)
                 {
                     Close();
                 }
@@ -186,9 +186,9 @@ public partial class DirectoryTransferForm : DpiAwareForm
         }
     }
 
-    private void OnLog(object obj, string text)
+    private void OnLog(object sender, string logMessage)
     {
-        _errorLog.AppendLine(text);
+        _errorLog.AppendLine(logMessage);
     }
 
     private void OnProgress(DirectoryCopier.CopyProgress copyProgress)
@@ -211,45 +211,45 @@ public partial class DirectoryTransferForm : DpiAwareForm
         }
     }
 
-    private void UpdateProgress(DirectoryCopier.CopyStage copyStage, string text, long value2, long value3)
+    private void UpdateProgress(DirectoryCopier.CopyStage copyStage, string currentPath, long bytesDone, long bytesTotal)
     {
-        if (value2 > value3)
+        if (bytesDone > bytesTotal)
         {
-            value3 = value2;
+            bytesTotal = bytesDone;
         }
-        if (value3 == 0L)
+        if (bytesTotal == 0L)
         {
-            value3 = 1L;
+            bytesTotal = 1L;
         }
         switch (copyStage)
         {
             case DirectoryCopier.CopyStage.Counting:
-                if (text == null)
+                if (currentPath == null)
                 {
                     label1.Text = "Determining directory size...";
                 }
                 else
                 {
-                    label1.Text = "Scanning " + text + "...";
+                    label1.Text = "Scanning " + currentPath + "...";
                 }
                 progressBar1.Style = ProgressBarStyle.Marquee;
-                lblStats.Text = $"{StringUtils.FormatSize(value2)}B found";
+                lblStats.Text = $"{StringUtils.FormatSize(bytesDone)}B found";
                 break;
             case DirectoryCopier.CopyStage.CopyingFile:
-                label1.Text = (_isUpload ? "Uploading " : "Downloading ") + text + "...";
+                label1.Text = (_isUpload ? "Uploading " : "Downloading ") + currentPath + "...";
                 progressBar1.Style = ProgressBarStyle.Blocks;
-                progressBar1.Value = (int)(value2 * progressBar1.Maximum / value3);
-                lblStats.Text = $"{StringUtils.FormatSize(value2)}B done";
+                progressBar1.Value = (int)(bytesDone * progressBar1.Maximum / bytesTotal);
+                lblStats.Text = $"{StringUtils.FormatSize(bytesDone)}B done";
                 break;
             case DirectoryCopier.CopyStage.CopyingTarEntry:
-                label1.Text = "Linking " + text + "...";
+                label1.Text = "Linking " + currentPath + "...";
                 progressBar1.Style = ProgressBarStyle.Marquee;
                 lblStats.Text = "";
                 break;
             case DirectoryCopier.CopyStage.StreamingTar:
                 label1.Text = "Downloading external symbolic link targets...";
                 progressBar1.Style = ProgressBarStyle.Marquee;
-                lblStats.Text = $"{StringUtils.FormatSize(value2)}B done";
+                lblStats.Text = $"{StringUtils.FormatSize(bytesDone)}B done";
                 break;
         }
     }
@@ -278,16 +278,16 @@ public partial class DirectoryTransferForm : DpiAwareForm
     {
         _remoteFolderDialog.InitialFolder = txtRemoteDir.Text;
         _remoteFolderDialog.HostName = this._session.HostName;
-        string text = _remoteFolderDialog.ShowDialog();
-        if (text != null)
+        string result = _remoteFolderDialog.ShowDialog();
+        if (result != null)
         {
-            txtRemoteDir.Text = text;
+            txtRemoteDir.Text = result;
         }
     }
 
-    private void StartRemoteCommand(string text, string text2, ref IRemoteCommand remoteCommand)
+    private void StartRemoteCommand(string command, string arguments, ref IRemoteCommand remoteCommand)
     {
-        SshShellChannel sshShellChannel = this._session.OpenShellChannel(text + " " + text2);
+        SshShellChannel sshShellChannel = this._session.OpenShellChannel(command + " " + arguments);
         if (sshShellChannel != null)
         {
             remoteCommand = new RemoteCommandJob(sshShellChannel);

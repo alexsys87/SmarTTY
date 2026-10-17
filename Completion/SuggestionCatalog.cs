@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
@@ -37,13 +37,13 @@ public class SuggestionCatalog
 
         public bool IsBold => false;
 
-        public SuggestionItem(string text, string text2, string text3, string text4, int value2)
+        public SuggestionItem(string name, string detail, string hint, string documentation, int iconIndex)
         {
-            this.Name = text;
-            this.Detail = text2;
-            this.Hint = text3;
-            Documentation = text4;
-            IconIndex = value2;
+            this.Name = name;
+            this.Detail = detail;
+            this.Hint = hint;
+            Documentation = documentation;
+            IconIndex = iconIndex;
         }
     }
 
@@ -57,11 +57,11 @@ public class SuggestionCatalog
 
         public IEnumerable<ISuggestion> Items => _items;
 
-        public SuggestionSnapshot(SuggestionCatalog suggestionCatalog, List<SuggestionItem> list)
+        public SuggestionSnapshot(SuggestionCatalog suggestionCatalog, List<SuggestionItem> itemsList)
         {
             this._catalog = suggestionCatalog;
             this._items = new List<ISuggestion>();
-            foreach (SuggestionItem item in list)
+            foreach (SuggestionItem item in itemsList)
             {
                 this._items.Add(item);
             }
@@ -74,15 +74,15 @@ public class SuggestionCatalog
 
     internal List<Image> Images => _images;
 
-    public bool Add(string text, int value2, string text2, string text3, string text4)
+    public bool Add(string name, int imageIndex, string detail, string hint, string documentation)
     {
-        if (value2 >= this._images.Count)
+        if (imageIndex >= this._images.Count)
         {
-            value2 = -1;
+            imageIndex = -1;
         }
-        if (!this._items.ContainsKey(text))
+        if (!this._items.ContainsKey(name))
         {
-            this._items.Add(text, new SuggestionItem(text, text2, text3, text4, value2));
+            this._items.Add(name, new SuggestionItem(name, detail, hint, documentation, imageIndex));
         }
         return false;
     }
@@ -93,47 +93,47 @@ public class SuggestionCatalog
         return _images.Count - 1;
     }
 
-    internal SuggestionPopup CreatePopup(string text, ICompletionHost completionHost)
+    internal SuggestionPopup CreatePopup(string prefix, ICompletionHost completionHost)
     {
-        return new SuggestionPopup(this, text, completionHost, flag: true);
+        return new SuggestionPopup(this, prefix, completionHost, allowMultiSelect: true);
     }
 
-    internal ISuggestionSource CreateSnapshot(string text)
+    internal ISuggestionSource CreateSnapshot(string prefix)
     {
-        List<SuggestionItem> list = new List<SuggestionItem>();
+        List<SuggestionItem> itemsList = new List<SuggestionItem>();
         foreach (KeyValuePair<string, SuggestionItem> item in _items)
         {
-            if (text == null || (item.Key.Length < text.Length && !(item.Key.Substring(0, text.Length) != text)))
+            if (prefix == null || (item.Key.Length < prefix.Length && !(item.Key.Substring(0, prefix.Length) != prefix)))
             {
-                list.Add(item.Value);
+                itemsList.Add(item.Value);
             }
         }
-        return new SuggestionSnapshot(this, list);
+        return new SuggestionSnapshot(this, itemsList);
     }
 
-    public int CountMatching(string text)
+    public int CountMatching(string prefix)
     {
-        int num = 0;
+        int matchCount = 0;
         foreach (KeyValuePair<string, SuggestionItem> item in _items)
         {
-            if (text == null || (item.Key.Length >= text.Length && !(item.Key.Substring(0, text.Length) != text)))
+            if (prefix == null || (item.Key.Length >= prefix.Length && !(item.Key.Substring(0, prefix.Length) != prefix)))
             {
-                num++;
+                matchCount++;
             }
         }
-        return num;
+        return matchCount;
     }
 
-    public bool Contains(string text)
+    public bool Contains(string name)
     {
-        return _items.ContainsKey(text);
+        return _items.ContainsKey(name);
     }
 
-    public SuggestionItem Find(string text)
+    public SuggestionItem Find(string name)
     {
         try
         {
-            return _items[text];
+            return _items[name];
         }
         catch (Exception)
         {

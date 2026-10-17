@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using System;
 using System.Security.Cryptography;
 using System.Text;
@@ -7,15 +7,15 @@ namespace VisualTTY;
 
 public class PasswordProtector
 {
-    public static bool BytesEqual(byte[] buffer, byte[] buffer2)
+    public static bool BytesEqual(byte[] first, byte[] second)
     {
-        if (buffer.Length != buffer2.Length)
+        if (first.Length != second.Length)
         {
             return false;
         }
-        for (int num = 0; num < buffer2.Length; num++)
+        for (int i = 0; i < second.Length; i++)
         {
-            if (buffer[num] != buffer2[num])
+            if (first[i] != second[i])
             {
                 return false;
             }
@@ -23,27 +23,27 @@ public class PasswordProtector
         return true;
     }
 
-    public static byte[] Encrypt(string text, string text2)
+    public static byte[] Encrypt(string password, string containerName)
     {
-        if (text == null)
+        if (password == null)
         {
             return null;
         }
-        byte[] bytes = Encoding.UTF8.GetBytes(text);
+        byte[] bytes = Encoding.UTF8.GetBytes(password);
         if (bytes.Length > 200)
         {
             throw new Exception("Maximum saved password length is 200 bytes");
         }
-        return (RsaSshKey.OpenContainer(text2, 2048) ?? throw new Exception("RSA key container is damaged or unreadable.")).Encrypt(bytes, fOAEP: false);
+        return (RsaSshKey.OpenContainer(containerName, 2048) ?? throw new Exception("RSA key container is damaged or unreadable.")).Encrypt(bytes, fOAEP: false);
     }
 
-    public static string Decrypt(byte[] buffer, string text)
+    public static string Decrypt(byte[] encryptedBytes, string containerName)
     {
-        if (buffer == null)
+        if (encryptedBytes == null)
         {
             return null;
         }
-        RSACryptoServiceProvider rSACryptoServiceProvider = RsaSshKey.OpenContainer(text, 2048);
-        return Encoding.UTF8.GetString(rSACryptoServiceProvider.Decrypt(buffer, fOAEP: false));
+        RSACryptoServiceProvider rsaProvider = RsaSshKey.OpenContainer(containerName, 2048);
+        return Encoding.UTF8.GetString(rsaProvider.Decrypt(encryptedBytes, fOAEP: false));
     }
 }

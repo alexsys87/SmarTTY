@@ -1,4 +1,4 @@
-﻿using SmarTTY.IO;
+using SmarTTY.IO;
 using SmarTTY.Sync;
 using System;
 using System.Collections.Generic;
@@ -54,9 +54,9 @@ public class RemoteFileSet
         {
             get
             {
-                List<string> list = new List<string>();
-                CollectFilePaths(list, "");
-                return list.ToArray();
+                List<string> pathsList = new List<string>();
+                CollectFilePaths(pathsList, "");
+                return pathsList.ToArray();
             }
         }
 
@@ -65,11 +65,11 @@ public class RemoteFileSet
             get
             {
                 yield return this;
-                foreach (RemoteDirectory item in SubDirectories)
+                foreach (RemoteDirectory child in SubDirectories)
                 {
-                    foreach (RemoteDirectory item2 in item.Descendants)
+                    foreach (RemoteDirectory descendant in child.Descendants)
                     {
-                        yield return item2;
+                        yield return descendant;
                     }
                 }
             }
@@ -87,21 +87,21 @@ public class RemoteFileSet
             }
         }
 
-        public RemoteDirectory(RemoteDirectory remoteDirectory, string text)
+        public RemoteDirectory(RemoteDirectory parent, string dirName)
         {
-            Parent = remoteDirectory;
-            Name = text;
+            Parent = parent;
+            Name = dirName;
         }
 
-        private void CollectFilePaths(List<string> list, string text)
+        private void CollectFilePaths(List<string> pathsList, string prefix)
         {
-            foreach (RemoteDirectory item in SubDirectories)
+            foreach (RemoteDirectory child in SubDirectories)
             {
-                item.CollectFilePaths(list, item.Name + "/");
+                child.CollectFilePaths(pathsList, prefix + child.Name + "/");
             }
-            foreach (RemoteFileEntry item2 in Files)
+            foreach (RemoteFileEntry file in Files)
             {
-                list.Add(text + item2.Name);
+                pathsList.Add(prefix + file.Name);
             }
         }
 
@@ -110,40 +110,40 @@ public class RemoteFileSet
             return FullPath ?? "(root)";
         }
 
-        public string Combine(string text)
+        public string Combine(string childName)
         {
             if (string.IsNullOrEmpty(FullPath))
             {
-                return text;
+                return childName;
             }
-            return FullPath + "/" + text;
+            return FullPath + "/" + childName;
         }
 
-        public void Dump(StreamWriter streamWriter, string text2 = "", int value2 = 1)
+        public void Dump(StreamWriter writer, string indent = "", int depth = 1)
         {
-            string text = "/";
-            streamWriter.WriteLine($"<{value2}>{text2}{Name} ({FullPath ?? text}):");
-            text2 += "  ";
-            foreach (RemoteFileEntry item in Files)
+            string rootSymbol = "/";
+            writer.WriteLine($"<{depth}>{indent}{Name} ({FullPath ?? rootSymbol}):");
+            indent += "  ";
+            foreach (RemoteFileEntry file in Files)
             {
-                streamWriter.WriteLine($"{text2}{item.Name} (size={item.Size}, time={item.ModifiedSeconds}, id={item.Id})");
+                writer.WriteLine($"{indent}{file.Name} (size={file.Size}, time={file.ModifiedSeconds}, id={file.Id})");
             }
-            foreach (RemoteSymlink item2 in this.Symlinks)
+            foreach (RemoteSymlink symlink in this.Symlinks)
             {
-                streamWriter.WriteLine(text2 + item2.Name + " => " + item2.Target + (item2.IsDirectory ? "(dir)" : "(file)"));
+                writer.WriteLine(indent + symlink.Name + " => " + symlink.Target + (symlink.IsDirectory ? "(dir)" : "(file)"));
             }
-            foreach (RemoteDirectory item3 in SubDirectories)
+            foreach (RemoteDirectory subDir in SubDirectories)
             {
-                item3.Dump(streamWriter, text2, value2 + 1);
+                subDir.Dump(writer, indent, depth + 1);
             }
         }
     }
 
-    public struct QueuedSymlink(RemoteDirectory remoteDirectory, string text)
+    public struct QueuedSymlink(RemoteDirectory remoteDirectory, string linkName)
     {
         public RemoteDirectory Directory = remoteDirectory;
 
-        public string Name = text;
+        public string Name = linkName;
     }
 
     internal class RemoteFileSetReader
@@ -156,17 +156,17 @@ public class RemoteFileSet
 
             public string FullPath => Directory.Combine(Name);
 
-            public FileLocation(RemoteDirectory remoteDirectory, string text)
+            public FileLocation(RemoteDirectory remoteDirectory, string fileName)
             {
                 Directory = remoteDirectory;
-                this.Name = text;
+                this.Name = fileName;
             }
         }
 
         public class RemoteFileSetFormatException : Exception
         {
-            public RemoteFileSetFormatException(string text)
-                : base(text)
+            public RemoteFileSetFormatException(string message)
+                : base(message)
             {
             }
         }
@@ -183,48 +183,48 @@ public class RemoteFileSet
 
         public event Action<QuickSyncWarning> Warning;
 
-        public RemoteFileSetReader(SyncStreamReader syncStreamReader, int value2)
+        public RemoteFileSetReader(SyncStreamReader syncStreamReader, int timeOffsetSeconds)
         {
             this._reader = syncStreamReader;
-            _timeOffsetSeconds = value2;
+            _timeOffsetSeconds = timeOffsetSeconds;
         }
 
-        private void RegisterFile(int value2, RemoteDirectory remoteDirectory, string text)
+        private void RegisterFile(int fileId, RemoteDirectory remoteDirectory, string fileName)
         {
-            if (value2 >= 0)
+            if (fileId >= 0)
             {
-                while (value2 >= _files.Count)
+                while (fileId >= _files.Count)
                 {
                     _files.Add(default);
                 }
-                _files[value2] = new FileLocation(remoteDirectory, text);
+                _files[fileId] = new FileLocation(remoteDirectory, fileName);
             }
         }
 
-        private RemoteDirectory GetOrCreateDirectory(int value2, RemoteDirectory remoteDirectory, string text, bool flag = false)
+        private RemoteDirectory GetOrCreateDirectory(int dirId, RemoteDirectory parent, string dirName, bool isBody = false)
         {
-            while (value2 >= _directories.Count)
+            while (dirId >= _directories.Count)
             {
                 _directories.Add(null);
             }
-            if (_directories[value2] != null)
+            if (_directories[dirId] != null)
             {
-                if (flag)
+                if (isBody)
                 {
-                    throw new RemoteFileSetFormatException($"Directory #{value2} already has a body");
+                    throw new RemoteFileSetFormatException($"Directory #{dirId} already has a body");
                 }
-                return _directories[value2];
+                return _directories[dirId];
             }
-            return _directories[value2] = new RemoteDirectory(remoteDirectory, text);
+            return _directories[dirId] = new RemoteDirectory(parent, dirName);
         }
 
-        private RemoteDirectory GetDirectory(int value2)
+        private RemoteDirectory GetDirectory(int dirId)
         {
-            if (value2 < 0 || value2 >= _directories.Count || _directories[value2] == null)
+            if (dirId < 0 || dirId >= _directories.Count || _directories[dirId] == null)
             {
-                throw new RemoteFileSetFormatException("Unexpected directory ID: " + value2);
+                throw new RemoteFileSetFormatException("Unexpected directory ID: " + dirId);
             }
-            return _directories[value2];
+            return _directories[dirId];
         }
 
         public RemoteFileSet Read()
@@ -232,7 +232,7 @@ public class RemoteFileSet
             SyncRecordType syncRecordType = _reader.ReadRecordType();
             if (syncRecordType == SyncRecordType.FileSetStart)
             {
-                RemoteDirectory remoteDirectory = GetOrCreateDirectory(_reader.ReadInt32(), null, null);
+                RemoteDirectory rootDirectory = GetOrCreateDirectory(_reader.ReadInt32(), null, null);
                 while (true)
                 {
                     syncRecordType = _reader.ReadRecordType();
@@ -240,18 +240,18 @@ public class RemoteFileSet
                     {
                         case SyncRecordType.DirectoryBody:
                             {
-                                int num3 = _reader.ReadInt32();
-                                ReadDirectoryBody(GetDirectory(num3));
+                                int dirId = _reader.ReadInt32();
+                                ReadDirectoryBody(GetDirectory(dirId));
                                 break;
                             }
                         case SyncRecordType.DirectoryError:
                             {
-                                int num4 = _reader.ReadInt32();
-                                int num5 = _reader.ReadInt32();
-                                RemoteDirectory remoteDirectory2 = GetDirectory(num4);
-                                if (remoteDirectory2 != remoteDirectory || num5 != 2)
+                                int dirId = _reader.ReadInt32();
+                                int errCode = _reader.ReadInt32();
+                                RemoteDirectory errorDir = GetDirectory(dirId);
+                                if (errorDir != rootDirectory || errCode != 2)
                                 {
-                                    Warning?.Invoke(new QuickSyncWarning(QuickSyncWarningType.UnreadableRemoteDirectory, remoteDirectory2.FullPath, num5));
+                                    Warning?.Invoke(new QuickSyncWarning(QuickSyncWarningType.UnreadableRemoteDirectory, errorDir.FullPath, errCode));
                                 }
                                 break;
                             }
@@ -260,42 +260,42 @@ public class RemoteFileSet
                         case SyncRecordType.ResolvedSymlinkToDirectory:
                         case SyncRecordType.ResolvedSymlinkDirectoryBody:
                             {
-                                int num = _reader.ReadInt32();
-                                int num2 = _reader.ReadInt32();
-                                if (num < 0 || num >= _queuedSymlinks.Count || _queuedSymlinks[num].Directory == null)
+                                int symlinkId = _reader.ReadInt32();
+                                int targetId = _reader.ReadInt32();
+                                if (symlinkId < 0 || symlinkId >= _queuedSymlinks.Count || _queuedSymlinks[symlinkId].Directory == null)
                                 {
-                                    throw new RemoteFileSetFormatException("Unexpected queued symlink ID: " + num);
+                                    throw new RemoteFileSetFormatException("Unexpected queued symlink ID: " + symlinkId);
                                 }
-                                QueuedSymlink queuedSymlink = _queuedSymlinks[num];
+                                QueuedSymlink queuedSymlink = _queuedSymlinks[symlinkId];
                                 switch (syncRecordType)
                                 {
                                     case SyncRecordType.ResolvedSymlinkDirectoryBody:
                                         {
-                                            RemoteDirectory item = GetOrCreateDirectory(num2, queuedSymlink.Directory, queuedSymlink.Name, flag: true);
-                                            queuedSymlink.Directory.SubDirectories.Add(item);
+                                            RemoteDirectory subDir = GetOrCreateDirectory(targetId, queuedSymlink.Directory, queuedSymlink.Name, isBody: true);
+                                            queuedSymlink.Directory.SubDirectories.Add(subDir);
                                             break;
                                         }
                                     case SyncRecordType.ResolvedSymlinkToDirectory:
                                         {
-                                            RemoteDirectory remoteDirectory3 = GetDirectory(num2);
+                                            RemoteDirectory targetDir = GetDirectory(targetId);
                                             queuedSymlink.Directory.Symlinks.Add(new RemoteDirectory.RemoteSymlink
                                             {
                                                 Name = queuedSymlink.Name,
                                                 IsDirectory = true,
-                                                Target = RemotePathUtils.GetRelativePath("/" + queuedSymlink.Directory.FullPath, "/" + remoteDirectory3.FullPath, flag: false)
+                                                Target = RemotePathUtils.GetRelativePath("/" + queuedSymlink.Directory.FullPath, "/" + targetDir.FullPath, allowAbsoluteFallback: false)
                                             });
                                             break;
                                         }
                                     case SyncRecordType.ResolvedSymlinkToFile:
-                                        if (num2 < 0 || num2 >= _files.Count || _files[num2].Directory == null)
+                                        if (targetId < 0 || targetId >= _files.Count || _files[targetId].Directory == null)
                                         {
-                                            throw new RemoteFileSetFormatException("Invalid target file ID: " + num2);
+                                            throw new RemoteFileSetFormatException("Invalid target file ID: " + targetId);
                                         }
                                         queuedSymlink.Directory.Symlinks.Add(new RemoteDirectory.RemoteSymlink
                                         {
                                             Name = queuedSymlink.Name,
                                             IsDirectory = false,
-                                            Target = RemotePathUtils.GetRelativePath("/" + queuedSymlink.Directory.FullPath, "/" + _files[num2].FullPath, flag: false)
+                                            Target = RemotePathUtils.GetRelativePath("/" + queuedSymlink.Directory.FullPath, "/" + _files[targetId].FullPath, allowAbsoluteFallback: false)
                                         });
                                         break;
                                     case SyncRecordType.ResolvedSymlinkInTree:
@@ -316,7 +316,7 @@ public class RemoteFileSet
                         case SyncRecordType.EndOfFileSet:
                             return new RemoteFileSet
                             {
-                                Root = remoteDirectory
+                                Root = rootDirectory
                             };
                     }
                 }
@@ -336,52 +336,52 @@ public class RemoteFileSet
                         break;
                     case SyncRecordType.QueuedSymlink:
                         {
-                            int num4 = this._reader.ReadInt32();
-                            string text6 = this._reader.ReadString();
-                            while (num4 >= _queuedSymlinks.Count)
+                            int symlinkId = this._reader.ReadInt32();
+                            string linkName = this._reader.ReadString();
+                            while (symlinkId >= _queuedSymlinks.Count)
                             {
                                 _queuedSymlinks.Add(default);
                             }
-                            _queuedSymlinks[num4] = new QueuedSymlink(remoteDirectory, text6);
+                            _queuedSymlinks[symlinkId] = new QueuedSymlink(remoteDirectory, linkName);
                             break;
                         }
                     case SyncRecordType.DirectorySymlink:
                         {
-                            int num3 = this._reader.ReadInt32();
-                            string text5 = this._reader.ReadString();
-                            RemoteDirectory remoteDirectory2 = GetDirectory(num3);
+                            int targetDirId = this._reader.ReadInt32();
+                            string symlinkName = this._reader.ReadString();
+                            RemoteDirectory targetDir = GetDirectory(targetDirId);
                             remoteDirectory.Symlinks.Add(new RemoteDirectory.RemoteSymlink
                             {
                                 IsDirectory = true,
-                                Name = text5,
-                                Target = RemotePathUtils.GetRelativePath("/" + remoteDirectory.FullPath, "/" + remoteDirectory2.FullPath, flag: false)
+                                Name = symlinkName,
+                                Target = RemotePathUtils.GetRelativePath("/" + remoteDirectory.FullPath, "/" + targetDir.FullPath, allowAbsoluteFallback: false)
                             });
                             break;
                         }
                     case SyncRecordType.Directory:
                         {
-                            int num2 = this._reader.ReadInt32();
-                            string text4 = this._reader.ReadString();
-                            RemoteDirectory item = GetOrCreateDirectory(num2, remoteDirectory, text4);
-                            remoteDirectory.SubDirectories.Add(item);
+                            int subDirId = this._reader.ReadInt32();
+                            string subDirName = this._reader.ReadString();
+                            RemoteDirectory subDir = GetOrCreateDirectory(subDirId, remoteDirectory, subDirName);
+                            remoteDirectory.SubDirectories.Add(subDir);
                             break;
                         }
                     case SyncRecordType.UnreadableSymlink:
                         {
-                            int num = this._reader.ReadInt32();
-                            string text3 = this._reader.ReadString();
-                            Warning?.Invoke(new QuickSyncWarning(QuickSyncWarningType.UnreadableSourceSymlink, remoteDirectory.Combine(text3), num));
+                            int errCode = this._reader.ReadInt32();
+                            string symlinkName = this._reader.ReadString();
+                            Warning?.Invoke(new QuickSyncWarning(QuickSyncWarningType.UnreadableSourceSymlink, remoteDirectory.Combine(symlinkName), errCode));
                             break;
                         }
                     case SyncRecordType.FileSymlink:
                     case SyncRecordType.DirectorySymlinkText:
                         {
-                            string text = this._reader.ReadString();
-                            string text2 = this._reader.ReadString();
+                            string symlinkName = this._reader.ReadString();
+                            string targetPath = this._reader.ReadString();
                             remoteDirectory.Symlinks.Add(new RemoteDirectory.RemoteSymlink
                             {
-                                Name = text,
-                                Target = text2,
+                                Name = symlinkName,
+                                Target = targetPath,
                                 IsDirectory = (syncRecordType == SyncRecordType.DirectorySymlinkText)
                             });
                             break;

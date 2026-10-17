@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.Terminal;
 using System.Threading;
@@ -8,28 +8,28 @@ namespace SmarTTY.Forms;
 public partial class SudoConfirmationForm : FormBase
 {
 
-    public SudoConfirmationForm(SshShellChannel sshShellChannel, string text)
+    public SudoConfirmationForm(SshShellChannel sshShellChannel, string promptText)
     {
         SudoConfirmationForm sudoConfirmationForm = this;
         this.InitializeComponent();
-        this.terminalEmulatorControl1.ProcessOutput(text + "\r\n");
+        this.terminalEmulatorControl1.ProcessOutput(promptText + "\r\n");
         Utf8StreamDecoder utf8StreamDecoder = new Utf8StreamDecoder();
-        sshShellChannel.Finished += (object obj) =>
+        sshShellChannel.Finished += (object sender) =>
         {
             sudoConfirmationForm.BeginInvoke(new ThreadStart(sudoConfirmationForm.Close));
         };
         sshShellChannel.ResizePty(this.terminalEmulatorControl1.TerminalSize.Width, this.terminalEmulatorControl1.TerminalSize.Height);
-        sshShellChannel.DataReceived += (object obj, byte[] array, int num, int num2, int num3) =>
+        sshShellChannel.DataReceived += (object sender, byte[] buffer, int offset, int count, int dataType) =>
         {
-            sudoConfirmationForm.terminalEmulatorControl1.EnqueueOutput(utf8StreamDecoder.Decode(array, num, num2));
+            sudoConfirmationForm.terminalEmulatorControl1.EnqueueOutput(utf8StreamDecoder.Decode(buffer, offset, count));
         };
-        this.terminalEmulatorControl1.DataEntered += (object obj, byte[] array, TerminalEmulatorControl.InputKind inputKind) =>
+        this.terminalEmulatorControl1.DataEntered += (object sender, byte[] buffer, TerminalEmulatorControl.InputKind inputKind) =>
         {
-            sshShellChannel.Input.Write(array, 0, array.Length);
+            sshShellChannel.Input.Write(buffer, 0, buffer.Length);
         };
-        this.terminalEmulatorControl1.TerminalSizeChanged += (TerminalEmulatorControl terminalEmulatorControl, int num, int num2) =>
+        this.terminalEmulatorControl1.TerminalSizeChanged += (TerminalEmulatorControl terminalEmulatorControl, int width, int height) =>
         {
-            sshShellChannel.ResizePty(num, num2);
+            sshShellChannel.ResizePty(width, height);
         };
         sshShellChannel.PollingEnabled = true;
     }

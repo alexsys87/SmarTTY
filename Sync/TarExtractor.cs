@@ -1,4 +1,4 @@
-﻿using SmarTTY.Native;
+using SmarTTY.Native;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -29,11 +29,11 @@ public class TarExtractor
         }
     }
 
-    public delegate void TarProgressHandler(bool flag, string text, long value2, long value3, int value4, long value5);
+    public delegate void TarProgressHandler(bool isSymlink, string entryName, long entryOffset, long bytesDone, int filesDone, long totalBytes);
 
-    public delegate void PathRewriteHandler(string text, ref string text2);
+    public delegate void PathRewriteHandler(string rootPath, ref string relativePath);
 
-    public delegate void OverwriteHandler(string text, ref bool flag);
+    public delegate void OverwriteHandler(string filePath, ref bool overwrite);
 
     public class PathTooLongEventArgs : EventArgs
     {
@@ -56,12 +56,12 @@ public class TarExtractor
 
         public readonly string OriginalName;
 
-        public ResolvedLink(string text, string text2, string text3, string text4)
+        public ResolvedLink(string linkPath, string target, string originalName, string baseDir)
         {
-            LinkPath = text;
-            this.Target = text2;
-            this.FullTargetPath = Path.Combine(text4 ?? Path.GetDirectoryName(text), text2);
-            this.OriginalName = text3;
+            LinkPath = linkPath;
+            this.Target = target;
+            this.FullTargetPath = Path.Combine(baseDir ?? Path.GetDirectoryName(linkPath), target);
+            this.OriginalName = originalName;
         }
     }
 
@@ -99,158 +99,158 @@ public class TarExtractor
 
     public event EventHandler<PathTooLongEventArgs> PathTooLong;
 
-    public TarExtractor(Stream stream, string text, IExtractionTarget extractionTarget = null)
+    public TarExtractor(Stream stream, string rootPath, IExtractionTarget extractionTarget = null)
     {
         _stream = stream;
-        _rootPath = text;
+        _rootPath = rootPath;
         _target = extractionTarget;
     }
 
-    private byte[] ReadHeader(out string text, out ulong value2, out byte b2)
+    private byte[] ReadHeader(out string entryName, out ulong size, out byte typeFlag)
     {
-        byte[] array = new byte[512];
-        int num = _stream.Read(array, 0, 512);
-        if (num == 0 || array[0] == 0)
+        byte[] buffer = new byte[512];
+        int bytesRead = _stream.Read(buffer, 0, 512);
+        if (bytesRead == 0 || buffer[0] == 0)
         {
-            text = null;
-            value2 = 0uL;
-            b2 = 0;
+            entryName = null;
+            size = 0uL;
+            typeFlag = 0;
             return null;
         }
-        Encoding uTF = Encoding.UTF8;
-        _bytesRead += num;
-        if (num != 512)
+        Encoding utf8 = Encoding.UTF8;
+        _bytesRead += bytesRead;
+        if (bytesRead != 512)
         {
             throw new IOException("Incomplete TAR header");
         }
-        text = uTF.GetString(array, 0, 100).TrimEnd(default(char));
-        if (text == "")
+        entryName = utf8.GetString(buffer, 0, 100).TrimEnd(default(char));
+        if (entryName == "")
         {
             throw new Exception("Invalid file name in a TAR record");
         }
-        value2 = Convert.ToUInt64(uTF.GetString(array, 124, 12).TrimEnd('\0', ' '), 8);
-        b2 = array[156];
-        return array;
+        size = Convert.ToUInt64(utf8.GetString(buffer, 124, 12).TrimEnd('\0', ' '), 8);
+        typeFlag = buffer[156];
+        return buffer;
     }
 
-    private bool IsCaseCollision(string text)
+    private bool IsCaseCollision(string filePath)
     {
-        bool result = _caseInsensitiveNames.Contains(text) && !_exactNames.Contains(text);
-        _exactNames.Add(text);
-        _caseInsensitiveNames.Add(text);
+        bool result = _caseInsensitiveNames.Contains(filePath) && !_exactNames.Contains(filePath);
+        _exactNames.Add(filePath);
+        _caseInsensitiveNames.Add(filePath);
         return result;
     }
 
-    private bool ExtractNextEntry(bool flag6, bool flag7)
+    private bool ExtractNextEntry(bool ignoreErrors, bool stripFirstDirectory)
     {
-        byte[] array = ReadHeader(out var text, out var num, out var b2);
-        if (array == null)
+        byte[] headerBuffer = ReadHeader(out var entryName, out var entrySize, out var typeFlag);
+        if (headerBuffer == null)
         {
             return false;
         }
-        Encoding uTF = Encoding.UTF8;
-        if (b2 == 76 && text == "././@LongLink")
+        Encoding utf8 = Encoding.UTF8;
+        if (typeFlag == 76 && entryName == "././@LongLink")
         {
-            int num2 = 512 - (int)(num % 512);
-            byte[] array2 = new byte[num];
-            if (_stream.Read(array2, 0, (int)num) != (int)num)
+            int padLen = 512 - (int)(entrySize % 512);
+            byte[] nameBuffer = new byte[entrySize];
+            if (_stream.Read(nameBuffer, 0, (int)entrySize) != (int)entrySize)
             {
                 throw new IOException("Incomplete long TAR name");
             }
-            if (num2 != 512)
+            if (padLen != 512)
             {
-                _stream.Read(array, 0, num2);
+                _stream.Read(headerBuffer, 0, padLen);
             }
-            array = ReadHeader(out text, out num, out b2);
-            if (array == null)
+            headerBuffer = ReadHeader(out entryName, out entrySize, out typeFlag);
+            if (headerBuffer == null)
             {
                 return false;
             }
-            text = uTF.GetString(array2, 0, array2.Length).TrimEnd(default(char));
+            entryName = utf8.GetString(nameBuffer, 0, nameBuffer.Length).TrimEnd(default(char));
         }
-        ulong num3 = Convert.ToUInt64(uTF.GetString(array, 136, 12).TrimEnd('\0', ' '), 8);
-        DateTime lastWriteTimeUtc = UnixEpoch.AddSeconds(num3);
-        char ch = text[text.Length - 1];
-        bool flag = ch == '/' || ch == '\\' || b2 == 53;
-        bool flag2 = b2 == 49 || b2 == 50;
-        if (array[257] == 117 && array[258] == 115 && array[259] == 116 && array[260] == 97 && array[261] == 114 && array[345] != 0)
+        ulong mtimeSec = Convert.ToUInt64(utf8.GetString(headerBuffer, 136, 12).TrimEnd('\0', ' '), 8);
+        DateTime lastWriteTimeUtc = UnixEpoch.AddSeconds(mtimeSec);
+        char lastChar = entryName[entryName.Length - 1];
+        bool isDirectory = lastChar == '/' || lastChar == '\\' || typeFlag == 53;
+        bool isLink = typeFlag == 49 || typeFlag == 50;
+        if (headerBuffer[257] == 117 && headerBuffer[258] == 115 && headerBuffer[259] == 116 && headerBuffer[260] == 97 && headerBuffer[261] == 114 && headerBuffer[345] != 0)
         {
-            string text2 = uTF.GetString(array, 345, 155).TrimEnd(default(char));
-            if (!text2.EndsWith("/"))
+            string prefix = utf8.GetString(headerBuffer, 345, 155).TrimEnd(default(char));
+            if (!prefix.EndsWith("/"))
             {
-                text2 += "/";
+                prefix += "/";
             }
-            if (text2 != "")
+            if (prefix != "")
             {
-                text = text2 + text;
+                entryName = prefix + entryName;
             }
         }
-        if (text.StartsWith("..") || text.StartsWith("\\") || text.StartsWith("/"))
+        if (entryName.StartsWith("..") || entryName.StartsWith("\\") || entryName.StartsWith("/"))
         {
             throw new Exception("Invalid file name in a TAR record");
         }
-        text = text.TrimStart('/', '\\');
-        if (flag7)
+        entryName = entryName.TrimStart('/', '\\');
+        if (stripFirstDirectory)
         {
-            int num4 = text.IndexOf('/');
-            if (num4 != -1)
+            int slashIndex = entryName.IndexOf('/');
+            if (slashIndex != -1)
             {
-                text = text.Substring(num4 + 1).TrimStart('/', '\\');
+                entryName = entryName.Substring(slashIndex + 1).TrimStart('/', '\\');
             }
         }
-        string text3 = null;
-        if (text != "")
+        string fullPath = null;
+        if (entryName != "")
         {
-            text = text.Replace('/', '\\');
-            PathRewriting?.Invoke(_rootPath, ref text);
-            text3 = Path.Combine(_rootPath, text);
+            entryName = entryName.Replace('/', '\\');
+            PathRewriting?.Invoke(_rootPath, ref entryName);
+            fullPath = Path.Combine(_rootPath, entryName);
         }
-        if (IsCaseCollision(text3))
+        if (IsCaseCollision(fullPath))
         {
-            text3 = null;
+            fullPath = null;
         }
-        Progress?.Invoke(flag: false, text3, (long)num, 0L, _statistics.TotalFiles, _statistics.TotalBytes);
-        if (flag)
+        Progress?.Invoke(isSymlink: false, fullPath, (long)entrySize, 0L, _statistics.TotalFiles, _statistics.TotalBytes);
+        if (isDirectory)
         {
-            if (text3 != null)
+            if (fullPath != null)
             {
                 _statistics.TotalDirectories++;
-                if (num != 0L)
+                if (entrySize != 0L)
                 {
-                    throw new Exception("Found a TAR directory record with non-zero data size:" + text3);
+                    throw new Exception("Found a TAR directory record with non-zero data size:" + fullPath);
                 }
                 if (_target != null)
                 {
-                    _target.CreateDirectory(text3, lastWriteTimeUtc);
+                    _target.CreateDirectory(fullPath, lastWriteTimeUtc);
                 }
                 else
                 {
                     try
                     {
-                        Directory.CreateDirectory(text3);
+                        Directory.CreateDirectory(fullPath);
                     }
                     catch (Exception ex)
                     {
                         if (Log != null)
                         {
-                            Log(this, $"Cannot create {text3}: {ex.Message}");
+                            Log(this, $"Cannot create {fullPath}: {ex.Message}");
                         }
-                        bool flag3 = flag6;
+                        bool currentIgnoreErrors = ignoreErrors;
                         if (ex is PathTooLongException)
                         {
                             PathTooLongEventArgs pathTooLongEventArgs = new PathTooLongEventArgs
                             {
-                                Path = text3,
+                                Path = fullPath,
                                 IsDirectory = true
                             };
                             PathTooLong?.Invoke(this, pathTooLongEventArgs);
                             if (pathTooLongEventArgs.Handled)
                             {
                                 _longPathMode = true;
-                                flag3 = true;
+                                currentIgnoreErrors = true;
                             }
                         }
-                        if (!flag3)
+                        if (!currentIgnoreErrors)
                         {
                             throw;
                         }
@@ -259,7 +259,7 @@ public class TarExtractor
                     {
                         try
                         {
-                            Directory.SetLastWriteTimeUtc(text3, lastWriteTimeUtc);
+                            Directory.SetLastWriteTimeUtc(fullPath, lastWriteTimeUtc);
                         }
                         catch
                         {
@@ -268,24 +268,24 @@ public class TarExtractor
                 }
             }
         }
-        else if (flag2)
+        else if (isLink)
         {
-            if (text3 != null)
+            if (fullPath != null)
             {
                 _statistics.TotalSymlinks++;
-                string text4 = uTF.GetString(array, 157, 100).TrimEnd(default(char));
+                string targetName = utf8.GetString(headerBuffer, 157, 100).TrimEnd(default(char));
                 _symlinks.Add(new PendingSymlink
                 {
-                    Path = text3,
-                    Target = text4,
-                    RelativePath = text.Replace('\\', '/'),
-                    IsHardLink = (b2 == 49)
+                    Path = fullPath,
+                    Target = targetName,
+                    RelativePath = entryName.Replace('\\', '/'),
+                    IsHardLink = (typeFlag == 49)
                 });
                 if (PreserveTimestamps)
                 {
                     try
                     {
-                        File.SetLastWriteTimeUtc(text3, lastWriteTimeUtc);
+                        File.SetLastWriteTimeUtc(fullPath, lastWriteTimeUtc);
                     }
                     catch
                     {
@@ -295,86 +295,86 @@ public class TarExtractor
         }
         else
         {
-            Stream stream = null;
+            Stream outStream = null;
             try
             {
-                if (text3 != null && text3.Contains("?"))
+                if (fullPath != null && fullPath.Contains("?"))
                 {
-                    text3 = null;
+                    fullPath = null;
                 }
-                if (text3 != null && FileOverwriting != null && File.Exists(text3))
+                if (fullPath != null && FileOverwriting != null && File.Exists(fullPath))
                 {
-                    bool flag4 = false;
-                    FileOverwriting(text3, ref flag4);
-                    if (flag4)
+                    bool overwrite = false;
+                    FileOverwriting(fullPath, ref overwrite);
+                    if (overwrite)
                     {
-                        text3 = null;
+                        fullPath = null;
                     }
                 }
-                if (text3 != null)
+                if (fullPath != null)
                 {
                     if (_target != null)
                     {
-                        stream = _target.CreateFile(text3);
+                        outStream = _target.CreateFile(fullPath);
                     }
                     else
                     {
                         try
                         {
-                            stream = File.Create(text3);
+                            outStream = File.Create(fullPath);
                         }
                         catch (DirectoryNotFoundException)
                         {
-                            Directory.CreateDirectory(Path.GetDirectoryName(text3));
-                            stream = File.Create(text3);
+                            Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
+                            outStream = File.Create(fullPath);
                         }
                     }
                 }
             }
-            catch (Exception ex3)
+            catch (Exception ex)
             {
                 if (Log != null)
                 {
-                    Log(this, $"Cannot create {text3}: {ex3.Message}");
+                    Log(this, $"Cannot create {fullPath}: {ex.Message}");
                 }
-                bool flag5 = flag6;
-                if (ex3 is PathTooLongException || (_longPathMode && ex3 is DirectoryNotFoundException))
+                bool currentIgnoreErrors = ignoreErrors;
+                if (ex is PathTooLongException || (_longPathMode && ex is DirectoryNotFoundException))
                 {
-                    PathTooLongEventArgs pathTooLongEventArgs2 = new PathTooLongEventArgs
+                    PathTooLongEventArgs pathTooLongEventArgs = new PathTooLongEventArgs
                     {
-                        Path = text3
+                        Path = fullPath
                     };
-                    PathTooLong?.Invoke(this, pathTooLongEventArgs2);
-                    if (pathTooLongEventArgs2.Handled)
+                    PathTooLong?.Invoke(this, pathTooLongEventArgs);
+                    if (pathTooLongEventArgs.Handled)
                     {
-                        flag5 = true;
+                        currentIgnoreErrors = true;
                     }
                 }
-                if (!flag5)
+                if (!currentIgnoreErrors)
                 {
                     throw;
                 }
             }
-            using (stream)
+            using (outStream)
             {
-                CopyEntryBody(_stream, stream, (long)num);
+                CopyEntryBody(_stream, outStream, (long)entrySize);
             }
             _statistics.TotalFiles++;
-            _statistics.TotalBytes += (long)num;
-            _bytesRead += (long)num;
-            int num5 = 512 - (int)(num % 512);
-            if (num5 != 512)
+            _statistics.TotalBytes += (long)entrySize;
+            _bytesRead += (long)entrySize;
+            int padLen = 512 - (int)(entrySize % 512);
+            if (padLen != 512)
             {
-                _stream.Read(array, 0, num5);
+                _stream.Read(headerBuffer, 0, padLen);
             }
-            _bytesRead += num5;
+            _bytesRead += padLen;
             if (PreserveTimestamps)
             {
                 try
                 {
-                    if (text3 != null)
+                    if (fullPath != null)
                     {
-                        File.SetLastWriteTimeUtc(text3, lastWriteTimeUtc);
+                        File.SetLastWriteTimeUtc(fullPath, lastWriteTimeUtc);
                     }
                 }
                 catch
@@ -385,163 +385,163 @@ public class TarExtractor
         return true;
     }
 
-    private void CopyEntryBody(Stream stream, Stream stream2, long value2)
+    private void CopyEntryBody(Stream sourceStream, Stream targetStream, long length)
     {
-        long num = 0L;
-        while (num < value2)
+        long bytesCopied = 0L;
+        while (bytesCopied < length)
         {
-            int num2 = (int)Math.Min(value2 - num, _buffer.Length);
-            if (stream.Read(_buffer, 0, num2) != num2)
+            int bytesToRead = (int)Math.Min(length - bytesCopied, _buffer.Length);
+            if (sourceStream.Read(_buffer, 0, bytesToRead) != bytesToRead)
             {
                 throw new IOException("Cannot read TAR archive body");
             }
-            stream2?.Write(_buffer, 0, num2);
-            num += num2;
+            targetStream?.Write(_buffer, 0, bytesToRead);
+            bytesCopied += bytesToRead;
             if (Progress != null)
             {
-                Progress(flag: false, null, value2, num, _statistics.TotalFiles, _statistics.TotalBytes);
+                Progress(isSymlink: false, null, length, bytesCopied, _statistics.TotalFiles, _statistics.TotalBytes);
             }
         }
     }
 
-    public void ExtractAll(bool flag, bool flag2)
+    public void ExtractAll(bool ignoreErrors, bool stripFirstDirectory)
     {
-        int num = 0;
-        while (ExtractNextEntry(flag, flag2))
+        int count = 0;
+        while (ExtractNextEntry(ignoreErrors, stripFirstDirectory))
         {
-            num++;
+            count++;
         }
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern int GetFileAttributes(string text);
+    private static extern int GetFileAttributes(string path);
 
-    private static string ResolvePath(string text2, string text3)
+    private static string ResolvePath(string basePath, string relativePath)
     {
-        Stack<string> stack = new Stack<string>(text2.Split(new char[1] { '/' }, StringSplitOptions.RemoveEmptyEntries));
-        string[] array = text3.Split('/');
-        foreach (string text in array)
+        Stack<string> stack = new Stack<string>(basePath.Split(new char[1] { '/' }, StringSplitOptions.RemoveEmptyEntries));
+        string[] segments = relativePath.Split('/');
+        foreach (string segment in segments)
         {
-            if (!(text == ""))
+            if (!(segment == ""))
             {
-                if (text == ".." && stack.Count > 0)
+                if (segment == ".." && stack.Count > 0)
                 {
                     stack.Pop();
                 }
-                stack.Push(text);
+                stack.Push(segment);
             }
         }
         return "/" + string.Join("/", stack.ToArray());
     }
 
-    private int CountParentReferences(string text2, bool flag)
+    private int CountParentReferences(string path, bool isForward)
     {
-        int num = 0;
-        int num2 = 0;
-        string[] array = text2.Split('/');
-        foreach (string text in array)
+        int maxParentCount = 0;
+        int currentDepth = 0;
+        string[] segments = path.Split('/');
+        foreach (string segment in segments)
         {
-            if (!(text == ""))
+            if (!(segment == ""))
             {
-                num2 = ((!(text == "..")) ? (num2 - 1) : (num2 + 1));
-                num = ((!flag) ? Math.Max(num, -num2) : Math.Max(num, num2));
+                currentDepth = ((!(segment == "..")) ? (currentDepth - 1) : (currentDepth + 1));
+                maxParentCount = ((!isForward) ? Math.Max(maxParentCount, -currentDepth) : Math.Max(maxParentCount, currentDepth));
             }
         }
-        return num;
+        return maxParentCount;
     }
 
-    public void CreateSymlinks(out List<string> list2, string text4 = null)
+    public void CreateSymlinks(out List<string> unresolvedLinks, string remoteRoot = null)
     {
-        list2 = new List<string>();
-        List<ResolvedLink> list = new List<ResolvedLink>();
+        unresolvedLinks = new List<string>();
+        List<ResolvedLink> resolvedList = new List<ResolvedLink>();
         foreach (PendingSymlink item in _symlinks)
         {
             if (string.IsNullOrEmpty(item.Target))
             {
                 continue;
             }
-            string text = null;
+            string relativeTarget = null;
             if (item.Target[0] == '/')
             {
-                string text2 = item.Target;
-                if (text4 != null && text2.StartsWith(text4))
+                string targetPath = item.Target;
+                if (remoteRoot != null && targetPath.StartsWith(remoteRoot))
                 {
-                    int num = CountParentReferences(item.RelativePath, flag: false);
-                    for (int num2 = 0; num2 < num; num2++)
+                    int parentCount = CountParentReferences(item.RelativePath, isForward: false);
+                    for (int i = 0; i < parentCount; i++)
                     {
-                        text += "../";
+                        relativeTarget += "../";
                     }
-                    text += text2.Substring(text4.TrimEnd('/').Length + 1);
-                    text = text.Replace('/', '\\');
+                    relativeTarget += targetPath.Substring(remoteRoot.TrimEnd('/').Length + 1);
+                    relativeTarget = relativeTarget.Replace('/', '\\');
                 }
             }
             else
             {
-                int num3 = CountParentReferences(item.Target, flag: true);
-                int num4 = CountParentReferences(item.RelativePath, flag: false) - 1;
-                if (num3 <= num4)
+                int targetParents = CountParentReferences(item.Target, isForward: true);
+                int pathParents = CountParentReferences(item.RelativePath, isForward: false) - 1;
+                if (targetParents <= pathParents)
                 {
-                    text = item.Target.Replace('/', '\\');
+                    relativeTarget = item.Target.Replace('/', '\\');
                 }
             }
-            if (text != null)
+            if (relativeTarget != null)
             {
-                string text3 = null;
+                string baseDir = null;
                 if (item.IsHardLink)
                 {
-                    text3 = _rootPath;
+                    baseDir = _rootPath;
                 }
-                list.Add(new ResolvedLink(item.Path, text, item.RelativePath, text3));
+                resolvedList.Add(new ResolvedLink(item.Path, relativeTarget, item.RelativePath, baseDir));
             }
             else
             {
-                list2.Add(item.RelativePath);
+                unresolvedLinks.Add(item.RelativePath);
             }
         }
         _symlinks.Clear();
-        bool flag;
+        bool anyCreated;
         do
         {
-            flag = false;
-            foreach (ResolvedLink item2 in list)
+            anyCreated = false;
+            foreach (ResolvedLink link in resolvedList)
             {
-                if (item2.Created)
+                if (link.Created)
                 {
                     continue;
                 }
-                int fileAttributes = GetFileAttributes(item2.FullTargetPath);
-                if (fileAttributes != -1)
+                int attributes = GetFileAttributes(link.FullTargetPath);
+                if (attributes != -1)
                 {
                     if (Progress != null)
                     {
-                        Progress(flag: true, item2.LinkPath, 0L, 0L, 0, 0L);
+                        Progress(isSymlink: true, link.LinkPath, 0L, 0L, 0, 0L);
                     }
-                    if (CreateLink(item2.LinkPath, item2.Target, item2.FullTargetPath, (fileAttributes & 0x10) != 0))
+                    if (CreateLink(link.LinkPath, link.Target, link.FullTargetPath, (attributes & 0x10) != 0))
                     {
-                        flag = true;
-                        item2.Created = true;
+                        anyCreated = true;
+                        link.Created = true;
                     }
                 }
             }
         }
-        while (flag);
-        foreach (ResolvedLink item3 in list)
+        while (anyCreated);
+        foreach (ResolvedLink link in resolvedList)
         {
-            if (!item3.Created)
+            if (!link.Created)
             {
-                list2.Add(item3.OriginalName);
+                unresolvedLinks.Add(link.OriginalName);
             }
         }
     }
 
-    public void SaveStatistics(string text)
+    public void SaveStatistics(string filePath)
     {
         XmlSerializer xmlSerializer = new XmlSerializer(typeof(DirectoryStatistics));
-        using FileStream stream = File.Create(text);
+        using FileStream stream = File.Create(filePath);
         xmlSerializer.Serialize(stream, _statistics);
     }
 
-    private static void RetryFor(ThreadStart callback, int value2 = 5000)
+    private static void RetryFor(ThreadStart callback, int timeoutMs = 5000)
     {
         try
         {
@@ -560,7 +560,7 @@ public class TarExtractor
                 }
                 catch
                 {
-                    if ((DateTime.Now - now).TotalMilliseconds > (double)value2)
+                    if ((DateTime.Now - now).TotalMilliseconds > (double)timeoutMs)
                     {
                         throw;
                     }
@@ -569,39 +569,38 @@ public class TarExtractor
         }
     }
 
-    public static void DeleteDirectoryRecursive(string text)
+    public static void DeleteDirectoryRecursive(string dirPath)
     {
         string[] directories;
         try
         {
-            directories = Directory.GetDirectories(text);
+            directories = Directory.GetDirectories(dirPath);
         }
         catch
         {
-            Directory.Delete(text);
+            Directory.Delete(dirPath);
             return;
         }
-        string[] array = directories;
-        for (int num = 0; num < array.Length; num++)
+        foreach (string subDir in directories)
         {
-            DeleteDirectoryRecursive(array[num]);
+            DeleteDirectoryRecursive(subDir);
         }
-        array = Directory.GetFiles(text);
-        foreach (string text2 in array)
+        string[] files = Directory.GetFiles(dirPath);
+        foreach (string file in files)
         {
-            if (File.Exists(text2))
+            if (File.Exists(file))
             {
                 RetryFor(() =>
                 {
-                    File.Delete(text2);
+                    File.Delete(file);
                 });
             }
         }
-        if (Directory.Exists(text))
+        if (Directory.Exists(dirPath))
         {
             RetryFor(() =>
             {
-                Directory.Delete(text, recursive: true);
+                Directory.Delete(dirPath, recursive: true);
             });
         }
     }
@@ -618,70 +617,69 @@ public class TarExtractor
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool CreateHardLink(string text, string text2, IntPtr handle);
+    private static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
 
-    private static void CopyDirectory(string text2, string text3, bool flag)
+    private static void CopyDirectory(string sourceDir, string destDir, bool copySubDirs)
     {
-        DirectoryInfo directoryInfo = new DirectoryInfo(text2);
+        DirectoryInfo directoryInfo = new DirectoryInfo(sourceDir);
         DirectoryInfo[] directories = directoryInfo.GetDirectories();
         if (!directoryInfo.Exists)
         {
-            throw new DirectoryNotFoundException("Source directory does not exist or could not be found: " + text2);
+            throw new DirectoryNotFoundException("Source directory does not exist or could not be found: " + sourceDir);
         }
-        if (!Directory.Exists(text3))
+        if (!Directory.Exists(destDir))
         {
-            Directory.CreateDirectory(text3);
+            Directory.CreateDirectory(destDir);
         }
         FileInfo[] files = directoryInfo.GetFiles();
         foreach (FileInfo fileInfo in files)
         {
-            string destFileName = Path.Combine(text3, fileInfo.Name);
+            string destFileName = Path.Combine(destDir, fileInfo.Name);
             fileInfo.CopyTo(destFileName, overwrite: true);
         }
-        if (flag)
+        if (copySubDirs)
         {
-            DirectoryInfo[] array = directories;
-            foreach (DirectoryInfo directoryInfo2 in array)
+            foreach (DirectoryInfo subDirInfo in directories)
             {
-                string text = Path.Combine(text3, directoryInfo2.Name);
-                CopyDirectory(directoryInfo2.FullName, text, flag);
+                string destSubDir = Path.Combine(destDir, subDirInfo.Name);
+                CopyDirectory(subDirInfo.FullName, destSubDir, copySubDirs);
             }
         }
     }
 
-    private bool CreateLink(string text, string text2, string text3, bool flag)
+    private bool CreateLink(string linkPath, string targetPath, string fullTargetPath, bool isDirectory)
     {
-        if (GetFileAttributes(text) != -1 && !flag)
+        if (GetFileAttributes(linkPath) != -1 && !isDirectory)
         {
             try
             {
-                File.Delete(text);
+                File.Delete(linkPath);
             }
             catch
             {
             }
         }
-        if (flag)
+        if (isDirectory)
         {
             try
             {
                 try
                 {
-                    if (Directory.Exists(text))
+                    if (Directory.Exists(linkPath))
                     {
                         try
                         {
-                            _ = ReparsePoints.ReadReparsePoint(text).Value;
+                            _ = ReparsePoints.ReadReparsePoint(linkPath).Value;
                         }
                         catch
                         {
                         }
                     }
-                    ReparsePoints.CreateJunction(text, text3);
+                    ReparsePoints.CreateJunction(linkPath, fullTargetPath);
                 }
                 catch
                 {
-                    CopyDirectory(text3, text, flag: true);
+                    CopyDirectory(fullTargetPath, linkPath, copySubDirs: true);
                 }
             }
             catch
@@ -689,11 +687,11 @@ public class TarExtractor
                 return false;
             }
         }
-        else if (!CreateHardLink(text, text3, IntPtr.Zero))
+        else if (!CreateHardLink(linkPath, fullTargetPath, IntPtr.Zero))
         {
             try
             {
-                File.Copy(text3, text);
+                File.Copy(fullTargetPath, linkPath);
             }
             catch
             {

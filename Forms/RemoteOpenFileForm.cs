@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using SmarTTY.IO;
 using System;
 using System.Collections.Generic;
@@ -65,14 +65,14 @@ public partial class RemoteOpenFileForm : DpiAwareForm
             {
                 return;
             }
-            string text = RemotePathUtils.GetDirectoryName(value);
-            if (text != null)
+            string dir = RemotePathUtils.GetDirectoryName(value);
+            if (dir != null)
             {
-                _initialDirectory = text;
-                string text2 = RemotePathUtils.GetFileName(value);
-                if (text2 != null)
+                _initialDirectory = dir;
+                string fileName = RemotePathUtils.GetFileName(value);
+                if (fileName != null)
                 {
-                    _initialFileName = text2;
+                    _initialFileName = fileName;
                 }
             }
         }
@@ -115,8 +115,8 @@ public partial class RemoteOpenFileForm : DpiAwareForm
                     TextBox textBox = tbFileName;
                     Button button = btnOpen;
                     Button button2 = btnCancel;
-                    bool flag = (tsControls.Enabled = false);
-                    bool flag3 = (button2.Enabled = flag);
+                    bool disabledState = (tsControls.Enabled = false);
+                    bool flag3 = (button2.Enabled = disabledState);
                     bool flag5 = (button.Enabled = flag3);
                     bool enabled = (textBox.Enabled = flag5);
                     doubleBufferedListView.Enabled = enabled;
@@ -131,8 +131,8 @@ public partial class RemoteOpenFileForm : DpiAwareForm
                     TextBox textBox2 = tbFileName;
                     Button button3 = btnOpen;
                     Button button4 = btnCancel;
-                    bool flag = (tsControls.Enabled = true);
-                    bool flag3 = (button4.Enabled = flag);
+                    bool enabledState = (tsControls.Enabled = true);
+                    bool flag3 = (button4.Enabled = enabledState);
                     bool flag5 = (button3.Enabled = flag3);
                     bool enabled = (textBox2.Enabled = flag5);
                     doubleBufferedListView2.Enabled = enabled;
@@ -162,33 +162,33 @@ public partial class RemoteOpenFileForm : DpiAwareForm
         {
             if (remoteCommand.WaitForExit(5000))
             {
-                List<string> list = remoteCommand.OutputLines;
-                if (list != null && list.Count > 0)
+                List<string> output = remoteCommand.OutputLines;
+                if (output != null && output.Count > 0)
                 {
-                    return list[0];
+                    return output[0];
                 }
             }
         }
         return null;
     }
 
-    public static string Browse(RemoteCommandStarter callback, string text = null, string text2 = null, string text3 = null, DialogMode dialogMode = RemoteOpenFileForm.DialogMode.Open, bool flag = false)
+    public static string Browse(RemoteCommandStarter callback, string filePath = null, string dirPath = null, string hostDisplayName = null, DialogMode dialogMode = RemoteOpenFileForm.DialogMode.Open, bool usePrefixedListing = false)
     {
-        if (text2 == null && text != null)
+        if (dirPath == null && filePath != null)
         {
-            text2 = RemotePathUtils.GetDirectoryName(text);
+            dirPath = RemotePathUtils.GetDirectoryName(filePath);
         }
-        if (string.IsNullOrEmpty(text2))
+        if (string.IsNullOrEmpty(dirPath))
         {
-            text2 = GetWorkingDirectory(callback);
+            dirPath = GetWorkingDirectory(callback);
         }
         RemoteOpenFileForm remoteOpenFileForm = new RemoteOpenFileForm(callback)
         {
-            _initialDirectory = text2,
-            Text = "Browse File System on " + (text3 ?? "Remote Host"),
+            _initialDirectory = dirPath,
+            Text = "Browse File System on " + (hostDisplayName ?? "Remote Host"),
             Mode = dialogMode,
-            _initialFileName = RemotePathUtils.GetFileName(text),
-            _usePrefixedListing = flag
+            _initialFileName = RemotePathUtils.GetFileName(filePath),
+            _usePrefixedListing = usePrefixedListing
         };
         if (remoteOpenFileForm.ShowModal() != DialogResult.OK)
         {
@@ -197,15 +197,15 @@ public partial class RemoteOpenFileForm : DpiAwareForm
         return remoteOpenFileForm.SelectedPath;
     }
 
-    protected bool TryStatPath(string text, out bool flag)
+    protected bool TryStatPath(string path, out bool isDirectory)
     {
-        flag = false;
-        if (!text.StartsWith("/"))
+        isDirectory = false;
+        if (!path.StartsWith("/"))
         {
-            text = _currentDirectory + "/" + text;
+            path = _currentDirectory + "/" + path;
         }
         IRemoteCommand remoteCommand = null;
-        _runCommand("ls", "-1dLF \"" + text + "\"", ref remoteCommand);
+        _runCommand("ls", "-1dLF \"" + path + "\"", ref remoteCommand);
         if (remoteCommand == null)
         {
             return false;
@@ -217,95 +217,95 @@ public partial class RemoteOpenFileForm : DpiAwareForm
             {
                 return false;
             }
-            List<string> list = remoteCommand.OutputLines;
-            if (list == null || list.Count != 1)
+            List<string> output = remoteCommand.OutputLines;
+            if (output == null || output.Count != 1)
             {
                 return false;
             }
-            flag = list[0].EndsWith("/");
+            isDirectory = output[0].EndsWith("/");
             return true;
         }
     }
 
-    public static List<string> SortEntries(List<string> list3, bool flag = false)
+    public static List<string> SortEntries(List<string> entries, bool isPrefixed = false)
     {
-        List<string> list = new List<string>();
-        List<string> list2 = new List<string>();
-        foreach (string item in list3)
+        List<string> dirList = new List<string>();
+        List<string> fileList = new List<string>();
+        foreach (string item in entries)
         {
-            if (flag)
+            if (isPrefixed)
             {
                 if (item.StartsWith("d ") || item.StartsWith("ld "))
                 {
-                    list.Add(item);
+                    dirList.Add(item);
                 }
                 else
                 {
-                    list2.Add(item);
+                    fileList.Add(item);
                 }
             }
             else if (item.EndsWith("/"))
             {
-                list.Add(item);
+                dirList.Add(item);
             }
             else
             {
-                list2.Add(item);
+                fileList.Add(item);
             }
         }
-        list.AddRange(list2);
-        return list;
+        dirList.AddRange(fileList);
+        return dirList;
     }
 
-    protected void UpdateDirectoryCombo(string text2)
+    protected void UpdateDirectoryCombo(string dirPath)
     {
         tscbDir.Items.Clear();
-        string text = text2;
-        while (text2 != null && text2.Length > 1)
+        string current = dirPath;
+        while (dirPath != null && dirPath.Length > 1)
         {
-            tscbDir.Items.Add(text2);
-            text2 = RemotePathUtils.GetDirectoryName(text2);
+            tscbDir.Items.Add(dirPath);
+            dirPath = RemotePathUtils.GetDirectoryName(dirPath);
         }
         tscbDir.Items.Add("/");
         _updatingDirCombo = true;
-        tscbDir.Text = text;
+        tscbDir.Text = current;
     }
 
-    protected void NavigateTo(string text2 = null)
+    protected void NavigateTo(string dirPath = null)
     {
         if (_runCommand == null)
         {
             return;
         }
-        string text;
-        if (text2 != null)
+        string targetDir;
+        if (dirPath != null)
         {
-            text = text2;
+            targetDir = dirPath;
         }
         else if (_initialDirectory != null)
         {
-            text = ((_initialDirectory == null) ? "" : _initialDirectory);
+            targetDir = ((_initialDirectory == null) ? "" : _initialDirectory);
         }
         else
         {
-            text = "/";
+            targetDir = "/";
         }
-        if (!text.StartsWith("/"))
+        if (!targetDir.StartsWith("/"))
         {
-            text = _currentDirectory + "/" + text;
+            targetDir = _currentDirectory + "/" + targetDir;
         }
-        _requestedDirectory = text;
+        _requestedDirectory = targetDir;
         try
         {
             IRemoteCommand remoteCommand = null;
             try
             {
-                string arg = "-1ALF";
+                string lsFlags = "-1ALF";
                 if (_usePrefixedListing)
                 {
-                    arg = "-F";
+                    lsFlags = "-F";
                 }
-                _runCommand("ls", $"{arg} \"{text}\"", ref remoteCommand);
+                _runCommand("ls", $"{lsFlags} \"{targetDir}\"", ref remoteCommand);
                 if (remoteCommand == null)
                 {
                     return;
@@ -391,37 +391,37 @@ public partial class RemoteOpenFileForm : DpiAwareForm
         }
     }
 
-    protected void PopulateList(List<string> list, string text2)
+    protected void PopulateList(List<string> lines, string errorText)
     {
-        if (list == null)
+        if (lines == null)
         {
-            list = new List<string>();
+            lines = new List<string>();
         }
-        if (string.IsNullOrEmpty(text2))
+        if (string.IsNullOrEmpty(errorText))
         {
             lblErrorInfo.Visible = false;
         }
         else
         {
             lblErrorInfo.Visible = true;
-            lblErrorInfo.Text = text2;
+            lblErrorInfo.Text = errorText;
         }
         UpdateDirectoryCombo(_requestedDirectory);
         _currentDirectory = _requestedDirectory;
         lvFiles.Items.Clear();
-        if (list == null)
+        if (lines == null)
         {
             return;
         }
-        list = SortEntries(list, _usePrefixedListing);
+        lines = SortEntries(lines, _usePrefixedListing);
         char[] trimChars = new char[5] { '/', '*', '@', '|', '=' };
         Regex regex = new Regex("stat '(.*)' failed:.*");
         Graphics graphics = Graphics.FromHwnd(Handle);
-        int num = 100;
-        foreach (string item in list)
+        int maxItemWidth = 100;
+        foreach (string item in lines)
         {
             int imageIndex = 1;
-            string text = item;
+            string entryName = item;
             if (string.IsNullOrEmpty(item))
             {
                 continue;
@@ -442,7 +442,7 @@ public partial class RemoteOpenFileForm : DpiAwareForm
                     imageIndex = 3;
                     break;
                 }
-                text = item.TrimEnd(trimChars);
+                entryName = item.TrimEnd(trimChars);
             }
             else
             {
@@ -451,31 +451,31 @@ public partial class RemoteOpenFileForm : DpiAwareForm
                 case '-':
                     if (item.StartsWith("- "))
                     {
-                        text = item.Substring(2);
+                        entryName = item.Substring(2);
                         imageIndex = 1;
                     }
                     break;
                 case 'd':
                     if (item.StartsWith("d "))
                     {
-                        text = item.Substring(2);
+                        entryName = item.Substring(2);
                         imageIndex = 0;
                     }
                     break;
                 case 'l':
                     if (item.StartsWith("ld "))
                     {
-                        text = item.Substring(3);
+                        entryName = item.Substring(3);
                         imageIndex = 0;
                     }
                     else if (item.StartsWith("l- "))
                     {
-                        text = item.Substring(3);
+                        entryName = item.Substring(3);
                         imageIndex = 1;
                     }
                     else if (item.StartsWith("l? "))
                     {
-                        text = item.Substring(3);
+                        entryName = item.Substring(3);
                         imageIndex = 1;
                     }
                     break;
@@ -487,9 +487,9 @@ public partial class RemoteOpenFileForm : DpiAwareForm
                     break;
                 }
             }
-            int num2 = (int)graphics.MeasureString(text, lvFiles.Font).Width;
-            num = Math.Max(num, num2);
-            lvFiles.Items.Add(text, imageIndex);
+            int itemWidth = (int)graphics.MeasureString(entryName, lvFiles.Font).Width;
+            maxItemWidth = Math.Max(maxItemWidth, itemWidth);
+            lvFiles.Items.Add(entryName, imageIndex);
         }
         if (_initialFileName != null)
         {
@@ -500,18 +500,18 @@ public partial class RemoteOpenFileForm : DpiAwareForm
         {
             lvFiles.Items[0].Focused = true;
         }
-        lvFiles.Columns[0].Width = num + 20;
+        lvFiles.Columns[0].Width = maxItemWidth + 20;
     }
 
-    protected void SelectItem(string text)
+    protected void SelectItem(string itemName)
     {
-        if (text == null || lvFiles.Items.Count == 0)
+        if (itemName == null || lvFiles.Items.Count == 0)
         {
             return;
         }
         foreach (ListViewItem item in lvFiles.Items)
         {
-            if (item.Text == text)
+            if (item.Text == itemName)
             {
                 item.Focused = true;
                 item.Selected = true;
@@ -530,15 +530,15 @@ public partial class RemoteOpenFileForm : DpiAwareForm
     {
         if (_currentDirectory != null && _currentDirectory.Length > 1)
         {
-            int num = _currentDirectory.LastIndexOf('/');
-            string text = _currentDirectory.Substring(0, num);
-            text = text.TrimEnd('/');
-            if (num == 0)
+            int slashIndex = _currentDirectory.LastIndexOf('/');
+            string parentPath = _currentDirectory.Substring(0, slashIndex);
+            parentPath = parentPath.TrimEnd('/');
+            if (slashIndex == 0)
             {
-                text = "/";
+                parentPath = "/";
             }
-            _initialFileName = _currentDirectory.Substring(num + 1);
-            NavigateTo(text);
+            _initialFileName = _currentDirectory.Substring(slashIndex + 1);
+            NavigateTo(parentPath);
         }
     }
 
@@ -550,13 +550,13 @@ public partial class RemoteOpenFileForm : DpiAwareForm
         }
         else if (_currentDirectory != null)
         {
-            string text = _currentDirectory + "/" + lvFiles.SelectedItems[0].Text;
+            string childPath = _currentDirectory + "/" + lvFiles.SelectedItems[0].Text;
             if (_currentDirectory == "/")
             {
-                text = text.Substring(1);
+                childPath = childPath.Substring(1);
             }
-            text = text.TrimEnd('/');
-            NavigateTo(text);
+            childPath = childPath.TrimEnd('/');
+            NavigateTo(childPath);
         }
     }
 
@@ -577,14 +577,14 @@ public partial class RemoteOpenFileForm : DpiAwareForm
                 DialogResult = DialogResult.OK;
                 return;
             }
-            string text = _currentDirectory + "/" + lvFiles.SelectedItems[0].Text;
-            NavigateTo(text);
+            string childPath = _currentDirectory + "/" + lvFiles.SelectedItems[0].Text;
+            NavigateTo(childPath);
         }
     }
 
     private bool TryAcceptEnteredPath()
     {
-        if (!TryStatPath(tbFileName.Text, out var flag))
+        if (!TryStatPath(tbFileName.Text, out var isDirectory))
         {
             if (_mode == DialogMode.Save)
             {
@@ -594,7 +594,7 @@ public partial class RemoteOpenFileForm : DpiAwareForm
             }
             return false;
         }
-        if (flag)
+        if (isDirectory)
         {
             NavigateTo(tbFileName.Text);
             tbFileName.Text = "";
@@ -664,16 +664,16 @@ public partial class RemoteOpenFileForm : DpiAwareForm
 
     private void tsControls_Layout(object sender, LayoutEventArgs e)
     {
-        int num = tsControls.DisplayRectangle.Width;
+        int availableWidth = tsControls.DisplayRectangle.Width;
         foreach (ToolStripItem item in tsControls.Items)
         {
             if (item != tscbDir)
             {
-                num -= item.Width;
-                num -= item.Margin.Horizontal;
+                availableWidth -= item.Width;
+                availableWidth -= item.Margin.Horizontal;
             }
         }
-        tscbDir.Width = Math.Max(0, num - tscbDir.Margin.Horizontal);
+        tscbDir.Width = Math.Max(0, availableWidth - tscbDir.Margin.Horizontal);
     }
 
     private void RemoteOpenFileForm_Resize(object sender, EventArgs e)

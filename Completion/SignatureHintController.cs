@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using SmarTTY.Forms;
 using System.Windows.Forms;
 
@@ -29,10 +29,10 @@ public class SignatureHintController
         _host = completionHost;
     }
 
-    public void Show(ISignatureInfo signatureInfo, int value2, string text3, Control control)
+    public void Show(ISignatureInfo signatureInfo, int activeParamIndex, string description, Control parentControl)
     {
         this.Hide();
-        if (control == null)
+        if (parentControl == null)
         {
             this._view = new TextHintForm();
         }
@@ -40,29 +40,29 @@ public class SignatureHintController
         {
             TextHintControl textHintControl = (TextHintControl)(this._view = new TextHintControl());
             textHintControl.Visible = false;
-            textHintControl.Parent = control;
+            textHintControl.Parent = parentControl;
         }
-        string text = "";
-        string text2 = signatureInfo.Separator;
-        for (int num = 0; num < signatureInfo.ParameterCount; num++)
+        string fullSignatureText = "";
+        string separator = signatureInfo.Separator;
+        for (int i = 0; i < signatureInfo.ParameterCount; i++)
         {
-            if (text != "")
+            if (fullSignatureText != "")
             {
-                text += text2;
+                fullSignatureText += separator;
             }
-            text += signatureInfo.GetParameter(num).Text;
+            fullSignatureText += signatureInfo.GetParameter(i).Text;
         }
-        if (text3 == null)
+        if (description == null)
         {
             this._view.ShowDescription = false;
         }
         else
         {
             this._view.ShowDescription = true;
-            this._view.Description = text3;
+            this._view.Description = description;
         }
         this._view.SetSignature(signatureInfo);
-        this._view.SetActiveParameter(value2);
+        this._view.SetActiveParameter(activeParamIndex);
         _isVertical = signatureInfo.IsVertical;
         this._view.ShowAt(_host, _isVertical);
     }
@@ -84,11 +84,11 @@ public class SignatureHintController
         }
     }
 
-    public void SetActiveParameter(int value2)
+    public void SetActiveParameter(int activeParamIndex)
     {
         if (this._view != null)
         {
-            this._view.SetActiveParameter(value2);
+            this._view.SetActiveParameter(activeParamIndex);
         }
     }
 }

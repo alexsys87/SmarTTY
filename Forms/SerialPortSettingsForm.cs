@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO.Ports;
 using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
@@ -11,14 +11,14 @@ public partial class SerialPortSettingsForm : OKCancelFormBase
 
     public DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings AdvancedSettings => _advancedSettings;
 
-    public SerialPortSettingsForm(DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings, string text)
+    public SerialPortSettingsForm(DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings, string portName)
     {
         InitializeComponent();
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(portName))
         {
-            text = "the selected COM port";
+            portName = "the selected COM port";
         }
-        rbDefault.Text += text;
+        rbDefault.Text += portName;
         if (advancedSerialPortSettings == null)
         {
             rbDefault.Checked = true;
@@ -69,61 +69,61 @@ public partial class SerialPortSettingsForm : OKCancelFormBase
         panel1.Enabled = rbManual.Checked;
     }
 
-    protected override void btnOK_Click(object sender, EventArgs e2)
+    protected override void btnOK_Click(object sender, EventArgs e)
     {
-        if (!int.TryParse(cbBitsPerSecond.Text, out var result))
+        if (!int.TryParse(cbBitsPerSecond.Text, out var baudRate))
         {
             MessageBox.Show("Invalid baud rate. Should be an integer!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             return;
         }
         _advancedSettings = new DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings
         {
-            BaudRate = result,
+            BaudRate = baudRate,
             DataBits = 5 + cbDataBits.SelectedIndex,
             Parity = (Parity)cbParity.SelectedIndex,
             StopBits = (StopBits)cbStopBits.SelectedIndex,
             FlowControl = (Handshake)cbFlowControl.SelectedIndex
         };
-        base.btnOK_Click(sender, e2);
+        base.btnOK_Click(sender, e);
     }
 
-    private void cbStopBits_SelectedIndexChanged(object sender, EventArgs e2)
+    private void cbStopBits_SelectedIndexChanged(object sender, EventArgs e)
     {
-        int num = (5 + cbDataBits.SelectedIndex) * 2;
-        num += 2;
+        int bitsPerFrame = (5 + cbDataBits.SelectedIndex) * 2;
+        bitsPerFrame += 2;
         if (cbParity.SelectedIndex != 0)
         {
-            num += 2;
+            bitsPerFrame += 2;
         }
         switch (cbStopBits.SelectedIndex)
         {
         case 1:
-            num += 2;
+            bitsPerFrame += 2;
             break;
         case 2:
-            num += 4;
+            bitsPerFrame += 4;
             break;
         case 3:
-            num += 3;
+            bitsPerFrame += 3;
             break;
         }
-        if (!int.TryParse(cbBitsPerSecond.Text, out var result))
+        if (!int.TryParse(cbBitsPerSecond.Text, out var baudRate))
         {
             label7.Text = "unknown";
             return;
         }
-        double num2 = (double)(result * 2) / (double)num;
-        if (num2 > 1048576.0)
+        double bytesPerSec = (double)(baudRate * 2) / (double)bitsPerFrame;
+        if (bytesPerSec > 1048576.0)
         {
-            label7.Text = $"{num2 / 1048576.0:f1} MB/s";
+            label7.Text = $"{bytesPerSec / 1048576.0:f1} MB/s";
         }
-        else if (num2 > 1024.0)
+        else if (bytesPerSec > 1024.0)
         {
-            label7.Text = $"{num2 / 1024.0:f1} KB/s";
+            label7.Text = $"{bytesPerSec / 1024.0:f1} KB/s";
         }
         else
         {
-            label7.Text = $"{num2:f1} bytes/s";
+            label7.Text = $"{bytesPerSec:f1} bytes/s";
         }
     }
 }

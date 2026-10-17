@@ -1,4 +1,3 @@
-﻿
 namespace SmarTTY.Completion;
 
 public interface ISignatureInfo
@@ -9,5 +8,5 @@ public interface ISignatureInfo
 
     bool IsVertical { get; }
 
-    ISignatureParameter GetParameter(int value2);
+    ISignatureParameter GetParameter(int index);
 }

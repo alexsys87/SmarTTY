@@ -1,4 +1,3 @@
-﻿
 namespace SmarTTY.Completion;
 
 internal interface IHintView
@@ -11,13 +10,13 @@ internal interface IHintView
 
     bool Visible { get; }
 
-    void SetActiveParameter(int value2);
+    void SetActiveParameter(int index);
 
     void SetSignature(ISignatureInfo signatureInfo);
 
     void Dismiss();
 
-    void ShowAt(ICompletionHost completionHost, bool flag);
+    void ShowAt(ICompletionHost completionHost, bool isVertical);
 
-    void Reposition(ICompletionHost completionHost, bool flag);
+    void Reposition(ICompletionHost completionHost, bool isVertical);
 }

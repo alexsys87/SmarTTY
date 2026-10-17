@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 
 namespace SmarTTY;
 
@@ -18,73 +18,73 @@ public static class AnsiEscapeUtils
             return text;
         }
         StringBuilder stringBuilder = new StringBuilder();
-        for (int num = 0; num < text.Length; num++)
+        for (int i = 0; i < text.Length; i++)
         {
-            if (text[num] != '\u001b')
+            if (text[i] != '\u001b')
             {
-                stringBuilder.Append(text[num]);
+                stringBuilder.Append(text[i]);
             }
-            else if (num != text.Length - 1)
+            else if (i != text.Length - 1)
             {
-                num += GetSequenceLength(text, num) - 1;
+                i += GetSequenceLength(text, i) - 1;
             }
         }
         return stringBuilder.ToString();
     }
 
-    public static int FindCsiEnd(string text, int value2)
+    public static int FindCsiEnd(string text, int startIndex)
     {
-        for (int num = value2; num < text.Length; num++)
+        for (int i = startIndex; i < text.Length; i++)
         {
-            if (text[num] >= '@' && text[num] <= '~')
+            if (text[i] >= '@' && text[i] <= '~')
             {
-                return num;
+                return i;
             }
         }
         return -1;
     }
 
-    public static int FindOscEnd(string text, int value2, out int value3)
+    public static int FindOscEnd(string text, int startIndex, out int sequenceLength)
     {
-        value3 = 0;
-        for (int num = value2; num < text.Length; num++)
+        sequenceLength = 0;
+        for (int i = startIndex; i < text.Length; i++)
         {
-            char ch = text[num];
-            if (ch == '\a')
+            char currentChar = text[i];
+            if (currentChar == '\a')
             {
-                value3 = num - value2 + 1;
-                return num;
+                sequenceLength = i - startIndex + 1;
+                return i;
             }
-            if (num < text.Length - 1 && ch == '\u001b' && text[num + 1] == '\\')
+            if (i < text.Length - 1 && currentChar == '\u001b' && text[i + 1] == '\\')
             {
-                value3 = num - value2 + 2;
-                return num;
+                sequenceLength = i - startIndex + 2;
+                return i;
             }
         }
         return -1;
     }
 
-    private static int GetSequenceLength(string text, int value2)
+    private static int GetSequenceLength(string text, int startIndex)
     {
-        switch (text[value2 + 1])
+        switch (text[startIndex + 1])
         {
             case ']':
                 {
-                    int num = FindOscEnd(text, value2 + 1, out var num2);
-                    if (num == -1)
+                    int endIndex = FindOscEnd(text, startIndex + 1, out var oscLength);
+                    if (endIndex == -1)
                     {
                         return 2;
                     }
-                    return num2 + 1;
+                    return oscLength + 1;
                 }
             case '[':
                 {
-                    int num = FindCsiEnd(text, value2 + 2);
-                    if (num == -1)
+                    int endIndex = FindCsiEnd(text, startIndex + 2);
+                    if (endIndex == -1)
                     {
                         return 2;
                     }
-                    return num - value2 + 1;
+                    return endIndex - startIndex + 1;
                 }
             case ' ':
             case '#':

@@ -1,4 +1,4 @@
-﻿using SmarTTY.TextEditing;
+using SmarTTY.TextEditing;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -105,10 +105,10 @@ public class TokenCache
 
         int ITokenSink.CurrentLine => LineIndex;
 
-        public LineTokens(int value2, int value3)
+        public LineTokens(int lineIndex, int startState)
         {
-            this.Line = value2;
-            StartState = value3;
+            this.Line = lineIndex;
+            StartState = startState;
         }
 
         public void CloseForAdding()
@@ -116,27 +116,27 @@ public class TokenCache
             _acceptsTokens = false;
         }
 
-        public void AddToken(int value2, int value3, int value4)
+        public void AddToken(int type, int start, int end)
         {
             if (_acceptsTokens)
             {
-                if (value3 > value4)
+                if (start > end)
                 {
                     throw new ArgumentException();
                 }
-                _tokens.Add(new Token(this, value2, value3, value4, _tokens.Count));
+                _tokens.Add(new Token(this, type, start, end, _tokens.Count));
             }
         }
 
-        public void AddPairedToken(int value2, int value3, int value4, int value5, bool flag, RegionStyle regionStyle)
+        public void AddPairedToken(int type, int start, int end, int pairId, bool isOpening, RegionStyle regionStyle)
         {
             if (this._acceptsTokens)
             {
-                if (value3 >= value4)
+                if (start >= end)
                 {
                     throw new ArgumentException();
                 }
-                _tokens.Add(new Token(this, value2, value3, value4, value5, flag, _tokens.Count, regionStyle));
+                _tokens.Add(new Token(this, type, start, end, pairId, isOpening, _tokens.Count, regionStyle));
             }
         }
 
@@ -195,22 +195,22 @@ public class TokenCache
 
         public Token Partner => _partner;
 
-        internal Token(LineTokens lineTokens, int value2, int value3, int value4, int value5)
+        internal Token(LineTokens lineTokens, int type, int start, int end, int index)
         {
             _line = lineTokens;
             Kind = TokenCache.Token.TokenKind.Normal;
-            this.Type = value2;
-            Start = value3;
-            End = value4;
-            Index = value5;
+            this.Type = type;
+            Start = start;
+            End = end;
+            Index = index;
         }
 
-        internal Token(LineTokens lineTokens, int value2, int value3, int value4, int value5, bool flag, int value6, RegionStyle regionStyle)
-            : this(lineTokens, value2, value3, value4, value6)
+        internal Token(LineTokens lineTokens, int type, int start, int end, int pairId, bool isOpening, int index, RegionStyle regionStyle)
+            : this(lineTokens, type, start, end, index)
         {
             Kind = TokenCache.Token.TokenKind.Paired;
-            PairId = value5;
-            IsOpening = flag;
+            PairId = pairId;
+            IsOpening = isOpening;
             Style = regionStyle;
         }
 
@@ -268,12 +268,12 @@ public class TokenCache
     {
         int CurrentLine { get; }
 
-        void AddToken(int value2, int value3, int value4);
+        void AddToken(int type, int start, int end);
 
-        void AddPairedToken(int value2, int value3, int value4, int value5, bool flag, RegionStyle regionStyle);
+        void AddPairedToken(int type, int start, int end, int pairId, bool isOpening, RegionStyle regionStyle);
     }
 
-    public delegate bool LineTokenizer(int value2, string text, ITokenSink tokenSink, out int value3);
+    public delegate bool LineTokenizer(int startState, string lineText, ITokenSink tokenSink, out int endState);
 
     public enum TokenSearchMode
     {
@@ -304,12 +304,12 @@ public class TokenCache
     {
     }
 
-    private LineTokens TokenizeLine(int value2, LineTokenizer callback, string text, ref int value3)
+    private LineTokens TokenizeLine(int lineIndex, LineTokenizer callback, string lineText, ref int startState)
     {
-        LineTokens lineTokens = new LineTokens(value2, value3);
-        if ((callback == null || !callback(value3, text, lineTokens, out value3)) && text.Length > 0)
+        LineTokens lineTokens = new LineTokens(lineIndex, startState);
+        if ((callback == null || !callback(startState, lineText, lineTokens, out startState)) && lineText.Length > 0)
         {
-            lineTokens.AddToken(value3, 0, text.Length);
+            lineTokens.AddToken(startState, 0, lineText.Length);
         }
         return lineTokens;
     }
@@ -322,130 +322,130 @@ public class TokenCache
         {
             return;
         }
-        int num = 0;
-        int num2 = 0;
-        foreach (string item in _document)
+        int currentState = 0;
+        int lineIndex = 0;
+        foreach (string lineText in _document)
         {
-            _lines.Add(TokenizeLine(num2++, callback, item, ref num));
+            _lines.Add(TokenizeLine(lineIndex++, callback, lineText, ref currentState));
         }
         PairAll(null);
     }
 
-    private int RetokenizeFrom(int value2, int value3, LineTokenizer callback, UnpairedTokenSet unpairedTokenSet)
+    private int RetokenizeFrom(int startLineIndex, int endLineIndex, LineTokenizer callback, UnpairedTokenSet unpairedTokenSet)
     {
-        if (value2 >= this._lines.Count)
+        if (startLineIndex >= this._lines.Count)
         {
             return 0;
         }
-        int num = this._lines[value2].StartState;
-        int num2;
-        for (num2 = value2; num2 < _document.LineCount && (num2 <= value3 || num != this._lines[num2].StartState); num2++)
+        int currentState = this._lines[startLineIndex].StartState;
+        int lineIndex;
+        for (lineIndex = startLineIndex; lineIndex < _document.LineCount && (lineIndex <= endLineIndex || currentState != this._lines[lineIndex].StartState); lineIndex++)
         {
-            if (this._lines[num2] != null)
+            if (this._lines[lineIndex] != null)
             {
-                this._lines[num2].Detach(unpairedTokenSet);
+                this._lines[lineIndex].Detach(unpairedTokenSet);
             }
-            this._lines[num2] = TokenizeLine(num2, callback, _document.GetLineText(num2), ref num);
+            this._lines[lineIndex] = TokenizeLine(lineIndex, callback, _document.GetLineText(lineIndex), ref currentState);
         }
-        RepairPairs(value2, value3, unpairedTokenSet);
-        return num2 - value2;
+        RepairPairs(startLineIndex, endLineIndex, unpairedTokenSet);
+        return lineIndex - startLineIndex;
     }
 
-    public int RetokenizeLine(int value2, LineTokenizer callback)
+    public int RetokenizeLine(int lineIndex, LineTokenizer callback)
     {
-        return RetokenizeFrom(value2, value2, callback, this._unpaired);
+        return RetokenizeFrom(lineIndex, lineIndex, callback, this._unpaired);
     }
 
-    public void OnLinesChanged(int value2, int value3, int value4, LineTokenizer callback)
+    public void OnLinesChanged(int startLineIndex, int oldLineCount, int newLineCount, LineTokenizer callback)
     {
-        if (value3 > value4)
+        if (oldLineCount > newLineCount)
         {
-            for (int num = 0; num < value3 - value4; num++)
+            for (int i = 0; i < oldLineCount - newLineCount; i++)
             {
-                this._lines[value2 + num].Detach(this._unpaired);
+                this._lines[startLineIndex + i].Detach(this._unpaired);
             }
-            this._lines.RemoveRange(value2, value3 - value4);
+            this._lines.RemoveRange(startLineIndex, oldLineCount - newLineCount);
         }
-        else if (value3 < value4)
+        else if (oldLineCount < newLineCount)
         {
-            int num2 = value4 - value3;
-            this._lines.InsertRange(value2, new LineTokens[num2]);
-            for (int num3 = value2; num3 < value2 + num2; num3++)
+            int addedLines = newLineCount - oldLineCount;
+            this._lines.InsertRange(startLineIndex, new LineTokens[addedLines]);
+            for (int j = startLineIndex; j < startLineIndex + addedLines; j++)
             {
-                this._lines[num3] = new LineTokens(num3, 0);
+                this._lines[j] = new LineTokens(j, 0);
             }
         }
-        for (int num4 = value2; num4 < this._lines.Count; num4++)
+        for (int lineIndex = startLineIndex; lineIndex < this._lines.Count; lineIndex++)
         {
-            this._lines[num4].Line = num4;
+            this._lines[lineIndex].Line = lineIndex;
         }
-        this.RetokenizeFrom(value2, value2 + value4, callback, this._unpaired);
+        this.RetokenizeFrom(startLineIndex, startLineIndex + newLineCount, callback, this._unpaired);
     }
 
-    public List<Token> GetLineTokens(int value2)
+    public List<Token> GetLineTokens(int lineIndex)
     {
-        return _lines[value2].Tokens;
+        return _lines[lineIndex].Tokens;
     }
 
-    public int FindTokenIndex(List<Token> list, int value2, TokenSearchMode tokenSearchMode)
+    public int FindTokenIndex(List<Token> tokens, int offset, TokenSearchMode tokenSearchMode)
     {
-        for (int num = 0; num < list.Count; num++)
+        for (int i = 0; i < tokens.Count; i++)
         {
-            if (list[num].Start <= value2 && list[num].End >= value2)
+            if (tokens[i].Start <= offset && tokens[i].End >= offset)
             {
-                return num;
+                return i;
             }
         }
-        for (int num2 = 0; num2 < list.Count; num2++)
+        for (int i = 0; i < tokens.Count; i++)
         {
             switch (tokenSearchMode)
             {
                 case TokenSearchMode.Previous:
                 case TokenSearchMode.PreviousOrLast:
-                    if (list[num2].End <= value2 && (num2 == list.Count - 1 || list[num2 + 1].Start >= value2))
+                    if (tokens[i].End <= offset && (i == tokens.Count - 1 || tokens[i + 1].Start >= offset))
                     {
-                        return num2;
+                        return i;
                     }
                     break;
                 case TokenSearchMode.Next:
-                    if (list[num2].Start >= value2)
+                    if (tokens[i].Start >= offset)
                     {
-                        return num2;
+                        return i;
                     }
                     break;
                 case TokenSearchMode.Containing:
-                    if (list[num2].Start < value2 && list[num2].End >= value2)
+                    if (tokens[i].Start < offset && tokens[i].End >= offset)
                     {
-                        return num2;
+                        return i;
                     }
                     break;
             }
         }
-        if (tokenSearchMode == TokenSearchMode.PreviousOrLast && list.Count != 0)
+        if (tokenSearchMode == TokenSearchMode.PreviousOrLast && tokens.Count != 0)
         {
-            return list.Count - 1;
+            return tokens.Count - 1;
         }
         return -1;
     }
 
-    public Token FindToken(int value2, int value3, TokenSearchMode tokenSearchMode)
+    public Token FindToken(int lineIndex, int offset, TokenSearchMode tokenSearchMode)
     {
-        if (value2 < 0 || value2 >= _lines.Count)
+        if (lineIndex < 0 || lineIndex >= _lines.Count)
         {
             return null;
         }
-        LineTokens lineTokens = _lines[value2];
-        int num = FindTokenIndex(lineTokens.Tokens, value3, tokenSearchMode);
-        if (num != -1)
+        LineTokens lineTokens = _lines[lineIndex];
+        int idx = FindTokenIndex(lineTokens.Tokens, offset, tokenSearchMode);
+        if (idx != -1)
         {
-            return lineTokens.Tokens[num];
+            return lineTokens.Tokens[idx];
         }
         return null;
     }
 
-    public Token FindNearestToken(int value2, int value3)
+    public Token FindNearestToken(int lineIndex, int offset)
     {
-        return FindToken(value2, value3, TokenSearchMode.PreviousOrLast);
+        return FindToken(lineIndex, offset, TokenSearchMode.PreviousOrLast);
     }
 
     private void PairAll(UnpairedTokenSet unpairedTokenSet)
@@ -453,42 +453,42 @@ public class TokenCache
         PairRange(unpairedTokenSet, 0, _lines.Count - 1);
     }
 
-    private void PairRange(UnpairedTokenSet unpairedTokenSet, int value2, int value3)
+    private void PairRange(UnpairedTokenSet unpairedTokenSet, int startLineIndex, int endLineIndex)
     {
         Stack<Token> stack = new Stack<Token>();
-        for (int num = value2; num <= value3; num++)
+        for (int lineIndex = startLineIndex; lineIndex <= endLineIndex; lineIndex++)
         {
-            foreach (Token item in _lines[num].Tokens)
+            foreach (Token token in _lines[lineIndex].Tokens)
             {
-                item.ClearPartner();
+                token.ClearPartner();
             }
         }
-        for (int num2 = value2; num2 <= value3; num2++)
+        for (int lineIndex = startLineIndex; lineIndex <= endLineIndex; lineIndex++)
         {
-            foreach (Token item2 in _lines[num2].Tokens)
+            foreach (Token token in _lines[lineIndex].Tokens)
             {
-                if (item2.Kind != Token.TokenKind.Paired)
+                if (token.Kind != Token.TokenKind.Paired)
                 {
                     continue;
                 }
-                if (item2.IsOpening)
+                if (token.IsOpening)
                 {
-                    stack.Push(item2);
+                    stack.Push(token);
                     continue;
                 }
                 if (stack.Count == 0)
                 {
-                    unpairedTokenSet?.Add(item2);
+                    unpairedTokenSet?.Add(token);
                     continue;
                 }
-                Token token = stack.Pop();
-                if (token.PairId != item2.PairId)
+                Token top = stack.Pop();
+                if (top.PairId != token.PairId)
                 {
-                    unpairedTokenSet?.Add(item2);
+                    unpairedTokenSet?.Add(token);
                 }
                 else
                 {
-                    item2.SetPartner(token);
+                    token.SetPartner(top);
                 }
             }
         }
@@ -508,61 +508,61 @@ public class TokenCache
             return false;
         }
         token.VisitMark = _visitGeneration;
-        int num = (token.IsOpening ? 1 : (-1));
-        int num2 = token.LineNumber;
-        int num3 = token.Index + num;
+        int step = (token.IsOpening ? 1 : (-1));
+        int currentLineIndex = token.LineNumber;
+        int currentTokenIndex = token.Index + step;
         LineTokens lineTokens;
         while (true)
         {
-            lineTokens = _lines[num2];
-            if (num3 >= lineTokens.Tokens.Count)
+            lineTokens = _lines[currentLineIndex];
+            if (currentTokenIndex >= lineTokens.Tokens.Count)
             {
-                num3 = 0;
-                if (++num2 >= _lines.Count)
+                currentTokenIndex = 0;
+                if (++currentLineIndex >= _lines.Count)
                 {
                     return false;
                 }
                 continue;
             }
-            if (num3 < 0)
+            if (currentTokenIndex < 0)
             {
-                if (--num2 < 0)
+                if (--currentLineIndex < 0)
                 {
                     return false;
                 }
-                num3 = _lines[num2].Tokens.Count - 1;
+                currentTokenIndex = _lines[currentLineIndex].Tokens.Count - 1;
                 continue;
             }
-            if (lineTokens.Tokens[num3].Kind == Token.TokenKind.Paired)
+            if (lineTokens.Tokens[currentTokenIndex].Kind == Token.TokenKind.Paired)
             {
-                if (lineTokens.Tokens[num3].IsOpening == token.IsOpening)
+                if (lineTokens.Tokens[currentTokenIndex].IsOpening == token.IsOpening)
                 {
-                    if (lineTokens.Tokens[num3].Partner == null && !FindPartner(lineTokens.Tokens[num3], queue))
+                    if (lineTokens.Tokens[currentTokenIndex].Partner == null && !FindPartner(lineTokens.Tokens[currentTokenIndex], queue))
                     {
                         return false;
                     }
-                    num2 = lineTokens.Tokens[num3].Partner.LineNumber;
-                    num3 = lineTokens.Tokens[num3].Partner.Index + (lineTokens.Tokens[num3].IsOpening ? 1 : (-1));
+                    currentLineIndex = lineTokens.Tokens[currentTokenIndex].Partner.LineNumber;
+                    currentTokenIndex = lineTokens.Tokens[currentTokenIndex].Partner.Index + (lineTokens.Tokens[currentTokenIndex].IsOpening ? 1 : (-1));
                     continue;
                 }
-                if (lineTokens.Tokens[num3].PairId == token.PairId && lineTokens.Tokens[num3].IsOpening != token.IsOpening)
+                if (lineTokens.Tokens[currentTokenIndex].PairId == token.PairId && lineTokens.Tokens[currentTokenIndex].IsOpening != token.IsOpening)
                 {
                     break;
                 }
             }
-            num3 += num;
+            currentTokenIndex += step;
         }
-        lineTokens.Tokens[num3].ReleasePartner(queue);
-        token.SetPartner(lineTokens.Tokens[num3]);
+        lineTokens.Tokens[currentTokenIndex].ReleasePartner(queue);
+        token.SetPartner(lineTokens.Tokens[currentTokenIndex]);
         return true;
     }
 
-    private void RepairPairs(int value2, int value3, UnpairedTokenSet unpairedTokenSet)
+    private void RepairPairs(int startLineIndex, int endLineIndex, UnpairedTokenSet unpairedTokenSet)
     {
-        UnpairedTokenSet unpairedTokenSet2 = new UnpairedTokenSet();
-        PairRange(unpairedTokenSet2, value2, value3);
+        UnpairedTokenSet localUnpaired = new UnpairedTokenSet();
+        PairRange(localUnpaired, startLineIndex, endLineIndex);
         _visitGeneration++;
-        Queue<Token> queue = unpairedTokenSet2.ToQueue();
+        Queue<Token> queue = localUnpaired.ToQueue();
         while (queue.Count != 0)
         {
             Token token = queue.Dequeue();

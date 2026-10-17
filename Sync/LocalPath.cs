@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 
 namespace SmarTTY.Sync;
@@ -11,51 +11,51 @@ public struct LocalPath
     {
         get
         {
-            int num = FullPath.TrimEnd('\\').LastIndexOf('\\');
-            if (num == -1)
+            int slashIndex = FullPath.TrimEnd('\\').LastIndexOf('\\');
+            if (slashIndex == -1)
             {
                 return FullPath;
             }
-            return FullPath.Substring(num + 1).TrimEnd('\\');
+            return FullPath.Substring(slashIndex + 1).TrimEnd('\\');
         }
     }
 
     public string DisplayPath => StripLongPathPrefix(FullPath);
 
-    private LocalPath(string text)
+    private LocalPath(string path)
     {
-        this.FullPath = text;
+        this.FullPath = path;
     }
 
-    public static LocalPath FromUserPath(string text)
+    public static LocalPath FromUserPath(string path)
     {
-        return new LocalPath("\\\\?\\" + text.Replace('/', '\\').TrimEnd('\\'));
+        return new LocalPath("\\\\?\\" + path.Replace('/', '\\').TrimEnd('\\'));
     }
 
-    public static string StripLongPathPrefix(string text)
+    public static string StripLongPathPrefix(string path)
     {
-        if (text != null && text.StartsWith("\\\\?\\"))
+        if (path != null && path.StartsWith("\\\\?\\"))
         {
-            return text.Substring(4);
+            return path.Substring(4);
         }
-        return text;
+        return path;
     }
 
-    public LocalPath Combine(string text2)
+    public LocalPath Combine(string relativePath)
     {
-        if (text2.Contains("\\") || text2 == ".." || text2 == "." || text2.Contains('/'))
+        if (relativePath.Contains("\\") || relativePath == ".." || relativePath == "." || relativePath.Contains('/'))
         {
             LocalPath result = this;
-            string[] array = text2.Replace('/', '\\').Split('\\');
-            foreach (string text in array)
+            string[] segments = relativePath.Replace('/', '\\').Split('\\');
+            foreach (string part in segments)
             {
-                switch (text)
+                switch (part)
                 {
                     case "..":
                         result = result.GetParent();
                         break;
                     default:
-                        result = new LocalPath(result.FullPath + "\\" + text);
+                        result = new LocalPath(result.FullPath + "\\" + part);
                         break;
                     case "":
                     case ".":
@@ -64,7 +64,7 @@ public struct LocalPath
             }
             return result;
         }
-        return new LocalPath(this.FullPath + "\\" + text2.Replace('/', '\\'));
+        return new LocalPath(this.FullPath + "\\" + relativePath.Replace('/', '\\'));
     }
 
     public override string ToString()
@@ -74,16 +74,16 @@ public struct LocalPath
 
     public LocalPath GetParent()
     {
-        int num = FullPath.TrimEnd('\\').LastIndexOf('\\');
-        if (num == -1)
+        int slashIndex = FullPath.TrimEnd('\\').LastIndexOf('\\');
+        if (slashIndex == -1)
         {
             throw new Exception("Cannot get parent path for " + FullPath);
         }
-        return new LocalPath(FullPath.Substring(0, num));
+        return new LocalPath(FullPath.Substring(0, slashIndex));
     }
 
-    public static LocalPath FromRaw(string text)
+    public static LocalPath FromRaw(string rawPath)
     {
-        return new LocalPath(text);
+        return new LocalPath(rawPath);
     }
 }

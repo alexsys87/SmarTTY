@@ -44,7 +44,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
 
         public void Start()
         {
-            string text = LsOutputParser.LsParser.BuildListCommand(_Directory, flag: true, flag2: false);
+            string text = LsOutputParser.LsParser.BuildListCommand(_Directory, followSymlinks: true, recursive: false);
             SshShellChannel sshShellChannel = (_Channel = Session.OpenShellChannel(text));
             sshShellChannel.DataReceived += Channel_ChannelDataReceived;
             sshShellChannel.Finished += Channel_ChannelClosed;

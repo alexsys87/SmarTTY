@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -28,11 +28,11 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
 
             public int Length;
 
-            public LineChange(bool flag, int value2, int value3)
+            public LineChange(bool isInsert, int start, int length)
             {
-                this.IsInsert = flag;
-                this.Start = value2;
-                this.Length = value3;
+                this.IsInsert = isInsert;
+                this.Start = start;
+                this.Length = length;
             }
         }
 
@@ -68,15 +68,15 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
 
         private void CountTabs()
         {
-            int num = 0;
-            for (int num2 = 0; num2 < _text.Length; num2++)
+            int tabs = 0;
+            for (int i = 0; i < _text.Length; i++)
             {
-                if (_text[num2] == '\t')
+                if (_text[i] == '\t')
                 {
-                    num++;
+                    tabs++;
                 }
             }
-            _tabCount = num;
+            _tabCount = tabs;
         }
 
         public override string ToString()
@@ -84,9 +84,9 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
             return _text;
         }
 
-        public int GetMaxWidth(int value2)
+        public int GetMaxWidth(int tabSize)
         {
-            return _text.Length + _tabCount * (value2 - 1);
+            return _text.Length + _tabCount * (tabSize - 1);
         }
 
         public string GetText()
@@ -94,86 +94,86 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
             return _text;
         }
 
-        private int ConvertPosition(int value2, int value3, bool flag, out bool flag2)
+        private int ConvertPosition(int tabSize, int target, bool isColumnToIndex, out bool isPastEnd)
         {
-            flag2 = false;
-            int num = 0;
-            int num2 = 0;
+            isPastEnd = false;
+            int currCol = 0;
+            int currIdx = 0;
             while (true)
             {
-                if (flag)
+                if (isColumnToIndex)
                 {
-                    if (num == value3)
+                    if (currCol == target)
                     {
-                        return num2;
+                        return currIdx;
                     }
-                    if (num > value3)
+                    if (currCol > target)
                     {
-                        return num2 - 1;
+                        return currIdx - 1;
                     }
                 }
-                else if (value3 <= num2)
+                else if (target <= currIdx)
                 {
-                    return num;
+                    return currCol;
                 }
-                if (num2 >= _text.Length)
+                if (currIdx >= _text.Length)
                 {
                     break;
                 }
-                num = ((_text[num2] != '\t') ? (num + 1) : (num + (value2 - num % value2)));
-                num2++;
+                currCol = ((_text[currIdx] != '\t') ? (currCol + 1) : (currCol + (tabSize - currCol % tabSize)));
+                currIdx++;
             }
-            flag2 = true;
-            if (!flag)
+            isPastEnd = true;
+            if (!isColumnToIndex)
             {
-                return num;
+                return currCol;
             }
-            return num2;
+            return currIdx;
         }
 
-        public int ColumnToIndex(int value2, int value3, out bool flag)
+        public int ColumnToIndex(int tabSize, int column, out bool isPastEnd)
         {
-            return this.ConvertPosition(value2, value3, flag: true, out flag);
+            return this.ConvertPosition(tabSize, column, isColumnToIndex: true, out isPastEnd);
         }
 
-        public int IndexToColumn(int value2, int value3, out bool flag)
+        public int IndexToColumn(int tabSize, int index, out bool isPastEnd)
         {
-            return this.ConvertPosition(value2, value3, flag: false, out flag);
+            return this.ConvertPosition(tabSize, index, isColumnToIndex: false, out isPastEnd);
         }
 
-        private void OnChanged(bool flag, int value2, int value3)
+        private void OnChanged(bool isInsert, int start, int length)
         {
         }
 
         public void SetText(string text)
         {
-            OnChanged(flag: false, 0, _text.Length);
+            OnChanged(isInsert: false, 0, _text.Length);
             _text = text;
-            OnChanged(flag: true, 0, _text.Length);
+            OnChanged(isInsert: true, 0, _text.Length);
             CountTabs();
         }
 
-        public string Replace(int value2, int value3, string text)
+        public string Replace(int offset, int length, string newText)
         {
-            if (value2 == -1 || value2 > _text.Length)
+            if (offset == -1 || offset > _text.Length)
             {
-                value2 = _text.Length;
+                offset = _text.Length;
             }
-            if (value3 == -1 || value3 >= _text.Length - value2)
+            if (length == -1 || length >= _text.Length - offset)
             {
-                value3 = _text.Length - value2;
+                length = _text.Length - offset;
             }
             string result = "";
-            if (value3 != 0)
+            if (length != 0)
             {
-                OnChanged(flag: false, value2, value3);
-                result = _text.Substring(value2, value3);
-                _text = _text.Remove(value2, value3);
+                OnChanged(isInsert: false, offset, length);
+                result = _text.Substring(offset, length);
+                _text = _text.Remove(offset, length);
             }
-            if (text.Length != 0)
+            if (newText.Length != 0)
             {
-                OnChanged(flag: true, value2, text.Length);
-                _text = _text.Insert(value2, text);
+                OnChanged(isInsert: true, offset, newText.Length);
+                _text = _text.Insert(offset, newText);
             }
             return result;
         }
@@ -215,10 +215,10 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
             }
         }
 
-        public TextPosition(int value2, int value3)
+        public TextPosition(int column, int line)
         {
-            Column = value2;
-            Line = value3;
+            Column = column;
+            Line = line;
         }
 
         public TextPosition(TextPosition textPosition)
@@ -307,7 +307,7 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
         }
     }
 
-    public delegate string LineTerminatorProvider(int value2);
+    public delegate string LineTerminatorProvider(int lineIndex);
 
     private class LineEnumerator : IEnumerator<string>, IDisposable, IEnumerator
     {
@@ -370,66 +370,66 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
 
     ILineCollection ITextSource.Lines => AsLineCollection;
 
-    public string GetLine(int value2)
+    public string GetLine(int lineIndex)
     {
-        return Lines[value2].GetText();
+        return Lines[lineIndex].GetText();
     }
 
-    public int GetMaxLineWidth(int value2)
+    public int GetMaxLineWidth(int tabSize)
     {
-        int num = 0;
-        foreach (DocumentLine item in _lines)
+        int maxWidth = 0;
+        foreach (DocumentLine line in _lines)
         {
-            int num2 = item.GetMaxWidth(value2);
-            if (num2 > num)
+            int width = line.GetMaxWidth(tabSize);
+            if (width > maxWidth)
             {
-                num = num2;
+                maxWidth = width;
             }
         }
-        return num;
+        return maxWidth;
     }
 
     private void OnReset()
     {
     }
 
-    public string GetLineText(int value2)
+    public string GetLineText(int lineIndex)
     {
-        if (value2 >= _lines.Count || value2 < 0)
+        if (lineIndex >= _lines.Count || lineIndex < 0)
         {
             return "";
         }
-        return _lines[value2].GetText();
+        return _lines[lineIndex].GetText();
     }
 
-    public string GetLineTerminator(int value2, string text = "\r\n")
+    public string GetLineTerminator(int lineIndex, string defaultTerminator = "\r\n")
     {
-        if (value2 >= _lines.Count || value2 < 0)
+        if (lineIndex >= _lines.Count || lineIndex < 0)
         {
-            return text;
+            return defaultTerminator;
         }
-        return GetLineEndingText(_lines[value2].Ending);
+        return GetLineEndingText(_lines[lineIndex].Ending);
     }
 
-    public int GetLineLengthWithTerminator(int value2)
+    public int GetLineLengthWithTerminator(int lineIndex)
     {
-        if (value2 >= _lines.Count || value2 < 0)
+        if (lineIndex >= _lines.Count || lineIndex < 0)
         {
             return 0;
         }
-        return _lines[value2].GetText().Length + _lines[value2].EndingLength;
+        return _lines[lineIndex].GetText().Length + _lines[lineIndex].EndingLength;
     }
 
-    public bool LoadFromFile(string text)
+    public bool LoadFromFile(string filePath)
     {
         try
         {
-            FileStream fileStream = new FileStream(text, FileMode.Open, FileAccess.Read);
+            FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
             using (fileStream)
             {
-                byte[] array = new byte[fileStream.Length];
-                fileStream.Read(array, 0, (int)fileStream.Length);
-                return SetText(Encoding.ASCII.GetString(array));
+                byte[] buffer = new byte[fileStream.Length];
+                fileStream.Read(buffer, 0, (int)fileStream.Length);
+                return SetText(Encoding.ASCII.GetString(buffer));
             }
         }
         catch (Exception)
@@ -438,25 +438,25 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
         }
     }
 
-    protected static List<DocumentLine> SplitLines(string text2)
+    protected static List<DocumentLine> SplitLines(string text)
     {
-        int num = 0;
+        int startIndex = 0;
         List<DocumentLine> list = new List<DocumentLine>();
-        string text;
+        string lineText;
         while (true)
         {
-            int num2 = text2.IndexOfAny(_lineBreakChars, num);
-            if (num2 == -1)
+            int breakIndex = text.IndexOfAny(_lineBreakChars, startIndex);
+            if (breakIndex == -1)
             {
                 break;
             }
-            int num3 = num2;
+            int endingEndIndex = breakIndex;
             LineEnding lineEnding;
-            if (text2[num3] == '\r')
+            if (text[endingEndIndex] == '\r')
             {
-                if (num3 < text2.Length - 1 && text2[num3 + 1] == '\n')
+                if (endingEndIndex < text.Length - 1 && text[endingEndIndex + 1] == '\n')
                 {
-                    num3++;
+                    endingEndIndex++;
                     lineEnding = LineEnding.CrLf;
                 }
                 else
@@ -468,12 +468,12 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
             {
                 lineEnding = LineEnding.Lf;
             }
-            text = text2.Substring(num, num2 - num);
-            list.Add(new DocumentLine(text, lineEnding));
-            num = num3 + 1;
+            lineText = text.Substring(startIndex, breakIndex - startIndex);
+            list.Add(new DocumentLine(lineText, lineEnding));
+            startIndex = endingEndIndex + 1;
         }
-        text = text2.Substring(num);
-        list.Add(new DocumentLine(text, (list.Count == 0) ? LineEnding.Inherit : list[list.Count - 1].Ending));
+        lineText = text.Substring(startIndex);
+        list.Add(new DocumentLine(lineText, (list.Count == 0) ? LineEnding.Inherit : list[list.Count - 1].Ending));
         return list;
     }
 
@@ -489,110 +489,110 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
         return GetText();
     }
 
-    public string GetRangeText(TextPosition textPosition, TextPosition textPosition2, LineTerminatorProvider callback = null)
+    public string GetRangeText(TextPosition startPos, TextPosition endPos, LineTerminatorProvider callback = null)
     {
-        TextPosition textPosition3;
-        TextPosition textPosition4;
-        if (textPosition < textPosition2)
+        TextPosition minPos;
+        TextPosition maxPos;
+        if (startPos < endPos)
         {
-            textPosition3 = textPosition;
-            textPosition4 = textPosition2;
+            minPos = startPos;
+            maxPos = endPos;
         }
         else
         {
-            textPosition3 = textPosition2;
-            textPosition4 = textPosition;
+            minPos = endPos;
+            maxPos = startPos;
         }
-        if (textPosition3.Line == textPosition4.Line)
+        if (minPos.Line == maxPos.Line)
         {
-            return _lines[textPosition3.Line].GetText().Substring(textPosition3.Column, textPosition4.Column - textPosition3.Column);
+            return _lines[minPos.Line].GetText().Substring(minPos.Column, maxPos.Column - minPos.Column);
         }
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.Append(_lines[textPosition3.Line].GetText().Substring(textPosition3.Column) + (callback?.Invoke(textPosition3.Line) ?? "\r\n"));
-        int num = Math.Min(textPosition4.Line, _lines.Count);
-        for (int num2 = textPosition3.Line + 1; num2 < num; num2++)
+        stringBuilder.Append(_lines[minPos.Line].GetText().Substring(minPos.Column) + (callback?.Invoke(minPos.Line) ?? "\r\n"));
+        int endLine = Math.Min(maxPos.Line, _lines.Count);
+        for (int i = minPos.Line + 1; i < endLine; i++)
         {
-            stringBuilder.Append(_lines[num2].GetText() + (callback?.Invoke(num2) ?? "\r\n"));
+            stringBuilder.Append(_lines[i].GetText() + (callback?.Invoke(i) ?? "\r\n"));
         }
-        if (textPosition4.Line < _lines.Count)
+        if (maxPos.Line < _lines.Count)
         {
-            stringBuilder.Append(_lines[textPosition4.Line].GetText().Substring(0, textPosition4.Column));
+            stringBuilder.Append(_lines[maxPos.Line].GetText().Substring(0, maxPos.Column));
         }
         return stringBuilder.ToString();
     }
 
-    public static string SubstringFromColumn(string text, int value2, int value3, out int value4, out int value5)
+    public static string SubstringFromColumn(string lineText, int targetColumn, int tabSize, out int columnOffset, out int charIndex)
     {
-        value4 = 0;
-        value5 = 0;
-        if (value2 == 0)
+        columnOffset = 0;
+        charIndex = 0;
+        if (targetColumn == 0)
         {
-            return text;
+            return lineText;
         }
-        int num = 0;
-        int num2 = 0;
-        for (; num < text.Length; num++)
+        int i = 0;
+        int currCol = 0;
+        for (; i < lineText.Length; i++)
         {
-            if (num2 >= value2)
+            if (currCol >= targetColumn)
             {
-                value4 = num2 - value2;
-                value5 = num;
-                return text.Substring(num);
+                columnOffset = currCol - targetColumn;
+                charIndex = i;
+                return lineText.Substring(i);
             }
-            num2 = ((text[num] != '\t') ? (num2 + 1) : (num2 + (value3 - num2 % value3)));
+            currCol = ((lineText[i] != '\t') ? (currCol + 1) : (currCol + (tabSize - currCol % tabSize)));
         }
         return null;
     }
 
-    public string GetLineSubstringFromColumn(int value2, int value3, int value4, out int value5, out int value6)
+    public string GetLineSubstringFromColumn(int lineIndex, int targetColumn, int tabSize, out int columnOffset, out int charIndex)
     {
-        return SubstringFromColumn(Lines[value2].GetText(), value3, value4, out value5, out value6);
+        return SubstringFromColumn(Lines[lineIndex].GetText(), targetColumn, tabSize, out columnOffset, out charIndex);
     }
 
-    public int IndexToColumn(int value2, int value3, int value4)
+    public int IndexToColumn(int lineIndex, int index, int tabSize)
     {
-        bool flag;
-        return IndexToColumn(value2, value3, value4, out flag);
+        bool isPastEnd;
+        return IndexToColumn(lineIndex, index, tabSize, out isPastEnd);
     }
 
-    public int IndexToColumn(int value2, int value3, int value4, out bool flag)
+    public int IndexToColumn(int lineIndex, int index, int tabSize, out bool isPastEnd)
     {
-        flag = true;
-        if (value2 >= Lines.Count || value2 < 0)
+        isPastEnd = true;
+        if (lineIndex >= Lines.Count || lineIndex < 0)
         {
             return 0;
         }
-        return Lines[value2].IndexToColumn(value4, value3, out flag);
+        return Lines[lineIndex].IndexToColumn(tabSize, index, out isPastEnd);
     }
 
-    public int ColumnToIndex(int value2, int value3, int value4)
+    public int ColumnToIndex(int lineIndex, int column, int tabSize)
     {
-        bool flag;
-        return ColumnToIndex(value2, value3, value4, out flag);
+        bool isPastEnd;
+        return ColumnToIndex(lineIndex, column, tabSize, out isPastEnd);
     }
 
-    public int ColumnToIndex(int value2, int value3, int value4, out bool flag)
+    public int ColumnToIndex(int lineIndex, int column, int tabSize, out bool isPastEnd)
     {
-        flag = true;
-        if (value2 >= Lines.Count)
+        isPastEnd = true;
+        if (lineIndex >= Lines.Count)
         {
             return 0;
         }
-        return Lines[value2].ColumnToIndex(value4, value3, out flag);
+        return Lines[lineIndex].ColumnToIndex(tabSize, column, out isPastEnd);
     }
 
-    public TextPosition OffsetToPosition(int value2)
+    public TextPosition OffsetToPosition(int offset)
     {
-        int num = 0;
-        for (int num2 = 0; num2 < Lines.Count; num2++)
+        int currOffset = 0;
+        for (int i = 0; i < Lines.Count; i++)
         {
-            int num3 = Lines[num2].GetText().Length + ((Lines[num2].Ending != LineEnding.CrLf) ? 1 : 2);
-            int num4 = num + num3;
-            if (num4 > value2)
+            int lineLen = Lines[i].GetText().Length + ((Lines[i].Ending != LineEnding.CrLf) ? 1 : 2);
+            int nextOffset = currOffset + lineLen;
+            if (nextOffset > offset)
             {
-                return new TextPosition(value2 - num, num2);
+                return new TextPosition(offset - currOffset, i);
             }
-            num = num4;
+            currOffset = nextOffset;
         }
         return default;
     }
@@ -611,11 +611,11 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
     public string GetText()
     {
         StringBuilder stringBuilder = new StringBuilder(_lines.Count * 80);
-        for (int num = 0; num < _lines.Count; num++)
+        for (int i = 0; i < _lines.Count; i++)
         {
-            DocumentLine documentLine = _lines[num];
+            DocumentLine documentLine = _lines[i];
             stringBuilder.Append(documentLine.GetText());
-            if (num != _lines.Count - 1)
+            if (i != _lines.Count - 1)
             {
                 LineEnding lineEnding = documentLine.Ending;
                 if (lineEnding == LineEnding.Inherit)

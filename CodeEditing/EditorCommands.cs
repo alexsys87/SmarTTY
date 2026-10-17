@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
@@ -12,15 +12,15 @@ public class EditorCommands
 
         private CommandAction _action;
 
-        public DelegateCommand(string text, string text2, CommandAction callback)
-            : base(text, text2)
+        public DelegateCommand(string name, string description, CommandAction callback)
+            : base(name, description)
         {
             this._action = callback;
         }
 
-        public override void Execute(object obj)
+        public override void Execute(object target)
         {
-            _action(obj as CodeEditorPP);
+            _action(target as CodeEditorPP);
         }
     }
 
@@ -39,7 +39,7 @@ public class EditorCommands
         },
         new DelegateCommand("GoToOpeningRoundBracket", "Go to next '('", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: true, flag3: false, flag4: false, (string text) => text == "(");
+            codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: false, (string tokenText) => tokenText == "(");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -50,7 +50,7 @@ public class EditorCommands
         },
         new DelegateCommand("SelectToOpeningRoundBracket", "Select to next '('", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: true, flag3: false, flag4: true, (string text) => text == "(");
+            codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: true, (string tokenText) => tokenText == "(");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -62,7 +62,7 @@ public class EditorCommands
         },
         new DelegateCommand("GoToClosingRoundBracket", "Go to next ')'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: false, flag3: false, flag4: false, (string text) => text == ")");
+            codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: false, (string tokenText) => tokenText == ")");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -73,7 +73,7 @@ public class EditorCommands
         },
         new DelegateCommand("SelectToClosingRoundBracket", "Select to next ')'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: false, flag3: false, flag4: true, (string text) => text == ")");
+            codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: true, (string tokenText) => tokenText == ")");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -85,7 +85,7 @@ public class EditorCommands
         },
         new DelegateCommand("GoToOpeningCurlyBracket", "Go to next '{'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: true, flag3: false, flag4: false, (string text) => text == "{");
+            codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: false, (string tokenText) => tokenText == "{");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -97,7 +97,7 @@ public class EditorCommands
         },
         new DelegateCommand("SelectToOpeningCurlyBracket", "Select to next '{'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: true, flag3: false, flag4: true, (string text) => text == "{");
+            codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: true, (string tokenText) => tokenText == "{");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -110,7 +110,7 @@ public class EditorCommands
         },
         new DelegateCommand("GoToClosingCurlyBracket", "Go to next '}'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: false, flag3: false, flag4: false, (string text) => text == "}");
+            codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: false, (string tokenText) => tokenText == "}");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -122,7 +122,7 @@ public class EditorCommands
         },
         new DelegateCommand("SelectToClosingCurlyBracket", "Select to next '}'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: false, flag3: false, flag4: true, (string text) => text == "}");
+            codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: true, (string tokenText) => tokenText == "}");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -135,7 +135,7 @@ public class EditorCommands
         },
         new DelegateCommand("GoToOpeningSquareBracket", "Go to next '['", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: true, flag3: false, flag4: false, (string text) => text == "[");
+            codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: false, (string tokenText) => tokenText == "[");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -146,7 +146,7 @@ public class EditorCommands
         },
         new DelegateCommand("SelectToOpeningSquareBracket", "Select to next '['", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: true, flag3: false, flag4: true, (string text) => text == "[");
+            codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: true, (string tokenText) => tokenText == "[");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -158,7 +158,7 @@ public class EditorCommands
         },
         new DelegateCommand("GoToClosingSquareBracket", "Go to next ']'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: false, flag3: false, flag4: false, (string text) => text == "]");
+            codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: false, (string tokenText) => tokenText == "]");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -169,7 +169,7 @@ public class EditorCommands
         },
         new DelegateCommand("SelectToClosingSquareBracket", "Select to next ']'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: false, flag3: false, flag4: true, (string text) => text == "]");
+            codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: true, (string tokenText) => tokenText == "]");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -181,7 +181,7 @@ public class EditorCommands
         },
         new DelegateCommand("GoToOpeningAngularBracket", "Go to next '<'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: true, flag3: false, flag4: false, (string text) => text == "<");
+            codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: false, (string tokenText) => tokenText == "<");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -192,7 +192,7 @@ public class EditorCommands
         },
         new DelegateCommand("SelectToOpeningAngularBracket", "Select to next '<'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: true, flag3: false, flag4: true, (string text) => text == "<");
+            codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: true, (string tokenText) => tokenText == "<");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -204,7 +204,7 @@ public class EditorCommands
         },
         new DelegateCommand("GoToClosingAngularBracket", "Go to next '>'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: false, flag3: false, flag4: false, (string text) => text == ">");
+            codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: false, (string tokenText) => tokenText == ">");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut
@@ -215,7 +215,7 @@ public class EditorCommands
         },
         new DelegateCommand("SelectToClosingAngularBracket", "Select to next '>'", (CodeEditorPP codeEditorPP) =>
         {
-            codeEditorPP.MoveToToken(flag2: false, flag3: false, flag4: true, (string text) => text == ">");
+            codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: true, (string tokenText) => tokenText == ">");
         })
         {
             DefaultShortcut = new KeyBindingMap.KeyShortcut

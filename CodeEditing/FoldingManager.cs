@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System.Collections.Generic;
 using System.Drawing;
@@ -17,57 +17,57 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             _manager = foldingManager;
         }
 
-        public void Paint(Graphics graphics, Rectangle rectangle, SizeF sizeF, int value2, int value3, int value4, ReadonlyTextBrowser readonlyTextBrowser)
+        public void Paint(Graphics graphics, Rectangle rectangle, SizeF charSize, int firstLineIndex, int lastLineIndex, int rowCount, ReadonlyTextBrowser readonlyTextBrowser)
         {
-            float num = rectangle.Top;
-            for (int num2 = 0; num2 < value4; num2++)
+            float yPos = rectangle.Top;
+            for (int rowIdx = 0; rowIdx < rowCount; rowIdx++)
             {
-                int num3 = readonlyTextBrowser.DisplayRows[num2].Line;
+                int lineIndex = readonlyTextBrowser.DisplayRows[rowIdx].Line;
                 GutterState gutterState = GutterState.Plain;
-                if (readonlyTextBrowser.DisplayRows[num2].VirtualLine == null && num3 != -1)
+                if (readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && lineIndex != -1)
                 {
-                    gutterState = this._manager.GetGutterState(num3);
+                    gutterState = this._manager.GetGutterState(lineIndex);
                 }
-                int num4 = ((int)sizeF.Height - 10) / 2;
-                int num5 = rectangle.Left + 1 + 5;
+                int yOffset = ((int)charSize.Height - 10) / 2;
+                int xCenter = rectangle.Left + 1 + 5;
                 switch (gutterState)
                 {
                     case GutterState.Plain:
                     case GutterState.SectionEnd:
-                        graphics.DrawLine(Pens.Black, num5, num, num5, num + sizeF.Height);
+                        graphics.DrawLine(Pens.Black, xCenter, yPos, xCenter, yPos + charSize.Height);
                         if (gutterState == GutterState.SectionEnd)
                         {
-                            graphics.DrawLine(Pens.Black, num5, num + sizeF.Height / 2f, rectangle.Right, num + sizeF.Height / 2f);
+                            graphics.DrawLine(Pens.Black, xCenter, yPos + charSize.Height / 2f, rectangle.Right, yPos + charSize.Height / 2f);
                         }
                         break;
                     case GutterState.Expandable:
                     case GutterState.Collapsed:
-                        graphics.DrawLine(Pens.Black, num5, num, num5, num + (float)num4);
-                        graphics.DrawRectangle(Pens.Black, num5 - 5, num + (float)num4, 10f, 10f);
-                        graphics.DrawLine(Pens.Black, num5, num + (float)num4 + 10f, num5, num + sizeF.Height);
-                        graphics.DrawLine(Pens.Black, num5 - 3, num + (float)num4 + 5f, num5 + 3, num + (float)num4 + 5f);
+                        graphics.DrawLine(Pens.Black, xCenter, yPos, xCenter, yPos + (float)yOffset);
+                        graphics.DrawRectangle(Pens.Black, xCenter - 5, yPos + (float)yOffset, 10f, 10f);
+                        graphics.DrawLine(Pens.Black, xCenter, yPos + (float)yOffset + 10f, xCenter, yPos + charSize.Height);
+                        graphics.DrawLine(Pens.Black, xCenter - 3, yPos + (float)yOffset + 5f, xCenter + 3, yPos + (float)yOffset + 5f);
                         if (gutterState == GutterState.Collapsed)
                         {
-                            graphics.DrawLine(Pens.Black, num5, num + (float)num4 + 2f, num5, num + (float)num4 + 10f - 2f);
+                            graphics.DrawLine(Pens.Black, xCenter, yPos + (float)yOffset + 2f, xCenter, yPos + (float)yOffset + 10f - 2f);
                         }
                         break;
                 }
-                num += sizeF.Height;
+                yPos += charSize.Height;
             }
         }
 
-        public int MeasureWidth(ReadonlyTextBrowser readonlyTextBrowser, Graphics graphics, int value2)
+        public int MeasureWidth(ReadonlyTextBrowser readonlyTextBrowser, Graphics graphics, int lineCount)
         {
             return 12;
         }
 
-        public bool OnMouseDown(Point point, ReadonlyTextBrowser readonlyTextBrowser, int value2, int value3, SizeF sizeF, int value4)
+        public bool OnMouseDown(Point point, ReadonlyTextBrowser readonlyTextBrowser, int firstLineIndex, int lastLineIndex, SizeF charSize, int rowIdx)
         {
-            if (readonlyTextBrowser.DisplayRows[value4].VirtualLine == null && this._manager.ToggleFold(readonlyTextBrowser.DisplayRows[value4].Line, readonlyTextBrowser, out var token, flag: false))
+            if (readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && this._manager.ToggleFold(readonlyTextBrowser.DisplayRows[rowIdx].Line, readonlyTextBrowser, out var endToken, collapseOnly: false))
             {
-                if (token != null && readonlyTextBrowser.CaretPosition.Line <= token.LineNumber && readonlyTextBrowser.CaretPosition.Line >= token.Partner.LineNumber)
+                if (endToken != null && readonlyTextBrowser.CaretPosition.Line <= endToken.LineNumber && readonlyTextBrowser.CaretPosition.Line >= endToken.Partner.LineNumber)
                 {
-                    readonlyTextBrowser.SetCaret(new TextDocument.TextPosition(0, token.Partner.LineNumber - 1));
+                    readonlyTextBrowser.SetCaret(new TextDocument.TextPosition(0, endToken.Partner.LineNumber - 1));
                 }
                 readonlyTextBrowser.RebuildDisplayRows();
                 readonlyTextBrowser.UpdateLayout();
@@ -109,13 +109,13 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
 
         public int EndColumn => EndToken.End;
 
-        public FoldedRegion(TokenCache.Token token, TokenCache.Token token2, FoldingManager foldingManager, bool flag, int value2)
+        public FoldedRegion(TokenCache.Token startToken, TokenCache.Token endToken, FoldingManager foldingManager, bool includesPrecedingLine, int trailingBlankLines)
         {
-            this._includesPrecedingLine = flag;
+            this._includesPrecedingLine = includesPrecedingLine;
             this._manager = foldingManager;
-            StartToken = token;
-            EndToken = token2;
-            _trailingBlankLines = value2;
+            StartToken = startToken;
+            EndToken = endToken;
+            _trailingBlankLines = trailingBlankLines;
         }
 
         public override string ToString()
@@ -123,62 +123,62 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             return $"({StartToken}) - ({EndToken})";
         }
 
-        public string Transform(string text5, out CharacterRange characterRange, out Brush brush)
+        public string Transform(string lineText, out CharacterRange characterRange, out Brush brush)
         {
-            int num = 0;
+            int startCol = 0;
             switch (StartToken.Style.StartBoundary)
             {
                 case TokenCache.RegionStyle.FoldBoundary.TokenEnd:
-                    num = StartToken.End;
+                    startCol = StartToken.End;
                     break;
                 case TokenCache.RegionStyle.FoldBoundary.TokenStart:
-                    num = StartToken.Start;
+                    startCol = StartToken.Start;
                     break;
             }
-            string text = this._manager._tokenCache.Document.GetLineText(EndToken.LineNumber);
-            int length = text.Length;
+            string endLineText = this._manager._tokenCache.Document.GetLineText(EndToken.LineNumber);
+            int endCol = endLineText.Length;
             switch (StartToken.Style.EndBoundary)
             {
                 case TokenCache.RegionStyle.FoldBoundary.TokenEnd:
-                    length = EndToken.Start;
+                    endCol = EndToken.Start;
                     break;
                 case TokenCache.RegionStyle.FoldBoundary.TokenStart:
-                    length = EndToken.End;
+                    endCol = EndToken.End;
                     break;
             }
-            string text2 = StartToken.Style.Text;
+            string labelText = StartToken.Style.Text;
             switch (StartToken.Style.LabelKind)
             {
                 case TokenCache.RegionStyle.LabelSource.NextToken:
                     if (StartToken.Index + 1 < StartToken._line.Tokens.Count)
                     {
-                        TokenCache.Token token = StartToken._line.Tokens[StartToken.Index + 1];
-                        text2 = text5.Substring(token.Start, token.End - token.Start);
+                        TokenCache.Token nextToken = StartToken._line.Tokens[StartToken.Index + 1];
+                        labelText = lineText.Substring(nextToken.Start, nextToken.End - nextToken.Start);
                     }
                     break;
                 case TokenCache.RegionStyle.LabelSource.PreviousToken:
                     if (StartToken.Index > 0)
                     {
-                        TokenCache.Token token2 = StartToken._line.Tokens[StartToken.Index - 1];
-                        text2 = text5.Substring(token2.Start, token2.End - token2.Start);
+                        TokenCache.Token prevToken = StartToken._line.Tokens[StartToken.Index - 1];
+                        labelText = lineText.Substring(prevToken.Start, prevToken.End - prevToken.Start);
                     }
                     break;
                 case TokenCache.RegionStyle.LabelSource.RestOfLine:
-                    text2 = text5.Substring(StartToken.End);
+                    labelText = lineText.Substring(StartToken.End);
                     break;
             }
             if (this._includesPrecedingLine)
             {
-                string text3 = this._manager._tokenCache.Document.GetLineText(StartToken.LineNumber);
-                string text4 = text3.TrimStart(' ', '\t');
-                int num2 = text3.Length - text4.Length;
-                characterRange = new CharacterRange(text5.Length + num - num2 + 1, text2.Length);
+                string headerLineText = this._manager._tokenCache.Document.GetLineText(StartToken.LineNumber);
+                string trimmedText = headerLineText.TrimStart(' ', '\t');
+                int indentLen = headerLineText.Length - trimmedText.Length;
+                characterRange = new CharacterRange(lineText.Length + startCol - indentLen + 1, labelText.Length);
                 brush = Brushes.DarkGray;
-                return string.Format("{3} {0}{1}{2}", text3.Substring(num2, num - num2), text2, text.Substring(length), text5);
+                return string.Format("{3} {0}{1}{2}", headerLineText.Substring(indentLen, startCol - indentLen), labelText, endLineText.Substring(endCol), lineText);
             }
-            characterRange = new CharacterRange(num, text2.Length);
+            characterRange = new CharacterRange(startCol, labelText.Length);
             brush = Brushes.DarkGray;
-            return $"{text5.Substring(0, num)}{text2}{text.Substring(length)}";
+            return $"{lineText.Substring(0, startCol)}{labelText}{endLineText.Substring(endCol)}";
         }
 
         public void DrawDecoration(Graphics graphics, SizeF sizeF, Rectangle rectangle, CharacterRange characterRange)
@@ -209,105 +209,105 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         _tokenCache = tokenCache;
     }
 
-    private GutterState GetGutterState(int value2)
+    private GutterState GetGutterState(int lineIndex)
     {
-        bool flag = false;
-        if (_regions.ContainsKey(value2))
+        bool hasPartnerEnd = false;
+        if (_regions.ContainsKey(lineIndex))
         {
             return GutterState.Collapsed;
         }
-        if (value2 >= _tokenCache.LineCount)
+        if (lineIndex >= _tokenCache.LineCount)
         {
             return GutterState.Plain;
         }
-        if (value2 < _tokenCache.LineCount - 1 && _tokenCache.GetLineTokens(value2).Count != 0)
+        if (lineIndex < _tokenCache.LineCount - 1 && _tokenCache.GetLineTokens(lineIndex).Count != 0)
         {
-            List<TokenCache.Token> list = _tokenCache.GetLineTokens(value2 + 1);
-            if (list.Count > 0)
+            List<TokenCache.Token> nextTokens = _tokenCache.GetLineTokens(lineIndex + 1);
+            if (nextTokens.Count > 0)
             {
-                TokenCache.Token token = list[0];
-                if (token.Style != null && token.Style.OpeningOnNextLine && token.IsOpening && token.Partner != null && token.Partner.LineNumber != token.LineNumber)
+                TokenCache.Token firstToken = nextTokens[0];
+                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && firstToken.Partner != null && firstToken.Partner.LineNumber != firstToken.LineNumber)
                 {
                     return GutterState.Expandable;
                 }
             }
         }
-        int num = -1;
-        foreach (TokenCache.Token item in _tokenCache.GetLineTokens(value2))
+        int tokenIndex = -1;
+        foreach (TokenCache.Token token in _tokenCache.GetLineTokens(lineIndex))
         {
-            num++;
-            if (item.Style != null && item.IsOpening && item.Partner != null && item.Partner.LineNumber != item.LineNumber)
+            tokenIndex++;
+            if (token.Style != null && token.IsOpening && token.Partner != null && token.Partner.LineNumber != token.LineNumber)
             {
-                if (num != 0 || !item.Style.OpeningOnNextLine)
+                if (tokenIndex != 0 || !token.Style.OpeningOnNextLine)
                 {
                     return GutterState.Expandable;
                 }
             }
-            else if (!item.IsOpening && item.Partner != null && item.Partner.LineNumber != item.LineNumber && item.Partner.Style != null)
+            else if (!token.IsOpening && token.Partner != null && token.Partner.LineNumber != token.LineNumber && token.Partner.Style != null)
             {
-                flag = true;
+                hasPartnerEnd = true;
             }
         }
-        if (flag)
+        if (hasPartnerEnd)
         {
             return GutterState.SectionEnd;
         }
         return GutterState.Plain;
     }
 
-    private int CountTrailingBlankLines(int value2, int value3)
+    private int CountTrailingBlankLines(int lineIndex, int maxCount)
     {
-        for (int num = 0; num <= value3; num++)
+        for (int i = 0; i <= maxCount; i++)
         {
-            int num2 = value2 + 1;
-            if (num2 >= _tokenCache.LineCount)
+            int nextLine = lineIndex + 1;
+            if (nextLine >= _tokenCache.LineCount)
             {
-                return num;
+                return i;
             }
-            if (_tokenCache.Document.GetLineText(num2).Trim(' ', '\t').Length != 0)
+            if (_tokenCache.Document.GetLineText(nextLine).Trim(' ', '\t').Length != 0)
             {
-                return num;
+                return i;
             }
         }
-        return value3;
+        return maxCount;
     }
 
-    private bool ToggleFold(int value2, ReadonlyTextBrowser readonlyTextBrowser, out TokenCache.Token token, bool flag)
+    private bool ToggleFold(int lineIndex, ReadonlyTextBrowser readonlyTextBrowser, out TokenCache.Token endToken, bool collapseOnly)
     {
-        token = null;
-        if (value2 >= _tokenCache.LineCount)
+        endToken = null;
+        if (lineIndex >= _tokenCache.LineCount)
         {
             return false;
         }
-        if (_regions.ContainsKey(value2))
+        if (_regions.ContainsKey(lineIndex))
         {
-            if (flag)
+            if (collapseOnly)
             {
                 return false;
             }
-            _regions.Remove(value2);
+            _regions.Remove(lineIndex);
             return true;
         }
-        if (value2 < _tokenCache.LineCount - 1 && _tokenCache.GetLineTokens(value2).Count != 0)
+        if (lineIndex < _tokenCache.LineCount - 1 && _tokenCache.GetLineTokens(lineIndex).Count != 0)
         {
-            List<TokenCache.Token> list = _tokenCache.GetLineTokens(value2 + 1);
-            if (list.Count > 0)
+            List<TokenCache.Token> nextTokens = _tokenCache.GetLineTokens(lineIndex + 1);
+            if (nextTokens.Count > 0)
             {
-                TokenCache.Token token2 = list[0];
-                if (token2.Style != null && token2.Style.OpeningOnNextLine && token2.IsOpening && token2.Partner != null && token2.Partner.LineNumber != token2.LineNumber)
+                TokenCache.Token firstToken = nextTokens[0];
+                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && firstToken.Partner != null && firstToken.Partner.LineNumber != firstToken.LineNumber)
                 {
-                    _regions[value2] = new FoldedRegion(token2, token2.Partner, this, flag: true, this.CountTrailingBlankLines(token2.Partner.LineNumber, token2.Style.TrailingBlankLines));
-                    token = token2.Partner;
+                    _regions[lineIndex] = new FoldedRegion(firstToken, firstToken.Partner, this, includesPrecedingLine: true, this.CountTrailingBlankLines(firstToken.Partner.LineNumber, firstToken.Style.TrailingBlankLines));
+                    endToken = firstToken.Partner;
                     return true;
                 }
             }
         }
-        foreach (TokenCache.Token item in _tokenCache.GetLineTokens(value2))
+        foreach (TokenCache.Token token in _tokenCache.GetLineTokens(lineIndex))
         {
-            if (item.Style != null && item.IsOpening && item.Partner != null && item.Partner.LineNumber != item.LineNumber)
+            if (token.Style != null && token.IsOpening && token.Partner != null && token.Partner.LineNumber != token.LineNumber)
             {
-                _regions[value2] = new FoldedRegion(item, item.Partner, this, flag: false, this.CountTrailingBlankLines(item.Partner.LineNumber, item.Style.TrailingBlankLines));
-                token = item.Partner;
+                _regions[lineIndex] = new FoldedRegion(token, token.Partner, this, includesPrecedingLine: false, this.CountTrailingBlankLines(token.Partner.LineNumber, token.Style.TrailingBlankLines));
+                endToken = token.Partner;
                 return true;
             }
         }
@@ -321,136 +321,136 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
 
     public int GetTotalHiddenLines()
     {
-        int num = 0;
-        foreach (FoldedRegion value in _regions.Values)
+        int hiddenCount = 0;
+        foreach (FoldedRegion region in _regions.Values)
         {
-            num += value.HiddenLineCount;
+            hiddenCount += region.HiddenLineCount;
         }
-        return num;
+        return hiddenCount;
     }
 
-    public int GetNextSpecialLine(int value2)
+    public int GetNextSpecialLine(int lineIndex)
     {
-        int num = int.MaxValue;
+        int minLine = int.MaxValue;
         foreach (int key in _regions.Keys)
         {
-            if (key >= value2 && key < num)
+            if (key >= lineIndex && key < minLine)
             {
-                num = key;
+                minLine = key;
             }
         }
-        return num;
+        return minLine;
     }
 
-    public int GetVirtualRowCount(int value2)
+    public int GetVirtualRowCount(int lineIndex)
     {
         return 0;
     }
 
-    public void GetVirtualLines(int value2, List<ReadonlyTextBrowser.IVirtualLine> list)
+    public void GetVirtualLines(int lineIndex, List<ReadonlyTextBrowser.IVirtualLine> list)
     {
     }
 
-    public int GetHiddenLineCount(int value2)
+    public int GetHiddenLineCount(int lineIndex)
     {
-        if (!_regions.TryGetValue(value2, out var value))
+        if (!_regions.TryGetValue(lineIndex, out var region))
         {
             return 0;
         }
-        return value.HiddenLineCount;
+        return region.HiddenLineCount;
     }
 
-    public void RemoveStaleRegions(int value2, int value3, int value4, out bool flag)
+    public void RemoveStaleRegions(int startLineIndex, int oldLineCount, int newLineCount, out bool modified)
     {
-        Dictionary<int, FoldedRegion> dictionary = new Dictionary<int, FoldedRegion>();
-        List<int> list = new List<int>();
+        Dictionary<int, FoldedRegion> relocated = new Dictionary<int, FoldedRegion>();
+        List<int> toDelete = new List<int>();
         foreach (KeyValuePair<int, FoldedRegion> item in _regions)
         {
             if (item.Value.HeaderLine == -1 || item.Value.EndToken.LineNumber == -1)
             {
-                list.Add(item.Key);
+                toDelete.Add(item.Key);
             }
             else if (item.Value.HeaderLine != item.Key)
             {
-                dictionary[item.Key] = item.Value;
+                relocated[item.Key] = item.Value;
             }
         }
-        foreach (int item2 in list)
-        {
-            _regions.Remove(item2);
-        }
-        foreach (int key in dictionary.Keys)
+        foreach (int key in toDelete)
         {
             _regions.Remove(key);
         }
-        foreach (FoldedRegion value in dictionary.Values)
+        foreach (int key in relocated.Keys)
         {
-            _regions[value.HeaderLine] = value;
+            _regions.Remove(key);
         }
-        flag = list.Count != 0 || dictionary.Count != 0;
+        foreach (FoldedRegion region in relocated.Values)
+        {
+            _regions[region.HeaderLine] = region;
+        }
+        modified = toDelete.Count != 0 || relocated.Count != 0;
     }
 
-    public ReadonlyTextBrowser.ILineDecorator GetDecorator(int value2)
+    public ReadonlyTextBrowser.ILineDecorator GetDecorator(int lineIndex)
     {
-        if (!_regions.TryGetValue(value2, out var value))
+        if (!_regions.TryGetValue(lineIndex, out var region))
         {
             return null;
         }
-        return value;
+        return region;
     }
 
-    internal bool ExpandAt(int value2, int value3)
+    internal bool ExpandAt(int lineIndex, int columnIndex)
     {
-        List<int> list = new List<int>();
+        List<int> toExpand = new List<int>();
         foreach (KeyValuePair<int, FoldedRegion> item in _regions)
         {
-            if ((item.Value.StartLine < value2 || (item.Value.StartLine == value2 && item.Value.StartColumn <= value3)) && (item.Value.EndLine > value2 || (item.Value.EndLine == value2 && item.Value.EndColumn >= value3)))
+            if ((item.Value.StartLine < lineIndex || (item.Value.StartLine == lineIndex && item.Value.StartColumn <= columnIndex)) && (item.Value.EndLine > lineIndex || (item.Value.EndLine == lineIndex && item.Value.EndColumn >= columnIndex)))
             {
-                list.Add(item.Key);
+                toExpand.Add(item.Key);
             }
-            else if (value3 == -1 && item.Value.HeaderLine == value2)
+            else if (columnIndex == -1 && item.Value.HeaderLine == lineIndex)
             {
-                list.Add(item.Key);
+                toExpand.Add(item.Key);
             }
         }
-        if (list.Count != 0)
+        if (toExpand.Count != 0)
         {
-            foreach (int item2 in list)
+            foreach (int key in toExpand)
             {
-                _regions.Remove(item2);
+                _regions.Remove(key);
             }
             return true;
         }
         return false;
     }
 
-    public bool OnCaretMoved(int value2, int value3)
+    public bool OnCaretMoved(int lineIndex, int columnIndex)
     {
-        return ExpandAt(value2, value3);
+        return ExpandAt(lineIndex, columnIndex);
     }
 
-    public bool ExpandLine(int value2)
+    public bool ExpandLine(int lineIndex)
     {
-        return ExpandAt(value2, -1);
+        return ExpandAt(lineIndex, -1);
     }
 
-    public bool CollapseLine(int value2, ReadonlyTextBrowser readonlyTextBrowser)
+    public bool CollapseLine(int lineIndex, ReadonlyTextBrowser readonlyTextBrowser)
     {
-        TokenCache.Token token;
-        return ToggleFold(value2, readonlyTextBrowser, out token, flag: true);
+        TokenCache.Token endToken;
+        return ToggleFold(lineIndex, readonlyTextBrowser, out endToken, collapseOnly: true);
     }
 
     public FoldedLineInfo[] GetCollapsedRegions()
     {
-        List<FoldedLineInfo> list = new List<FoldedLineInfo>();
-        foreach (FoldedRegion value in _regions.Values)
+        List<FoldedLineInfo> result = new List<FoldedLineInfo>();
+        foreach (FoldedRegion region in _regions.Values)
         {
-            list.Add(new FoldedLineInfo
+            result.Add(new FoldedLineInfo
             {
-                Line = value.HeaderLine,
-                Text = _tokenCache.Document.GetLineText(value.HeaderLine)
+                Line = region.HeaderLine,
+                Text = _tokenCache.Document.GetLineText(region.HeaderLine)
             });
         }
-        return list.ToArray();
+        return result.ToArray();
     }
 }

@@ -1,4 +1,4 @@
-﻿using SmarTTY.IO;
+using SmarTTY.IO;
 using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
@@ -31,28 +31,28 @@ public struct QuickSyncFilter
         return "-" + Regex;
     }
 
-    public static QuickSyncFilter FromRegex(string text, bool flag)
+    public static QuickSyncFilter FromRegex(string maskText, bool ignoreCase)
     {
-        if (text == null)
+        if (maskText == null)
         {
-            throw new ArgumentException("mask");
+            throw new ArgumentException("maskText");
         }
         QuickSyncAction quickSyncAction = QuickSyncAction.Include;
-        if (text.StartsWith("-"))
+        if (maskText.StartsWith("-"))
         {
             quickSyncAction = QuickSyncAction.Exclude;
-            text = text.Substring(1);
+            maskText = maskText.Substring(1);
         }
-        return new QuickSyncFilter(new Regex(text, flag ? RegexOptions.IgnoreCase : RegexOptions.None), quickSyncAction);
+        return new QuickSyncFilter(new Regex(maskText, ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None), quickSyncAction);
     }
 
-    public static QuickSyncFilter FromWildcard(string text, bool flag)
+    public static QuickSyncFilter FromWildcard(string maskText, bool ignoreCase)
     {
-        if (text == null)
+        if (maskText == null)
         {
-            throw new ArgumentException("mask");
+            throw new ArgumentException("maskText");
         }
-        MaskSpec maskSpec = WildcardParser.ParseMask(text.Replace('\\', '/'), flag);
+        MaskSpec maskSpec = WildcardParser.ParseMask(maskText.Replace('\\', '/'), ignoreCase);
         return new QuickSyncFilter(maskSpec.Regex, (!maskSpec.IsInclude) ? QuickSyncAction.Exclude : QuickSyncAction.Include);
     }
 
@@ -60,105 +60,105 @@ public struct QuickSyncFilter
     {
         this.Regex = regex;
         Action = quickSyncAction;
-        string text = regex.ToString();
-        if (text.StartsWith("(^|.*/)") && text.IndexOf('/', "(^|.*/)".Length) == -1)
+        string pattern = regex.ToString();
+        if (pattern.StartsWith("(^|.*/)") && pattern.IndexOf('/', "(^|.*/)".Length) == -1)
         {
-            _fileNameRegex = new Regex("^" + text.Substring("(^|.*/)".Length), regex.Options);
+            _fileNameRegex = new Regex("^" + pattern.Substring("(^|.*/)".Length), regex.Options);
         }
         else
         {
             _fileNameRegex = null;
         }
-        _matchesAll = text == ".*" || text == "^.*$";
+        _matchesAll = pattern == ".*" || pattern == "^.*$";
     }
 
-    public static QuickSyncFilter[] FromPaths(IEnumerable<string> items, bool flag2)
+    public static QuickSyncFilter[] FromPaths(IEnumerable<string> paths, bool ignoreCase)
     {
-        HashSet<string> hashSet = new HashSet<string>();
-        HashSet<string> hashSet2 = new HashSet<string>();
-        HashSet<string> hashSet3 = new HashSet<string>();
-        bool flag = false;
-        foreach (string item in items)
+        HashSet<string> parentDirs = new HashSet<string>();
+        HashSet<string> targetPaths = new HashSet<string>();
+        HashSet<string> dirWildcards = new HashSet<string>();
+        bool hasRootWildcard = false;
+        foreach (string path in paths)
         {
-            if (!string.IsNullOrEmpty(item))
+            if (!string.IsNullOrEmpty(path))
             {
-                string text = item.Replace('\\', '/');
-                if (text == "*")
+                string normPath = path.Replace('\\', '/');
+                if (normPath == "*")
                 {
-                    flag = true;
+                    hasRootWildcard = true;
                 }
-                else if (text.EndsWith("/*"))
+                else if (normPath.EndsWith("/*"))
                 {
-                    hashSet3.Add(text.Substring(0, text.Length - 2));
+                    dirWildcards.Add(normPath.Substring(0, normPath.Length - 2));
                 }
                 else
                 {
-                    hashSet2.Add(text);
+                    targetPaths.Add(normPath);
                 }
-                string text2 = RemotePathUtils.GetDirectoryName(text);
-                while (!string.IsNullOrEmpty(text2))
+                string parentDir = RemotePathUtils.GetDirectoryName(normPath);
+                while (!string.IsNullOrEmpty(parentDir))
                 {
-                    hashSet.Add(text2);
-                    text2 = RemotePathUtils.GetDirectoryName(text2);
+                    parentDirs.Add(parentDir);
+                    parentDir = RemotePathUtils.GetDirectoryName(parentDir);
                 }
             }
         }
-        List<QuickSyncFilter> list = new List<QuickSyncFilter>();
-        if (hashSet.Count > 0)
+        List<QuickSyncFilter> filters = new List<QuickSyncFilter>();
+        if (parentDirs.Count > 0)
         {
-            list.Add(new QuickSyncFilter(new Regex("^(" + string.Join("|", hashSet.ArraySelect(Regex.Escape)) + ")$"), QuickSyncAction.Include));
+            filters.Add(new QuickSyncFilter(new Regex("^(" + string.Join("|", parentDirs.ArraySelect(Regex.Escape)) + ")$"), QuickSyncAction.Include));
         }
-        if (hashSet2.Count > 0)
+        if (targetPaths.Count > 0)
         {
-            list.Add(new QuickSyncFilter(new Regex("^(" + string.Join("|", hashSet2.ArraySelect(Regex.Escape)) + ")($|/.*)"), QuickSyncAction.Include));
+            filters.Add(new QuickSyncFilter(new Regex("^(" + string.Join("|", targetPaths.ArraySelect(Regex.Escape)) + ")($|/.*)"), QuickSyncAction.Include));
         }
-        if (hashSet3.Count > 0)
+        if (dirWildcards.Count > 0)
         {
-            list.Add(new QuickSyncFilter(new Regex("^(" + string.Join("|", hashSet3.ArraySelect(Regex.Escape)) + ")/\\.$"), QuickSyncAction.Include));
+            filters.Add(new QuickSyncFilter(new Regex("^(" + string.Join("|", dirWildcards.ArraySelect(Regex.Escape)) + ")/\\.$"), QuickSyncAction.Include));
         }
-        if (flag)
+        if (hasRootWildcard)
         {
-            list.Add(new QuickSyncFilter(new Regex("^\\.$"), QuickSyncAction.Include));
+            filters.Add(new QuickSyncFilter(new Regex("^\\.$"), QuickSyncAction.Include));
         }
-        return list.ToArray();
+        return filters.ToArray();
     }
 
-    public static QuickSyncFilter[] FromMaskList(IEnumerable<string> items, bool flag3)
+    public static QuickSyncFilter[] FromMaskList(IEnumerable<string> masks, bool ignoreCase)
     {
-        if (items == null)
+        if (masks == null)
         {
             return null;
         }
-        List<string> list = new List<string>();
-        bool flag = false;
-        List<QuickSyncFilter> list2 = new List<QuickSyncFilter>();
-        foreach (string item2 in items)
+        List<string> groupMasks = new List<string>();
+        bool isIncludeGroup = false;
+        List<QuickSyncFilter> result = new List<QuickSyncFilter>();
+        foreach (string mask in masks)
         {
-            bool flag2 = true;
-            string item = item2;
-            if (item2.StartsWith("-"))
+            bool isInclude = true;
+            string cleanMask = mask;
+            if (mask.StartsWith("-"))
             {
-                flag2 = false;
-                item = item2.Substring(1);
+                isInclude = false;
+                cleanMask = mask.Substring(1);
             }
-            if (list.Count > 0 && flag2 != flag)
+            if (groupMasks.Count > 0 && isInclude != isIncludeGroup)
             {
-                list2.Add(QuickSyncFilter.FromWildcard((flag ? "" : "-") + string.Join(";", list.ToArray()), flag3));
-                list.Clear();
+                result.Add(QuickSyncFilter.FromWildcard((isIncludeGroup ? "" : "-") + string.Join(";", groupMasks.ToArray()), ignoreCase));
+                groupMasks.Clear();
             }
-            list.Add(item);
-            flag = flag2;
+            groupMasks.Add(cleanMask);
+            isIncludeGroup = isInclude;
         }
-        if (list.Count > 0)
+        if (groupMasks.Count > 0)
         {
-            list2.Add(QuickSyncFilter.FromWildcard((flag ? "" : "-") + string.Join(";", list.ToArray()), flag3));
+            result.Add(QuickSyncFilter.FromWildcard((isIncludeGroup ? "" : "-") + string.Join(";", groupMasks.ToArray()), ignoreCase));
         }
-        return list2.ToArray();
+        return result.ToArray();
     }
 
-    public bool IsMatch(string text)
+    public bool IsMatch(string path)
     {
-        if (this.Regex == null || text == null)
+        if (this.Regex == null || path == null)
         {
             return false;
         }
@@ -168,22 +168,22 @@ public struct QuickSyncFilter
         }
         if (_fileNameRegex != null)
         {
-            int num = text.LastIndexOf('/');
-            if (num != -1)
+            int slashIndex = path.LastIndexOf('/');
+            if (slashIndex != -1)
             {
-                text = text.Substring(num + 1);
+                path = path.Substring(slashIndex + 1);
             }
-            return _fileNameRegex.IsMatch(text);
+            return _fileNameRegex.IsMatch(path);
         }
-        return this.Regex.IsMatch(text);
+        return this.Regex.IsMatch(path);
     }
 
-    public static QuickSyncFilter[] FromExclusions(string[] items, bool flag)
+    public static QuickSyncFilter[] FromExclusions(string[] exclusions, bool ignoreCase)
     {
-        if (items == null)
+        if (exclusions == null)
         {
             return null;
         }
-        return FromMaskList(items.Select((string text) => "-" + text).AppendSlow("*"), flag);
+        return FromMaskList(exclusions.Select((string pattern) => "-" + pattern).AppendSlow("*"), ignoreCase);
     }
 }

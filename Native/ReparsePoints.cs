@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32.SafeHandles;
+using Microsoft.Win32.SafeHandles;
 using SmarTTY.Sync;
 using System;
 using System.Collections.Generic;
@@ -113,132 +113,132 @@ public static class ReparsePoints
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool DeviceIoControl(SafeFileHandle safeFileHandle, uint value2, ref MountPointReparseBuffer mountPointReparseBuffer, int value3, IntPtr handle, int value4, out int value5, IntPtr handle2);
+    private static extern bool DeviceIoControl(SafeFileHandle safeFileHandle, uint ioControlCode, ref MountPointReparseBuffer inBuffer, int inBufferSize, IntPtr outBuffer, int outBufferSize, out int bytesReturned, IntPtr overlapped);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool DeviceIoControl(SafeFileHandle safeFileHandle, uint value2, ref SymbolicLinkReparseBuffer symbolicLinkReparseBuffer, int value3, IntPtr handle, int value4, out int value5, IntPtr handle2);
+    private static extern bool DeviceIoControl(SafeFileHandle safeFileHandle, uint ioControlCode, ref SymbolicLinkReparseBuffer inBuffer, int inBufferSize, IntPtr outBuffer, int outBufferSize, out int bytesReturned, IntPtr overlapped);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool DeviceIoControl(SafeFileHandle safeFileHandle, uint value2, IntPtr handle, int value3, [Out][MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 5)] byte[] buffer, int value4, out int value5, IntPtr handle2);
+    private static extern bool DeviceIoControl(SafeFileHandle safeFileHandle, uint ioControlCode, IntPtr inBuffer, int inBufferSize, [Out][MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 5)] byte[] outBuffer, int outBufferSize, out int bytesReturned, IntPtr overlapped);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern SafeFileHandle CreateFile(string text, FileAccessRights fileAccessRights, FileShareMode fileShareMode, IntPtr handle, CreationDisposition creationDisposition, FileFlags fileFlags, IntPtr handle2);
+    private static extern SafeFileHandle CreateFile(string fileName, FileAccessRights fileAccessRights, FileShareMode fileShareMode, IntPtr securityAttributes, CreationDisposition creationDisposition, FileFlags fileFlags, IntPtr templateFile);
 
     [DllImport("kernel32.dll", BestFitMapping = false, CharSet = CharSet.Auto, SetLastError = true)]
-    internal static extern bool CreateDirectory(string text, IntPtr handle);
+    internal static extern bool CreateDirectory(string path, IntPtr securityAttributes);
 
-    public static void CreateJunction(string text, string text2)
+    public static void CreateJunction(string linkPath, string targetPath)
     {
-        if (!Directory.Exists(text2))
+        if (!Directory.Exists(targetPath))
         {
-            throw new Exception(text2 + " does not exist.");
+            throw new Exception(targetPath + " does not exist.");
         }
-        text2 = Path.GetFullPath(text2);
-        Directory.CreateDirectory(text);
-        using SafeFileHandle safeFileHandle = CreateFile(text, ReparsePoints.FileAccessRights.GenericWrite, FileShareMode.Read | FileShareMode.Write | FileShareMode.Delete, IntPtr.Zero, CreationDisposition.OpenExisting, FileFlags.BackupSemantics | FileFlags.OpenReparsePoint, IntPtr.Zero);
+        targetPath = Path.GetFullPath(targetPath);
+        Directory.CreateDirectory(linkPath);
+        using SafeFileHandle safeFileHandle = CreateFile(linkPath, ReparsePoints.FileAccessRights.GenericWrite, FileShareMode.Read | FileShareMode.Write | FileShareMode.Delete, IntPtr.Zero, CreationDisposition.OpenExisting, FileFlags.BackupSemantics | FileFlags.OpenReparsePoint, IntPtr.Zero);
         if (safeFileHandle.IsInvalid)
         {
-            throw new Win32Exception("Failed to open " + text);
+            throw new Win32Exception("Failed to open " + linkPath);
         }
-        ushort num = (ushort)(8 + text2.Length * 2);
+        ushort substituteLength = (ushort)(8 + targetPath.Length * 2);
         MountPointReparseBuffer mountPointReparseBuffer = new MountPointReparseBuffer
         {
-            PathBuffer = "\\??\\" + text2,
+            PathBuffer = "\\??\\" + targetPath,
             ReparseTag = 2684354563u,
-            ReparseDataLength = (ushort)(num + 12),
+            ReparseDataLength = (ushort)(substituteLength + 12),
             SubstituteNameOffset = 0,
-            SubstituteNameLength = num,
-            PrintNameOffset = (ushort)(num + 2),
+            SubstituteNameLength = substituteLength,
+            PrintNameOffset = (ushort)(substituteLength + 2),
             PrintNameLength = 0
         };
-        if (!DeviceIoControl(safeFileHandle, 589988u, ref mountPointReparseBuffer, num + 20, IntPtr.Zero, 0, out var _, IntPtr.Zero))
+        if (!DeviceIoControl(safeFileHandle, 589988u, ref mountPointReparseBuffer, substituteLength + 20, IntPtr.Zero, 0, out var bytesReturned, IntPtr.Zero))
         {
             throw new Win32Exception("FSCTL_SET_REPARSE_POINT failed");
         }
     }
 
-    public static void CreateSymbolicLink(string text, string text2, bool flag)
+    public static void CreateSymbolicLink(string linkPath, string targetPath, bool isDirectory)
     {
-        if (flag)
+        if (isDirectory)
         {
-            CreateDirectory(text, IntPtr.Zero);
+            CreateDirectory(linkPath, IntPtr.Zero);
         }
         try
         {
-            using SafeFileHandle safeFileHandle = CreateFile(text, ReparsePoints.FileAccessRights.GenericWrite, FileShareMode.Read | FileShareMode.Write | FileShareMode.Delete, IntPtr.Zero, flag ? ReparsePoints.CreationDisposition.OpenExisting : ReparsePoints.CreationDisposition.CreateAlways, FileFlags.BackupSemantics | FileFlags.OpenReparsePoint, IntPtr.Zero);
+            using SafeFileHandle safeFileHandle = CreateFile(linkPath, ReparsePoints.FileAccessRights.GenericWrite, FileShareMode.Read | FileShareMode.Write | FileShareMode.Delete, IntPtr.Zero, isDirectory ? ReparsePoints.CreationDisposition.OpenExisting : ReparsePoints.CreationDisposition.CreateAlways, FileFlags.BackupSemantics | FileFlags.OpenReparsePoint, IntPtr.Zero);
             if (safeFileHandle.IsInvalid)
             {
-                throw new Win32Exception("Failed to open " + text);
+                throw new Win32Exception("Failed to open " + linkPath);
             }
-            ushort num = (ushort)(text2.Length * 2);
+            ushort targetNameLength = (ushort)(targetPath.Length * 2);
             SymbolicLinkReparseBuffer symbolicLinkReparseBuffer = new SymbolicLinkReparseBuffer
             {
-                PathBuffer = text2 + text2,
+                PathBuffer = targetPath + targetPath,
                 ReparseTag = 2684354572u,
-                ReparseDataLength = (ushort)(12 + num * 2),
-                SubstituteNameOffset = num,
-                SubstituteNameLength = num,
+                ReparseDataLength = (ushort)(12 + targetNameLength * 2),
+                SubstituteNameOffset = targetNameLength,
+                SubstituteNameLength = targetNameLength,
                 PrintNameOffset = 0,
-                PrintNameLength = num,
+                PrintNameLength = targetNameLength,
                 Flags = 1u
             };
-            if (!DeviceIoControl(safeFileHandle, 589988u, ref symbolicLinkReparseBuffer, num * 2 + 20, IntPtr.Zero, 0, out var _, IntPtr.Zero))
+            if (!DeviceIoControl(safeFileHandle, 589988u, ref symbolicLinkReparseBuffer, targetNameLength * 2 + 20, IntPtr.Zero, 0, out var bytesReturned, IntPtr.Zero))
             {
                 throw new Win32Exception("FSCTL_SET_REPARSE_POINT failed");
             }
         }
         catch
         {
-            if (!flag)
+            if (!isDirectory)
             {
-                LocalFileSystem.DeleteFile(LocalPath.FromRaw(text), flag: true);
+                LocalFileSystem.DeleteFile(LocalPath.FromRaw(linkPath), resetReadOnly: true);
             }
             throw;
         }
     }
 
-    public static KeyValuePair<string, bool> ReadReparsePoint(string text3)
+    public static KeyValuePair<string, bool> ReadReparsePoint(string path)
     {
-        using SafeFileHandle safeFileHandle = CreateFile(text3, FileAccessRights.GenericRead, FileShareMode.Read | FileShareMode.Write | FileShareMode.Delete, IntPtr.Zero, CreationDisposition.OpenExisting, FileFlags.BackupSemantics | FileFlags.OpenReparsePoint, IntPtr.Zero);
+        using SafeFileHandle safeFileHandle = CreateFile(path, FileAccessRights.GenericRead, FileShareMode.Read | FileShareMode.Write | FileShareMode.Delete, IntPtr.Zero, CreationDisposition.OpenExisting, FileFlags.BackupSemantics | FileFlags.OpenReparsePoint, IntPtr.Zero);
         if (safeFileHandle.IsInvalid)
         {
             throw new Win32Exception();
         }
-        byte[] array = new byte[65536];
-        if (!DeviceIoControl(safeFileHandle, 589992u, IntPtr.Zero, 0, array, array.Length, out var _, IntPtr.Zero))
+        byte[] reparseBuffer = new byte[65536];
+        if (!DeviceIoControl(safeFileHandle, 589992u, IntPtr.Zero, 0, reparseBuffer, reparseBuffer.Length, out var bytesReturned, IntPtr.Zero))
         {
             throw new Win32Exception();
         }
-        uint num2 = BitConverter.ToUInt32(array, 0);
-        switch (num2)
+        uint reparseTag = BitConverter.ToUInt32(reparseBuffer, 0);
+        switch (reparseTag)
         {
             case 2684354572u:
                 {
-                    int num5 = 20;
-                    int num6 = BitConverter.ToInt16(array, 8);
-                    int count2 = BitConverter.ToInt16(array, 10);
-                    int num7 = BitConverter.ToInt32(array, 16);
-                    string text2 = Encoding.Unicode.GetString(array, num5 + num6, count2);
-                    if (text2.StartsWith("\\??\\"))
+                    int pathBufferOffset = 20;
+                    int subNameOffset = BitConverter.ToInt16(reparseBuffer, 8);
+                    int subNameLength = BitConverter.ToInt16(reparseBuffer, 10);
+                    int flags = BitConverter.ToInt32(reparseBuffer, 16);
+                    string printName = Encoding.Unicode.GetString(reparseBuffer, pathBufferOffset + subNameOffset, subNameLength);
+                    if (printName.StartsWith("\\??\\"))
                     {
-                        text2 = text2.Substring(4);
+                        printName = printName.Substring(4);
                     }
-                    return new KeyValuePair<string, bool>(text2, (num7 & 1) != 0);
+                    return new KeyValuePair<string, bool>(printName, (flags & 1) != 0);
                 }
             case 2684354563u:
                 {
-                    int num3 = 16;
-                    int num4 = BitConverter.ToInt16(array, 8);
-                    int count = BitConverter.ToInt16(array, 10);
-                    string text = Encoding.Unicode.GetString(array, num3 + num4, count);
-                    if (text.StartsWith("\\??\\"))
+                    int pathBufferOffset = 16;
+                    int subNameOffset = BitConverter.ToInt16(reparseBuffer, 8);
+                    int subNameLength = BitConverter.ToInt16(reparseBuffer, 10);
+                    string printName = Encoding.Unicode.GetString(reparseBuffer, pathBufferOffset + subNameOffset, subNameLength);
+                    if (printName.StartsWith("\\??\\"))
                     {
-                        text = text.Substring(4);
+                        printName = printName.Substring(4);
                     }
-                    return new KeyValuePair<string, bool>(text, value: false);
+                    return new KeyValuePair<string, bool>(printName, value: false);
                 }
             default:
-                throw new Exception($"Unknown reparse tag: 0x{num2:x8}");
+                throw new Exception($"Unknown reparse tag: 0x{reparseTag:x8}");
         }
     }
 }

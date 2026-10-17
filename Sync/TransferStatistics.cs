@@ -1,4 +1,4 @@
-﻿using SmarTTY.Utilities;
+using SmarTTY.Utilities;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
@@ -49,7 +49,7 @@ public struct TransferStatistics
         List<string> list = new List<string>();
         if (CopiedFiles > 0)
         {
-            list.Add($"{CopiedFiles} files copied ({StringUtils.FormatSize(TotalBytes, flag: true)})");
+            list.Add($"{CopiedFiles} files copied ({StringUtils.FormatSize(TotalBytes, appendUnit: true)})");
         }
         if (CopiedFiles != TotalFiles)
         {

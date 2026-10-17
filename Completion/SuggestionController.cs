@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 
 namespace SmarTTY.Completion;
 
@@ -27,17 +27,17 @@ public class SuggestionController
         _host = completionHost;
     }
 
-    public void Show(ISuggestionSource suggestionSource, bool flag, bool flag2)
+    public void Show(ISuggestionSource suggestionSource, bool autoSize, bool allowMultiSelect)
     {
         if (_popup != null)
         {
             _popup.Hide();
         }
-        _popup = new SuggestionPopup(suggestionSource, _host, flag2);
+        _popup = new SuggestionPopup(suggestionSource, _host, allowMultiSelect);
         _popup.BackColor = this.BackColor;
         if (_popup != null)
         {
-            _popup.Show(flag);
+            _popup.Show(autoSize);
         }
     }
 
@@ -49,11 +49,11 @@ public class SuggestionController
         }
     }
 
-    public void SelectMatch(string text, bool flag)
+    public void SelectMatch(string prefix, bool exactMatch)
     {
-        if (_popup != null && text != null)
+        if (_popup != null && prefix != null)
         {
-            _popup.SelectMatch(text, flag);
+            _popup.SelectMatch(prefix, exactMatch);
         }
     }
 

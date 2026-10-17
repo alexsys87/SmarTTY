@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using System;
 using System.ComponentModel;
 using System.IO.Ports;
@@ -96,19 +96,19 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 {
                     return SerialSettings;
                 }
-                string text = TCPEndpoint ?? "";
-                int num = text.IndexOf(':');
+                string endpoint = TCPEndpoint ?? "";
+                int colonIdx = endpoint.IndexOf(':');
                 string host;
                 int port;
-                if (num == -1)
+                if (colonIdx == -1)
                 {
-                    host = text;
+                    host = endpoint;
                     port = 0;
                 }
                 else
                 {
-                    host = text.Substring(0, num);
-                    port = int.Parse(text.Substring(num + 1));
+                    host = endpoint.Substring(0, colonIdx);
+                    port = int.Parse(endpoint.Substring(colonIdx + 1));
                 }
                 return new DeviceTerminalSettings.ConnectionSettings.Tcp
                 {
@@ -156,36 +156,36 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 MaximumSpeed = "unknown";
                 return;
             }
-            int num = (5 + advancedSerialPortSettings.DataBits) * 2;
-            num += 2;
+            int bitsPerFrame = (5 + advancedSerialPortSettings.DataBits) * 2;
+            bitsPerFrame += 2;
             if (advancedSerialPortSettings.Parity != Parity.None)
             {
-                num += 2;
+                bitsPerFrame += 2;
             }
             switch (advancedSerialPortSettings.StopBits)
             {
                 case StopBits.One:
-                    num += 2;
+                    bitsPerFrame += 2;
                     break;
                 case StopBits.Two:
-                    num += 4;
+                    bitsPerFrame += 4;
                     break;
                 case StopBits.OnePointFive:
-                    num += 3;
+                    bitsPerFrame += 3;
                     break;
             }
-            double num2 = (double)(advancedSerialPortSettings.BaudRate * 2) / (double)num;
-            if (num2 > 1048576.0)
+            double bytesPerSec = (double)(advancedSerialPortSettings.BaudRate * 2) / (double)bitsPerFrame;
+            if (bytesPerSec > 1048576.0)
             {
-                MaximumSpeed = $"{num2 / 1048576.0:f1} MB/s";
+                MaximumSpeed = $"{bytesPerSec / 1048576.0:f1} MB/s";
             }
-            else if (num2 > 1024.0)
+            else if (bytesPerSec > 1024.0)
             {
-                MaximumSpeed = $"{num2 / 1024.0:f1} KB/s";
+                MaximumSpeed = $"{bytesPerSec / 1024.0:f1} KB/s";
             }
             else
             {
-                MaximumSpeed = $"{num2:f1} bytes/s";
+                MaximumSpeed = $"{bytesPerSec:f1} bytes/s";
             }
         }
 
@@ -199,54 +199,54 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             return DeviceTerminalControl.TestConnection(EffectiveConnectionSettings);
         }
 
-        public void EditColor(Border b)
+        public void EditColor(Border border)
         {
-            BindingExpression bindingExpression = ((FrameworkElement)b).GetBindingExpression(Border.BackgroundProperty);
-            object obj;
+            BindingExpression bindingExpression = ((FrameworkElement)border).GetBindingExpression(Border.BackgroundProperty);
+            object pathObj;
             if (bindingExpression == null)
             {
-                obj = null;
+                pathObj = null;
             }
             else
             {
                 Binding parentBinding = bindingExpression.ParentBinding;
                 if (parentBinding == null)
                 {
-                    obj = null;
+                    pathObj = null;
                 }
                 else
                 {
                     PropertyPath path = parentBinding.Path;
-                    obj = ((path != null) ? path.Path : null);
+                    pathObj = ((path != null) ? path.Path : null);
                 }
             }
-            string text = (string)obj;
-            object dataContext = ((FrameworkElement)b).DataContext;
-            if (text == null || dataContext == null)
+            string pathStr = (string)pathObj;
+            object dataContext = ((FrameworkElement)border).DataContext;
+            if (pathStr == null || dataContext == null)
             {
                 return;
             }
-            string[] array = text.Split('.');
-            if (array.Length != 2)
+            string[] pathParts = pathStr.Split('.');
+            if (pathParts.Length != 2)
             {
                 return;
             }
-            PropertyInfo property = dataContext.GetType().GetProperty(array[0]);
-            if (property == null)
+            PropertyInfo objProp = dataContext.GetType().GetProperty(pathParts[0]);
+            if (objProp == null)
             {
                 return;
             }
-            object value = property.GetValue(dataContext, new object[0]);
-            PropertyInfo property2 = value.GetType().GetProperty(array[1]);
-            if (property2 != null && property2.GetValue(value, new object[0]) is DeviceTerminalSettings.ColorWrapper colorWrapper)
+            object containerObj = objProp.GetValue(dataContext, new object[0]);
+            PropertyInfo colorProp = containerObj.GetType().GetProperty(pathParts[1]);
+            if (colorProp != null && colorProp.GetValue(containerObj, new object[0]) is DeviceTerminalSettings.ColorWrapper colorWrapper)
             {
                 ColorDialog colorDialog = new ColorDialog();
                 colorDialog.Color = colorWrapper;
                 if (colorDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    DeviceTerminalSettings.ColorWrapper colorWrapper2 = colorDialog.Color;
-                    property2.SetValue(value, colorWrapper2, new object[0]);
-                    property.SetValue(dataContext, value, new object[0]);
+                    DeviceTerminalSettings.ColorWrapper newColorWrapper = colorDialog.Color;
+                    colorProp.SetValue(containerObj, newColorWrapper, new object[0]);
+                    objProp.SetValue(dataContext, containerObj, new object[0]);
                     ((BindingExpressionBase)bindingExpression).UpdateTarget();
                     OnSettingsChanged();
                 }

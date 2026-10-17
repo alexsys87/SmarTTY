@@ -1,4 +1,4 @@
-﻿using SmarTTY.IO;
+using SmarTTY.IO;
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
@@ -44,23 +44,23 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
         }
     }
 
-    private RemoteFolderBrowserForm(bool flag)
+    private RemoteFolderBrowserForm(bool usePrefixedListing)
     {
         InitializeComponent();
-        _usePrefixedListing = flag;
+        _usePrefixedListing = usePrefixedListing;
     }
 
-    public static string Browse(RemoteCommandStarter callback, bool flag, string text = null, string text2 = null, FolderBrowserOptions folderBrowserOptions = null)
+    public static string Browse(RemoteCommandStarter callback, bool usePrefixedListing, string initialPath = null, string hostDisplayName = null, FolderBrowserOptions folderBrowserOptions = null)
     {
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(initialPath))
         {
-            text = RemoteOpenFileForm.GetWorkingDirectory(callback);
+            initialPath = RemoteOpenFileForm.GetWorkingDirectory(callback);
         }
-        RemoteFolderBrowserForm remoteFolderBrowserForm = new RemoteFolderBrowserForm(flag)
+        RemoteFolderBrowserForm remoteFolderBrowserForm = new RemoteFolderBrowserForm(usePrefixedListing)
         {
             _runCommand = callback,
-            _initialPath = text,
-            Text = "Select a Folder on " + (text2 ?? "remote host")
+            _initialPath = initialPath,
+            Text = "Select a Folder on " + (hostDisplayName ?? "remote host")
         };
         if (folderBrowserOptions != null)
         {
@@ -86,8 +86,8 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
             tvDirectories.Height -= iwcProgress.Height + iwcProgress.Margin.Top;
             TreeView treeView = tvDirectories;
             Button button = bOK;
-            bool flag = (bCancel.Enabled = false);
-            bool enabled = (button.Enabled = flag);
+            bool enabledState = (bCancel.Enabled = false);
+            bool enabled = (button.Enabled = enabledState);
             treeView.Enabled = enabled;
         }
     }
@@ -100,27 +100,27 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
             tvDirectories.Height += iwcProgress.Height + iwcProgress.Margin.Top;
             TreeView treeView = tvDirectories;
             Button button = bOK;
-            bool flag = (bCancel.Enabled = true);
-            bool enabled = (button.Enabled = flag);
+            bool enabledState = (bCancel.Enabled = true);
+            bool enabled = (button.Enabled = enabledState);
             treeView.Enabled = enabled;
         }
     }
 
-    protected void InitializeTree(bool flag = false)
+    protected void InitializeTree(bool clearNodes = false)
     {
         TreeNode treeNode = tvDirectories.Nodes.Add("/", "/", 0);
         treeNode.Nodes.Add("", "");
         treeNode.Expand();
-        LoadChildren(treeNode, flag: true);
+        LoadChildren(treeNode, clearNodes: true);
     }
 
-    protected void LoadChildren(TreeNode treeNode, bool flag = false)
+    protected void LoadChildren(TreeNode treeNode, bool clearNodes = false)
     {
         if (treeNode == null || this._runCommand == null || treeNode.Nodes.Count != 1 || !(treeNode.Nodes[0].Text == ""))
         {
             return;
         }
-        if (flag)
+        if (clearNodes)
         {
             treeNode.Nodes.Clear();
         }
@@ -130,12 +130,12 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
         try
         {
             IRemoteCommand remoteCommand = null;
-            string text = "-1pLA";
+            string lsFlags = "-1pLA";
             if (_usePrefixedListing)
             {
-                text = "-F";
+                lsFlags = "-F";
             }
-            this._runCommand("ls", text + " \"" + fullPath + "\"", ref remoteCommand);
+            this._runCommand("ls", lsFlags + " \"" + fullPath + "\"", ref remoteCommand);
             if (remoteCommand == null)
             {
                 return;
@@ -216,7 +216,7 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
         }
     }
 
-    protected void PopulateChildren(List<string> list, string text)
+    protected void PopulateChildren(List<string> lines, string errorText)
     {
         if (_loadingNode == null)
         {
@@ -226,24 +226,24 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
         {
             _loadingNode.Nodes.Clear();
         }
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(errorText))
         {
             lblErrorInfo.Visible = false;
         }
         else
         {
             lblErrorInfo.Visible = true;
-            lblErrorInfo.Text = text;
+            lblErrorInfo.Text = errorText;
         }
-        if (list == null)
+        if (lines == null)
         {
             return;
         }
         if (_usePrefixedListing)
         {
-            list = RemoteOpenFileForm.SortEntries(list, flag: true);
+            lines = RemoteOpenFileForm.SortEntries(lines, isPrefixed: true);
         }
-        foreach (string item in list)
+        foreach (string item in lines)
         {
             if (_usePrefixedListing)
             {
@@ -259,7 +259,7 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
         }
     }
 
-    protected void SelectPath(string text2)
+    protected void SelectPath(string path)
     {
         if (this._runCommand == null)
         {
@@ -269,25 +269,24 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
         {
             InitializeTree();
         }
-        string[] array = text2.Split('/');
+        string[] segments = path.Split('/');
         TreeNodeCollection nodes = tvDirectories.Nodes[0].Nodes;
-        string[] array2 = array;
-        foreach (string text in array2)
+        foreach (string segment in segments)
         {
-            if (!(text == ""))
+            if (!(segment == ""))
             {
-                int num2 = nodes.IndexOfKey(text);
-                if (num2 < 0)
+                int nodeIndex = nodes.IndexOfKey(segment);
+                if (nodeIndex < 0)
                 {
                     return;
                 }
-                nodes[num2].Expand();
-                tvDirectories.SelectedNode = nodes[num2];
-                LoadChildren(nodes[num2]);
-                nodes = nodes[num2].Nodes;
+                nodes[nodeIndex].Expand();
+                tvDirectories.SelectedNode = nodes[nodeIndex];
+                LoadChildren(nodes[nodeIndex]);
+                nodes = nodes[nodeIndex].Nodes;
             }
         }
-        txtFolder.Text = text2;
+        txtFolder.Text = path;
     }
 
     private void RemoteFolderBrowserForm_Load(object sender, EventArgs e)
@@ -324,7 +323,7 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
         }
     }
 
-    private void tvDirectories_AfterSelect(object sender, TreeViewEventArgs e2)
+    private void tvDirectories_AfterSelect(object sender, TreeViewEventArgs e)
     {
         txtFolder.Text = SelectedNodePath;
     }

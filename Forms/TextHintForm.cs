@@ -1,4 +1,4 @@
-﻿using SmarTTY.Completion;
+using SmarTTY.Completion;
 using System;
 using System.Drawing;
 using System.Runtime.CompilerServices;
@@ -53,44 +53,44 @@ public partial class TextHintForm : Form, IHintView
         textHintControl1.Visible = true;
     }
 
-    public void ShowBeside(Control control, int value2, bool flag)
+    public void ShowBeside(Control control, int yOffset, bool isVertical)
     {
-        Rectangle rectangle = control.RectangleToScreen(control.DisplayRectangle);
-        if (flag)
+        Rectangle bounds = control.RectangleToScreen(control.DisplayRectangle);
+        if (isVertical)
         {
-            int num = rectangle.Right + 5;
-            if (num + Width > SystemInformation.VirtualScreen.Width)
+            int xPos = bounds.Right + 5;
+            if (xPos + Width > SystemInformation.VirtualScreen.Width)
             {
-                num = rectangle.Left - 5 - Width;
+                xPos = bounds.Left - 5 - Width;
             }
-            int num2 = rectangle.Top + value2;
-            if (num2 + Height > rectangle.Bottom)
+            int yPos = bounds.Top + yOffset;
+            if (yPos + Height > bounds.Bottom)
             {
-                num2 = rectangle.Bottom - Height;
+                yPos = bounds.Bottom - Height;
             }
-            if (num2 < rectangle.Top)
+            if (yPos < bounds.Top)
             {
-                num2 = rectangle.Top;
+                yPos = bounds.Top;
             }
-            Top = num2;
-            Left = num;
+            Top = yPos;
+            Left = xPos;
         }
         else
         {
-            int num3 = rectangle.Top - 5 - Height;
-            if (num3 < 0)
+            int topPos = bounds.Top - 5 - Height;
+            if (topPos < 0)
             {
-                num3 = rectangle.Bottom + 5;
+                topPos = bounds.Bottom + 5;
             }
-            Top = num3;
-            Left = rectangle.Left + value2;
+            Top = topPos;
+            Left = bounds.Left + yOffset;
         }
         this.ShowPopup();
     }
 
-    public void ShowAt(ICompletionHost completionHost, bool flag)
+    public void ShowAt(ICompletionHost completionHost, bool isVertical)
     {
-        Reposition(completionHost, flag);
+        Reposition(completionHost, isVertical);
         this.ShowPopup();
     }
 
@@ -111,26 +111,26 @@ public partial class TextHintForm : Form, IHintView
         base.OnResize(e);
     }
 
-    public void Reposition(ICompletionHost completionHost, bool flag)
+    public void Reposition(ICompletionHost completionHost, bool isVertical)
     {
-        int num = ((!flag) ? (completionHost.CaretScreenBounds.Bottom + 5) : (completionHost.CaretScreenBounds.Top - 5 - Height));
-        if (num < 0)
+        int yPos = ((!isVertical) ? (completionHost.CaretScreenBounds.Bottom + 5) : (completionHost.CaretScreenBounds.Top - 5 - Height));
+        if (yPos < 0)
         {
-            num = completionHost.CaretScreenBounds.Bottom + 5;
+            yPos = completionHost.CaretScreenBounds.Bottom + 5;
         }
-        else if (num > SystemInformation.VirtualScreen.Height - Height)
+        else if (yPos > SystemInformation.VirtualScreen.Height - Height)
         {
-            num = completionHost.CaretScreenBounds.Top - 5 - Height;
+            yPos = completionHost.CaretScreenBounds.Top - 5 - Height;
         }
-        Top = num;
+        Top = yPos;
         Left = completionHost.CaretScreenBounds.Left;
         Width = textHintControl1.Width;
         Height = textHintControl1.Height;
     }
 
-    public void SetActiveParameter(int value2)
+    public void SetActiveParameter(int parameterIndex)
     {
-        textHintControl1.SetActiveParameter(value2);
+        textHintControl1.SetActiveParameter(parameterIndex);
     }
 
     public void SetSignature(ISignatureInfo signatureInfo)

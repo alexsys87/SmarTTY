@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text.RegularExpressions;
 
 namespace SmarTTY.IO;
@@ -32,24 +32,24 @@ public static class LsOutputParser
     {
         private static readonly Regex _lineRegex = new Regex("^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +([0-9]+) +([0-9]{4})-([0-9]{2})-([0-9]{2}) +([0-9]{2}):([0-9]{2}):([0-9]{2})\\.[0-9]+ +([0-9+\\-]+) +([^ ].*)$");
 
-        public static LsEntry ParseLine(string text2)
+        public static LsEntry ParseLine(string line)
         {
-            Match match = _lineRegex.Match(text2);
+            Match match = _lineRegex.Match(line);
             if (!match.Success)
             {
                 return default;
             }
-            string text = match.Groups[9].Value;
-            bool flag = true;
-            bool flag2 = false;
+            string fileName = match.Groups[9].Value;
+            bool hasSuffixChar = true;
+            bool isExecutableMark = false;
             LsEntryFlags lsEntryFlags = LsOutputParser.LsEntryFlags.None;
-            switch (text[text.Length - 1])
+            switch (fileName[fileName.Length - 1])
             {
                 case '/':
                     lsEntryFlags = LsOutputParser.LsEntryFlags.Directory;
                     break;
                 case '*':
-                    flag2 = true;
+                    isExecutableMark = true;
                     break;
                 case '=':
                 case '@':
@@ -57,39 +57,39 @@ public static class LsOutputParser
                     lsEntryFlags = LsOutputParser.LsEntryFlags.Special;
                     break;
                 default:
-                    flag = false;
+                    hasSuffixChar = false;
                     break;
             }
-            if (flag)
+            if (hasSuffixChar)
             {
-                text = text.Substring(0, text.Length - 1);
+                fileName = fileName.Substring(0, fileName.Length - 1);
             }
-            if (flag2)
+            if (isExecutableMark)
             {
                 lsEntryFlags |= LsOutputParser.LsEntryFlags.Executable;
             }
             DateTime dateTime = new DateTime(int.Parse(match.Groups[2].Value), int.Parse(match.Groups[3].Value), int.Parse(match.Groups[4].Value), int.Parse(match.Groups[5].Value), int.Parse(match.Groups[6].Value), int.Parse(match.Groups[7].Value));
-            int num = text.IndexOf(" -> ");
-            if (num != -1)
+            int arrowIndex = fileName.IndexOf(" -> ");
+            if (arrowIndex != -1)
             {
-                text = text.Substring(0, num);
+                fileName = fileName.Substring(0, arrowIndex);
             }
             return new LsEntry
             {
-                Name = text,
+                Name = fileName,
                 Size = long.Parse(match.Groups[1].Value),
                 Flags = lsEntryFlags,
                 ModifiedTime = dateTime
             };
         }
 
-        public static string BuildListCommand(string text, bool flag, bool flag2, bool flag3 = false)
+        public static string BuildListCommand(string path, bool followSymlinks, bool recursive, bool useGls = false)
         {
-            if (flag3)
+            if (useGls)
             {
-                return string.Format("/opt/local/bin/gls -a{0}Fl{1} --full-time '{2}'", flag ? "L" : "", flag2 ? "R" : "", text);
+                return string.Format("/opt/local/bin/gls -a{0}Fl{1} --full-time '{2}'", followSymlinks ? "L" : "", recursive ? "R" : "", path);
             }
-            return string.Format("ls -a{0}Fl{1} --full-time '{2}'", flag ? "L" : "", flag2 ? "R" : "", text);
+            return string.Format("ls -a{0}Fl{1} --full-time '{2}'", followSymlinks ? "L" : "", recursive ? "R" : "", path);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 
 namespace SmarTTY.Native;
@@ -32,7 +32,7 @@ public class Win32Clipboard
     }
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool OpenClipboard(IntPtr handle);
+    private static extern bool OpenClipboard(IntPtr hWndNewOwner);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool EmptyClipboard();
@@ -41,21 +41,21 @@ public class Win32Clipboard
     private static extern bool CloseClipboard();
 
     [DllImport("kernel32.dll")]
-    private static extern bool GlobalUnlock(IntPtr handle);
+    private static extern bool GlobalUnlock(IntPtr hMem);
 
     [DllImport("kernel32.dll")]
-    private static extern IntPtr GlobalLock(IntPtr handle);
+    private static extern IntPtr GlobalLock(IntPtr hMem);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr GetClipboardData(uint value2);
+    private static extern IntPtr GetClipboardData(uint format);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr SetClipboardData(uint value2, IntPtr handle);
+    private static extern IntPtr SetClipboardData(uint format, IntPtr hMem);
 
-    public static string GetText(IntPtr handle)
+    public static string GetText(IntPtr hWnd)
     {
-        IntPtr intPtr = IntPtr.Zero;
-        if (!OpenClipboard(handle))
+        IntPtr lockedPtr = IntPtr.Zero;
+        if (!OpenClipboard(hWnd))
         {
             return null;
         }
@@ -66,22 +66,22 @@ public class Win32Clipboard
             {
                 return null;
             }
-            intPtr = GlobalLock(clipboardData);
-            return Marshal.PtrToStringUni(intPtr);
+            lockedPtr = GlobalLock(clipboardData);
+            return Marshal.PtrToStringUni(lockedPtr);
         }
         finally
         {
-            if (intPtr != IntPtr.Zero)
+            if (lockedPtr != IntPtr.Zero)
             {
-                GlobalUnlock(intPtr);
+                GlobalUnlock(lockedPtr);
             }
             CloseClipboard();
         }
     }
 
-    public static void SetText(IntPtr handle, string text)
+    public static void SetText(IntPtr hWnd, string text)
     {
-        if (!OpenClipboard(handle))
+        if (!OpenClipboard(hWnd))
         {
             throw new InvalidOperationException("Cannot open clipboard, error " + Marshal.GetLastWin32Error());
         }

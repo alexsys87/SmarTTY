@@ -1,11 +1,10 @@
-﻿
 namespace SmarTTY.Ssh.QuickSync;
 
-public struct RemoteWarningRecord(FileOperationFailure fileOperationFailure, string text, int value2)
+public struct RemoteWarningRecord(FileOperationFailure fileOperationFailure, string path, int errorCode)
 {
     public FileOperationFailure Code = fileOperationFailure;
 
-    public string Path = text;
+    public string Path = path;
 
-    public int ErrorCode = value2;
+    public int ErrorCode = errorCode;
 }
