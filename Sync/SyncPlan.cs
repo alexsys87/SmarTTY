@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh.QuickSync;
+using SmarTTY.Ssh.QuickSync;
 using SmarTTY.IO;
 using SmarTTY.Native;
 using SmarTTY.Utilities;
@@ -24,13 +24,13 @@ internal class SyncPlan
         PrintStderrMessage
     }
 
-    public struct SyncAction(ActionType actionType, string text, int value2 = 0)
+    public struct SyncAction(ActionType actionType, string path, int argument = 0)
     {
         public readonly ActionType Type = actionType;
 
-        public readonly string Path = text;
+        public readonly string Path = path;
 
-        public readonly int Argument = value2;
+        public readonly int Argument = argument;
 
         public override string ToString()
         {
@@ -38,13 +38,13 @@ internal class SyncPlan
         }
     }
 
-    public struct SymlinkRequest(LocalPath localPath, string text, bool flag)
+    public struct SymlinkRequest(LocalPath localPath, string target, bool isDirectory)
     {
         public readonly string LinkPath = localPath.FullPath;
 
-        public readonly string Target = text;
+        public readonly string Target = target;
 
-        public readonly bool IsDirectory = flag;
+        public readonly bool IsDirectory = isDirectory;
     }
 
     public class SyncPlannerBase
@@ -55,23 +55,23 @@ internal class SyncPlan
 
         protected Dictionary<string, LocalFileSystem.FindData> ListLocalDirectory(LocalPath localPath)
         {
-            Dictionary<string, LocalFileSystem.FindData> dictionary = new Dictionary<string, LocalFileSystem.FindData>(StringComparer.InvariantCultureIgnoreCase);
+            Dictionary<string, LocalFileSystem.FindData> result = new Dictionary<string, LocalFileSystem.FindData>(StringComparer.InvariantCultureIgnoreCase);
             try
             {
                 foreach (LocalFileSystem.FindData item in LocalFileSystem.EnumerateDirectory(localPath, flag: true))
                 {
-                    dictionary[item.FileName] = item;
+                    result[item.FileName] = item;
                 }
             }
-            catch (Exception arg)
+            catch (Exception ex)
             {
                 Warning?.Invoke(new QuickSyncWarning
                 {
                     Path = localPath.FullPath,
                     Type = QuickSyncWarningType.UnreadableLocalDirectory
-                }, arg);
+                }, ex);
             }
-            return dictionary;
+            return result;
         }
 
         protected void ReportWarning(QuickSyncWarning quickSyncWarning, Exception exception)
@@ -79,9 +79,9 @@ internal class SyncPlan
             Warning?.Invoke(quickSyncWarning, exception);
         }
 
-        protected bool IsIncluded(string text, QuickSyncFilter[] items)
+        protected bool IsIncluded(string path, QuickSyncFilter[] filters)
         {
-            return QuickSyncRunner.IsIncluded(text, items);
+            return QuickSyncRunner.IsIncluded(path, filters);
         }
     }
 
@@ -91,13 +91,13 @@ internal class SyncPlan
         {
             private HashSet<string> _names = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
 
-            public bool TryAdd(string text)
+            public bool TryAdd(string name)
             {
-                if (_names.Contains(text))
+                if (_names.Contains(name))
                 {
                     return false;
                 }
-                _names.Add(text);
+                _names.Add(name);
                 return true;
             }
         }
@@ -123,27 +123,27 @@ internal class SyncPlan
 
         private void PlanDirectory(LocalPath localPath, RemoteFileSet.RemoteDirectory remoteDirectory)
         {
-            Dictionary<string, LocalFileSystem.FindData> dictionary = ListLocalDirectory(localPath);
+            Dictionary<string, LocalFileSystem.FindData> localEntries = ListLocalDirectory(localPath);
             NameDeduplicator nameDeduplicator = new NameDeduplicator();
             base.Statistics.Directories++;
-            foreach (RemoteFileSet.RemoteFileEntry item in remoteDirectory.Files)
+            foreach (RemoteFileSet.RemoteFileEntry fileEntry in remoteDirectory.Files)
             {
-                if (item.Name.Contains(":"))
+                if (fileEntry.Name.Contains(":"))
                 {
-                    base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.SkippingUnsupportedPath, localPath.Combine(item.Name).FullPath, 0), null);
+                    base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.SkippingUnsupportedPath, localPath.Combine(fileEntry.Name).FullPath, 0), null);
                 }
                 else
                 {
-                    if (!IsIncluded(item.Name, _settings.FileFilters) || !nameDeduplicator.TryAdd(item.Name))
+                    if (!IsIncluded(fileEntry.Name, _settings.FileFilters) || !nameDeduplicator.TryAdd(fileEntry.Name))
                     {
                         continue;
                     }
-                    if (dictionary.TryGetValue(item.Name, out var value))
+                    if (localEntries.TryGetValue(fileEntry.Name, out var findData))
                     {
-                        dictionary.Remove(item.Name);
-                        if (value.HasAttribute(FileAttributes.Directory | FileAttributes.ReparsePoint))
+                        localEntries.Remove(fileEntry.Name);
+                        if (findData.HasAttribute(FileAttributes.Directory | FileAttributes.ReparsePoint))
                         {
-                            PlanDelete(localPath, value);
+                            PlanDelete(localPath, findData);
                         }
                         else
                         {
@@ -151,88 +151,88 @@ internal class SyncPlan
                             {
                                 case QuickSyncOverwriteTrigger.OnlyIfMissing:
                                     base.Statistics.UpToDateFiles++;
-                                    base.Statistics.UpToDateBytes += value.Size;
+                                    base.Statistics.UpToDateBytes += findData.Size;
                                     continue;
                                 case QuickSyncOverwriteTrigger.Stat:
-                                    if (LocalFileSystem.FileStamp.IsSame(item.GetFileInfo(), new LocalFileSystem.FileStamp(value)))
+                                    if (LocalFileSystem.FileStamp.IsSame(fileEntry.GetFileInfo(), new LocalFileSystem.FileStamp(findData)))
                                     {
                                         base.Statistics.UpToDateFiles++;
-                                        base.Statistics.UpToDateBytes += value.Size;
+                                        base.Statistics.UpToDateBytes += findData.Size;
                                         continue;
                                     }
                                     break;
                             }
                         }
                     }
-                    base.Statistics.TotalBytes += item.Size;
-                    this._plan.AddAction(ActionType.TransferFile, item.Name, item.Id);
+                    base.Statistics.TotalBytes += fileEntry.Size;
+                    this._plan.AddAction(ActionType.TransferFile, fileEntry.Name, fileEntry.Id);
                     base.Statistics.TotalFiles++;
                 }
             }
-            foreach (RemoteFileSet.RemoteDirectory item2 in remoteDirectory.SubDirectories)
+            foreach (RemoteFileSet.RemoteDirectory dirEntry in remoteDirectory.SubDirectories)
             {
-                if (item2.Name.Contains(":"))
+                if (dirEntry.Name.Contains(":"))
                 {
-                    base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.SkippingUnsupportedPath, localPath.Combine(item2.Name).FullPath, 0), null);
+                    base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.SkippingUnsupportedPath, localPath.Combine(dirEntry.Name).FullPath, 0), null);
                 }
                 else
                 {
-                    if ((item2.FullPath != null && !IsIncluded(item2.FullPath.Replace('\\', '/'), _settings.DirectoryFilters)) || !nameDeduplicator.TryAdd(item2.Name))
+                    if ((dirEntry.FullPath != null && !IsIncluded(dirEntry.FullPath.Replace('\\', '/'), _settings.DirectoryFilters)) || !nameDeduplicator.TryAdd(dirEntry.Name))
                     {
                         continue;
                     }
-                    bool flag = false;
-                    if (dictionary.TryGetValue(item2.Name, out var value2))
+                    bool exists = false;
+                    if (localEntries.TryGetValue(dirEntry.Name, out var findData))
                     {
-                        dictionary.Remove(item2.Name);
-                        if (value2.HasAttribute(FileAttributes.ReparsePoint) || !value2.HasAttribute(FileAttributes.Directory))
+                        localEntries.Remove(dirEntry.Name);
+                        if (findData.HasAttribute(FileAttributes.ReparsePoint) || !findData.HasAttribute(FileAttributes.Directory))
                         {
-                            PlanDelete(localPath, value2);
+                            PlanDelete(localPath, findData);
                         }
                         else
                         {
-                            flag = true;
+                            exists = true;
                         }
                     }
-                    using (this._plan.EnterDirectory(item2.Name, flag, 0))
+                    using (this._plan.EnterDirectory(dirEntry.Name, exists, 0))
                     {
-                        PlanDirectory(localPath.Combine(item2.Name), item2);
+                        PlanDirectory(localPath.Combine(dirEntry.Name), dirEntry);
                     }
                 }
             }
-            foreach (RemoteFileSet.RemoteDirectory.RemoteSymlink item3 in remoteDirectory.Symlinks)
+            foreach (RemoteFileSet.RemoteDirectory.RemoteSymlink symlinkEntry in remoteDirectory.Symlinks)
             {
-                if (item3.Name.Contains(":"))
+                if (symlinkEntry.Name.Contains(":"))
                 {
-                    base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.SkippingUnsupportedPath, localPath.Combine(item3.Name).FullPath, 0), null);
+                    base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.SkippingUnsupportedPath, localPath.Combine(symlinkEntry.Name).FullPath, 0), null);
                 }
                 else
                 {
-                    if (!nameDeduplicator.TryAdd(item3.Name))
+                    if (!nameDeduplicator.TryAdd(symlinkEntry.Name))
                     {
                         continue;
                     }
                     base.Statistics.Symlinks++;
-                    if (item3.IsDirectory)
+                    if (symlinkEntry.IsDirectory)
                     {
-                        if (!IsIncluded(remoteDirectory.Combine(item3.Name).Replace('\\', '/'), _settings.DirectoryFilters))
+                        if (!IsIncluded(remoteDirectory.Combine(symlinkEntry.Name).Replace('\\', '/'), _settings.DirectoryFilters))
                         {
                             continue;
                         }
                     }
-                    else if (!IsIncluded(item3.Name, _settings.FileFilters))
+                    else if (!IsIncluded(symlinkEntry.Name, _settings.FileFilters))
                     {
                         continue;
                     }
-                    if (dictionary.TryGetValue(item3.Name, out var value3))
+                    if (localEntries.TryGetValue(symlinkEntry.Name, out var findData))
                     {
-                        dictionary.Remove(item3.Name);
-                        if (value3.HasAttribute(FileAttributes.ReparsePoint) && value3.HasAttribute(FileAttributes.Directory) == item3.IsDirectory)
+                        localEntries.Remove(symlinkEntry.Name);
+                        if (findData.HasAttribute(FileAttributes.ReparsePoint) && findData.HasAttribute(FileAttributes.Directory) == symlinkEntry.IsDirectory)
                         {
                             try
                             {
-                                KeyValuePair<string, bool> keyValuePair = ReparsePoints.ReadReparsePoint(localPath.Combine(item3.Name).FullPath);
-                                if (keyValuePair.Key == item3.Target && keyValuePair.Value)
+                                KeyValuePair<string, bool> linkInfo = ReparsePoints.ReadReparsePoint(localPath.Combine(symlinkEntry.Name).FullPath);
+                                if (linkInfo.Key == symlinkEntry.Target && linkInfo.Value)
                                 {
                                     continue;
                                 }
@@ -242,78 +242,78 @@ internal class SyncPlan
                             }
                         }
                     }
-                    this._plan.Symlinks.Add(new SymlinkRequest(localPath.Combine(item3.Name), item3.Target, item3.IsDirectory));
+                    this._plan.Symlinks.Add(new SymlinkRequest(localPath.Combine(symlinkEntry.Name), symlinkEntry.Target, symlinkEntry.IsDirectory));
                 }
             }
             if ((_settings.Options & SyncOptions.DeleteExtraneous) == 0)
             {
                 return;
             }
-            foreach (KeyValuePair<string, LocalFileSystem.FindData> item4 in dictionary)
+            foreach (KeyValuePair<string, LocalFileSystem.FindData> item in localEntries)
             {
-                if (item4.Value.HasAttribute(FileAttributes.Directory))
+                if (item.Value.HasAttribute(FileAttributes.Directory))
                 {
-                    if (!IsIncluded(remoteDirectory.Combine(item4.Key).Replace('\\', '/'), _settings.DirectoryFilters))
+                    if (!IsIncluded(remoteDirectory.Combine(item.Key).Replace('\\', '/'), _settings.DirectoryFilters))
                     {
                         continue;
                     }
                 }
-                else if (!IsIncluded(item4.Key, _settings.FileFilters))
+                else if (!IsIncluded(item.Key, _settings.FileFilters))
                 {
                     continue;
                 }
-                PlanDelete(localPath, item4.Value);
+                PlanDelete(localPath, item.Value);
             }
         }
 
         public void PlanDelete(LocalPath localPath, LocalFileSystem.FindData findData)
         {
-            LocalPath localPath2 = localPath.Combine(findData.FileName);
+            LocalPath fullLocalPath = localPath.Combine(findData.FileName);
             if (findData.HasAttribute(FileAttributes.ReparsePoint))
             {
                 if (findData.HasAttribute(FileAttributes.Directory))
                 {
-                    this._plan.AddAction(ActionType.DeleteEmptyTargetDirectory, localPath2.FullPath);
+                    this._plan.AddAction(ActionType.DeleteEmptyTargetDirectory, fullLocalPath.FullPath);
                     return;
                 }
                 base.Statistics.FilesToDelete++;
-                this._plan.AddAction(ActionType.DeleteTargetFile, localPath2.FullPath);
+                this._plan.AddAction(ActionType.DeleteTargetFile, fullLocalPath.FullPath);
                 return;
             }
             if (findData.HasAttribute(FileAttributes.Directory))
             {
                 try
                 {
-                    foreach (LocalFileSystem.FindData item in LocalFileSystem.EnumerateDirectory(localPath2, flag: false))
+                    foreach (LocalFileSystem.FindData childData in LocalFileSystem.EnumerateDirectory(fullLocalPath, flag: false))
                     {
-                        PlanDelete(localPath2, item);
+                        PlanDelete(fullLocalPath, childData);
                     }
-                    this._plan.AddAction(ActionType.DeleteEmptyTargetDirectory, localPath2.FullPath);
+                    this._plan.AddAction(ActionType.DeleteEmptyTargetDirectory, fullLocalPath.FullPath);
                     return;
                 }
                 catch (Exception ex)
                 {
                     base.ReportWarning(new QuickSyncWarning
                     {
-                        Path = localPath2.FullPath,
+                        Path = fullLocalPath.FullPath,
                         Type = QuickSyncWarningType.UnreadableLocalDirectory
                     }, ex);
                     return;
                 }
             }
             base.Statistics.FilesToDelete++;
-            this._plan.AddAction(ActionType.DeleteTargetFile, localPath2.FullPath);
+            this._plan.AddAction(ActionType.DeleteTargetFile, fullLocalPath.FullPath);
         }
 
-        public SyncPlan PlanDeleteNames(LocalPath localPath, string[] items)
+        public SyncPlan PlanDeleteNames(LocalPath localPath, string[] names)
         {
             this._plan = new SyncPlan();
-            HashSet<string> hashSet = DataExtensions.ToHashSet(items.EnsureNotNull(), StringComparer.InvariantCultureIgnoreCase);
-            foreach (LocalFileSystem.FindData item in LocalFileSystem.EnumerateDirectory(localPath, flag: true))
+            HashSet<string> nameSet = DataExtensions.ToHashSet(names.EnsureNotNull(), StringComparer.InvariantCultureIgnoreCase);
+            foreach (LocalFileSystem.FindData findData in LocalFileSystem.EnumerateDirectory(localPath, flag: true))
             {
-                if (item.HasAttribute(FileAttributes.Directory) && hashSet.Contains(item.FileName ?? ""))
+                if (findData.HasAttribute(FileAttributes.Directory) && nameSet.Contains(findData.FileName ?? ""))
                 {
-                    PlanDelete(localPath, item);
+                    PlanDelete(localPath, findData);
                 }
             }
             return this._plan;
@@ -322,11 +322,11 @@ internal class SyncPlan
 
     public class UploadPlanner : SyncPlannerBase
     {
-        private struct VisitedDirectory(RelativeRemotePath relativeRemotePath, bool flag)
+        private struct VisitedDirectory(RelativeRemotePath relativeRemotePath, bool isIncluded)
         {
             public RelativeRemotePath RelativePath = relativeRemotePath;
 
-            public bool IsIncluded = flag;
+            public bool IsIncluded = isIncluded;
         }
 
         private struct LocalEntry
@@ -360,11 +360,11 @@ internal class SyncPlan
             Symlink
         }
 
-        private struct RemoteEntryRef(RemoteEntryKind remoteEntryKind, int value2)
+        private struct RemoteEntryRef(RemoteEntryKind remoteEntryKind, int index)
         {
             public RemoteEntryKind Kind = remoteEntryKind;
 
-            public int Index = value2;
+            public int Index = index;
         }
 
         private SyncPlan _plan;
@@ -385,41 +385,39 @@ internal class SyncPlan
 
         private RemoteFileSet.RemoteDirectory _emptyDirectory = new RemoteFileSet.RemoteDirectory(null, null);
 
-        public UploadPlanner(SyncSettings syncSettings, RemoteFileSet remoteFileSet, ILocalFileCache localFileCache, bool flag, ISyncCustomization syncCustomization)
+        public UploadPlanner(SyncSettings syncSettings, RemoteFileSet remoteFileSet, ILocalFileCache localFileCache, bool remoteIsEmpty, ISyncCustomization syncCustomization)
         {
             _settings = syncSettings;
             _remoteFileSet = remoteFileSet;
             this._cache = localFileCache;
-            _remoteIsEmpty = flag;
+            _remoteIsEmpty = remoteIsEmpty;
             this._customization = syncCustomization;
             Files.Add(LocalPath.FromRaw(""));
         }
 
         private LocalDirectoryListing ListDirectory(LocalPath localPath, RelativeRemotePath relativeRemotePath)
         {
-            bool flag = IsIncluded(relativeRemotePath.Combine(".").Path, _settings.DirectoryFilters);
-            _visited[localPath.FullPath] = new VisitedDirectory(relativeRemotePath, flag);
-            List<LocalEntry> list = new List<LocalEntry>();
-            LocalFileSystem.FindData[] array;
+            bool isIncluded = IsIncluded(relativeRemotePath.Combine(".").Path, _settings.DirectoryFilters);
+            _visited[localPath.FullPath] = new VisitedDirectory(relativeRemotePath, isIncluded);
+            List<LocalEntry> entryList = new List<LocalEntry>();
+            LocalFileSystem.FindData[] findDataArray;
             try
             {
-                array = LocalFileSystem.EnumerateDirectory(localPath, flag: true).ToArray();
+                findDataArray = LocalFileSystem.EnumerateDirectory(localPath, flag: true).ToArray();
             }
             catch (Exception ex)
             {
                 base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.UnreadableLocalDirectory, localPath.FullPath, 0), ex);
-                array = new LocalFileSystem.FindData[0];
+                findDataArray = new LocalFileSystem.FindData[0];
             }
-            LocalFileSystem.FindData[] array2 = array;
-            for (int num = 0; num < array2.Length; num++)
+            foreach (LocalFileSystem.FindData findData in findDataArray)
             {
-                LocalFileSystem.FindData findData = array2[num];
                 if (findData.HasAttribute(FileAttributes.Directory))
                 {
                     ISyncCustomization syncCustomization = _customization;
                     if ((syncCustomization == null || !syncCustomization.IsDirectoryIgnored(localPath, findData.FileName)) && IsIncluded(relativeRemotePath.Combine(findData.FileName).Path, _settings.DirectoryFilters))
                     {
-                        list.Add(new LocalEntry
+                        entryList.Add(new LocalEntry
                         {
                             Name = findData.FileName,
                             Attributes = findData.Attributes,
@@ -427,12 +425,12 @@ internal class SyncPlan
                         });
                     }
                 }
-                else if (flag)
+                else if (isIncluded)
                 {
                     ISyncCustomization syncCustomization2 = _customization;
                     if ((syncCustomization2 == null || !syncCustomization2.IsFileIgnored(localPath, findData.FileName)) && IsIncluded(findData.FileName, _settings.FileFilters))
                     {
-                        list.Add(new LocalEntry
+                        entryList.Add(new LocalEntry
                         {
                             Name = findData.FileName,
                             Attributes = findData.Attributes,
@@ -443,8 +441,8 @@ internal class SyncPlan
             }
             return new LocalDirectoryListing
             {
-                Entries = list.ToArray(),
-                IsIncluded = flag
+                Entries = entryList.ToArray(),
+                IsIncluded = isIncluded
             };
         }
 
@@ -459,115 +457,112 @@ internal class SyncPlan
         private LocalDirectoryListing ListRecursive(LocalPath localPath, RelativeRemotePath relativeRemotePath)
         {
             LocalDirectoryListing result = ListDirectory(localPath, relativeRemotePath);
-            for (int num = 0; num < result.Entries.Length; num++)
+            for (int i = 0; i < result.Entries.Length; i++)
             {
-                if (result.Entries[num].HasAttribute(FileAttributes.Directory) && !result.Entries[num].HasAttribute(FileAttributes.ReparsePoint))
+                if (result.Entries[i].HasAttribute(FileAttributes.Directory) && !result.Entries[i].HasAttribute(FileAttributes.ReparsePoint))
                 {
-                    result.Entries[num].Children = ListRecursive(localPath.Combine(result.Entries[num].Name), relativeRemotePath.Combine(result.Entries[num].Name));
+                    result.Entries[i].Children = ListRecursive(localPath.Combine(result.Entries[i].Name), relativeRemotePath.Combine(result.Entries[i].Name));
                 }
             }
             return result;
         }
 
-        private int AddFile(LocalPath localPath, long value2)
+        private int AddFile(LocalPath localPath, long size)
         {
             int count = Files.Count;
             Files.Add(localPath);
-            base.Statistics.TotalBytes += value2;
+            base.Statistics.TotalBytes += size;
             base.Statistics.TotalFiles++;
             return count;
         }
 
         private void PlanDirectory(LocalPath localPath, RemoteFileSet.RemoteDirectory remoteDirectory, RelativeRemotePath relativeRemotePath, LocalDirectoryListing localDirectoryListing)
         {
-            Dictionary<string, RemoteEntryRef> dictionary = IndexRemoteDirectory(remoteDirectory);
+            Dictionary<string, RemoteEntryRef> remoteEntries = IndexRemoteDirectory(remoteDirectory);
             ICachedDirectory cachedDirectory = _cache?.GetDirectory(localPath);
             if (localDirectoryListing.Entries == null)
             {
                 localDirectoryListing = ListDirectory(localPath, relativeRemotePath);
             }
-            LocalEntry[] array = localDirectoryListing.Entries;
-            for (int num = 0; num < array.Length; num++)
+            foreach (LocalEntry localEntry in localDirectoryListing.Entries)
             {
-                LocalEntry localEntry = array[num];
-                LocalPath localPath2 = localPath.Combine(localEntry.Name);
-                bool flag = dictionary.TryGetValue(localEntry.Name, out var value);
-                if (flag)
+                LocalPath childLocalPath = localPath.Combine(localEntry.Name);
+                bool existsRemotely = remoteEntries.TryGetValue(localEntry.Name, out var remoteRef);
+                if (existsRemotely)
                 {
-                    dictionary.Remove(localEntry.Name);
+                    remoteEntries.Remove(localEntry.Name);
                 }
                 LocalFileSystem.FileStamp fileStamp = localEntry.Stamp;
                 if (localEntry.HasAttribute(FileAttributes.ReparsePoint))
                 {
                     try
                     {
-                        localPath2 = LocalFileSystem.ResolveFinalSymlink(localPath2);
+                        childLocalPath = LocalFileSystem.ResolveFinalSymlink(childLocalPath);
                     }
                     catch (Exception ex)
                     {
-                        base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.UnreadableSourceSymlink, localPath2.FullPath, 0), ex);
+                        base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.UnreadableSourceSymlink, childLocalPath.FullPath, 0), ex);
                         continue;
                     }
-                    string text = null;
-                    VisitedDirectory value3;
+                    string symlinkTarget = null;
                     if (localEntry.HasAttribute(FileAttributes.Directory))
                     {
-                        if (_visited.TryGetValue(localPath2.FullPath, out var value2))
+                        if (_visited.TryGetValue(childLocalPath.FullPath, out var visitedDir))
                         {
-                            string text2 = "/" + relativeRemotePath.Path;
-                            RelativeRemotePath relativeRemotePath2 = value2.RelativePath;
-                            text = RemotePathUtils.GetRelativePath(text2, "/" + relativeRemotePath2.ToString(), flag: false);
+                            string currRelPath = "/" + relativeRemotePath.Path;
+                            RelativeRemotePath targetRelPath = visitedDir.RelativePath;
+                            symlinkTarget = RemotePathUtils.GetRelativePath(currRelPath, "/" + targetRelPath.ToString(), allowAbsoluteFallback: false);
                         }
                     }
-                    else if (_visited.TryGetValue(localPath2.GetParent().FullPath, out value3) && value3.IsIncluded && IsIncluded(localPath2.FileName, _settings.FileFilters))
+                    else if (_visited.TryGetValue(childLocalPath.GetParent().FullPath, out var visitedParent) && visitedParent.IsIncluded && IsIncluded(childLocalPath.FileName, _settings.FileFilters))
                     {
-                        string text3 = "/" + relativeRemotePath.Path;
-                        RelativeRemotePath relativeRemotePath3 = value3.RelativePath;
-                        string text4 = RemotePathUtils.GetRelativePath(text3, "/" + relativeRemotePath3.ToString(), flag: false);
-                        string text5 = localPath2.FileName;
-                        text = ((!(text4 == "") && !(text4 == ".")) ? (text4 + "/" + text5) : text5);
+                        string currRelPath = "/" + relativeRemotePath.Path;
+                        RelativeRemotePath targetRelPath = visitedParent.RelativePath;
+                        string parentRelPath = RemotePathUtils.GetRelativePath(currRelPath, "/" + targetRelPath.ToString(), allowAbsoluteFallback: false);
+                        string fileName = childLocalPath.FileName;
+                        symlinkTarget = ((!(parentRelPath == "") && !(parentRelPath == ".")) ? (parentRelPath + "/" + fileName) : fileName);
                     }
                     else
                     {
                         try
                         {
-                            using LocalFileSystem.NativeFile nativeFile = LocalFileSystem.OpenFile(localPath2, LocalFileSystem.FileOpenMode.Open);
+                            using LocalFileSystem.NativeFile nativeFile = LocalFileSystem.OpenFile(childLocalPath, LocalFileSystem.FileOpenMode.Open);
                             fileStamp = new LocalFileSystem.FileStamp(nativeFile.GetSize(), nativeFile.GetLastWriteTime());
                         }
-                        catch (Exception ex2)
+                        catch (Exception ex)
                         {
-                            base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.CannotStatLocalSymlink, localPath2.FullPath, 0), ex2);
+                            base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.CannotStatLocalSymlink, childLocalPath.FullPath, 0), ex);
                         }
                     }
-                    if (text != null)
+                    if (symlinkTarget != null)
                     {
-                        if (!flag || value.Kind != SyncPlan.UploadPlanner.RemoteEntryKind.Symlink || !(remoteDirectory.Symlinks[value.Index].Target == text))
+                        if (!existsRemotely || remoteRef.Kind != SyncPlan.UploadPlanner.RemoteEntryKind.Symlink || !(remoteDirectory.Symlinks[remoteRef.Index].Target == symlinkTarget))
                         {
-                            if (flag)
+                            if (existsRemotely)
                             {
-                                PlanDeleteEntry(value, remoteDirectory, localEntry.Name);
+                                PlanDeleteEntry(remoteRef, remoteDirectory, localEntry.Name);
                             }
-                            bool flag2 = cachedDirectory?.IsSymlinkUpToDate(localEntry.Name, text) ?? true;
-                            if (_settings.QuickSyncOverwriteTrigger != QuickSyncOverwriteTrigger.LocalCache || cachedDirectory == null || _remoteIsEmpty || flag2)
+                            bool isUpToDate = cachedDirectory?.IsSymlinkUpToDate(localEntry.Name, symlinkTarget) ?? true;
+                            if (_settings.QuickSyncOverwriteTrigger != QuickSyncOverwriteTrigger.LocalCache || cachedDirectory == null || _remoteIsEmpty || isUpToDate)
                             {
-                                _plan.AddAction(ActionType.CreateRemoteSymlink, relativeRemotePath.Combine(localEntry.Name).ToString() + "\n" + text);
+                                _plan.AddAction(ActionType.CreateRemoteSymlink, relativeRemotePath.Combine(localEntry.Name).ToString() + "\n" + symlinkTarget);
                             }
                         }
                         continue;
                     }
                 }
-                if (flag)
+                if (existsRemotely)
                 {
                     if (localEntry.HasAttribute(FileAttributes.Directory))
                     {
-                        if (value.Kind != SyncPlan.UploadPlanner.RemoteEntryKind.Directory)
+                        if (remoteRef.Kind != SyncPlan.UploadPlanner.RemoteEntryKind.Directory)
                         {
-                            PlanDeleteEntry(value, remoteDirectory, localEntry.Name);
+                            PlanDeleteEntry(remoteRef, remoteDirectory, localEntry.Name);
                         }
                     }
-                    else if (value.Kind != SyncPlan.UploadPlanner.RemoteEntryKind.File)
+                    else if (remoteRef.Kind != SyncPlan.UploadPlanner.RemoteEntryKind.File)
                     {
-                        PlanDeleteEntry(value, remoteDirectory, localEntry.Name);
+                        PlanDeleteEntry(remoteRef, remoteDirectory, localEntry.Name);
                     }
                     else
                     {
@@ -578,7 +573,7 @@ internal class SyncPlan
                                 base.Statistics.UpToDateBytes += fileStamp.Size;
                                 continue;
                             case QuickSyncOverwriteTrigger.Stat:
-                                if (LocalFileSystem.FileStamp.IsSame(fileStamp, remoteDirectory.Files[value.Index].GetFileInfo()))
+                                if (LocalFileSystem.FileStamp.IsSame(fileStamp, remoteDirectory.Files[remoteRef.Index].GetFileInfo()))
                                 {
                                     base.Statistics.UpToDateFiles++;
                                     base.Statistics.UpToDateBytes += fileStamp.Size;
@@ -590,34 +585,34 @@ internal class SyncPlan
                 }
                 if (localEntry.HasAttribute(FileAttributes.Directory))
                 {
-                    RelativeRemotePath relativeRemotePath4 = relativeRemotePath.Combine(localEntry.Name);
+                    RelativeRemotePath childRemotePath = relativeRemotePath.Combine(localEntry.Name);
                     SyncPlan syncPlan = _plan;
-                    string text6 = localEntry.Name;
-                    bool num2 = flag && value.Kind == SyncPlan.UploadPlanner.RemoteEntryKind.Directory;
-                    LocalFileSystem.FileStamp fileStamp2 = localEntry.Stamp;
-                    using (syncPlan.EnterDirectory(text6, num2, fileStamp2.ModifiedSeconds))
+                    string dirName = localEntry.Name;
+                    bool isExistingDir = existsRemotely && remoteRef.Kind == SyncPlan.UploadPlanner.RemoteEntryKind.Directory;
+                    LocalFileSystem.FileStamp stamp = localEntry.Stamp;
+                    using (syncPlan.EnterDirectory(dirName, isExistingDir, stamp.ModifiedSeconds))
                     {
-                        RemoteFileSet.RemoteDirectory remoteDirectory2 = this._emptyDirectory;
-                        if (flag && value.Kind == SyncPlan.UploadPlanner.RemoteEntryKind.Directory)
+                        RemoteFileSet.RemoteDirectory subRemoteDir = this._emptyDirectory;
+                        if (existsRemotely && remoteRef.Kind == SyncPlan.UploadPlanner.RemoteEntryKind.Directory)
                         {
-                            remoteDirectory2 = remoteDirectory.SubDirectories[value.Index];
+                            subRemoteDir = remoteDirectory.SubDirectories[remoteRef.Index];
                         }
-                        PlanDirectory(localPath2, remoteDirectory2, relativeRemotePath4, localEntry.Children);
+                        PlanDirectory(childLocalPath, subRemoteDir, childRemotePath, localEntry.Children);
                     }
                 }
                 else
                 {
-                    bool flag3 = cachedDirectory?.IsFileUpToDate(localEntry.Name, fileStamp) ?? true;
-                    if (_settings.QuickSyncOverwriteTrigger == QuickSyncOverwriteTrigger.LocalCache && cachedDirectory != null && !_remoteIsEmpty && !flag3)
+                    bool isUpToDate = cachedDirectory?.IsFileUpToDate(localEntry.Name, fileStamp) ?? true;
+                    if (_settings.QuickSyncOverwriteTrigger == QuickSyncOverwriteTrigger.LocalCache && cachedDirectory != null && !_remoteIsEmpty && !isUpToDate)
                     {
                         base.Statistics.UpToDateFiles++;
                         base.Statistics.UpToDateBytes += fileStamp.Size;
                     }
                     else
                     {
-                        int num3 = AddFile(localPath2, fileStamp.Size);
-                        cachedDirectory?.Register(num3, localEntry.Name);
-                        _plan.AddAction(ActionType.TransferFile, localEntry.Name, num3);
+                        int fileId = AddFile(childLocalPath, fileStamp.Size);
+                        cachedDirectory?.Register(fileId, localEntry.Name);
+                        _plan.AddAction(ActionType.TransferFile, localEntry.Name, fileId);
                     }
                 }
             }
@@ -625,7 +620,7 @@ internal class SyncPlan
             {
                 return;
             }
-            foreach (KeyValuePair<string, RemoteEntryRef> item in dictionary)
+            foreach (KeyValuePair<string, RemoteEntryRef> item in remoteEntries)
             {
                 PlanDeleteEntry(item.Value, remoteDirectory, item.Key);
             }
@@ -633,44 +628,44 @@ internal class SyncPlan
             {
                 return;
             }
-            foreach (string item2 in cachedDirectory.GetEntryNames().EnsureNotNull())
+            foreach (string entryName in cachedDirectory.GetEntryNames().EnsureNotNull())
             {
-                if (IsIncluded(item2, _settings.FileFilters))
+                if (IsIncluded(entryName, _settings.FileFilters))
                 {
-                    string text7 = relativeRemotePath.PrependBase(_settings.RemotePath) + "/" + item2;
+                    string fullRemotePath = relativeRemotePath.PrependBase(_settings.RemotePath) + "/" + entryName;
                     base.Statistics.FilesToDelete++;
-                    _plan.AddAction(ActionType.DeleteTargetFile, text7);
+                    _plan.AddAction(ActionType.DeleteTargetFile, fullRemotePath);
                 }
             }
         }
 
-        private void DeleteDirectoryContents(RemoteFileSet.RemoteDirectory remoteDirectory, string text)
+        private void DeleteDirectoryContents(RemoteFileSet.RemoteDirectory remoteDirectory, string dirName)
         {
-            _plan.AddAction(ActionType.EnterDirectory, text);
+            _plan.AddAction(ActionType.EnterDirectory, dirName);
             foreach (KeyValuePair<string, RemoteEntryRef> item in IndexRemoteDirectory(remoteDirectory))
             {
                 PlanDeleteEntry(item.Value, remoteDirectory, item.Key);
             }
             _plan.AddAction(ActionType.GoToParentDirectory, null);
-            _plan.AddAction(ActionType.DeleteEmptyTargetDirectory, text);
+            _plan.AddAction(ActionType.DeleteEmptyTargetDirectory, dirName);
         }
 
-        private void PlanDeleteEntry(RemoteEntryRef remoteEntryRef, RemoteFileSet.RemoteDirectory remoteDirectory, string text)
+        private void PlanDeleteEntry(RemoteEntryRef remoteEntryRef, RemoteFileSet.RemoteDirectory remoteDirectory, string entryName)
         {
             switch (remoteEntryRef.Kind)
             {
                 case SyncPlan.UploadPlanner.RemoteEntryKind.File:
                 case SyncPlan.UploadPlanner.RemoteEntryKind.Symlink:
-                    _plan.AddAction(ActionType.DeleteTargetFile, text);
+                    _plan.AddAction(ActionType.DeleteTargetFile, entryName);
                     break;
                 case SyncPlan.UploadPlanner.RemoteEntryKind.Directory:
                     if (_settings.FileFilters.IsNullOrEmpty() && _settings.DirectoryFilters.IsNullOrEmpty())
                     {
-                        _plan.AddAction(ActionType.DeleteTargetDirectoryRecursively, text);
+                        _plan.AddAction(ActionType.DeleteTargetDirectoryRecursively, entryName);
                     }
                     else
                     {
-                        DeleteDirectoryContents(remoteDirectory.SubDirectories[remoteEntryRef.Index], text);
+                        DeleteDirectoryContents(remoteDirectory.SubDirectories[remoteEntryRef.Index], entryName);
                     }
                     break;
             }
@@ -678,20 +673,20 @@ internal class SyncPlan
 
         private static Dictionary<string, RemoteEntryRef> IndexRemoteDirectory(RemoteFileSet.RemoteDirectory remoteDirectory)
         {
-            Dictionary<string, RemoteEntryRef> dictionary = new Dictionary<string, RemoteEntryRef>();
-            for (int num = 0; num < remoteDirectory.Files.Count; num++)
+            Dictionary<string, RemoteEntryRef> result = new Dictionary<string, RemoteEntryRef>();
+            for (int i = 0; i < remoteDirectory.Files.Count; i++)
             {
-                dictionary[remoteDirectory.Files[num].Name] = new RemoteEntryRef(SyncPlan.UploadPlanner.RemoteEntryKind.File, num);
+                result[remoteDirectory.Files[i].Name] = new RemoteEntryRef(SyncPlan.UploadPlanner.RemoteEntryKind.File, i);
             }
-            for (int num2 = 0; num2 < remoteDirectory.SubDirectories.Count; num2++)
+            for (int i = 0; i < remoteDirectory.SubDirectories.Count; i++)
             {
-                dictionary[remoteDirectory.SubDirectories[num2].Name] = new RemoteEntryRef(SyncPlan.UploadPlanner.RemoteEntryKind.Directory, num2);
+                result[remoteDirectory.SubDirectories[i].Name] = new RemoteEntryRef(SyncPlan.UploadPlanner.RemoteEntryKind.Directory, i);
             }
-            for (int num3 = 0; num3 < remoteDirectory.Symlinks.Count; num3++)
+            for (int i = 0; i < remoteDirectory.Symlinks.Count; i++)
             {
-                dictionary[remoteDirectory.Symlinks[num3].Name] = new RemoteEntryRef(SyncPlan.UploadPlanner.RemoteEntryKind.Symlink, num3);
+                result[remoteDirectory.Symlinks[i].Name] = new RemoteEntryRef(SyncPlan.UploadPlanner.RemoteEntryKind.Symlink, i);
             }
-            return dictionary;
+            return result;
         }
     }
 
@@ -701,10 +696,10 @@ internal class SyncPlan
 
         private int _depth;
 
-        public DirectoryScope(SyncPlan syncPlan, int value2)
+        public DirectoryScope(SyncPlan syncPlan, int depth)
         {
             this._plan = syncPlan;
-            this._depth = value2;
+            this._depth = depth;
         }
 
         public void Dispose()
@@ -726,15 +721,15 @@ internal class SyncPlan
 
     public List<SymlinkRequest> Symlinks = new List<SymlinkRequest>();
 
-    private void AddAction(ActionType actionType, string text, int value2 = 0)
+    private void AddAction(ActionType actionType, string path, int argument = 0)
     {
-        Actions.Add(new SyncAction(actionType, text, value2));
+        Actions.Add(new SyncAction(actionType, path, argument));
     }
 
-    public IDisposable EnterDirectory(string text, bool flag, int value2)
+    public IDisposable EnterDirectory(string dirName, bool exists, int argument)
     {
-        AddAction(flag ? ActionType.EnterDirectory : ActionType.CreateAndEnterDirectory, text, value2);
-        int count = Actions.Count;
-        return new DirectoryScope(this, count);
+        AddAction(exists ? ActionType.EnterDirectory : ActionType.CreateAndEnterDirectory, dirName, argument);
+        int depth = Actions.Count;
+        return new DirectoryScope(this, depth);
     }
 }

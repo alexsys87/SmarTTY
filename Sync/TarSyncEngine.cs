@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.Ssh.QuickSync;
 using SmarTTY.IO;
 using SmarTTY.Utilities;
@@ -25,22 +25,22 @@ internal class TarSyncEngine : CommandSyncEngine
             sshShellChannel.PollingEnabled = true;
         }
 
-        private void OnFinished(object obj)
+        private void OnFinished(object sender)
         {
         }
 
-        internal void OnDataReceived(object obj, byte[] buffer, int value2, int value3, int value4)
+        internal void OnDataReceived(object sender, byte[] buffer, int offset, int count, int dataType)
         {
             try
             {
-                if (value4 != 1)
+                if (dataType != 1)
                 {
                     return;
                 }
-                foreach (string item in this._lineSplitter.Feed(buffer, value2, value3))
+                foreach (string line in this._lineSplitter.Feed(buffer, offset, count))
                 {
                     HasOutput = true;
-                    StderrLine?.Invoke(item);
+                    StderrLine?.Invoke(line);
                 }
             }
             catch
@@ -49,11 +49,11 @@ internal class TarSyncEngine : CommandSyncEngine
         }
     }
 
-    private struct TarPayload(string text, byte[] buffer)
+    private struct TarPayload(string path, byte[] data)
     {
-        public readonly string Path = text;
+        public readonly string Path = path;
 
-        public readonly byte[] Data = buffer;
+        public readonly byte[] Data = data;
     }
 
     public TarSyncEngine(SshSession sshSession, SyncSettings syncSettings, ISyncEvents syncEvents, ILocalFileCache localFileCache, SyncTuning syncTuning, ISyncCustomization syncCustomization)
@@ -71,43 +71,43 @@ internal class TarSyncEngine : CommandSyncEngine
         throw new NotSupportedException("Incoming sync transfers via tar are not yet supported");
     }
 
-    public override void Upload(List<SyncPlan.SyncAction> list2, List<LocalPath> list3, ref TransferStatistics transferStatistics)
+    public override void Upload(List<SyncPlan.SyncAction> actions, List<LocalPath> localPaths, ref TransferStatistics transferStatistics)
     {
-        string text = "LANG=en_US " + DirectoryCopier.TarCommands.GetExtractCommand(_settings.RemotePath, _settings.ClockOffset.IsKnown);
+        string command = "LANG=en_US " + DirectoryCopier.TarCommands.GetExtractCommand(_settings.RemotePath, _settings.ClockOffset.IsKnown);
         IShellLauncher shellLauncher = null;
         if ((_settings.Options & SyncOptions.UseLauncher) != 0)
         {
-            shellLauncher = _customization?.GetLauncher(text);
+            shellLauncher = _customization?.GetLauncher(command);
         }
-        LocalFileSystem.FileStamp[] array = new LocalFileSystem.FileStamp[list3.Count];
+        LocalFileSystem.FileStamp[] fileStamps = new LocalFileSystem.FileStamp[localPaths.Count];
         if (_session.RunCommandChecked("mkdir -p \"" + _settings.RemotePath + "\"", requireSuccess: true) == null)
         {
             throw new Exception("Failed to create " + _settings.RemotePath);
         }
         TarPayload tarPayload;
-        using (SshShellChannel sshShellChannel = _session.OpenShellChannel(shellLauncher?.Command ?? text))
+        using (SshShellChannel sshShellChannel = _session.OpenShellChannel(shellLauncher?.Command ?? command))
         {
             shellLauncher?.Prepare(sshShellChannel, "Outgoing file transfers");
             StderrMonitor stderrMonitor = new StderrMonitor(this, sshShellChannel);
             sshShellChannel.PollingEnabled = true;
-            stderrMonitor.StderrLine += (string text2) =>
+            stderrMonitor.StderrLine += (string stderrLine) =>
             {
                 base._events?.OnWarning(new SyncWarning
                 {
-                    Warning = new QuickSyncWarning(QuickSyncWarningType.StderrLine, text2, 0)
+                    Warning = new QuickSyncWarning(QuickSyncWarningType.StderrLine, stderrLine, 0)
                 });
             };
-            tarPayload = this.WriteArchive(new TarWriter(null), sshShellChannel.Input, list2, list3, ref transferStatistics, array);
+            tarPayload = this.WriteArchive(new TarWriter(null), sshShellChannel.Input, actions, localPaths, ref transferStatistics, fileStamps);
             sshShellChannel.Input.Write(new byte[1024], 0, 1024);
             sshShellChannel.SendEof();
             sshShellChannel.WaitEof();
             if (!stderrMonitor.HasOutput && sshShellChannel.ExitStatus == 0 && _cache != null)
             {
-                for (int num = 0; num < list3.Count; num++)
+                for (int i = 0; i < localPaths.Count; i++)
                 {
-                    if (array[num].HasTimestamp)
+                    if (fileStamps[i].HasTimestamp)
                     {
-                        _cache.StoreFileStamp(num, array[num]);
+                        _cache.StoreFileStamp(i, fileStamps[i]);
                     }
                 }
             }
@@ -116,141 +116,141 @@ internal class TarSyncEngine : CommandSyncEngine
         {
             return;
         }
-        List<string> list = RunScript(tarPayload.Path, tarPayload.Data);
-        bool flag = false;
-        foreach (string item in list)
+        List<string> scriptOutput = RunScript(tarPayload.Path, tarPayload.Data);
+        bool markerSeen = false;
+        foreach (string line in scriptOutput)
         {
-            int result;
-            if (!flag)
+            int actionIndex;
+            if (!markerSeen)
             {
-                if (!(item != tarPayload.Path))
+                if (!(line != tarPayload.Path))
                 {
-                    flag = true;
+                    markerSeen = true;
                 }
             }
-            else if (item.StartsWith("cmdfail:") && int.TryParse(item.Substring(8), out result) && result >= 0 && result < list2.Count)
+            else if (line.StartsWith("cmdfail:") && int.TryParse(line.Substring(8), out actionIndex) && actionIndex >= 0 && actionIndex < actions.Count)
             {
                 base._events?.OnWarning(new SyncWarning
                 {
-                    Warning = new QuickSyncWarning(SysprogsSyncEngine.GetWarningType(list2[result].Type), list2[result].Path, -1)
+                    Warning = new QuickSyncWarning(SysprogsSyncEngine.GetWarningType(actions[actionIndex].Type), actions[actionIndex].Path, -1)
                 });
             }
         }
     }
 
-    private TarPayload WriteArchive(TarWriter tarWriter, Stream stream, List<SyncPlan.SyncAction> list, List<LocalPath> list2, ref TransferStatistics transferStatistics, LocalFileSystem.FileStamp[] items)
+    private TarPayload WriteArchive(TarWriter tarWriter, Stream destinationStream, List<SyncPlan.SyncAction> actions, List<LocalPath> localPaths, ref TransferStatistics transferStatistics, LocalFileSystem.FileStamp[] fileStamps)
     {
-        string text = Guid.NewGuid().ToString();
-        byte[] array = new byte[Tuning.BufferSize];
+        string marker = Guid.NewGuid().ToString();
+        byte[] copyBuffer = new byte[Tuning.BufferSize];
         MemoryStream memoryStream = new MemoryStream();
-        string text2 = _settings.RemotePath;
+        string remoteDir = _settings.RemotePath;
         RelativeRemotePath relativeRemotePath = default;
-        byte[] array2 = new byte[1024];
+        byte[] paddingBuffer = new byte[1024];
         IPermissionProvider permissionProvider = base._events?.PermissionProvider;
-        int num = Convert.ToInt32("755", 8);
-        int num2 = 0;
+        int defaultPermissions = Convert.ToInt32("755", 8);
+        int scriptCommandCount = 0;
         using StreamWriter streamWriter = new StreamWriter(memoryStream)
         {
             NewLine = "\n"
         };
-        streamWriter.WriteLine("echo " + text);
+        streamWriter.WriteLine("echo " + marker);
         streamWriter.WriteLine("cd \"" + _settings.RemotePath + "\" || exit 1");
-        for (int num3 = 0; num3 < list.Count; num3++)
+        for (int i = 0; i < actions.Count; i++)
         {
-            SyncPlan.SyncAction syncAction = list[num3];
-            int num7;
-            switch (syncAction.Type)
+            SyncPlan.SyncAction action = actions[i];
+            int paddingBytes;
+            switch (action.Type)
             {
                 case SyncPlan.ActionType.CreateAndEnterDirectory:
                     {
-                        DateTime dateTime = ((syncAction.Argument != 0) ? SshSession.UnixEpoch.AddSeconds(syncAction.Argument) : DateTime.UtcNow.AddSeconds(-5.0));
-                        stream.Write(tarWriter.CreateHeader(relativeRemotePath.Combine(syncAction.Path).Path, flag: true, 0L, dateTime.AddSeconds(_settings.ClockOffset.Seconds), out num7), 0, 512);
+                        DateTime modifiedTime = ((action.Argument != 0) ? SshSession.UnixEpoch.AddSeconds(action.Argument) : DateTime.UtcNow.AddSeconds(-5.0));
+                        destinationStream.Write(tarWriter.CreateHeader(relativeRemotePath.Combine(action.Path).Path, isDirectory: true, 0L, modifiedTime.AddSeconds(_settings.ClockOffset.Seconds), out paddingBytes), 0, 512);
                         goto case SyncPlan.ActionType.EnterDirectory;
                     }
                 case SyncPlan.ActionType.EnterDirectory:
-                    text2 = RemotePathUtils.Combine(text2, syncAction.Path);
-                    relativeRemotePath = relativeRemotePath.Combine(syncAction.Path);
-                    streamWriter.WriteLine($"cd \"{text2}\" || echo \"cmdfail:{num3}\"");
+                    remoteDir = RemotePathUtils.Combine(remoteDir, action.Path);
+                    relativeRemotePath = relativeRemotePath.Combine(action.Path);
+                    streamWriter.WriteLine($"cd \"{remoteDir}\" || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.GoToParentDirectory:
-                    text2 = RemotePathUtils.GetDirectoryName(text2);
+                    remoteDir = RemotePathUtils.GetDirectoryName(remoteDir);
                     relativeRemotePath = new RelativeRemotePath(RemotePathUtils.GetDirectoryName(relativeRemotePath.Path));
-                    streamWriter.WriteLine("cd \"" + text2 + "\"");
+                    streamWriter.WriteLine("cd \"" + remoteDir + "\"");
                     break;
                 case SyncPlan.ActionType.CreateRemoteSymlink:
                     {
-                        KeyValuePair<string, string> keyValuePair = StringUtils.SplitAtFirst(syncAction.Path, '\n');
-                        string text3 = RemotePathUtils.GetFileName(keyValuePair.Key);
-                        if (keyValuePair.Key == null || keyValuePair.Value == null)
+                        KeyValuePair<string, string> symlinkPair = StringUtils.SplitAtFirst(action.Path, '\n');
+                        string linkFileName = RemotePathUtils.GetFileName(symlinkPair.Key);
+                        if (symlinkPair.Key == null || symlinkPair.Value == null)
                         {
-                            throw new Exception("Invalid queued symlink: " + syncAction.Path);
+                            throw new Exception("Invalid queued symlink: " + action.Path);
                         }
-                        streamWriter.WriteLine("rm -f \"" + text3 + "\"");
-                        streamWriter.WriteLine($"ln -s \"{keyValuePair.Value}\" \"{text3}\" || echo \"cmdfail:{num3}\"");
-                        num2++;
+                        streamWriter.WriteLine("rm -f \"" + linkFileName + "\"");
+                        streamWriter.WriteLine($"ln -s \"{symlinkPair.Value}\" \"{linkFileName}\" || echo \"cmdfail:{i}\"");
+                        scriptCommandCount++;
                         break;
                     }
                 case SyncPlan.ActionType.TransferFile:
                     {
-                        QuickSyncWarningType quickSyncWarningType = QuickSyncWarningType.CannotReadLocalFile;
-                        bool flag = false;
+                        QuickSyncWarningType warningType = QuickSyncWarningType.CannotReadLocalFile;
+                        bool headerWritten = false;
                         try
                         {
-                            using LocalFileSystem.NativeFile nativeFile = LocalFileSystem.OpenFile(list2[syncAction.Argument], LocalFileSystem.FileOpenMode.Open);
-                            long num4 = nativeFile.GetLastWriteTime();
-                            num4 += (long)_settings.ClockOffset.Seconds * 10000000L;
-                            long num5 = nativeFile.GetSize();
-                            quickSyncWarningType = QuickSyncWarningType.CannotCreateTargetFile;
-                            int num6 = syncAction.Argument;
-                            int value = permissionProvider?.GetFilePermissions(list2[num6]) ?? num;
-                            items[num6] = new LocalFileSystem.FileStamp(num5, num4);
-                            byte[] array3 = tarWriter.CreateHeader(relativeRemotePath.Combine(syncAction.Path).Path, flag: false, num5, DateTime.FromFileTimeUtc(num4), out num7, flag2: false, value);
-                            stream.Write(array3, 0, array3.Length);
-                            flag = true;
-                            bool flag2 = false;
-                            long num8 = 0L;
-                            while (num8 < num5)
+                            using LocalFileSystem.NativeFile nativeFile = LocalFileSystem.OpenFile(localPaths[action.Argument], LocalFileSystem.FileOpenMode.Open);
+                            long writeTime = nativeFile.GetLastWriteTime();
+                            writeTime += (long)_settings.ClockOffset.Seconds * 10000000L;
+                            long fileSize = nativeFile.GetSize();
+                            warningType = QuickSyncWarningType.CannotCreateTargetFile;
+                            int fileIndex = action.Argument;
+                            int permissions = permissionProvider?.GetFilePermissions(localPaths[fileIndex]) ?? defaultPermissions;
+                            fileStamps[fileIndex] = new LocalFileSystem.FileStamp(fileSize, writeTime);
+                            byte[] header = tarWriter.CreateHeader(relativeRemotePath.Combine(action.Path).Path, isDirectory: false, fileSize, DateTime.FromFileTimeUtc(writeTime), out paddingBytes, isLongLink: false, permissions);
+                            destinationStream.Write(header, 0, header.Length);
+                            headerWritten = true;
+                            bool shortReadOccurred = false;
+                            long transferred = 0L;
+                            while (transferred < fileSize)
                             {
-                                int num9 = (int)Math.Min(num5 - num8, array.Length);
-                                int num10;
+                                int bytesToRead = (int)Math.Min(fileSize - transferred, copyBuffer.Length);
+                                int bytesRead;
                                 try
                                 {
-                                    num10 = nativeFile.Read(array, num9);
+                                    bytesRead = nativeFile.Read(copyBuffer, bytesToRead);
                                 }
                                 catch
                                 {
-                                    num10 = 0;
+                                    bytesRead = 0;
                                 }
-                                if (num10 < num9)
+                                if (bytesRead < bytesToRead)
                                 {
-                                    flag2 = true;
-                                    while (num10 < num9)
+                                    shortReadOccurred = true;
+                                    while (bytesRead < bytesToRead)
                                     {
-                                        array[num10++] = 0;
+                                        copyBuffer[bytesRead++] = 0;
                                     }
                                 }
-                                stream.Write(array, 0, num10);
-                                num8 += num10;
-                                transferStatistics.TransferredBytes += num10;
+                                destinationStream.Write(copyBuffer, 0, bytesRead);
+                                transferred += bytesRead;
+                                transferStatistics.TransferredBytes += bytesRead;
                                 base._events?.OnProgress(new SyncProgress
                                 {
                                     Stage = SyncStage.Transferring,
-                                    CurrentFile = list2[syncAction.Argument].FullPath,
+                                    CurrentFile = localPaths[action.Argument].FullPath,
                                     Transferred = transferStatistics.TransferredBytes,
                                     Total = transferStatistics.TotalBytes
                                 });
                             }
                             transferStatistics.CopiedFiles++;
-                            if (num7 > array2.Length)
+                            if (paddingBytes > paddingBuffer.Length)
                             {
-                                array2 = new byte[num7];
+                                paddingBuffer = new byte[paddingBytes];
                             }
-                            stream.Write(array2, 0, num7);
-                            if (flag2)
+                            destinationStream.Write(paddingBuffer, 0, paddingBytes);
+                            if (shortReadOccurred)
                             {
                                 base._events.OnWarning(new SyncWarning
                                 {
-                                    Warning = new QuickSyncWarning(QuickSyncWarningType.CannotReadLocalFile, list2[syncAction.Argument].FullPath, 0)
+                                    Warning = new QuickSyncWarning(QuickSyncWarningType.CannotReadLocalFile, localPaths[action.Argument].FullPath, 0)
                                 });
                             }
                         }
@@ -258,31 +258,31 @@ internal class TarSyncEngine : CommandSyncEngine
                         {
                             throw;
                         }
-                        catch (Exception ex2)
+                        catch (Exception ex)
                         {
-                            if (flag)
+                            if (headerWritten)
                             {
                                 throw;
                             }
                             base._events.OnWarning(new SyncWarning
                             {
-                                Exception = ex2,
-                                Warning = new QuickSyncWarning(quickSyncWarningType, list2[syncAction.Argument].FullPath, 0)
+                                Exception = ex,
+                                Warning = new QuickSyncWarning(warningType, localPaths[action.Argument].FullPath, 0)
                             });
                         }
                         break;
                     }
                 case SyncPlan.ActionType.DeleteTargetFile:
-                    streamWriter.WriteLine($"rm -f \"{syncAction.Path}\" || echo \"cmdfail:{num3}\"");
-                    num2++;
+                    streamWriter.WriteLine($"rm -f \"{action.Path}\" || echo \"cmdfail:{i}\"");
+                    scriptCommandCount++;
                     break;
             }
         }
         streamWriter.Flush();
-        if (num2 == 0)
+        if (scriptCommandCount == 0)
         {
             return default;
         }
-        return new TarPayload(text, memoryStream.ToArray());
+        return new TarPayload(marker, memoryStream.ToArray());
     }
 }

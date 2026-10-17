@@ -1,35 +1,35 @@
-﻿using System.Windows.Forms;
+using System.Windows.Forms;
 
 namespace SmarTTY.Forms;
 
 public partial class ProxyAuthForm : DpiAwareForm
 {
 
-    private ProxyAuthForm(string text, string text2)
+    private ProxyAuthForm(string hostName, string credentials)
     {
         this.InitializeComponent();
-        lblHostName.Text = text;
-        if (text2 != null)
+        lblHostName.Text = hostName;
+        if (credentials != null)
         {
-            int num = text2.IndexOf(':');
-            if (num == -1)
+            int colonIdx = credentials.IndexOf(':');
+            if (colonIdx == -1)
             {
-                txtUserName.Text = text2;
+                txtUserName.Text = credentials;
                 return;
             }
-            txtUserName.Text = text2.Substring(0, num);
-            txtPassword.Text = text2.Substring(num + 1);
+            txtUserName.Text = credentials.Substring(0, colonIdx);
+            txtPassword.Text = credentials.Substring(colonIdx + 1);
         }
     }
 
-    public static bool ShowPrompt(string text, ref string text2)
+    public static bool ShowPrompt(string hostName, ref string credentials)
     {
-        ProxyAuthForm proxyAuthForm = new ProxyAuthForm(text, text2);
+        ProxyAuthForm proxyAuthForm = new ProxyAuthForm(hostName, credentials);
         if (proxyAuthForm.ShowModal() != DialogResult.OK)
         {
             return false;
         }
-        text2 = proxyAuthForm.txtUserName.Text + ":" + proxyAuthForm.txtPassword.Text;
+        credentials = proxyAuthForm.txtUserName.Text + ":" + proxyAuthForm.txtPassword.Text;
         return true;
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace SmarTTY.Utilities;
@@ -14,26 +14,26 @@ public static class ScreenEdgeUtils
         Bottom = 8
     }
 
-    public static EdgeFlags GetNearEdges(Control control, Point point, int value2)
+    public static EdgeFlags GetNearEdges(Control control, Point point, int margin)
     {
         EdgeFlags edgeFlags = ScreenEdgeUtils.EdgeFlags.None;
         if (control == null)
         {
             return edgeFlags;
         }
-        if (point.X < value2)
+        if (point.X < margin)
         {
             edgeFlags |= ScreenEdgeUtils.EdgeFlags.Left;
         }
-        if (point.Y < value2)
+        if (point.Y < margin)
         {
             edgeFlags |= ScreenEdgeUtils.EdgeFlags.Top;
         }
-        if (point.X > control.Width - value2)
+        if (point.X > control.Width - margin)
         {
             edgeFlags |= ScreenEdgeUtils.EdgeFlags.Right;
         }
-        if (point.Y > control.Height - value2)
+        if (point.Y > control.Height - margin)
         {
             edgeFlags |= ScreenEdgeUtils.EdgeFlags.Bottom;
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 using VisualTTY;
@@ -17,15 +17,15 @@ public partial class PaletteEditForm : OKCancelFormBase
 
         private PaletteEditForm _owner;
 
-        public SwatchClickHandler(PaletteEditForm paletteEditForm, int value2, Panel panel, bool flag)
+        public SwatchClickHandler(PaletteEditForm paletteEditForm, int colorIndex, Panel swatch, bool isBright)
         {
-            this._colorIndex = value2;
-            _swatch = panel;
-            this._isBright = flag;
+            this._colorIndex = colorIndex;
+            _swatch = swatch;
+            this._isBright = isBright;
             this._owner = paletteEditForm;
         }
 
-        internal void OnClick(object sender, EventArgs e2)
+        internal void OnClick(object sender, EventArgs e)
         {
             _owner._colorDialog.Color = _swatch.BackColor;
             if (_owner._colorDialog.ShowDialog() == DialogResult.OK)
@@ -55,38 +55,38 @@ public partial class PaletteEditForm : OKCancelFormBase
         {
             _palette = ConsolePalette.PuTTY.Clone();
         }
-        for (int num = 1; num < tableLayoutPanel1.RowCount; num++)
+        for (int rowIdx = 1; rowIdx < tableLayoutPanel1.RowCount; rowIdx++)
         {
             tableLayoutPanel1.Controls.Add(new Label
             {
-                Text = (num - 1).ToString(),
+                Text = (rowIdx - 1).ToString(),
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft
-            }, 0, num);
+            }, 0, rowIdx);
             Panel panel = new Panel
             {
                 BorderStyle = BorderStyle.Fixed3D,
-                BackColor = _palette.NormalColors[num - 1]
+                BackColor = _palette.NormalColors[rowIdx - 1]
             };
-            panel.Click += new SwatchClickHandler(this, num - 1, panel, flag: false).OnClick;
-            tableLayoutPanel1.Controls.Add(panel, 1, num);
+            panel.Click += new SwatchClickHandler(this, rowIdx - 1, panel, isBright: false).OnClick;
+            tableLayoutPanel1.Controls.Add(panel, 1, rowIdx);
             panel = new Panel
             {
                 BorderStyle = BorderStyle.Fixed3D,
-                BackColor = _palette.BrightColors[num - 1]
+                BackColor = _palette.BrightColors[rowIdx - 1]
             };
-            tableLayoutPanel1.Controls.Add(panel, 2, num);
-            panel.Click += new SwatchClickHandler(this, num - 1, panel, flag: true).OnClick;
+            tableLayoutPanel1.Controls.Add(panel, 2, rowIdx);
+            panel.Click += new SwatchClickHandler(this, rowIdx - 1, panel, isBright: true).OnClick;
         }
     }
 
     private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
     {
         _palette = ConsolePalette.PuTTY.Clone();
-        for (int num = 1; num < tableLayoutPanel1.RowCount; num++)
+        for (int rowIdx = 1; rowIdx < tableLayoutPanel1.RowCount; rowIdx++)
         {
-            tableLayoutPanel1.GetControlFromPosition(1, num).BackColor = _palette.NormalColors[num - 1];
-            tableLayoutPanel1.GetControlFromPosition(2, num).BackColor = _palette.BrightColors[num - 1];
+            tableLayoutPanel1.GetControlFromPosition(1, rowIdx).BackColor = _palette.NormalColors[rowIdx - 1];
+            tableLayoutPanel1.GetControlFromPosition(2, rowIdx).BackColor = _palette.BrightColors[rowIdx - 1];
         }
     }
 }

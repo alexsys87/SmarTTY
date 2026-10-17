@@ -1,4 +1,4 @@
-﻿using SmarTTY.Forms;
+using SmarTTY.Forms;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
@@ -33,14 +33,14 @@ internal class SuggestionPopup
 
     public bool IsVisible => _form.Visible;
 
-    internal SuggestionPopup(SuggestionCatalog suggestionCatalog, string text, ICompletionHost completionHost, bool flag)
-        : this(suggestionCatalog.CreateSnapshot(text), completionHost, flag)
+    internal SuggestionPopup(SuggestionCatalog suggestionCatalog, string filterText, ICompletionHost completionHost, bool allowMultiSelect)
+        : this(suggestionCatalog.CreateSnapshot(filterText), completionHost, allowMultiSelect)
     {
     }
 
-    internal SuggestionPopup(ISuggestionSource suggestionSource, ICompletionHost completionHost, bool flag)
+    internal SuggestionPopup(ISuggestionSource suggestionSource, ICompletionHost completionHost, bool allowMultiSelect)
     {
-        _form = new SuggestionListForm(completionHost, flag);
+        _form = new SuggestionListForm(completionHost, allowMultiSelect);
         _maxWidth = _form.Width;
         _maxHeight = _form.Height;
         _source = suggestionSource;
@@ -50,49 +50,49 @@ internal class SuggestionPopup
         this._parentHandle = parent.Handle;
     }
 
-    public void SelectMatch(string text, bool flag)
+    public void SelectMatch(string prefix, bool exactMatch)
     {
-        _form.SelectMatch(text, flag);
+        _form.SelectMatch(prefix, exactMatch);
     }
 
-    public void Show(bool flag)
+    public void Show(bool autoSize)
     {
-        Rectangle rectangle = _host.CaretScreenBounds;
+        Rectangle bounds = _host.CaretScreenBounds;
         Screen screen = Screen.FromControl(_host.HostControl);
-        int num = rectangle.Left - 16;
-        if (num < screen.WorkingArea.Left)
+        int xPos = bounds.Left - 16;
+        if (xPos < screen.WorkingArea.Left)
         {
-            num = screen.WorkingArea.Left;
+            xPos = screen.WorkingArea.Left;
         }
-        if (num + _form.Width >= screen.WorkingArea.Right)
+        if (xPos + _form.Width >= screen.WorkingArea.Right)
         {
-            num = screen.WorkingArea.Right - _form.Width;
+            xPos = screen.WorkingArea.Right - _form.Width;
         }
-        if (flag)
+        if (autoSize)
         {
             Graphics graphics = Graphics.FromHwnd(_form.Handle);
-            int num2 = 0;
-            foreach (ISuggestion item in _source.Items)
+            int maxItemWidth = 0;
+            foreach (ISuggestion suggestion in _source.Items)
             {
-                SizeF sizeF = graphics.MeasureString(item.DisplayName, _form.Font);
-                if ((int)sizeF.Width > num2)
+                SizeF sizeF = graphics.MeasureString(suggestion.DisplayName, _form.Font);
+                if ((int)sizeF.Width > maxItemWidth)
                 {
-                    num2 = (int)sizeF.Width;
+                    maxItemWidth = (int)sizeF.Width;
                 }
             }
-            if (num2 > _maxWidth)
+            if (maxItemWidth > _maxWidth)
             {
-                num2 = _maxWidth;
+                maxItemWidth = _maxWidth;
             }
-            _form.SetSize(num2, 0, _maxHeight);
+            _form.SetSize(maxItemWidth, 0, _maxHeight);
         }
-        int num3 = rectangle.Bottom + 5;
-        if (num3 + _form.Height >= screen.WorkingArea.Bottom)
+        int yPos = bounds.Bottom + 5;
+        if (yPos + _form.Height >= screen.WorkingArea.Bottom)
         {
-            num3 = rectangle.Top - 5 - _form.Height;
+            yPos = bounds.Top - 5 - _form.Height;
         }
-        _form.Top = num3;
-        _form.Left = num;
+        _form.Top = yPos;
+        _form.Left = xPos;
         if (!_form.Visible)
         {
             _form.Show();
@@ -110,40 +110,40 @@ internal class SuggestionPopup
         }
     }
 
-    private static int CommonPrefixLength(string text, string text2)
+    private static int CommonPrefixLength(string first, string second)
     {
-        int num = Math.Min(text.Length, text2.Length);
-        for (int num2 = 0; num2 < num; num2++)
+        int limit = Math.Min(first.Length, second.Length);
+        for (int i = 0; i < limit; i++)
         {
-            if (text[num2] != text2[num2])
+            if (first[i] != second[i])
             {
-                return num2;
+                return i;
             }
         }
-        return num;
+        return limit;
     }
 
-    public string GetCommonPrefix(string text2)
+    public string GetCommonPrefix(string prefix)
     {
-        string text = null;
-        foreach (ISuggestion item in _source.Items)
+        string commonPrefix = null;
+        foreach (ISuggestion suggestion in _source.Items)
         {
-            if (item.DisplayName.Length < text2.Length || item.DisplayName.Substring(0, text2.Length) != text2)
+            if (suggestion.DisplayName.Length < prefix.Length || suggestion.DisplayName.Substring(0, prefix.Length) != prefix)
             {
                 continue;
             }
-            if (text == null)
+            if (commonPrefix == null)
             {
-                text = item.DisplayName;
+                commonPrefix = suggestion.DisplayName;
                 continue;
             }
-            int num = CommonPrefixLength(item.DisplayName, text);
-            if (num < text.Length)
+            int len = CommonPrefixLength(suggestion.DisplayName, commonPrefix);
+            if (len < commonPrefix.Length)
             {
-                text = text.Substring(0, num);
+                commonPrefix = commonPrefix.Substring(0, len);
             }
         }
-        return text;
+        return commonPrefix;
     }
 
     internal void AcceptSelected()

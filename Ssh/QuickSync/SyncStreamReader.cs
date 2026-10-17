@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 
 namespace SmarTTY.Ssh.QuickSync;
@@ -13,24 +13,24 @@ internal class SyncStreamReader
 
     private byte[] _buffer;
 
-    public SyncStreamReader(SshShellChannel sshShellChannel, int value2 = 65536)
+    public SyncStreamReader(SshShellChannel sshShellChannel, int bufferSize = 65536)
     {
-        _buffer = new byte[value2];
+        _buffer = new byte[bufferSize];
         _channel = sshShellChannel;
     }
 
-    public void ReadBytes(byte[] buffer, int value2)
+    public void ReadBytes(byte[] buffer, int length)
     {
-        int num = 0;
+        int destOffset = 0;
         while (true)
         {
-            if (_position < _count && value2 > 0)
+            if (_position < _count && length > 0)
             {
-                buffer[num++] = _buffer[_position++];
-                value2--;
+                buffer[destOffset++] = _buffer[_position++];
+                length--;
                 continue;
             }
-            if (value2 != 0)
+            if (length != 0)
             {
                 _position = 0;
                 _count = _channel.Output.Read(_buffer, 0, _buffer.Length);
@@ -46,29 +46,29 @@ internal class SyncStreamReader
 
     public SyncRecordType ReadRecordType()
     {
-        byte[] array = new byte[1];
-        ReadBytes(array, 1);
-        return (SyncRecordType)array[0];
+        byte[] bytes = new byte[1];
+        ReadBytes(bytes, 1);
+        return (SyncRecordType)bytes[0];
     }
 
     public int ReadInt32()
     {
-        byte[] value = new byte[4];
-        ReadBytes(value, 4);
-        return BitConverter.ToInt32(value, 0);
+        byte[] bytes = new byte[4];
+        ReadBytes(bytes, 4);
+        return BitConverter.ToInt32(bytes, 0);
     }
 
     public long ReadInt64()
     {
-        byte[] value = new byte[8];
-        ReadBytes(value, 8);
-        return BitConverter.ToInt64(value, 0);
+        byte[] bytes = new byte[8];
+        ReadBytes(bytes, 8);
+        return BitConverter.ToInt64(bytes, 0);
     }
 
     public string ReadString()
     {
-        byte[] array = new byte[ReadInt32()];
-        ReadBytes(array, array.Length);
-        return Encoding.UTF8.GetString(array);
+        byte[] bytes = new byte[ReadInt32()];
+        ReadBytes(bytes, bytes.Length);
+        return Encoding.UTF8.GetString(bytes);
     }
 }

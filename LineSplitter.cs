@@ -1,4 +1,4 @@
-﻿using SmarTTY.Terminal;
+using SmarTTY.Terminal;
 using System.Collections.Generic;
 
 namespace SmarTTY;
@@ -11,25 +11,25 @@ public class LineSplitter
 
     public string PendingText => _pending;
 
-    public IEnumerable<string> Feed(byte[] buffer, int value2, int value3)
+    public IEnumerable<string> Feed(byte[] buffer, int offset, int count)
     {
-        List<string> list = new List<string>();
-        this._pending += this._decoder.Decode(buffer, value2, value3);
-        int num = 0;
+        List<string> lines = new List<string>();
+        this._pending += this._decoder.Decode(buffer, offset, count);
+        int startIndex = 0;
         while (true)
         {
-            int num2 = this._pending.IndexOf('\n', num);
-            if (num2 == -1)
+            int newlineIndex = this._pending.IndexOf('\n', startIndex);
+            if (newlineIndex == -1)
             {
                 break;
             }
-            list.Add(this._pending.Substring(num, num2 - num));
-            num = num2 + 1;
+            lines.Add(this._pending.Substring(startIndex, newlineIndex - startIndex));
+            startIndex = newlineIndex + 1;
         }
-        if (num != 0)
+        if (startIndex != 0)
         {
-            this._pending = this._pending.Substring(num);
+            this._pending = this._pending.Substring(startIndex);
         }
-        return list;
+        return lines;
     }
 }

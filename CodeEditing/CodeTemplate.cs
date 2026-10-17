@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -30,12 +30,12 @@ public class CodeTemplate
 
         public object Tag;
 
-        public TemplatePart(string text, bool flag, PlaceholderSelection placeholderSelection, object obj)
+        public TemplatePart(string text, bool isTabStop, PlaceholderSelection selection, object tag)
         {
             this.Text = text;
-            this.IsTabStop = flag;
-            this.Selection = placeholderSelection;
-            Tag = obj;
+            this.IsTabStop = isTabStop;
+            this.Selection = selection;
+            Tag = tag;
         }
 
         public bool HasSelection(PlaceholderSelection placeholderSelection)
@@ -46,8 +46,8 @@ public class CodeTemplate
 
     public class TabStopPart : TemplatePart
     {
-        public TabStopPart(string text, PlaceholderSelection placeholderSelection, object obj)
-            : base(text, flag: true, placeholderSelection, obj)
+        public TabStopPart(string text, PlaceholderSelection placeholderSelection, object tag)
+            : base(text, isTabStop: true, placeholderSelection, tag)
         {
         }
 
@@ -56,16 +56,16 @@ public class CodeTemplate
         {
         }
 
-        public TabStopPart(string text, object obj)
-            : this(text, PlaceholderSelection.Default, obj)
+        public TabStopPart(string text, object tag)
+            : this(text, PlaceholderSelection.Default, tag)
         {
         }
     }
 
     public class LiteralPart : TemplatePart
     {
-        public LiteralPart(string text, PlaceholderSelection placeholderSelection, object obj)
-            : base(text, flag: false, placeholderSelection, obj)
+        public LiteralPart(string text, PlaceholderSelection placeholderSelection, object tag)
+            : base(text, isTabStop: false, placeholderSelection, tag)
         {
         }
 
@@ -74,8 +74,8 @@ public class CodeTemplate
         {
         }
 
-        public LiteralPart(string text, object obj)
-            : this(text, PlaceholderSelection.Default, obj)
+        public LiteralPart(string text, object tag)
+            : this(text, PlaceholderSelection.Default, tag)
         {
         }
     }
@@ -86,32 +86,32 @@ public class CodeTemplate
 
         public List<TemplatePart> Parts;
 
-        public TemplateLine(int value2)
+        public TemplateLine(int indent)
         {
-            this.Indent = value2;
+            this.Indent = indent;
             Parts = new List<TemplatePart>();
         }
 
-        public TemplateLine(int value2, params TemplatePart[] items)
+        public TemplateLine(int indent, params TemplatePart[] parts)
         {
-            this.Indent = value2;
-            this.Parts = new List<TemplatePart>(items);
+            this.Indent = indent;
+            this.Parts = new List<TemplatePart>(parts);
         }
 
-        public TemplateLine(int value2, params string[] items)
+        public TemplateLine(int indent, params string[] partStrings)
         {
-            this.Indent = value2;
+            this.Indent = indent;
             this.Parts = new List<TemplatePart>();
-            foreach (string text in items)
+            foreach (string str in partStrings)
             {
-                if (text[0] == '+')
+                if (str[0] == '+')
                 {
-                    this.Parts.Add(new TabStopPart(text.Substring(1)));
+                    this.Parts.Add(new TabStopPart(str.Substring(1)));
                     continue;
                 }
-                if (text[0] == '-')
+                if (str[0] == '-')
                 {
-                    this.Parts.Add(new LiteralPart(text.Substring(1)));
+                    this.Parts.Add(new LiteralPart(str.Substring(1)));
                     continue;
                 }
                 throw new ArgumentException();
@@ -123,9 +123,9 @@ public class CodeTemplate
 
     public TemplateInsertMode InsertMode;
 
-    public CodeTemplate(params TemplateLine[] items)
+    public CodeTemplate(params TemplateLine[] lines)
     {
-        Lines = new List<TemplateLine>(items);
+        Lines = new List<TemplateLine>(lines);
     }
 
     internal void Insert(CodeEditorPP codeEditorPP, TextDocument.TextPosition textPosition)

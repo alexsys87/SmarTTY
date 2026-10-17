@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,33 +10,33 @@ namespace SmarTTY;
 internal static class AuthorizedKeysManager
 {
 
-    public static bool IsKeyAuthorized(SshSession sshSession, byte[] buffer)
+    public static bool IsKeyAuthorized(SshSession sshSession, byte[] keyBlob)
     {
         try
         {
-            List<string> list = sshSession.RunCommandChecked("pwd", requireSuccess: true);
-            if (list == null || list.Count < 1)
+            List<string> pwdLines = sshSession.RunCommandChecked("pwd", requireSuccess: true);
+            if (pwdLines == null || pwdLines.Count < 1)
             {
                 return false;
             }
-            using (ScpDownloadStream stream = sshSession.OpenDownload(list[0] + "/.ssh/authorized_keys"))
+            using (ScpDownloadStream stream = sshSession.OpenDownload(pwdLines[0] + "/.ssh/authorized_keys"))
             {
                 using StreamReader streamReader = new StreamReader(stream);
                 while (!streamReader.EndOfStream)
                 {
-                    string text = streamReader.ReadLine();
-                    if (text == null)
+                    string line = streamReader.ReadLine();
+                    if (line == null)
                     {
                         break;
                     }
-                    string[] array = text.Split(' ');
-                    if (array.Length < 3)
+                    string[] parts = line.Split(' ');
+                    if (parts.Length < 3)
                     {
                         continue;
                     }
                     try
                     {
-                        if (PasswordProtector.BytesEqual(Convert.FromBase64String(array[1]), buffer))
+                        if (PasswordProtector.BytesEqual(Convert.FromBase64String(parts[1]), keyBlob))
                         {
                             return true;
                         }
@@ -54,20 +54,20 @@ internal static class AuthorizedKeysManager
         }
     }
 
-    public static void RemoveAuthorizedKey(SshSession sshSession, byte[] buffer)
+    public static void RemoveAuthorizedKey(SshSession sshSession, byte[] keyBlob)
     {
-        List<string> list = sshSession.RunCommandChecked("pwd", requireSuccess: true);
-        if (list == null || list.Count < 1)
+        List<string> pwdLines = sshSession.RunCommandChecked("pwd", requireSuccess: true);
+        if (pwdLines == null || pwdLines.Count < 1)
         {
             throw new Exception("Cannot determine user profile directory");
         }
-        string text = list.Where((string text4) => text4.StartsWith("/")).FirstOrDefault() ?? throw new Exception("Failed to detect home directory");
-        if (sshSession.RunCommandChecked(string.Format("test -d {0}", text + "/.ssh"), requireSuccess: true) == null)
+        string homeDir = pwdLines.Where((string line) => line.StartsWith("/")).FirstOrDefault() ?? throw new Exception("Failed to detect home directory");
+        if (sshSession.RunCommandChecked(string.Format("test -d {0}", homeDir + "/.ssh"), requireSuccess: true) == null)
         {
             return;
         }
         MemoryStream memoryStream = new MemoryStream();
-        using (ScpDownloadStream stream = sshSession.OpenDownload(list[0] + "/.ssh/authorized_keys"))
+        using (ScpDownloadStream stream = sshSession.OpenDownload(pwdLines[0] + "/.ssh/authorized_keys"))
         {
             using StreamReader streamReader = new StreamReader(stream);
             using StreamWriter streamWriter = new StreamWriter(memoryStream)
@@ -76,19 +76,19 @@ internal static class AuthorizedKeysManager
             };
             while (!streamReader.EndOfStream)
             {
-                string text2 = streamReader.ReadLine();
-                if (text2 == null)
+                string line = streamReader.ReadLine();
+                if (line == null)
                 {
                     break;
                 }
-                string[] array = text2.Split(' ');
-                if (array.Length < 3)
+                string[] parts = line.Split(' ');
+                if (parts.Length < 3)
                 {
                     continue;
                 }
                 try
                 {
-                    if (PasswordProtector.BytesEqual(Convert.FromBase64String(array[1]), buffer))
+                    if (PasswordProtector.BytesEqual(Convert.FromBase64String(parts[1]), keyBlob))
                     {
                         continue;
                     }
@@ -96,45 +96,45 @@ internal static class AuthorizedKeysManager
                 catch
                 {
                 }
-                streamWriter.WriteLine(text2);
+                streamWriter.WriteLine(line);
             }
         }
-        string text3 = text + "/.ssh/authorized_keys";
-        byte[] array2 = memoryStream.ToArray();
-        using (ScpChannelStream scpChannelStream = sshSession.OpenUpload(text3 + ".smartty", array2.Length))
+        string authKeysPath = homeDir + "/.ssh/authorized_keys";
+        byte[] data = memoryStream.ToArray();
+        using (ScpChannelStream scpChannelStream = sshSession.OpenUpload(authKeysPath + ".smartty", data.Length))
         {
-            scpChannelStream.Write(array2, 0, array2.Length);
+            scpChannelStream.Write(data, 0, data.Length);
         }
-        if (sshSession.RunCommandChecked(string.Format("mv {0}.smartty {0}", text3), requireSuccess: true) != null)
+        if (sshSession.RunCommandChecked(string.Format("mv {0}.smartty {0}", authKeysPath), requireSuccess: true) != null)
         {
             return;
         }
         throw new Exception("Cannot rename authorized_keys file");
     }
 
-    public static void AppendAuthorizedKey(SshSession sshSession, string text4)
+    public static void AppendAuthorizedKey(SshSession sshSession, string keyString)
     {
-        List<string> list = sshSession.RunCommandChecked("pwd", requireSuccess: true);
-        if (list == null || list.Count < 1)
+        List<string> pwdLines = sshSession.RunCommandChecked("pwd", requireSuccess: true);
+        if (pwdLines == null || pwdLines.Count < 1)
         {
             throw new Exception("Cannot determine user profile directory");
         }
-        string text = list.Where((string text3) => text3.StartsWith("/")).FirstOrDefault() ?? throw new Exception("Failed to detect home directory");
-        if (sshSession.RunCommandChecked(string.Format("test -d {0} || mkdir -m 700 {0}", text + "/.ssh"), requireSuccess: true) == null)
+        string homeDir = pwdLines.Where((string line) => line.StartsWith("/")).FirstOrDefault() ?? throw new Exception("Failed to detect home directory");
+        if (sshSession.RunCommandChecked(string.Format("test -d {0} || mkdir -m 700 {0}", homeDir + "/.ssh"), requireSuccess: true) == null)
         {
             throw new Exception("Cannot access .ssh directory");
         }
-        string text2 = text + "/.ssh/authorized_keys";
-        sshSession.RunCommandChecked("test -f " + text2, requireSuccess: true);
-        using (SshShellChannel sshShellChannel = sshSession.OpenShellChannel("cat >> " + text2))
+        string authKeysPath = homeDir + "/.ssh/authorized_keys";
+        sshSession.RunCommandChecked("test -f " + authKeysPath, requireSuccess: true);
+        using (SshShellChannel sshShellChannel = sshSession.OpenShellChannel("cat >> " + authKeysPath))
         {
             using (StreamWriter streamWriter = new StreamWriter(sshShellChannel.Input))
             {
-                streamWriter.Write(text4 + "\n");
+                streamWriter.Write(keyString + "\n");
             }
             sshShellChannel.SendEof();
         }
-        sshSession.RunCommandChecked("chmod 700 " + text + "/.ssh", requireSuccess: true);
-        sshSession.RunCommandChecked("chmod 600 " + text2, requireSuccess: true);
+        sshSession.RunCommandChecked("chmod 700 " + homeDir + "/.ssh", requireSuccess: true);
+        sshSession.RunCommandChecked("chmod 600 " + authKeysPath, requireSuccess: true);
     }
 }

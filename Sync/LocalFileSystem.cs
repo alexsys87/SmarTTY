@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh.QuickSync;
+using SmarTTY.Ssh.QuickSync;
 using Microsoft.Win32.SafeHandles;
 using SmarTTY.Native;
 using SmarTTY.Utilities;
@@ -94,16 +94,16 @@ public static class LocalFileSystem
 
         public bool HasTimestamp => LastWriteFileTime != 0;
 
-        public FileStamp(long value2, int value3)
+        public FileStamp(long size, int unixSeconds)
         {
-            LastWriteFileTime = UnixEpoch.AddSeconds(value3).ToFileTimeUtc();
-            Size = value2;
+            LastWriteFileTime = UnixEpoch.AddSeconds(unixSeconds).ToFileTimeUtc();
+            Size = size;
         }
 
-        public FileStamp(long value2, long value3)
+        public FileStamp(long size, long fileTime)
         {
-            Size = value2;
-            LastWriteFileTime = value3;
+            Size = size;
+            LastWriteFileTime = fileTime;
         }
 
         public FileStamp(FindData findData)
@@ -113,21 +113,21 @@ public static class LocalFileSystem
         }
 
         [SpecialName]
-        public static bool IsSame(FileStamp fileStamp, FileStamp fileStamp2)
+        public static bool IsSame(FileStamp first, FileStamp second)
         {
-            if (fileStamp.ModifiedSeconds == fileStamp2.ModifiedSeconds)
+            if (first.ModifiedSeconds == second.ModifiedSeconds)
             {
-                return fileStamp.Size == fileStamp2.Size;
+                return first.Size == second.Size;
             }
             return false;
         }
 
         [SpecialName]
-        public static bool IsDifferent(FileStamp fileStamp, FileStamp fileStamp2)
+        public static bool IsDifferent(FileStamp first, FileStamp second)
         {
-            if (fileStamp.ModifiedSeconds == fileStamp2.ModifiedSeconds)
+            if (first.ModifiedSeconds == second.ModifiedSeconds)
             {
-                return fileStamp.Size != fileStamp2.Size;
+                return first.Size != second.Size;
             }
             return true;
         }
@@ -148,31 +148,31 @@ public static class LocalFileSystem
             _handle = safeFileHandle;
         }
 
-        public int Write(byte[] buffer, int value2)
+        public int Write(byte[] buffer, int count)
         {
-            if (!WriteFile(this._handle, buffer, value2, out var result, IntPtr.Zero))
+            if (!WriteFile(this._handle, buffer, count, out var bytesWritten, IntPtr.Zero))
             {
                 throw new Win32Exception();
             }
-            return result;
+            return bytesWritten;
         }
 
-        public int Read(byte[] buffer, int value2)
+        public int Read(byte[] buffer, int count)
         {
-            if (!ReadFile(this._handle, buffer, value2, out var result, IntPtr.Zero))
+            if (!ReadFile(this._handle, buffer, count, out var bytesRead, IntPtr.Zero))
             {
                 throw new Win32Exception();
             }
-            return result;
+            return bytesRead;
         }
 
         public long GetSize()
         {
-            if (!GetFileSizeEx(_handle, out var result))
+            if (!GetFileSizeEx(_handle, out var fileSize))
             {
                 throw new Win32Exception();
             }
-            return result;
+            return fileSize;
         }
 
         public void Dispose()
@@ -180,9 +180,9 @@ public static class LocalFileSystem
             _handle.Dispose();
         }
 
-        public void SetLastWriteTime(long value2)
+        public void SetLastWriteTime(long fileTime)
         {
-            if (!SetFileTime(_handle, IntPtr.Zero, IntPtr.Zero, ref value2))
+            if (!SetFileTime(_handle, IntPtr.Zero, IntPtr.Zero, ref fileTime))
             {
                 throw new Win32Exception();
             }
@@ -190,11 +190,11 @@ public static class LocalFileSystem
 
         public long GetLastWriteTime()
         {
-            if (!GetFileTime(_handle, IntPtr.Zero, IntPtr.Zero, out var result))
+            if (!GetFileTime(_handle, IntPtr.Zero, IntPtr.Zero, out var fileTime))
             {
                 throw new Win32Exception();
             }
-            return result;
+            return fileTime;
         }
     }
 
@@ -216,7 +216,7 @@ public static class LocalFileSystem
     public static readonly long UnixEpochFileTime = UnixEpoch.ToFileTimeUtc();
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    public static extern IntPtr FindFirstFile(string text, out FindData findData);
+    public static extern IntPtr FindFirstFile(string fileName, out FindData findData);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
     public static extern bool FindNextFile(IntPtr handle, out FindData findData);
@@ -225,80 +225,80 @@ public static class LocalFileSystem
     public static extern bool FindClose(IntPtr handle);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    public static extern int GetFileAttributes(string text);
+    public static extern int GetFileAttributes(string fileName);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetFileAttributes(string text, [MarshalAs(UnmanagedType.U4)] int value2);
+    private static extern bool SetFileAttributes(string fileName, [MarshalAs(UnmanagedType.U4)] int fileAttributes);
 
     [DllImport("kernel32.dll", BestFitMapping = false, CharSet = CharSet.Auto, SetLastError = true)]
-    public static extern bool CreateDirectory(string text, IntPtr handle);
+    public static extern bool CreateDirectory(string path, IntPtr securityAttributes);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool RemoveDirectory(string text);
+    private static extern bool RemoveDirectory(string path);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool MoveFileEx(string text, string text2, MoveFileFlags moveFileFlags);
+    private static extern bool MoveFileEx(string existingFileName, string newFileName, MoveFileFlags flags);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern SafeFileHandle CreateFile([MarshalAs(UnmanagedType.LPTStr)] string text, [MarshalAs(UnmanagedType.U4)] uint value2, [MarshalAs(UnmanagedType.U4)] FileShare fileShare, IntPtr handle, [MarshalAs(UnmanagedType.U4)] FileMode fileMode, [MarshalAs(UnmanagedType.U4)] FileAttributes fileAttributes, IntPtr handle2);
+    private static extern SafeFileHandle CreateFile([MarshalAs(UnmanagedType.LPTStr)] string fileName, [MarshalAs(UnmanagedType.U4)] uint desiredAccess, [MarshalAs(UnmanagedType.U4)] FileShare shareMode, IntPtr securityAttributes, [MarshalAs(UnmanagedType.U4)] FileMode creationDisposition, [MarshalAs(UnmanagedType.U4)] FileAttributes flagsAndAttributes, IntPtr templateFile);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseHandle(IntPtr handle);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetOverlappedResult(SafeHandle safeHandle, [In] IntPtr handle, out int value2, bool flag);
+    private static extern bool GetOverlappedResult(SafeHandle safeHandle, [In] IntPtr overlapped, out int bytesTransferred, bool wait);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool ReadFile(SafeHandle safeHandle, IntPtr handle, int value2, out int value3, IntPtr handle2);
+    private static extern bool ReadFile(SafeHandle safeHandle, IntPtr buffer, int count, out int bytesRead, IntPtr overlapped);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool WriteFile(SafeHandle safeHandle, [Out][MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] byte[] buffer, int value2, out int value3, IntPtr handle);
+    private static extern bool WriteFile(SafeHandle safeHandle, [Out][MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] byte[] buffer, int count, out int bytesWritten, IntPtr overlapped);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool ReadFile(SafeHandle safeHandle, [In][MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] byte[] buffer, int value2, out int value3, IntPtr handle);
+    private static extern bool ReadFile(SafeHandle safeHandle, [In][MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] byte[] buffer, int count, out int bytesRead, IntPtr overlapped);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetFileTime(SafeHandle safeHandle, IntPtr handle, IntPtr handle2, ref long value2);
+    private static extern bool SetFileTime(SafeHandle safeHandle, IntPtr creationTime, IntPtr lastAccessTime, ref long lastWriteTime);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetFileTime(SafeHandle safeHandle, IntPtr handle, IntPtr handle2, out long value2);
+    private static extern bool GetFileTime(SafeHandle safeHandle, IntPtr creationTime, IntPtr lastAccessTime, out long lastWriteTime);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetFileInformationByHandle(SafeFileHandle safeFileHandle, out FileInformation fileInformation);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetFileSizeEx(SafeFileHandle safeFileHandle, out long value2);
+    private static extern bool GetFileSizeEx(SafeFileHandle safeFileHandle, out long fileSize);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeleteFile(string text);
+    private static extern bool DeleteFile(string fileName);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    public static extern bool CreateHardLink(string text, string text2, IntPtr handle);
+    public static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool CreateSymbolicLink(string text, string text2, int value2);
+    private static extern bool CreateSymbolicLink(string symlinkFileName, string targetFileName, int flags);
 
-    public static void CreateSymbolicLink(string text, string text2)
+    public static void CreateSymbolicLink(string symlinkPath, string targetPath)
     {
-        if ((CreateSymbolicLink(text, text2, 2) && IsAccessible(text)) || (CreateSymbolicLink(text, text2, 0) && IsAccessible(text)))
+        if ((CreateSymbolicLink(symlinkPath, targetPath, 2) && IsAccessible(symlinkPath)) || (CreateSymbolicLink(symlinkPath, targetPath, 0) && IsAccessible(symlinkPath)))
         {
             return;
         }
-        throw new Win32Exception("Failed to symlink " + text + " to " + text2);
+        throw new Win32Exception("Failed to symlink " + symlinkPath + " to " + targetPath);
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    public static extern bool CopyFile(string text, string text2, [MarshalAs(UnmanagedType.I1)] bool flag);
+    public static extern bool CopyFile(string existingFileName, string newFileName, [MarshalAs(UnmanagedType.I1)] bool failIfExists);
 
-    public static IEnumerable<FindData> EnumerateDirectory(LocalPath localPath, bool flag)
+    public static IEnumerable<FindData> EnumerateDirectory(LocalPath localPath, bool ignoreMissing)
     {
-        IntPtr intPtr = FindFirstFile(localPath.FullPath + "\\*.*", out var findData);
-        if (intPtr == (IntPtr)(-1))
+        IntPtr findHandle = FindFirstFile(localPath.FullPath + "\\*.*", out var findData);
+        if (findHandle == (IntPtr)(-1))
         {
             int lastWin32Error = Marshal.GetLastWin32Error();
-            if (!((lastWin32Error == 3) & flag))
+            if (!((lastWin32Error == 3) & ignoreMissing))
             {
                 throw new Win32Exception(lastWin32Error);
             }
@@ -313,22 +313,22 @@ public static class LocalFileSystem
                     yield return findData;
                 }
             }
-            while (FindNextFile(intPtr, out findData));
+            while (FindNextFile(findHandle, out findData));
         }
         finally
         {
-            FindClose(intPtr);
+            FindClose(findHandle);
         }
     }
 
-    public static long MakeLong(int value2, int value3)
+    public static long MakeLong(int high, int low)
     {
-        return (long)(((ulong)(uint)value2 << 32) | (uint)value3);
+        return (long)(((ulong)(uint)high << 32) | (uint)low);
     }
 
-    public static long MakeLongUnsigned(uint value2, uint value3)
+    public static long MakeLongUnsigned(uint high, uint low)
     {
-        return (long)(((ulong)value2 << 32) | value3);
+        return (long)(((ulong)high << 32) | low);
     }
 
     public static void CreateDirectoryRecursive(LocalPath localPath)
@@ -352,9 +352,9 @@ public static class LocalFileSystem
         throw new Win32Exception();
     }
 
-    public static bool IsAccessible(string text)
+    public static bool IsAccessible(string path)
     {
-        using SafeFileHandle safeFileHandle = CreateFile(text, 131072u, FileShare.ReadWrite, IntPtr.Zero, FileMode.Open, FileAttributes.Normal, IntPtr.Zero);
+        using SafeFileHandle safeFileHandle = CreateFile(path, 131072u, FileShare.ReadWrite, IntPtr.Zero, FileMode.Open, FileAttributes.Normal, IntPtr.Zero);
         return !safeFileHandle.IsInvalid;
     }
 
@@ -373,38 +373,38 @@ public static class LocalFileSystem
         return new NativeFile(safeFileHandle);
     }
 
-    public static FileInformation GetFileInformation(LocalPath localPath, out long value2, bool flag)
+    public static FileInformation GetFileInformation(LocalPath localPath, out long fileSize, bool throwOnError)
     {
-        value2 = 0L;
+        fileSize = 0L;
         using SafeFileHandle safeFileHandle = CreateFile(localPath.FullPath, 2147483648u, FileShare.Read, IntPtr.Zero, FileMode.Open, FileAttributes.Normal, IntPtr.Zero);
-        if (safeFileHandle.IsInvalid || !GetFileInformationByHandle(safeFileHandle, out var result) || !GetFileSizeEx(safeFileHandle, out value2))
+        if (safeFileHandle.IsInvalid || !GetFileInformationByHandle(safeFileHandle, out var fileInfo) || !GetFileSizeEx(safeFileHandle, out fileSize))
         {
-            if (flag)
+            if (throwOnError)
             {
                 throw new Win32Exception();
             }
             return default;
         }
-        return result;
+        return fileInfo;
     }
 
-    public static void CreateFileLink(LocalPath localPath, string text, LinkOptions linkOptions, Action<RemoteWarningRecord> action)
+    public static void CreateFileLink(LocalPath localPath, string relativeTarget, LinkOptions linkOptions, Action<RemoteWarningRecord> warningHandler)
     {
-        LocalPath localPath2 = localPath.GetParent().Combine(text);
+        LocalPath targetLocalPath = localPath.GetParent().Combine(relativeTarget);
         int fileAttributes = GetFileAttributes(localPath.FullPath);
         if (fileAttributes != -1 && (fileAttributes & 0x400) != 0 && (fileAttributes & 0x10) == 0)
         {
-            KeyValuePair<string, bool> keyValuePair = ReparsePoints.ReadReparsePoint(localPath.FullPath);
-            if (StringComparer.InvariantCulture.Compare(keyValuePair.Key, text) == 0)
+            KeyValuePair<string, bool> linkInfo = ReparsePoints.ReadReparsePoint(localPath.FullPath);
+            if (StringComparer.InvariantCulture.Compare(linkInfo.Key, relativeTarget) == 0)
             {
                 return;
             }
         }
         if (fileAttributes != -1 && (fileAttributes & 0x400) == 0)
         {
-            FileInformation fileInformation = LocalFileSystem.GetFileInformation(localPath, out var num, flag: false);
-            FileInformation fileInformation2 = LocalFileSystem.GetFileInformation(localPath2, out var num2, flag: false);
-            if (fileInformation.Attributes != 0 && fileInformation2.Attributes != 0 && ((fileInformation.NumberOfLinks > 1 && fileInformation.VolumeSerialNumber == fileInformation2.VolumeSerialNumber && fileInformation.FileIndex == fileInformation2.FileIndex) || (fileInformation.LastWriteTime == fileInformation2.LastWriteTime && num == num2)))
+            FileInformation fileInfo1 = LocalFileSystem.GetFileInformation(localPath, out var size1, throwOnError: false);
+            FileInformation fileInfo2 = LocalFileSystem.GetFileInformation(targetLocalPath, out var size2, throwOnError: false);
+            if (fileInfo1.Attributes != 0 && fileInfo2.Attributes != 0 && ((fileInfo1.NumberOfLinks > 1 && fileInfo1.VolumeSerialNumber == fileInfo2.VolumeSerialNumber && fileInfo1.FileIndex == fileInfo2.FileIndex) || (fileInfo1.LastWriteTime == fileInfo2.LastWriteTime && size1 == size2)))
             {
                 return;
             }
@@ -415,16 +415,16 @@ public static class LocalFileSystem
             {
                 if (!DeleteFile(localPath.FullPath))
                 {
-                    action?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteFile, localPath.FullPath, Marshal.GetLastWin32Error()));
+                    warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteFile, localPath.FullPath, Marshal.GetLastWin32Error()));
                 }
             }
             else if ((fileAttributes & 0x400) == 0)
             {
-                DeleteDirectoryRecursive(localPath, action);
+                DeleteDirectoryRecursive(localPath, warningHandler);
             }
             else if (!RemoveDirectory(localPath.FullPath))
             {
-                action?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteDirectory, localPath.FullPath, Marshal.GetLastWin32Error()));
+                warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteDirectory, localPath.FullPath, Marshal.GetLastWin32Error()));
             }
         }
         try
@@ -433,134 +433,134 @@ public static class LocalFileSystem
         }
         catch
         {
-            action?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateDirectory, localPath.GetParent().FullPath, Marshal.GetLastWin32Error()));
+            warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateDirectory, localPath.GetParent().FullPath, Marshal.GetLastWin32Error()));
             return;
         }
         if ((linkOptions & LinkOptions.SkipSymlinks) == 0)
         {
             try
             {
-                CreateSymbolicLink(localPath.FullPath, text.Replace('/', '\\'));
+                CreateSymbolicLink(localPath.FullPath, relativeTarget.Replace('/', '\\'));
                 return;
             }
             catch
             {
-                action?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateSymlink, localPath.FullPath, Marshal.GetLastWin32Error()));
+                warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateSymlink, localPath.FullPath, Marshal.GetLastWin32Error()));
             }
         }
         if ((linkOptions & LinkOptions.SkipHardlinks) == 0)
         {
             try
             {
-                if (!CreateHardLink(localPath.FullPath, localPath2.FullPath, IntPtr.Zero))
+                if (!CreateHardLink(localPath.FullPath, targetLocalPath.FullPath, IntPtr.Zero))
                 {
-                    throw new Win32Exception($"Failed to hardlink {localPath} to {localPath2}");
+                    throw new Win32Exception($"Failed to hardlink {localPath} to {targetLocalPath}");
                 }
                 return;
             }
             catch
             {
-                action?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateHardlink, localPath.FullPath, Marshal.GetLastWin32Error()));
+                warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateHardlink, localPath.FullPath, Marshal.GetLastWin32Error()));
             }
         }
         try
         {
-            if (!CopyFile(localPath.FullPath, localPath2.FullPath, flag: false))
+            if (!CopyFile(localPath.FullPath, targetLocalPath.FullPath, failIfExists: false))
             {
-                throw new Win32Exception($"Failed to copy {localPath2} to {localPath}");
+                throw new Win32Exception($"Failed to copy {targetLocalPath} to {localPath}");
             }
         }
         catch
         {
-            action?.Invoke(new RemoteWarningRecord(FileOperationFailure.CopyFile, localPath.FullPath, Marshal.GetLastWin32Error()));
+            warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.CopyFile, localPath.FullPath, Marshal.GetLastWin32Error()));
         }
     }
 
     private static LocalPath ResolveSymlinkTarget(LocalPath localPath)
     {
-        KeyValuePair<string, bool> keyValuePair = ReparsePoints.ReadReparsePoint(localPath.FullPath);
-        string text = keyValuePair.Key ?? "";
-        if (text.StartsWith("\\\\?\\"))
+        KeyValuePair<string, bool> linkInfo = ReparsePoints.ReadReparsePoint(localPath.FullPath);
+        string target = linkInfo.Key ?? "";
+        if (target.StartsWith("\\\\?\\"))
         {
-            text = text.Substring(4);
+            target = target.Substring(4);
         }
-        if (!keyValuePair.Value || text.StartsWith("\\\\") || (text.Length >= 2 && text[1] == ':'))
+        if (!linkInfo.Value || target.StartsWith("\\\\") || (target.Length >= 2 && target[1] == ':'))
         {
-            return LocalPath.FromUserPath(keyValuePair.Key);
+            return LocalPath.FromUserPath(linkInfo.Key);
         }
-        return localPath.GetParent().Combine(text);
+        return localPath.GetParent().Combine(target);
     }
 
     public static LocalPath ResolveFinalSymlink(LocalPath localPath)
     {
-        HashSet<string> hashSet = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
-        int fileAttributes;
+        HashSet<string> visitedPaths = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+        int attributes;
         do
         {
-            hashSet.Add(localPath.FullPath);
+            visitedPaths.Add(localPath.FullPath);
             localPath = ResolveSymlinkTarget(localPath);
-            if (hashSet.Contains(localPath.FullPath))
+            if (visitedPaths.Contains(localPath.FullPath))
             {
                 throw new Exception("Recursive symlink: " + localPath.FullPath);
             }
-            fileAttributes = GetFileAttributes(localPath.FullPath);
+            attributes = GetFileAttributes(localPath.FullPath);
         }
-        while (fileAttributes != -1 && (fileAttributes & 0x400) != 0);
+        while (attributes != -1 && (attributes & 0x400) != 0);
         return localPath;
     }
 
-    public static void MoveFile(LocalPath localPath, LocalPath localPath2, MoveFileFlags moveFileFlags = MoveFileFlags.None)
+    public static void MoveFile(LocalPath sourcePath, LocalPath destPath, MoveFileFlags moveFileFlags = MoveFileFlags.None)
     {
-        if (!MoveFileEx(localPath.FullPath, localPath2.FullPath, moveFileFlags))
+        if (!MoveFileEx(sourcePath.FullPath, destPath.FullPath, moveFileFlags))
         {
             throw new Win32Exception();
         }
     }
 
-    public static void DeleteDirectoryRecursive(LocalPath localPath, Action<RemoteWarningRecord> action)
+    public static void DeleteDirectoryRecursive(LocalPath localPath, Action<RemoteWarningRecord> warningHandler)
     {
-        foreach (FindData item in EnumerateDirectory(localPath, flag: false))
+        foreach (FindData childData in EnumerateDirectory(localPath, ignoreMissing: false))
         {
-            LocalPath localPath2 = localPath.Combine(item.FileName);
-            if (item.HasAttribute(FileAttributes.Directory))
+            LocalPath childPath = localPath.Combine(childData.FileName);
+            if (childData.HasAttribute(FileAttributes.Directory))
             {
-                if (!item.HasAttribute(FileAttributes.ReparsePoint))
+                if (!childData.HasAttribute(FileAttributes.ReparsePoint))
                 {
-                    DeleteDirectoryRecursive(localPath2, action);
+                    DeleteDirectoryRecursive(childPath, warningHandler);
                 }
-                else if (!RemoveDirectory(localPath2.FullPath))
+                else if (!RemoveDirectory(childPath.FullPath))
                 {
-                    action?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteDirectory, localPath2.FullPath, Marshal.GetLastWin32Error()));
+                    warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteDirectory, childPath.FullPath, Marshal.GetLastWin32Error()));
                 }
             }
-            else if (!TryDeleteFile(localPath2, flag: true, flag2: false))
+            else if (!TryDeleteFile(childPath, resetReadOnly: true, ignoreMissing: false))
             {
-                action?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteFile, localPath2.FullPath, Marshal.GetLastWin32Error()));
+                warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteFile, childPath.FullPath, Marshal.GetLastWin32Error()));
             }
         }
         if (!RemoveDirectory(localPath.FullPath))
         {
-            action?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteDirectory, localPath.FullPath, Marshal.GetLastWin32Error()));
+            warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteDirectory, localPath.FullPath, Marshal.GetLastWin32Error()));
         }
     }
 
-    private static bool TryDeleteFile(LocalPath localPath, bool flag, bool flag2)
+    private static bool TryDeleteFile(LocalPath localPath, bool resetReadOnly, bool ignoreMissing)
     {
         if (DeleteFile(localPath.FullPath))
         {
             return true;
         }
         int lastWin32Error = Marshal.GetLastWin32Error();
-        if ((lastWin32Error == 2) & flag2)
+        if ((lastWin32Error == 2) & ignoreMissing)
         {
             return true;
         }
-        if ((lastWin32Error == 5) & flag)
+        if ((lastWin32Error == 5) & resetReadOnly)
         {
-            int fileAttributes = GetFileAttributes(localPath.FullPath);
-            if (fileAttributes != -1 && (fileAttributes & 1) != 0)
+            int attributes = GetFileAttributes(localPath.FullPath);
+            if (attributes != -1 && (attributes & 1) != 0)
             {
-                SetFileAttributes(localPath.FullPath, fileAttributes & -2);
+                SetFileAttributes(localPath.FullPath, attributes & -2);
                 if (DeleteFile(localPath.FullPath))
                 {
                     return true;
@@ -570,14 +570,13 @@ public static class LocalFileSystem
         return false;
     }
 
-    public static void DeleteFile(LocalPath localPath, bool flag, bool flag2 = false)
+    public static void DeleteFile(LocalPath localPath, bool resetReadOnly, bool ignoreMissing = false)
     {
-        if (TryDeleteFile(localPath, flag, flag2))
+        if (TryDeleteFile(localPath, resetReadOnly, ignoreMissing))
         {
             return;
         }
-        LocalPath localPath2 = localPath;
-        throw new Win32Exception("Failed to delete " + localPath2.ToString());
+        throw new Win32Exception("Failed to delete " + localPath.ToString());
     }
 
     public static void DeleteDirectory(LocalPath localPath)
@@ -588,34 +587,33 @@ public static class LocalFileSystem
         }
         if (Marshal.GetLastWin32Error() == 5)
         {
-            int fileAttributes = GetFileAttributes(localPath.FullPath);
-            if (fileAttributes != -1 && (fileAttributes & 1) != 0)
+            int attributes = GetFileAttributes(localPath.FullPath);
+            if (attributes != -1 && (attributes & 1) != 0)
             {
-                SetFileAttributes(localPath.FullPath, fileAttributes & -2);
+                SetFileAttributes(localPath.FullPath, attributes & -2);
                 if (RemoveDirectory(localPath.FullPath))
                 {
                     return;
                 }
             }
         }
-        LocalPath localPath2 = localPath;
-        throw new Win32Exception("Failed to delete " + localPath2.ToString());
+        throw new Win32Exception("Failed to delete " + localPath.ToString());
     }
 
-    public static void CreateDirectoryLink(LocalPath localPath, string text2, LinkOptions linkOptions, Action<RemoteWarningRecord> action)
+    public static void CreateDirectoryLink(LocalPath localPath, string targetPath, LinkOptions linkOptions, Action<RemoteWarningRecord> warningHandler)
     {
         int fileAttributes = GetFileAttributes(localPath.FullPath);
         if (fileAttributes != -1 && (fileAttributes & 0x400) != 0 && (fileAttributes & 0x10) != 0)
         {
-            KeyValuePair<string, bool> keyValuePair = ReparsePoints.ReadReparsePoint(localPath.FullPath);
-            if (StringComparer.InvariantCulture.Compare(keyValuePair.Key, text2) == 0)
+            KeyValuePair<string, bool> linkInfo = ReparsePoints.ReadReparsePoint(localPath.FullPath);
+            if (StringComparer.InvariantCulture.Compare(linkInfo.Key, targetPath) == 0)
             {
                 return;
             }
         }
         if (fileAttributes != -1 && (fileAttributes & 0x10) == 0 && !DeleteFile(localPath.FullPath))
         {
-            action?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteFile, localPath.FullPath, Marshal.GetLastWin32Error()));
+            warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteFile, localPath.FullPath, Marshal.GetLastWin32Error()));
         }
         try
         {
@@ -623,65 +621,65 @@ public static class LocalFileSystem
         }
         catch
         {
-            action?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateDirectory, localPath.GetParent().FullPath, Marshal.GetLastWin32Error()));
+            warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateDirectory, localPath.GetParent().FullPath, Marshal.GetLastWin32Error()));
             return;
         }
         if ((linkOptions & LinkOptions.SkipSymlinks) == 0)
         {
             try
             {
-                ReparsePoints.CreateSymbolicLink(localPath.FullPath, text2.Replace('/', '\\'), flag: true);
+                ReparsePoints.CreateSymbolicLink(localPath.FullPath, targetPath.Replace('/', '\\'), isDirectory: true);
                 return;
             }
             catch
             {
-                action?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateSymlink, localPath.FullPath, Marshal.GetLastWin32Error()));
+                warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.CreateSymlink, localPath.FullPath, Marshal.GetLastWin32Error()));
             }
         }
-        if (text2.Contains("."))
+        if (targetPath.Contains("."))
         {
-            LocalPath localPath2 = localPath.Combine("..\\" + text2.Replace('/', '\\'));
-            if (localPath.FullPath.ToLower() == localPath2.FullPath.ToLower() || localPath.FullPath.StartsWith(localPath2.FullPath.TrimEnd('\\') + "\\", StringComparison.InvariantCultureIgnoreCase))
+            LocalPath relativeParentPath = localPath.Combine("..\\" + targetPath.Replace('/', '\\'));
+            if (localPath.FullPath.ToLower() == relativeParentPath.FullPath.ToLower() || localPath.FullPath.StartsWith(relativeParentPath.FullPath.TrimEnd('\\') + "\\", StringComparison.InvariantCultureIgnoreCase))
             {
-                action?.Invoke(new RemoteWarningRecord(FileOperationFailure.RecursiveLink, localPath.FullPath, Marshal.GetLastWin32Error()));
+                warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.RecursiveLink, localPath.FullPath, Marshal.GetLastWin32Error()));
                 return;
             }
         }
-        Dictionary<string, FindData> dictionary = EnumerateDirectory(localPath, flag: true).ToOverridingDictionary((FindData findData) => findData.FileName, StringComparer.InvariantCultureIgnoreCase);
-        foreach (FindData item in EnumerateDirectory(localPath.GetParent().Combine(text2), flag: true))
+        Dictionary<string, FindData> childDict = EnumerateDirectory(localPath, ignoreMissing: true).ToOverridingDictionary((FindData findData) => findData.FileName, StringComparer.InvariantCultureIgnoreCase);
+        foreach (FindData childData in EnumerateDirectory(localPath.GetParent().Combine(targetPath), ignoreMissing: true))
         {
-            dictionary.Remove(item.FileName);
-            string text = "..\\" + text2 + "\\" + item.FileName;
-            if (item.HasAttribute(FileAttributes.Directory))
+            childDict.Remove(childData.FileName);
+            string subTargetPath = "..\\" + targetPath + "\\" + childData.FileName;
+            if (childData.HasAttribute(FileAttributes.Directory))
             {
-                CreateDirectoryLink(localPath.Combine(item.FileName), text, linkOptions | LinkOptions.SkipSymlinks, action);
+                CreateDirectoryLink(localPath.Combine(childData.FileName), subTargetPath, linkOptions | LinkOptions.SkipSymlinks, warningHandler);
             }
             else
             {
-                CreateFileLink(localPath.Combine(item.FileName), text, linkOptions | LinkOptions.SkipSymlinks, action);
+                CreateFileLink(localPath.Combine(childData.FileName), subTargetPath, linkOptions | LinkOptions.SkipSymlinks, warningHandler);
             }
         }
         if ((linkOptions & LinkOptions.DeleteExtraneous) != LinkOptions.DeleteExtraneous)
         {
             return;
         }
-        foreach (FindData value in dictionary.Values)
+        foreach (FindData extraneousData in childDict.Values)
         {
-            LocalPath localPath3 = localPath.Combine(value.FileName);
-            if (!value.HasAttribute(FileAttributes.Directory))
+            LocalPath extraneousPath = localPath.Combine(extraneousData.FileName);
+            if (!extraneousData.HasAttribute(FileAttributes.Directory))
             {
-                if (!DeleteFile(localPath3.FullPath))
+                if (!DeleteFile(extraneousPath.FullPath))
                 {
-                    action?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteFile, localPath3.FullPath, Marshal.GetLastWin32Error()));
+                    warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteFile, extraneousPath.FullPath, Marshal.GetLastWin32Error()));
                 }
             }
-            else if (!value.HasAttribute(FileAttributes.ReparsePoint))
+            else if (!extraneousData.HasAttribute(FileAttributes.ReparsePoint))
             {
-                DeleteDirectoryRecursive(localPath3, action);
+                DeleteDirectoryRecursive(extraneousPath, warningHandler);
             }
-            else if (!RemoveDirectory(localPath3.FullPath))
+            else if (!RemoveDirectory(extraneousPath.FullPath))
             {
-                action?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteDirectory, localPath3.FullPath, Marshal.GetLastWin32Error()));
+                warningHandler?.Invoke(new RemoteWarningRecord(FileOperationFailure.DeleteDirectory, extraneousPath.FullPath, Marshal.GetLastWin32Error()));
             }
         }
     }

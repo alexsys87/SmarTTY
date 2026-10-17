@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using Microsoft.Win32;
 using SmarTTY.Controls;
 using System.Drawing;
@@ -19,53 +19,53 @@ public static class AppEnvironment
         return Registry.CurrentUser.CreateSubKey("SOFTWARE\\Sysprogs\\SmarTTY\\Settings");
     }
 
-    public static string GetCurrentDirectory(TerminalEmulatorControl terminalEmulatorControl, SshSession sshSession, ref string text5)
+    public static string GetCurrentDirectory(TerminalEmulatorControl terminalEmulatorControl, SshSession sshSession, ref string cachedHomeDirectory)
     {
         if (terminalEmulatorControl is SshTerminalControl sshTerminalControl)
         {
             return sshTerminalControl.CurrentDirectory;
         }
-        string text = terminalEmulatorControl.Title;
-        if (text == null)
+        string title = terminalEmulatorControl.Title;
+        if (title == null)
         {
             return null;
         }
-        string text2 = null;
-        int num = text.IndexOf(": ");
-        if (num != -1)
+        string workingDir = null;
+        int colonIndex = title.IndexOf(": ");
+        if (colonIndex != -1)
         {
-            text2 = text.Substring(num + 2);
+            workingDir = title.Substring(colonIndex + 2);
         }
         else if (terminalEmulatorControl != null)
         {
-            Point point = terminalEmulatorControl.CursorPosition;
-            string text3 = terminalEmulatorControl.GetLineText(point.Y);
-            if (text3 != null && point.X == text3.Length && text3.Length > 3 && "$#>".IndexOf(text3[point.X - 2]) != -1)
+            Point cursorPosition = terminalEmulatorControl.CursorPosition;
+            string lineText = terminalEmulatorControl.GetLineText(cursorPosition.Y);
+            if (lineText != null && cursorPosition.X == lineText.Length && lineText.Length > 3 && "$#>".IndexOf(lineText[cursorPosition.X - 2]) != -1)
             {
-                num = text3.IndexOf(":");
-                if (num != -1)
+                colonIndex = lineText.IndexOf(":");
+                if (colonIndex != -1)
                 {
-                    string text4 = text3.Substring(num + 1, text3.Length - num - 3);
-                    int num2 = text4.LastIndexOf(' ');
-                    if (num2 != -1 && text4.Substring(num2 + 1) == sshSession.UserName)
+                    string parsedPath = lineText.Substring(colonIndex + 1, lineText.Length - colonIndex - 3);
+                    int spaceIndex = parsedPath.LastIndexOf(' ');
+                    if (spaceIndex != -1 && parsedPath.Substring(spaceIndex + 1) == sshSession.UserName)
                     {
-                        text4 = "~";
+                        parsedPath = "~";
                     }
-                    text2 = text4;
+                    workingDir = parsedPath;
                 }
             }
         }
-        if (text2 != null && text2.StartsWith("~"))
+        if (workingDir != null && workingDir.StartsWith("~"))
         {
-            QueryHomeDirectory(sshSession, ref text5);
-            text2 = ((text5 != null) ? (text5 + text2.Substring(1)) : null);
+            QueryHomeDirectory(sshSession, ref cachedHomeDirectory);
+            workingDir = ((cachedHomeDirectory != null) ? (cachedHomeDirectory + workingDir.Substring(1)) : null);
         }
-        return text2;
+        return workingDir;
     }
 
-    public static void QueryHomeDirectory(SshSession sshSession, ref string text)
+    public static void QueryHomeDirectory(SshSession sshSession, ref string cachedHomeDirectory)
     {
-        if (text != null)
+        if (cachedHomeDirectory != null)
         {
             return;
         }
@@ -73,7 +73,7 @@ public static class AppEnvironment
         {
             using SshShellChannel sshShellChannel = sshSession.OpenShellChannel("pwd");
             using StreamReader streamReader = new StreamReader(sshShellChannel.Output);
-            text = streamReader.ReadLine();
+            cachedHomeDirectory = streamReader.ReadLine();
         }
         catch
         {

@@ -1,4 +1,4 @@
-﻿using SmarTTY.Utilities;
+using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -22,23 +22,23 @@ public class PathUtils
         AlphanumericOnly = 65535
     }
 
-    public static bool IsPathRooted(string text)
+    public static bool IsPathRooted(string path)
     {
         try
         {
-            return Path.IsPathRooted(text);
+            return Path.IsPathRooted(path);
         }
         catch (ArgumentException)
         {
-            throw new ArgumentException("Invalid path: " + text);
+            throw new ArgumentException("Invalid path: " + path);
         }
     }
 
-    public static bool? TryIsPathRooted(string text)
+    public static bool? TryIsPathRooted(string path)
     {
         try
         {
-            return Path.IsPathRooted(text);
+            return Path.IsPathRooted(path);
         }
         catch (ArgumentException)
         {
@@ -46,122 +46,122 @@ public class PathUtils
         }
     }
 
-    public static string StripBasePath(string text, string text2)
+    public static string StripBasePath(string basePath, string fullPath)
     {
-        if (!text2.StartsWith(text, StringComparison.InvariantCultureIgnoreCase))
+        if (!fullPath.StartsWith(basePath, StringComparison.InvariantCultureIgnoreCase))
         {
-            throw new Exception(text2 + " does not start with " + text);
+            throw new Exception(fullPath + " does not start with " + basePath);
         }
-        return text2.Substring(text.Length).TrimStart('\\', '/');
+        return fullPath.Substring(basePath.Length).TrimStart('\\', '/');
     }
 
-    public static string GetRelativePath(string text2, string text3, bool flag = false)
+    public static string GetRelativePath(string basePath, string targetPath, bool useShortPaths = false)
     {
         try
         {
-            if (text3.Length == 2 && text3.EndsWith(":"))
+            if (targetPath.Length == 2 && targetPath.EndsWith(":"))
             {
-                text3 += "\\";
+                targetPath += "\\";
             }
-            if (!Path.IsPathRooted(text3))
+            if (!Path.IsPathRooted(targetPath))
             {
-                return text3;
+                return targetPath;
             }
             char[] separator = new char[2] { '/', '\\' };
-            text2 = Path.GetFullPath(text2);
-            text3 = Path.GetFullPath(text3);
-            if (flag)
+            basePath = Path.GetFullPath(basePath);
+            targetPath = Path.GetFullPath(targetPath);
+            if (useShortPaths)
             {
-                text2 = GetShortPath(text2);
-                text3 = GetShortPath(text3);
+                basePath = GetShortPath(basePath);
+                targetPath = GetShortPath(targetPath);
             }
-            string[] array = text2.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-            string[] array2 = text3.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-            int num;
-            for (num = 0; num < Math.Min(array.Length, array2.Length) && string.Compare(array[num], array2[num], ignoreCase: true) == 0; num++)
+            string[] baseSegments = basePath.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+            string[] targetSegments = targetPath.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+            int commonCount;
+            for (commonCount = 0; commonCount < Math.Min(baseSegments.Length, targetSegments.Length) && string.Compare(baseSegments[commonCount], targetSegments[commonCount], ignoreCase: true) == 0; commonCount++)
             {
             }
-            if (num == 0)
+            if (commonCount == 0)
             {
-                return Path.GetFullPath(text3);
+                return Path.GetFullPath(targetPath);
             }
-            string text = "";
-            for (int num2 = num; num2 < array.Length; num2++)
+            string result = "";
+            for (int i = commonCount; i < baseSegments.Length; i++)
             {
-                text = Path.Combine(text, "..");
+                result = Path.Combine(result, "..");
             }
-            for (int num3 = num; num3 < array2.Length; num3++)
+            for (int j = commonCount; j < targetSegments.Length; j++)
             {
-                text = Path.Combine(text, array2[num3]);
+                result = Path.Combine(result, targetSegments[j]);
             }
-            if (text == "")
+            if (result == "")
             {
-                text = ".";
+                result = ".";
             }
-            return text;
+            return result;
         }
         catch (Exception ex)
         {
-            throw new TargetInvocationException("GetRelativePath('" + text2 + "', '" + text3 + "') failed - " + ex.Message, ex);
+            throw new TargetInvocationException("GetRelativePath('" + basePath + "', '" + targetPath + "') failed - " + ex.Message, ex);
         }
     }
 
-    public static string SanitizeFileName(string text2, FileNameSanitizeMode fileNameSanitizeMode = FileNameSanitizeMode.Default)
+    public static string SanitizeFileName(string fileName, FileNameSanitizeMode fileNameSanitizeMode = FileNameSanitizeMode.Default)
     {
-        if (text2 == null)
+        if (fileName == null)
         {
             return "";
         }
-        char[] array = text2.ToCharArray();
+        char[] charArray = fileName.ToCharArray();
         if (fileNameSanitizeMode == FileNameSanitizeMode.AlphanumericOnly)
         {
-            for (int num = 0; num < array.Length; num++)
+            for (int i = 0; i < charArray.Length; i++)
             {
-                if ((array[num] < 'a' || array[num] > 'z') && (array[num] < 'A' || array[num] > 'Z') && (array[num] < '0' || array[num] > '9'))
+                if ((charArray[i] < 'a' || charArray[i] > 'z') && (charArray[i] < 'A' || charArray[i] > 'Z') && (charArray[i] < '0' || charArray[i] > '9'))
                 {
-                    array[num] = '_';
+                    charArray[i] = '_';
                 }
             }
         }
         else
         {
-            string text = "<>:| ;&=";
+            string invalidChars = "<>:| ;&=";
             if ((fileNameSanitizeMode & FileNameSanitizeMode.PathSeparators) == FileNameSanitizeMode.PathSeparators)
             {
-                text += "\\/";
+                invalidChars += "\\/";
             }
             if ((fileNameSanitizeMode & FileNameSanitizeMode.Parentheses) == FileNameSanitizeMode.Parentheses)
             {
-                text += "()";
+                invalidChars += "()";
             }
             if ((fileNameSanitizeMode & FileNameSanitizeMode.Space) == FileNameSanitizeMode.Space)
             {
-                text += " ";
+                invalidChars += " ";
             }
-            for (int num2 = 0; num2 < array.Length; num2++)
+            for (int i = 0; i < charArray.Length; i++)
             {
-                if (text.IndexOf(array[num2]) != -1)
+                if (invalidChars.IndexOf(charArray[i]) != -1)
                 {
-                    array[num2] = '_';
+                    charArray[i] = '_';
                 }
-                else if (array[num2] < ' ' || array[num2] >= '\u007f')
+                else if (charArray[i] < ' ' || charArray[i] >= '\u007f')
                 {
-                    array[num2] = '_';
+                    charArray[i] = '_';
                 }
             }
         }
-        return new string(array);
+        return new string(charArray);
     }
 
-    public static string GetFullPathOrNull(string text)
+    public static string GetFullPathOrNull(string path)
     {
         try
         {
-            if (text == null)
+            if (path == null)
             {
                 return null;
             }
-            return Path.GetFullPath(text);
+            return Path.GetFullPath(path);
         }
         catch
         {
@@ -169,46 +169,46 @@ public class PathUtils
         }
     }
 
-    public static bool IsUnderDirectory(string text, string text2)
+    public static bool IsUnderDirectory(string path, string directoryPath)
     {
-        if (text == null || text2 == null)
+        if (path == null || directoryPath == null)
         {
             return false;
         }
-        text = text.Replace('/', '\\');
-        text2 = text2.Replace('/', '\\');
-        if (!text.EndsWith("\\"))
+        path = path.Replace('/', '\\');
+        directoryPath = directoryPath.Replace('/', '\\');
+        if (!path.EndsWith("\\"))
         {
-            text += "\\";
+            path += "\\";
         }
-        if (!text2.EndsWith("\\"))
+        if (!directoryPath.EndsWith("\\"))
         {
-            text2 += "\\";
+            directoryPath += "\\";
         }
-        return text.StartsWith(text2, StringComparison.InvariantCultureIgnoreCase);
+        return path.StartsWith(directoryPath, StringComparison.InvariantCultureIgnoreCase);
     }
 
-    public static string GetFullPathChecked(string text)
+    public static string GetFullPathChecked(string path)
     {
         try
         {
-            return Path.GetFullPath(text);
+            return Path.GetFullPath(path);
         }
         catch (NotSupportedException)
         {
-            throw new NotSupportedException("Unsupported path format: " + text);
+            throw new NotSupportedException("Unsupported path format: " + path);
         }
     }
 
-    public static string GetExactCasePath(string text)
+    public static string GetExactCasePath(string path)
     {
         try
         {
-            if (!File.Exists(text) && !Directory.Exists(text))
+            if (!File.Exists(path) && !Directory.Exists(path))
             {
-                return text;
+                return path;
             }
-            DirectoryInfo directoryInfo = new DirectoryInfo(text);
+            DirectoryInfo directoryInfo = new DirectoryInfo(path);
             if (directoryInfo.Parent != null)
             {
                 return Path.Combine(GetExactCasePath(directoryInfo.Parent.FullName), directoryInfo.Parent.GetFileSystemInfos(directoryInfo.Name)[0].Name);
@@ -217,27 +217,27 @@ public class PathUtils
         }
         catch
         {
-            return text;
+            return path;
         }
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    protected static extern uint GetShortPathName([MarshalAs(UnmanagedType.LPTStr)] string text, [MarshalAs(UnmanagedType.LPTStr)] StringBuilder stringBuilder, int value2);
+    protected static extern uint GetShortPathName([MarshalAs(UnmanagedType.LPTStr)] string lpszLongPath, [MarshalAs(UnmanagedType.LPTStr)] StringBuilder lpszShortPath, int cchBuffer);
 
-    public static string GetShortPath(string text)
+    public static string GetShortPath(string path)
     {
-        if (text == null)
+        if (path == null)
         {
             return null;
         }
-        if (text.IndexOf(' ') == -1)
+        if (path.IndexOf(' ') == -1)
         {
-            return text;
+            return path;
         }
         try
         {
             StringBuilder stringBuilder = new StringBuilder(512);
-            if (GetShortPathName(text, stringBuilder, stringBuilder.Capacity) != 0)
+            if (GetShortPathName(path, stringBuilder, stringBuilder.Capacity) != 0)
             {
                 return stringBuilder.ToString();
             }
@@ -245,18 +245,18 @@ public class PathUtils
         catch
         {
         }
-        return text;
+        return path;
     }
 
-    public static bool IsAbsolutePath(string text)
+    public static bool IsAbsolutePath(string path)
     {
         try
         {
-            if (string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(path))
             {
                 return false;
             }
-            return Path.IsPathRooted(text);
+            return Path.IsPathRooted(path);
         }
         catch
         {
@@ -270,93 +270,93 @@ public class PathUtils
         {
             throw new ArgumentException("No path components provided");
         }
-        string text = items[0];
+        string result = items[0];
         foreach (string item in items.Skip(1))
         {
             if (!item.IsNullOrEmpty())
             {
-                text = Path.Combine(text, item);
+                result = Path.Combine(result, item);
             }
         }
-        return text;
+        return result;
     }
 
-    public static string GetFileName(string text)
+    public static string GetFileName(string path)
     {
-        if (text == null)
+        if (path == null)
         {
             return null;
         }
-        int num = text.LastIndexOfAny(new char[2] { '\\', '/' });
-        if (num == -1)
+        int separatorIndex = path.LastIndexOfAny(new char[2] { '\\', '/' });
+        if (separatorIndex == -1)
         {
-            return text;
+            return path;
         }
-        return text.Substring(num + 1);
+        return path.Substring(separatorIndex + 1);
     }
 
-    public static string GetDirectoryName(string text)
+    public static string GetDirectoryName(string path)
     {
-        if (text == null)
+        if (path == null)
         {
             return null;
         }
-        int num = text.LastIndexOfAny(new char[2] { '\\', '/' });
-        if (num == -1)
+        int separatorIndex = path.LastIndexOfAny(new char[2] { '\\', '/' });
+        if (separatorIndex == -1)
         {
             return "";
         }
-        return text.Substring(0, num).TrimEnd('\\', '/');
+        return path.Substring(0, separatorIndex).TrimEnd('\\', '/');
     }
 
-    public static bool PathsEqual(string text, string text2)
+    public static bool PathsEqual(string firstPath, string secondPath)
     {
-        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(text2))
+        if (string.IsNullOrEmpty(firstPath) || string.IsNullOrEmpty(secondPath))
         {
-            return string.IsNullOrEmpty(text) == string.IsNullOrEmpty(text2);
+            return string.IsNullOrEmpty(firstPath) == string.IsNullOrEmpty(secondPath);
         }
         try
         {
-            return StringComparer.InvariantCultureIgnoreCase.Compare(GetFullPathChecked(text), GetFullPathChecked(text2)) == 0;
+            return StringComparer.InvariantCultureIgnoreCase.Compare(GetFullPathChecked(firstPath), GetFullPathChecked(secondPath)) == 0;
         }
         catch
         {
-            return StringComparer.InvariantCultureIgnoreCase.Compare(text, text2) == 0;
+            return StringComparer.InvariantCultureIgnoreCase.Compare(firstPath, secondPath) == 0;
         }
     }
 
-    public static string GetCommonDirectory(IEnumerable<string> items)
+    public static string GetCommonDirectory(IEnumerable<string> paths)
     {
-        string text = null;
-        foreach (string item in items)
+        string commonPrefix = null;
+        foreach (string path in paths)
         {
-            if (!item.IsNullOrEmpty())
+            if (!path.IsNullOrEmpty())
             {
-                if (text == null)
+                if (commonPrefix == null)
                 {
-                    text = item;
+                    commonPrefix = path;
                 }
-                int num = StringUtils.CommonPrefixLength(text, item);
-                if (num < 0)
+                int commonLen = StringUtils.CommonPrefixLength(commonPrefix, path);
+                if (commonLen < 0)
                 {
                     return null;
                 }
-                text = text.Substring(0, num);
+                commonPrefix = commonPrefix.Substring(0, commonLen);
             }
         }
-        if (!string.IsNullOrEmpty(text))
+        if (!string.IsNullOrEmpty(commonPrefix))
         {
-            int num2 = text.LastIndexOfAny(new char[2] { '/', '\\' });
-            if (num2 != -1)
+            int separatorIndex = commonPrefix.LastIndexOfAny(new char[2] { '/', '\\' });
+            if (separatorIndex != -1)
             {
-                return text.Substring(0, num2);
+                return commonPrefix.Substring(0, separatorIndex);
             }
         }
         return null;
     }
 
-    public static string CombineWithDirectoryOf(string text, string text2)
+    public static string CombineWithDirectoryOf(string sourceFilePath, string relativeFileName)
     {
-        return Path.Combine(Path.GetDirectoryName(text), text2);
+        return Path.Combine(Path.GetDirectoryName(sourceFilePath), relativeFileName);
     }
 }

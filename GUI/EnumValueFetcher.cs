@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Windows.Data;
@@ -20,9 +20,9 @@ public class EnumValueFetcher : IValueConverter
         {
             return new string[0];
         }
-        if (_ValueDict.TryGetValue(type, out var value2))
+        if (_ValueDict.TryGetValue(type, out var valuesArray))
         {
-            return value2;
+            return valuesArray;
         }
         return _ValueDict[type] = Enum.GetValues(type);
     }

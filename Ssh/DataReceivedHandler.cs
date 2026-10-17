@@ -1,4 +1,3 @@
-﻿
 namespace SmarTTY.Ssh;
 
-public delegate void DataReceivedHandler(object obj, byte[] buffer, int value2, int value3, int value4);
+public delegate void DataReceivedHandler(object sender, byte[] buffer, int offset, int count, int dataType);

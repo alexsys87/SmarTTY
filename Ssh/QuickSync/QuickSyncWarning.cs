@@ -1,4 +1,3 @@
-﻿
 namespace SmarTTY.Ssh.QuickSync;
 
 public struct QuickSyncWarning
@@ -81,11 +80,11 @@ public struct QuickSyncWarning
         Type = (QuickSyncWarningType)remoteWarningRecord.Code;
     }
 
-    public QuickSyncWarning(QuickSyncWarningType quickSyncWarningType, string text, int value2)
+    public QuickSyncWarning(QuickSyncWarningType quickSyncWarningType, string path, int errorCode)
     {
         Type = quickSyncWarningType;
-        this.Path = text;
-        this.ErrorCode = value2;
+        this.Path = path;
+        this.ErrorCode = errorCode;
     }
 
     public override string ToString()

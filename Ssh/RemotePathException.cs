@@ -1,4 +1,4 @@
-﻿using SmarTTY;
+using SmarTTY;
 using SmarTTY.IO;
 using System;
 
@@ -10,21 +10,21 @@ public class RemotePathException : Exception, IProjectAwareException
 
     public readonly RemotePathProblem Problem;
 
-    public RemotePathException(RemoteFileContext remoteFileContext, RemotePathProblem remotePathProblem, string text = null)
-        : base(RemotePathException.BuildMessage(remoteFileContext, remotePathProblem, text))
+    public RemotePathException(RemoteFileContext remoteFileContext, RemotePathProblem remotePathProblem, string projectName = null)
+        : base(RemotePathException.BuildMessage(remoteFileContext, remotePathProblem, projectName))
     {
         this.Context = remoteFileContext;
         this.Problem = remotePathProblem;
     }
 
-    private static string BuildMessage(RemoteFileContext remoteFileContext, RemotePathProblem remotePathProblem, string text2)
+    private static string BuildMessage(RemoteFileContext remoteFileContext, RemotePathProblem remotePathProblem, string projectName)
     {
-        string text = "";
-        if (!string.IsNullOrEmpty(text2))
+        string extraInfo = "";
+        if (!string.IsNullOrEmpty(projectName))
         {
-            text = " Related project name: " + text2 + ".";
+            extraInfo = " Related project name: " + projectName + ".";
         }
-        return GetProblemText(remoteFileContext, remotePathProblem) + text;
+        return GetProblemText(remoteFileContext, remotePathProblem) + extraInfo;
     }
 
     private static string GetProblemText(RemoteFileContext remoteFileContext, RemotePathProblem remotePathProblem)
@@ -40,8 +40,8 @@ public class RemotePathException : Exception, IProjectAwareException
         };
     }
 
-    public Exception WithProjectName(string text)
+    public Exception WithProjectName(string projectName)
     {
-        return new RemotePathException(Context, Problem, text);
+        return new RemotePathException(Context, Problem, projectName);
     }
 }

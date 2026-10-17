@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -44,7 +44,7 @@ public class ScpTransferManager : IDisposable
         public bool OpenFolderWhenDone;
     }
 
-    public delegate bool ConfirmHandler(string text);
+    public delegate bool ConfirmHandler(string message);
 
     private LinkedList<TransferJob> _downloadQueue = new LinkedList<TransferJob>();
 
@@ -96,21 +96,21 @@ public class ScpTransferManager : IDisposable
         _uploadThread.Start();
     }
 
-    public TransferJob EnqueueDownload(string text, string text2, object obj = null, bool flag2 = false)
+    public TransferJob EnqueueDownload(string remotePath, string localPath, object tag = null, bool openFolderWhenDone = false)
     {
         try
         {
-            ScpDownloadStream scpDownloadStream = Session.OpenDownload(text);
+            ScpDownloadStream scpDownloadStream = Session.OpenDownload(remotePath);
             TransferJob transferJob = new TransferJob
             {
                 IsDownload = true,
-                RemotePath = text,
-                LocalPath = text2,
+                RemotePath = remotePath,
+                LocalPath = localPath,
                 TotalBytes = scpDownloadStream.Length,
-                Tag = obj,
-                OpenFolderWhenDone = flag2
+                Tag = tag,
+                OpenFolderWhenDone = openFolderWhenDone
             };
-            bool flag = false;
+            bool shouldDispose = false;
             lock (_downloadQueue)
             {
                 if (_downloadQueue.Count == 0)
@@ -119,12 +119,12 @@ public class ScpTransferManager : IDisposable
                 }
                 else
                 {
-                    flag = true;
+                    shouldDispose = true;
                 }
                 _downloadQueue.AddLast(transferJob);
             }
             this._downloadSignal.Release();
-            if (flag)
+            if (shouldDispose)
             {
                 scpDownloadStream.Dispose();
             }
@@ -137,16 +137,16 @@ public class ScpTransferManager : IDisposable
         }
     }
 
-    public TransferJob EnqueueUpload(string text, string text2, object obj = null, bool flag = true)
+    public TransferJob EnqueueUpload(string localPath, string remotePath, object tag = null, bool checkOverwrite = true)
     {
         try
         {
-            if (flag)
+            if (checkOverwrite)
             {
                 try
                 {
-                    using ScpDownloadStream scpDownloadStream = Session.OpenDownload(text2);
-                    if (scpDownloadStream.Length != 0L && !ConfirmOverwrite(text2 + " already exists. Overwrite it?"))
+                    using ScpDownloadStream scpDownloadStream = Session.OpenDownload(remotePath);
+                    if (scpDownloadStream.Length != 0L && !ConfirmOverwrite(remotePath + " already exists. Overwrite it?"))
                     {
                         return null;
                     }
@@ -158,11 +158,11 @@ public class ScpTransferManager : IDisposable
             TransferJob transferJob = new TransferJob
             {
                 IsDownload = false,
-                RemotePath = text2,
-                LocalPath = text,
-                Tag = obj
+                RemotePath = remotePath,
+                LocalPath = localPath,
+                Tag = tag
             };
-            using (FileStream fileStream = File.Open(text, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (FileStream fileStream = File.Open(localPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
                 transferJob.TotalBytes = fileStream.Length;
             }
@@ -180,34 +180,34 @@ public class ScpTransferManager : IDisposable
         }
     }
 
-    private long CopyStream(Stream stream, Stream stream2, long value2, TransferJob transferJob = null)
+    private long CopyStream(Stream sourceStream, Stream destinationStream, long length, TransferJob transferJob = null)
     {
-        if (value2 < 0)
+        if (length < 0)
         {
-            value2 = stream.Length;
+            length = sourceStream.Length;
         }
-        long num = 0L;
-        byte[] array = new byte[262144];
+        long totalRead = 0L;
+        byte[] buffer = new byte[262144];
         DateTime now = DateTime.Now;
-        while (num < value2)
+        while (totalRead < length)
         {
-            long num2 = Math.Min(array.LongLength, value2 - num);
-            int num3 = stream.Read(array, 0, (int)num2);
-            if (num3 <= 0)
+            long bytesToRead = Math.Min(buffer.LongLength, length - totalRead);
+            int bytesRead = sourceStream.Read(buffer, 0, (int)bytesToRead);
+            if (bytesRead <= 0)
             {
-                return num;
+                return totalRead;
             }
-            stream2.Write(array, 0, num3);
-            num += num3;
+            destinationStream.Write(buffer, 0, bytesRead);
+            totalRead += bytesRead;
             if (transferJob != null)
             {
-                transferJob.TransferredBytes = num;
-                int num4 = (int)(DateTime.Now - now).TotalMilliseconds;
-                if (num4 == 0)
+                transferJob.TransferredBytes = totalRead;
+                int elapsedMs = (int)(DateTime.Now - now).TotalMilliseconds;
+                if (elapsedMs == 0)
                 {
-                    num4 = 1;
+                    elapsedMs = 1;
                 }
-                transferJob.BytesPerSecond = num * 1000 / num4;
+                transferJob.BytesPerSecond = totalRead * 1000 / elapsedMs;
                 if (transferJob.CancelRequested)
                 {
                     throw new OperationCanceledException();
@@ -218,7 +218,7 @@ public class ScpTransferManager : IDisposable
                 _resumeEvent.WaitOne();
             }
         }
-        return num;
+        return totalRead;
     }
 
     private void DownloadThreadBody()
@@ -230,15 +230,15 @@ public class ScpTransferManager : IDisposable
             {
                 break;
             }
-            TransferJob value;
+            TransferJob job;
             lock (_downloadQueue)
             {
                 if (_downloadQueue.Count < 1)
                 {
                     continue;
                 }
-                value = _downloadQueue.First.Value;
-                if (value == null)
+                job = _downloadQueue.First.Value;
+                if (job == null)
                 {
                     continue;
                 }
@@ -246,49 +246,49 @@ public class ScpTransferManager : IDisposable
             }
             try
             {
-                value.State = TransferState.InProgress;
-                ScpDownloadStream scpDownloadStream = value.PrefetchedStream;
+                job.State = TransferState.InProgress;
+                ScpDownloadStream scpDownloadStream = job.PrefetchedStream;
                 if (scpDownloadStream == null)
                 {
-                    scpDownloadStream = Session.OpenDownload(value.RemotePath);
+                    scpDownloadStream = Session.OpenDownload(job.RemotePath);
                 }
-                value.PrefetchedStream = null;
+                job.PrefetchedStream = null;
                 using (scpDownloadStream)
                 {
-                    using FileStream fileStream = File.Open(value.LocalPath, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
-                    CopyStream(scpDownloadStream, fileStream, value.TotalBytes, value);
+                    using FileStream fileStream = File.Open(job.LocalPath, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
+                    CopyStream(scpDownloadStream, fileStream, job.TotalBytes, job);
                 }
                 if (scpDownloadStream.ChangeTime.Year > 1970)
                 {
-                    File.SetCreationTimeUtc(value.LocalPath, scpDownloadStream.ChangeTime);
+                    File.SetCreationTimeUtc(job.LocalPath, scpDownloadStream.ChangeTime);
                 }
                 if (scpDownloadStream.AccessTime.Year > 1970)
                 {
-                    File.SetLastAccessTimeUtc(value.LocalPath, scpDownloadStream.AccessTime);
+                    File.SetLastAccessTimeUtc(job.LocalPath, scpDownloadStream.AccessTime);
                 }
                 if (scpDownloadStream.ModifyTime.Year > 1970)
                 {
-                    File.SetLastWriteTimeUtc(value.LocalPath, scpDownloadStream.ModifyTime);
+                    File.SetLastWriteTimeUtc(job.LocalPath, scpDownloadStream.ModifyTime);
                 }
-                if (value.OpenFolderWhenDone)
+                if (job.OpenFolderWhenDone)
                 {
-                    Process.Start(Path.GetDirectoryName(value.LocalPath));
+                    Process.Start(Path.GetDirectoryName(job.LocalPath));
                 }
-                value.State = TransferState.Completed;
+                job.State = TransferState.Completed;
             }
             catch
             {
-                if (value.CancelRequested)
+                if (job.CancelRequested)
                 {
                     try
                     {
-                        File.Delete(value.LocalPath);
+                        File.Delete(job.LocalPath);
                     }
                     catch
                     {
                     }
                 }
-                value.State = TransferState.Failed;
+                job.State = TransferState.Failed;
             }
         }
     }
@@ -302,15 +302,15 @@ public class ScpTransferManager : IDisposable
             {
                 break;
             }
-            TransferJob value;
+            TransferJob job;
             lock (_uploadQueue)
             {
                 if (_uploadQueue.Count < 1)
                 {
                     continue;
                 }
-                value = _uploadQueue.First.Value;
-                if (value == null)
+                job = _uploadQueue.First.Value;
+                if (job == null)
                 {
                     continue;
                 }
@@ -318,18 +318,18 @@ public class ScpTransferManager : IDisposable
             }
             try
             {
-                value.State = TransferState.InProgress;
-                ScpChannelStream scpChannelStream = Session.OpenUpload(value.RemotePath, value.TotalBytes);
+                job.State = TransferState.InProgress;
+                ScpChannelStream scpChannelStream = Session.OpenUpload(job.RemotePath, job.TotalBytes);
                 using (scpChannelStream)
                 {
-                    using FileStream fileStream = File.Open(value.LocalPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    CopyStream(fileStream, scpChannelStream, value.TotalBytes, value);
+                    using FileStream fileStream = File.Open(job.LocalPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    CopyStream(fileStream, scpChannelStream, job.TotalBytes, job);
                 }
-                value.State = TransferState.Completed;
+                job.State = TransferState.Completed;
             }
             catch
             {
-                value.State = TransferState.Failed;
+                job.State = TransferState.Failed;
             }
         }
     }

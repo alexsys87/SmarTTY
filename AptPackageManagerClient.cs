@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -15,24 +15,24 @@ public class AptPackageManagerClient : ILinuxPackageManagerClient
         {
             return null;
         }
-        string text = "";
+        string optionsFlag = "";
         if (options != null && options.NoPrompt)
         {
-            text = "-y ";
+            optionsFlag = "-y ";
         }
-        string text2;
+        string actionName;
         switch (action)
         {
             case LinuxPackageInfo.PackageAction.Install:
-                text2 = "install";
+                actionName = "install";
                 break;
             case LinuxPackageInfo.PackageAction.Remove:
-                text2 = "remove";
+                actionName = "remove";
                 break;
             default:
                 return null;
         }
-        return "apt-get " + text2 + " " + text + string.Join(" ", packages.Select((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.ID).ToArray());
+        return "apt-get " + actionName + " " + optionsFlag + string.Join(" ", packages.Select((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.ID).ToArray());
     }
 
     public int Probe(ISSHCommandRunner runner)
@@ -46,14 +46,13 @@ public class AptPackageManagerClient : ILinuxPackageManagerClient
 
     public LinuxPackageInfo[] QueryAllPackages(ISSHCommandRunner runner, bool allVersions)
     {
-        List<LinuxPackageInfo> list = new List<LinuxPackageInfo>();
-        string[] array = runner.RunCommand("LANG=en_US apt list" + (allVersions ? " -a" : "")) ?? throw new Exception("Failed to list packages with apt");
+        List<LinuxPackageInfo> packagesList = new List<LinuxPackageInfo>();
+        string[] lines = runner.RunCommand("LANG=en_US apt list" + (allVersions ? " -a" : "")) ?? throw new Exception("Failed to list packages with apt");
         Regex regex = new Regex("^([^/]+)/([^ ]+) ([^ ]+) ");
-        string[] array2 = array;
-        foreach (string text in array2)
+        foreach (string line in lines)
         {
-            int num2 = text.IndexOf('[');
-            Match match = regex.Match(text);
+            int bracketIndex = line.IndexOf('[');
+            Match match = regex.Match(line);
             if (!match.Success)
             {
                 continue;
@@ -64,21 +63,21 @@ public class AptPackageManagerClient : ILinuxPackageManagerClient
                 Version = match.Groups[3].Value,
                 State = LinuxPackageInfo.PackageState.Available
             };
-            if (num2 != -1)
+            if (bracketIndex != -1)
             {
-                string text2 = text.Substring(num2);
-                linuxPackageInfo.RawState = text2.Trim(' ', '[', ']');
-                if (text2.Contains("installed"))
+                string bracketContent = line.Substring(bracketIndex);
+                linuxPackageInfo.RawState = bracketContent.Trim(' ', '[', ']');
+                if (bracketContent.Contains("installed"))
                 {
                     linuxPackageInfo.State = LinuxPackageInfo.PackageState.Installed;
                 }
-                else if (text2.Contains("upgradable"))
+                else if (bracketContent.Contains("upgradable"))
                 {
                     linuxPackageInfo.State = LinuxPackageInfo.PackageState.Upgradeable;
                 }
             }
-            list.Add(linuxPackageInfo);
+            packagesList.Add(linuxPackageInfo);
         }
-        return list.ToArray();
+        return packagesList.ToArray();
     }
 }

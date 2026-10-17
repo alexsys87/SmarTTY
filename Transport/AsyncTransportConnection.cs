@@ -1,4 +1,4 @@
-﻿using SmarTTY.Native;
+using SmarTTY.Native;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,9 +17,9 @@ internal class AsyncTransportConnection : IDisposable
         public int Length;
     }
 
-    public delegate void DataReceivedHandler(object obj, byte[] buffer, int value2);
+    public delegate void DataReceivedHandler(object sender, byte[] buffer, int count);
 
-    public delegate void StateChangedHandler(object obj, ConnectionStateEnum connectionStateEnum, string text);
+    public delegate void StateChangedHandler(object sender, ConnectionStateEnum connectionStateEnum, string message);
 
     private readonly IDeviceTransport _transport;
 
@@ -57,11 +57,11 @@ internal class AsyncTransportConnection : IDisposable
 
     public event StateChangedHandler StateChanged;
 
-    public AsyncTransportConnection(IDeviceTransport deviceTransport, Dispatcher dispatcher, int value2 = 0, IHostNameResolver hostNameResolver = null)
+    public AsyncTransportConnection(IDeviceTransport deviceTransport, Dispatcher dispatcher, int connectTimeoutMs = 0, IHostNameResolver hostNameResolver = null)
     {
         _transport = deviceTransport;
         _dispatcher = dispatcher;
-        _connectTimeoutMs = value2;
+        _connectTimeoutMs = connectTimeoutMs;
         _hostResolver = hostNameResolver;
     }
 
@@ -117,14 +117,13 @@ internal class AsyncTransportConnection : IDisposable
         }
         catch (Exception ex)
         {
-            Exception ex2 = ex;
-            Exception exception = ex2;
+            Exception connectEx = ex;
             _state = ConnectionStateEnum.Failed;
             PostToUi(() =>
             {
                 if (StateChanged != null && !_disposed)
                 {
-                    StateChanged(this, _state, exception.Message);
+                    StateChanged(this, _state, connectEx.Message);
                 }
             });
             return;
@@ -134,24 +133,24 @@ internal class AsyncTransportConnection : IDisposable
         try
         {
             Stream stream = _transport.GetStream();
-            byte[] array = new byte[1024];
+            byte[] rawBuffer = new byte[1024];
             while (!_stopRequested)
             {
-                int value2 = stream.Read(array, 0, array.Length);
-                if (value2 <= 0)
+                int count = stream.Read(rawBuffer, 0, rawBuffer.Length);
+                if (count <= 0)
                 {
                     break;
                 }
-                byte[] buffer = new byte[value2];
-                for (int num = 0; num < value2; num++)
+                byte[] buffer = new byte[count];
+                for (int i = 0; i < count; i++)
                 {
-                    buffer[num] = array[num];
+                    buffer[i] = rawBuffer[i];
                 }
                 PostToUi(() =>
                 {
                     if (DataReceived != null && !_disposed)
                     {
-                        DataReceived(this, buffer, value2);
+                        DataReceived(this, buffer, count);
                     }
                 });
             }
@@ -245,34 +244,34 @@ internal class AsyncTransportConnection : IDisposable
         _disposed = true;
     }
 
-    public void Send(byte[] buffer, int value2)
+    public void Send(byte[] buffer, int count)
     {
         lock (_writeQueue)
         {
             _writeQueue.Enqueue(new PendingWrite
             {
                 Buffer = buffer,
-                Length = value2
+                Length = count
             });
         }
         _writeSignal.Release();
     }
 
-    public string GetDisplayName(bool flag, IHostNameResolver hostNameResolver)
+    public string GetDisplayName(bool includeParameters, IHostNameResolver hostNameResolver)
     {
-        string text = _transport.GetDisplayName(flag);
-        return hostNameResolver?.ResolveHostName(text) ?? text;
+        string name = _transport.GetDisplayName(includeParameters);
+        return hostNameResolver?.ResolveHostName(name) ?? name;
     }
 
-    public bool MatchesPort(string text)
+    public bool MatchesPort(string portName)
     {
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(portName))
         {
             return true;
         }
         if (_transport is SerialTransport serialTransport)
         {
-            return serialTransport.PortName == text;
+            return serialTransport.PortName == portName;
         }
         return false;
     }

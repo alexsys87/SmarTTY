@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -22,11 +22,11 @@ internal class TemplateSession : IDisposable
 
         public int Line => Start.Line;
 
-        public TabStop(CodeTemplate.TemplatePart templatePart, int value2, int value3, int value4)
+        public TabStop(CodeTemplate.TemplatePart templatePart, int line, int startCol, int endCol)
         {
             this.Part = templatePart;
-            Start = new TextDocument.TextPosition(value3, value2);
-            this.End = new TextDocument.TextPosition(value4, value2);
+            Start = new TextDocument.TextPosition(startCol, line);
+            this.End = new TextDocument.TextPosition(endCol, line);
         }
 
         public bool HasSelection(CodeTemplate.PlaceholderSelection placeholderSelection)
@@ -57,60 +57,60 @@ internal class TemplateSession : IDisposable
             _editor._templateSession.Dispose();
         }
         _editor._templateSession = this;
-        string text = codeEditorPP.GetIndentation(textPosition.Line);
+        string indent = codeEditorPP.GetIndentation(textPosition.Line);
         StringBuilder stringBuilder = new StringBuilder(1024);
-        string text2 = codeEditorPP.GetLineOrNull(textPosition.Line);
-        int num = textPosition.Column;
-        while (--num >= 0 && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".IndexOf(text2[num]) != -1)
+        string lineText = codeEditorPP.GetLineOrNull(textPosition.Line);
+        int identStartCol = textPosition.Column;
+        while (--identStartCol >= 0 && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".IndexOf(lineText[identStartCol]) != -1)
         {
         }
         if ((codeTemplate.InsertMode & CodeTemplate.TemplateInsertMode.AtCaret) != 0)
         {
-            num = textPosition.Column - 1;
+            identStartCol = textPosition.Column - 1;
         }
-        int num2 = textPosition.Line;
-        int num3 = num + 1;
-        int num4 = 0;
-        foreach (CodeTemplate.TemplateLine item in codeTemplate.Lines)
+        int lineIndex = textPosition.Line;
+        int colIndex = identStartCol + 1;
+        int lineIdx = 0;
+        foreach (CodeTemplate.TemplateLine tmplLine in codeTemplate.Lines)
         {
-            if (num4++ > 0)
+            if (lineIdx++ > 0)
             {
-                stringBuilder.Append(text);
-                stringBuilder.Append(new string('\t', item.Indent));
-                num3 = text.Length + item.Indent;
+                stringBuilder.Append(indent);
+                stringBuilder.Append(new string('\t', tmplLine.Indent));
+                colIndex = indent.Length + tmplLine.Indent;
             }
-            foreach (CodeTemplate.TemplatePart item2 in item.Parts)
+            foreach (CodeTemplate.TemplatePart tmplPart in tmplLine.Parts)
             {
-                stringBuilder.Append(item2.Text);
-                if (item2.IsTabStop)
+                stringBuilder.Append(tmplPart.Text);
+                if (tmplPart.IsTabStop)
                 {
-                    _stops.Add(new TabStop(item2, num2, num3, num3 + item2.Text.Length));
+                    _stops.Add(new TabStop(tmplPart, lineIndex, colIndex, colIndex + tmplPart.Text.Length));
                 }
-                num3 += item2.Text.Length;
+                colIndex += tmplPart.Text.Length;
             }
-            if (num4 != codeTemplate.Lines.Count)
+            if (lineIdx != codeTemplate.Lines.Count)
             {
                 stringBuilder.Append("\r\n");
-                num2++;
-                num3 = 0;
+                lineIndex++;
+                colIndex = 0;
             }
         }
-        _editor.ReplaceText(new TextDocument.TextPosition(num + 1, textPosition.Line), textPosition, flag: false, stringBuilder.ToString());
+        _editor.ReplaceText(new TextDocument.TextPosition(identStartCol + 1, textPosition.Line), textPosition, flag: false, stringBuilder.ToString());
         ((EditableTextBrowser)_editor).RangeChanged += this.OnRangeChanged;
         ((EditableTextBrowser)_editor).LineChanged += OnLineChanged;
         CodeEditorPP codeEditorPP2 = _editor;
         codeEditorPP2._tabHandler = (CodeEditorPP.TabHandler)Delegate.Combine(codeEditorPP2._tabHandler, new CodeEditorPP.TabHandler(OnTab));
-        MoveToStop(flag2: false);
+        MoveToStop(isShiftTab: false);
     }
 
-    private void MoveToStop(bool flag2)
+    private void MoveToStop(bool isShiftTab)
     {
-        int num = _currentIndex;
+        int prevIndex = _currentIndex;
         if (_stops.Count == 0)
         {
             return;
         }
-        if (!flag2)
+        if (!isShiftTab)
         {
             if (++_currentIndex >= _stops.Count)
             {
@@ -124,17 +124,17 @@ internal class TemplateSession : IDisposable
         this._navigating = true;
         TabStop tabStop = _stops[_currentIndex];
         _editor.SetCaret(tabStop.Start);
-        bool flag = !tabStop.Modified || tabStop.HasSelection(CodeTemplate.PlaceholderSelection.SelectText);
+        bool shouldSelect = !tabStop.Modified || tabStop.HasSelection(CodeTemplate.PlaceholderSelection.SelectText);
         if (tabStop.HasSelection(CodeTemplate.PlaceholderSelection.CaretOnly))
         {
-            flag = false;
+            shouldSelect = false;
         }
-        _editor.SetSelection(flag, tabStop.End);
-        if (_currentIndex != num)
+        _editor.SetSelection(shouldSelect, tabStop.End);
+        if (_currentIndex != prevIndex)
         {
-            if (num != -1 && _stops[num].Part.Tag != null)
+            if (prevIndex != -1 && _stops[prevIndex].Part.Tag != null)
             {
-                _editor.RaisePlaceholderChanged(_stops[num].Line, _stops[num].Start.Column, _stops[num].End.Column, _stops[num].Part.Tag, flag: false);
+                _editor.RaisePlaceholderChanged(_stops[prevIndex].Line, _stops[prevIndex].Start.Column, _stops[prevIndex].End.Column, _stops[prevIndex].Part.Tag, flag: false);
             }
             if (tabStop.Part.Tag != null)
             {
@@ -149,41 +149,41 @@ internal class TemplateSession : IDisposable
         }
     }
 
-    private void OnTab(ref bool flag)
+    private void OnTab(ref bool handled)
     {
         MoveToStop((Control.ModifierKeys & Keys.Shift) != 0);
-        flag = true;
+        handled = true;
     }
 
-    private void OnLineChanged(EditableTextBrowser editableTextBrowser, int value2, int value3, int value4, int value5)
+    private void OnLineChanged(EditableTextBrowser editableTextBrowser, int lineIndex, int column, int oldLen, int newLen)
     {
         foreach (TabStop item in _stops)
         {
-            if (value2 != item.Line)
+            if (lineIndex != item.Line)
             {
                 continue;
             }
-            int num = value5 - value4;
-            if (value3 + value4 <= item.Start.Column)
+            int diff = newLen - oldLen;
+            if (column + oldLen <= item.Start.Column)
             {
-                item.Start.Column += num;
-                item.End.Column += num;
+                item.Start.Column += diff;
+                item.End.Column += diff;
             }
             else
             {
-                if (value3 > item.End.Column)
+                if (column > item.End.Column)
                 {
                     continue;
                 }
-                if (value3 < item.Start.Column)
+                if (column < item.Start.Column)
                 {
-                    item.Start.Column = value3;
+                    item.Start.Column = column;
                 }
-                if (value3 + value4 > item.End.Column)
+                if (column + oldLen > item.End.Column)
                 {
-                    item.End.Column = value3 + value4;
+                    item.End.Column = column + oldLen;
                 }
-                item.End.Column += num;
+                item.End.Column += diff;
                 item.Modified = true;
             }
             if (item == _stops[this._currentIndex])
@@ -193,7 +193,7 @@ internal class TemplateSession : IDisposable
         }
     }
 
-    private void OnRangeChanged(EditableTextBrowser editableTextBrowser, TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, TextDocument.TextPosition textPosition3)
+    private void OnRangeChanged(EditableTextBrowser editableTextBrowser, TextDocument.TextPosition startPos, TextDocument.TextPosition oldEndPos, TextDocument.TextPosition newEndPos)
     {
         Dispose();
     }

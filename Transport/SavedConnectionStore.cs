@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml.Serialization;
@@ -35,15 +35,15 @@ public class SavedConnectionStore
         }
     }
 
-    public SavedConnectionStore(string text = null)
+    public SavedConnectionStore(string directory = null)
     {
-        if (text == null)
+        if (directory == null)
         {
             _directory = Path.Combine(GlobalSettings.DataDirectory, "SavedConnections");
         }
         else
         {
-            _directory = text;
+            _directory = directory;
         }
         Reload();
     }
@@ -57,27 +57,27 @@ public class SavedConnectionStore
             XmlSerializer xmlSerializer = new XmlSerializer(typeof(SSHConnectionSettings));
             XmlSerializer xmlSerializer2 = new XmlSerializer(typeof(RawConnectionSettings));
             string[] files = Directory.GetFiles(_directory, "*.sshconnection");
-            foreach (string text in files)
+            foreach (string file in files)
             {
                 try
                 {
-                    using FileStream stream = File.Open(text, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    SSHConnectionSettings sSHConnectionSettings = (SSHConnectionSettings)xmlSerializer.Deserialize(stream);
-                    sSHConnectionSettings.FileName = text;
-                    _sshConnections.Add(sSHConnectionSettings);
+                    using FileStream stream = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    SSHConnectionSettings sshSettings = (SSHConnectionSettings)xmlSerializer.Deserialize(stream);
+                    sshSettings.FileName = file;
+                    _sshConnections.Add(sshSettings);
                 }
                 catch
                 {
                 }
             }
             files = Directory.GetFiles(_directory, "*.rawconnection");
-            foreach (string text2 in files)
+            foreach (string file in files)
             {
                 try
                 {
-                    using FileStream stream2 = File.Open(text2, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using FileStream stream2 = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     RawConnectionSettings rawConnectionSettings = (RawConnectionSettings)xmlSerializer2.Deserialize(stream2);
-                    rawConnectionSettings.FileName = text2;
+                    rawConnectionSettings.FileName = file;
                     _rawConnections.Add(rawConnectionSettings);
                 }
                 catch
@@ -108,44 +108,44 @@ public class SavedConnectionStore
         }
     }
 
-    internal static void TouchTimestamp(string text)
+    internal static void TouchTimestamp(string directory)
     {
-        File.WriteAllText(Path.Combine(text, "_update_timestamp.txt"), "The timestamp of this file indicates the last time some of the settings files here were changed");
+        File.WriteAllText(Path.Combine(directory, "_update_timestamp.txt"), "The timestamp of this file indicates the last time some of the settings files here were changed");
     }
 
-    public static string SanitizeFileName(string text2)
+    public static string SanitizeFileName(string fileName)
     {
-        if (text2 == null)
+        if (fileName == null)
         {
             return "";
         }
-        char[] array = text2.ToCharArray();
-        string text = "\\/<>:| ;&=";
-        for (int num = 0; num < array.Length; num++)
+        char[] charArray = fileName.ToCharArray();
+        string invalidChars = "\\/<>:| ;&=";
+        for (int i = 0; i < charArray.Length; i++)
         {
-            if (text.IndexOf(array[num]) != -1)
+            if (invalidChars.IndexOf(charArray[i]) != -1)
             {
-                array[num] = '_';
+                charArray[i] = '_';
             }
         }
-        return new string(array);
+        return new string(charArray);
     }
 
-    public void SaveSshConnection(SSHConnectionSettings sshConnectionSettings, Action<string> action = null)
+    public void SaveSshConnection(SSHConnectionSettings sshConnectionSettings, Action<string> progressCallback = null)
     {
-        action?.Invoke("Saving connection settings...");
+        progressCallback?.Invoke("Saving connection settings...");
         sshConnectionSettings.FileName = Path.Combine(_directory, $"{SanitizeFileName(sshConnectionSettings.UserName)}@{SanitizeFileName(sshConnectionSettings.HostName)}.sshconnection");
-        action?.Invoke("Settings file name:" + sshConnectionSettings.FileName);
-        for (int num = 0; num < _sshConnections.Count; num++)
+        progressCallback?.Invoke("Settings file name:" + sshConnectionSettings.FileName);
+        for (int i = 0; i < _sshConnections.Count; i++)
         {
-            if (StringComparer.InvariantCultureIgnoreCase.Compare(_sshConnections[num].FileName, sshConnectionSettings.FileName) == 0)
+            if (StringComparer.InvariantCultureIgnoreCase.Compare(_sshConnections[i].FileName, sshConnectionSettings.FileName) == 0)
             {
-                action?.Invoke($"Found the same settings at position {num}. Removing...");
-                _sshConnections.RemoveAt(num--);
+                progressCallback?.Invoke($"Found the same settings at position {i}. Removing...");
+                _sshConnections.RemoveAt(i--);
             }
         }
         _sshConnections.Add(sshConnectionSettings);
-        action?.Invoke("Saving connection index to " + sshConnectionSettings.FileName + "...");
+        progressCallback?.Invoke("Saving connection index to " + sshConnectionSettings.FileName + "...");
         sshConnectionSettings.Save();
     }
 
@@ -165,16 +165,16 @@ public class SavedConnectionStore
         }
     }
 
-    public SSHConnectionSettings FindSshConnection(string text, string text2)
+    public SSHConnectionSettings FindSshConnection(string hostName, string userName)
     {
         try
         {
             ReloadIfChanged();
-            foreach (SSHConnectionSettings item in _sshConnections)
+            foreach (SSHConnectionSettings connection in _sshConnections)
             {
-                if (StringComparer.InvariantCultureIgnoreCase.Compare(item.HostName, text) == 0 && StringComparer.InvariantCultureIgnoreCase.Compare(item.UserName, text2) == 0)
+                if (StringComparer.InvariantCultureIgnoreCase.Compare(connection.HostName, hostName) == 0 && StringComparer.InvariantCultureIgnoreCase.Compare(connection.UserName, userName) == 0)
                 {
-                    return item;
+                    return connection;
                 }
             }
             return null;
@@ -185,31 +185,31 @@ public class SavedConnectionStore
         }
     }
 
-    public List<SSHConnectionSettings> FindByHost(string text)
+    public List<SSHConnectionSettings> FindByHost(string hostName)
     {
         ReloadIfChanged();
-        List<SSHConnectionSettings> list = new List<SSHConnectionSettings>();
-        if (text == null)
+        List<SSHConnectionSettings> matches = new List<SSHConnectionSettings>();
+        if (hostName == null)
         {
-            return list;
+            return matches;
         }
-        foreach (SSHConnectionSettings item in _sshConnections)
+        foreach (SSHConnectionSettings connection in _sshConnections)
         {
-            if (SSHConnectionSettings.HostNamesEqual(item.HostName, text))
+            if (SSHConnectionSettings.HostNamesEqual(connection.HostName, hostName))
             {
-                list.Add(item);
+                matches.Add(connection);
             }
         }
-        return list;
+        return matches;
     }
 
     public void SaveRawConnection(RawConnectionSettings rawConnectionSettings)
     {
-        for (int num = 0; num < _rawConnections.Count; num++)
+        for (int i = 0; i < _rawConnections.Count; i++)
         {
-            if (_rawConnections[num].Settings != null && _rawConnections[num].Settings.Connection.FileNameBase == rawConnectionSettings.Settings.Connection.FileNameBase)
+            if (_rawConnections[i].Settings != null && _rawConnections[i].Settings.Connection.FileNameBase == rawConnectionSettings.Settings.Connection.FileNameBase)
             {
-                _rawConnections.RemoveAt(num--);
+                _rawConnections.RemoveAt(i--);
             }
         }
         _rawConnections.Add(rawConnectionSettings);

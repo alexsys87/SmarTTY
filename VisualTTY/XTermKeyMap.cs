@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 using System.Xml.Serialization;
@@ -34,45 +34,45 @@ internal class XTermKeyMap
         {
             _appNumPadSequences[(int)(appModeNumPadKey.KeyCode & (Keys.F16 | Keys.F17))] = appModeNumPadKey.EscapeSequence;
         }
-        foreach (Keys item in terminalKeyLayout.NumPadKeyCodesNonExtended)
+        foreach (Keys nonExtendedKey in terminalKeyLayout.NumPadKeyCodesNonExtended)
         {
-            _numPadNonExtended[(int)(item & (Keys.F16 | Keys.F17))] = true;
+            _numPadNonExtended[(int)(nonExtendedKey & (Keys.F16 | Keys.F17))] = true;
         }
-        foreach (Keys item2 in terminalKeyLayout.NumPadKeyCodesExtended)
+        foreach (Keys extendedKey in terminalKeyLayout.NumPadKeyCodesExtended)
         {
-            _numPadExtended[(int)(item2 & (Keys.F16 | Keys.F17))] = true;
+            _numPadExtended[(int)(extendedKey & (Keys.F16 | Keys.F17))] = true;
         }
     }
 
-    public bool IsNumPadKey(Keys keys, bool flag)
+    public bool IsNumPadKey(Keys keys, bool isExtended)
     {
         if ((uint)keys > 255u)
         {
             return false;
         }
-        if (flag)
+        if (isExtended)
         {
             return this._numPadExtended[(int)keys];
         }
         return _numPadNonExtended[(int)keys];
     }
 
-    public string GetEscapeSequence(Keys keys, bool flag, bool flag2, bool flag3)
+    public string GetEscapeSequence(Keys keys, bool isNumPadMode, bool isApplicationCursorMode, bool isNumPadKey)
     {
-        if (flag & flag3)
+        if (isNumPadMode & isNumPadKey)
         {
-            string text = this._appNumPadSequences[(int)(keys & (Keys.F16 | Keys.F17))];
-            if (text != null)
+            string numPadSeq = this._appNumPadSequences[(int)(keys & (Keys.F16 | Keys.F17))];
+            if (numPadSeq != null)
             {
-                return text;
+                return numPadSeq;
             }
         }
-        if (flag2)
+        if (isApplicationCursorMode)
         {
-            string text2 = _appCursorSequences[(int)(keys & (Keys.F16 | Keys.F17))];
-            if (text2 != null)
+            string cursorSeq = _appCursorSequences[(int)(keys & (Keys.F16 | Keys.F17))];
+            if (cursorSeq != null)
             {
-                return text2;
+                return cursorSeq;
             }
         }
         return _plainSequences[(int)(keys & (Keys.F16 | Keys.F17))];

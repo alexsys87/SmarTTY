@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -98,13 +98,13 @@ internal class SoftwareCaret : ICaret
         }
     }
 
-    public SoftwareCaret(ICaretHost caretHost, int value2, int value3)
+    public SoftwareCaret(ICaretHost caretHost, int x, int y)
     {
         _host = caretHost;
         _host.HostControl.GotFocus += OnGotFocus;
         _host.HostControl.LostFocus += OnLostFocus;
         _host.HostControl.Paint += OnPaint;
-        _bounds = new Rectangle(value2, value3, _bounds.Width, _bounds.Height);
+        _bounds = new Rectangle(x, y, _bounds.Width, _bounds.Height);
         _enabled = true;
         Timer timer = (this._blinkTimer = new Timer());
         timer.Interval = 530;
@@ -152,10 +152,10 @@ internal class SoftwareCaret : ICaret
     {
     }
 
-    public void MoveTo(int value2, int value3)
+    public void MoveTo(int x, int y)
     {
         _host.HostControl.Invalidate(_bounds);
-        _bounds = new Rectangle(value2, value3 + _yOffset, _bounds.Width, _bounds.Height);
+        _bounds = new Rectangle(x, y + _yOffset, _bounds.Width, _bounds.Height);
         _host.HostControl.Invalidate(_bounds);
         _blinkTimer.Stop();
         _blinkTimer.Start();
@@ -191,22 +191,22 @@ internal class SoftwareCaret : ICaret
         {
             width = (int)Graphics.FromHwnd(_host.HostControl.Handle).MeasureString(new string('O', 10), _host.HostControl.Font).Width / 10;
         }
-        int num = _height;
-        if (num == 0)
+        int caretHeight = _height;
+        if (caretHeight == 0)
         {
-            num = _host.HostControl.Font.Height;
+            caretHeight = _host.HostControl.Font.Height;
         }
         if (_underlineStyle)
         {
-            num = 2;
-            _yOffset = _host.HostControl.Font.Height - num;
+            caretHeight = 2;
+            _yOffset = _host.HostControl.Font.Height - caretHeight;
         }
         else
         {
             _yOffset = 0;
         }
         _bounds.Width = width;
-        _bounds.Height = num;
+        _bounds.Height = caretHeight;
         _host.CaretBounds = _bounds;
         _host.HostControl.Invalidate(_bounds);
         _blinkTimer.Stop();

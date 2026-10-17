@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading;
@@ -28,7 +28,7 @@ public partial class TerminalEventDispatcher : Component
     {
     }
 
-    private void OnDisposed(object sender, EventArgs e2)
+    private void OnDisposed(object sender, EventArgs e)
     {
         _stopping = true;
         _signal.Release();
@@ -82,28 +82,28 @@ public partial class TerminalEventDispatcher : Component
             }
             try
             {
-                ThreadStart threadStart = null;
+                ThreadStart inputCallback = null;
                 lock (_inputQueue)
                 {
                     if (_inputQueue.Count > 0)
                     {
-                        threadStart = _inputQueue.Dequeue();
+                        inputCallback = _inputQueue.Dequeue();
                     }
                 }
-                threadStart?.Invoke();
+                inputCallback?.Invoke();
             }
             catch
             {
             }
             try
             {
-                ThreadStart threadStart2;
+                ThreadStart resizeCallback;
                 lock (_inputQueue)
                 {
-                    threadStart2 = _pendingResize;
+                    resizeCallback = _pendingResize;
                     _pendingResize = null;
                 }
-                threadStart2?.Invoke();
+                resizeCallback?.Invoke();
             }
             catch
             {
@@ -122,9 +122,9 @@ public partial class TerminalEventDispatcher : Component
             }
             try
             {
-                ThreadStart threadStart = _pendingBeep;
+                ThreadStart beepCallback = _pendingBeep;
                 _pendingBeep = null;
-                threadStart?.Invoke();
+                beepCallback?.Invoke();
             }
             catch
             {

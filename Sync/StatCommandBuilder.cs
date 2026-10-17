@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
@@ -15,7 +15,7 @@ public class StatCommandBuilder
         GnuFindNewlineSeparated
     }
 
-    public delegate IEnumerable<string> CommandRunner(string text);
+    public delegate IEnumerable<string> CommandRunner(string command);
 
     public enum StatEntryKind
     {
@@ -54,9 +54,9 @@ public class StatCommandBuilder
         Flavor = statFlavor;
     }
 
-    public static StatFlavor DetectFlavor(CommandRunner callback, string text2 = ".")
+    public static StatFlavor DetectFlavor(CommandRunner callback, string testPath = ".")
     {
-        if (callback("stat -c \"path=%N\" \"" + text2 + "\"")?.FirstOrDefault((string text) => text.StartsWith("path=")) != null)
+        if (callback("stat -c \"path=%N\" \"" + testPath + "\"")?.FirstOrDefault((string line) => line.StartsWith("path=")) != null)
         {
             if (callback("echo | xargs -d \"\\n\" echo") != null)
             {
@@ -68,67 +68,67 @@ public class StatCommandBuilder
             }
             return StatFlavor.GnuFindNewlineSeparated;
         }
-        if (callback("stat -f \"path=%N\" \"" + text2 + "\"")?.FirstOrDefault((string text) => text.StartsWith("path=")) != null)
+        if (callback("stat -f \"path=%N\" \"" + testPath + "\"")?.FirstOrDefault((string line) => line.StartsWith("path=")) != null)
         {
             return StatFlavor.Bsd;
         }
         return StatFlavor.Unknown;
     }
 
-    public string GetListCommand(string text3, bool flag = false)
+    public string GetListCommand(string dirPath, bool followSymlinks = false)
     {
-        string text = (flag ? "L" : "");
-        string text2 = (flag ? "-L" : "");
+        string symlinkFlag = (followSymlinks ? "L" : "");
+        string findSymlinkFlag = (followSymlinks ? "-L" : "");
         if (this.Flavor == StatFlavor.Bsd)
         {
-            return "LANG=en_US cd \"" + text3 + "\" && ls -1A" + text + " | xargs -d \"\\n\" stat -" + text + "f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" .";
+            return "LANG=en_US cd \"" + dirPath + "\" && ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" .";
         }
         if (this.Flavor == StatFlavor.GnuFindNullSeparated)
         {
-            return "LANG=en_US cd \"" + text3 + "\" && find . " + text2 + " -maxdepth 1 -print0 | xargs -0 stat -" + text + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
+            return "LANG=en_US cd \"" + dirPath + "\" && find . " + findSymlinkFlag + " -maxdepth 1 -print0 | xargs -0 stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
         }
         if (this.Flavor == StatFlavor.GnuFindNewlineSeparated)
         {
-            return "LANG=en_US cd \"" + text3 + "\" && find . " + text2 + " -maxdepth 1 -print | xargs stat -" + text + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
+            return "LANG=en_US cd \"" + dirPath + "\" && find . " + findSymlinkFlag + " -maxdepth 1 -print | xargs stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
         }
-        return "LANG=en_US cd \"" + text3 + "\" && ls -1A" + text + " | xargs -d \"\\n\" stat -" + text + "c \"StatEntryL:|%N|%Y|%d|%s|%f\" .";
+        return "LANG=en_US cd \"" + dirPath + "\" && ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\" .";
     }
 
-    public string GetStatCommand(string text2, bool flag)
+    public string GetStatCommand(string path, bool followSymlinks)
     {
-        string text = (flag ? " -L" : "");
+        string symlinkFlag = (followSymlinks ? " -L" : "");
         if (this.Flavor == StatFlavor.Bsd)
         {
-            return "stat" + text + " -f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" \"" + text2 + "\"";
+            return "stat" + symlinkFlag + " -f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" \"" + path + "\"";
         }
-        return "stat" + text + " -c \"StatEntryL:|%N|%Y|%d|%s|%f\" \"" + text2 + "\"";
+        return "stat" + symlinkFlag + " -c \"StatEntryL:|%N|%Y|%d|%s|%f\" \"" + path + "\"";
     }
 
-    public StatEntry ParseEntry(string text2)
+    public StatEntry ParseEntry(string line)
     {
         StatEntry result = default;
-        if (text2.Length < 6)
+        if (line.Length < 6)
         {
             return default;
         }
-        string[] array = text2.Split('|');
-        if (!long.TryParse(array[2], out result.ModifiedTime))
+        string[] parts = line.Split('|');
+        if (!long.TryParse(parts[2], out result.ModifiedTime))
         {
             return default;
         }
-        if (!int.TryParse(array[3], out result.DeviceId))
+        if (!int.TryParse(parts[3], out result.DeviceId))
         {
             return default;
         }
-        if (!long.TryParse(array[4], out result.Size))
+        if (!long.TryParse(parts[4], out result.Size))
         {
             return default;
         }
-        if (!int.TryParse(array[5], NumberStyles.HexNumber, null, out var result2))
+        if (!int.TryParse(parts[5], NumberStyles.HexNumber, null, out var modeHex))
         {
             return default;
         }
-        switch ((result2 >> 12) & 0xF)
+        switch ((modeHex >> 12) & 0xF)
         {
             case 8:
                 result.Kind = StatEntryKind.File;
@@ -140,34 +140,34 @@ public class StatCommandBuilder
                 result.Kind = StatEntryKind.Symlink;
                 break;
         }
-        if (text2.StartsWith("StatEntryL:|"))
+        if (line.StartsWith("StatEntryL:|"))
         {
-            if (array.Length != 6)
+            if (parts.Length != 6)
             {
                 return default;
             }
-            int num = array[1].IndexOf("->");
-            if (num == -1)
+            int arrowIndex = parts[1].IndexOf("->");
+            if (arrowIndex == -1)
             {
-                result.Name = array[1].Trim(' ', '\'');
+                result.Name = parts[1].Trim(' ', '\'');
             }
             else
             {
-                result.Name = array[1].Substring(0, num).Trim(' ', '\'');
-                result.LinkTarget = array[1].Substring(num + 2).Trim(' ', '\'');
+                result.Name = parts[1].Substring(0, arrowIndex).Trim(' ', '\'');
+                result.LinkTarget = parts[1].Substring(arrowIndex + 2).Trim(' ', '\'');
             }
         }
-        else if (text2.StartsWith("StatEntryB:|"))
+        else if (line.StartsWith("StatEntryB:|"))
         {
-            if (array.Length != 7)
+            if (parts.Length != 7)
             {
                 return default;
             }
-            result.Name = array[1];
-            result.LinkTarget = array[6];
+            result.Name = parts[1];
+            result.LinkTarget = parts[6];
         }
-        string text = result.Name;
-        if (text != null && text.StartsWith("./"))
+        string name = result.Name;
+        if (name != null && name.StartsWith("./"))
         {
             result.Name = result.Name.Substring(2);
         }

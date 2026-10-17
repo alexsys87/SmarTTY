@@ -1,297 +1,297 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace SmarTTY.IO;
 
 public class RemotePathUtils
 {
-    public static string GetDirectoryName(string text)
+    public static string GetDirectoryName(string path)
     {
-        if (text == null)
+        if (path == null)
         {
             return null;
         }
-        int num = text.LastIndexOfAny(new char[2] { '/', '\\' });
-        if (num <= 0)
+        int separatorIndex = path.LastIndexOfAny(new char[2] { '/', '\\' });
+        if (separatorIndex <= 0)
         {
-            if (text.Length == 1 || num < 0)
+            if (path.Length == 1 || separatorIndex < 0)
             {
                 return "";
             }
             return "/";
         }
-        return text.Substring(0, num);
+        return path.Substring(0, separatorIndex);
     }
 
-    public static string GetFileName(string text)
+    public static string GetFileName(string path)
     {
-        if (text == null)
+        if (path == null)
         {
             return null;
         }
-        int num = text.LastIndexOfAny(new char[2] { '/', '\\' });
-        if (num < 0)
+        int separatorIndex = path.LastIndexOfAny(new char[2] { '/', '\\' });
+        if (separatorIndex < 0)
         {
-            return text;
+            return path;
         }
-        if (num == text.Length - 1)
+        if (separatorIndex == path.Length - 1)
         {
             return null;
         }
-        return text.Substring(num + 1);
+        return path.Substring(separatorIndex + 1);
     }
 
-    public static string GetExtension(string text3)
+    public static string GetExtension(string path)
     {
-        string text = GetFileName(text3);
-        int num = text.LastIndexOf('.');
-        if (num == -1)
+        string fileName = GetFileName(path);
+        int dotIndex = fileName.LastIndexOf('.');
+        if (dotIndex == -1)
         {
             return "";
         }
-        string text2 = text.Substring(num);
-        if (text2.IndexOfAny(new char[2] { '\\', '/' }) != -1)
+        string ext = fileName.Substring(dotIndex);
+        if (ext.IndexOfAny(new char[2] { '\\', '/' }) != -1)
         {
             return "";
         }
-        return text2;
+        return ext;
     }
 
-    public static string ChangeExtension(string text, string text2)
+    public static string ChangeExtension(string path, string newExtension)
     {
-        int num = text.LastIndexOf('.');
-        if (num == -1)
+        int dotIndex = path.LastIndexOf('.');
+        if (dotIndex == -1)
         {
-            return text + text2;
+            return path + newExtension;
         }
-        if (text.Substring(num).IndexOfAny(new char[2] { '\\', '/' }) != -1)
+        if (path.Substring(dotIndex).IndexOfAny(new char[2] { '\\', '/' }) != -1)
         {
-            return text + text2;
+            return path + newExtension;
         }
-        return text.Substring(0, num) + text2;
+        return path.Substring(0, dotIndex) + newExtension;
     }
 
-    public static string NormalizeUnix(string text3)
+    public static string NormalizeUnix(string path)
     {
-        if (string.IsNullOrEmpty(text3) || text3.IndexOf('.') == -1)
+        if (string.IsNullOrEmpty(path) || path.IndexOf('.') == -1)
         {
-            return text3;
+            return path;
         }
-        int num;
-        for (num = 0; num < text3.Length && text3[num] == '/'; num++)
+        int leadingSlashesCount;
+        for (leadingSlashesCount = 0; leadingSlashesCount < path.Length && path[leadingSlashesCount] == '/'; leadingSlashesCount++)
         {
         }
-        List<string> list = new List<string>();
-        string[] array = text3.Split(new char[1] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-        foreach (string text in array)
+        List<string> segments = new List<string>();
+        string[] rawSegments = path.Split(new char[1] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (string segment in rawSegments)
         {
-            if (text == ".")
+            if (segment == ".")
             {
                 continue;
             }
-            if (text == "..")
+            if (segment == "..")
             {
-                if (list.Count > 0 && list[list.Count - 1] != "..")
+                if (segments.Count > 0 && segments[segments.Count - 1] != "..")
                 {
-                    list.RemoveAt(list.Count - 1);
+                    segments.RemoveAt(segments.Count - 1);
                 }
                 else
                 {
-                    list.Add("..");
+                    segments.Add("..");
                 }
             }
             else
             {
-                list.Add(text);
+                segments.Add(segment);
             }
         }
-        string text2 = string.Join("/", list.ToArray());
-        while (num > 0)
+        string result = string.Join("/", segments.ToArray());
+        while (leadingSlashesCount > 0)
         {
-            text2 = "/" + text2;
-            num--;
+            result = "/" + result;
+            leadingSlashesCount--;
         }
-        return text2;
+        return result;
     }
 
-    public static string NormalizeMixed(string text2)
+    public static string NormalizeMixed(string path)
     {
-        if (string.IsNullOrEmpty(text2) || text2.IndexOf('.') == -1)
+        if (string.IsNullOrEmpty(path) || path.IndexOf('.') == -1)
         {
-            return text2;
+            return path;
         }
-        int num = 0;
-        List<string> list = new List<string>();
-        while (num < text2.Length)
+        int index = 0;
+        List<string> segments = new List<string>();
+        while (index < path.Length)
         {
-            int num2 = text2.IndexOfAny(new char[2] { '\\', '/' }, num + 1);
-            if (num2 == -1)
+            int nextSeparator = path.IndexOfAny(new char[2] { '\\', '/' }, index + 1);
+            if (nextSeparator == -1)
             {
-                num2 = text2.Length;
+                nextSeparator = path.Length;
             }
-            num = Math.Max(num, 0);
-            list.Add(text2.Substring(num, num2 - num));
-            num = num2;
+            index = Math.Max(index, 0);
+            segments.Add(path.Substring(index, nextSeparator - index));
+            index = nextSeparator;
         }
-        for (int num3 = 0; num3 < list.Count; num3++)
+        for (int i = 0; i < segments.Count; i++)
         {
-            string text = list[num3].TrimStart('\\', '/');
-            if (text == ".")
+            string segment = segments[i].TrimStart('\\', '/');
+            if (segment == ".")
             {
-                list.RemoveAt(num3--);
+                segments.RemoveAt(i--);
             }
-            else if (text == ".." && num3 > 0)
+            else if (segment == ".." && i > 0)
             {
-                list.RemoveRange(num3 - 1, 2);
-                num3 -= 2;
+                segments.RemoveRange(i - 1, 2);
+                i -= 2;
             }
         }
-        return string.Join("", list.ToArray());
+        return string.Join("", segments.ToArray());
     }
 
-    public static string GetNameWithoutExtension(string text2)
+    public static string GetNameWithoutExtension(string path)
     {
-        string text = GetFileName(text2);
-        if (text != null)
+        string fileName = GetFileName(path);
+        if (fileName != null)
         {
-            int num = text.LastIndexOf('.');
-            if (num != -1)
+            int dotIndex = fileName.LastIndexOf('.');
+            if (dotIndex != -1)
             {
-                text = text.Substring(0, num);
+                fileName = fileName.Substring(0, dotIndex);
             }
         }
-        return text;
+        return fileName;
     }
 
-    public static string GetNameBeforeFirstDot(string text2)
+    public static string GetNameBeforeFirstDot(string path)
     {
-        string text = GetFileName(text2);
-        if (text != null)
+        string fileName = GetFileName(path);
+        if (fileName != null)
         {
-            int num = text.IndexOf('.');
-            if (num != -1)
+            int dotIndex = fileName.IndexOf('.');
+            if (dotIndex != -1)
             {
-                text = text.Substring(0, num);
+                fileName = fileName.Substring(0, dotIndex);
             }
         }
-        return text;
+        return fileName;
     }
 
-    public static string ReplaceFileName(string text, string text2)
+    public static string ReplaceFileName(string path, string newFileName)
     {
-        if (text == null)
+        if (path == null)
         {
             return null;
         }
-        if (string.IsNullOrEmpty(text2))
+        if (string.IsNullOrEmpty(newFileName))
         {
-            return text;
+            return path;
         }
-        int num = text.LastIndexOfAny(new char[2] { '\\', '/' });
-        if (num == -1)
+        int separatorIndex = path.LastIndexOfAny(new char[2] { '\\', '/' });
+        if (separatorIndex == -1)
         {
-            return text2;
+            return newFileName;
         }
-        return text.Substring(0, num + 1) + text2;
+        return path.Substring(0, separatorIndex + 1) + newFileName;
     }
 
-    public static bool IsUnderDirectory(string text, string text2)
+    public static bool IsUnderDirectory(string path, string directoryPath)
     {
-        text = text.Replace('\\', '/');
-        text2 = text2.Replace('\\', '/');
-        if (!text.EndsWith("/"))
+        path = path.Replace('\\', '/');
+        directoryPath = directoryPath.Replace('\\', '/');
+        if (!path.EndsWith("/"))
         {
-            text += "/";
+            path += "/";
         }
-        if (!text2.EndsWith("/"))
+        if (!directoryPath.EndsWith("/"))
         {
-            text2 += "/";
+            directoryPath += "/";
         }
-        return text.StartsWith(text2, StringComparison.InvariantCultureIgnoreCase);
+        return path.StartsWith(directoryPath, StringComparison.InvariantCultureIgnoreCase);
     }
 
-    public static bool IsRelative(string text)
+    public static bool IsRelative(string path)
     {
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(path))
         {
             return false;
         }
-        if (text[0] == '.')
+        if (path[0] == '.')
         {
             return true;
         }
-        if (text[0] == '/' || text[0] == '\\' || (text.Length >= 2 && text[1] == ':'))
+        if (path[0] == '/' || path[0] == '\\' || (path.Length >= 2 && path[1] == ':'))
         {
             return false;
         }
         return true;
     }
 
-    public static bool IsWindowsRooted(string text)
+    public static bool IsWindowsRooted(string path)
     {
-        if (text.Length >= 3 && char.IsLetter(text[0]) && text[1] == ':')
+        if (path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':')
         {
-            if (text[2] != '\\')
+            if (path[2] != '\\')
             {
-                return text[2] == '/';
+                return path[2] == '/';
             }
             return true;
         }
         return false;
     }
 
-    public static string GetRelativePath(string text, string text2, bool flag = true)
+    public static string GetRelativePath(string basePath, string targetPath, bool allowAbsoluteFallback = true)
     {
-        if (text == text2)
+        if (basePath == targetPath)
         {
             return ".";
         }
-        text = text.Replace('\\', '/');
-        text2 = text2.Replace('\\', '/');
-        if (IsRelative(text2))
+        basePath = basePath.Replace('\\', '/');
+        targetPath = targetPath.Replace('\\', '/');
+        if (IsRelative(targetPath))
         {
-            return text2;
+            return targetPath;
         }
         char[] separator = new char[2] { '/', '\\' };
-        text = NormalizeUnix(text);
-        text2 = NormalizeUnix(text2);
-        string[] array = text.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-        string[] array2 = text2.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-        bool ignoreCase = RemotePathUtils.IsWindowsRooted(text2);
-        int num;
-        for (num = 0; num < Math.Min(array.Length, array2.Length) && string.Compare(array[num], array2[num], ignoreCase) == 0; num++)
+        basePath = NormalizeUnix(basePath);
+        targetPath = NormalizeUnix(targetPath);
+        string[] baseSegments = basePath.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+        string[] targetSegments = targetPath.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+        bool ignoreCase = RemotePathUtils.IsWindowsRooted(targetPath);
+        int commonCount;
+        for (commonCount = 0; commonCount < Math.Min(baseSegments.Length, targetSegments.Length) && string.Compare(baseSegments[commonCount], targetSegments[commonCount], ignoreCase) == 0; commonCount++)
         {
         }
-        if ((num == 0) & flag)
+        if ((commonCount == 0) & allowAbsoluteFallback)
         {
-            return text2;
+            return targetPath;
         }
         string result = "";
-        for (int num2 = num; num2 < array.Length; num2++)
+        for (int i = commonCount; i < baseSegments.Length; i++)
         {
             result = Combine(result, "..");
         }
-        for (int num3 = num; num3 < array2.Length; num3++)
+        for (int j = commonCount; j < targetSegments.Length; j++)
         {
-            result = Combine(result, array2[num3]);
+            result = Combine(result, targetSegments[j]);
         }
         return result;
     }
 
-    public static string Combine(string text, string text2)
+    public static string Combine(string basePath, string relativePath)
     {
-        if (string.IsNullOrEmpty(text2))
+        if (string.IsNullOrEmpty(relativePath))
         {
-            return text;
+            return basePath;
         }
-        if (string.IsNullOrEmpty(text) || !IsRelative(text2))
+        if (string.IsNullOrEmpty(basePath) || !IsRelative(relativePath))
         {
-            return text2;
+            return relativePath;
         }
-        if (text2[0] == '/' || (text2.Length >= 2 && text2[1] == ':'))
+        if (relativePath[0] == '/' || (relativePath.Length >= 2 && relativePath[1] == ':'))
         {
-            return text2;
+            return relativePath;
         }
-        return text.TrimEnd('/') + "/" + text2;
+        return basePath.TrimEnd('/') + "/" + relativePath;
     }
 }

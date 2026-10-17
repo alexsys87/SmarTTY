@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
@@ -14,10 +14,10 @@ public class KeyBindingMap
 
         public KeyShortcut DefaultShortcut;
 
-        public EditorCommand(string text, string text2)
+        public EditorCommand(string name, string description)
         {
-            this.Name = text;
-            this.Description = text2;
+            this.Name = name;
+            this.Description = description;
             DefaultShortcut = null;
         }
 
@@ -26,7 +26,7 @@ public class KeyBindingMap
             return Description;
         }
 
-        public abstract void Execute(object obj);
+        public abstract void Execute(object target);
     }
 
     public class KeyShortcut
@@ -39,29 +39,29 @@ public class KeyBindingMap
 
         public bool Shift;
 
-        public bool Matches(KeyEventArgs e2)
+        public bool Matches(KeyEventArgs e)
         {
-            if (e2.Alt != Alt)
+            if (e.Alt != Alt)
             {
                 return false;
             }
-            if (e2.Control != Ctrl)
+            if (e.Control != Ctrl)
             {
                 return false;
             }
-            if (e2.Shift != Shift)
+            if (e.Shift != Shift)
             {
                 return false;
             }
-            return e2.KeyCode == Key;
+            return e.KeyCode == Key;
         }
 
-        public KeyShortcut(KeyEventArgs e2)
+        public KeyShortcut(KeyEventArgs e)
         {
-            Ctrl = e2.Control;
-            Alt = e2.Alt;
-            Shift = e2.Shift;
-            Key = e2.KeyCode;
+            Ctrl = e.Control;
+            Alt = e.Alt;
+            Shift = e.Shift;
+            Key = e.KeyCode;
         }
 
         public KeyShortcut()
@@ -73,13 +73,13 @@ public class KeyBindingMap
             return $"{Key}{Ctrl}{Alt}{Shift}".GetHashCode();
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object other)
         {
-            if (!(obj is KeyShortcut))
+            if (!(other is KeyShortcut))
             {
                 return false;
             }
-            KeyShortcut keyShortcut = (KeyShortcut)obj;
+            KeyShortcut keyShortcut = (KeyShortcut)other;
             if (keyShortcut.Alt == Alt && keyShortcut.Ctrl == Ctrl && keyShortcut.Shift == Shift)
             {
                 return keyShortcut.Key == Key;
@@ -87,45 +87,45 @@ public class KeyBindingMap
             return false;
         }
 
-        public static bool TryParse(string text2, out KeyShortcut keyShortcut)
+        public static bool TryParse(string str, out KeyShortcut keyShortcut)
         {
             keyShortcut = new KeyShortcut();
             try
             {
-                bool flag = false;
-                bool flag2 = false;
-                bool flag3 = false;
-                Keys keys = Keys.None;
+                bool ctrl = false;
+                bool alt = false;
+                bool shift = false;
+                Keys key = Keys.None;
                 KeysConverter keysConverter = new KeysConverter();
-                string[] array = text2.Split(new char[2] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string text in array)
+                string[] parts = str.Split(new char[2] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string part in parts)
                 {
-                    switch (text)
+                    switch (part)
                     {
                         case "Control":
-                            flag = true;
+                            ctrl = true;
                             break;
                         case "Alt":
-                            flag2 = true;
+                            alt = true;
                             break;
                         case "Shift":
-                            flag3 = true;
+                            shift = true;
                             break;
                         default:
-                            keys = (Keys)keysConverter.ConvertFromString(text);
+                            key = (Keys)keysConverter.ConvertFromString(part);
                             break;
                     }
                 }
-                if (keys == Keys.None)
+                if (key == Keys.None)
                 {
                     return false;
                 }
                 keyShortcut = new KeyShortcut
                 {
-                    Ctrl = flag,
-                    Alt = flag2,
-                    Shift = flag3,
-                    Key = keys
+                    Ctrl = ctrl,
+                    Alt = alt,
+                    Shift = shift,
+                    Key = key
                 };
                 return true;
             }
@@ -159,26 +159,26 @@ public class KeyBindingMap
 
     public Dictionary<KeyShortcut, EditorCommand> Bindings = new Dictionary<KeyShortcut, EditorCommand>();
 
-    public EditorCommand FindCommand(string text)
+    public EditorCommand FindCommand(string commandName)
     {
-        foreach (EditorCommand item in _commands)
+        foreach (EditorCommand cmd in _commands)
         {
-            if (item.Name == text)
+            if (cmd.Name == commandName)
             {
-                return item;
+                return cmd;
             }
         }
-        throw new InvalidOperationException("Command " + text + " not found");
+        throw new InvalidOperationException("Command " + commandName + " not found");
     }
 
-    public KeyBindingMap(IEnumerable<EditorCommand> items)
+    public KeyBindingMap(IEnumerable<EditorCommand> commands)
     {
-        _commands.AddRange(items);
-        foreach (EditorCommand item in _commands)
+        _commands.AddRange(commands);
+        foreach (EditorCommand cmd in _commands)
         {
-            if (item.DefaultShortcut != null)
+            if (cmd.DefaultShortcut != null)
             {
-                Bindings[item.DefaultShortcut] = item;
+                Bindings[cmd.DefaultShortcut] = cmd;
             }
         }
     }

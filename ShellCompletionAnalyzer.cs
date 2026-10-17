@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using System;
 using System.Collections.Generic;
@@ -91,62 +91,60 @@ public class ShellCompletionAnalyzer : IDisposable
         {
             return new List<string>();
         }
-        string[] array;
+        string[] unprocessedDirs;
         lock (this._executablesByDir)
         {
-            array = items.Where((string key2) => !this._executablesByDir.ContainsKey(key2)).ToArray();
+            unprocessedDirs = items.Where((string dir) => !this._executablesByDir.ContainsKey(dir)).ToArray();
         }
-        string[] array2 = array;
-        foreach (string key in array2)
+        foreach (string dir in unprocessedDirs)
         {
-            this._executablesByDir[key] = new HashSet<string>();
+            this._executablesByDir[dir] = new HashSet<string>();
         }
-        List<string> list = new List<string>();
-        if (array.Length != 0)
+        List<string> findOutput = new List<string>();
+        if (unprocessedDirs.Length != 0)
         {
-            string text = "find -L " + string.Join(" ", array.Select((string text3) => "\"" + text3 + "\"").ToArray()) + " -maxdepth 1 -perm -111 -type f";
-            list = _sshSession.RunCommandChecked(text, requireSuccess: false);
-            if (list == null)
+            string findCommand = "find -L " + string.Join(" ", unprocessedDirs.Select((string dir) => "\"" + dir + "\"").ToArray()) + " -maxdepth 1 -perm -111 -type f";
+            findOutput = _sshSession.RunCommandChecked(findCommand, requireSuccess: false);
+            if (findOutput == null)
             {
                 throw new Exception("Failed to list files in $PATH");
             }
         }
         lock (this._executablesByDir)
         {
-            string[] array3 = items.OrderBy((string text3) => -text3.Length).ToArray();
-            foreach (string item in list)
+            string[] sortedDirs = items.OrderBy((string dir) => -dir.Length).ToArray();
+            foreach (string filePath in findOutput)
             {
-                if (!item.StartsWith("/"))
+                if (!filePath.StartsWith("/"))
                 {
                     continue;
                 }
-                array2 = array3;
-                foreach (string text2 in array2)
+                foreach (string dir in sortedDirs)
                 {
-                    if (item.StartsWith(text2))
+                    if (filePath.StartsWith(dir))
                     {
-                        if (!this._executablesByDir.TryGetValue(text2, out var value))
+                        if (!this._executablesByDir.TryGetValue(dir, out var executablesSet))
                         {
-                            value = (this._executablesByDir[text2] = new HashSet<string>());
+                            executablesSet = (this._executablesByDir[dir] = new HashSet<string>());
                         }
-                        value.Add(item);
+                        executablesSet.Add(filePath);
                         break;
                     }
                 }
             }
-            HashSet<string> hashSet2 = new HashSet<string>();
-            foreach (string item2 in items)
+            HashSet<string> resultSet = new HashSet<string>();
+            foreach (string dir in items)
             {
-                if (!this._executablesByDir.TryGetValue(item2, out var value2))
+                if (!this._executablesByDir.TryGetValue(dir, out var executablesSet))
                 {
                     continue;
                 }
-                foreach (string item3 in value2)
+                foreach (string executablePath in executablesSet)
                 {
-                    hashSet2.Add(item3);
+                    resultSet.Add(executablePath);
                 }
             }
-            return hashSet2;
+            return resultSet;
         }
     }
 
@@ -184,21 +182,21 @@ public class ShellCompletionAnalyzer : IDisposable
 
     private void ProcessHistoryQueue()
     {
-        string text = null;
+        string command = null;
         lock (_historyQueue)
         {
             if (_historyWriterBusy || _historyQueue.Count == 0)
             {
                 return;
             }
-            text = _historyQueue.Dequeue();
+            command = _historyQueue.Dequeue();
             _historyWriterBusy = true;
         }
         try
         {
             _historyChannel?.Dispose();
-            _historyChannel = _sshSession.OpenShellChannel(text);
-            _historyChannel.Finished += (object obj2) =>
+            _historyChannel = _sshSession.OpenShellChannel(command);
+            _historyChannel.Finished += (object sender) =>
             {
                 _historyWriterBusy = false;
                 new Thread(ProcessHistoryQueue).Start();
@@ -212,31 +210,31 @@ public class ShellCompletionAnalyzer : IDisposable
         }
     }
 
-    private static List<string> SplitPath(List<string> list2)
+    private static List<string> SplitPath(List<string> pathLines)
     {
-        List<string> list = new List<string>();
-        if (list2 != null)
+        List<string> result = new List<string>();
+        if (pathLines != null)
         {
-            foreach (string item2 in list2)
+            foreach (string pathLine in pathLines)
             {
-                string[] array = item2.Split(':');
-                foreach (string item in array)
+                string[] parts = pathLine.Split(':');
+                foreach (string part in parts)
                 {
-                    list.Add(item);
+                    result.Add(part);
                 }
             }
         }
-        return list;
+        return result;
     }
 
     public IEnumerable<string> GetExecutables(SshTerminalControl sshTerminalControl)
     {
-        List<string> list = _pathDirs ?? new List<string>();
-        if (list.FirstOrDefault((string text) => !text.StartsWith("/")) != null || list.Count == 0 || sshTerminalControl.HasEnvironment)
+        List<string> rawPathLines = _pathDirs ?? new List<string>();
+        if (rawPathLines.FirstOrDefault((string path) => !path.StartsWith("/")) != null || rawPathLines.Count == 0 || sshTerminalControl.HasEnvironment)
         {
-            list = _sshSession.RunCommandChecked(sshTerminalControl.BuildRemoteCommand("echo $PATH"), requireSuccess: true, "xterm");
+            rawPathLines = _sshSession.RunCommandChecked(sshTerminalControl.BuildRemoteCommand("echo $PATH"), requireSuccess: true, "xterm");
         }
-        List<string> list2 = SplitPath(list);
-        return CollectExecutables(list2);
+        List<string> pathDirectories = SplitPath(rawPathLines);
+        return CollectExecutables(pathDirectories);
     }
 }

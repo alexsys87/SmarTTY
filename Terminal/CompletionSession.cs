@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using SmarTTY.IO;
 using System;
 using System.Collections.Generic;
@@ -45,11 +45,11 @@ internal class CompletionSession : IDisposable
 
         public int End => Start + Length;
 
-        public Token(string text, int value2, int value3)
+        public Token(string text, int start, int end)
         {
-            Start = value2;
-            this.Length = value3 - value2;
-            this.IsQuoted = value2 > 0 && value2 < text.Length && text[value2] == '"';
+            Start = start;
+            this.Length = end - start;
+            this.IsQuoted = start > 0 && start < text.Length && text[start] == '"';
             this.Text = text.Substring(Start, this.Length);
         }
 
@@ -58,9 +58,9 @@ internal class CompletionSession : IDisposable
             return Text;
         }
 
-        public bool Contains(int value2)
+        public bool Contains(int position)
         {
-            if (value2 >= Start && value2 <= Start + Length)
+            if (position >= Start && position <= Start + Length)
             {
                 return true;
             }
@@ -120,15 +120,15 @@ internal class CompletionSession : IDisposable
 
     public event EventHandler<AppliedEventArgs> ItemApplied;
 
-    public CompletionSession(SshTerminalControl sshTerminalControl, string text, CompletionTarget completionTarget, Token token, ICompletionPopup completionPopup, bool flag, CommandCompletion commandCompletion)
+    public CompletionSession(SshTerminalControl sshTerminalControl, string commandText, CompletionTarget completionTarget, Token token, ICompletionPopup completionPopup, bool autoApply, CommandCompletion commandCompletion)
     {
         _terminal = sshTerminalControl;
         _target = completionTarget;
         _token = token;
-        _commandText = text;
+        _commandText = commandText;
         _popup = completionPopup;
         _popup.ItemSelected += OnItemSelected;
-        _autoApply = flag;
+        _autoApply = autoApply;
         _commandCompletion = commandCompletion;
         _listing = ResolveListing(_token.Text);
         UpdatePopup(_token.Text);
@@ -144,54 +144,54 @@ internal class CompletionSession : IDisposable
 
     private void UpdatePopup(string text)
     {
-        bool flag;
+        bool isOption;
         if (text == null)
         {
-            flag = _showingOptions;
+            isOption = _showingOptions;
         }
         else
         {
-            flag = text.StartsWith("-");
+            isOption = text.StartsWith("-");
             _popup.SetFilter(GetFilterText(text));
         }
-        if (flag == _showingOptions && text != null)
+        if (isOption == _showingOptions && text != null)
         {
             return;
         }
-        if (flag && _commandCompletion?.Options != null)
+        if (isOption && _commandCompletion?.Options != null)
         {
-            List<CompletionItem> list = _commandCompletion.Options.SelectMany((CommandCompletion.Option option) => from option2 in new string[1] { option.Value }.Concat((option.Aliases ?? "").Split('|'))
+            List<CompletionItem> list = _commandCompletion.Options.SelectMany((CommandCompletion.Option option) => from val in new string[1] { option.Value }.Concat((option.Aliases ?? "").Split('|'))
                                                                                                                    select new CompletionItem
                                                                                                                    {
                                                                                                                        Icon = VirtualTerminalPopupItemIcon.Flag,
-                                                                                                                       Text = option2,
-                                                                                                                       InsertText = option2,
+                                                                                                                       Text = val,
+                                                                                                                       InsertText = val,
                                                                                                                        Description = option.ShortDescription,
                                                                                                                        Summary = new VirtualTerminalPopupSummary.OptionInfo
                                                                                                                        {
-                                                                                                                           Option = option2,
+                                                                                                                           Option = val,
                                                                                                                            Description = option.LongDescription
                                                                                                                        }
                                                                                                                    }).ToList();
-            list.Sort((CompletionItem completionItem, CompletionItem completionItem2) => StringComparer.Ordinal.Compare(completionItem.Text, completionItem2.Text));
+            list.Sort((CompletionItem first, CompletionItem second) => StringComparer.Ordinal.Compare(first.Text, second.Text));
             _popup.SetItemList(list.ToArray());
         }
         else
         {
             _popup.SetItemList(_items?.ToArray());
         }
-        _showingOptions = flag;
+        _showingOptions = isOption;
     }
 
-    private ListingTarget ResolveListing(string text3)
+    private ListingTarget ResolveListing(string rawText)
     {
-        string text = (text3 ?? "").Trim('\'', '"');
-        if (text.StartsWith("~"))
+        string pathText = (rawText ?? "").Trim('\'', '"');
+        if (pathText.StartsWith("~"))
         {
-            text = _terminal.HomeDirectory + text.Substring(1);
+            pathText = _terminal.HomeDirectory + pathText.Substring(1);
         }
-        int num = text.LastIndexOf('/');
-        switch (num)
+        int slashIndex = pathText.LastIndexOf('/');
+        switch (slashIndex)
         {
             case -1:
                 return new ListingTarget
@@ -199,7 +199,7 @@ internal class CompletionSession : IDisposable
                     Directory = _terminal.CurrentDirectory
                 };
             case 0:
-                if (num < text.Length && text[num] == '/')
+                if (slashIndex < pathText.Length && pathText[slashIndex] == '/')
                 {
                     return new ListingTarget
                     {
@@ -209,11 +209,11 @@ internal class CompletionSession : IDisposable
                 }
                 break;
         }
-        string text2 = text.Substring(0, num);
+        string prefix = pathText.Substring(0, slashIndex);
         return new ListingTarget
         {
-            Directory = RemotePathUtils.Combine(_terminal.CurrentDirectory, text2),
-            Prefix = text2
+            Directory = RemotePathUtils.Combine(_terminal.CurrentDirectory, prefix),
+            Prefix = prefix
         };
     }
 
@@ -221,14 +221,14 @@ internal class CompletionSession : IDisposable
     {
         try
         {
-            List<CompletionItem> list;
+            List<CompletionItem> itemsList;
             while (true)
             {
                 ListingTarget listingTarget = _listing;
                 if (_target == CompletionTarget.Command && !listingTarget.HasPrefix)
                 {
                     IEnumerable<string> source = _terminal._shellCompletionAnalyzer.GetExecutables(_terminal);
-                    list = (from ba2 in source.Select((string fullPath) => new CompletionItem
+                    itemsList = (from item in source.Select((string fullPath) => new CompletionItem
                     {
                         Icon = VirtualTerminalPopupItemIcon.Command,
                         Text = RemotePathUtils.GetFileName(fullPath),
@@ -237,37 +237,37 @@ internal class CompletionSession : IDisposable
                             FullPath = fullPath
                         },
                         InsertText = RemotePathUtils.GetFileName(fullPath)
-                    }).Concat(from text2 in "alias,bg,bind,break,builtin,case,cd,command,compgen,complete,continue,declare,dirs,disown,echo,enable,eval,exec,exit,export,fc,fg,getopts,hash,help,history,if,jobs,kill,let,local,logout,popd,printf,pushd,pwd,read,readonly,return,set,shift,shopt,source,suspend,test,times,trap,type,typeset,ulimit,umask,unalias,unset,until,wait,while".Split(',')
+                    }).Concat(from builtinCmd in "alias,bg,bind,break,builtin,case,cd,command,compgen,complete,continue,declare,dirs,disown,echo,enable,eval,exec,exit,export,fc,fg,getopts,hash,help,history,if,jobs,kill,let,local,logout,popd,printf,pushd,pwd,read,readonly,return,set,shift,shopt,source,suspend,test,times,trap,type,typeset,ulimit,umask,unalias,unset,until,wait,while".Split(',')
                               select new CompletionItem
                               {
                                   Icon = VirtualTerminalPopupItemIcon.Command,
-                                  Text = text2,
-                                  InsertText = text2
+                                  Text = builtinCmd,
+                                  InsertText = builtinCmd
                               })
-                            orderby ba2.Text
-                            select ba2).ToList();
+                            orderby item.Text
+                            select item).ToList();
                 }
                 else
                 {
-                    string text = LsOutputParser.LsParser.BuildListCommand(listingTarget.Directory, flag: false, flag2: false);
-                    IEnumerable<LsOutputParser.LsEntry> enumerable = _terminal.Session.RunCommandChecked(_terminal.BuildRemoteCommand(text, false), requireSuccess: true, "xterm")?.Select((string text2) => LsOutputParser.LsParser.ParseLine(text2))?.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.Name != null && lsEntry.Name != ".");
-                    if (enumerable == null)
+                    string lsCommand = LsOutputParser.LsParser.BuildListCommand(listingTarget.Directory, followSymlinks: false, recursive: false);
+                    IEnumerable<LsOutputParser.LsEntry> entries = _terminal.Session.RunCommandChecked(_terminal.BuildRemoteCommand(lsCommand, false), requireSuccess: true, "xterm")?.Select((string line) => LsOutputParser.LsParser.ParseLine(line))?.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.Name != null && lsEntry.Name != ".");
+                    if (entries == null)
                     {
                         throw new Exception("Failed to list " + listingTarget.Directory);
                     }
                     if (_target == CompletionTarget.Command)
                     {
-                        enumerable = enumerable.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.IsExecutable || lsEntry.IsDirectory);
+                        entries = entries.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.IsExecutable || lsEntry.IsDirectory);
                     }
                     else if (_target == CompletionTarget.Directory)
                     {
-                        enumerable = enumerable.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.IsDirectory);
+                        entries = entries.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.IsDirectory);
                     }
                     if (listingTarget.HasPrefix && (RemotePathUtils.NormalizeUnix(listingTarget.Directory) == "/" || !listingTarget.Directory.EndsWith("/..")))
                     {
-                        enumerable = enumerable.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.Name != "..");
+                        entries = entries.Where((LsOutputParser.LsEntry lsEntry) => lsEntry.Name != "..");
                     }
-                    list = enumerable.Select((LsOutputParser.LsEntry lsEntry) => new CompletionItem
+                    itemsList = entries.Select((LsOutputParser.LsEntry lsEntry) => new CompletionItem
                     {
                         Icon = (lsEntry.IsDirectory ? VirtualTerminalPopupItemIcon.Directory : VirtualTerminalPopupItemIcon.File),
                         Summary = new VirtualTerminalPopupSummary.FileOrDirectoryInfo
@@ -278,7 +278,7 @@ internal class CompletionSession : IDisposable
                         Text = lsEntry.Name,
                         InsertText = BuildInsertText(listingTarget, lsEntry)
                     }).ToList();
-                    list.Sort(CompareItems);
+                    itemsList.Sort(CompareItems);
                 }
                 lock (_lock)
                 {
@@ -292,7 +292,7 @@ internal class CompletionSession : IDisposable
             }
             _terminal.BeginInvoke((Action)(() =>
             {
-                OnItemsLoaded(list);
+                OnItemsLoaded(itemsList);
             }));
         }
         catch (Exception ex)
@@ -310,93 +310,91 @@ internal class CompletionSession : IDisposable
         {
             return;
         }
-        string text2 = GetFilterText(_token.Text);
-        CompletionItem[] array = list.Where((CompletionItem completionItem) => completionItem.Text.StartsWith(text2)).ToArray();
-        if (array.Length == 1)
+        string filterText = GetFilterText(_token.Text);
+        CompletionItem[] matches = list.Where((CompletionItem completionItem) => completionItem.Text.StartsWith(filterText)).ToArray();
+        if (matches.Length == 1)
         {
-            ApplyItem(array[0], flag3: false);
+            ApplyItem(matches[0], commit: false);
         }
-        else if (array.Length != 0)
+        else if (matches.Length != 0)
         {
-            string text = array[0].Text;
-            CompletionItem[] array2 = array;
-            for (int num = 0; num < array2.Length; num++)
+            string common = matches[0].Text;
+            foreach (CompletionItem item in matches)
             {
-                CompletionItem completionItem2 = array2[num];
-                text = CommonPrefix(text, completionItem2.Text);
+                common = CommonPrefix(common, item.Text);
             }
-            if (text.Length > 0 && text != text2)
+            if (common.Length > 0 && common != filterText)
             {
                 ApplyItem(new CompletionItem
                 {
-                    Text = text,
-                    InsertText = text
-                }, flag3: false);
+                    Text = common,
+                    InsertText = common
+                }, commit: false);
             }
         }
     }
 
-    private static string CommonPrefix(string text, string text2)
+    private static string CommonPrefix(string first, string second)
     {
-        int num = Math.Min(text.Length, text2.Length);
-        for (int num2 = 0; num2 < num; num2++)
+        int limit = Math.Min(first.Length, second.Length);
+        for (int i = 0; i < limit; i++)
         {
-            if (text[num2] != text2[num2])
+            if (first[i] != second[i])
             {
-                return text.Substring(0, num2);
+                return first.Substring(0, i);
             }
         }
-        return text.Substring(0, num);
+        return first.Substring(0, limit);
     }
 
     private string BuildInsertText(ListingTarget listingTarget, LsOutputParser.LsEntry lsEntry)
     {
-        string text = "";
+        string result = "";
         if (listingTarget.HasPrefix)
         {
-            text = listingTarget.Prefix;
-            if (!text.EndsWith("/"))
+            result = listingTarget.Prefix;
+            if (!result.EndsWith("/"))
             {
-                text += "/";
+                result += "/";
             }
         }
-        text += lsEntry.Name;
-        if (lsEntry.IsDirectory && !text.EndsWith("/"))
+        result += lsEntry.Name;
+        if (lsEntry.IsDirectory && !result.EndsWith("/"))
         {
-            text += "/";
+            result += "/";
         }
-        return text;
+        return result;
     }
 
-    private static int CompareItems(CompletionItem completionItem, CompletionItem completionItem2)
+    private static int CompareItems(CompletionItem first, CompletionItem second)
     {
-        if (completionItem.Icon != completionItem2.Icon)
+        if (first.Icon != second.Icon)
         {
-            if (completionItem.Icon == VirtualTerminalPopupItemIcon.Directory)
+            if (first.Icon == VirtualTerminalPopupItemIcon.Directory)
             {
                 return -1;
             }
             return 1;
         }
-        if ((completionItem.Text == ".." || completionItem2.Text == "..") && completionItem.Text != completionItem2.Text)
+        if ((first.Text == ".." || second.Text == "..") && first.Text != second.Text)
         {
-            if (!(completionItem.Text == ".."))
+            if (!(first.Text == ".."))
             {
                 return 1;
             }
             return -1;
         }
-        bool flag = completionItem.Text.StartsWith(".");
-        bool flag2 = completionItem2.Text.StartsWith(".");
-        if (flag != flag2)
+        bool isFirstHidden = first.Text.StartsWith(".");
+        bool isSecondHidden = second.Text.StartsWith(".");
+        if (isFirstHidden != isSecondHidden)
         {
-            if (!flag)
+            if (!isFirstHidden)
             {
                 return -1;
             }
             return 1;
         }
-        return StringComparer.InvariantCulture.Compare(completionItem.Text, completionItem2.Text);
+        return StringComparer.InvariantCulture.Compare(first.Text, second.Text);
     }
 
     private void OnItemSelected(CompletionItem completionItem, Keys keys)
@@ -404,7 +402,7 @@ internal class CompletionSession : IDisposable
         ApplyItem(completionItem, keys == Keys.Return);
     }
 
-    private void ApplyItem(CompletionItem completionItem, bool flag3, string text3 = "")
+    private void ApplyItem(CompletionItem completionItem, bool commit, string suffix = "")
     {
         if (completionItem.InsertText == null)
         {
@@ -412,38 +410,38 @@ internal class CompletionSession : IDisposable
         }
         try
         {
-            bool flag = IsQuoted;
-            string text = completionItem.InsertText;
-            if (!flag)
+            bool isQuoted = IsQuoted;
+            string insertText = completionItem.InsertText;
+            if (!isQuoted)
             {
-                text = text.Replace(" ", "\\ ");
+                insertText = insertText.Replace(" ", "\\ ");
             }
-            bool flag2 = text.EndsWith("/");
-            if (flag2)
+            bool isDir = insertText.EndsWith("/");
+            if (isDir)
             {
-                if (text3 == "/")
+                if (suffix == "/")
                 {
-                    text3 = "";
+                    suffix = "";
                 }
-                else if (flag3)
+                else if (commit)
                 {
-                    text = text.TrimEnd('/');
+                    insertText = insertText.TrimEnd('/');
                 }
             }
-            int num = 0;
-            if (flag)
+            int caretOffset = 0;
+            if (isQuoted)
             {
-                text = _token.Text[0] + text + _token.Text[0];
-                num = -1;
+                insertText = _token.Text[0] + insertText + _token.Text[0];
+                caretOffset = -1;
             }
-            string text2 = _commandText.Substring(0, _token.Start) + text + _commandText.Substring(_token.End) + text3;
+            string newText = _commandText.Substring(0, _token.Start) + insertText + _commandText.Substring(_token.End) + suffix;
             AppliedEventArgs appliedEventArgs = new AppliedEventArgs
             {
-                NewText = text2,
-                CaretIndex = _token.Start + text.Length + (text3 ?? "").Length + num,
-                Commit = flag3,
+                NewText = newText,
+                CaretIndex = _token.Start + insertText.Length + (suffix ?? "").Length + caretOffset,
+                Commit = commit,
                 Item = completionItem,
-                IsDirectory = flag2
+                IsDirectory = isDir
             };
             this.ItemApplied?.Invoke(this, appliedEventArgs);
             LastApplied = appliedEventArgs;
@@ -456,72 +454,72 @@ internal class CompletionSession : IDisposable
     public static Token[] Tokenize(string text)
     {
         List<Token> list = new List<Token>();
-        int num = 0;
-        bool flag = false;
+        int tokenStart = 0;
+        bool inQuotes = false;
         if (string.IsNullOrEmpty(text))
         {
             return list.ToArray();
         }
-        bool flag2 = false;
-        for (int num2 = 0; num2 < text.Length; num2++)
+        bool isEscaped = false;
+        for (int i = 0; i < text.Length; i++)
         {
-            if (text[num2] == '"' && !flag2)
+            if (text[i] == '"' && !isEscaped)
             {
-                flag = !flag;
+                inQuotes = !inQuotes;
             }
-            else if (text[num2] == ' ' && !flag && !flag2)
+            else if (text[i] == ' ' && !inQuotes && !isEscaped)
             {
-                if (num2 != num)
+                if (i != tokenStart)
                 {
-                    list.Add(new Token(text, num, num2));
+                    list.Add(new Token(text, tokenStart, i));
                 }
-                num = num2 + 1;
+                tokenStart = i + 1;
             }
-            flag2 = text[num2] == '\\' && !flag2;
+            isEscaped = text[i] == '\\' && !isEscaped;
         }
-        if (num != text.Length)
+        if (tokenStart != text.Length)
         {
-            list.Add(new Token(text, num, text.Length));
+            list.Add(new Token(text, tokenStart, text.Length));
         }
         return list.ToArray();
     }
 
     private static bool ContainsUnescapedSpace(string text)
     {
-        bool flag = false;
-        for (int num = 0; num < text.Length; num++)
+        bool isEscaped = false;
+        for (int i = 0; i < text.Length; i++)
         {
-            if (!flag && text[num] == ' ')
+            if (!isEscaped && text[i] == ' ')
             {
                 return true;
             }
-            flag = text[num] == '\\' && !flag;
+            isEscaped = text[i] == '\\' && !isEscaped;
         }
         return false;
     }
 
-    public bool OnTextChanged(string text2, int value2, int value3, int value4)
+    public bool OnTextChanged(string newFullText, int offset, int oldLength, int newLength)
     {
-        int num = value2 + value3;
-        if (value2 >= _token.Start && value2 <= _token.End && num <= _token.End)
+        int endOffset = offset + oldLength;
+        if (offset >= _token.Start && offset <= _token.End && endOffset <= _token.End)
         {
-            int num2 = value4 - value3;
-            _token.Length += num2;
-            _commandText = text2;
-            string text = _token.Extract(text2) ?? "";
-            if (text.IndexOfAny(new char[7] { '`', '$', '<', '>', '|', '&', ';' }) != -1)
+            int lengthDiff = newLength - oldLength;
+            _token.Length += lengthDiff;
+            _commandText = newFullText;
+            string extracted = _token.Extract(newFullText) ?? "";
+            if (extracted.IndexOfAny(new char[7] { '`', '$', '<', '>', '|', '&', ';' }) != -1)
             {
                 return true;
             }
-            if (ContainsUnescapedSpace(text) && text.IndexOfAny(new char[3] { '`', '\'', '"' }) != 0)
+            if (ContainsUnescapedSpace(extracted) && extracted.IndexOfAny(new char[3] { '`', '\'', '"' }) != 0)
             {
                 return true;
             }
-            if (text.StartsWith("-"))
+            if (extracted.StartsWith("-"))
             {
                 return true;
             }
-            ListingTarget listingTarget = ResolveListing(text);
+            ListingTarget listingTarget = ResolveListing(extracted);
             if (!listingTarget.Equals(_listing))
             {
                 _listing = listingTarget;
@@ -534,7 +532,7 @@ internal class CompletionSession : IDisposable
                     }
                 }
             }
-            UpdatePopup(text);
+            UpdatePopup(extracted);
             return false;
         }
         return true;
@@ -565,12 +563,12 @@ internal class CompletionSession : IDisposable
             case '/':
                 break;
         }
-        CompletionItem selectedItem = _popup.GetSelectedItem(flag: true);
+        CompletionItem selectedItem = _popup.GetSelectedItem(allowNull: true);
         if (selectedItem.InsertText == null)
         {
             return false;
         }
-        ApplyItem(selectedItem, flag3: false, new string(ch, 1));
+        ApplyItem(selectedItem, commit: false, new string(ch, 1));
         _popup.Close();
         return true;
     }

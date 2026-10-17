@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32.SafeHandles;
+using Microsoft.Win32.SafeHandles;
 using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -350,20 +350,20 @@ public class SerialPortStream : Stream, IDisposable
     public bool ReturnOnEmptyRead { get; set; }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    public static extern SafeFileHandle CreateFile([MarshalAs(UnmanagedType.LPTStr)] string text, [MarshalAs(UnmanagedType.U4)] FileAccess fileAccess, [MarshalAs(UnmanagedType.U4)] FileShare fileShare, IntPtr handle, [MarshalAs(UnmanagedType.U4)] FileMode fileMode, [MarshalAs(UnmanagedType.U4)] FileAttributes fileAttributes, IntPtr handle2);
+    public static extern SafeFileHandle CreateFile([MarshalAs(UnmanagedType.LPTStr)] string portName, [MarshalAs(UnmanagedType.U4)] FileAccess fileAccess, [MarshalAs(UnmanagedType.U4)] FileShare fileShare, IntPtr securityAttributes, [MarshalAs(UnmanagedType.U4)] FileMode fileMode, [MarshalAs(UnmanagedType.U4)] FileAttributes fileAttributes, IntPtr templateFile);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseHandle(IntPtr handle);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetOverlappedResult(SafeHandle safeHandle, [In] IntPtr handle, out int value2, bool flag);
+    private static extern bool GetOverlappedResult(SafeHandle safeHandle, [In] IntPtr overlapped, out int bytesTransferred, bool wait);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool ReadFile(SafeHandle safeHandle, IntPtr handle, int value2, out int value3, IntPtr handle2);
+    private static extern bool ReadFile(SafeHandle safeHandle, IntPtr buffer, int count, out int bytesRead, IntPtr overlapped);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool WriteFile(SafeHandle safeHandle, IntPtr handle, int value2, out int value3, IntPtr handle2);
+    private static extern bool WriteFile(SafeHandle safeHandle, IntPtr buffer, int count, out int bytesWritten, IntPtr overlapped);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool SetCommTimeouts(SafeHandle safeHandle, ref CommTimeouts commTimeouts);
@@ -374,12 +374,12 @@ public class SerialPortStream : Stream, IDisposable
     [DllImport("kernel32.dll")]
     private static extern bool SetCommState(SafeFileHandle safeFileHandle, ref Dcb dcb);
 
-    public SerialPortStream(string text, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings = null)
+    public SerialPortStream(string portName, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings = null)
     {
-        _handle = CreateFile("\\\\.\\" + text, FileAccess.ReadWrite, FileShare.None, IntPtr.Zero, FileMode.Open, (FileAttributes)1073741952, IntPtr.Zero);
+        _handle = CreateFile("\\\\.\\" + portName, FileAccess.ReadWrite, FileShare.None, IntPtr.Zero, FileMode.Open, (FileAttributes)1073741952, IntPtr.Zero);
         if (_handle.IsInvalid)
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot open " + text);
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot open " + portName);
         }
         if (advancedSerialPortSettings != null)
         {
@@ -391,19 +391,19 @@ public class SerialPortStream : Stream, IDisposable
         };
         if (!SetCommTimeouts(_handle, ref commTimeouts))
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot set timeouts on " + text);
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot set timeouts on " + portName);
         }
     }
 
-    public void SetTimeouts(uint value2, uint value3, uint value4, uint value5, uint value6)
+    public void SetTimeouts(uint readInterval, uint readTotalMultiplier, uint readTotalConstant, uint writeTotalMultiplier, uint writeTotalConstant)
     {
         CommTimeouts commTimeouts = new CommTimeouts
         {
-            ReadIntervalTimeout = value2,
-            ReadTotalTimeoutMultiplier = value3,
-            ReadTotalTimeoutConstant = value4,
-            WriteTotalTimeoutMultiplier = value5,
-            WriteTotalTimeoutConstant = value6
+            ReadIntervalTimeout = readInterval,
+            ReadTotalTimeoutMultiplier = readTotalMultiplier,
+            ReadTotalTimeoutConstant = readTotalConstant,
+            WriteTotalTimeoutMultiplier = writeTotalMultiplier,
+            WriteTotalTimeoutConstant = writeTotalConstant
         };
         if (!SetCommTimeouts(_handle, ref commTimeouts))
         {
@@ -486,7 +486,7 @@ public class SerialPortStream : Stream, IDisposable
         throw new NotSupportedException();
     }
 
-    public override void SetLength(long value2)
+    public override void SetLength(long value)
     {
         throw new NotSupportedException();
     }
@@ -499,37 +499,37 @@ public class SerialPortStream : Stream, IDisposable
             {
                 EventHandle = _readEvent.SafeWaitHandle.DangerousGetHandle()
             };
-            IntPtr intPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
-            IntPtr intPtr2 = Marshal.AllocHGlobal(count);
+            IntPtr overlappedPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
+            IntPtr bufferPtr = Marshal.AllocHGlobal(count);
             try
             {
-                int num;
+                int bytesRead;
                 do
                 {
-                    Marshal.StructureToPtr((object)nativeOverlapped, intPtr, false);
-                    if (!ReadFile(_handle, intPtr2, count, out num, intPtr) && Marshal.GetLastWin32Error() != 997)
+                    Marshal.StructureToPtr((object)nativeOverlapped, overlappedPtr, false);
+                    if (!ReadFile(_handle, bufferPtr, count, out bytesRead, overlappedPtr) && Marshal.GetLastWin32Error() != 997)
                     {
                         throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot read from serial port");
                     }
                     _readEvent.WaitOne();
-                    if (!GetOverlappedResult(_handle, intPtr, out num, flag: false))
+                    if (!GetOverlappedResult(_handle, overlappedPtr, out bytesRead, wait: false))
                     {
                         throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot read from serial port");
                     }
                 }
-                while (num == 0 && !ReturnOnEmptyRead);
-                Marshal.Copy(intPtr2, buffer, offset, num);
-                return num;
+                while (bytesRead == 0 && !ReturnOnEmptyRead);
+                Marshal.Copy(bufferPtr, buffer, offset, bytesRead);
+                return bytesRead;
             }
             finally
             {
-                Marshal.FreeHGlobal(intPtr);
-                Marshal.FreeHGlobal(intPtr2);
+                Marshal.FreeHGlobal(overlappedPtr);
+                Marshal.FreeHGlobal(bufferPtr);
             }
         }
     }
 
-    private int WriteChunk(byte[] buffer, int value2, int value3)
+    private int WriteChunk(byte[] buffer, int offset, int count)
     {
         lock (_writeLock)
         {
@@ -537,41 +537,41 @@ public class SerialPortStream : Stream, IDisposable
             {
                 EventHandle = _writeEvent.SafeWaitHandle.DangerousGetHandle()
             };
-            IntPtr intPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
-            IntPtr intPtr2 = Marshal.AllocHGlobal(value3);
-            int result;
+            IntPtr overlappedPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
+            IntPtr bufferPtr = Marshal.AllocHGlobal(count);
+            int bytesWritten;
             try
             {
-                Marshal.StructureToPtr((object)nativeOverlapped, intPtr, false);
-                Marshal.Copy(buffer, value2, intPtr2, value3);
-                if (!WriteFile(_handle, intPtr2, value3, out result, intPtr) && Marshal.GetLastWin32Error() != 997)
+                Marshal.StructureToPtr((object)nativeOverlapped, overlappedPtr, false);
+                Marshal.Copy(buffer, offset, bufferPtr, count);
+                if (!WriteFile(_handle, bufferPtr, count, out bytesWritten, overlappedPtr) && Marshal.GetLastWin32Error() != 997)
                 {
                     throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot read from serial port");
                 }
                 _writeEvent.WaitOne();
-                if (!GetOverlappedResult(_handle, intPtr, out result, flag: false))
+                if (!GetOverlappedResult(_handle, overlappedPtr, out bytesWritten, wait: false))
                 {
                     throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot read from serial port");
                 }
             }
             finally
             {
-                Marshal.FreeHGlobal(intPtr);
-                Marshal.FreeHGlobal(intPtr2);
+                Marshal.FreeHGlobal(overlappedPtr);
+                Marshal.FreeHGlobal(bufferPtr);
             }
-            return result;
+            return bytesWritten;
         }
     }
 
     public override void Write(byte[] buffer, int offset, int count)
     {
-        int num2;
-        for (int num = 0; num < count; num += num2)
+        int chunkWritten;
+        for (int written = 0; written < count; written += chunkWritten)
         {
-            num2 = WriteChunk(buffer, offset + num, count - num);
-            if (num2 <= 0)
+            chunkWritten = WriteChunk(buffer, offset + written, count - written);
+            if (chunkWritten <= 0)
             {
-                throw new Exception("Unexpected byte count written to serial port: " + num2);
+                throw new Exception("Unexpected byte count written to serial port: " + chunkWritten);
             }
         }
     }

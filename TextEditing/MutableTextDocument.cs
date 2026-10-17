@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace SmarTTY.TextEditing;
 
@@ -10,56 +10,56 @@ public class MutableTextDocument : TextDocument
     {
     }
 
-    protected void InsertLine(int value2, string text, LineEnding lineEnding)
+    protected void InsertLine(int lineIndex, string text, LineEnding lineEnding)
     {
-        this.LineList.Insert(value2, new DocumentLine(text, lineEnding));
+        this.LineList.Insert(lineIndex, new DocumentLine(text, lineEnding));
     }
 
-    public void RemoveLines(int value2, int value3)
+    public void RemoveLines(int lineIndex, int count)
     {
-        if (value2 >= 0 && value2 < this.LineList.Count)
+        if (lineIndex >= 0 && lineIndex < this.LineList.Count)
         {
-            if (value3 > this.LineList.Count - value2)
+            if (count > this.LineList.Count - lineIndex)
             {
-                value3 = this.LineList.Count - value2;
+                count = this.LineList.Count - lineIndex;
             }
-            this.LineList.RemoveRange(value2, value3);
+            this.LineList.RemoveRange(lineIndex, count);
         }
     }
 
-    public string ReplaceInLine(int value2, int value3, int value4, string text, LineEnding lineEnding = LineEnding.CrLf)
+    public string ReplaceInLine(int lineIndex, int offset, int length, string text, LineEnding lineEnding = LineEnding.CrLf)
     {
-        if (value2 == 0 && this.LineList.Count == 0)
+        if (lineIndex == 0 && this.LineList.Count == 0)
         {
             this.LineList.Add(new DocumentLine("", lineEnding));
         }
-        else if (value2 >= this.LineList.Count)
+        else if (lineIndex >= this.LineList.Count)
         {
             return null;
         }
-        return this.LineList[value2].Replace(value3, value4, text);
+        return this.LineList[lineIndex].Replace(offset, length, text);
     }
 
-    public void SplitLine(int value2, int value3, LineEnding lineEnding)
+    public void SplitLine(int lineIndex, int offset, LineEnding lineEnding)
     {
         if (this.LineList.Count != 0)
         {
-            if (value2 >= this.LineList.Count)
+            if (lineIndex >= this.LineList.Count)
             {
-                value2 = this.LineList.Count - 1;
-                value3 = int.MaxValue;
+                lineIndex = this.LineList.Count - 1;
+                offset = int.MaxValue;
             }
-            InsertLine(value2 + 1, this.LineList[value2].Replace(value3, -1, ""), lineEnding);
+            InsertLine(lineIndex + 1, this.LineList[lineIndex].Replace(offset, -1, ""), lineEnding);
         }
     }
 
-    public void JoinWithNextLine(int value2)
+    public void JoinWithNextLine(int lineIndex)
     {
-        if (value2 < LineList.Count - 1)
+        if (lineIndex < LineList.Count - 1)
         {
-            string text = LineList[value2 + 1].GetText();
-            RemoveLines(value2 + 1, 1);
-            LineList[value2].Replace(-1, 0, text);
+            string text = LineList[lineIndex + 1].GetText();
+            RemoveLines(lineIndex + 1, 1);
+            LineList[lineIndex].Replace(-1, 0, text);
         }
     }
 

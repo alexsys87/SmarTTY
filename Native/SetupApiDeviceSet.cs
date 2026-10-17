@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -77,57 +77,57 @@ public class SetupApiDeviceSet : IDisposable
 
     private enum DeviceInstallFunction
     {
-        Value1 = 1,
-        Value2 = 2,
-        Value3 = 3,
-        Value4 = 4,
-        Value5 = 5,
-        Value6 = 6,
-        Value7 = 7,
-        Value8 = 8,
-        Value9 = 9,
-        Value10 = 10,
-        Value11 = 11,
-        Value12 = 12,
-        Value13 = 13,
-        Value14 = 14,
-        Value15 = 15,
-        Value16 = 16,
-        Value17 = 17,
-        Value18 = 18,
-        Value19 = 19,
-        Value20 = 20,
-        Value21 = 21,
-        Value22 = 22,
-        Value23 = 23,
-        Value24 = 24,
-        Value25 = 25,
-        Value26 = 26,
-        Value27 = 27,
-        Value28 = 28,
-        Value29 = 29,
-        Value30 = 30,
-        Value31 = 31,
-        Value32 = 32,
-        Value33 = 33,
-        Value34 = 34,
-        Value35 = 35,
-        Value36 = 36,
-        Value37 = 37,
-        Value38 = 38,
-        Value39 = 39,
-        Value40 = 40,
-        Value41 = 41,
-        Value48 = 48
+        InstallDevice = 1,
+        AssignResources = 2,
+        Properties = 3,
+        Remove = 4,
+        FirstTimeSetup = 5,
+        Unremove = 6,
+        SelectDevice = 7,
+        EnumerateFunctions = 8,
+        RegisterDevice = 9,
+        InstallInterfaces = 10,
+        Detect = 11,
+        InstallClass = 12,
+        SelectClassDrivers = 13,
+        ValidateClassDrivers = 14,
+        InstallClassDrivers = 15,
+        CalcDiskSpace = 16,
+        DestroyPrivateData = 17,
+        ValidateDriver = 18,
+        DetectUnused19 = 19,
+        Movedevice = 20,
+        SelectBestCompatDrv = 21,
+        AllowInstall = 22,
+        RegisterCoinstallers = 23,
+        PropertyChange = 24,
+        EnableClass = 25,
+        DetectUnused26 = 26,
+        DetectUnused27 = 27,
+        DetectUnused28 = 28,
+        DetectUnused29 = 29,
+        DetectUnused30 = 30,
+        DetectUnused31 = 31,
+        DetectUnused32 = 32,
+        DetectUnused33 = 33,
+        DetectUnused34 = 34,
+        DetectUnused35 = 35,
+        DetectUnused36 = 36,
+        DetectUnused37 = 37,
+        DetectUnused38 = 38,
+        DetectUnused39 = 39,
+        DetectUnused40 = 40,
+        DetectUnused41 = 41,
+        DetectUnused48 = 48
     }
 
     public enum OemSourceMediaTypeLegacy
     {
-        Value1 = 1,
-        Value2,
-        Value3,
-        Value4,
-        Value5
+        Unknown = 1,
+        CdRom,
+        Disk,
+        Directory,
+        Web
     }
 
     [Flags]
@@ -179,29 +179,28 @@ public class SetupApiDeviceSet : IDisposable
 
     public enum SetupCopyStyle
     {
-        Value0 = 0,
-        Value1 = 1,
-        Value2 = 2,
-        Value4 = 4,
-        Value4Alias = Value4,
-        Value8 = 8,
-        Value16 = 16,
-        Value32 = 32,
-        Value64 = 64,
-        Value128 = 128,
-        Value256 = 256,
-        Value512 = 512,
-        Value1024 = 1024,
-        Value2048 = 2048,
-        Value4096 = 4096,
-        Value8192 = 8192,
-        Value16384 = 16384,
-        SetupCopyStyle64 = 32768,
-        Value65536 = 65536,
-        Value131072 = 131072,
-        Value262144 = 262144,
-        Value524288 = 524288,
-        Value1048576 = 1048576
+        None = 0,
+        WarnIfSkip = 1,
+        NoOverwrite = 2,
+        NoDecompress = 4,
+        ForceNewer = 8,
+        NoBackup = 16,
+        CheckSecurityByFile = 32,
+        NewerOnly = 64,
+        NoBrowse = 128,
+        CopyAlways = 256,
+        NoCat = 512,
+        VerifySqm = 1024,
+        InUse = 2048,
+        InUseSubst = 4096,
+        RenameToBackup = 8192,
+        ForceNoPath = 16384,
+        SecurityEx = 32768,
+        SubDir = 65536,
+        TargetReadonly = 131072,
+        OverwriteFileInUse = 262144,
+        TargetPruned = 524288,
+        NoVerify = 1048576
     }
 
     public enum UninstallOemInfFlags : uint
@@ -213,64 +212,64 @@ public class SetupApiDeviceSet : IDisposable
     private IntPtr _deviceInfoSet;
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetupDiGetDeviceRegistryProperty(IntPtr handle, ref SpDevInfoData spDevInfoData, DeviceRegistryProperty deviceRegistryProperty, out uint value2, StringBuilder stringBuilder, uint value3, out uint value4);
+    private static extern bool SetupDiGetDeviceRegistryProperty(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData, DeviceRegistryProperty property, out uint propertyRegDataType, StringBuilder propertyBuffer, uint propertyBufferSize, out uint requiredSize);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr SetupDiGetClassDevs(ref Guid guid, [MarshalAs(UnmanagedType.LPTStr)] string text, IntPtr handle, uint value2);
+    private static extern IntPtr SetupDiGetClassDevs(ref Guid classGuid, [MarshalAs(UnmanagedType.LPTStr)] string enumerator, IntPtr hwndParent, uint flags);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr SetupDiGetClassDevs(IntPtr handle, [MarshalAs(UnmanagedType.LPTStr)] string text, IntPtr handle2, uint value2);
+    private static extern IntPtr SetupDiGetClassDevs(IntPtr classGuid, [MarshalAs(UnmanagedType.LPTStr)] string enumerator, IntPtr hwndParent, uint flags);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetupDiDestroyDeviceInfoList(IntPtr handle);
+    private static extern bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetupDiEnumDeviceInterfaces(IntPtr handle, IntPtr handle2, IntPtr handle3, uint value2, ref SpDeviceInterfaceData spDeviceInterfaceData);
+    private static extern bool SetupDiEnumDeviceInterfaces(IntPtr deviceInfoSet, IntPtr deviceInfoData, IntPtr interfaceClassGuid, uint memberIndex, ref SpDeviceInterfaceData deviceInterfaceData);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr handle, ref SpDeviceInterfaceData spDeviceInterfaceData, ref SpDeviceInterfaceDetailData spDeviceInterfaceDetailData, uint value2, out uint value3, ref SpDevInfoData spDevInfoData);
+    private static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr deviceInfoSet, ref SpDeviceInterfaceData deviceInterfaceData, ref SpDeviceInterfaceDetailData deviceInterfaceDetailData, uint deviceInterfaceDetailDataSize, out uint requiredSize, ref SpDevInfoData deviceInfoData);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr handle, ref SpDeviceInterfaceData spDeviceInterfaceData, IntPtr handle2, uint value2, out uint value3, IntPtr handle3);
+    private static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr deviceInfoSet, ref SpDeviceInterfaceData deviceInterfaceData, IntPtr deviceInterfaceDetailData, uint deviceInterfaceDetailDataSize, out uint requiredSize, IntPtr deviceInfoData);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetupDiGetDeviceInstanceId(IntPtr handle, ref SpDevInfoData spDevInfoData, StringBuilder stringBuilder, int value2, out int value3);
+    private static extern bool SetupDiGetDeviceInstanceId(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData, StringBuilder deviceInstanceId, int deviceInstanceIdSize, out int requiredSize);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetupDiGetDeviceInstanceId(IntPtr handle, ref SpDevInfoData spDevInfoData, IntPtr handle2, int value2, out int value3);
+    private static extern bool SetupDiGetDeviceInstanceId(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData, IntPtr deviceInstanceId, int deviceInstanceIdSize, out int requiredSize);
 
     [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern bool SetupDiEnumDeviceInfo(IntPtr handle, uint value2, ref SpDevInfoData spDevInfoData);
+    private static extern bool SetupDiEnumDeviceInfo(IntPtr deviceInfoSet, uint memberIndex, ref SpDevInfoData deviceInfoData);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto)]
-    private static extern int CM_Get_Device_ID(IntPtr handle, StringBuilder stringBuilder, int value2, int value3);
+    private static extern int CM_Get_Device_ID(IntPtr devNode, StringBuilder buffer, int bufferLen, int flags);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetupDiSetClassInstallParams(IntPtr handle, ref SpDevInfoData spDevInfoData, ref SpPropChangeParams spPropChangeParams, int value2);
+    private static extern bool SetupDiSetClassInstallParams(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData, ref SpPropChangeParams classInstallParams, int classInstallParamsSize);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool SetupDiCallClassInstaller(uint value2, IntPtr handle, ref SpDevInfoData spDevInfoData);
+    private static extern bool SetupDiCallClassInstaller(uint installFunction, IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData);
 
     [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern bool SetupDiEnumDriverInfoW(IntPtr handle, ref SpDevInfoData spDevInfoData, int value2, int value3, ref SpDriverInfoData spDriverInfoData);
+    private static extern bool SetupDiEnumDriverInfoW(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData, int driverType, int memberIndex, ref SpDriverInfoData driverInfoData);
 
     [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern bool SetupDiBuildDriverInfoList(IntPtr handle, ref SpDevInfoData spDevInfoData, int value2);
+    private static extern bool SetupDiBuildDriverInfoList(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData, int driverType);
 
     [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern bool SetupDiSetSelectedDevice(IntPtr handle, ref SpDevInfoData spDevInfoData);
+    private static extern bool SetupDiSetSelectedDevice(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool SetupDiSetSelectedDriver(IntPtr handle, ref SpDevInfoData spDevInfoData, ref SpDriverInfoData spDriverInfoData);
+    private static extern bool SetupDiSetSelectedDriver(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData, ref SpDriverInfoData driverInfoData);
 
     [DllImport("newdev.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool InstallSelectedDriver(IntPtr handle, IntPtr handle2, IntPtr handle3, bool flag, out int value2);
+    private static extern bool InstallSelectedDriver(IntPtr hwndParent, IntPtr deviceInfoSet, IntPtr reserved, bool backup, out int rebootRequired);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern bool SetupCopyOEMInf(string text, string text2, OemSourceMediaType oemSourceMediaType, SetupCopyStyle setupCopyStyle, string text3, int value2, IntPtr handle, string text4);
+    public static extern bool SetupCopyOEMInf(string sourceInfFileName, string oemInfFileName, OemSourceMediaType oemSourceMediaType, SetupCopyStyle copyStyle, string destinationInfFileName, int destinationInfFileNameSize, IntPtr requiredSize, string destinationInfFileNameComponent);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern bool SetupUninstallOEMInf(string text, UninstallOemInfFlags uninstallOemInfFlags, IntPtr handle);
+    public static extern bool SetupUninstallOEMInf(string infFileName, UninstallOemInfFlags flags, IntPtr reserved);
 
     public SetupApiDeviceSet(Guid guid)
     {
@@ -278,18 +277,18 @@ public class SetupApiDeviceSet : IDisposable
     }
 
     [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern int CM_Locate_DevNode(out int value2, string text, int value3);
+    private static extern int CM_Locate_DevNode(out int devNode, string deviceId, int flags);
 
     [DllImport("setupapi.dll")]
-    private static extern int CM_Get_Parent(out int value2, int value3, int value4);
+    private static extern int CM_Get_Parent(out int parentDevNode, int devNode, int flags);
 
-    public static string GetParentDeviceId(string text)
+    public static string GetParentDeviceId(string deviceId)
     {
-        if (CM_Locate_DevNode(out var num, text, 0) != 0)
+        if (CM_Locate_DevNode(out var devNode, deviceId, 0) != 0)
         {
             return null;
         }
-        if (CM_Get_Parent(out var num2, num, 0) != 0)
+        if (CM_Get_Parent(out var parentDevNode, devNode, 0) != 0)
         {
             return null;
         }
@@ -297,34 +296,34 @@ public class SetupApiDeviceSet : IDisposable
         {
             Capacity = 1024
         };
-        CM_Get_Device_ID((IntPtr)num2, stringBuilder, stringBuilder.Capacity - 1, 0);
+        CM_Get_Device_ID((IntPtr)parentDevNode, stringBuilder, stringBuilder.Capacity - 1, 0);
         return stringBuilder.ToString().TrimEnd(default(char));
     }
 
-    public static string GetUsbSerialNumber(string text2, out bool flag)
+    public static string GetUsbSerialNumber(string deviceId, out bool isUsbDevice)
     {
-        string text = text2;
-        if (!text.StartsWith("USB\\"))
+        string currentDeviceId = deviceId;
+        if (!currentDeviceId.StartsWith("USB\\"))
         {
-            text = GetParentDeviceId(text);
+            currentDeviceId = GetParentDeviceId(currentDeviceId);
         }
-        if (text.StartsWith("USB\\"))
+        if (currentDeviceId.StartsWith("USB\\"))
         {
-            flag = true;
+            isUsbDevice = true;
         }
         else
         {
-            flag = false;
+            isUsbDevice = false;
         }
-        while (text != null && text.Contains("&MI_"))
+        while (currentDeviceId != null && currentDeviceId.Contains("&MI_"))
         {
-            text = GetParentDeviceId(text);
+            currentDeviceId = GetParentDeviceId(currentDeviceId);
         }
         string result = null;
-        int num = text?.LastIndexOf('\\') ?? (-1);
-        if (num > 0)
+        int slashIndex = currentDeviceId?.LastIndexOf('\\') ?? (-1);
+        if (slashIndex > 0)
         {
-            result = text.Substring(num + 1);
+            result = currentDeviceId.Substring(slashIndex + 1);
         }
         return result;
     }
@@ -332,11 +331,11 @@ public class SetupApiDeviceSet : IDisposable
     public IEnumerable<ComPortInfo> EnumerateComPorts()
     {
         SpDevInfoData spDevInfoData = default;
-        uint num = 0u;
+        uint memberIndex = 0u;
         while (true)
         {
             spDevInfoData.Size = Marshal.SizeOf((object)spDevInfoData);
-            if (!SetupDiEnumDeviceInfo(_deviceInfoSet, num, ref spDevInfoData))
+            if (!SetupDiEnumDeviceInfo(_deviceInfoSet, memberIndex, ref spDevInfoData))
             {
                 if (Marshal.GetLastWin32Error() == 259)
                 {
@@ -345,25 +344,25 @@ public class SetupApiDeviceSet : IDisposable
             }
             else
             {
-                int capacity = 0;
-                SetupDiGetDeviceInstanceId(_deviceInfoSet, ref spDevInfoData, IntPtr.Zero, 0, out capacity);
-                StringBuilder stringBuilder = new StringBuilder(capacity);
-                if (SetupDiGetDeviceInstanceId(_deviceInfoSet, ref spDevInfoData, stringBuilder, capacity, out capacity))
+                int requiredSize = 0;
+                SetupDiGetDeviceInstanceId(_deviceInfoSet, ref spDevInfoData, IntPtr.Zero, 0, out requiredSize);
+                StringBuilder stringBuilder = new StringBuilder(requiredSize);
+                if (SetupDiGetDeviceInstanceId(_deviceInfoSet, ref spDevInfoData, stringBuilder, requiredSize, out requiredSize))
                 {
-                    string text = GetRegistryProperty(_deviceInfoSet, ref spDevInfoData, DeviceRegistryProperty.FriendlyName);
-                    if (text != null)
+                    string friendlyName = GetRegistryProperty(_deviceInfoSet, ref spDevInfoData, DeviceRegistryProperty.FriendlyName);
+                    if (friendlyName != null)
                     {
-                        string text2 = GetRegistryProperty(_deviceInfoSet, ref spDevInfoData, DeviceRegistryProperty.DeviceDescription);
-                        int num2 = text.LastIndexOf("(COM");
-                        if (num2 != -1)
+                        string description = GetRegistryProperty(_deviceInfoSet, ref spDevInfoData, DeviceRegistryProperty.DeviceDescription);
+                        int comIndex = friendlyName.LastIndexOf("(COM");
+                        if (comIndex != -1)
                         {
-                            int num3 = text.IndexOf(')', num2);
-                            if (num3 != -1 && int.TryParse(text.Substring(num2 + 4, num3 - num2 - 4), out var result))
+                            int closingParenIndex = friendlyName.IndexOf(')', comIndex);
+                            if (closingParenIndex != -1 && int.TryParse(friendlyName.Substring(comIndex + 4, closingParenIndex - comIndex - 4), out var portNumber))
                             {
                                 yield return new ComPortInfo
                                 {
-                                    Description = text2,
-                                    PortNumber = result,
+                                    Description = description,
+                                    PortNumber = portNumber,
                                     InstanceId = stringBuilder.ToString()
                                 };
                             }
@@ -371,15 +370,15 @@ public class SetupApiDeviceSet : IDisposable
                     }
                 }
             }
-            num++;
+            memberIndex++;
         }
     }
 
     private string GetRegistryProperty(IntPtr handle, ref SpDevInfoData spDevInfoData, DeviceRegistryProperty deviceRegistryProperty)
     {
-        SetupDiGetDeviceRegistryProperty(handle, ref spDevInfoData, deviceRegistryProperty, out var num, null, 0u, out var capacity);
-        StringBuilder stringBuilder = new StringBuilder((int)capacity);
-        if (!SetupDiGetDeviceRegistryProperty(handle, ref spDevInfoData, deviceRegistryProperty, out num, stringBuilder, capacity, out capacity))
+        SetupDiGetDeviceRegistryProperty(handle, ref spDevInfoData, deviceRegistryProperty, out var dataType, null, 0u, out var requiredSize);
+        StringBuilder stringBuilder = new StringBuilder((int)requiredSize);
+        if (!SetupDiGetDeviceRegistryProperty(handle, ref spDevInfoData, deviceRegistryProperty, out dataType, stringBuilder, requiredSize, out requiredSize))
         {
             return null;
         }

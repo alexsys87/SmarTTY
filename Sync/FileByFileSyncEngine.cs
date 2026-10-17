@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.Ssh.QuickSync;
 using SmarTTY.IO;
 using SmarTTY.Utilities;
@@ -61,19 +61,19 @@ internal class FileByFileSyncEngine : CommandSyncEngine
 
         private List<DownloadEntry> _entries;
 
-        public FileByFileSource(FileByFileSyncEngine fileByFileSyncEngine, List<DownloadEntry> list)
+        public FileByFileSource(FileByFileSyncEngine fileByFileSyncEngine, List<DownloadEntry> entries)
         {
             this._engine = fileByFileSyncEngine;
-            this._entries = list;
+            this._entries = entries;
         }
 
-        public IRemoteFileStream OpenFile(int value2)
+        public IRemoteFileStream OpenFile(int fileId)
         {
-            if (value2 < 0 || value2 >= _entries.Count)
+            if (fileId < 0 || fileId >= _entries.Count)
             {
                 throw new ArgumentException("uniqueFileID");
             }
-            return new FileByFileStream(this._engine, _entries[value2]);
+            return new FileByFileStream(this._engine, _entries[fileId]);
         }
 
         public void Dispose()
@@ -100,7 +100,7 @@ internal class FileByFileSyncEngine : CommandSyncEngine
         return "File-by-file synchronization engine";
     }
 
-    public override IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> items)
+    public override IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> actions)
     {
         if (DownloadList == null)
         {
@@ -109,37 +109,37 @@ internal class FileByFileSyncEngine : CommandSyncEngine
         return new FileByFileSource(this, DownloadList);
     }
 
-    public override void Upload(List<SyncPlan.SyncAction> list, List<LocalPath> list2, ref TransferStatistics transferStatistics)
+    public override void Upload(List<SyncPlan.SyncAction> actions, List<LocalPath> localPaths, ref TransferStatistics transferStatistics)
     {
-        UploadedFile[] array = new UploadedFile[list2.Count];
-        CreateDirectories(list, array);
-        byte[] array2 = new byte[this.BufferSize];
-        long num = 0L;
-        for (int num2 = 0; num2 < list2.Count; num2++)
+        UploadedFile[] uploadedFiles = new UploadedFile[localPaths.Count];
+        CreateDirectories(actions, uploadedFiles);
+        byte[] copyBuffer = new byte[this.BufferSize];
+        long totalTransferred = 0L;
+        for (int i = 0; i < localPaths.Count; i++)
         {
-            if (array[num2].Path == null)
+            if (uploadedFiles[i].Path == null)
             {
                 continue;
             }
-            QuickSyncWarningType quickSyncWarningType = QuickSyncWarningType.CannotReadLocalFile;
+            QuickSyncWarningType warningType = QuickSyncWarningType.CannotReadLocalFile;
             try
             {
-                using LocalFileSystem.NativeFile nativeFile = LocalFileSystem.OpenFile(list2[num2], LocalFileSystem.FileOpenMode.Open);
-                array[num2].Size = nativeFile.GetLastWriteTime();
-                quickSyncWarningType = QuickSyncWarningType.CannotCreateTargetFile;
-                using ScpChannelStream scpChannelStream = _session.OpenUpload(array[num2].Path, nativeFile.GetSize());
+                using LocalFileSystem.NativeFile nativeFile = LocalFileSystem.OpenFile(localPaths[i], LocalFileSystem.FileOpenMode.Open);
+                uploadedFiles[i].Size = nativeFile.GetLastWriteTime();
+                warningType = QuickSyncWarningType.CannotCreateTargetFile;
+                using ScpChannelStream scpChannelStream = _session.OpenUpload(uploadedFiles[i].Path, nativeFile.GetSize());
                 while (true)
                 {
-                    int num3 = nativeFile.Read(array2, array2.Length);
-                    if (num3 != 0)
+                    int bytesRead = nativeFile.Read(copyBuffer, copyBuffer.Length);
+                    if (bytesRead != 0)
                     {
-                        scpChannelStream.Write(array2, 0, num3);
-                        num += num3;
+                        scpChannelStream.Write(copyBuffer, 0, bytesRead);
+                        totalTransferred += bytesRead;
                         base._events?.OnProgress(new SyncProgress
                         {
                             Stage = SyncStage.Transferring,
-                            CurrentFile = array[num2].Path,
-                            Transferred = num,
+                            CurrentFile = uploadedFiles[i].Path,
+                            Transferred = totalTransferred,
                             Total = transferStatistics.TotalBytes
                         });
                         continue;
@@ -151,165 +151,165 @@ internal class FileByFileSyncEngine : CommandSyncEngine
             {
                 throw;
             }
-            catch (Exception ex2)
+            catch (Exception ex)
             {
                 base._events.OnWarning(new SyncWarning
                 {
-                    Exception = ex2,
-                    Warning = new QuickSyncWarning(quickSyncWarningType, array[num2].Path, 0)
+                    Exception = ex,
+                    Warning = new QuickSyncWarning(warningType, uploadedFiles[i].Path, 0)
                 });
             }
         }
-        ApplyAttributes(list, array, list2);
+        ApplyAttributes(actions, uploadedFiles, localPaths);
     }
 
-    private void CreateDirectories(List<SyncPlan.SyncAction> list2, UploadedFile[] items)
+    private void CreateDirectories(List<SyncPlan.SyncAction> actions, UploadedFile[] uploadedFiles)
     {
-        string text = Guid.NewGuid().ToString();
+        string marker = Guid.NewGuid().ToString();
         MemoryStream memoryStream = new MemoryStream();
-        string text2 = "--- Entered main directory ---";
-        string text3 = _settings.RemotePath;
+        string mainDirMsg = "--- Entered main directory ---";
+        string currentRemoteDir = _settings.RemotePath;
         using StreamWriter streamWriter = new StreamWriter(memoryStream)
         {
             NewLine = "\n"
         };
-        streamWriter.WriteLine("echo " + text);
+        streamWriter.WriteLine("echo " + marker);
         streamWriter.WriteLine("mkdir -p \"" + _settings.RemotePath + "\"");
         streamWriter.WriteLine("test -d \"" + _settings.RemotePath + "\" || exit 1");
         streamWriter.WriteLine("cd \"" + _settings.RemotePath + "\" || exit 1");
-        streamWriter.WriteLine("echo " + text2);
-        for (int num = 0; num < list2.Count; num++)
+        streamWriter.WriteLine("echo " + mainDirMsg);
+        for (int i = 0; i < actions.Count; i++)
         {
-            SyncPlan.SyncAction syncAction = list2[num];
-            switch (syncAction.Type)
+            SyncPlan.SyncAction action = actions[i];
+            switch (action.Type)
             {
                 case SyncPlan.ActionType.CreateAndEnterDirectory:
-                    streamWriter.WriteLine($"mkdir \"{syncAction.Path}\" || echo \"cmdfail:{num}\"");
+                    streamWriter.WriteLine($"mkdir \"{action.Path}\" || echo \"cmdfail:{i}\"");
                     goto case SyncPlan.ActionType.EnterDirectory;
                 case SyncPlan.ActionType.EnterDirectory:
-                    text3 = RemotePathUtils.Combine(text3, syncAction.Path);
-                    streamWriter.WriteLine($"cd \"{text3}\" || echo \"cmdfail:{num}\"");
+                    currentRemoteDir = RemotePathUtils.Combine(currentRemoteDir, action.Path);
+                    streamWriter.WriteLine($"cd \"{currentRemoteDir}\" || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.GoToParentDirectory:
-                    text3 = RemotePathUtils.GetDirectoryName(text3);
-                    streamWriter.WriteLine("cd \"" + text3 + "\"");
+                    currentRemoteDir = RemotePathUtils.GetDirectoryName(currentRemoteDir);
+                    streamWriter.WriteLine("cd \"" + currentRemoteDir + "\"");
                     break;
                 case SyncPlan.ActionType.TransferFile:
-                    items[syncAction.Argument].Path = RemotePathUtils.Combine(text3, syncAction.Path);
+                    uploadedFiles[action.Argument].Path = RemotePathUtils.Combine(currentRemoteDir, action.Path);
                     break;
                 case SyncPlan.ActionType.DeleteTargetFile:
-                    streamWriter.WriteLine($"rm -f \"{syncAction.Path}\" || echo \"cmdfail:{num}\"");
+                    streamWriter.WriteLine($"rm -f \"{action.Path}\" || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.DeleteEmptyTargetDirectory:
-                    streamWriter.WriteLine($"rm -f \"{syncAction.Path}\" || echo \"cmdfail:{num}\"");
+                    streamWriter.WriteLine($"rm -f \"{action.Path}\" || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.DeleteTargetDirectoryRecursively:
-                    streamWriter.WriteLine($"rm -rf \"{syncAction.Path}\" || echo \"cmdfail:{num}\"");
+                    streamWriter.WriteLine($"rm -rf \"{action.Path}\" || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.PrintStderrMessage:
-                    streamWriter.WriteLine($"echo \"cmdfail:{num}\"");
+                    streamWriter.WriteLine($"echo \"cmdfail:{i}\"");
                     break;
             }
         }
         streamWriter.Flush();
-        List<string> list = RunScript(text, memoryStream.ToArray());
-        bool flag = false;
-        bool flag2 = false;
-        foreach (string item in list)
+        List<string> scriptOutput = RunScript(marker, memoryStream.ToArray());
+        bool markerSeen = false;
+        bool mainDirSeen = false;
+        foreach (string line in scriptOutput)
         {
-            if (!flag)
+            if (!markerSeen)
             {
-                if (!(item != text))
+                if (!(line != marker))
                 {
-                    flag = true;
+                    markerSeen = true;
                 }
                 continue;
             }
-            if (item == text2)
+            if (line == mainDirMsg)
             {
-                flag2 = true;
+                mainDirSeen = true;
             }
-            if (item.StartsWith("cmdfail:") && int.TryParse(item.Substring(8), out var result) && result >= 0 && result < list2.Count)
+            if (line.StartsWith("cmdfail:") && int.TryParse(line.Substring(8), out var actionIdx) && actionIdx >= 0 && actionIdx < actions.Count)
             {
                 _events?.OnWarning(new SyncWarning
                 {
-                    Warning = new QuickSyncWarning(SysprogsSyncEngine.GetWarningType(list2[result].Type), list2[result].Path, -1)
+                    Warning = new QuickSyncWarning(SysprogsSyncEngine.GetWarningType(actions[actionIdx].Type), actions[actionIdx].Path, -1)
                 });
             }
         }
-        if (!flag2)
+        if (!mainDirSeen)
         {
             throw new Exception("Failed to create " + _settings.RemotePath);
         }
     }
 
-    private void ApplyAttributes(List<SyncPlan.SyncAction> list2, UploadedFile[] items, List<LocalPath> list3)
+    private void ApplyAttributes(List<SyncPlan.SyncAction> actions, UploadedFile[] uploadedFiles, List<LocalPath> localPaths)
     {
-        string text = Guid.NewGuid().ToString();
+        string marker = Guid.NewGuid().ToString();
         MemoryStream memoryStream = new MemoryStream();
-        string text2 = _settings.RemotePath;
+        string currentRemoteDir = _settings.RemotePath;
         IPermissionProvider permissionProvider = base._events?.PermissionProvider;
-        int num = Convert.ToInt32("755", 8);
+        int defaultPermissions = Convert.ToInt32("755", 8);
         using StreamWriter streamWriter = new StreamWriter(memoryStream)
         {
             NewLine = "\n"
         };
-        streamWriter.WriteLine("echo " + text);
+        streamWriter.WriteLine("echo " + marker);
         streamWriter.WriteLine("cd \"" + _settings.RemotePath + "\" || exit 1");
-        for (int num2 = 0; num2 < list2.Count; num2++)
+        for (int i = 0; i < actions.Count; i++)
         {
-            SyncPlan.SyncAction syncAction = list2[num2];
-            switch (syncAction.Type)
+            SyncPlan.SyncAction action = actions[i];
+            switch (action.Type)
             {
                 case SyncPlan.ActionType.CreateAndEnterDirectory:
                 case SyncPlan.ActionType.EnterDirectory:
-                    text2 = RemotePathUtils.Combine(text2, syncAction.Path);
-                    streamWriter.WriteLine($"cd \"{text2}\" || echo \"cmdfail:{num2}\"");
+                    currentRemoteDir = RemotePathUtils.Combine(currentRemoteDir, action.Path);
+                    streamWriter.WriteLine($"cd \"{currentRemoteDir}\" || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.GoToParentDirectory:
-                    text2 = RemotePathUtils.GetDirectoryName(text2);
-                    streamWriter.WriteLine("cd \"" + text2 + "\"");
+                    currentRemoteDir = RemotePathUtils.GetDirectoryName(currentRemoteDir);
+                    streamWriter.WriteLine("cd \"" + currentRemoteDir + "\"");
                     break;
                 case SyncPlan.ActionType.TransferFile:
                     {
-                        items[syncAction.Argument].Path = RemotePathUtils.Combine(text2, syncAction.Path);
-                        int num3 = permissionProvider?.GetFilePermissions(list3[syncAction.Argument]) ?? num;
-                        streamWriter.WriteLine("chmod " + Convert.ToString(num3, 8) + " \"" + syncAction.Path + "\"");
-                        streamWriter.WriteLine($"touch -d @{new LocalFileSystem.FileStamp(0L, items[syncAction.Argument].Size + _settings.ClockOffset.Seconds).UnixSeconds} \"{syncAction.Path}\"");
+                        uploadedFiles[action.Argument].Path = RemotePathUtils.Combine(currentRemoteDir, action.Path);
+                        int permissions = permissionProvider?.GetFilePermissions(localPaths[action.Argument]) ?? defaultPermissions;
+                        streamWriter.WriteLine("chmod " + Convert.ToString(permissions, 8) + " \"" + action.Path + "\"");
+                        streamWriter.WriteLine($"touch -d @{new LocalFileSystem.FileStamp(0L, uploadedFiles[action.Argument].Size + _settings.ClockOffset.Seconds).UnixSeconds} \"{action.Path}\"");
                         break;
                     }
                 case SyncPlan.ActionType.CreateRemoteSymlink:
                     {
-                        KeyValuePair<string, string> keyValuePair = StringUtils.SplitAtFirst(syncAction.Path, '\n');
-                        string text3 = RemotePathUtils.GetFileName(keyValuePair.Key);
-                        if (keyValuePair.Key == null || keyValuePair.Value == null)
+                        KeyValuePair<string, string> symlinkPair = StringUtils.SplitAtFirst(action.Path, '\n');
+                        string linkFileName = RemotePathUtils.GetFileName(symlinkPair.Key);
+                        if (symlinkPair.Key == null || symlinkPair.Value == null)
                         {
-                            throw new Exception("Invalid queued symlink: " + syncAction.Path);
+                            throw new Exception("Invalid queued symlink: " + action.Path);
                         }
-                        streamWriter.WriteLine("rm -f \"" + text3 + "\"");
-                        streamWriter.WriteLine($"ln -s \"{keyValuePair.Value}\" \"{text3}\" || echo \"cmdfail:{num2}\"");
+                        streamWriter.WriteLine("rm -f \"" + linkFileName + "\"");
+                        streamWriter.WriteLine($"ln -s \"{symlinkPair.Value}\" \"{linkFileName}\" || echo \"cmdfail:{i}\"");
                         break;
                     }
             }
         }
         streamWriter.Flush();
-        List<string> list = RunScript(text, memoryStream.ToArray());
-        bool flag = false;
-        foreach (string item in list)
+        List<string> scriptOutput = RunScript(marker, memoryStream.ToArray());
+        bool markerSeen = false;
+        foreach (string line in scriptOutput)
         {
-            int result;
-            if (!flag)
+            int actionIdx;
+            if (!markerSeen)
             {
-                if (!(item != text))
+                if (!(line != marker))
                 {
-                    flag = true;
+                    markerSeen = true;
                 }
             }
-            else if (item.StartsWith("cmdfail:") && int.TryParse(item.Substring(8), out result) && result >= 0 && result < list2.Count)
+            else if (line.StartsWith("cmdfail:") && int.TryParse(line.Substring(8), out actionIdx) && actionIdx >= 0 && actionIdx < actions.Count)
             {
                 base._events?.OnWarning(new SyncWarning
                 {
-                    Warning = new QuickSyncWarning(SysprogsSyncEngine.GetWarningType(list2[result].Type), list2[result].Path, -1)
+                    Warning = new QuickSyncWarning(SysprogsSyncEngine.GetWarningType(actions[actionIdx].Type), actions[actionIdx].Path, -1)
                 });
             }
         }

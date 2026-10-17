@@ -1,40 +1,40 @@
-﻿using SmarTTY.Utilities;
+using SmarTTY.Utilities;
 using System;
 
 namespace SmarTTY.Sync;
 
-internal struct RelativeRemotePath(string text2)
+internal struct RelativeRemotePath(string relativePath)
 {
-    public readonly string Path = text2;
+    public readonly string Path = relativePath;
 
-    public RelativeRemotePath Combine(string text2)
+    public RelativeRemotePath Combine(string childPath)
     {
-        string text = Path;
-        if (text.IsNonTrivial())
+        string result = Path;
+        if (result.IsNonTrivial())
         {
-            text += "/";
+            result += "/";
         }
-        text += text2;
-        return new RelativeRemotePath(text);
+        result += childPath;
+        return new RelativeRemotePath(result);
     }
 
     public RelativeRemotePath GetParent()
     {
-        int num = Path.TrimEnd('/').LastIndexOf('/');
-        if (num == -1)
+        int slashIndex = Path.TrimEnd('/').LastIndexOf('/');
+        if (slashIndex == -1)
         {
             throw new Exception("Cannot get parent path for " + Path);
         }
-        return new RelativeRemotePath(Path.Substring(0, num));
+        return new RelativeRemotePath(Path.Substring(0, slashIndex));
     }
 
-    public string PrependBase(string text)
+    public string PrependBase(string basePath)
     {
         if (Path.IsNonTrivial())
         {
-            return text + "/" + Path;
+            return basePath + "/" + Path;
         }
-        return text;
+        return basePath;
     }
 
     public override string ToString()

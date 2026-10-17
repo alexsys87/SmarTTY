@@ -1,21 +1,21 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace SmarTTY.Ssh.QuickSync;
 
 public static class WildcardParser
 {
-    public static Regex WildcardToRegex(string text2, bool flag2 = false, bool flag3 = false)
+    public static Regex WildcardToRegex(string pattern, bool ignoreCase = false, bool filenameOnly = false)
     {
-        string text = "\\/[]().{}-+";
-        for (int num = 0; num < text.Length; num++)
+        string escapedChars = "\\/[]().{}-+";
+        for (int i = 0; i < escapedChars.Length; i++)
         {
-            text2 = text2.Replace(text.Substring(num, 1), "\\" + text.Substring(num, 1));
+            pattern = pattern.Replace(escapedChars.Substring(i, 1), "\\" + escapedChars.Substring(i, 1));
         }
-        text2 = text2.Replace("*", ".*");
-        text2 = text2.Replace("?", ".");
+        pattern = pattern.Replace("*", ".*");
+        pattern = pattern.Replace("?", ".");
         StringBuilder stringBuilder = new StringBuilder();
-        if (flag3)
+        if (filenameOnly)
         {
             stringBuilder.Append("(^|.*/)(");
         }
@@ -23,44 +23,44 @@ public static class WildcardParser
         {
             stringBuilder.Append("^(");
         }
-        bool flag = true;
-        string[] array = text2.Split(';');
-        foreach (string value in array)
+        bool isFirst = true;
+        string[] parts = pattern.Split(';');
+        foreach (string part in parts)
         {
-            if (flag)
+            if (isFirst)
             {
-                flag = false;
+                isFirst = false;
             }
             else
             {
                 stringBuilder.Append("|");
             }
-            stringBuilder.Append(value);
+            stringBuilder.Append(part);
         }
         stringBuilder.Append(")$");
-        if (flag2)
+        if (ignoreCase)
         {
             return new Regex(stringBuilder.ToString(), RegexOptions.IgnoreCase);
         }
         return new Regex(stringBuilder.ToString());
     }
 
-    public static MaskSpec ParseMask(string text, bool flag2 = false)
+    public static MaskSpec ParseMask(string maskText, bool ignoreCase = false)
     {
-        if (string.IsNullOrEmpty(text) || text == "-" || text == "-\"\"")
+        if (string.IsNullOrEmpty(maskText) || maskText == "-" || maskText == "-\"\"")
         {
             return new MaskSpec(null, flag: false);
         }
-        bool flag = true;
-        if (text.StartsWith("-"))
+        bool isInclude = true;
+        if (maskText.StartsWith("-"))
         {
-            flag = false;
-            text = text.Substring(1);
+            isInclude = false;
+            maskText = maskText.Substring(1);
         }
-        if (text.Length >= 2 && text.StartsWith("\"") && text.EndsWith("\""))
+        if (maskText.Length >= 2 && maskText.StartsWith("\"") && maskText.EndsWith("\""))
         {
-            text = text.Substring(1, text.Length - 2);
+            maskText = maskText.Substring(1, maskText.Length - 2);
         }
-        return new MaskSpec(WildcardParser.WildcardToRegex(text, flag2), flag);
+        return new MaskSpec(WildcardParser.WildcardToRegex(maskText, ignoreCase), isInclude);
     }
 }
