@@ -32,8 +32,32 @@ public class CommandCompletionDatabase
             string source = path;
             if (!compressed && !File.Exists(source))
             {
-                source += ".gz";
-                compressed = true;
+                if (File.Exists(source + ".gz"))
+                {
+                    source += ".gz";
+                    compressed = true;
+                }
+                else
+                {
+                    CommandCompletionDatabase defaultDb = new CommandCompletionDatabase();
+                    defaultDb.Save(path);
+                    return defaultDb;
+                }
+            }
+            else if (compressed && !File.Exists(source))
+            {
+                string uncompressedPath = path.Substring(0, path.Length - 3);
+                if (File.Exists(uncompressedPath))
+                {
+                    source = uncompressedPath;
+                    compressed = false;
+                }
+                else
+                {
+                    CommandCompletionDatabase defaultDb = new CommandCompletionDatabase();
+                    defaultDb.Save(uncompressedPath);
+                    return defaultDb;
+                }
             }
 
             using (FileStream file = File.OpenRead(source))
@@ -93,5 +117,26 @@ public class CommandCompletionDatabase
     public CommandCompletion LookupCommand(string cmdLine)
     {
         return Completions?.FirstOrDefault(command => command != null && command.IsMatch(cmdLine));
+    }
+
+    public void Save(string path)
+    {
+        string directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        XmlWriterSettings settings = new XmlWriterSettings
+        {
+            Indent = true,
+            OmitXmlDeclaration = false
+        };
+
+        using (XmlWriter writer = XmlWriter.Create(path, settings))
+        {
+            XmlSerializer serializer = new XmlSerializer(typeof(CommandCompletionDatabase));
+            serializer.Serialize(writer, this);
+        }
     }
 }

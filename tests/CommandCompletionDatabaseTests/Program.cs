@@ -41,7 +41,11 @@ internal static class Program
         string path = Path.Combine(directory, "CommandCompletions.xml");
         try
         {
-            ExpectEmpty(path, "missing XML and gzip");
+            Check(!File.Exists(path), "xml does not exist initially");
+            CommandCompletionDatabase autoCreated = CommandCompletionDatabase.Load(path);
+            Check(File.Exists(path), "missing XML auto-creates file");
+            Check(autoCreated != null && autoCreated.Completions != null && autoCreated.Completions.Length == 0 && autoCreated.LoadWarning == null, "auto-created database is valid and empty");
+
             Check(new CommandCompletionDatabase().LookupCommand("ls -") == null, "default database is safe");
             Check(new CommandCompletionDatabase { Completions = null }.LookupCommand("ls -") == null, "explicit null array is safe");
             Check(new CommandCompletionDatabase { Completions = new CommandCompletion[] { null } }.LookupCommand("ls -") == null, "null command is safe");
