@@ -73,22 +73,22 @@ public partial class XServerLaunchWindow : Window, IComponentConnector
     public static TcpClient CreateX11ConnectionFromArbitraryThread(Dispatcher dispatcher, GlobalSettings settings, Window parent)
     {
         TcpClient client = new TcpClient();
-        IAsyncResult result = client.BeginConnect("localhost", 6000, null, null);
-        if (result.AsyncWaitHandle.WaitOne(300, exitContext: false))
+        IAsyncResult connectResult = client.BeginConnect("localhost", 6000, null, null);
+        if (connectResult.AsyncWaitHandle.WaitOne(300, exitContext: false))
         {
             try
             {
-                client.EndConnect(result);
+                client.EndConnect(connectResult);
                 return client;
             }
             catch
             {
-                result = null;
+                connectResult = null;
             }
         }
         return (TcpClient)dispatcher.Invoke((Delegate)(Func<TcpClient>)(() =>
         {
-            ControllerImpl controllerImpl = new ControllerImpl(client, result, settings);
+            ControllerImpl controllerImpl = new ControllerImpl(client, connectResult, settings);
             XServerLaunchWindow xServerLaunchWindow = new XServerLaunchWindow(controllerImpl);
             xServerLaunchWindow.Owner = parent;
             XServerLaunchWindow xServerLaunchWindow2 = xServerLaunchWindow;

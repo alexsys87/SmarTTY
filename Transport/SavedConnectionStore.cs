@@ -55,7 +55,7 @@ public class SavedConnectionStore
             _sshConnections.Clear();
             Directory.CreateDirectory(_directory);
             XmlSerializer xmlSerializer = new XmlSerializer(typeof(SSHConnectionSettings));
-            XmlSerializer xmlSerializer2 = new XmlSerializer(typeof(RawConnectionSettings));
+            XmlSerializer rawSettingsSerializer = new XmlSerializer(typeof(RawConnectionSettings));
             string[] files = Directory.GetFiles(_directory, "*.sshconnection");
             foreach (string file in files)
             {
@@ -75,8 +75,8 @@ public class SavedConnectionStore
             {
                 try
                 {
-                    using FileStream stream2 = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    RawConnectionSettings rawConnectionSettings = (RawConnectionSettings)xmlSerializer2.Deserialize(stream2);
+                    using FileStream item = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    RawConnectionSettings rawConnectionSettings = (RawConnectionSettings)rawSettingsSerializer.Deserialize(item);
                     rawConnectionSettings.FileName = file;
                     _rawConnections.Add(rawConnectionSettings);
                 }

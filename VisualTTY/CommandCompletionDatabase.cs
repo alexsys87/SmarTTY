@@ -50,12 +50,12 @@ public class CommandCompletionDatabase
         }
         // InvalidDataException signals a damaged gzip stream. It derives from SystemException,
         // so it is not covered by IOException and must be listed explicitly.
-        catch (Exception ex) when (ex is IOException || ex is InvalidDataException ||
-                                   ex is UnauthorizedAccessException ||
-                                   ex is InvalidOperationException || ex is XmlException ||
-                                   ex is SecurityException || ex is ArgumentException)
+        catch (Exception exception) when (exception is IOException || exception is InvalidDataException ||
+                                   exception is UnauthorizedAccessException ||
+                                   exception is InvalidOperationException || exception is XmlException ||
+                                   exception is SecurityException || exception is ArgumentException)
         {
-            string warning = "Could not load command completions from '" + path + "': " + ex.Message;
+            string warning = "Could not load command completions from '" + path + "': " + exception.Message;
             Trace.TraceWarning(warning);
             return new CommandCompletionDatabase { LoadWarning = warning };
         }

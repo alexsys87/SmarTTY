@@ -115,9 +115,9 @@ internal class AsyncTransportConnection : IDisposable
                 }
             });
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Exception connectEx = ex;
+            Exception connectEx = exception;
             _state = ConnectionStateEnum.Failed;
             PostToUi(() =>
             {

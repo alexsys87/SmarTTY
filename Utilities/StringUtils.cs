@@ -246,12 +246,12 @@ public static class StringUtils
         return stringBuilder.ToString();
     }
 
-    public static int CommonPrefixLength(string text, string text2)
+    public static int CommonPrefixLength(string text, string value)
     {
-        int limit = Math.Min(text.Length, text2.Length);
+        int limit = Math.Min(text.Length, value.Length);
         for (int i = 0; i < limit; i++)
         {
-            if (char.ToLower(text[i]) != char.ToLower(text2[i]))
+            if (char.ToLower(text[i]) != char.ToLower(value[i]))
             {
                 return i;
             }
@@ -330,10 +330,10 @@ public static class StringUtils
     {
         int tokenStart = 0;
         bool inQuotes = false;
-        List<string> result = new List<string>();
+        List<string> items = new List<string>();
         if (text == null)
         {
-            return result;
+            return items;
         }
         for (int i = 0; i < text.Length; i++)
         {
@@ -345,30 +345,30 @@ public static class StringUtils
             {
                 if (i != tokenStart)
                 {
-                    result.Add(text.Substring(tokenStart, i - tokenStart));
+                    items.Add(text.Substring(tokenStart, i - tokenStart));
                 }
                 tokenStart = i + 1;
             }
         }
         if (tokenStart != text.Length)
         {
-            result.Add(text.Substring(tokenStart));
+            items.Add(text.Substring(tokenStart));
         }
-        return result;
+        return items;
     }
 
     public static string SplitCamelCase(string input)
     {
-        string result = input;
-        for (int i = 0; i < result.Length; i++)
+        string text = input;
+        for (int i = 0; i < text.Length; i++)
         {
-            if (i > 0 && char.IsUpper(result[i]))
+            if (i > 0 && char.IsUpper(text[i]))
             {
-                result = result.Insert(i++, " ");
-                result = result.Substring(0, i) + char.ToLower(result[i]) + result.Substring(i + 1);
+                text = text.Insert(i++, " ");
+                text = text.Substring(0, i) + char.ToLower(text[i]) + text.Substring(i + 1);
             }
         }
-        return result;
+        return text;
     }
 
     public static string Pluralize(long count, string noun, bool isSizeFormat = false)
@@ -381,15 +381,15 @@ public static class StringUtils
         return formattedCount + " " + noun + "s";
     }
 
-    public static bool TryParseNumber(string text, out ulong result)
+    public static bool TryParseNumber(string text, out ulong value)
     {
         ulong? number = ParseNumber(text);
         if (number.HasValue)
         {
-            result = number.Value;
+            value = number.Value;
             return true;
         }
-        result = 0uL;
+        value = 0uL;
         return false;
     }
 
@@ -404,20 +404,20 @@ public static class StringUtils
         {
             text = text.Substring(0, spaceIndex);
         }
-        ulong result;
+        ulong value;
         if (text.StartsWith("0x", StringComparison.InvariantCultureIgnoreCase))
         {
-            if (!ulong.TryParse(text.Substring(2), NumberStyles.AllowHexSpecifier, null, out result))
+            if (!ulong.TryParse(text.Substring(2), NumberStyles.AllowHexSpecifier, null, out value))
             {
                 return null;
             }
-            return result;
+            return value;
         }
-        if (!ulong.TryParse(text, out result))
+        if (!ulong.TryParse(text, out value))
         {
             return null;
         }
-        return result;
+        return value;
     }
 
     public static ulong? ParseSize(string text)

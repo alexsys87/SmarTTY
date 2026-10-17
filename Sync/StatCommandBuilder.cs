@@ -106,21 +106,21 @@ public class StatCommandBuilder
 
     public StatEntry ParseEntry(string line)
     {
-        StatEntry result = default;
+        StatEntry entry = default;
         if (line.Length < 6)
         {
             return default;
         }
         string[] parts = line.Split('|');
-        if (!long.TryParse(parts[2], out result.ModifiedTime))
+        if (!long.TryParse(parts[2], out entry.ModifiedTime))
         {
             return default;
         }
-        if (!int.TryParse(parts[3], out result.DeviceId))
+        if (!int.TryParse(parts[3], out entry.DeviceId))
         {
             return default;
         }
-        if (!long.TryParse(parts[4], out result.Size))
+        if (!long.TryParse(parts[4], out entry.Size))
         {
             return default;
         }
@@ -131,13 +131,13 @@ public class StatCommandBuilder
         switch ((modeHex >> 12) & 0xF)
         {
             case 8:
-                result.Kind = StatEntryKind.File;
+                entry.Kind = StatEntryKind.File;
                 break;
             case 4:
-                result.Kind = StatEntryKind.Directory;
+                entry.Kind = StatEntryKind.Directory;
                 break;
             case 10:
-                result.Kind = StatEntryKind.Symlink;
+                entry.Kind = StatEntryKind.Symlink;
                 break;
         }
         if (line.StartsWith("StatEntryL:|"))
@@ -149,12 +149,12 @@ public class StatCommandBuilder
             int arrowIndex = parts[1].IndexOf("->");
             if (arrowIndex == -1)
             {
-                result.Name = parts[1].Trim(' ', '\'');
+                entry.Name = parts[1].Trim(' ', '\'');
             }
             else
             {
-                result.Name = parts[1].Substring(0, arrowIndex).Trim(' ', '\'');
-                result.LinkTarget = parts[1].Substring(arrowIndex + 2).Trim(' ', '\'');
+                entry.Name = parts[1].Substring(0, arrowIndex).Trim(' ', '\'');
+                entry.LinkTarget = parts[1].Substring(arrowIndex + 2).Trim(' ', '\'');
             }
         }
         else if (line.StartsWith("StatEntryB:|"))
@@ -163,14 +163,14 @@ public class StatCommandBuilder
             {
                 return default;
             }
-            result.Name = parts[1];
-            result.LinkTarget = parts[6];
+            entry.Name = parts[1];
+            entry.LinkTarget = parts[6];
         }
-        string name = result.Name;
+        string name = entry.Name;
         if (name != null && name.StartsWith("./"))
         {
-            result.Name = result.Name.Substring(2);
+            entry.Name = entry.Name.Substring(2);
         }
-        return result;
+        return entry;
     }
 }

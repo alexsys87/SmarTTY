@@ -116,9 +116,9 @@ public partial class RemoteOpenFileForm : DpiAwareForm
                     Button button = btnOpen;
                     Button button2 = btnCancel;
                     bool disabledState = (tsControls.Enabled = false);
-                    bool flag3 = (button2.Enabled = disabledState);
-                    bool flag5 = (button.Enabled = flag3);
-                    bool enabled = (textBox.Enabled = flag5);
+                    bool isEnabled = (button2.Enabled = disabledState);
+                    bool openButtonEnabled = (button.Enabled = isEnabled);
+                    bool enabled = (textBox.Enabled = openButtonEnabled);
                     doubleBufferedListView.Enabled = enabled;
                 }
                 else
@@ -127,15 +127,15 @@ public partial class RemoteOpenFileForm : DpiAwareForm
                     lvFiles.Height += iwcProgress.Height + iwcProgress.Margin.Top;
                     tbFileName.Location = new Point(tbFileName.Location.X, tbFileName.Location.Y + iwcProgress.Height + iwcProgress.Margin.Top);
                     lFileName.Location = new Point(lFileName.Location.X, lFileName.Location.Y + iwcProgress.Height + iwcProgress.Margin.Top);
-                    DoubleBufferedListView doubleBufferedListView2 = lvFiles;
+                    DoubleBufferedListView fileList = lvFiles;
                     TextBox textBox2 = tbFileName;
                     Button button3 = btnOpen;
                     Button button4 = btnCancel;
                     bool enabledState = (tsControls.Enabled = true);
-                    bool flag3 = (button4.Enabled = enabledState);
-                    bool flag5 = (button3.Enabled = flag3);
-                    bool enabled = (textBox2.Enabled = flag5);
-                    doubleBufferedListView2.Enabled = enabled;
+                    bool cancelButtonEnabled = (button4.Enabled = enabledState);
+                    bool openButtonEnabled = (button3.Enabled = cancelButtonEnabled);
+                    bool enabled = (textBox2.Enabled = openButtonEnabled);
+                    fileList.Enabled = enabled;
                 }
             }
         }
@@ -353,9 +353,9 @@ public partial class RemoteOpenFileForm : DpiAwareForm
             _pendingJob = remoteCommand;
             _timer.Enabled = true;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             IsBusy = false;
             _pendingJob = null;
             _timer.Enabled = false;

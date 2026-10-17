@@ -295,9 +295,9 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             string text = _Controller.TestConnectionOrThrow();
             MessageBoxes.Info("Connection test to " + text + " succeeded. Your settings appear to be valid.");
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -330,9 +330,9 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 this.DialogResult = true;
                 return;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
                 return;
             }
         }

@@ -234,17 +234,17 @@ public class DirectoryCopier
                     scpChannelStream.Write(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
                 }
                 command = TarCommands.GetCreateFromListCommand(remotePath, followSymlinks: true, tempListFile, excludeItems);
-                using (SshShellChannel sshShellChannel2 = this._session.OpenShellChannel(command))
+                using (SshShellChannel shellChannel = this._session.OpenShellChannel(command))
                 {
-                    sshShellChannel2.DataReceived += outputCollector.OnDataReceived;
-                    sshShellChannel2.ReadStderrOnRead = true;
-                    sshShellChannel2.Output.ReadFully = true;
-                    TarExtractor tarExtractor2 = new TarExtractor(sshShellChannel2.Output, localPath);
-                    tarExtractor2.PreserveTimestamps = preserveTimestamps;
-                    tarExtractor2.Progress = OnTarListProgress;
-                    tarExtractor2.ExtractAll(ignoreErrors: true, stripFirstDirectory: false);
-                    tarExtractor2.CreateSymlinks(out symlinkList, remotePath);
-                    tarExtractor2.AddStatisticsTo(directoryStatistics);
+                    shellChannel.DataReceived += outputCollector.OnDataReceived;
+                    shellChannel.ReadStderrOnRead = true;
+                    shellChannel.Output.ReadFully = true;
+                    TarExtractor tarExtractor = new TarExtractor(shellChannel.Output, localPath);
+                    tarExtractor.PreserveTimestamps = preserveTimestamps;
+                    tarExtractor.Progress = OnTarListProgress;
+                    tarExtractor.ExtractAll(ignoreErrors: true, stripFirstDirectory: false);
+                    tarExtractor.CreateSymlinks(out symlinkList, remotePath);
+                    tarExtractor.AddStatisticsTo(directoryStatistics);
                     CheckErrors(outputCollector);
                 }
                 if (symlinkList.Count == 0)
@@ -309,11 +309,11 @@ public class DirectoryCopier
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
                 if (Log != null)
                 {
-                    Log(this, "Cannot retrieve contents of " + localFilePath + ": " + ex.Message);
+                    Log(this, "Cannot retrieve contents of " + localFilePath + ": " + exception.Message);
                 }
             }
         }
@@ -585,9 +585,9 @@ public class DirectoryCopier
             {
             }
         }
-        int result = sshShellChannel.ExitStatus;
+        int exitStatus = sshShellChannel.ExitStatus;
         sshShellChannel.WaitClosed();
-        return result;
+        return exitStatus;
     }
 
     public void Upload(string localPath, string remotePath, PathFilter filter = null, string[] excludeItems = null)
@@ -643,11 +643,11 @@ public class DirectoryCopier
                 {
                     CountLocalFiles(remotePath + "/" + findData.FileName, ref filesDone, ref bytesDone, localFilePath);
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
                     if (Log != null)
                     {
-                        Log(this, "Cannot upload " + localFilePath + ": " + ex.Message);
+                        Log(this, "Cannot upload " + localFilePath + ": " + exception.Message);
                     }
                 }
             }
@@ -750,11 +750,11 @@ public class DirectoryCopier
                 {
                     throw;
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
                     if (this.Log != null)
                     {
-                        this.Log(this, "Cannot upload " + localFilePath + ": " + ex.Message);
+                        this.Log(this, "Cannot upload " + localFilePath + ": " + exception.Message);
                     }
                 }
             }

@@ -15,5 +15,5 @@ public interface ICompletionHost
 
     void ForwardMessage(Message message);
 
-    void SetPopupActive(bool flag);
+    void SetPopupActive(bool changed);
 }

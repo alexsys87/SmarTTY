@@ -39,17 +39,17 @@ public class SshTerminalControl : TerminalEmulatorControl
             {
                 StringBuilder stringBuilder = new StringBuilder();
                 EditableTextDocument editableTextDocument = ((EditableTextBrowser)_terminal).EditableDocument;
-                for (int num = _startLine; num < editableTextDocument.LineCount; num++)
+                for (int editableTextDocumentIndex = _startLine; editableTextDocumentIndex < editableTextDocument.LineCount; editableTextDocumentIndex++)
                 {
-                    string value = editableTextDocument.GetLineText(num);
+                    string value = editableTextDocument.GetLineText(editableTextDocumentIndex);
                     stringBuilder.Append(value);
                 }
                 return stringBuilder.ToString().Substring(_startColumn);
             }
             set
             {
-                EditableTextDocument editableTextDocument2 = ((EditableTextBrowser)_terminal).EditableDocument;
-                _terminal.ReplaceText(StartPosition, editableTextDocument2.EndPosition, flag: false, value ?? "");
+                EditableTextDocument document = ((EditableTextBrowser)_terminal).EditableDocument;
+                _terminal.ReplaceText(StartPosition, document.EndPosition, select: false, value ?? "");
             }
         }
 
@@ -65,43 +65,43 @@ public class SshTerminalControl : TerminalEmulatorControl
             }
         }
 
-        public InputRegion(SshTerminalControl sshTerminalControl, int value2, int value3)
+        public InputRegion(SshTerminalControl sshTerminalControl, int startLine, int startColumn)
         {
             _terminal = sshTerminalControl;
-            this._startColumn = value3;
-            _startLine = value2;
+            this._startColumn = startColumn;
+            _startLine = startLine;
         }
 
         public int IndexOf(TextDocument.TextPosition textPosition)
         {
             EditableTextDocument editableTextDocument = ((EditableTextBrowser)_terminal).EditableDocument;
-            int num = -this._startColumn;
-            for (int num2 = _startLine; num2 < editableTextDocument.LineCount; num2++)
+            int offset = -this._startColumn;
+            for (int line = _startLine; line < editableTextDocument.LineCount; line++)
             {
-                int length = editableTextDocument.GetLineText(num2).Length;
-                if (num2 == textPosition.Line)
+                int length = editableTextDocument.GetLineText(line).Length;
+                if (line == textPosition.Line)
                 {
-                    return num + textPosition.Column;
+                    return offset + textPosition.Column;
                 }
-                num += length;
+                offset += length;
             }
             return -1;
         }
 
-        public TextDocument.TextPosition PositionAt(int value2)
+        public TextDocument.TextPosition PositionAt(int index)
         {
-            if (value2 >= 0)
+            if (index >= 0)
             {
-                int num = value2 + this._startColumn;
-                int num2 = 0;
-                for (int num3 = _startLine; num3 < ((EditableTextBrowser)_terminal).EditableDocument.LineCount; num3++)
+                int targetColumn = index + this._startColumn;
+                int charsBefore = 0;
+                for (int line = _startLine; line < ((EditableTextBrowser)_terminal).EditableDocument.LineCount; line++)
                 {
-                    int length = ((EditableTextBrowser)_terminal).EditableDocument.GetLineText(num3).Length;
-                    if (num >= num2 && num <= num2 + length)
+                    int length = ((EditableTextBrowser)_terminal).EditableDocument.GetLineText(line).Length;
+                    if (targetColumn >= charsBefore && targetColumn <= charsBefore + length)
                     {
-                        return new TextDocument.TextPosition(num - num2, num3);
+                        return new TextDocument.TextPosition(targetColumn - charsBefore, line);
                     }
-                    num2 += length;
+                    charsBefore += length;
                 }
             }
             return ((EditableTextBrowser)_terminal).EditableDocument.EndPosition;
@@ -130,15 +130,15 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             get
             {
-                int num = Region.IndexOf(_terminal.CaretPosition);
+                int index = Region.IndexOf(_terminal.CaretPosition);
                 string text = Text;
-                if (text != null && num >= 0 && num <= text.Length)
+                if (text != null && index >= 0 && index <= text.Length)
                 {
-                    if (num == 0)
+                    if (index == 0)
                     {
                         return true;
                     }
-                    if (text[num - 1] == ' ')
+                    if (text[index - 1] == ' ')
                     {
                         return true;
                     }
@@ -147,11 +147,11 @@ public class SshTerminalControl : TerminalEmulatorControl
             }
         }
 
-        public InputLine(SshTerminalControl sshTerminalControl, int value2, string text)
+        public InputLine(SshTerminalControl sshTerminalControl, int startLine, string text)
         {
             _terminal = sshTerminalControl;
-            this.StartLine = value2;
-            Region = new InputRegion(sshTerminalControl, value2, text.Length);
+            this.StartLine = startLine;
+            Region = new InputRegion(sshTerminalControl, startLine, text.Length);
             Prompt = text;
         }
 
@@ -161,7 +161,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             Region.CaretIndex = -1;
         }
 
-        public void NavigateHistory(bool flag)
+        public void NavigateHistory(bool forward)
         {
             string text = this.Text;
             if (_history == null)
@@ -174,7 +174,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             {
                 _history[_historyIndex] = text;
             }
-            if (flag)
+            if (forward)
             {
                 if (++_historyIndex >= _history.Count)
                 {
@@ -196,14 +196,14 @@ public class SshTerminalControl : TerminalEmulatorControl
 
         internal List<string> BuildHistory()
         {
-            string[] array = _terminal._shellCompletionAnalyzer?.GetHistory();
+            string[] items = _terminal._shellCompletionAnalyzer?.GetHistory();
             List<string> list = new List<string>();
             HashSet<string> hashSet = new HashSet<string>();
-            if (array == null)
+            if (items == null)
             {
-                array = new string[0];
+                items = new string[0];
             }
-            foreach (string item in array.Concat(_terminal._typedCommands).Reverse())
+            foreach (string item in items.Concat(_terminal._typedCommands).Reverse())
             {
                 if (!hashSet.Contains(item))
                 {
@@ -236,9 +236,9 @@ public class SshTerminalControl : TerminalEmulatorControl
             sshShellChannel.DataReceived += OnDataReceived;
         }
 
-        private void OnDataReceived(object obj, byte[] buffer, int value2, int value3, int value4)
+        private void OnDataReceived(object sender, byte[] buffer, int offset, int count, int flags)
         {
-            string text = _decoder.Decode(buffer, value2, value3);
+            string text = _decoder.Decode(buffer, offset, count);
             if (!this._outputStarted)
             {
                 text = text.TrimStart('\r', '\n');
@@ -262,9 +262,9 @@ public class SshTerminalControl : TerminalEmulatorControl
             _channel.Input.Write(buffer, 0, buffer.Length);
         }
 
-        public void Resize(int value2, int value3)
+        public void Resize(int columns, int rows)
         {
-            _channel.ResizePty(value2, value3);
+            _channel.ResizePty(columns, rows);
         }
 
         public void Dispose()
@@ -348,17 +348,17 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     public event EventHandler<CompletionPopupRequest> CompletionPopupRequested;
 
-    public SshTerminalControl(ITerminalSessionContext terminalSessionContext, string text2 = null)
+    public SshTerminalControl(ITerminalSessionContext terminalSessionContext, string initialDirectory = null)
     {
         _context = terminalSessionContext;
         _homeDirectory = (_currentDirectory = terminalSessionContext.Session.RunCommandChecked("pwd", requireSuccess: true)?.Where((string text) => text != "")?.LastOrDefault());
-        if (text2 != null)
+        if (initialDirectory != null)
         {
-            _currentDirectory = text2;
+            _currentDirectory = initialDirectory;
         }
         _linkExtensions = new HashSet<string>();
-        string[] array = (terminalSessionContext.VTSettings.AutoLinkExtensions ?? "").Split(';');
-        foreach (string item in array)
+        string[] parts = (terminalSessionContext.VTSettings.AutoLinkExtensions ?? "").Split(';');
+        foreach (string item in parts)
         {
             _linkExtensions.Add(item);
         }
@@ -372,24 +372,24 @@ public class SshTerminalControl : TerminalEmulatorControl
         _shellCompletionAnalyzer = terminalSessionContext.ProvideAnalyzer();
     }
 
-    public void RequestOpenFile(string text, int? value2, int? value3)
+    public void RequestOpenFile(string text, int? line, int? column)
     {
         OpenFileRequested?.Invoke(this, new OpenFileEventArgs
         {
             Path = text,
-            Column = value3,
-            Line = value2
+            Column = column,
+            Line = line
         });
     }
 
-    private void OnDataEntered(object obj, byte[] buffer, InputKind inputKind)
+    private void OnDataEntered(object sender, byte[] buffer, InputKind inputKind)
     {
         _channel?.SendInput(buffer, inputKind);
     }
 
-    private void OnTerminalSizeChanged(TerminalEmulatorControl terminalEmulatorControl, int value2, int value3)
+    private void OnTerminalSizeChanged(TerminalEmulatorControl terminalEmulatorControl, int columns, int rows)
     {
-        _channel?.Resize(value2, value3);
+        _channel?.Resize(columns, rows);
     }
 
     public bool IsLinkExtension(string text)
@@ -402,32 +402,32 @@ public class SshTerminalControl : TerminalEmulatorControl
         base.Title = PromptPrefix;
     }
 
-    public void ChangeDirectory(string text3)
+    public void ChangeDirectory(string path)
     {
-        if (text3.StartsWith("~"))
+        if (path.StartsWith("~"))
         {
-            text3 = _homeDirectory + text3.Substring(1);
+            path = _homeDirectory + path.Substring(1);
         }
-        text3 = ((!text3.StartsWith("\"") && !text3.StartsWith("'")) ? text3.Replace("\\ ", " ") : text3.Trim('\'', '"'));
-        string text = RemotePathUtils.NormalizeUnix(RemotePathUtils.Combine(_currentDirectory, text3));
-        string text2 = text.TrimEnd('/');
-        if (text2.Length > 0)
+        path = ((!path.StartsWith("\"") && !path.StartsWith("'")) ? path.Replace("\\ ", " ") : path.Trim('\'', '"'));
+        string text = RemotePathUtils.NormalizeUnix(RemotePathUtils.Combine(_currentDirectory, path));
+        string trimmedPath = text.TrimEnd('/');
+        if (trimmedPath.Length > 0)
         {
-            text = text2;
+            text = trimmedPath;
         }
-        List<string> list = _context.Session.RunCommand("cd \"" + text + "\"", out var num) ?? new List<string>();
+        List<string> list = _context.Session.RunCommand("cd \"" + text + "\"", out var exitCode) ?? new List<string>();
         foreach (string item in list)
         {
             ProcessOutput(item);
         }
-        if (num == 0)
+        if (exitCode == 0)
         {
             _currentDirectory = text;
             DirectoryChanged?.Invoke(text);
         }
         else if (list.Count == 0)
         {
-            ProcessOutput(TerminalEmulatorControl.Colorize($"'cd {text}' exited with code {num ?? (-1)}", 1));
+            ProcessOutput(TerminalEmulatorControl.Colorize($"'cd {text}' exited with code {exitCode ?? (-1)}", 1));
         }
         ShowPrompt();
     }
@@ -467,9 +467,9 @@ public class SshTerminalControl : TerminalEmulatorControl
         base.OnMouseMove(e);
     }
 
-    private ILinkTarget GetLinkAt(int value2, Point point)
+    private ILinkTarget GetLinkAt(int line, Point point)
     {
-        LineInfo lineInfo = ActiveBuffer?.Lines?.GetLine(value2);
+        LineInfo lineInfo = ActiveBuffer?.Lines?.GetLine(line);
         if (lineInfo?.Cells != null)
         {
             TextDocument.TextPosition textPosition = HitTest(point);
@@ -481,9 +481,9 @@ public class SshTerminalControl : TerminalEmulatorControl
         return null;
     }
 
-    protected override HoverTarget GetHoverTarget(int value2, Point point)
+    protected override HoverTarget GetHoverTarget(int line, Point point)
     {
-        ILinkTarget linkTarget = GetLinkAt(value2, point);
+        ILinkTarget linkTarget = GetLinkAt(line, point);
         if (linkTarget != null && linkTarget.IsActive)
         {
             return new HoverTarget
@@ -492,7 +492,7 @@ public class SshTerminalControl : TerminalEmulatorControl
                 ClickAction = linkTarget.Activate
             };
         }
-        return base.GetHoverTarget(value2, point);
+        return base.GetHoverTarget(line, point);
     }
 
     private bool IsInInputArea(TextDocument.TextPosition textPosition)
@@ -510,15 +510,15 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             return false;
         }
-        for (int num = _inputLine.StartLine; num < ((EditableTextBrowser)this).EditableDocument.LineCount; num++)
+        for (int startLine = _inputLine.StartLine; startLine < ((EditableTextBrowser)this).EditableDocument.LineCount; startLine++)
         {
-            int length = ((EditableTextBrowser)this).EditableDocument.GetLineText(num).Length;
-            bool flag = num == ((EditableTextBrowser)this).EditableDocument.LineCount - 1;
+            int length = ((EditableTextBrowser)this).EditableDocument.GetLineText(startLine).Length;
+            bool isLastLine = startLine == ((EditableTextBrowser)this).EditableDocument.LineCount - 1;
             if (length > _visibleColumns)
             {
                 return true;
             }
-            if (!flag && length != _visibleColumns)
+            if (!isLastLine && length != _visibleColumns)
             {
                 return true;
             }
@@ -526,34 +526,34 @@ public class SshTerminalControl : TerminalEmulatorControl
         return false;
     }
 
-    protected override void OnResize(EventArgs e2)
+    protected override void OnResize(EventArgs e)
     {
-        int? num = _inputLine?.Region?.CaretIndex;
-        base.OnResize(e2);
-        if (!RewrapInput(num) && num.HasValue && _inputLine != null)
+        int? caretIndex = _inputLine?.Region?.CaretIndex;
+        base.OnResize(e);
+        if (!RewrapInput(caretIndex) && caretIndex.HasValue && _inputLine != null)
         {
-            _inputLine.Region.CaretIndex = num.Value;
+            _inputLine.Region.CaretIndex = caretIndex.Value;
         }
     }
 
-    public override void ReplaceText(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, bool flag, string text)
+    public override void ReplaceText(TextDocument.TextPosition start, TextDocument.TextPosition end, bool select, string text)
     {
-        if (IsInInputArea(textPosition) && (flag || IsInInputArea(textPosition2)) && _inputLine != null)
+        if (IsInInputArea(start) && (select || IsInInputArea(end)) && _inputLine != null)
         {
-            int num = _inputLine.Region.IndexOf(textPosition);
-            int num2 = ((!flag) ? _inputLine.Region.IndexOf(textPosition2) : num);
-            if (num2 < num)
+            int startIndex = _inputLine.Region.IndexOf(start);
+            int endIndex = ((!select) ? _inputLine.Region.IndexOf(end) : startIndex);
+            if (endIndex < startIndex)
             {
-                int num3 = num2;
-                num2 = num;
-                num = num3;
+                int swapIndex = endIndex;
+                endIndex = startIndex;
+                startIndex = swapIndex;
             }
-            ReplaceTextCore(textPosition, textPosition2, flag, text);
+            ReplaceTextCore(start, end, select, text);
             RewrapInput();
             string filter = _inputLine?.Text;
             _popup?.SetFilter(filter);
             CompletionSession completionSession = _completion;
-            if (completionSession != null && completionSession.OnTextChanged(filter, num, num2 - num, (text ?? "").Replace("\n", "").Replace("\r", "").Length))
+            if (completionSession != null && completionSession.OnTextChanged(filter, startIndex, endIndex - startIndex, (text ?? "").Replace("\n", "").Replace("\r", "").Length))
             {
                 _completion.Dispose();
                 _completion = null;
@@ -561,11 +561,11 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
         else
         {
-            base.ReplaceText(textPosition, textPosition2, flag, text);
+            base.ReplaceText(start, end, select, text);
         }
     }
 
-    private bool RewrapInput(int? value2 = null)
+    private bool RewrapInput(int? caretIndex = null)
     {
         if (!InputWraps())
         {
@@ -577,20 +577,20 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             return false;
         }
-        int num = value2 ?? _inputLine.Region.CaretIndex;
+        int resolvedCaretIndex = caretIndex ?? _inputLine.Region.CaretIndex;
         StringBuilder stringBuilder = new StringBuilder();
-        for (int num2 = 0; num2 < text.Length; num2 += _visibleColumns)
+        for (int textIndex = 0; textIndex < text.Length; textIndex += _visibleColumns)
         {
-            int length = Math.Min(text.Length - num2, _visibleColumns);
-            stringBuilder.Append(text.Substring(num2, length));
-            if (num2 + _visibleColumns < text.Length)
+            int length = Math.Min(text.Length - textIndex, _visibleColumns);
+            stringBuilder.Append(text.Substring(textIndex, length));
+            if (textIndex + _visibleColumns < text.Length)
             {
                 stringBuilder.Append("\n");
             }
         }
-        ReplaceTextCore(new TextDocument.TextPosition(0, inputLine.StartLine), new TextDocument.TextPosition(0, ((EditableTextBrowser)this).EditableDocument.LineCount), flag: false, stringBuilder.ToString());
+        ReplaceTextCore(new TextDocument.TextPosition(0, inputLine.StartLine), new TextDocument.TextPosition(0, ((EditableTextBrowser)this).EditableDocument.LineCount), select: false, stringBuilder.ToString());
         OnTextReplaced();
-        inputLine.Region.CaretIndex = num;
+        inputLine.Region.CaretIndex = resolvedCaretIndex;
         return true;
     }
 
@@ -598,7 +598,7 @@ public class SshTerminalControl : TerminalEmulatorControl
     {
         if (_inputLine != null)
         {
-            TextDocument.TextPosition textPosition = HitTest(point, flag2: true);
+            TextDocument.TextPosition textPosition = HitTest(point, allowPastEnd: true);
             if (textPosition.IsValid && IsInInputArea(textPosition))
             {
                 SetCaret(textPosition);
@@ -607,58 +607,58 @@ public class SshTerminalControl : TerminalEmulatorControl
         base.PlaceCaretAt(point);
     }
 
-    private int FindWordBoundary(int value2, string text, bool flag)
+    private int FindWordBoundary(int position, string text, bool backward)
     {
-        if (flag)
+        if (backward)
         {
             do
             {
-                value2--;
+                position--;
             }
-            while (value2 > 0 && IsWordChar(text[value2 - 1]) && IsWordChar(text[value2]));
-            if (value2 < 0)
+            while (position > 0 && IsWordChar(text[position - 1]) && IsWordChar(text[position]));
+            if (position < 0)
             {
-                value2 = 0;
+                position = 0;
             }
         }
         else
         {
             do
             {
-                value2++;
+                position++;
             }
-            while (value2 > 0 && value2 < text.Length && IsWordChar(text[value2 - 1]) && IsWordChar(text[value2]));
-            if (value2 > text.Length)
+            while (position > 0 && position < text.Length && IsWordChar(text[position - 1]) && IsWordChar(text[position]));
+            if (position > text.Length)
             {
-                value2 = text.Length;
+                position = text.Length;
             }
         }
-        return value2;
+        return position;
     }
 
-    protected override TextDocument.TextPosition ComputeMovedPosition(CaretMove caretMove, Keys keys, TextDocument.TextPosition textPosition, bool flag = false)
+    protected override TextDocument.TextPosition ComputeMovedPosition(CaretMove caretMove, Keys keys, TextDocument.TextPosition textPosition, bool extendSelection = false)
     {
         if (caretMove == CaretMove.Home || caretMove == CaretMove.End)
         {
             keys |= Keys.Control;
         }
-        TextDocument.TextPosition result = base.ComputeMovedPosition(caretMove, keys, textPosition, flag);
+        TextDocument.TextPosition movedPosition = base.ComputeMovedPosition(caretMove, keys, textPosition, extendSelection);
         if ((caretMove == CaretMove.WordLeft || caretMove == CaretMove.WordRight) && _inputLine != null)
         {
-            int num = _inputLine.Region.IndexOf(textPosition);
+            int index = _inputLine.Region.IndexOf(textPosition);
             string text = _inputLine?.Text;
-            if (text != null && num >= 0 && num < text.Length)
+            if (text != null && index >= 0 && index < text.Length)
             {
-                int num2 = FindWordBoundary(num, text, caretMove == CaretMove.WordLeft);
-                result = _inputLine.Region.PositionAt(num2);
+                int boundary = FindWordBoundary(index, text, caretMove == CaretMove.WordLeft);
+                movedPosition = _inputLine.Region.PositionAt(boundary);
             }
         }
         InputLine inputLine = _inputLine;
-        if (inputLine != null && result < inputLine.StartPosition)
+        if (inputLine != null && movedPosition < inputLine.StartPosition)
         {
-            result = inputLine.StartPosition;
+            movedPosition = inputLine.StartPosition;
         }
-        return result;
+        return movedPosition;
     }
 
     protected override void SetCaretCore(TextDocument.TextPosition textPosition, SelectionChangeSource selectionChangeSource, CaretDirection caretDirection = CaretDirection.Unspecified)
@@ -675,7 +675,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         if (_inputLine != null)
         {
             SetSelectionEnd(new TextDocument.TextPosition(((EditableTextBrowser)this).EditableDocument.GetLineText(((EditableTextBrowser)this).EditableDocument.LineCount - 1).Length, ((EditableTextBrowser)this).EditableDocument.LineCount - 1));
-            SetSelection(flag: true, new TextDocument.TextPosition(_inputLine.Prompt.Length, _inputLine.StartLine));
+            SetSelection(select: true, new TextDocument.TextPosition(_inputLine.Prompt.Length, _inputLine.StartLine));
         }
     }
 
@@ -706,7 +706,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             return;
         }
         string text = inputLine.Text;
-        int value2 = inputLine.Region.CaretIndex;
+        int caretIndex = inputLine.Region.CaretIndex;
         CommandCompletion commandCompletion = _shellCompletionAnalyzer.CompletionDatabase?.LookupCommand(text);
         switch (completionTrigger)
         {
@@ -724,23 +724,23 @@ public class SshTerminalControl : TerminalEmulatorControl
                 break;
         }
         CompletionSession.Token[] items = CompletionSession.Tokenize(text);
-        int? num = Enumerable.Range(0, items.Length).Select((Func<int, int?>)((int value) => value)).FirstOrDefault((int? num3) => items[num3.Value].Contains(value2));
-        int? num2 = null;
-        if (num.HasValue)
+        int? matchIndex = Enumerable.Range(0, items.Length).Select((Func<int, int?>)((int value) => value)).FirstOrDefault((int? itemIndex) => items[itemIndex.Value].Contains(caretIndex));
+        int? previousIndex = null;
+        if (matchIndex.HasValue)
         {
-            num2 = num.Value - 1;
+            previousIndex = matchIndex.Value - 1;
         }
         else if (items.Length != 0)
         {
-            num2 = items.Length - 1;
+            previousIndex = items.Length - 1;
         }
         CompletionSession.Token token = default;
-        if (num.HasValue)
+        if (matchIndex.HasValue)
         {
-            token = items[num.Value];
+            token = items[matchIndex.Value];
         }
         CompletionTarget completionTarget;
-        if (items.Length == 0 || num == 0 || (num2.HasValue && items[num2.Value].Text == "|"))
+        if (items.Length == 0 || matchIndex == 0 || (previousIndex.HasValue && items[previousIndex.Value].Text == "|"))
         {
             completionTarget = CompletionTarget.Command;
         }
@@ -767,15 +767,15 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
     }
 
-    private void OnCompletionApplied(object sender, CompletionSession.AppliedEventArgs e2)
+    private void OnCompletionApplied(object sender, CompletionSession.AppliedEventArgs item)
     {
         InputRegion inputRegion = _inputLine?.Region;
         if (inputRegion != null)
         {
-            inputRegion.Text = e2.NewText;
-            inputRegion.CaretIndex = e2.CaretIndex;
+            inputRegion.Text = item.NewText;
+            inputRegion.CaretIndex = item.CaretIndex;
         }
-        if (e2.Commit)
+        if (item.Commit)
         {
             SubmitInput();
         }
@@ -783,7 +783,7 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
-        bool? flag = null;
+        bool? isAtWordStart = null;
         if (_inputLine != null)
         {
             switch (e.KeyChar)
@@ -808,12 +808,12 @@ public class SshTerminalControl : TerminalEmulatorControl
                 default:
                     if (e.KeyChar > ' ' && _context.VTSettings.CompletionTriggers.FirstCharacterInWord)
                     {
-                        flag = _inputLine?.IsAtWordStart;
+                        isAtWordStart = _inputLine?.IsAtWordStart;
                     }
                     break;
             }
-            CompletionSession completionSession2 = _completion;
-            if (completionSession2 != null && completionSession2.IsOpen && completionSession2.HandleChar(e.KeyChar))
+            CompletionSession activeCompletion = _completion;
+            if (activeCompletion != null && activeCompletion.IsOpen && activeCompletion.HandleChar(e.KeyChar))
             {
                 _completion = null;
                 e.Handled = true;
@@ -858,7 +858,7 @@ public class SshTerminalControl : TerminalEmulatorControl
                 }
                 break;
             default:
-                if (_context.VTSettings.CompletionTriggers.FirstCharacterInWord && flag == true)
+                if (_context.VTSettings.CompletionTriggers.FirstCharacterInWord && isAtWordStart == true)
                 {
                     ShowCompletions((e.KeyChar != '-') ? CompletionTrigger.Auto : CompletionTrigger.Options);
                 }
@@ -870,16 +870,16 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
     }
 
-    protected override void OnKeyDown(KeyEventArgs e2)
+    protected override void OnKeyDown(KeyEventArgs e)
     {
         CompletionSession completionSession = _completion;
         ICompletionPopup completionPopup = _popup;
-        if ((completionPopup != null && completionPopup.TryHandleKeyEvent(e2)) || (completionSession != null && completionSession.HandleKey(e2)))
+        if ((completionPopup != null && completionPopup.TryHandleKeyEvent(e)) || (completionSession != null && completionSession.HandleKey(e)))
         {
-            e2.Handled = true;
-            e2.SuppressKeyPress = true;
+            e.Handled = true;
+            e.SuppressKeyPress = true;
             CompletionSession.AppliedEventArgs appliedEventArgs = completionSession?.LastApplied;
-            if (appliedEventArgs != null && appliedEventArgs.IsDirectory && e2.KeyCode != Keys.Return)
+            if (appliedEventArgs != null && appliedEventArgs.IsDirectory && e.KeyCode != Keys.Return)
             {
                 _completion = null;
                 ShowCompletions();
@@ -888,13 +888,13 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
         if (_inputLine != null)
         {
-            if (e2.KeyCode == Keys.Escape)
+            if (e.KeyCode == Keys.Escape)
             {
                 CloseCompletion();
             }
             if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
             {
-                switch (e2.KeyCode)
+                switch (e.KeyCode)
                 {
                     case Keys.L:
                         if (_inputLine != null)
@@ -917,10 +917,10 @@ public class SshTerminalControl : TerminalEmulatorControl
                             {
                                 ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))),
                                 LineHeight = LineHeight,
-                                Items = _inputLine.BuildHistory()?.Select((string text2) => new CompletionItem
+                                Items = _inputLine.BuildHistory()?.Select((string historyCommand) => new CompletionItem
                                 {
                                     Icon = VirtualTerminalPopupItemIcon.Command,
-                                    Text = text2
+                                    Text = historyCommand
                                 })?.ToArray(),
                                 Title = "Command history",
                                 Icon = VirtualTerminalPopupIcon.History
@@ -945,8 +945,8 @@ public class SshTerminalControl : TerminalEmulatorControl
                         if (_context.VTSettings.CompletionTriggers.CtrlSpace)
                         {
                             ShowCompletions();
-                            e2.Handled = true;
-                            e2.SuppressKeyPress = true;
+                            e.Handled = true;
+                            e.SuppressKeyPress = true;
                             return;
                         }
                         break;
@@ -954,16 +954,16 @@ public class SshTerminalControl : TerminalEmulatorControl
             }
             else
             {
-                Keys keyCode = e2.KeyCode;
+                Keys keyCode = e.KeyCode;
                 if (keyCode == Keys.Up || keyCode == Keys.Down)
                 {
-                    _inputLine.NavigateHistory(e2.KeyCode == Keys.Up);
-                    e2.Handled = true;
-                    e2.SuppressKeyPress = true;
+                    _inputLine.NavigateHistory(e.KeyCode == Keys.Up);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
                 }
             }
         }
-        base.OnKeyDown(e2);
+        base.OnKeyDown(e);
     }
 
     private void BeginExecution()
@@ -987,19 +987,19 @@ public class SshTerminalControl : TerminalEmulatorControl
         _completion = null;
     }
 
-    public string BuildRemoteCommand(string text2, bool? flag = null)
+    public string BuildRemoteCommand(string command, bool? interactive = null)
     {
         string text = "cd \"" + _currentDirectory + "\" && ";
-        flag = flag ?? _context.VTSettings.InteractiveModeWrapper;
+        interactive = interactive ?? _context.VTSettings.InteractiveModeWrapper;
         foreach (KeyValuePair<string, string> item in _environment)
         {
-            text2 = item.Key + "=" + item.Value + " " + text2;
+            command = item.Key + "=" + item.Value + " " + command;
         }
-        if (flag.Value)
+        if (interactive.Value)
         {
-            text2 = _context.VTSettings.DefaultShell + " -i -c \"" + ShellCompletionAnalyzer.EscapeForShell(text2) + "\"";
+            command = _context.VTSettings.DefaultShell + " -i -c \"" + ShellCompletionAnalyzer.EscapeForShell(command) + "\"";
         }
-        return text + text2;
+        return text + command;
     }
 
     public bool SubmitInput()
@@ -1007,21 +1007,21 @@ public class SshTerminalControl : TerminalEmulatorControl
         return Submit(null);
     }
 
-    public bool Submit(string text3)
+    public bool Submit(string command)
     {
         if (_inputLine == null)
         {
             return false;
         }
-        if (text3 != null)
+        if (command != null)
         {
-            _inputLine.SetText(text3);
+            _inputLine.SetText(command);
         }
         else
         {
-            text3 = _inputLine?.Text;
+            command = _inputLine?.Text;
         }
-        if (string.IsNullOrEmpty(text3))
+        if (string.IsNullOrEmpty(command))
         {
             ShowPrompt();
             return true;
@@ -1029,53 +1029,53 @@ public class SshTerminalControl : TerminalEmulatorControl
         BeginExecution();
         try
         {
-            _typedCommands.Add(text3);
-            _shellCompletionAnalyzer.AppendToHistory(text3);
-            if (text3.StartsWith("cd "))
+            _typedCommands.Add(command);
+            _shellCompletionAnalyzer.AppendToHistory(command);
+            if (command.StartsWith("cd "))
             {
-                string text = text3.Substring(2).Trim();
+                string text = command.Substring(2).Trim();
                 ChangeDirectory(text);
             }
-            else if (text3.StartsWith("export "))
+            else if (command.StartsWith("export "))
             {
-                string text2 = text3.Substring(6).Trim();
-                int num = text2.IndexOf('=');
-                if (num != -1)
+                string assignment = command.Substring(6).Trim();
+                int equalsIndex = assignment.IndexOf('=');
+                if (equalsIndex != -1)
                 {
-                    string key = text2.Substring(0, num);
-                    if (num == text2.Length - 1)
+                    string key = assignment.Substring(0, equalsIndex);
+                    if (equalsIndex == assignment.Length - 1)
                     {
                         _environment.Remove(key);
                     }
                     else
                     {
-                        _environment[key] = text2.Substring(num + 1);
+                        _environment[key] = assignment.Substring(equalsIndex + 1);
                     }
                 }
                 ShowPrompt();
             }
             else
             {
-                SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(BuildRemoteCommand(text3), "xterm", ExtendedDataMode.Merge);
+                SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(BuildRemoteCommand(command), "xterm", ExtendedDataMode.Merge);
                 if (sshShellChannel == null)
                 {
                     throw new Exception("Failed to open an SSH channel");
                 }
-                CommandRun item = new CommandRun(this, text3, _currentDirectory, ((EditableTextBrowser)this).EditableDocument.LineCount - 1);
+                CommandRun item = new CommandRun(this, command, _currentDirectory, ((EditableTextBrowser)this).EditableDocument.LineCount - 1);
                 _runs.Add(item);
                 CommandChannel commandChannel = new CommandChannel(sshShellChannel, this, item);
                 _channel = commandChannel;
-                sshShellChannel.Finished += (object obj) =>
+                sshShellChannel.Finished += (object sender) =>
                 {
-                    OnCommandFinished(text3, commandChannel);
+                    OnCommandFinished(command, commandChannel);
                 };
                 sshShellChannel.PollingEnabled = true;
                 sshShellChannel.ResizePty(TerminalSize.Width, TerminalSize.Height);
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            ProcessOutput(TerminalEmulatorControl.Colorize(ex.Message, 1));
+            ProcessOutput(TerminalEmulatorControl.Colorize(exception.Message, 1));
             ShowPrompt();
             return true;
         }
@@ -1093,13 +1093,13 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     private void PostToUi(Action action)
     {
-        bool flag;
+        bool queueWasEmpty;
         lock (_uiQueue)
         {
-            flag = _uiQueue.Count == 0;
+            queueWasEmpty = _uiQueue.Count == 0;
             _uiQueue.Enqueue(action);
         }
-        if (flag)
+        if (queueWasEmpty)
         {
             BeginInvoke(new Action(DrainUiQueue));
         }

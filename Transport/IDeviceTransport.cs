@@ -13,5 +13,5 @@ public interface IDeviceTransport : IDisposable
 
     Stream GetStream();
 
-    string GetDisplayName(bool flag);
+    string GetDisplayName(bool includeParameters);
 }

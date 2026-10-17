@@ -6,9 +6,9 @@ namespace SmarTTY.Sync;
 
 internal interface ISyncEngine : IDisposable
 {
-    IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> items);
+    IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> actions);
 
     RemoteFileSet GetRemoteFileSet();
 
-    void Upload(List<SyncPlan.SyncAction> list, List<LocalPath> list2, ref TransferStatistics transferStatistics);
+    void Upload(List<SyncPlan.SyncAction> actions, List<LocalPath> localPaths, ref TransferStatistics transferStatistics);
 }

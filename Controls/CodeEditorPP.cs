@@ -31,9 +31,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
     }
 
-    internal delegate void TabHandler(ref bool flag);
+    internal delegate void TabHandler(ref bool handled);
 
-    public delegate void PlaceholderChangedHandler(CodeEditorPP codeEditorPP, int value2, int value3, int value4, object obj, bool flag);
+    public delegate void PlaceholderChangedHandler(CodeEditorPP codeEditorPP, int line, int startColumn, int endColumn, object tag, bool isLast);
 
     public delegate bool TokenPredicate(string text);
 
@@ -149,11 +149,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     {
         get
         {
-            if (!base.TryGetCaretColumn(CaretPosition, out int num))
+            if (!base.TryGetCaretColumn(CaretPosition, out int caretColumn))
             {
                 return RectangleToScreen(DisplayRectangle);
             }
-            Point point = Point.Round(PositionToPoint(num, CaretPosition.Line));
+            Point point = Point.Round(PositionToPoint(caretColumn, CaretPosition.Line));
             Rectangle rectangle = new Rectangle(point.X, point.Y, TextArea.Right - point.X, (int)((ReadonlyTextBrowser)this).CharSize.Height);
             return RectangleToScreen(rectangle);
         }
@@ -202,63 +202,63 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         OnTextReplaced();
     }
 
-    protected override ColorSpan[] GetLineColorSpans(int value2)
+    protected override ColorSpan[] GetLineColorSpans(int line)
     {
-        if (value2 >= _tokenCache.LineCount)
+        if (line >= _tokenCache.LineCount)
         {
             return null;
         }
-        List<TokenCache.Token> list = _tokenCache.GetLineTokens(value2);
-        ColorSpan[] array = new ColorSpan[list.Count];
-        for (int num = 0; num < list.Count; num++)
+        List<TokenCache.Token> list = _tokenCache.GetLineTokens(line);
+        ColorSpan[] colorSpans = new ColorSpan[list.Count];
+        for (int listIndex = 0; listIndex < list.Count; listIndex++)
         {
-            array[num].Start = list[num].Start;
-            array[num].End = list[num].End;
+            colorSpans[listIndex].Start = list[listIndex].Start;
+            colorSpans[listIndex].End = list[listIndex].End;
             if (TokenBrushes == null || TokenBrushes.Length == 0)
             {
-                array[num].Foreground = _defaultColors[0].Foreground;
+                colorSpans[listIndex].Foreground = _defaultColors[0].Foreground;
             }
             else
             {
-                array[num].Foreground = ((list[num].Type >= TokenBrushes.Length) ? TokenBrushes[0] : TokenBrushes[list[num].Type]);
+                colorSpans[listIndex].Foreground = ((list[listIndex].Type >= TokenBrushes.Length) ? TokenBrushes[0] : TokenBrushes[list[listIndex].Type]);
             }
         }
-        return array;
+        return colorSpans;
     }
 
-    protected override void OnLineChanged(int value2, int value3, int value4, int value5)
+    protected override void OnLineChanged(int line, int column, int addedLength, int removedLength)
     {
         DateTime now = DateTime.Now;
-        int num = _tokenCache.RetokenizeLine(value2, Tokenizing);
+        int linesRetokenized = _tokenCache.RetokenizeLine(line, Tokenizing);
         Value = (DateTime.Now - now).TotalMilliseconds;
-        if (num > 1)
+        if (linesRetokenized > 1)
         {
-            InvalidateLines(value2, value2 + num - 1);
+            InvalidateLines(line, line + linesRetokenized - 1);
         }
-        base.OnLineChanged(value2, value3, value4, value5);
+        base.OnLineChanged(line, column, addedLength, removedLength);
         CancelHover();
     }
 
-    protected override void OnRangeChanged(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, TextDocument.TextPosition textPosition3)
+    protected override void OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
-        int num = textPosition.Line;
-        int num2 = textPosition2.Line - textPosition.Line;
-        int num3 = textPosition3.Line - textPosition.Line;
-        if (textPosition.Column == 0 && textPosition2 == textPosition && textPosition3.Line == textPosition.Line + 1 && textPosition3.Column == 0 && num > 0)
+        int changeStartLine = start.Line;
+        int removedLineCount = oldEnd.Line - start.Line;
+        int addedLineCount = newEnd.Line - start.Line;
+        if (start.Column == 0 && oldEnd == start && newEnd.Line == start.Line + 1 && newEnd.Column == 0 && changeStartLine > 0)
         {
-            num--;
+            changeStartLine--;
         }
-        if (textPosition.Column == 0 && textPosition3 == textPosition && textPosition2.Line == textPosition.Line + 1 && textPosition2.Column == 0 && num > 0)
+        if (start.Column == 0 && newEnd == start && oldEnd.Line == start.Line + 1 && oldEnd.Column == 0 && changeStartLine > 0)
         {
-            num--;
+            changeStartLine--;
         }
-        _inlineMessageProvider.ShiftLines(num, num2, num3);
+        _inlineMessageProvider.ShiftLines(changeStartLine, removedLineCount, addedLineCount);
         DateTime now = DateTime.Now;
-        _tokenCache.OnLinesChanged(num, num2, num3, Tokenizing);
+        _tokenCache.OnLinesChanged(changeStartLine, removedLineCount, addedLineCount, Tokenizing);
         Value = (DateTime.Now - now).TotalMilliseconds;
-        _foldingManager.RemoveStaleRegions(num, num2, num3, out var flag);
-        base.OnRangeChanged(textPosition, textPosition2, textPosition3);
-        if (flag)
+        _foldingManager.RemoveStaleRegions(changeStartLine, removedLineCount, addedLineCount, out var staleRegionsRemoved);
+        base.OnRangeChanged(start, oldEnd, newEnd);
+        if (staleRegionsRemoved)
         {
             UpdateLayout();
         }
@@ -274,12 +274,12 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
     }
 
-    protected override void OnSelectionChanged(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, bool flag, SelectionChangeSource selectionChangeSource)
+    protected override void OnSelectionChanged(TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool hasSelection, SelectionChangeSource selectionChangeSource)
     {
         CancelHover();
-        if (!flag)
+        if (!hasSelection)
         {
-            TokenCache.Token token = _tokenCache.FindNearestToken(textPosition2.Line, textPosition2.Column);
+            TokenCache.Token token = _tokenCache.FindNearestToken(currentCaret.Line, currentCaret.Column);
             if (token == null || token.Kind != TokenCache.Token.TokenKind.Paired || CaretPosition.Line != token.LineNumber || CaretPosition.Column != token.End)
             {
                 RemoveHighlight(_pairHighlightId);
@@ -288,15 +288,15 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             else
             {
                 string text = base.EditableDocument.GetLineText(token.LineNumber);
-                string text2 = "";
+                string tokenText = "";
                 if (token.End <= text.Length)
                 {
-                    text2 = text.Substring(token.Start, token.End - token.Start);
+                    tokenText = text.Substring(token.Start, token.End - token.Start);
                 }
-                if (text2.Length >= 1)
+                if (tokenText.Length >= 1)
                 {
                     HighlightStyle highlightStyle;
-                    switch (text2[0])
+                    switch (tokenText[0])
                     {
                         case '(':
                         case ')':
@@ -318,34 +318,34 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
                             highlightStyle = DefaultPairHighlightStyle;
                             break;
                     }
-                    TextDocument.TextPosition textPosition3;
-                    TextDocument.TextPosition textPosition4;
+                    TextDocument.TextPosition pairStart;
+                    TextDocument.TextPosition pairEnd;
                     if (token.Partner == null)
                     {
                         highlightStyle = UnpairedHighlightStyle;
-                        textPosition3 = token.StartPosition;
-                        textPosition4 = token.EndPosition;
-                        if (textPosition3 < textPosition4)
+                        pairStart = token.StartPosition;
+                        pairEnd = token.EndPosition;
+                        if (pairStart < pairEnd)
                         {
-                            textPosition4 = token.StartPosition;
-                            textPosition3 = token.EndPosition;
+                            pairEnd = token.StartPosition;
+                            pairStart = token.EndPosition;
                         }
                     }
                     else if (token.StartPosition < token.Partner.StartPosition)
                     {
-                        textPosition3 = token.StartPosition;
-                        textPosition4 = token.Partner.EndPosition;
+                        pairStart = token.StartPosition;
+                        pairEnd = token.Partner.EndPosition;
                     }
                     else
                     {
-                        textPosition3 = token.Partner.StartPosition;
-                        textPosition4 = token.EndPosition;
+                        pairStart = token.Partner.StartPosition;
+                        pairEnd = token.EndPosition;
                     }
-                    _pairHighlightId = SetHighlight(_pairHighlightId, textPosition3, textPosition4, highlightStyle);
+                    _pairHighlightId = SetHighlight(_pairHighlightId, pairStart, pairEnd, highlightStyle);
                 }
             }
         }
-        base.OnSelectionChanged(textPosition, textPosition2, flag, selectionChangeSource);
+        base.OnSelectionChanged(previousCaret, currentCaret, hasSelection, selectionChangeSource);
     }
 
     public void ClearMessages()
@@ -355,9 +355,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         UpdateLayout();
     }
 
-    public void AddMessage(int value2, InlineMessageProvider.MessageSeverity messageSeverity, string text, int value3)
+    public void AddMessage(int line, InlineMessageProvider.MessageSeverity messageSeverity, string text, int column)
     {
-        _inlineMessageProvider.AddMessage(value2 - 1, messageSeverity, text, value3);
+        _inlineMessageProvider.AddMessage(line - 1, messageSeverity, text, column);
     }
 
     public void RefreshMessages()
@@ -366,19 +366,19 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         UpdateLayout();
     }
 
-    public void GoToPosition(int value2, int value3)
+    public void GoToPosition(int line, int column)
     {
-        if (value3 < 0)
+        if (column < 0)
         {
-            value3 = 0;
+            column = 0;
         }
-        value2 = _inlineMessageProvider.GetCurrentLine(value2);
-        if (_foldingManager.ExpandAt(value2, value3))
+        line = _inlineMessageProvider.GetCurrentLine(line);
+        if (_foldingManager.ExpandAt(line, column))
         {
             RebuildDisplayRows();
             Redraw();
         }
-        SetCaret(new TextDocument.TextPosition(value3, value2));
+        SetCaret(new TextDocument.TextPosition(column, line));
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -447,7 +447,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         CancelHover();
     }
 
-    public void ShowSignatureHint(ISignatureInfo signatureInfo, int value2, string text)
+    public void ShowSignatureHint(ISignatureInfo signatureInfo, int parameterIndex, string text)
     {
         HideSignatureHint();
         _signatureHintController = new SignatureHintController(this);
@@ -457,7 +457,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         {
             control = this;
         }
-        _signatureHintController.Show(signatureInfo, value2, (text == null) ? null : ("Press TAB to " + text), control);
+        _signatureHintController.Show(signatureInfo, parameterIndex, (text == null) ? null : ("Press TAB to " + text), control);
         Focus();
         _suppressHintClose = false;
     }
@@ -514,9 +514,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     {
         if (e.KeyChar == '\t' && _tabHandler != null)
         {
-            bool flag = false;
-            _tabHandler(ref flag);
-            if (flag)
+            bool popupActive = false;
+            _tabHandler(ref popupActive);
+            if (popupActive)
             {
                 return;
             }
@@ -543,20 +543,20 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         return base.EditableDocument.GetLineText(token.LineNumber).Substring(token.Start, token.End - token.Start);
     }
 
-    public void SetPopupActive(bool flag)
+    public void SetPopupActive(bool active)
     {
-        ShowCaretWhenUnfocused = flag;
-        if (!flag)
+        ShowCaretWhenUnfocused = active;
+        if (!active)
         {
             Focus();
         }
     }
 
-    public void SetActiveParameter(int value2)
+    public void SetActiveParameter(int parameterIndex)
     {
         if (IsSignatureHintVisible)
         {
-            _signatureHintController.SetActiveParameter(value2);
+            _signatureHintController.SetActiveParameter(parameterIndex);
         }
     }
 
@@ -565,11 +565,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         codeTemplate.Insert(this, CaretPosition);
     }
 
-    internal virtual void RaisePlaceholderChanged(int value2, int value3, int value4, object obj, bool flag)
+    internal virtual void RaisePlaceholderChanged(int line, int startColumn, int endColumn, object tag, bool isLast)
     {
         if (PlaceholderChanged != null)
         {
-            PlaceholderChanged(this, value2, value3, value4, obj, flag);
+            PlaceholderChanged(this, line, startColumn, endColumn, tag, isLast);
         }
     }
 
@@ -667,32 +667,32 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     {
         foreach (FoldedLineInfo foldedLineInfo in items)
         {
-            int num2 = foldedLineInfo.Line;
-            if (num2 >= _tokenCache.LineCount || _tokenCache.Document.GetLineText(num2) != foldedLineInfo.Text)
+            int foldedLine = foldedLineInfo.Line;
+            if (foldedLine >= _tokenCache.LineCount || _tokenCache.Document.GetLineText(foldedLine) != foldedLineInfo.Text)
             {
-                int num3 = -1;
-                bool flag = false;
-                for (int num4 = 0; num4 < _tokenCache.Document.LineCount; num4++)
+                int matchIndex = -1;
+                bool foundMatch = false;
+                for (int documentLine = 0; documentLine < _tokenCache.Document.LineCount; documentLine++)
                 {
-                    if (_tokenCache.Document.GetLineText(num4) == foldedLineInfo.Text)
+                    if (_tokenCache.Document.GetLineText(documentLine) == foldedLineInfo.Text)
                     {
-                        if (num3 != -1)
+                        if (matchIndex != -1)
                         {
-                            flag = true;
+                            foundMatch = true;
                             break;
                         }
-                        num3 = num4;
+                        matchIndex = documentLine;
                     }
                 }
-                if (flag)
+                if (foundMatch)
                 {
                     continue;
                 }
-                num2 = num3;
+                foldedLine = matchIndex;
             }
-            if (num2 != -1)
+            if (foldedLine != -1)
             {
-                _foldingManager.CollapseLine(num2, this);
+                _foldingManager.CollapseLine(foldedLine, this);
             }
         }
         UpdateLayout();
@@ -766,8 +766,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
     }
 
-    public int GetLineLength(int value2)
+    public int GetLineLength(int line)
     {
-        return base.EditableDocument.GetLineLengthWithTerminator(value2);
+        return base.EditableDocument.GetLineLengthWithTerminator(line);
     }
 }

@@ -15,14 +15,14 @@ public partial class DpiAwareControl : UserControl
     public AutoScaleMode CurrentAutoScaleMode => AutoScaleMode;
 
     public DpiAwareControl()
-        : this(flag: false)
+        : this(scaleOnCreate: false)
     {
     }
 
-    public DpiAwareControl(bool flag)
+    public DpiAwareControl(bool scaleOnCreate)
     {
         InitializeComponent();
-        _scaleOnCreate = flag;
+        _scaleOnCreate = scaleOnCreate;
         if (AutoScaleMode != AutoScaleMode.None)
         {
             AutoScaleMode = AutoScaleMode.None;
@@ -54,12 +54,12 @@ public partial class DpiAwareControl : UserControl
             return;
         }
         DpiAwareForm dpiAwareForm = null;
-        bool flag = false;
+        bool inWinFormsAdapter = false;
         for (Control control = Parent; control != null; control = control.Parent)
         {
             if (control?.GetType()?.Name == "WinFormsAdapter")
             {
-                flag = true;
+                inWinFormsAdapter = true;
             }
             if (control is DpiAwareForm)
             {
@@ -67,7 +67,7 @@ public partial class DpiAwareControl : UserControl
                 break;
             }
         }
-        if (((dpiAwareForm != null && dpiAwareForm.IsScaled) || _scaleOnCreate) | flag)
+        if (((dpiAwareForm != null && dpiAwareForm.IsScaled) || _scaleOnCreate) | inWinFormsAdapter)
         {
             ApplyScaling();
         }

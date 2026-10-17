@@ -64,22 +64,22 @@ public partial class FileListControl : UserControl, IComponentConnector
         try
         {
             _SelDepth++;
-            bool flag = false;
-            bool flag2 = false;
+            bool directorySelectionChanged = false;
+            bool fileSelectionChanged = false;
             foreach (FileExplorer.ItemWrapper item in ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>())
             {
                 if (item.Entry.IsDirectory)
                 {
-                    flag = true;
+                    directorySelectionChanged = true;
                 }
                 else
                 {
-                    flag2 = true;
+                    fileSelectionChanged = true;
                 }
             }
-            cmdDownload.Visibility = ((!flag2) ? Visibility.Collapsed : Visibility.Visible);
-            cmdEdit.Visibility = ((!flag2) ? Visibility.Collapsed : Visibility.Visible);
-            cmdNavigate.Visibility = ((!flag) ? Visibility.Collapsed : Visibility.Visible);
+            cmdDownload.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
+            cmdEdit.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
+            cmdNavigate.Visibility = ((!directorySelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             if (((ListBox)TransferList).SelectedItems.Count == 0 && ((CollectionView)TransferList.Items).Count > 0 && _SelDepth < 5)
             {
                 ((Selector)TransferList).SelectedItem = TransferList.Items[0];
@@ -135,8 +135,8 @@ public partial class FileListControl : UserControl, IComponentConnector
     {
         try
         {
-            FileExplorer.ItemWrapper[] array = ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>().ToArray();
-            foreach (FileExplorer.ItemWrapper itemWrapper in array)
+            FileExplorer.ItemWrapper[] items = ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>().ToArray();
+            foreach (FileExplorer.ItemWrapper itemWrapper in items)
             {
                 if (itemWrapper.Entry.IsDirectory)
                 {
@@ -152,9 +152,9 @@ public partial class FileListControl : UserControl, IComponentConnector
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -181,12 +181,12 @@ public partial class FileListControl : UserControl, IComponentConnector
     {
         try
         {
-            double num = Math.Ceiling((from val in ((IEnumerable)toolBar.Items).OfType<FrameworkElement>()
+            double value = Math.Ceiling((from val in ((IEnumerable)toolBar.Items).OfType<FrameworkElement>()
                                        where (object)val != txtFilter
                                        select val).Sum((FrameworkElement frameworkElement) => frameworkElement.ActualWidth));
-            if (num != 0.0)
+            if (value != 0.0)
             {
-                txtFilter.Width = toolBar.ActualWidth - num - 32.0;
+                txtFilter.Width = toolBar.ActualWidth - value - 32.0;
             }
         }
         catch
@@ -207,18 +207,18 @@ public partial class FileListControl : UserControl, IComponentConnector
     private void ContentControl_IsEnabledChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         object newValue = e.NewValue;
-        bool flag = false;
-        int num;
+        bool isEnabled = false;
+        int value;
         if (newValue is bool)
         {
-            flag = (bool)newValue;
-            num = 1;
+            isEnabled = (bool)newValue;
+            value = 1;
         }
         else
         {
-            num = 0;
+            value = 0;
         }
-        if (((uint)num & (flag ? 1u : 0u)) != 0)
+        if (((uint)value & (isEnabled ? 1u : 0u)) != 0)
         {
             FocusFirstItem();
         }

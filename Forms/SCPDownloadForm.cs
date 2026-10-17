@@ -44,12 +44,12 @@ public partial class SCPDownloadForm : DpiAwareForm
         }
     }
 
-    public SCPDownloadForm(RemoteCommandStarter callback, string text, bool flag = false)
+    public SCPDownloadForm(RemoteCommandStarter callback, string text, bool showCheckBox = false)
     {
         InitializeComponent();
         _remoteFileDialog.CommandRequested += callback;
         _initialDirectory = text;
-        checkBox1.Visible = flag;
+        checkBox1.Visible = showCheckBox;
     }
 
     private void bntBrowse_Click(object sender, EventArgs e)

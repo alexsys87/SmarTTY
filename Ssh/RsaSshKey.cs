@@ -73,13 +73,13 @@ public class RsaSshKey : SshKeyEncoding, ISshKeyPair
         {
             return new RSACryptoServiceProvider(keySize, cspParameters);
         }
-        catch (CryptographicException ex)
+        catch (CryptographicException exception)
         {
-            if (Marshal.GetHRForException(ex) == -2146893802 && !create)
+            if (Marshal.GetHRForException(exception) == -2146893802 && !create)
             {
                 return null;
             }
-            throw new CryptoContainerCorruptException(ex);
+            throw new CryptoContainerCorruptException(exception);
         }
         catch
         {
@@ -138,11 +138,11 @@ public class RsaSshKey : SshKeyEncoding, ISshKeyPair
         WriteDerInteger(body, parameters.DP);
         WriteDerInteger(body, parameters.DQ);
         WriteDerInteger(body, parameters.InverseQ);
-        using MemoryStream result = new MemoryStream();
-        result.WriteByte(0x30);
-        WriteDerLength(result, (int)body.Length);
-        body.WriteTo(result);
-        return result.ToArray();
+        using MemoryStream derStream = new MemoryStream();
+        derStream.WriteByte(0x30);
+        WriteDerLength(derStream, (int)body.Length);
+        body.WriteTo(derStream);
+        return derStream.ToArray();
     }
 
     // Writes an unsigned big-endian value as a minimal DER INTEGER.

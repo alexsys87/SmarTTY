@@ -69,7 +69,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             _scrollBar = scrollBar;
             scrollBar.Cursor = Cursors.Arrow;
-            scrollBar.ValueChanged += (object obj, EventArgs e) =>
+            scrollBar.ValueChanged += (object sender, EventArgs e) =>
             {
                 ValueChanged?.Invoke(this, e);
             };
@@ -105,10 +105,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             }
         }
 
-        public LineRange(int value2, int value3)
+        public LineRange(int start, int end)
         {
-            First = value2;
-            Last = value3;
+            First = start;
+            Last = end;
         }
     }
 
@@ -165,11 +165,11 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         PageDown
     }
 
-    public struct ColorSpan(int value2, int value3, Brush brush)
+    public struct ColorSpan(int start, int end, Brush brush)
     {
-        public int Start = value2;
+        public int Start = start;
 
-        public int End = value3;
+        public int End = end;
 
         public Brush Foreground = brush;
 
@@ -211,28 +211,28 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             _text = null;
         }
 
-        public void Append(Graphics graphics, Font font, string text, float value2, float value3, int value4, Brush brush, Brush brush2, StringFormat stringFormat, SizeF sizeF)
+        public void Append(Graphics graphics, Font font, string text, float x, float y, int index, Brush foregroundBrush, Brush backgroundBrush, StringFormat stringFormat, SizeF sizeF)
         {
-            if (this._lastIndex != value4 || this._y != value3 || this._foreground != brush || this._stringFormat != stringFormat || _background != brush2)
+            if (this._lastIndex != index || this._y != y || this._foreground != foregroundBrush || this._stringFormat != stringFormat || _background != backgroundBrush)
             {
                 this.FlushPending(graphics);
             }
             if (this._text == null)
             {
                 this._text = text;
-                this._x = value2;
+                this._x = x;
             }
             else
             {
                 this._text += text;
             }
             this._charSize = sizeF;
-            this._lastIndex = value4 + 1;
-            this._y = value3;
-            this._foreground = brush;
+            this._lastIndex = index + 1;
+            this._y = y;
+            this._foreground = foregroundBrush;
             this._font = font;
             this._stringFormat = stringFormat;
-            _background = brush2;
+            _background = backgroundBrush;
         }
 
         public void Flush(Graphics graphics)
@@ -249,10 +249,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
         public HighlightStyle Style;
 
-        public Highlight(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, HighlightStyle highlightStyle)
+        public Highlight(TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle)
         {
-            this.Start = textPosition;
-            this.End = textPosition2;
+            this.Start = start;
+            this.End = end;
             this.Style = highlightStyle;
         }
     }
@@ -277,7 +277,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public interface IVirtualLine
     {
-        void Draw(Graphics graphics, ReadonlyTextBrowser readonlyTextBrowser, int value2, int value3, int value4, Rectangle rectangle, SizeF sizeF);
+        void Draw(Graphics graphics, ReadonlyTextBrowser readonlyTextBrowser, int row, int firstColumn, int line, Rectangle rectangle, SizeF sizeF);
     }
 
     public interface ILineDecorator
@@ -295,17 +295,17 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
         int GetTotalHiddenLines();
 
-        int GetNextSpecialLine(int value2);
+        int GetNextSpecialLine(int line);
 
-        int GetVirtualRowCount(int value2);
+        int GetVirtualRowCount(int line);
 
-        void GetVirtualLines(int value2, List<IVirtualLine> list);
+        void GetVirtualLines(int line, List<IVirtualLine> list);
 
-        int GetHiddenLineCount(int value2);
+        int GetHiddenLineCount(int line);
 
-        ILineDecorator GetDecorator(int value2);
+        ILineDecorator GetDecorator(int line);
 
-        bool OnCaretMoved(int value2, int value3);
+        bool OnCaretMoved(int line, int column);
     }
 
     private class CompositeVirtualLineProvider : IVirtualLineProvider
@@ -319,71 +319,71 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
         public int GetTotalVirtualRows()
         {
-            int num = 0;
-            for (int num2 = 0; num2 < _providers.Count; num2++)
+            int totalRows = 0;
+            for (int providerIndex = 0; providerIndex < _providers.Count; providerIndex++)
             {
-                num += _providers[num2].GetTotalVirtualRows();
+                totalRows += _providers[providerIndex].GetTotalVirtualRows();
             }
-            return num;
+            return totalRows;
         }
 
         public int GetTotalHiddenLines()
         {
-            int num = 0;
-            for (int num2 = 0; num2 < _providers.Count; num2++)
+            int totalLines = 0;
+            for (int providerIndex = 0; providerIndex < _providers.Count; providerIndex++)
             {
-                num += _providers[num2].GetTotalHiddenLines();
+                totalLines += _providers[providerIndex].GetTotalHiddenLines();
             }
-            return num;
+            return totalLines;
         }
 
-        public int GetNextSpecialLine(int value2)
+        public int GetNextSpecialLine(int line)
         {
-            int num = int.MaxValue;
-            for (int num2 = 0; num2 < this._providers.Count; num2++)
+            int nextLine = int.MaxValue;
+            for (int providerIndex = 0; providerIndex < this._providers.Count; providerIndex++)
             {
-                int num3 = this._providers[num2].GetNextSpecialLine(value2);
-                if (num3 < num)
+                int providerLine = this._providers[providerIndex].GetNextSpecialLine(line);
+                if (providerLine < nextLine)
                 {
-                    num = num3;
+                    nextLine = providerLine;
                 }
             }
-            return num;
+            return nextLine;
         }
 
-        public int GetVirtualRowCount(int value2)
+        public int GetVirtualRowCount(int line)
         {
-            int num = 0;
-            for (int num2 = 0; num2 < this._providers.Count; num2++)
+            int totalRows = 0;
+            for (int providerIndex = 0; providerIndex < this._providers.Count; providerIndex++)
             {
-                num += this._providers[num2].GetVirtualRowCount(value2);
+                totalRows += this._providers[providerIndex].GetVirtualRowCount(line);
             }
-            return num;
+            return totalRows;
         }
 
-        public void GetVirtualLines(int value2, List<IVirtualLine> list)
+        public void GetVirtualLines(int line, List<IVirtualLine> list)
         {
-            for (int num = 0; num < this._providers.Count; num++)
+            for (int providerIndex = 0; providerIndex < this._providers.Count; providerIndex++)
             {
-                this._providers[num].GetVirtualLines(value2, list);
+                this._providers[providerIndex].GetVirtualLines(line, list);
             }
         }
 
-        public int GetHiddenLineCount(int value2)
+        public int GetHiddenLineCount(int line)
         {
-            int num = 0;
-            for (int num2 = 0; num2 < this._providers.Count; num2++)
+            int totalLines = 0;
+            for (int providerIndex = 0; providerIndex < this._providers.Count; providerIndex++)
             {
-                num += this._providers[num2].GetHiddenLineCount(value2);
+                totalLines += this._providers[providerIndex].GetHiddenLineCount(line);
             }
-            return num;
+            return totalLines;
         }
 
-        public ILineDecorator GetDecorator(int value2)
+        public ILineDecorator GetDecorator(int line)
         {
-            for (int num = 0; num < this._providers.Count; num++)
+            for (int providerIndex = 0; providerIndex < this._providers.Count; providerIndex++)
             {
-                ILineDecorator lineDecorator = this._providers[num].GetDecorator(value2);
+                ILineDecorator lineDecorator = this._providers[providerIndex].GetDecorator(line);
                 if (lineDecorator != null)
                 {
                     return lineDecorator;
@@ -392,21 +392,21 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             return null;
         }
 
-        public bool OnCaretMoved(int value2, int value3)
+        public bool OnCaretMoved(int line, int column)
         {
-            bool result = false;
+            bool caretMoved = false;
             foreach (IVirtualLineProvider item in this._providers)
             {
-                if (item.OnCaretMoved(value2, value3))
+                if (item.OnCaretMoved(line, column))
                 {
-                    result = true;
+                    caretMoved = true;
                 }
             }
-            return result;
+            return caretMoved;
         }
     }
 
-    public delegate void SelectionChangedHandler(ReadonlyTextBrowser readonlyTextBrowser, TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, bool flag);
+    public delegate void SelectionChangedHandler(ReadonlyTextBrowser readonlyTextBrowser, TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool hasSelection);
 
     public enum SelectionChangeSource
     {
@@ -414,7 +414,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         Programmatic
     }
 
-    public delegate void CtrlTabHandler(ReadonlyTextBrowser readonlyTextBrowser, bool flag);
+    public delegate void CtrlTabHandler(ReadonlyTextBrowser readonlyTextBrowser, bool shift);
 
     public enum FindSelectMode
     {
@@ -550,7 +550,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public Brush Brush = new SolidBrush(SystemColors.ButtonFace);
 
-    public Brush Brush2 = Brushes.DarkGray;
+    public Brush LineNumberForegroundBrush = Brushes.DarkGray;
 
     public int LineHeight => (int)Math.Ceiling(_charSize.Height);
 
@@ -636,8 +636,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
         set
         {
-            bool flag = (_caret.UnderlineStyle = value);
-            _terminalMode = flag;
+            bool isUnderline = (_caret.UnderlineStyle = value);
+            _terminalMode = isUnderline;
         }
     }
 
@@ -954,18 +954,18 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private TextDocument.TextPosition NormalizePosition(TextDocument.TextPosition textPosition)
     {
-        int num = LineToRow(textPosition.Line);
-        if (num == -1)
+        int row = LineToRow(textPosition.Line);
+        if (row == -1)
         {
             return textPosition;
         }
-        if (_displayRows[num].VirtualLine != null)
+        if (_displayRows[row].VirtualLine != null)
         {
-            textPosition.Line = _displayRows[num].Line;
+            textPosition.Line = _displayRows[row].Line;
         }
-        if (_displayRows[num].Decorator != null)
+        if (_displayRows[row].Decorator != null)
         {
-            textPosition = _displayRows[num].Decorator.MapPosition(_document.GetLineText(textPosition.Line), textPosition);
+            textPosition = _displayRows[row].Decorator.MapPosition(_document.GetLineText(textPosition.Line), textPosition);
         }
         string text = _document.GetLineText(textPosition.Line);
         if (textPosition.Column > text.Length)
@@ -993,55 +993,55 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             {
                 UpdateLayout();
             }
-            TextDocument.TextPosition textPosition2 = _caretPosition;
+            TextDocument.TextPosition previousCaret = _caretPosition;
             _caretPosition = NormalizePosition(textPosition);
-            OnSelectionChanged(textPosition2, _caretPosition, _hasSelection, selectionChangeSource);
+            OnSelectionChanged(previousCaret, _caretPosition, _hasSelection, selectionChangeSource);
             EnsureCaretVisible(_caretPosition);
             UpdateCaret();
             _forceCaretUpdate = false;
         }
     }
 
-    public void SetSelection(bool flag, TextDocument.TextPosition textPosition)
+    public void SetSelection(bool select, TextDocument.TextPosition textPosition)
     {
-        SetSelectionCore(flag, textPosition, SelectionChangeSource.Programmatic);
+        SetSelectionCore(select, textPosition, SelectionChangeSource.Programmatic);
     }
 
-    protected void SetSelectionCore(bool flag2, TextDocument.TextPosition textPosition, SelectionChangeSource selectionChangeSource)
+    protected void SetSelectionCore(bool select, TextDocument.TextPosition textPosition, SelectionChangeSource selectionChangeSource)
     {
-        bool flag = false;
-        TextDocument.TextPosition textPosition2 = _caretPosition;
-        if (_hasSelection != flag2)
+        bool selectionChanged = false;
+        TextDocument.TextPosition previousCaret = _caretPosition;
+        if (_hasSelection != select)
         {
-            flag = true;
-            _hasSelection = flag2;
+            selectionChanged = true;
+            _hasSelection = select;
         }
         if (_selectionStart != textPosition)
         {
             _selectionStart = textPosition;
             OnSelectionStartChanged();
-            flag = true;
+            selectionChanged = true;
         }
-        if (flag)
+        if (selectionChanged)
         {
             Redraw();
-            OnSelectionChanged(textPosition2, _caretPosition, _hasSelection, selectionChangeSource);
+            OnSelectionChanged(previousCaret, _caretPosition, _hasSelection, selectionChangeSource);
         }
     }
 
-    protected void SetCaretColumn(int value2)
+    protected void SetCaretColumn(int column)
     {
         TextDocument.TextPosition textPosition = _caretPosition;
-        _caretPosition.Column = value2;
+        _caretPosition.Column = column;
         _caretPosition = NormalizePosition(_caretPosition);
         EnsureCaretVisible(_caretPosition);
         OnSelectionChanged(textPosition, _caretPosition, _hasSelection, SelectionChangeSource.Programmatic);
         UpdateCaret();
     }
 
-    private int Round(float value2)
+    private int Round(float number)
     {
-        return (int)Math.Round(value2);
+        return (int)Math.Round(number);
     }
 
     [DllImport("user32.dll")]
@@ -1077,18 +1077,18 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
-    protected void UpdateMaxLineWidth(int value2)
+    protected void UpdateMaxLineWidth(int line)
     {
-        if (value2 == -1)
+        if (line == -1)
         {
             _maxLineWidth = -1;
         }
         else if (_maxLineWidth != -1)
         {
-            int num = _document.IndexToColumn(value2, _document.GetLineText(value2).Length - 1, TabSize);
-            if (num > _maxLineWidth)
+            int lineLength = _document.IndexToColumn(line, _document.GetLineText(line).Length - 1, TabSize);
+            if (lineLength > _maxLineWidth)
             {
-                _maxLineWidth = num;
+                _maxLineWidth = lineLength;
             }
         }
     }
@@ -1128,34 +1128,34 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 _metricsCache.Width = Width;
             }
             _charSize = _metricsCache.CharSize;
-            int num = 0;
+            int marginRight = 0;
             if (!_hideMargins && _margins.Count > 0)
             {
                 if (graphics == null)
                 {
                     graphics = Graphics.FromHwnd(Handle);
                 }
-                for (int num2 = 0; num2 < _margins.Count; num2++)
+                for (int marginIndex = 0; marginIndex < _margins.Count; marginIndex++)
                 {
-                    _margins[num2].Left = num;
-                    _margins[num2].Right = _margins[num2].Left + _margins[num2].Margin.MeasureWidth(this, graphics, _document.LineCount);
-                    num = _margins[num2].Right;
+                    _margins[marginIndex].Left = marginRight;
+                    _margins[marginIndex].Right = _margins[marginIndex].Left + _margins[marginIndex].Margin.MeasureWidth(this, graphics, _document.LineCount);
+                    marginRight = _margins[marginIndex].Right;
                 }
             }
-            int num3 = (_verticalScrollBar.Visible ? _verticalScrollBar.Width : 0);
-            int num4 = (_horizontalScrollBar.Visible ? _horizontalScrollBar.Height : 0);
-            int num5 = ((!NoLeftPadding) ? _leftPadding : 0);
+            int scrollBarWidth = (_verticalScrollBar.Visible ? _verticalScrollBar.Width : 0);
+            int scrollBarHeight = (_horizontalScrollBar.Visible ? _horizontalScrollBar.Height : 0);
+            int leftPadding = ((!NoLeftPadding) ? _leftPadding : 0);
             if (_singleLine)
             {
-                int num6 = (int)((float)(ClientRectangle.Height - num4) - _charSize.Height) / 2;
-                _textArea = new Rectangle(ClientRectangle.Left + num + num5, ClientRectangle.Top + num6, ClientRectangle.Width - (num3 + num + num5), (int)_charSize.Height);
+                int verticalCenter = (int)((float)(ClientRectangle.Height - scrollBarHeight) - _charSize.Height) / 2;
+                _textArea = new Rectangle(ClientRectangle.Left + marginRight + leftPadding, ClientRectangle.Top + verticalCenter, ClientRectangle.Width - (scrollBarWidth + marginRight + leftPadding), (int)_charSize.Height);
             }
             else
             {
-                _textArea = new Rectangle(ClientRectangle.Left + num + num5, ClientRectangle.Top, ClientRectangle.Width - (num3 + num + num5), ClientRectangle.Height - num4);
+                _textArea = new Rectangle(ClientRectangle.Left + marginRight + leftPadding, ClientRectangle.Top, ClientRectangle.Width - (scrollBarWidth + marginRight + leftPadding), ClientRectangle.Height - scrollBarHeight);
             }
-            int num7 = _visibleRows;
-            int num8 = _visibleColumns;
+            int previousVisibleRows = _visibleRows;
+            int previousVisibleColumns = _visibleColumns;
             if (_allowPartialRows)
             {
                 _visibleColumns = (int)Math.Ceiling((float)_textArea.Width / _charSize.Width);
@@ -1174,28 +1174,28 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             {
                 _visibleRows = 1;
             }
-            if (_visibleRows != num7 || _visibleColumns != num8)
+            if (_visibleRows != previousVisibleRows || _visibleColumns != previousVisibleColumns)
             {
                 AddRef();
             }
-            int num9 = _document.LineCount;
+            int lineCount = _document.LineCount;
             if (_virtualLines != null)
             {
-                num9 += _virtualLines.GetTotalVirtualRows() - _virtualLines.GetTotalHiddenLines();
+                lineCount += _virtualLines.GetTotalVirtualRows() - _virtualLines.GetTotalHiddenLines();
             }
-            if (num9 < 0)
+            if (lineCount < 0)
             {
-                num9 = 0;
+                lineCount = 0;
             }
-            if (_singleLine && num9 > 1)
+            if (_singleLine && lineCount > 1)
             {
-                num9 = 1;
+                lineCount = 1;
             }
             if (NativeScrollSemantics)
             {
                 _verticalScrollBar.Limits = new ScrollLimits
                 {
-                    Maximum = Math.Max(num9, 0),
+                    Maximum = Math.Max(lineCount, 0),
                     LargeChange = _visibleRows
                 };
                 _horizontalScrollBar.Limits = new ScrollLimits
@@ -1208,7 +1208,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             {
                 _verticalScrollBar.Limits = new ScrollLimits
                 {
-                    Maximum = Math.Max(num9 - _visibleRows + 1, 0),
+                    Maximum = Math.Max(lineCount - _visibleRows + 1, 0),
                     LargeChange = _visibleRows
                 };
                 _horizontalScrollBar.Limits = new ScrollLimits
@@ -1217,18 +1217,18 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     LargeChange = _visibleColumns
                 };
             }
-            int num10 = _maxLineWidth - _visibleColumns + 2;
-            if (num10 < 0)
+            int horizontalScrollRange = _maxLineWidth - _visibleColumns + 2;
+            if (horizontalScrollRange < 0)
             {
-                num10 = 0;
+                horizontalScrollRange = 0;
             }
-            ScrollColumn = Math.Min(ScrollColumn, num10);
-            int num11 = _document.LineCount - _visibleRows + 2;
-            if (num11 < 0)
+            ScrollColumn = Math.Min(ScrollColumn, horizontalScrollRange);
+            int verticalScrollRange = _document.LineCount - _visibleRows + 2;
+            if (verticalScrollRange < 0)
             {
-                num11 = 0;
+                verticalScrollRange = 0;
             }
-            ScrollLine = Math.Min(ScrollLine, num11);
+            ScrollLine = Math.Min(ScrollLine, verticalScrollRange);
             UpdateCaret();
             RebuildDisplayRows();
         }
@@ -1248,7 +1248,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             return;
         }
-        if (!TryGetCaretColumn(CaretPosition, out var num))
+        if (!TryGetCaretColumn(CaretPosition, out var caretColumn))
         {
             _caret.Disable();
             return;
@@ -1283,7 +1283,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 }
             }
         }
-        Point point = Point.Round(PositionToPoint(num, CaretPosition.Line));
+        Point point = Point.Round(PositionToPoint(caretColumn, CaretPosition.Line));
         point.Offset(dx, 0);
         _caret.SetPosition(point);
         if (!_caretHidden)
@@ -1292,227 +1292,227 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
-    protected bool TryGetCaretColumn(TextDocument.TextPosition textPosition, out int value2)
+    protected bool TryGetCaretColumn(TextDocument.TextPosition textPosition, out int column)
     {
-        value2 = 0;
+        column = 0;
         if (textPosition.Line < _firstVisibleLine || textPosition.Line > _lastVisibleLine)
         {
             return false;
         }
-        value2 = _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize);
-        if (value2 < ScrollColumn || value2 >= ScrollColumn + _visibleColumns)
+        column = _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize);
+        if (column < ScrollColumn || column >= ScrollColumn + _visibleColumns)
         {
             return false;
         }
         return true;
     }
 
-    public float ColumnToX(int value2)
+    public float ColumnToX(int column)
     {
-        int num = value2 - ScrollColumn;
-        if (num < 0)
+        int visibleColumn = column - ScrollColumn;
+        if (visibleColumn < 0)
         {
-            num = 0;
+            visibleColumn = 0;
         }
-        if (num > _visibleColumns)
+        if (visibleColumn > _visibleColumns)
         {
-            num = _visibleColumns;
+            visibleColumn = _visibleColumns;
         }
-        return (float)_textArea.Left + (float)num * _charSize.Width;
+        return (float)_textArea.Left + (float)visibleColumn * _charSize.Width;
     }
 
-    private float RowToY(int value2)
+    private float RowToY(int row)
     {
-        return (float)_textArea.Top + (float)value2 * _charSize.Height;
+        return (float)_textArea.Top + (float)row * _charSize.Height;
     }
 
-    private float LineToY(int value2)
+    private float LineToY(int line)
     {
-        int num = -1;
-        for (int num2 = 0; num2 < _displayRows.Length; num2++)
+        int rowIndex = -1;
+        for (int candidateRow = 0; candidateRow < _displayRows.Length; candidateRow++)
         {
-            if (_displayRows[num2].Line == value2)
+            if (_displayRows[candidateRow].Line == line)
             {
-                num = num2;
+                rowIndex = candidateRow;
                 break;
             }
         }
-        if (num == -1)
+        if (rowIndex == -1)
         {
             return -1f;
         }
-        if (num < 0)
+        if (rowIndex < 0)
         {
-            num = 0;
+            rowIndex = 0;
         }
-        if (num >= this._visibleRows)
+        if (rowIndex >= this._visibleRows)
         {
-            num = this._visibleRows - 1;
+            rowIndex = this._visibleRows - 1;
         }
-        return RowToY(num);
+        return RowToY(rowIndex);
     }
 
-    protected PointF PositionToPoint(int value2, int value3)
+    protected PointF PositionToPoint(int column, int line)
     {
-        return new PointF(ColumnToX(value2), LineToY(value3));
+        return new PointF(ColumnToX(column), LineToY(line));
     }
 
-    private int YToRow(float value2)
+    private int YToRow(float y)
     {
-        value2 -= (float)_textArea.Top;
-        if (value2 < 0f)
+        y -= (float)_textArea.Top;
+        if (y < 0f)
         {
-            value2 = 0f;
+            y = 0f;
         }
-        if (value2 > (float)_textArea.Height)
+        if (y > (float)_textArea.Height)
         {
-            value2 = _textArea.Height;
+            y = _textArea.Height;
         }
-        int num = (int)(value2 / _charSize.Height);
-        if (num >= this._visibleRows && this._visibleRows != 0)
+        int row = (int)(y / _charSize.Height);
+        if (row >= this._visibleRows && this._visibleRows != 0)
         {
-            num = this._visibleRows - 1;
+            row = this._visibleRows - 1;
         }
-        return num;
+        return row;
     }
 
-    protected int YToLine(float value2)
+    protected int YToLine(float y)
     {
-        int num = YToRow(value2);
-        if (_displayRows[num].VirtualLine != null)
+        int row = YToRow(y);
+        if (_displayRows[row].VirtualLine != null)
         {
             return -1;
         }
-        return _displayRows[num].Line;
+        return _displayRows[row].Line;
     }
 
-    private int XToColumn(float value2)
+    private int XToColumn(float x)
     {
-        value2 -= (float)_textArea.Left;
-        if (value2 < 0f)
+        x -= (float)_textArea.Left;
+        if (x < 0f)
         {
-            value2 = 0f;
+            x = 0f;
         }
-        return ScrollColumn + (int)((value2 + _charSize.Width / 2f) / _charSize.Width);
+        return ScrollColumn + (int)((x + _charSize.Width / 2f) / _charSize.Width);
     }
 
-    protected TextDocument.TextPosition HitTest(Point point, bool flag2 = false)
+    protected TextDocument.TextPosition HitTest(Point point, bool allowPastEnd = false)
     {
-        int num = YToLine(point.Y);
-        if (num == -1)
+        int line = YToLine(point.Y);
+        if (line == -1)
         {
             return new TextDocument.TextPosition(-1, -1);
         }
-        TextDocument.TextPosition result = new TextDocument.TextPosition(_document.ColumnToIndex(num, XToColumn(point.X), TabSize, out var flag), num);
-        if (result.Line >= _document.LineCount || (!flag2 & flag))
+        TextDocument.TextPosition columnIndex = new TextDocument.TextPosition(_document.ColumnToIndex(line, XToColumn(point.X), TabSize, out var isPastEnd), line);
+        if (columnIndex.Line >= _document.LineCount || (!allowPastEnd & isPastEnd))
         {
             return new TextDocument.TextPosition(-1, -1);
         }
-        int length = _document.GetLineText(result.Line).Length;
-        if (result.Column > length)
+        int length = _document.GetLineText(columnIndex.Line).Length;
+        if (columnIndex.Column > length)
         {
-            if (!flag2)
+            if (!allowPastEnd)
             {
                 return new TextDocument.TextPosition(-1, -1);
             }
-            result.Column = length;
+            columnIndex.Column = length;
         }
-        return result;
+        return columnIndex;
     }
 
     private void MoveCaretToPoint(Point point)
     {
-        TextDocument.TextPosition textPosition = HitTest(point, flag2: true);
+        TextDocument.TextPosition textPosition = HitTest(point, allowPastEnd: true);
         if (textPosition.IsValid)
         {
             SetCaret(textPosition);
         }
     }
 
-    public virtual string GetIndentation(int value2)
+    public virtual string GetIndentation(int line)
     {
-        string text = Document.GetLineText(value2);
-        int num;
-        for (num = 0; num < text.Length && (text[num] == ' ' || text[num] == '\t'); num++)
+        string text = Document.GetLineText(line);
+        int indentLength;
+        for (indentLength = 0; indentLength < text.Length && (text[indentLength] == ' ' || text[indentLength] == '\t'); indentLength++)
         {
         }
-        return text.Substring(0, num);
+        return text.Substring(0, indentLength);
     }
 
-    public string GetLineOrNull(int value2)
+    public string GetLineOrNull(int line)
     {
-        if (value2 >= _document.LineCount)
+        if (line >= _document.LineCount)
         {
             return null;
         }
-        return _document.GetLineText(value2);
+        return _document.GetLineText(line);
     }
 
-    public int ColumnToIndex(int value2, int value3)
+    public int ColumnToIndex(int line, int column)
     {
-        return _document.ColumnToIndex(value2, value3, TabSize);
+        return _document.ColumnToIndex(line, column, TabSize);
     }
 
-    public int IndexToColumn(int value2, int value3)
+    public int IndexToColumn(int line, int index)
     {
-        return _document.IndexToColumn(value2, value3, TabSize);
+        return _document.IndexToColumn(line, index, TabSize);
     }
 
     private bool EnsureCaretVisible(TextDocument.TextPosition textPosition)
     {
-        return EnsureVisible(textPosition, flag3: false);
+        return EnsureVisible(textPosition, center: false);
     }
 
-    private bool EnsureVisible(TextDocument.TextPosition textPosition, bool flag3)
+    private bool EnsureVisible(TextDocument.TextPosition textPosition, bool center)
     {
-        int num = _firstVisibleLine;
-        int num2 = _lastVisibleLine;
-        int num3 = ScrollColumn;
-        int num4 = num3 + _visibleColumns - 1;
-        bool flag = true;
-        if (!flag3)
+        int firstLine = _firstVisibleLine;
+        int lastLine = _lastVisibleLine;
+        int firstColumn = ScrollColumn;
+        int lastColumn = firstColumn + _visibleColumns - 1;
+        bool lineScrolled = true;
+        if (!center)
         {
-            if (textPosition.Line < num)
+            if (textPosition.Line < firstLine)
             {
                 TopLine = LineToRowIndex(textPosition.Line);
             }
-            else if (textPosition.Line > num2 || (_allowPartialRows && textPosition.Line == num2 && LineToRow(textPosition.Line) >= this._visibleRows - 1))
+            else if (textPosition.Line > lastLine || (_allowPartialRows && textPosition.Line == lastLine && LineToRow(textPosition.Line) >= this._visibleRows - 1))
             {
                 TopLine = LineToRowIndex(textPosition.Line) - this._visibleRows + 2;
             }
             else
             {
-                flag = false;
+                lineScrolled = false;
             }
         }
         else
         {
-            int num5 = LineToRowIndex(textPosition.Line) - this._visibleRows / 2;
-            if (num5 < 0)
+            int topRow = LineToRowIndex(textPosition.Line) - this._visibleRows / 2;
+            if (topRow < 0)
             {
-                num5 = 0;
+                topRow = 0;
             }
-            TopLine = num5;
-            flag = true;
+            TopLine = topRow;
+            lineScrolled = true;
         }
-        bool flag2 = true;
+        bool columnScrolled = true;
         if (!_terminalMode)
         {
-            int num6 = _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize);
-            if (num6 < num3)
+            int caretColumn = _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize);
+            if (caretColumn < firstColumn)
             {
-                ScrollColumn = num6;
+                ScrollColumn = caretColumn;
             }
-            else if (num6 >= num4)
+            else if (caretColumn >= lastColumn)
             {
-                ScrollColumn = num6 - _visibleColumns + 2;
+                ScrollColumn = caretColumn - _visibleColumns + 2;
             }
             else
             {
-                flag2 = false;
+                columnScrolled = false;
             }
         }
-        return flag | flag2;
+        return lineScrolled | columnScrolled;
     }
 
     protected virtual bool OnTripleClick(MouseEventArgs e)
@@ -1522,7 +1522,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
-        bool flag = false;
+        bool handledByMargin = false;
         if (_hoverTarget?.ClickAction != null && e.Button == MouseButtons.Left)
         {
             _hoverTarget.ClickAction();
@@ -1530,8 +1530,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
         if (e.Button == MouseButtons.Left)
         {
-            bool flag2 = (DateTime.Now - _lastDoubleClickTime).TotalMilliseconds <= (double)_doubleClickTime;
-            if (flag2 && OnTripleClick(e))
+            bool isDoubleClick = (DateTime.Now - _lastDoubleClickTime).TotalMilliseconds <= (double)_doubleClickTime;
+            if (isDoubleClick && OnTripleClick(e))
             {
                 _lastMouseButton = e.Button;
                 return;
@@ -1543,46 +1543,46 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     TextDocument.TextPosition textPosition = HitTest(e.Location);
                     if (textPosition.IsValid && textPosition.Line < Document.LineCount)
                     {
-                        if (flag2)
+                        if (isDoubleClick)
                         {
-                            SetSelection(flag: true, new TextDocument.TextPosition(0, textPosition.Line));
+                            SetSelection(select: true, new TextDocument.TextPosition(0, textPosition.Line));
                             SetSelectionEnd(new TextDocument.TextPosition(GetLineOrNull(textPosition.Line).Length, textPosition.Line));
                             InvalidateLine(textPosition.Line);
                         }
                         else
                         {
-                            TextDocument.TextPosition textPosition2 = ComputeMovedPosition(CaretMove.WordLeft, Control.ModifierKeys, textPosition);
-                            TextDocument.TextPosition textPosition3 = ComputeMovedPosition(CaretMove.WordRight, Control.ModifierKeys, textPosition);
-                            if (textPosition2.Line == textPosition3.Line || AllowCrossLineWordSelection)
+                            TextDocument.TextPosition wordLeft = ComputeMovedPosition(CaretMove.WordLeft, Control.ModifierKeys, textPosition);
+                            TextDocument.TextPosition wordRight = ComputeMovedPosition(CaretMove.WordRight, Control.ModifierKeys, textPosition);
+                            if (wordLeft.Line == wordRight.Line || AllowCrossLineWordSelection)
                             {
-                                SetSelection(flag: true, textPosition2);
-                                SetSelectionEnd(textPosition3);
-                                InvalidateLine(textPosition2.Line);
+                                SetSelection(select: true, wordLeft);
+                                SetSelectionEnd(wordRight);
+                                InvalidateLine(wordLeft.Line);
                             }
                         }
                     }
                 }
                 else
                 {
-                    TextDocument.TextPosition textPosition4 = GetMovedPosition(CaretMove.WordLeft);
-                    TextDocument.TextPosition textPosition5 = GetMovedPosition(CaretMove.WordRight);
-                    if (textPosition4.Line == CaretPosition.Line && textPosition5.Line == CaretPosition.Line)
+                    TextDocument.TextPosition wordLeft = GetMovedPosition(CaretMove.WordLeft);
+                    TextDocument.TextPosition wordRight = GetMovedPosition(CaretMove.WordRight);
+                    if (wordLeft.Line == CaretPosition.Line && wordRight.Line == CaretPosition.Line)
                     {
-                        bool flag3 = true;
+                        bool invalidateCurrentLine = true;
                         if (_hasSelection && _selectionStart.Line != CaretPosition.Line)
                         {
-                            flag3 = false;
+                            invalidateCurrentLine = false;
                         }
-                        _selectionStart = textPosition4;
+                        _selectionStart = wordLeft;
                         _hasSelection = true;
                         OnSelectionStartChanged();
                         if (!NavigationLocked)
                         {
-                            SetCaret(textPosition5);
+                            SetCaret(wordRight);
                         }
-                        if (flag3)
+                        if (invalidateCurrentLine)
                         {
-                            InvalidateLine(textPosition4.Line);
+                            InvalidateLine(wordLeft.Line);
                         }
                         else
                         {
@@ -1596,31 +1596,31 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             }
             else if (e.Location.X < _textArea.Left)
             {
-                bool flag4 = false;
+                bool handled = false;
                 if (!_hideMargins)
                 {
                     foreach (MarginSlot item in _margins)
                     {
                         if (e.X >= item.Left && e.X <= item.Right)
                         {
-                            flag4 = item.Margin.OnMouseDown(new Point(e.X - item.Left, e.Y - _textArea.Top), this, ScrollLine, this._visibleRows, _charSize, YToRow(e.Y));
-                            if (flag4)
+                            handled = item.Margin.OnMouseDown(new Point(e.X - item.Left, e.Y - _textArea.Top), this, ScrollLine, this._visibleRows, _charSize, YToRow(e.Y));
+                            if (handled)
                             {
-                                flag = true;
+                                handledByMargin = true;
                                 break;
                             }
                         }
                     }
                 }
-                int num = YToLine(e.Location.Y);
-                if (!flag4 && num != -1)
+                int line = YToLine(e.Location.Y);
+                if (!handled && line != -1)
                 {
                     _hasSelection = true;
-                    _selectionStart = new TextDocument.TextPosition(0, num);
+                    _selectionStart = new TextDocument.TextPosition(0, line);
                     OnSelectionStartChanged();
                     if (!_terminalMode && !NavigationLocked)
                     {
-                        SetCaret(new TextDocument.TextPosition(_document.GetLineText(num).Length, num));
+                        SetCaret(new TextDocument.TextPosition(_document.GetLineText(line).Length, line));
                     }
                 }
             }
@@ -1642,7 +1642,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 }
                 PlaceCaretAt(e.Location);
             }
-            if (flag)
+            if (handledByMargin)
             {
                 _lastClickTime = DateTime.MinValue;
             }
@@ -1664,7 +1664,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     {
         if (_terminalMode)
         {
-            UpdateSelectionFromPoint(flag2: false, point, flag3: false);
+            UpdateSelectionFromPoint(adjustStart: false, point, select: false);
         }
         else if (!_navigationLocked)
         {
@@ -1676,39 +1676,39 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     {
     }
 
-    private void UpdateSelectionFromPoint(bool flag2, Point point, bool flag3)
+    private void UpdateSelectionFromPoint(bool adjustStart, Point point, bool select)
     {
-        TextDocument.TextPosition textPosition = HitTest(point, flag2: true);
+        TextDocument.TextPosition textPosition = HitTest(point, allowPastEnd: true);
         if (!textPosition.IsValid)
         {
             return;
         }
-        bool flag = false;
-        TextDocument.TextPosition textPosition2 = _caretPosition;
-        if (_hasSelection != flag3)
+        bool selectionChanged = false;
+        TextDocument.TextPosition previousCaret = _caretPosition;
+        if (_hasSelection != select)
         {
-            flag = true;
-            _hasSelection = flag3;
+            selectionChanged = true;
+            _hasSelection = select;
         }
-        if (flag2)
+        if (adjustStart)
         {
             AdjustSelectionEnd(ref textPosition);
             if (_selectionStart != textPosition)
             {
                 _selectionStart = textPosition;
-                flag = true;
+                selectionChanged = true;
                 OnSelectionStartChanged();
             }
         }
         else if (_selectionEnd != textPosition)
         {
             _selectionEnd = textPosition;
-            flag = true;
+            selectionChanged = true;
         }
-        if (flag)
+        if (selectionChanged)
         {
             Redraw();
-            OnSelectionChanged(textPosition2, _caretPosition, _hasSelection, SelectionChangeSource.Programmatic);
+            OnSelectionChanged(previousCaret, _caretPosition, _hasSelection, SelectionChangeSource.Programmatic);
         }
     }
 
@@ -1725,7 +1725,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         _hoverTarget = null;
         if (e.Button == MouseButtons.Left && _lastMouseButton != MouseButtons.Left)
         {
-            if (!_hasSelection && (!_terminalMode || HitTest(e.Location, flag2: true).IsValid))
+            if (!_hasSelection && (!_terminalMode || HitTest(e.Location, allowPastEnd: true).IsValid))
             {
                 _selectionStart = CaretPosition;
                 _hasSelection = true;
@@ -1734,7 +1734,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             TextDocument.TextPosition textPosition = CaretPosition;
             if (_terminalMode)
             {
-                UpdateSelectionFromPoint(flag2: true, e.Location, flag3: true);
+                UpdateSelectionFromPoint(adjustStart: true, e.Location, select: true);
             }
             else if (!_navigationLocked)
             {
@@ -1757,10 +1757,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
         if (_textArea.Contains(e.Location))
         {
-            int num = YToLine(e.Y);
-            if (num != -1)
+            int line = YToLine(e.Y);
+            if (line != -1)
             {
-                _hoverTarget = GetHoverTarget(num, e.Location);
+                _hoverTarget = GetHoverTarget(line, e.Location);
                 Cursor = _hoverTarget?.Cursor ?? Cursors.IBeam;
                 base.OnMouseMove(e);
                 return;
@@ -1770,14 +1770,14 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         base.OnMouseMove(e);
     }
 
-    protected virtual HoverTarget GetHoverTarget(int value2, Point point)
+    protected virtual HoverTarget GetHoverTarget(int line, Point point)
     {
         return null;
     }
 
-    protected TextDocument.TextPosition GetMovedPosition(CaretMove caretMove, bool flag = false)
+    protected TextDocument.TextPosition GetMovedPosition(CaretMove caretMove, bool extendSelection = false)
     {
-        return ComputeMovedPosition(caretMove, Control.ModifierKeys, CaretPosition, flag);
+        return ComputeMovedPosition(caretMove, Control.ModifierKeys, CaretPosition, extendSelection);
     }
 
     protected virtual bool IsWordChar(char ch)
@@ -1785,11 +1785,11 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         return "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".IndexOf(ch) != -1;
     }
 
-    protected virtual void OnMoveBeyondDocument(ref TextDocument.TextPosition textPosition, int value2)
+    protected virtual void OnMoveBeyondDocument(ref TextDocument.TextPosition textPosition, int direction)
     {
     }
 
-    protected virtual TextDocument.TextPosition ComputeMovedPosition(CaretMove caretMove, Keys keys, TextDocument.TextPosition textPosition, bool flag = false)
+    protected virtual TextDocument.TextPosition ComputeMovedPosition(CaretMove caretMove, Keys keys, TextDocument.TextPosition textPosition, bool extendSelection = false)
     {
         if (textPosition.Column < 0 || textPosition.Line < 0)
         {
@@ -1858,8 +1858,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 if (textPosition.Line > 0)
                 {
                     textPosition.Line = GetPreviousRealLine(textPosition.Line);
-                    int num2 = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
-                    textPosition.Column = Math.Min(num2, _document.GetLineText(textPosition.Line).Length);
+                    int index = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
+                    textPosition.Column = Math.Min(index, _document.GetLineText(textPosition.Line).Length);
                 }
                 return textPosition;
             case CaretMove.Down:
@@ -1870,8 +1870,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 if (textPosition.Line < _document.LineCount - 1)
                 {
                     textPosition.Line = GetNextRealLine(textPosition.Line);
-                    int num3 = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
-                    textPosition.Column = Math.Min(num3, _document.GetLineText(textPosition.Line).Length);
+                    int columnIndexAfterDown = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
+                    textPosition.Column = Math.Min(columnIndexAfterDown, _document.GetLineText(textPosition.Line).Length);
                 }
                 return textPosition;
             case CaretMove.Home:
@@ -1883,18 +1883,18 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 }
                 else
                 {
-                    string text2 = _document.GetLineText(textPosition.Line);
-                    int num;
-                    for (num = 0; num < text2.Length && (text2[num] == ' ' || text2[num] == '\t'); num++)
+                    string lineText = _document.GetLineText(textPosition.Line);
+                    int indentLength;
+                    for (indentLength = 0; indentLength < lineText.Length && (lineText[indentLength] == ' ' || lineText[indentLength] == '\t'); indentLength++)
                     {
                     }
-                    if (textPosition.Column == num)
+                    if (textPosition.Column == indentLength)
                     {
                         textPosition.Column = 0;
                     }
                     else
                     {
-                        textPosition.Column = num;
+                        textPosition.Column = indentLength;
                     }
                 }
                 return textPosition;
@@ -1917,8 +1917,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     {
                         textPosition.Line = 0;
                     }
-                    int num4 = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
-                    textPosition.Column = Math.Min(num4, _document.GetLineText(textPosition.Line).Length);
+                    int columnAfterPageUp = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
+                    textPosition.Column = Math.Min(columnAfterPageUp, _document.GetLineText(textPosition.Line).Length);
                     return textPosition;
                 }
             case CaretMove.PageDown:
@@ -1932,8 +1932,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     {
                         textPosition.Line = _document.LineCount - 1;
                     }
-                    int num5 = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
-                    textPosition.Column = Math.Min(num5, _document.GetLineText(textPosition.Line).Length);
+                    int columnAfterPageDown = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
+                    textPosition.Column = Math.Min(columnAfterPageDown, _document.GetLineText(textPosition.Line).Length);
                     return textPosition;
                 }
             default:
@@ -1952,10 +1952,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
-    private bool TryGetNavigationTarget(KeyEventArgs e2, bool flag, out TextDocument.TextPosition textPosition, out CaretDirection caretDirection)
+    private bool TryGetNavigationTarget(KeyEventArgs e, bool extendSelection, out TextDocument.TextPosition textPosition, out CaretDirection caretDirection)
     {
         caretDirection = CaretDirection.Unspecified;
-        Keys keyCode = e2.KeyCode;
+        Keys keyCode = e.KeyCode;
         if ((uint)(keyCode - 33) <= 1u || keyCode == Keys.Up || keyCode == Keys.Down)
         {
             if (_desiredColumn == -1)
@@ -1967,47 +1967,47 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             _desiredColumn = -1;
         }
-        switch (e2.KeyCode)
+        switch (e.KeyCode)
         {
             case Keys.Left:
                 if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
                 {
-                    textPosition = GetMovedPosition(CaretMove.WordLeft, flag);
+                    textPosition = GetMovedPosition(CaretMove.WordLeft, extendSelection);
                 }
                 else
                 {
-                    textPosition = GetMovedPosition(CaretMove.Left, flag);
+                    textPosition = GetMovedPosition(CaretMove.Left, extendSelection);
                 }
                 caretDirection = CaretDirection.Backward;
                 return true;
             case Keys.Right:
                 if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
                 {
-                    textPosition = GetMovedPosition(CaretMove.WordRight, flag);
+                    textPosition = GetMovedPosition(CaretMove.WordRight, extendSelection);
                 }
                 else
                 {
-                    textPosition = GetMovedPosition(CaretMove.Right, flag);
+                    textPosition = GetMovedPosition(CaretMove.Right, extendSelection);
                 }
                 caretDirection = CaretDirection.Forward;
                 return true;
             case Keys.Up:
-                textPosition = GetMovedPosition(CaretMove.Up, flag);
+                textPosition = GetMovedPosition(CaretMove.Up, extendSelection);
                 return true;
             case Keys.Down:
-                textPosition = GetMovedPosition(CaretMove.Down, flag);
+                textPosition = GetMovedPosition(CaretMove.Down, extendSelection);
                 return true;
             case Keys.Home:
-                textPosition = GetMovedPosition(CaretMove.Home, flag);
+                textPosition = GetMovedPosition(CaretMove.Home, extendSelection);
                 return true;
             case Keys.End:
-                textPosition = GetMovedPosition(CaretMove.End, flag);
+                textPosition = GetMovedPosition(CaretMove.End, extendSelection);
                 return true;
             case Keys.Prior:
-                textPosition = GetMovedPosition(CaretMove.PageUp, flag);
+                textPosition = GetMovedPosition(CaretMove.PageUp, extendSelection);
                 return true;
             case Keys.Next:
-                textPosition = GetMovedPosition(CaretMove.PageDown, flag);
+                textPosition = GetMovedPosition(CaretMove.PageDown, extendSelection);
                 return true;
             default:
                 textPosition = new TextDocument.TextPosition(CaretPosition);
@@ -2072,28 +2072,28 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     break;
             }
         }
-        bool flag = false;
-        bool flag2 = false;
+        bool navigated = false;
+        bool needsRedraw = false;
         if (!e.Handled && !_navigationLocked)
         {
             CaretDirection caretDirection;
             if ((Control.ModifierKeys & Keys.Shift) != Keys.Shift)
             {
-                if (TryGetNavigationTarget(e, flag: true, out var textPosition, out caretDirection))
+                if (TryGetNavigationTarget(e, extendSelection: true, out var textPosition, out caretDirection))
                 {
-                    flag = true;
+                    navigated = true;
                     if (_hasSelection)
                     {
                         if (_selectionStart.Line != textPosition.Line)
                         {
-                            flag2 = true;
+                            needsRedraw = true;
                         }
                         _hasSelection = false;
                         OnSelectionStartChanged();
                     }
                     if (textPosition.Line != CaretPosition.Line)
                     {
-                        flag2 = true;
+                        needsRedraw = true;
                     }
                     if (!NavigationLocked)
                     {
@@ -2102,49 +2102,49 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     e.Handled = true;
                     if (EnsureCaretVisible(CaretPosition))
                     {
-                        flag2 = true;
+                        needsRedraw = true;
                     }
                 }
             }
             else
             {
-                bool flag3 = false;
+                bool selectionStarted = false;
                 if (!_hasSelection)
                 {
                     _hasSelection = true;
                     _selectionStart = CaretPosition;
-                    flag3 = true;
+                    selectionStarted = true;
                     OnSelectionStartChanged();
                 }
-                if (TryGetNavigationTarget(e, flag: true, out var textPosition2, out caretDirection))
+                if (TryGetNavigationTarget(e, extendSelection: true, out var navigationTarget, out caretDirection))
                 {
-                    flag = true;
-                    if (textPosition2.Line != CaretPosition.Line)
+                    navigated = true;
+                    if (navigationTarget.Line != CaretPosition.Line)
                     {
-                        flag2 = true;
+                        needsRedraw = true;
                     }
                     if (!NavigationLocked)
                     {
-                        SetCaret(textPosition2, caretDirection);
+                        SetCaret(navigationTarget, caretDirection);
                     }
                     e.Handled = true;
                     if (EnsureCaretVisible(CaretPosition))
                     {
-                        flag2 = true;
+                        needsRedraw = true;
                     }
                 }
-                else if (flag3)
+                else if (selectionStarted)
                 {
                     _hasSelection = false;
                     OnSelectionStartChanged();
                 }
             }
         }
-        if (flag2)
+        if (needsRedraw)
         {
             Redraw();
         }
-        else if (flag)
+        else if (navigated)
         {
             InvalidateLine(CaretPosition.Line);
         }
@@ -2172,152 +2172,152 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
-    private void PaintSelection(Graphics graphics, TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, HighlightStyle highlightStyle, Brush[,] items)
+    private void PaintSelection(Graphics graphics, TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle, Brush[,] items)
     {
-        if (textPosition == textPosition2)
+        if (start == end)
         {
             return;
         }
-        TextDocument.TextPosition textPosition3;
-        TextDocument.TextPosition textPosition4;
-        if (textPosition < textPosition2)
+        TextDocument.TextPosition rangeStart;
+        TextDocument.TextPosition rangeEnd;
+        if (start < end)
         {
-            textPosition3 = textPosition;
-            textPosition4 = textPosition2;
+            rangeStart = start;
+            rangeEnd = end;
         }
         else
         {
-            textPosition3 = textPosition2;
-            textPosition4 = textPosition;
+            rangeStart = end;
+            rangeEnd = start;
         }
-        int num = ScrollColumn;
-        int num2 = num + _visibleColumns - 1;
-        int num3 = -1;
-        int num4 = -1;
-        for (int num5 = 0; num5 < this._visibleRows; num5++)
+        int firstColumn = ScrollColumn;
+        int lastColumn = firstColumn + _visibleColumns - 1;
+        int previousStartX = -1;
+        int previousEndX = -1;
+        for (int row = 0; row < this._visibleRows; row++)
         {
-            int num6 = _displayRows[num5].Line;
-            if (num6 < textPosition3.Line)
+            int line = _displayRows[row].Line;
+            if (line < rangeStart.Line)
             {
                 continue;
             }
-            if (num6 > textPosition4.Line)
+            if (line > rangeEnd.Line)
             {
                 break;
             }
-            string text = _document.GetLineText(num6);
-            int num7 = _document.IndexToColumn(num6, text.Length, TabSize);
-            int num8 = 0;
-            int num9 = num7;
-            if (num6 == textPosition3.Line)
+            string text = _document.GetLineText(line);
+            int lineLength = _document.IndexToColumn(line, text.Length, TabSize);
+            int startColumn = 0;
+            int endColumn = lineLength;
+            if (line == rangeStart.Line)
             {
-                num8 = _document.IndexToColumn(num6, textPosition3.Column, TabSize);
-                if (num8 > num7)
+                startColumn = _document.IndexToColumn(line, rangeStart.Column, TabSize);
+                if (startColumn > lineLength)
                 {
-                    num8 = num7;
+                    startColumn = lineLength;
                 }
             }
-            if (num6 == textPosition4.Line)
+            if (line == rangeEnd.Line)
             {
-                num9 = _document.IndexToColumn(num6, textPosition4.Column, TabSize);
-                if (num9 > num7)
+                endColumn = _document.IndexToColumn(line, rangeEnd.Column, TabSize);
+                if (endColumn > lineLength)
                 {
-                    num9 = num7;
+                    endColumn = lineLength;
                 }
             }
-            if (textPosition3.Line == textPosition4.Line && _displayRows[num5].Line == textPosition3.Line && _displayRows[num5].VirtualLine != null)
+            if (rangeStart.Line == rangeEnd.Line && _displayRows[row].Line == rangeStart.Line && _displayRows[row].VirtualLine != null)
             {
                 break;
             }
             if (highlightStyle.TextBrush != null)
             {
-                for (int num10 = Math.Max(num8, num); num10 < Math.Min(num9, num2 + 1); num10++)
+                for (int column = Math.Max(startColumn, firstColumn); column < Math.Min(endColumn, lastColumn + 1); column++)
                 {
-                    items[num5, num10 - num] = highlightStyle.TextBrush;
+                    items[row, column - firstColumn] = highlightStyle.TextBrush;
                 }
             }
-            int num11 = Round(ColumnToX(num8));
-            int num12 = Round(ColumnToX(num9));
-            if ((num6 != textPosition3.Line || num6 != textPosition4.Line) && num8 == num9)
+            int startX = Round(ColumnToX(startColumn));
+            int endX = Round(ColumnToX(endColumn));
+            if ((line != rangeStart.Line || line != rangeEnd.Line) && startColumn == endColumn)
             {
-                num12 = num11 + Round(_charSize.Width / 4f);
+                endX = startX + Round(_charSize.Width / 4f);
             }
-            if (_displayRows[num5].VirtualLine != null)
+            if (_displayRows[row].VirtualLine != null)
             {
-                num11 = num3;
-                num12 = num4;
+                startX = previousStartX;
+                endX = previousEndX;
             }
-            int num13 = Round(RowToY(num5));
+            int y = Round(RowToY(row));
             if (highlightStyle.FillBrush != null)
             {
-                graphics.FillRectangle(highlightStyle.FillBrush, num11, num13, num12 - num11, _charSize.Height);
+                graphics.FillRectangle(highlightStyle.FillBrush, startX, y, endX - startX, _charSize.Height);
             }
             if (highlightStyle.BorderPen != null)
             {
-                if (num6 == textPosition3.Line)
+                if (line == rangeStart.Line)
                 {
-                    graphics.DrawLine(highlightStyle.BorderPen, num11, num13, num12, num13);
+                    graphics.DrawLine(highlightStyle.BorderPen, startX, y, endX, y);
                 }
                 else
                 {
-                    if (num3 != num11)
+                    if (previousStartX != startX)
                     {
-                        graphics.DrawLine(highlightStyle.BorderPen, num11, num13, num3, num13);
+                        graphics.DrawLine(highlightStyle.BorderPen, startX, y, previousStartX, y);
                     }
-                    if (num4 != num12)
+                    if (previousEndX != endX)
                     {
-                        graphics.DrawLine(highlightStyle.BorderPen, num12, num13, num4, num13);
+                        graphics.DrawLine(highlightStyle.BorderPen, endX, y, previousEndX, y);
                     }
                 }
-                if (num6 == textPosition4.Line)
+                if (line == rangeEnd.Line)
                 {
-                    graphics.DrawLine(highlightStyle.BorderPen, num11, (float)num13 + _charSize.Height, num12, (float)num13 + _charSize.Height);
+                    graphics.DrawLine(highlightStyle.BorderPen, startX, (float)y + _charSize.Height, endX, (float)y + _charSize.Height);
                 }
-                graphics.DrawLine(highlightStyle.BorderPen, num11, num13, num11, (float)num13 + _charSize.Height);
-                graphics.DrawLine(highlightStyle.BorderPen, num12, num13, num12, (float)num13 + _charSize.Height);
+                graphics.DrawLine(highlightStyle.BorderPen, startX, y, startX, (float)y + _charSize.Height);
+                graphics.DrawLine(highlightStyle.BorderPen, endX, y, endX, (float)y + _charSize.Height);
             }
-            num3 = num11;
-            num4 = num12;
+            previousStartX = startX;
+            previousEndX = endX;
         }
     }
 
-    protected void InvalidateLine(int value2)
+    protected void InvalidateLine(int line)
     {
-        if (value2 >= _firstVisibleLine && value2 <= _lastVisibleLine)
+        if (line >= _firstVisibleLine && line <= _lastVisibleLine)
         {
-            int num = LineToRow(value2);
-            if (num != -1)
+            int row = LineToRow(line);
+            if (row != -1)
             {
-                Invalidate(new Rectangle(0, Round((float)_textArea.Top + (float)num * _charSize.Height), Width, (int)Math.Ceiling(_charSize.Height)));
+                Invalidate(new Rectangle(0, Round((float)_textArea.Top + (float)row * _charSize.Height), Width, (int)Math.Ceiling(_charSize.Height)));
             }
         }
     }
 
-    protected void InvalidateLines(int value2, int value3)
+    protected void InvalidateLines(int startLine, int endLine)
     {
-        if (value2 > value3)
+        if (startLine > endLine)
         {
-            int num = value2;
-            value2 = value3;
-            value3 = num;
+            int temporaryLine = startLine;
+            startLine = endLine;
+            endLine = temporaryLine;
         }
-        if (value2 < _firstVisibleLine)
+        if (startLine < _firstVisibleLine)
         {
-            value2 = _firstVisibleLine;
+            startLine = _firstVisibleLine;
         }
-        if (value3 > _lastVisibleLine)
+        if (endLine > _lastVisibleLine)
         {
-            value3 = _lastVisibleLine;
+            endLine = _lastVisibleLine;
         }
-        int num2 = LineToRow(value2);
-        int num3 = LineToRow(value3);
-        if (num2 != -1 && num3 != -1 && num3 >= num2)
+        int startRow = LineToRow(startLine);
+        int endRow = LineToRow(endLine);
+        if (startRow != -1 && endRow != -1 && endRow >= startRow)
         {
-            Invalidate(new Rectangle(Left, Round((float)_textArea.Top + (float)num2 * _charSize.Height), Width, (int)Math.Ceiling((float)(num3 - num2 + 1) * _charSize.Height + 1f)));
+            Invalidate(new Rectangle(Left, Round((float)_textArea.Top + (float)startRow * _charSize.Height), Width, (int)Math.Ceiling((float)(endRow - startRow + 1) * _charSize.Height + 1f)));
         }
     }
 
-    protected virtual ColorSpan[] GetLineColorSpans(int value2)
+    protected virtual ColorSpan[] GetLineColorSpans(int line)
     {
         return null;
     }
@@ -2337,213 +2337,213 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         return true;
     }
 
-    private void PaintLine(Graphics graphics, int value2, int value3, int value4, Brush[,] items)
+    private void PaintLine(Graphics graphics, int line, int row, int firstColumn, Brush[,] items)
     {
-        int num = 0;
-        int num2 = 0;
+        int startIndex = 0;
+        int startColumn = 0;
         CharacterRange characterRange = default;
         Brush brush = null;
-        string text = _document.GetLineText(value2);
-        if (_displayRows[value3].Decorator != null)
+        string text = _document.GetLineText(line);
+        if (_displayRows[row].Decorator != null)
         {
-            text = _displayRows[value3].Decorator.Transform(text, out characterRange, out brush);
+            text = _displayRows[row].Decorator.Transform(text, out characterRange, out brush);
         }
-        text = TextDocument.SubstringFromColumn(text, value4, TabSize, out num, out num2);
+        text = TextDocument.SubstringFromColumn(text, firstColumn, TabSize, out startIndex, out startColumn);
         if (string.IsNullOrEmpty(text))
         {
             return;
         }
-        int num3 = 0;
+        int binaryDigitCount = 0;
         if (_groupBinaryDigits && IsBinaryDigit(text[0]))
         {
-            string text2 = _document.GetLineText(value2);
-            int num4 = num2;
-            while (num4 > 0 && IsBinaryDigit(text2[num4]))
+            string lineText = _document.GetLineText(line);
+            int binaryIndex = startColumn;
+            while (binaryIndex > 0 && IsBinaryDigit(lineText[binaryIndex]))
             {
-                num3++;
-                num4--;
+                binaryDigitCount++;
+                binaryIndex--;
             }
         }
-        num3 %= 4;
-        if (num2 > characterRange.First)
+        binaryDigitCount %= 4;
+        if (startColumn > characterRange.First)
         {
-            characterRange.First = num2;
+            characterRange.First = startColumn;
         }
-        int num5 = characterRange.First - num2;
-        if (characterRange.Length > text.Length - num5)
+        int characterOffset = characterRange.First - startColumn;
+        if (characterRange.Length > text.Length - characterOffset)
         {
-            characterRange.Length = text.Length - num5;
+            characterRange.Length = text.Length - characterOffset;
         }
         int left = _textArea.Left;
-        int num6 = Round((float)_textArea.Top + (float)value3 * _charSize.Height);
-        int num7 = -1;
-        ColorSpan[] array = ((brush == null) ? GetLineColorSpans(value2) : new ColorSpan[1]
+        int y = Round((float)_textArea.Top + (float)row * _charSize.Height);
+        int tabStartColumn = -1;
+        ColorSpan[] colorSpans = ((brush == null) ? GetLineColorSpans(line) : new ColorSpan[1]
         {
             new ColorSpan(0, int.MaxValue, brush)
         });
-        if (array == null || array.Length == 0)
+        if (colorSpans == null || colorSpans.Length == 0)
         {
-            array = _defaultColors;
+            colorSpans = _defaultColors;
         }
-        int num8 = 0;
+        int spanIndex = 0;
         List<KeyValuePair<int, int>> list = null;
         Pen pen = null;
-        Brush brush2 = null;
-        int num9 = 0;
-        int num10 = 0;
-        int num11 = num;
-        while (num10 < text.Length && num11 < _visibleColumns)
+        Brush backgroundBrush = null;
+        int lastPaintedColumn = 0;
+        int characterIndex = 0;
+        int column = startIndex;
+        while (characterIndex < text.Length && column < _visibleColumns)
         {
-            int num12 = num11 + value4;
-            int num13 = num10 + num2;
-            num9 = num11;
-            Brush brush3 = _defaultColors[0].Foreground;
-            while (array[num8].End <= num13)
+            int displayColumn = column + firstColumn;
+            int lineColumn = characterIndex + startColumn;
+            lastPaintedColumn = column;
+            Brush foregroundBrush = _defaultColors[0].Foreground;
+            while (colorSpans[spanIndex].End <= lineColumn)
             {
-                if (++num8 >= array.Length)
+                if (++spanIndex >= colorSpans.Length)
                 {
-                    array = _defaultColors;
-                    num8 = 0;
+                    colorSpans = _defaultColors;
+                    spanIndex = 0;
                     break;
                 }
             }
-            bool flag = false;
-            if (array[num8].Start <= num13)
+            bool isUnderlined = false;
+            if (colorSpans[spanIndex].Start <= lineColumn)
             {
-                brush3 = array[num8].Foreground;
-                if (brush3 == null)
+                foregroundBrush = colorSpans[spanIndex].Foreground;
+                if (foregroundBrush == null)
                 {
-                    brush3 = _defaultColors[0].Foreground;
+                    foregroundBrush = _defaultColors[0].Foreground;
                 }
-                brush2 = array[num8].Background;
-                flag = array[num8].Underline;
+                backgroundBrush = colorSpans[spanIndex].Background;
+                isUnderlined = colorSpans[spanIndex].Underline;
             }
             else
             {
-                brush2 = null;
+                backgroundBrush = null;
             }
-            if (items != null && items[value3, num11] != null)
+            if (items != null && items[row, column] != null)
             {
-                brush3 = items[value3, num11];
-                brush2 = null;
+                foregroundBrush = items[row, column];
+                backgroundBrush = null;
             }
             if (_showTabs)
             {
-                if (text[num10] == '\t')
+                if (text[characterIndex] == '\t')
                 {
-                    if (num7 == -1)
+                    if (tabStartColumn == -1)
                     {
-                        num7 = num10;
+                        tabStartColumn = characterIndex;
                     }
                 }
-                else if (num7 != -1)
+                else if (tabStartColumn != -1)
                 {
-                    float num14 = (float)num6 + _charSize.Height / 2f;
-                    graphics.DrawLine(Pens.DarkGray, (float)left + (float)num7 * _charSize.Width, num14, (float)left + (float)num11 * _charSize.Width, num14);
-                    num7 = -1;
+                    float tabLineY = (float)y + _charSize.Height / 2f;
+                    graphics.DrawLine(Pens.DarkGray, (float)left + (float)tabStartColumn * _charSize.Width, tabLineY, (float)left + (float)column * _charSize.Width, tabLineY);
+                    tabStartColumn = -1;
                 }
             }
-            if (text[num10] == '\t')
+            if (text[characterIndex] == '\t')
             {
-                num11 += TabSize - num12 % TabSize - 1;
+                column += TabSize - displayColumn % TabSize - 1;
             }
             else
             {
-                _textBatch.Append(graphics, Font, text.Substring(num10, 1), (float)left + (float)num11 * _charSize.Width, num6, num10, brush3, brush2, _stringFormat, _charSize);
+                _textBatch.Append(graphics, Font, text.Substring(characterIndex, 1), (float)left + (float)column * _charSize.Width, y, characterIndex, foregroundBrush, backgroundBrush, _stringFormat, _charSize);
             }
-            if (num10 == characterRange.First && _displayRows[value3].Decorator != null)
+            if (characterIndex == characterRange.First && _displayRows[row].Decorator != null)
             {
-                _displayRows[value3].Decorator.DrawDecoration(graphics, _charSize, new Rectangle(left + (int)((float)num11 * _charSize.Width), num6, (int)(_charSize.Width * (float)characterRange.Length), (int)_charSize.Height), characterRange);
+                _displayRows[row].Decorator.DrawDecoration(graphics, _charSize, new Rectangle(left + (int)((float)column * _charSize.Width), y, (int)(_charSize.Width * (float)characterRange.Length), (int)_charSize.Height), characterRange);
             }
-            bool flag2 = false;
+            bool needsUnderline = false;
             if (_groupBinaryDigits)
             {
-                num3 = (IsBinaryDigit(text[num10]) ? (num3 + 1) : 0);
-                if (num3 >= 4)
+                binaryDigitCount = (IsBinaryDigit(text[characterIndex]) ? (binaryDigitCount + 1) : 0);
+                if (binaryDigitCount >= 4)
                 {
-                    flag2 = true;
+                    needsUnderline = true;
                 }
             }
-            if (flag)
+            if (isUnderlined)
             {
-                flag2 = true;
+                needsUnderline = true;
             }
-            if (flag2)
+            if (needsUnderline)
             {
                 if (list == null)
                 {
                     list = new List<KeyValuePair<int, int>>();
-                    pen = new Pen((brush3 as SolidBrush)?.Color ?? Color.Black);
+                    pen = new Pen((foregroundBrush as SolidBrush)?.Color ?? Color.Black);
                 }
-                int num15 = (int)((float)left + (float)num11 * _charSize.Width);
-                int value = (int)((float)left + (float)(num11 + 1) * _charSize.Width);
-                if (list.Count > 0 && num15 == list[list.Count - 1].Value)
+                int underlineStartX = (int)((float)left + (float)column * _charSize.Width);
+                int value = (int)((float)left + (float)(column + 1) * _charSize.Width);
+                if (list.Count > 0 && underlineStartX == list[list.Count - 1].Value)
                 {
-                    num15 = list[list.Count - 1].Key;
+                    underlineStartX = list[list.Count - 1].Key;
                     list.RemoveAt(list.Count - 1);
                 }
-                list.Add(new KeyValuePair<int, int>(num15, value));
-                num3 = 0;
+                list.Add(new KeyValuePair<int, int>(underlineStartX, value));
+                binaryDigitCount = 0;
             }
-            num10++;
-            num11++;
+            characterIndex++;
+            column++;
         }
         _textBatch.Flush(graphics);
-        if (brush2 != null && FillLineBackground && num9 != _visibleColumns)
+        if (backgroundBrush != null && FillLineBackground && lastPaintedColumn != _visibleColumns)
         {
-            graphics.FillRectangle(brush2, ColumnToX(num9 + 1 + ScrollColumn), LineToY(value2), _charSize.Width * (float)(_visibleColumns - num9), _charSize.Height);
+            graphics.FillRectangle(backgroundBrush, ColumnToX(lastPaintedColumn + 1 + ScrollColumn), LineToY(line), _charSize.Width * (float)(_visibleColumns - lastPaintedColumn), _charSize.Height);
         }
-        if (_showTabs && num7 != -1)
+        if (_showTabs && tabStartColumn != -1)
         {
-            float num16 = (float)num6 + _charSize.Height / 2f;
-            graphics.DrawLine(Pens.DarkGray, (float)left + (float)num7 * _charSize.Width, num16, (float)left + (float)text.Length * _charSize.Width, num16);
+            float tabUnderlineY = (float)y + _charSize.Height / 2f;
+            graphics.DrawLine(Pens.DarkGray, (float)left + (float)tabStartColumn * _charSize.Width, tabUnderlineY, (float)left + (float)text.Length * _charSize.Width, tabUnderlineY);
         }
-        PaintLineOverlay(graphics, value2, value4, left, num6, (int)Math.Ceiling(_charSize.Height));
+        PaintLineOverlay(graphics, line, firstColumn, left, y, (int)Math.Ceiling(_charSize.Height));
         if (list == null || pen == null)
         {
             return;
         }
-        int num17 = num6 + (int)_charSize.Height;
+        int underlineY = y + (int)_charSize.Height;
         foreach (KeyValuePair<int, int> item in list)
         {
-            graphics.DrawLine(pen, item.Key, num17 - 1, item.Value, num17 - 1);
+            graphics.DrawLine(pen, item.Key, underlineY - 1, item.Value, underlineY - 1);
         }
     }
 
-    protected virtual void PaintLineOverlay(Graphics graphics, int value2, int value3, int value4, int value5, int value6)
+    protected virtual void PaintLineOverlay(Graphics graphics, int line, int firstColumn, int left, int top, int height)
     {
     }
 
-    public int AddHighlight(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, HighlightStyle highlightStyle)
+    public int AddHighlight(TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle)
     {
-        return SetHighlight(-1, textPosition, textPosition2, highlightStyle);
+        return SetHighlight(-1, start, end, highlightStyle);
     }
 
-    public void RemoveHighlight(int value2)
+    public void RemoveHighlight(int highlightIndex)
     {
-        if (value2 != -1)
+        if (highlightIndex != -1)
         {
-            Highlight highlight = _highlights[value2];
+            Highlight highlight = _highlights[highlightIndex];
             InvalidateLines(highlight.Start.Line, highlight.End.Line);
-            _highlights.Remove(value2);
+            _highlights.Remove(highlightIndex);
         }
     }
 
-    public int SetHighlight(int value2, TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, HighlightStyle highlightStyle)
+    public int SetHighlight(int highlightIndex, TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle)
     {
-        if (value2 == -1)
+        if (highlightIndex == -1)
         {
-            value2 = ++_lastHighlightId;
+            highlightIndex = ++_lastHighlightId;
         }
         else
         {
-            Highlight highlight = _highlights[value2];
+            Highlight highlight = _highlights[highlightIndex];
             InvalidateLines(highlight.Start.Line, highlight.End.Line);
         }
-        Highlight highlight2 = new Highlight(textPosition, textPosition2, highlightStyle);
-        _highlights[value2] = highlight2;
-        InvalidateLines(highlight2.Start.Line, highlight2.End.Line);
-        return value2;
+        Highlight updatedHighlight = new Highlight(start, end, highlightStyle);
+        _highlights[highlightIndex] = updatedHighlight;
+        InvalidateLines(updatedHighlight.Start.Line, updatedHighlight.End.Line);
+        return highlightIndex;
     }
 
     public void Redraw()
@@ -2551,54 +2551,54 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         Invalidate();
     }
 
-    protected override void OnPaint(PaintEventArgs e3)
+    protected override void OnPaint(PaintEventArgs e)
     {
         if (_flashBitmap != null)
         {
-            e3.Graphics.DrawImage(_flashBitmap, 0, 0);
-            PaintFlash(e3.Graphics);
+            e.Graphics.DrawImage(_flashBitmap, 0, 0);
+            PaintFlash(e.Graphics);
             return;
         }
         if (!_hideMargins)
         {
             foreach (MarginSlot item in _margins)
             {
-                item.Margin.Paint(e3.Graphics, new Rectangle(item.Left, 0, item.Right - item.Left, Height), _charSize, _document.LineCount, ScrollLine, this._visibleRows, this);
+                item.Margin.Paint(e.Graphics, new Rectangle(item.Left, 0, item.Right - item.Left, Height), _charSize, _document.LineCount, ScrollLine, this._visibleRows, this);
             }
         }
-        Brush[,] array = new Brush[this._visibleRows, _visibleColumns];
+        Brush[,] backgroundBrushes = new Brush[this._visibleRows, _visibleColumns];
         foreach (Highlight value in _highlights.Values)
         {
-            PaintSelection(e3.Graphics, value.Start, value.End, value.Style, array);
+            PaintSelection(e.Graphics, value.Start, value.End, value.Style, backgroundBrushes);
         }
         if (_hasSelection)
         {
-            PaintSelection(e3.Graphics, _selectionStart, SelectionEnd, _selectionStyle, array);
+            PaintSelection(e.Graphics, _selectionStart, SelectionEnd, _selectionStyle, backgroundBrushes);
         }
-        int num = ScrollColumn;
-        int num2 = ((e3.ClipRectangle.Top >= _textArea.Top) ? ((int)Math.Floor((float)(e3.ClipRectangle.Top - _textArea.Top) / _charSize.Height)) : 0);
-        int num5 = (int)Math.Ceiling(((float)(e3.ClipRectangle.Bottom - _textArea.Top) - _charSize.Height) / _charSize.Height);
-        for (int num3 = num2; num3 <= Math.Min(this._visibleRows - 1, num5); num3++)
+        int firstColumn = ScrollColumn;
+        int firstRow = ((e.ClipRectangle.Top >= _textArea.Top) ? ((int)Math.Floor((float)(e.ClipRectangle.Top - _textArea.Top) / _charSize.Height)) : 0);
+        int lastRow = (int)Math.Ceiling(((float)(e.ClipRectangle.Bottom - _textArea.Top) - _charSize.Height) / _charSize.Height);
+        for (int row = firstRow; row <= Math.Min(this._visibleRows - 1, lastRow); row++)
         {
-            if (_displayRows[num3].VirtualLine == null)
+            if (_displayRows[row].VirtualLine == null)
             {
-                int num4 = _displayRows[num3].Line;
-                if (num4 >= _document.LineCount)
+                int line = _displayRows[row].Line;
+                if (line >= _document.LineCount)
                 {
                     break;
                 }
-                if (num4 != -1)
+                if (line != -1)
                 {
-                    PaintLine(e3.Graphics, num4, num3, num, array);
+                    PaintLine(e.Graphics, line, row, firstColumn, backgroundBrushes);
                 }
             }
             else
             {
-                Rectangle rectangle = new Rectangle(_textArea.Left, (int)RowToY(num3), _textArea.Width, (int)_charSize.Height);
-                _displayRows[num3].VirtualLine.Draw(e3.Graphics, this, num3, ScrollColumn, _displayRows[num3].Line, rectangle, _charSize);
+                Rectangle rectangle = new Rectangle(_textArea.Left, (int)RowToY(row), _textArea.Width, (int)_charSize.Height);
+                _displayRows[row].VirtualLine.Draw(e.Graphics, this, row, ScrollColumn, _displayRows[row].Line, rectangle, _charSize);
             }
         }
-        base.OnPaint(e3);
+        base.OnPaint(e);
     }
 
     public void LoadFile(string text)
@@ -2610,15 +2610,15 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     public void SaveToFile(string text)
     {
         StreamWriter streamWriter = new StreamWriter(text, append: false);
-        for (int num = 0; num < Document.LineCount; num++)
+        for (int line = 0; line < Document.LineCount; line++)
         {
-            if (num < Document.LineCount - 1)
+            if (line < Document.LineCount - 1)
             {
-                streamWriter.WriteLine(_document.GetLineText(num));
+                streamWriter.WriteLine(_document.GetLineText(line));
             }
             else
             {
-                streamWriter.Write(_document.GetLineText(num));
+                streamWriter.Write(_document.GetLineText(line));
             }
         }
         streamWriter.Dispose();
@@ -2673,37 +2673,37 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     protected override void OnMouseWheel(MouseEventArgs e)
     {
         IScrollBar scrollBar;
-        int num;
+        int step;
         if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
         {
             scrollBar = _horizontalScrollBar;
-            num = _horizontalWheelStep;
+            step = _horizontalWheelStep;
         }
         else
         {
             scrollBar = _verticalScrollBar;
-            num = _verticalWheelStep;
+            step = _verticalWheelStep;
         }
         if (e.Delta > 0)
         {
-            num = -num;
+            step = -step;
         }
         if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
         {
-            num *= _ctrlWheelMultiplier;
+            step *= _ctrlWheelMultiplier;
         }
         ScrollLimits limits = scrollBar.Limits;
-        int num2 = (NativeScrollSemantics ? Math.Max(scrollBar.Maximum - limits.LargeChange + 1, 0) : Math.Max(scrollBar.Maximum, 0));
-        int num3 = scrollBar.Value + num;
-        if (num3 > num2)
+        int maxValue = (NativeScrollSemantics ? Math.Max(scrollBar.Maximum - limits.LargeChange + 1, 0) : Math.Max(scrollBar.Maximum, 0));
+        int newValue = scrollBar.Value + step;
+        if (newValue > maxValue)
         {
-            num3 = num2;
+            newValue = maxValue;
         }
-        if (num3 < limits.Minimum)
+        if (newValue < limits.Minimum)
         {
-            num3 = limits.Minimum;
+            newValue = limits.Minimum;
         }
-        scrollBar.Value = num3;
+        scrollBar.Value = newValue;
         Redraw();
         base.OnMouseWheel(e);
     }
@@ -2715,115 +2715,115 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         Redraw();
     }
 
-    private int LineToRow(int value2)
+    private int LineToRow(int line)
     {
-        for (int num = 0; num < _displayRows.Length; num++)
+        for (int row = 0; row < _displayRows.Length; row++)
         {
-            if (_displayRows[num].Line == value2 && _displayRows[num].VirtualLine == null)
+            if (_displayRows[row].Line == line && _displayRows[row].VirtualLine == null)
             {
-                return num;
+                return row;
             }
         }
         return -1;
     }
 
-    public int GetPreviousRealLine(int value2)
+    public int GetPreviousRealLine(int line)
     {
-        int num = LineToRow(value2);
-        while (--num >= 0)
+        int row = LineToRow(line);
+        while (--row >= 0)
         {
-            if (_displayRows[num].VirtualLine == null)
+            if (_displayRows[row].VirtualLine == null)
             {
-                return _displayRows[num].Line;
+                return _displayRows[row].Line;
             }
         }
         return _previousRealLine;
     }
 
-    public int GetNextRealLine(int value2)
+    public int GetNextRealLine(int line)
     {
-        int num = LineToRow(value2);
-        while (++num < this._visibleRows)
+        int row = LineToRow(line);
+        while (++row < this._visibleRows)
         {
-            if (_displayRows[num].VirtualLine == null)
+            if (_displayRows[row].VirtualLine == null)
             {
-                return _displayRows[num].Line;
+                return _displayRows[row].Line;
             }
         }
         return _nextRealLine;
     }
 
-    private int RowToLine(int value2, out int value3, out int value4)
+    private int RowToLine(int row, out int remainingRows, out int previousLine)
     {
-        int num = 0;
-        int num2 = 0;
-        int num3 = 0;
+        int line = 0;
+        int rowIndex = 0;
+        int previousVisibleLine = 0;
         while (true)
         {
-            if (num2 == value2)
+            if (rowIndex == row)
             {
-                value3 = -1;
-                value4 = num3;
-                return num;
+                remainingRows = -1;
+                previousLine = previousVisibleLine;
+                return line;
             }
-            if (num2 > value2)
+            if (rowIndex > row)
             {
                 break;
             }
-            num3 = num;
-            int num4 = _virtualLines.GetNextSpecialLine(Math.Min(num, 0));
-            if (num4 == -1)
+            previousVisibleLine = line;
+            int nextSpecialLine = _virtualLines.GetNextSpecialLine(Math.Min(line, 0));
+            if (nextSpecialLine == -1)
             {
-                num4 = _document.LineCount;
+                nextSpecialLine = _document.LineCount;
             }
-            int num5 = num4 - num;
-            if (num5 > 0)
+            int lineSpan = nextSpecialLine - line;
+            if (lineSpan > 0)
             {
-                int num6 = Math.Min(num5, value2 - num2);
-                num += num6;
-                num2 += num6;
-                num3 = num - 1;
+                int step = Math.Min(lineSpan, row - rowIndex);
+                line += step;
+                rowIndex += step;
+                previousVisibleLine = line - 1;
             }
             else
             {
-                num += _virtualLines.GetHiddenLineCount(num);
-                num2 += _virtualLines.GetVirtualRowCount(num);
-                num++;
-                num2++;
+                line += _virtualLines.GetHiddenLineCount(line);
+                rowIndex += _virtualLines.GetVirtualRowCount(line);
+                line++;
+                rowIndex++;
             }
         }
-        value3 = num2 - value2;
-        value4 = num3;
-        return num3;
+        remainingRows = rowIndex - row;
+        previousLine = previousVisibleLine;
+        return previousVisibleLine;
     }
 
-    private int LineToRowIndex(int value2)
+    private int LineToRowIndex(int line)
     {
-        int num = 0;
-        int num2 = 0;
-        while (num < value2)
+        int currentLine = 0;
+        int rowIndex = 0;
+        while (currentLine < line)
         {
-            int num3 = _virtualLines.GetNextSpecialLine(num);
-            if (num3 == -1)
+            int nextSpecialLine = _virtualLines.GetNextSpecialLine(currentLine);
+            if (nextSpecialLine == -1)
             {
-                num3 = _document.LineCount;
+                nextSpecialLine = _document.LineCount;
             }
-            int num4 = num3 - num;
-            if (num4 > 0)
+            int lineSpan = nextSpecialLine - currentLine;
+            if (lineSpan > 0)
             {
-                int num5 = Math.Min(num4, value2 - num);
-                num += num5;
-                num2 += num5;
+                int step = Math.Min(lineSpan, line - currentLine);
+                currentLine += step;
+                rowIndex += step;
             }
             else
             {
-                num += _virtualLines.GetHiddenLineCount(num);
-                num2 += _virtualLines.GetVirtualRowCount(num);
-                num++;
-                num2++;
+                currentLine += _virtualLines.GetHiddenLineCount(currentLine);
+                rowIndex += _virtualLines.GetVirtualRowCount(currentLine);
+                currentLine++;
+                rowIndex++;
             }
         }
-        return num2;
+        return rowIndex;
     }
 
     internal void RebuildDisplayRows()
@@ -2832,132 +2832,132 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             _displayRows = new DisplayRow[_visibleRows];
         }
-        int num = ScrollLine;
+        int scrollLine = ScrollLine;
         if (_virtualLines == null)
         {
-            _firstVisibleLine = num;
-            _lastVisibleLine = num + _visibleRows;
-            for (int num2 = 0; num2 < _visibleRows; num2++)
+            _firstVisibleLine = scrollLine;
+            _lastVisibleLine = scrollLine + _visibleRows;
+            for (int row = 0; row < _visibleRows; row++)
             {
-                _displayRows[num2].Line = num + num2;
-                _displayRows[num2].VirtualLine = null;
-                _displayRows[num2].Decorator = null;
+                _displayRows[row].Line = scrollLine + row;
+                _displayRows[row].VirtualLine = null;
+                _displayRows[row].Decorator = null;
             }
-            _previousRealLine = ((num == 0) ? num : (num - 1));
-            _nextRealLine = num + _visibleRows;
+            _previousRealLine = ((scrollLine == 0) ? scrollLine : (scrollLine - 1));
+            _nextRealLine = scrollLine + _visibleRows;
             return;
         }
-        int num3 = RowToLine(num, out var num4, out _previousRealLine);
-        int num5 = 0;
+        int line = RowToLine(scrollLine, out var remainingRows, out _previousRealLine);
+        int displayRowIndex = 0;
         List<IVirtualLine> list = new List<IVirtualLine>();
-        if (num4 != -1)
+        if (remainingRows != -1)
         {
-            _virtualLines.GetVirtualLines(num3, list);
-            for (int num6 = list.Count - num4; num6 < list.Count; num6++)
+            _virtualLines.GetVirtualLines(line, list);
+            for (int virtualLineIndex = list.Count - remainingRows; virtualLineIndex < list.Count; virtualLineIndex++)
             {
-                _displayRows[num5].Line = num3;
-                _displayRows[num5].VirtualLine = list[num6];
-                _displayRows[num5].Decorator = null;
-                num5++;
+                _displayRows[displayRowIndex].Line = line;
+                _displayRows[displayRowIndex].VirtualLine = list[virtualLineIndex];
+                _displayRows[displayRowIndex].Decorator = null;
+                displayRowIndex++;
             }
-            num3 += 1 + _virtualLines.GetHiddenLineCount(num3);
+            line += 1 + _virtualLines.GetHiddenLineCount(line);
         }
-        _firstVisibleLine = num3;
+        _firstVisibleLine = line;
         list.Clear();
-        int num7 = num3;
-        while (num5 < _visibleRows)
+        int previousLine = line;
+        while (displayRowIndex < _visibleRows)
         {
-            _displayRows[num5].VirtualLine = null;
-            _displayRows[num5].Line = num3;
-            _displayRows[num5].Decorator = _virtualLines.GetDecorator(num3);
-            _virtualLines.GetVirtualLines(num3, list);
+            _displayRows[displayRowIndex].VirtualLine = null;
+            _displayRows[displayRowIndex].Line = line;
+            _displayRows[displayRowIndex].Decorator = _virtualLines.GetDecorator(line);
+            _virtualLines.GetVirtualLines(line, list);
             if (list.Count > 0)
             {
-                for (int num8 = 0; num8 < list.Count; num8++)
+                for (int virtualLine = 0; virtualLine < list.Count; virtualLine++)
                 {
-                    if (++num5 >= _visibleRows)
+                    if (++displayRowIndex >= _visibleRows)
                     {
                         break;
                     }
-                    _displayRows[num5].VirtualLine = list[num8];
-                    _displayRows[num5].Line = num3;
-                    _displayRows[num5].Decorator = null;
+                    _displayRows[displayRowIndex].VirtualLine = list[virtualLine];
+                    _displayRows[displayRowIndex].Line = line;
+                    _displayRows[displayRowIndex].Decorator = null;
                 }
                 list.Clear();
             }
-            num7 = num3;
-            num3 += 1 + _virtualLines.GetHiddenLineCount(num3);
-            num5++;
-            if (num3 >= _document.LineCount)
+            previousLine = line;
+            line += 1 + _virtualLines.GetHiddenLineCount(line);
+            displayRowIndex++;
+            if (line >= _document.LineCount)
             {
-                for (; num5 < _visibleRows; num5++)
+                for (; displayRowIndex < _visibleRows; displayRowIndex++)
                 {
-                    _displayRows[num5].VirtualLine = null;
-                    _displayRows[num5].Line = -1;
-                    _displayRows[num5].Decorator = null;
+                    _displayRows[displayRowIndex].VirtualLine = null;
+                    _displayRows[displayRowIndex].Line = -1;
+                    _displayRows[displayRowIndex].Decorator = null;
                 }
             }
         }
-        _nextRealLine = num3;
-        _lastVisibleLine = num7;
+        _nextRealLine = line;
+        _lastVisibleLine = previousLine;
     }
 
-    protected virtual void OnSelectionChanged(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, bool flag, SelectionChangeSource selectionChangeSource)
+    protected virtual void OnSelectionChanged(TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool hasSelection, SelectionChangeSource selectionChangeSource)
     {
         if (SelectionChanged != null)
         {
-            SelectionChanged(this, textPosition, textPosition2, flag);
+            SelectionChanged(this, previousCaret, currentCaret, hasSelection);
         }
     }
 
-    protected virtual void OnCtrlTab(bool flag)
+    protected virtual void OnCtrlTab(bool shift)
     {
         if (CtrlTabPressed != null)
         {
-            CtrlTabPressed(this, flag);
+            CtrlTabPressed(this, shift);
         }
     }
 
-    private Rectangle InflateFlashRect(Rectangle rectangle, Rectangle rectangle2, int value2, int value3)
+    private Rectangle InflateFlashRect(Rectangle flashRect, Rectangle clientBounds, int step, int totalSteps)
     {
-        int num = Math.Max(rectangle.Top - rectangle2.Top, rectangle2.Bottom - rectangle.Bottom);
-        int num2 = Math.Min(rectangle.Left - rectangle2.Left, rectangle2.Right - rectangle.Right);
-        num2 = (num = Math.Min(num2, num));
-        num2 = num2 * value2 / value3;
-        num = num * value2 / value3;
-        return new Rectangle(rectangle.Left - num2, rectangle.Top - num, rectangle.Width + 2 * num2, rectangle.Height + 2 * num);
+        int verticalInset = Math.Max(flashRect.Top - clientBounds.Top, clientBounds.Bottom - flashRect.Bottom);
+        int horizontalInset = Math.Min(flashRect.Left - clientBounds.Left, clientBounds.Right - flashRect.Right);
+        horizontalInset = (verticalInset = Math.Min(horizontalInset, verticalInset));
+        horizontalInset = horizontalInset * step / totalSteps;
+        verticalInset = verticalInset * step / totalSteps;
+        return new Rectangle(flashRect.Left - horizontalInset, flashRect.Top - verticalInset, flashRect.Width + 2 * horizontalInset, flashRect.Height + 2 * verticalInset);
     }
 
     private void PaintFlash(Graphics graphics)
     {
         graphics.DrawRectangle(Pens.Black, _flashRect);
-        for (int num = 0; num < 3; num++)
+        for (int step = 0; step < 3; step++)
         {
-            int num2 = _flashStep - num * 2;
-            if (num2 >= 0 && num2 <= 10)
+            int inset = _flashStep - step * 2;
+            if (inset >= 0 && inset <= 10)
             {
-                graphics.DrawRectangle(_flashPen, InflateFlashRect(_flashRect, ClientRectangle, num2, 10));
+                graphics.DrawRectangle(_flashPen, InflateFlashRect(_flashRect, ClientRectangle, inset, 10));
             }
         }
     }
 
-    public void StartFlash(int value2)
+    public void StartFlash(int interval)
     {
-        _flashTimer.Interval = (int)Math.Ceiling((double)value2 / 16.0);
+        _flashTimer.Interval = (int)Math.Ceiling((double)interval / 16.0);
         _flashStep = 16;
         _flashTimer.Enabled = true;
         Bitmap bitmap = new Bitmap(Width, Height);
         DrawToBitmap(bitmap, ClientRectangle);
         _flashBitmap = bitmap;
-        if (!TryGetCaretColumn(CaretPosition, out var num))
+        if (!TryGetCaretColumn(CaretPosition, out var caretColumn))
         {
-            num = 0;
+            caretColumn = 0;
         }
-        Point point = Point.Round(PositionToPoint(num, CaretPosition.Line));
+        Point point = Point.Round(PositionToPoint(caretColumn, CaretPosition.Line));
         TextDocument.TextPosition textPosition = GetMovedPosition(CaretMove.WordRight);
-        num = ((textPosition.Line != CaretPosition.Line) ? _document.IndexToColumn(textPosition.Line, int.MaxValue, TabSize) : _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize));
-        int num2 = (int)ColumnToX(num);
-        _flashRect = new Rectangle(point.X, point.Y, num2 - point.X, (int)_charSize.Height);
+        caretColumn = ((textPosition.Line != CaretPosition.Line) ? _document.IndexToColumn(textPosition.Line, int.MaxValue, TabSize) : _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize));
+        int endX = (int)ColumnToX(caretColumn);
+        _flashRect = new Rectangle(point.X, point.Y, endX - point.X, (int)_charSize.Height);
     }
 
     private void OnFlashTick(object sender, EventArgs e)
@@ -2972,16 +2972,16 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public void CenterOnCaret()
     {
-        EnsureVisible(CaretPosition, flag3: true);
+        EnsureVisible(CaretPosition, center: true);
     }
 
-    public void MoveCaretToEnd(bool flag)
+    public void MoveCaretToEnd(bool toStart)
     {
         TextDocument.TextPosition textPosition = new TextDocument.TextPosition
         {
             Line = _document.LineCount - 1
         };
-        if (flag)
+        if (toStart)
         {
             textPosition.Column = 0;
         }
@@ -2991,7 +2991,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
         if (_hasSelection)
         {
-            SetSelection(flag: false, default);
+            SetSelection(select: false, default);
         }
         SetCaret(textPosition);
         EnsureCaretVisible(textPosition);
@@ -3029,115 +3029,115 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         _lastMouseButton = MouseButtons.None;
     }
 
-    public TextDocument.TextPosition GetSelectionBoundary(bool flag2)
+    public TextDocument.TextPosition GetSelectionBoundary(bool reverse)
     {
         if (!_hasSelection)
         {
             return CaretPosition;
         }
-        bool flag = SelectionEnd > SelectionStart;
-        if (flag2)
+        bool forward = SelectionEnd > SelectionStart;
+        if (reverse)
         {
-            flag = !flag;
+            forward = !forward;
         }
-        if (!flag)
+        if (!forward)
         {
             return SelectionEnd;
         }
         return SelectionStart;
     }
 
-    public TextDocument.TextPosition Find(TextDocument.TextPosition textPosition, string text2, bool flag, bool flag2, bool flag3, FindSelectMode findSelectMode = FindSelectMode.None)
+    public TextDocument.TextPosition Find(TextDocument.TextPosition textPosition, string searchText, bool searchBackward, bool ignoreCase, bool wrapAround, FindSelectMode findSelectMode = FindSelectMode.None)
     {
-        if (_document == null || _document.LineCount == 0 || string.IsNullOrEmpty(text2))
+        if (_document == null || _document.LineCount == 0 || string.IsNullOrEmpty(searchText))
         {
             return new TextDocument.TextPosition(-1, -1);
         }
-        int num = ((!flag) ? 1 : (-1));
-        int num2 = textPosition.Column;
-        for (int num3 = 0; num3 < 2; num3++)
+        int direction = ((!searchBackward) ? 1 : (-1));
+        int startColumn = textPosition.Column;
+        for (int pass = 0; pass < 2; pass++)
         {
-            for (int num4 = textPosition.Line; num4 >= 0 && num4 < _document.LineCount; num4 += num)
+            for (int line = textPosition.Line; line >= 0 && line < _document.LineCount; line += direction)
             {
-                string text = _document.GetLineText(num4);
+                string text = _document.GetLineText(line);
                 if (text == null)
                 {
                     continue;
                 }
-                int num6;
-                if (flag)
+                int matchIndex;
+                if (searchBackward)
                 {
-                    int num5 = ((num2 == -1) ? text.Length : num2);
-                    num6 = text.LastIndexOf(text2, num5, num5 + 1, flag2 ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture);
+                    int searchStart = ((startColumn == -1) ? text.Length : startColumn);
+                    matchIndex = text.LastIndexOf(searchText, searchStart, searchStart + 1, ignoreCase ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture);
                 }
                 else
                 {
-                    int startIndex = ((num2 != -1) ? num2 : 0);
-                    num6 = text.IndexOf(text2, startIndex, flag2 ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture);
+                    int startIndex = ((startColumn != -1) ? startColumn : 0);
+                    matchIndex = text.IndexOf(searchText, startIndex, ignoreCase ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture);
                 }
-                if (num6 != -1)
+                if (matchIndex != -1)
                 {
-                    TextDocument.TextPosition result = new TextDocument.TextPosition
+                    TextDocument.TextPosition position = new TextDocument.TextPosition
                     {
-                        Column = num6,
-                        Line = num4
+                        Column = matchIndex,
+                        Line = line
                     };
                     if (findSelectMode != FindSelectMode.None)
                     {
                         if (TerminalMode)
                         {
-                            SetSelectionEnd(result);
-                            SetSelectionCore(flag2: true, new TextDocument.TextPosition
+                            SetSelectionEnd(position);
+                            SetSelectionCore(select: true, new TextDocument.TextPosition
                             {
-                                Line = num4,
-                                Column = num6 + text2.Length
+                                Line = line,
+                                Column = matchIndex + searchText.Length
                             }, SelectionChangeSource.FindResult);
-                            EnsureCaretVisible(result);
+                            EnsureCaretVisible(position);
                         }
                         else
                         {
-                            SetCaretCore(result, SelectionChangeSource.FindResult);
-                            SetSelectionCore(flag2: true, new TextDocument.TextPosition
+                            SetCaretCore(position, SelectionChangeSource.FindResult);
+                            SetSelectionCore(select: true, new TextDocument.TextPosition
                             {
-                                Line = num4,
-                                Column = num6 + text2.Length
+                                Line = line,
+                                Column = matchIndex + searchText.Length
                             }, SelectionChangeSource.FindResult);
                         }
-                        int num7 = num6 + text2.Length;
-                        if (num7 <= _visibleColumns)
+                        int matchEnd = matchIndex + searchText.Length;
+                        if (matchEnd <= _visibleColumns)
                         {
                             ScrollColumn = 0;
                         }
-                        else if (text.Length - num6 < _visibleColumns && text.Length > _visibleColumns)
+                        else if (text.Length - matchIndex < _visibleColumns && text.Length > _visibleColumns)
                         {
                             ScrollColumn = text.Length - _visibleColumns;
                         }
-                        else if (text2.Length < _visibleColumns)
+                        else if (searchText.Length < _visibleColumns)
                         {
-                            int num8 = (num6 + num7) / 2;
-                            ScrollColumn = num8 - _visibleColumns / 2;
+                            int centerColumn = (matchIndex + matchEnd) / 2;
+                            ScrollColumn = centerColumn - _visibleColumns / 2;
                         }
                         else
                         {
-                            ScrollColumn = num6;
+                            ScrollColumn = matchIndex;
                         }
                     }
-                    return result;
+                    return position;
                 }
-                num2 = -1;
+                startColumn = -1;
             }
-            if (!((num3 == 0) & flag3))
+            if (!((pass == 0) & wrapAround))
             {
                 break;
             }
-            textPosition.Line = (flag ? (_document.LineCount - 1) : 0);
-            num2 = -1;
+            textPosition.Line = (searchBackward ? (_document.LineCount - 1) : 0);
+            startColumn = -1;
         }
         if (findSelectMode == FindSelectMode.SelectOrClear)
         {
             if (TerminalMode)
             {
-                SetSelection(flag: false, TextDocument.TextPosition.Invalid);
+                SetSelection(select: false, TextDocument.TextPosition.Invalid);
             }
             else
             {
@@ -3146,14 +3146,14 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     Column = 0,
                     Line = _document.LineCount
                 }, SelectionChangeSource.FindResult);
-                SetSelectionCore(flag2: false, CaretPosition, SelectionChangeSource.FindResult);
+                SetSelectionCore(select: false, CaretPosition, SelectionChangeSource.FindResult);
             }
         }
         return new TextDocument.TextPosition(-1, -1);
     }
 
-    public TextDocument.TextPosition OffsetToPosition(int value2)
+    public TextDocument.TextPosition OffsetToPosition(int offset)
     {
-        return Document.OffsetToPosition(value2);
+        return Document.OffsetToPosition(offset);
     }
 }

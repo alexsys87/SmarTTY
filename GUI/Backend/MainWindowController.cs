@@ -123,9 +123,9 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 ((_Controller.ActiveSession?.ActiveTab as EditorTabContext) ?? throw new Exception("No active editor tab")).Editor.Save();
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -157,16 +157,16 @@ public class MainWindowController : INotifyPropertyChanged
                 {
                     using (FileStream fileStream = File.OpenRead(openFileDialog.FileName))
                     {
-                        byte[] array = new byte[fileStream.Length];
-                        fileStream.Read(array, 0, array.Length);
-                        new LogReplayForm(Encoding.UTF8.GetString(array), terminalEmulatorControl).Show();
+                        byte[] bytes = new byte[fileStream.Length];
+                        fileStream.Read(bytes, 0, bytes.Length);
+                        new LogReplayForm(Encoding.UTF8.GetString(bytes), terminalEmulatorControl).Show();
                         return;
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -194,9 +194,9 @@ public class MainWindowController : INotifyPropertyChanged
                 }
                 _LogInProgress = !_LogInProgress;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -224,17 +224,17 @@ public class MainWindowController : INotifyPropertyChanged
                 {
                     remoteOpenFileDialog.InitialDirectory = text;
                 }
-                string text2 = remoteOpenFileDialog.ShowDialog();
-                if (text2 != null)
+                string selectedPath = remoteOpenFileDialog.ShowDialog();
+                if (selectedPath != null)
                 {
-                    activeSession.LastUsedOpenDir = RemotePathUtils.GetDirectoryName(text2);
+                    activeSession.LastUsedOpenDir = RemotePathUtils.GetDirectoryName(selectedPath);
                     activeSession.CurrentDirDuringLastOpen = text;
-                    CreateNewEditorTab(activeSession, text2);
+                    CreateNewEditorTab(activeSession, selectedPath);
                 }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -262,7 +262,7 @@ public class MainWindowController : INotifyPropertyChanged
             editor.KeyDown += editor_KeyDown;
             editor.MouseMove += _Controller.anyctl_MouseMove;
             ((EditableTextBrowser)editor).ModifiedChanged += editor_UnsavedChanged;
-            editor.LoadFailed += (object obj2, EventArgs e10) =>
+            editor.LoadFailed += (object sender, EventArgs e) =>
             {
                 session.CloseFirstMatchingPage((ITabContext tabContext) => tabContext.EditorControl == editor, closeSessionIfEmpty: false);
             };
@@ -358,9 +358,9 @@ public class MainWindowController : INotifyPropertyChanged
                     activeSession.DoUploadFile(scpUploadForm.LocalFile, _Controller.Settings.DefaultUploadDirectory);
                 }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -424,9 +424,9 @@ public class MainWindowController : INotifyPropertyChanged
                 directoryTransferForm.FormClosed += Frm_FormClosed;
                 directoryTransferForm.Show();
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -453,9 +453,9 @@ public class MainWindowController : INotifyPropertyChanged
                 directoryTransferForm.FormClosed += Frm_FormClosed;
                 directoryTransferForm.Show();
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -491,9 +491,9 @@ public class MainWindowController : INotifyPropertyChanged
                 }
                 DoDownloadFile(fn, text, _Controller.Settings.OpenLocalDirAfterDownload);
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -507,7 +507,7 @@ public class MainWindowController : INotifyPropertyChanged
                     throw new Exception("No session active");
                 }
                 string text = activeSession.TryExtractCurrentDir() ?? activeSession.LastDownloadDir;
-                SCPDownloadForm scpDownloadForm = new SCPDownloadForm(activeSession.ExecuteAsyncCommand, text, flag: true)
+                SCPDownloadForm scpDownloadForm = new SCPDownloadForm(activeSession.ExecuteAsyncCommand, text, showCheckBox: true)
                 {
                     OpenLocalDirAfterDownload = _Controller.Settings.OpenLocalDirAfterDownload
                 };
@@ -519,9 +519,9 @@ public class MainWindowController : INotifyPropertyChanged
                     DoDownloadFile(scpDownloadForm.RemoteFile, scpDownloadForm.LocalDirectory, scpDownloadForm.OpenLocalDirAfterDownload);
                 }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -622,7 +622,7 @@ public class MainWindowController : INotifyPropertyChanged
                 Interval = TimeSpan.FromMilliseconds(250.0),
                 IsEnabled = true
             };
-            _Timer.Tick += (object obj, EventArgs e10) =>
+            _Timer.Tick += (object sender, EventArgs e) =>
             {
                 RefreshAndSendKeepalives();
             };
@@ -671,9 +671,9 @@ public class MainWindowController : INotifyPropertyChanged
                 SshSession.SessionStats sessionStats = activeSession.Session.Statistics;
                 Status2 = $"{StringUtils.FormatSize(sessionStats.BytesSent)}B sent, {StringUtils.FormatSize(sessionStats.BytesReceived)}B received";
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                Status1 = ex.Message;
+                Status1 = exception.Message;
                 Status2 = null;
                 ProgressVisibility = Visibility.Collapsed;
             }
@@ -967,9 +967,9 @@ public class MainWindowController : INotifyPropertyChanged
                 MenuCommandHandlers.CreateNewEditorTab(ActiveSession, fdi.FullPath);
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -1003,7 +1003,7 @@ public class MainWindowController : INotifyPropertyChanged
         edit.BackColor = effectiveColors.BackColor;
         edit.ForeColor = effectiveColors.TextColor;
         edit.Brush = new SolidBrush(effectiveColors.LineNumberBackground);
-        edit.Brush2 = new SolidBrush(effectiveColors.LineNumberForeground);
+        edit.LineNumberForegroundBrush = new SolidBrush(effectiveColors.LineNumberForeground);
         edit.TabSize = Settings.Editor.TabSize;
         edit.HideMargins = !Settings.Editor.ShowLineNumbers;
         edit.TabSize = Settings.Editor.TabSize;
@@ -1026,23 +1026,23 @@ public class MainWindowController : INotifyPropertyChanged
         ToolStrip = new ToolStripImpl(this, ((DispatcherObject)wnd).Dispatcher);
         Dispatcher = ((DispatcherObject)wnd).Dispatcher;
         _TerminalContextMenu = new ContextMenuStrip();
-        _TerminalContextMenu.Items.Add("Copy", Resources.CopyHS, (object obj, EventArgs e10) =>
+        _TerminalContextMenu.Items.Add("Copy", Resources.CopyHS, (object sender, EventArgs e) =>
         {
             ActiveSession?.ActiveTab?.EditorControl?.CopySelection();
         });
-        _TerminalContextMenu.Items.Add("Paste", Resources.PasteHS, (object obj, EventArgs e10) =>
+        _TerminalContextMenu.Items.Add("Paste", Resources.PasteHS, (object _, EventArgs e) =>
         {
             ActiveSession?.ActiveTab?.EditorControl?.Paste();
         });
-        _TerminalContextMenu.Items.Add("Copy All", null, (object obj, EventArgs e10) =>
+        _TerminalContextMenu.Items.Add("Copy All", null, (object _, EventArgs e) =>
         {
             CopyAll();
         });
-        _TerminalContextMenu.Items.Add("New Tab", Resources.add16, (object obj, EventArgs e10) =>
+        _TerminalContextMenu.Items.Add("New Tab", Resources.add16, (object _, EventArgs e) =>
         {
             ActiveSession?.CreateNewTerminalPage();
         });
-        _TerminalContextMenu.Items.Add("Close Tab", Resources.delete16, (object obj, EventArgs e10) =>
+        _TerminalContextMenu.Items.Add("Close Tab", Resources.delete16, (object _, EventArgs e) =>
         {
             CloseActivePage();
         });
@@ -1139,7 +1139,7 @@ public class MainWindowController : INotifyPropertyChanged
                     Session = session
                 }
             };
-            vt.EndOfInputRequested += (object obj2, EventArgs e10) =>
+            vt.EndOfInputRequested += (object sender, EventArgs e) =>
             {
                 session.CloseTabPageForControl(vt);
             };
@@ -1194,9 +1194,9 @@ public class MainWindowController : INotifyPropertyChanged
         {
             MenuCommandHandlers.CreateNewEditorTab(ActiveSession, e.Path, new TextDocument.TextPosition(e.Column.GetValueOrDefault(), e.Line.GetValueOrDefault()));
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -1287,8 +1287,8 @@ public class MainWindowController : INotifyPropertyChanged
         }
         if (Settings.InterceptCtrlClipboardShortcuts)
         {
-            SshTerminalControl obj = terminalEmulatorControl as SshTerminalControl;
-            if ((obj == null || !((TextEditorControl)obj).CanEdit) && e.Control && !e.Alt && !e.Shift)
+            SshTerminalControl sshTerminal = terminalEmulatorControl as SshTerminalControl;
+            if ((sshTerminal == null || !((TextEditorControl)sshTerminal).CanEdit) && e.Control && !e.Alt && !e.Shift)
             {
                 switch (e.KeyCode)
                 {
@@ -1420,22 +1420,22 @@ public class MainWindowController : INotifyPropertyChanged
     {
         if (session == ActiveSession && _ActiveTab != activeTab)
         {
-            TerminalEmulatorControl terminalEmulatorControl = (_ActiveTab as NormalTabContext)?.Terminal;
-            TerminalEmulatorControl terminalEmulatorControl2 = (activeTab as NormalTabContext)?.Terminal;
+            TerminalEmulatorControl previousTerminal = (_ActiveTab as NormalTabContext)?.Terminal;
+            TerminalEmulatorControl newTerminal = (activeTab as NormalTabContext)?.Terminal;
             _ActiveTab = activeTab;
-            if (terminalEmulatorControl != null)
+            if (previousTerminal != null)
             {
-                terminalEmulatorControl.CaretWhenUnfocused = false;
-                terminalEmulatorControl.LayoutSuspended = false;
-                terminalEmulatorControl.LostFocus -= ActiveTerminal_LostFocus;
+                previousTerminal.CaretWhenUnfocused = false;
+                previousTerminal.LayoutSuspended = false;
+                previousTerminal.LostFocus -= ActiveTerminal_LostFocus;
             }
-            if (terminalEmulatorControl2 != null)
+            if (newTerminal != null)
             {
-                terminalEmulatorControl2.CaretWhenUnfocused = true;
-                terminalEmulatorControl2.VerticalScrollBarVisible = Settings.VerticalScrollbarMode == GlobalSettings.ScrollbarMode.Show;
-                terminalEmulatorControl2.HorizontalScrollBarVisible = Settings.HorizontalScrollbarMode == GlobalSettings.ScrollbarMode.Show;
-                terminalEmulatorControl2.LayoutSuspended = SuppressTerminalResizeEvents;
-                terminalEmulatorControl2.LostFocus += ActiveTerminal_LostFocus;
+                newTerminal.CaretWhenUnfocused = true;
+                newTerminal.VerticalScrollBarVisible = Settings.VerticalScrollbarMode == GlobalSettings.ScrollbarMode.Show;
+                newTerminal.HorizontalScrollBarVisible = Settings.HorizontalScrollbarMode == GlobalSettings.ScrollbarMode.Show;
+                newTerminal.LayoutSuspended = SuppressTerminalResizeEvents;
+                newTerminal.LostFocus += ActiveTerminal_LostFocus;
             }
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("RemoteFileSaveHeader"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SaveCommandVisibility"));
@@ -1479,8 +1479,8 @@ public class MainWindowController : INotifyPropertyChanged
 
     public void Dispose()
     {
-        SessionWrapper[] array = AllSessions.ToArray();
-        foreach (SessionWrapper sessionWrapper in array)
+        SessionWrapper[] items = AllSessions.ToArray();
+        foreach (SessionWrapper sessionWrapper in items)
         {
             if (sessionWrapper.Session != null)
             {

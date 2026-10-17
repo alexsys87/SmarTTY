@@ -130,9 +130,9 @@ public class ScpTransferManager : IDisposable
             }
             return transferJob;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show("Cannot download a file: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show("Cannot download a file: " + exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             return null;
         }
     }
@@ -173,9 +173,9 @@ public class ScpTransferManager : IDisposable
             _uploadSignal.Release();
             return transferJob;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show("Cannot upload a file: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show("Cannot upload a file: " + exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             return null;
         }
     }

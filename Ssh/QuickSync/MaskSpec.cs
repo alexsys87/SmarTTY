@@ -10,9 +10,9 @@ public struct MaskSpec
 
     public bool HasRegex => Regex != null;
 
-    public MaskSpec(Regex regex, bool flag)
+    public MaskSpec(Regex regex, bool isInclude)
     {
         this.Regex = regex;
-        IsInclude = flag;
+        IsInclude = isInclude;
     }
 }

@@ -55,9 +55,9 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
         InitializeComponent();
     }
 
-    private void SetHotZone(AutoScrollZone autoScrollZone, bool flag)
+    private void SetHotZone(AutoScrollZone autoScrollZone, bool resetActive)
     {
-        if (flag)
+        if (resetActive)
         {
             _activeZone = AutoScrollZone.None;
         }
@@ -82,56 +82,56 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
         }
     }
 
-    protected override void OnMouseMove(MouseEventArgs e2)
+    protected override void OnMouseMove(MouseEventArgs e)
     {
         if (_smartScrollEnabled)
         {
-            if (_activeZone != AutoScrollZone.None && e2.Button == MouseButtons.Left && _fastScrollButton.Contains(e2.Location))
+            if (_activeZone != AutoScrollZone.None && e.Button == MouseButtons.Left && _fastScrollButton.Contains(e.Location))
             {
-                SetHotZone(_activeZone, flag: false);
+                SetHotZone(_activeZone, resetActive: false);
                 _activeZone = AutoScrollZone.None;
                 _zoneDismissed = true;
                 Redraw();
             }
-            if (_hasSelection && e2.Button == MouseButtons.Left)
+            if (_hasSelection && e.Button == MouseButtons.Left)
             {
-                _lastMouse = e2;
+                _lastMouse = e;
                 AutoScrollZone autoScrollZone = AutoScrollZone.None;
-                if (TextArea.Bottom - e2.Y < 32)
+                if (TextArea.Bottom - e.Y < 32)
                 {
                     autoScrollZone = AutoScrollZone.Down;
                 }
-                else if (e2.Y - TextArea.Top < 32)
+                else if (e.Y - TextArea.Top < 32)
                 {
                     autoScrollZone = AutoScrollZone.Up;
                 }
                 if (!_zoneDismissed)
                 {
-                    SetHotZone(autoScrollZone, flag: false);
+                    SetHotZone(autoScrollZone, resetActive: false);
                 }
                 else if (autoScrollZone != AutoScrollZone.None)
                 {
-                    SetHotZone(autoScrollZone, flag: false);
+                    SetHotZone(autoScrollZone, resetActive: false);
                 }
                 if (autoScrollZone != AutoScrollZone.None && _activeZone != autoScrollZone && !_zoneDismissed)
                 {
-                    int num = 32;
-                    int num2 = ((e2.X <= TextArea.Right - (num + 5)) ? (e2.X + 5) : (e2.X - num - 5));
+                    int value = 32;
+                    int currentValue = ((e.X <= TextArea.Right - (value + 5)) ? (e.X + 5) : (e.X - value - 5));
                     if (autoScrollZone == AutoScrollZone.Down)
                     {
-                        _fastScrollButton = new Rectangle(num2, TextArea.Bottom - 32 - num - 5, num, num);
+                        _fastScrollButton = new Rectangle(currentValue, TextArea.Bottom - 32 - value - 5, value, value);
                     }
                     else
                     {
-                        _fastScrollButton = new Rectangle(num2, TextArea.Top + 32 + 5, num, num);
+                        _fastScrollButton = new Rectangle(currentValue, TextArea.Top + 32 + 5, value, value);
                     }
                     _activeZone = autoScrollZone;
-                    SetHotZone(autoScrollZone, flag: false);
+                    SetHotZone(autoScrollZone, resetActive: false);
                     Redraw();
                 }
                 if ((uint)(autoScrollZone - 1) <= 1u)
                 {
-                    _scrollSpeed = (e2.X - _sliderRect.Left) * 1000 / _sliderRect.Width;
+                    _scrollSpeed = (e.X - _sliderRect.Left) * 1000 / _sliderRect.Width;
                     if (_scrollSpeed < 0)
                     {
                         _scrollSpeed = 0;
@@ -152,19 +152,19 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
                 {
                     Cursor = Cursors.IBeam;
                 }
-                SetHotZone(AutoScrollZone.None, flag: true);
+                SetHotZone(AutoScrollZone.None, resetActive: true);
             }
         }
-        else if (_hasSelection && e2.Button == MouseButtons.Left)
+        else if (_hasSelection && e.Button == MouseButtons.Left)
         {
-            if (e2.Y < 0)
+            if (e.Y < 0)
             {
-                _autoScrollDelta = -1 + e2.Y / 10;
+                _autoScrollDelta = -1 + e.Y / 10;
                 _timer.Enabled = true;
             }
-            else if (e2.Y > Height)
+            else if (e.Y > Height)
             {
-                _autoScrollDelta = 1 + (e2.Y - Height) / 10;
+                _autoScrollDelta = 1 + (e.Y - Height) / 10;
                 _timer.Enabled = true;
             }
             else
@@ -173,7 +173,7 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
                 _timer.Enabled = false;
             }
         }
-        base.OnMouseMove(e2);
+        base.OnMouseMove(e);
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
@@ -182,7 +182,7 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
         {
             if (e.Button == MouseButtons.Left)
             {
-                SetHotZone(AutoScrollZone.None, flag: true);
+                SetHotZone(AutoScrollZone.None, resetActive: true);
                 _scrollSpeed = 0;
                 Redraw();
             }
@@ -195,71 +195,71 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
         base.OnMouseUp(e);
     }
 
-    internal static GraphicsPath CreateRoundedRectangle(Rectangle rectangle, int value2)
+    internal static GraphicsPath CreateRoundedRectangle(Rectangle rectangle, int value)
     {
         GraphicsPath graphicsPath = new GraphicsPath();
-        graphicsPath.AddArc(rectangle.X, rectangle.Y, value2 * 2, value2 * 2, 180f, 90f);
-        graphicsPath.AddLine(rectangle.X + value2, rectangle.Y, rectangle.Right - value2 * 2, rectangle.Y);
-        graphicsPath.AddArc(rectangle.X + rectangle.Width - value2 * 2, rectangle.Y, value2 * 2, value2 * 2, 270f, 90f);
-        graphicsPath.AddLine(rectangle.Right, rectangle.Y + value2 * 2, rectangle.Right, rectangle.Y + rectangle.Height - value2 * 2);
-        graphicsPath.AddArc(rectangle.X + rectangle.Width - value2 * 2, rectangle.Y + rectangle.Height - value2 * 2, value2 * 2, value2 * 2, 0f, 90f);
-        graphicsPath.AddLine(rectangle.Right - value2 * 2, rectangle.Bottom, rectangle.X + value2 * 2, rectangle.Bottom);
-        graphicsPath.AddArc(rectangle.X, rectangle.Bottom - value2 * 2, value2 * 2, value2 * 2, 90f, 90f);
-        graphicsPath.AddLine(rectangle.X, rectangle.Bottom - value2 * 2, rectangle.X, rectangle.Y + value2 * 2);
+        graphicsPath.AddArc(rectangle.X, rectangle.Y, value * 2, value * 2, 180f, 90f);
+        graphicsPath.AddLine(rectangle.X + value, rectangle.Y, rectangle.Right - value * 2, rectangle.Y);
+        graphicsPath.AddArc(rectangle.X + rectangle.Width - value * 2, rectangle.Y, value * 2, value * 2, 270f, 90f);
+        graphicsPath.AddLine(rectangle.Right, rectangle.Y + value * 2, rectangle.Right, rectangle.Y + rectangle.Height - value * 2);
+        graphicsPath.AddArc(rectangle.X + rectangle.Width - value * 2, rectangle.Y + rectangle.Height - value * 2, value * 2, value * 2, 0f, 90f);
+        graphicsPath.AddLine(rectangle.Right - value * 2, rectangle.Bottom, rectangle.X + value * 2, rectangle.Bottom);
+        graphicsPath.AddArc(rectangle.X, rectangle.Bottom - value * 2, value * 2, value * 2, 90f, 90f);
+        graphicsPath.AddLine(rectangle.X, rectangle.Bottom - value * 2, rectangle.X, rectangle.Y + value * 2);
         graphicsPath.CloseFigure();
         return graphicsPath;
     }
 
-    protected override void OnPaint(PaintEventArgs e2)
+    protected override void OnPaint(PaintEventArgs e)
     {
-        base.OnPaint(e2);
-        e2.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        int num = _zoneRect.Height;
+        base.OnPaint(e);
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        int height = _zoneRect.Height;
         ImageAttributes imageAttributes = new ImageAttributes();
         imageAttributes.SetColorKey(Color.Magenta, Color.Magenta);
         if (_activeZone != AutoScrollZone.None)
         {
-            bool flag = _activeZone == AutoScrollZone.Down;
-            Image image = (flag ? Resources.fastDown : Resources.fastUp);
+            bool isFastScrollDown = _activeZone == AutoScrollZone.Down;
+            Image fastScrollImage = (isFastScrollDown ? Resources.fastDown : Resources.fastUp);
             GraphicsPath path = CreateRoundedRectangle(_fastScrollButton, _fastScrollButton.Width / 8);
-            e2.Graphics.FillPath(new SolidBrush(Color.FromArgb(200, SystemColors.ButtonFace)), path);
-            e2.Graphics.DrawPath(Pens.Black, path);
-            e2.Graphics.DrawImage(image, _fastScrollButton, 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, imageAttributes);
+            e.Graphics.FillPath(new SolidBrush(Color.FromArgb(200, SystemColors.ButtonFace)), path);
+            e.Graphics.DrawPath(Pens.Black, path);
+            e.Graphics.DrawImage(fastScrollImage, _fastScrollButton, 0, 0, fastScrollImage.Width, fastScrollImage.Height, GraphicsUnit.Pixel, imageAttributes);
             return;
         }
-        bool flag2 = _hotZone == AutoScrollZone.Down;
-        Image image2 = (flag2 ? Resources.fastDown : Resources.fastUp);
-        Image image3 = (flag2 ? Resources.down : Resources.up);
+        bool isHotZoneDown = _hotZone == AutoScrollZone.Down;
+        Image scrollDirectionImage = (isHotZoneDown ? Resources.fastDown : Resources.fastUp);
+        Image arrowImage = (isHotZoneDown ? Resources.down : Resources.up);
         if (_hotZone != AutoScrollZone.None)
         {
-            int num2 = ((_hotZone == AutoScrollZone.Up) ? _sliderRect.Top : _sliderRect.Bottom);
-            int num3 = ((_hotZone != AutoScrollZone.Up) ? _sliderRect.Top : _sliderRect.Bottom);
-            e2.Graphics.FillRectangle(new SolidBrush(Color.FromArgb(200, SystemColors.ButtonFace)), _zoneRect);
-            Rectangle destRect = new Rectangle(_zoneRect.Left, _zoneRect.Top, num, num);
-            e2.Graphics.DrawImage(image3, destRect, 0, 0, image3.Width, image3.Height, GraphicsUnit.Pixel, imageAttributes);
-            destRect = new Rectangle(_zoneRect.Right - num, _zoneRect.Top, num, num);
-            e2.Graphics.DrawImage(image2, destRect, 0, 0, image2.Width, image2.Height, GraphicsUnit.Pixel, imageAttributes);
-            int num4 = _sliderRect.Width * _scrollSpeed / 1000;
-            int num5 = num4 * _sliderRect.Height / _sliderRect.Width;
+            int value = ((_hotZone == AutoScrollZone.Up) ? _sliderRect.Top : _sliderRect.Bottom);
+            int currentValue = ((_hotZone != AutoScrollZone.Up) ? _sliderRect.Top : _sliderRect.Bottom);
+            e.Graphics.FillRectangle(new SolidBrush(Color.FromArgb(200, SystemColors.ButtonFace)), _zoneRect);
+            Rectangle destRect = new Rectangle(_zoneRect.Left, _zoneRect.Top, height, height);
+            e.Graphics.DrawImage(arrowImage, destRect, 0, 0, arrowImage.Width, arrowImage.Height, GraphicsUnit.Pixel, imageAttributes);
+            destRect = new Rectangle(_zoneRect.Right - height, _zoneRect.Top, height, height);
+            e.Graphics.DrawImage(scrollDirectionImage, destRect, 0, 0, scrollDirectionImage.Width, scrollDirectionImage.Height, GraphicsUnit.Pixel, imageAttributes);
+            int candidateValue = _sliderRect.Width * _scrollSpeed / 1000;
+            int width = candidateValue * _sliderRect.Height / _sliderRect.Width;
             if (_hotZone == AutoScrollZone.Up)
             {
-                num5 = -num5;
+                width = -width;
             }
-            e2.Graphics.FillPolygon(new SolidBrush(Color.FromArgb(200, SystemColors.Highlight)), new Point[3]
+            e.Graphics.FillPolygon(new SolidBrush(Color.FromArgb(200, SystemColors.Highlight)), new Point[3]
             {
-                new Point(_sliderRect.Left, num2),
-                new Point(_sliderRect.Left + num4, num2),
-                new Point(_sliderRect.Left + num4, num2 - num5)
+                new Point(_sliderRect.Left, value),
+                new Point(_sliderRect.Left + candidateValue, value),
+                new Point(_sliderRect.Left + candidateValue, value - width)
             });
-            e2.Graphics.DrawLine(Pens.Black, _sliderRect.Left, num2, _sliderRect.Right, num2);
-            e2.Graphics.DrawLine(Pens.Black, _sliderRect.Right, num2, _sliderRect.Right, num3);
-            e2.Graphics.DrawLine(Pens.Black, _sliderRect.Left, num2, _sliderRect.Right, num3);
+            e.Graphics.DrawLine(Pens.Black, _sliderRect.Left, value, _sliderRect.Right, value);
+            e.Graphics.DrawLine(Pens.Black, _sliderRect.Right, value, _sliderRect.Right, currentValue);
+            e.Graphics.DrawLine(Pens.Black, _sliderRect.Left, value, _sliderRect.Right, currentValue);
         }
     }
 
-    protected virtual void ScrollBy(int value2)
+    protected virtual void ScrollBy(int scrollOffset)
     {
-        TopLine += value2;
+        TopLine += scrollOffset;
     }
 
     private void OnTimerTick(object sender, EventArgs e)
@@ -274,19 +274,19 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
             {
                 return;
             }
-            int num = ((_hotZone == AutoScrollZone.Down) ? 1 : (-1));
-            double num2 = ((_activeZone == AutoScrollZone.None) ? (Math.Exp((double)_scrollSpeed / 120.0) / 2.0) : ((double)num));
-            if (num2 > 1.0)
+            int value = ((_hotZone == AutoScrollZone.Down) ? 1 : (-1));
+            double currentValue = ((_activeZone == AutoScrollZone.None) ? (Math.Exp((double)_scrollSpeed / 120.0) / 2.0) : ((double)value));
+            if (currentValue > 1.0)
             {
-                TopLine += (int)num2 * num;
+                TopLine += (int)currentValue * value;
                 this._scrollRemainder = 0;
             }
             else
             {
-                int num3 = (int)(1.0 / num2);
-                if (++this._scrollRemainder > num3)
+                int candidateValue = (int)(1.0 / currentValue);
+                if (++this._scrollRemainder > candidateValue)
                 {
-                    TopLine += num;
+                    TopLine += value;
                     this._scrollRemainder = 0;
                 }
             }

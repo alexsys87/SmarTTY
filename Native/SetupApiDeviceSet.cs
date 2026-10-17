@@ -319,13 +319,13 @@ public class SetupApiDeviceSet : IDisposable
         {
             currentDeviceId = GetParentDeviceId(currentDeviceId);
         }
-        string result = null;
+        string text = null;
         int slashIndex = currentDeviceId?.LastIndexOf('\\') ?? (-1);
         if (slashIndex > 0)
         {
-            result = currentDeviceId.Substring(slashIndex + 1);
+            text = currentDeviceId.Substring(slashIndex + 1);
         }
-        return result;
+        return text;
     }
 
     public IEnumerable<ComPortInfo> EnumerateComPorts()

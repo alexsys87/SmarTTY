@@ -150,17 +150,17 @@ public class SSHConnectionSettings
         {
             return null;
         }
-        int num = hostWithPort.IndexOf(':');
-        if (num == -1)
+        int index = hostWithPort.IndexOf(':');
+        if (index == -1)
         {
             return hostWithPort;
         }
-        return hostWithPort.Substring(0, num);
+        return hostWithPort.Substring(0, index);
     }
 
-    public static bool HostNamesEqual(string hostWithPort1, string hostWithPort2)
+    public static bool HostNamesEqual(string firstHost, string secondHost)
     {
-        return StringComparer.InvariantCultureIgnoreCase.Compare(StripPortNumber(hostWithPort1), StripPortNumber(hostWithPort2)) == 0;
+        return StringComparer.InvariantCultureIgnoreCase.Compare(StripPortNumber(firstHost), StripPortNumber(secondHost)) == 0;
     }
 
     public void UpdateLastConnectionTime()

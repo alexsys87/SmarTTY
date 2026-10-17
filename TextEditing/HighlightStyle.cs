@@ -10,11 +10,11 @@ public class HighlightStyle
 
     public Brush TextBrush = new SolidBrush(SystemColors.HighlightText);
 
-    public HighlightStyle(Brush brush, Pen pen, Brush brush2)
+    public HighlightStyle(Brush fillBrush, Pen pen, Brush textBrush)
     {
-        this.FillBrush = brush;
+        this.FillBrush = fillBrush;
         this.BorderPen = pen;
-        this.TextBrush = brush2;
+        this.TextBrush = textBrush;
     }
 
     public HighlightStyle()

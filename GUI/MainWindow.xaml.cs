@@ -67,10 +67,10 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         if (_InitialCommand.Command == null && virtualTerminalMode == VirtualTerminalMode.Ask)
         {
             VirtualTerminalIntroWindow virtualTerminalIntroWindow = new VirtualTerminalIntroWindow(Controller.Settings);
-            bool? flag = virtualTerminalIntroWindow.ShowDialog();
-            if (flag.HasValue)
+            bool? dialogResult = virtualTerminalIntroWindow.ShowDialog();
+            if (dialogResult.HasValue)
             {
-                virtualTerminalMode = (flag.Value ? VirtualTerminalMode.Enabled : VirtualTerminalMode.Disabled);
+                virtualTerminalMode = (dialogResult.Value ? VirtualTerminalMode.Enabled : VirtualTerminalMode.Disabled);
                 if (((ToggleButton)virtualTerminalIntroWindow.cbRemember).IsChecked == true)
                 {
                     Controller.Settings.VirtualTerminal.DefaultMode = virtualTerminalMode;
@@ -136,8 +136,8 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private void NewConnectionSelected(object sender, SelectionChangedEventArgs e)
     {
-        object obj = ((sender is ListBox) ? sender : null);
-        if (((obj != null) ? ((Selector)obj).SelectedItem : null) is ConnectionSelectionWindow.IConnectionSettingsWrapper wrp)
+        object sourceElement = ((sender is ListBox) ? sender : null);
+        if (((sourceElement != null) ? ((Selector)sourceElement).SelectedItem : null) is ConnectionSelectionWindow.IConnectionSettingsWrapper wrp)
         {
             Controller.NewConnectionController.ConnectWithSettings(wrp);
         }
@@ -263,39 +263,39 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private void SearchUp_Click(object sender, RoutedEventArgs e)
     {
-        object obj = ((sender is FrameworkElement) ? sender : null);
-        (((obj != null) ? ((FrameworkElement)obj).DataContext : null) as TextSearcher)?.Search(up: true);
+        object sourceElement = ((sender is FrameworkElement) ? sender : null);
+        (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as TextSearcher)?.Search(up: true);
     }
 
     private void SearchDown_Click(object sender, RoutedEventArgs e)
     {
-        object obj = ((sender is FrameworkElement) ? sender : null);
-        (((obj != null) ? ((FrameworkElement)obj).DataContext : null) as TextSearcher)?.Search(up: false);
+        object sourceElement = ((sender is FrameworkElement) ? sender : null);
+        (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as TextSearcher)?.Search(up: false);
     }
 
     private void Border_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         Border border = sender as Border;
-        bool flag = false;
-        int num;
+        bool isVisible = false;
+        int value;
         if (border != null)
         {
             object newValue = e.NewValue;
             if (newValue is bool)
             {
-                flag = (bool)newValue;
-                num = 1;
+                isVisible = (bool)newValue;
+                value = 1;
             }
             else
             {
-                num = 0;
+                value = 0;
             }
         }
         else
         {
-            num = 0;
+            value = 0;
         }
-        if (((uint)num & (flag ? 1u : 0u)) == 0)
+        if (((uint)value & (isVisible ? 1u : 0u)) == 0)
         {
             return;
         }
@@ -313,21 +313,21 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private void CloseSearch_Click(object sender, RoutedEventArgs e)
     {
-        object obj = ((sender is FrameworkElement) ? sender : null);
-        (((obj != null) ? ((FrameworkElement)obj).DataContext : null) as TextSearcher)?.Hide();
+        object sourceElement = ((sender is FrameworkElement) ? sender : null);
+        (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as TextSearcher)?.Hide();
     }
 
     private void txtSearch_KeyDown(object sender, KeyEventArgs e)
     {
         if ((int)e.Key == 6)
         {
-            object obj = ((sender is FrameworkElement) ? sender : null);
-            (((obj != null) ? ((FrameworkElement)obj).DataContext : null) as TextSearcher)?.Search(up: false);
+            object sourceElement = ((sender is FrameworkElement) ? sender : null);
+            (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as TextSearcher)?.Search(up: false);
         }
         else if ((int)e.Key == 13)
         {
-            object obj2 = ((sender is FrameworkElement) ? sender : null);
-            (((obj2 != null) ? ((FrameworkElement)obj2).DataContext : null) as TextSearcher)?.Hide();
+            object hiddenSourceElement = ((sender is FrameworkElement) ? sender : null);
+            (((hiddenSourceElement != null) ? ((FrameworkElement)hiddenSourceElement).DataContext : null) as TextSearcher)?.Hide();
         }
     }
 
@@ -358,12 +358,12 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     {
         try
         {
-            object obj = ((sender is FrameworkElement) ? sender : null);
-            (((obj != null) ? ((FrameworkElement)obj).DataContext : null) as ICloseableElement)?.Close();
+            object sourceElement = ((sender is FrameworkElement) ? sender : null);
+            (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as ICloseableElement)?.Close();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -390,18 +390,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     private void SCPVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         object newValue = e.NewValue;
-        bool flag = false;
-        int num;
+        bool isVisible = false;
+        int value;
         if (newValue is bool)
         {
-            flag = (bool)newValue;
-            num = 1;
+            isVisible = (bool)newValue;
+            value = 1;
         }
         else
         {
-            num = 0;
+            value = 0;
         }
-        if (((uint)num & (flag ? 1u : 0u)) != 0)
+        if (((uint)value & (isVisible ? 1u : 0u)) != 0)
         {
             if (_SCPHeight.HasValue)
             {
@@ -418,18 +418,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     private void FilesVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         object newValue = e.NewValue;
-        bool flag = false;
-        int num;
+        bool isVisible = false;
+        int value;
         if (newValue is bool)
         {
-            flag = (bool)newValue;
-            num = 1;
+            isVisible = (bool)newValue;
+            value = 1;
         }
         else
         {
-            num = 0;
+            value = 0;
         }
-        if (((uint)num & (flag ? 1u : 0u)) != 0)
+        if (((uint)value & (isVisible ? 1u : 0u)) != 0)
         {
             if (_FilesWidth.HasValue)
             {
@@ -445,8 +445,8 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private void CancelTransfer(object sender, RoutedEventArgs e)
     {
-        object obj = ((sender is FrameworkElement) ? sender : null);
-        (((obj != null) ? ((FrameworkElement)obj).DataContext : null) as SCPController.TransferObject)?.Cancel();
+        object sourceElement = ((sender is FrameworkElement) ? sender : null);
+        (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as SCPController.TransferObject)?.Cancel();
     }
 
     private void ListView_KeyDown(object sender, KeyEventArgs e)
@@ -455,31 +455,31 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         {
             if ((int)e.Key == 32)
             {
-                SCPController.TransferObject[] array = ((ListBox)((sender is ListView) ? sender : null)).SelectedItems.OfType<SCPController.TransferObject>().ToArray();
-                for (int num = 0; num < array.Length; num++)
+                SCPController.TransferObject[] items = ((ListBox)((sender is ListView) ? sender : null)).SelectedItems.OfType<SCPController.TransferObject>().ToArray();
+                for (int arrayIndex = 0; arrayIndex < items.Length; arrayIndex++)
                 {
-                    array[num].Cancel();
+                    items[arrayIndex].Cancel();
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
     private void RemoveCompleted_Click(object sender, RoutedEventArgs e)
     {
-        object obj = ((sender is FrameworkElement) ? sender : null);
-        (((obj != null) ? ((FrameworkElement)obj).DataContext : null) as SCPController)?.RemoveCompleted();
+        object sourceElement = ((sender is FrameworkElement) ? sender : null);
+        (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as SCPController)?.RemoveCompleted();
     }
 
     private void RunForSelecterXfers(Action<SCPController.TransferObject> action, bool onlyFirst = false)
     {
-        SCPController.TransferObject[] array = ((ListBox)TransferList).SelectedItems.OfType<SCPController.TransferObject>().ToArray();
-        foreach (SCPController.TransferObject obj in array)
+        SCPController.TransferObject[] items = ((ListBox)TransferList).SelectedItems.OfType<SCPController.TransferObject>().ToArray();
+        foreach (SCPController.TransferObject sender in items)
         {
-            action(obj);
+            action(sender);
             if (onlyFirst)
             {
                 break;
@@ -529,15 +529,15 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private void TransferList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        SCPController.TransferObject[] array = ((ListBox)TransferList).SelectedItems.OfType<SCPController.TransferObject>().ToArray();
-        if (array.Length == 0)
+        SCPController.TransferObject[] items = ((ListBox)TransferList).SelectedItems.OfType<SCPController.TransferObject>().ToArray();
+        if (items.Length == 0)
         {
             xferMenu.Visibility = Visibility.Collapsed;
             return;
         }
         xferMenu.Visibility = Visibility.Visible;
-        cmdCancel.Visibility = ((array.FirstOrDefault((SCPController.TransferObject transferObject) => transferObject.Status == ScpTransferManager.TransferState.InProgress || transferObject.Status == ScpTransferManager.TransferState.Queued) == null) ? Visibility.Collapsed : Visibility.Visible);
-        cmdRetry.Visibility = ((array.FirstOrDefault((SCPController.TransferObject transferObject) => transferObject.Status == ScpTransferManager.TransferState.Failed) == null) ? Visibility.Collapsed : Visibility.Visible);
+        cmdCancel.Visibility = ((items.FirstOrDefault((SCPController.TransferObject transferObject) => transferObject.Status == ScpTransferManager.TransferState.InProgress || transferObject.Status == ScpTransferManager.TransferState.Queued) == null) ? Visibility.Collapsed : Visibility.Visible);
+        cmdRetry.Visibility = ((items.FirstOrDefault((SCPController.TransferObject transferObject) => transferObject.Status == ScpTransferManager.TransferState.Failed) == null) ? Visibility.Collapsed : Visibility.Visible);
     }
 
     public void UpdateContextMenu()
@@ -559,9 +559,9 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                     break;
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -591,9 +591,9 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                 activeSession.CreateNewTerminalPage(virtualMode: false, new InitialCommand(packageManagerWindow2.CommandLine, echoInitialCommand: true));
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -611,13 +611,13 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                 char ch = '\0';
                 if ((int)e.SystemKey >= 44 && (int)e.SystemKey <= 69)
                 {
-                    int num = (int)e.SystemKey - 44;
-                    ch = (char)(97 + num);
+                    int value = (int)e.SystemKey - 44;
+                    ch = (char)(97 + value);
                 }
                 else if ((int)e.Key >= 34 && (int)e.Key <= 43)
                 {
-                    int num2 = (int)e.SystemKey - 34;
-                    ch = (char)(48 + num2);
+                    int currentValue = (int)e.SystemKey - 34;
+                    ch = (char)(48 + currentValue);
                 }
                 if (ch != '\0' && terminalEmulatorControl != null && terminalEmulatorControl.SendAltChar(ch))
                 {

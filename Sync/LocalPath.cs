@@ -45,24 +45,24 @@ public struct LocalPath
     {
         if (relativePath.Contains("\\") || relativePath == ".." || relativePath == "." || relativePath.Contains('/'))
         {
-            LocalPath result = this;
+            LocalPath normalizedPath = this;
             string[] segments = relativePath.Replace('/', '\\').Split('\\');
             foreach (string part in segments)
             {
                 switch (part)
                 {
                     case "..":
-                        result = result.GetParent();
+                        normalizedPath = normalizedPath.GetParent();
                         break;
                     default:
-                        result = new LocalPath(result.FullPath + "\\" + part);
+                        normalizedPath = new LocalPath(normalizedPath.FullPath + "\\" + part);
                         break;
                     case "":
                     case ".":
                         break;
                 }
             }
-            return result;
+            return normalizedPath;
         }
         return new LocalPath(this.FullPath + "\\" + relativePath.Replace('/', '\\'));
     }

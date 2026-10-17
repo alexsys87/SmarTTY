@@ -49,7 +49,7 @@ public static class WildcardParser
     {
         if (string.IsNullOrEmpty(maskText) || maskText == "-" || maskText == "-\"\"")
         {
-            return new MaskSpec(null, flag: false);
+            return new MaskSpec(null, isInclude: false);
         }
         bool isInclude = true;
         if (maskText.StartsWith("-"))

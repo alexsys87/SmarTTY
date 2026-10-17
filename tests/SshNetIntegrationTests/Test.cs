@@ -44,17 +44,17 @@ internal static class Test
         {
             action();
         }
-        catch (TException ex)
+        catch (TException exception)
         {
-            verify?.Invoke(ex);
+            verify?.Invoke(exception);
             _passed++;
             Console.WriteLine("PASS: " + name);
             return;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
             Failures.Add(name);
-            Console.WriteLine("FAIL: " + name + " (threw " + ex.GetType().Name + ": " + ex.Message + " instead of " + typeof(TException).Name + ")");
+            Console.WriteLine("FAIL: " + name + " (threw " + exception.GetType().Name + ": " + exception.Message + " instead of " + typeof(TException).Name + ")");
             return;
         }
         Failures.Add(name);

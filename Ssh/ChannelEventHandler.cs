@@ -1,4 +1,4 @@
 ﻿
 namespace SmarTTY.Ssh;
 
-public delegate void ChannelEventHandler(object obj);
+public delegate void ChannelEventHandler(object sender);

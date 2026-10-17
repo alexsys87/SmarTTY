@@ -82,14 +82,14 @@ public class TextSearcher : INotifyPropertyChanged
             {
                 textPosition = editor.SelectionEnd;
             }
-            if (!editor.Find(textPosition, SearchedText, up, !CaseSensitive, flag3: true, ReadonlyTextBrowser.FindSelectMode.SelectOrClear).IsValid)
+            if (!editor.Find(textPosition, SearchedText, up, !CaseSensitive, wrapAround: true, ReadonlyTextBrowser.FindSelectMode.SelectOrClear).IsValid)
             {
                 MessageBoxes.Info("Cannot find \"" + SearchedText + "\"");
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 

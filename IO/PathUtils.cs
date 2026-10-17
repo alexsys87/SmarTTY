@@ -85,24 +85,24 @@ public class PathUtils
             {
                 return Path.GetFullPath(targetPath);
             }
-            string result = "";
+            string text = "";
             for (int i = commonCount; i < baseSegments.Length; i++)
             {
-                result = Path.Combine(result, "..");
+                text = Path.Combine(text, "..");
             }
             for (int j = commonCount; j < targetSegments.Length; j++)
             {
-                result = Path.Combine(result, targetSegments[j]);
+                text = Path.Combine(text, targetSegments[j]);
             }
-            if (result == "")
+            if (text == "")
             {
-                result = ".";
+                text = ".";
             }
-            return result;
+            return text;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            throw new TargetInvocationException("GetRelativePath('" + basePath + "', '" + targetPath + "') failed - " + ex.Message, ex);
+            throw new TargetInvocationException("GetRelativePath('" + basePath + "', '" + targetPath + "') failed - " + exception.Message, exception);
         }
     }
 
@@ -270,15 +270,15 @@ public class PathUtils
         {
             throw new ArgumentException("No path components provided");
         }
-        string result = items[0];
+        string text = items[0];
         foreach (string item in items.Skip(1))
         {
             if (!item.IsNullOrEmpty())
             {
-                result = Path.Combine(result, item);
+                text = Path.Combine(text, item);
             }
         }
-        return result;
+        return text;
     }
 
     public static string GetFileName(string path)

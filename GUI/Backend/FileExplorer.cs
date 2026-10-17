@@ -74,11 +74,11 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
                 }
                 return -1;
             }
-            bool flag = x.Name.StartsWith(".");
-            bool flag2 = y.Name.StartsWith(".");
-            if (flag != flag2)
+            bool xIsHidden = x.Name.StartsWith(".");
+            bool yIsHidden = y.Name.StartsWith(".");
+            if (xIsHidden != yIsHidden)
             {
-                if (!flag)
+                if (!xIsHidden)
                 {
                     return -1;
                 }
@@ -100,9 +100,9 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
                 }
                 try
                 {
-                    List<LsOutputParser.LsEntry> list = (from a10 in Encoding.UTF8.GetString(_AllData.ToArray()).Split('\n').Select(LsOutputParser.LsParser.ParseLine)
-                                                         where a10.Name != null && a10.Name != "." && (_Directory != "/" || a10.Name != "..")
-                                                         select a10).ToList();
+                    List<LsOutputParser.LsEntry> list = (from entry in Encoding.UTF8.GetString(_AllData.ToArray()).Split('\n').Select(LsOutputParser.LsParser.ParseLine)
+                                                         where entry.Name != null && entry.Name != "." && (_Directory != "/" || entry.Name != "..")
+                                                         select entry).ToList();
                     list.Sort(FileEntryComparer);
                     _Explorer.ProcessListResult(new ListResult
                     {
@@ -283,22 +283,22 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             _Control.ChangeDirectory(name);
             Filter = "";
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
     private void ProcessListResult(ListResult listResult)
     {
-        bool flag;
+        bool isCurrentDirectory;
         lock (_PendingListLock)
         {
             _PendingList = null;
-            flag = listResult?.Directory == _WorkingDirectory;
+            isCurrentDirectory = listResult?.Directory == _WorkingDirectory;
             _LastListResult = listResult;
         }
-        if (flag)
+        if (isCurrentDirectory)
         {
             ProgressText = null;
             UpdateFilteredItems();
@@ -317,7 +317,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
 
     private void UpdateFilteredItems()
     {
-        FilteredItems = _LastListResult?.Result?.Where((LsOutputParser.LsEntry a10) => string.IsNullOrEmpty(_Filter) || a10.Name.IndexOf(_Filter, StringComparison.InvariantCultureIgnoreCase) != -1)?.Select((LsOutputParser.LsEntry item) => new ItemWrapper(item, _WorkingDirectory))?.ToArray();
+        FilteredItems = _LastListResult?.Result?.Where((LsOutputParser.LsEntry entry) => string.IsNullOrEmpty(_Filter) || entry.Name.IndexOf(_Filter, StringComparison.InvariantCultureIgnoreCase) != -1)?.Select((LsOutputParser.LsEntry item) => new ItemWrapper(item, _WorkingDirectory))?.ToArray();
     }
 
     private void ProvideFileList(bool forceRefresh = false)
@@ -336,9 +336,9 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             ProgressText = "Loading...";
             listOperation.Start();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 

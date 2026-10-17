@@ -259,10 +259,10 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
     public SCPStatistics SendUpdateEventsAndGetStatistics()
     {
         SCPStatistics stats = default;
-        TransferObject[] array = ActiveTransfers.ToArray();
-        for (int num = 0; num < array.Length; num++)
+        TransferObject[] items = ActiveTransfers.ToArray();
+        for (int arrayIndex = 0; arrayIndex < items.Length; arrayIndex++)
         {
-            array[num].SendUpdateEvents(ref stats);
+            items[arrayIndex].SendUpdateEvents(ref stats);
         }
         return stats;
     }
@@ -274,8 +274,8 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
 
     public void RemoveCompleted()
     {
-        TransferObject[] array = ActiveTransfers.ToArray();
-        foreach (TransferObject transferObject in array)
+        TransferObject[] items = ActiveTransfers.ToArray();
+        foreach (TransferObject transferObject in items)
         {
             if (transferObject.Status == ScpTransferManager.TransferState.Completed)
             {

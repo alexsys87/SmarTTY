@@ -151,11 +151,11 @@ internal class FileByFileSyncEngine : CommandSyncEngine
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
                 base._events.OnWarning(new SyncWarning
                 {
-                    Exception = ex,
+                    Exception = exception,
                     Warning = new QuickSyncWarning(warningType, uploadedFiles[i].Path, 0)
                 });
             }

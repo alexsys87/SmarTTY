@@ -19,7 +19,7 @@ public partial class DynamicTreeBrowser : UserControl
 
         void Cancel();
 
-        IBrowserItem[] LoadChildren(bool flag);
+        IBrowserItem[] LoadChildren(bool refresh);
     }
 
     public interface IBrowserView
@@ -39,7 +39,7 @@ public partial class DynamicTreeBrowser : UserControl
 
         ContextMenuStrip ContextMenu { get; }
 
-        IChildLoader GetChildLoader(int value2);
+        IChildLoader GetChildLoader(int viewIndex);
 
         void Activate();
     }
@@ -63,10 +63,10 @@ public partial class DynamicTreeBrowser : UserControl
 
         public int TreeImageIndex = -1;
 
-        public ViewToggleButton(int value2, IBrowserView browserView, DynamicTreeBrowser dynamicTreeBrowser)
+        public ViewToggleButton(int viewIndex, IBrowserView browserView, DynamicTreeBrowser dynamicTreeBrowser)
             : base(browserView.Title, browserView.Icon)
         {
-            this.ViewIndex = value2;
+            this.ViewIndex = viewIndex;
             View = browserView;
             Image = browserView.Icon;
             CheckOnClick = true;
@@ -90,11 +90,11 @@ public partial class DynamicTreeBrowser : UserControl
                 return;
             }
             List<ViewToggleButton> list = new List<ViewToggleButton>();
-            ViewToggleButton[] array = _browser._viewButtons;
-            if (array != null)
+            ViewToggleButton[] viewButtons = _browser._viewButtons;
+            if (viewButtons != null)
             {
-                ViewToggleButton[] array2 = array;
-                foreach (ViewToggleButton viewToggleButton in array2)
+                ViewToggleButton[] buttons = viewButtons;
+                foreach (ViewToggleButton viewToggleButton in buttons)
                 {
                     if (viewToggleButton.Checked)
                     {
@@ -113,7 +113,7 @@ public partial class DynamicTreeBrowser : UserControl
         }
     }
 
-    public delegate void ViewsChangedHandler(bool flag, ToolStripButton[] items);
+    public delegate void ViewsChangedHandler(bool changed, ToolStripButton[] items);
 
     private class LoadingNode : TreeNode
     {
@@ -131,13 +131,13 @@ public partial class DynamicTreeBrowser : UserControl
 
         public readonly IBrowserItem Item;
 
-        public ViewNode(IBrowserView browserView, IBrowserItem browserItem, int value2, int value3)
+        public ViewNode(IBrowserView browserView, IBrowserItem browserItem, int viewIndex, int imageIndex)
             : base(browserView.GetItemText(browserItem))
         {
             this.View = browserView;
-            this.ViewIndex = value2;
+            this.ViewIndex = viewIndex;
             this.Item = browserItem;
-            ImageIndex = (SelectedImageIndex = value3);
+            ImageIndex = (SelectedImageIndex = imageIndex);
             Nodes.Add(new LoadingNode());
         }
     }
@@ -170,8 +170,8 @@ public partial class DynamicTreeBrowser : UserControl
             if (list.Count > 1)
             {
                 TreeNodeCollection treeNodeCollection = Nodes;
-                TreeNode[] array = list.ToArray();
-                treeNodeCollection.AddRange(array);
+                TreeNode[] children = list.ToArray();
+                treeNodeCollection.AddRange(children);
             }
             else
             {
@@ -184,11 +184,11 @@ public partial class DynamicTreeBrowser : UserControl
             if (items.Length == 1)
             {
                 ViewNode viewNode = null;
-                foreach (TreeNode node3 in Nodes)
+                foreach (TreeNode existingNode in Nodes)
                 {
-                    if (node3 is ViewNode && (node3 as ViewNode).ViewIndex == items[0].ViewIndex)
+                    if (existingNode is ViewNode && (existingNode as ViewNode).ViewIndex == items[0].ViewIndex)
                     {
-                        viewNode = node3 as ViewNode;
+                        viewNode = existingNode as ViewNode;
                         break;
                     }
                 }
@@ -219,12 +219,12 @@ public partial class DynamicTreeBrowser : UserControl
             if (this.SoleViewIndex != -1)
             {
                 List<TreeNode> list = new List<TreeNode>();
-                for (int num = 0; num < Nodes.Count; num++)
+                for (int index = 0; index < Nodes.Count; index++)
                 {
-                    if (Nodes[num] is ItemNode || Nodes[num] is LoadingNode)
+                    if (Nodes[index] is ItemNode || Nodes[index] is LoadingNode)
                     {
-                        list.Add(Nodes[num]);
-                        Nodes.RemoveAt(num--);
+                        list.Add(Nodes[index]);
+                        Nodes.RemoveAt(index--);
                     }
                 }
                 ViewToggleButton viewToggleButton2 = null;
@@ -238,35 +238,35 @@ public partial class DynamicTreeBrowser : UserControl
                 }
                 if (viewToggleButton2 != null)
                 {
-                    ViewNode viewNode2 = new ViewNode(viewToggleButton2.View, Item, viewToggleButton2.ViewIndex, viewToggleButton2.TreeImageIndex);
-                    viewNode2.Nodes.Clear();
+                    ViewNode newViewNode = new ViewNode(viewToggleButton2.View, Item, viewToggleButton2.ViewIndex, viewToggleButton2.TreeImageIndex);
+                    newViewNode.Nodes.Clear();
                     foreach (TreeNode item in list)
                     {
-                        viewNode2.Nodes.Add(item);
+                        newViewNode.Nodes.Add(item);
                     }
-                    Nodes.Add(viewNode2);
+                    Nodes.Add(newViewNode);
                 }
                 this.SoleViewIndex = -1;
             }
             if (viewToggleButton.Checked)
             {
-                int num3 = 0;
-                for (int num4 = 0; num4 < Nodes.Count; num4++)
+                int insertIndex = 0;
+                for (int insertPosition = 0; insertPosition < Nodes.Count; insertPosition++)
                 {
-                    if (Nodes[num4] is ViewNode && (Nodes[num4] as ViewNode).ViewIndex < viewToggleButton.ViewIndex)
+                    if (Nodes[insertPosition] is ViewNode && (Nodes[insertPosition] as ViewNode).ViewIndex < viewToggleButton.ViewIndex)
                     {
-                        num3 = num4 + 1;
+                        insertIndex = insertPosition + 1;
                     }
                 }
-                ViewNode node2 = new ViewNode(viewToggleButton.View, Item, viewToggleButton.ViewIndex, viewToggleButton.TreeImageIndex);
-                Nodes.Insert(num3, node2);
+                ViewNode viewNodeToInsert = new ViewNode(viewToggleButton.View, Item, viewToggleButton.ViewIndex, viewToggleButton.TreeImageIndex);
+                Nodes.Insert(insertIndex, viewNodeToInsert);
                 return;
             }
-            for (int num5 = 0; num5 < Nodes.Count; num5++)
+            for (int removalIndex = 0; removalIndex < Nodes.Count; removalIndex++)
             {
-                if (Nodes[num5] is ViewNode && (Nodes[num5] as ViewNode).ViewIndex == viewToggleButton.ViewIndex)
+                if (Nodes[removalIndex] is ViewNode && (Nodes[removalIndex] as ViewNode).ViewIndex == viewToggleButton.ViewIndex)
                 {
-                    Nodes.RemoveAt(num5);
+                    Nodes.RemoveAt(removalIndex);
                     break;
                 }
             }
@@ -300,17 +300,17 @@ public partial class DynamicTreeBrowser : UserControl
         {
             try
             {
-                _items = _loader.LoadChildren(flag: false);
+                _items = _loader.LoadChildren(refresh: false);
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                _exception = ex;
+                _exception = exception;
             }
         }
 
-        public bool Wait(int value2)
+        public bool Wait(int timeout)
         {
-            return _thread.Join(value2);
+            return _thread.Join(timeout);
         }
 
         public void Complete(ViewToggleButton[] items)
@@ -326,8 +326,8 @@ public partial class DynamicTreeBrowser : UserControl
             _targetNodes.Clear();
             if (_items != null)
             {
-                IBrowserItem[] array = _items;
-                foreach (IBrowserItem browserItem in array)
+                IBrowserItem[] children = _items;
+                foreach (IBrowserItem browserItem in children)
                 {
                     _targetNodes.Add(new ItemNode(browserItem, items));
                 }
@@ -348,7 +348,7 @@ public partial class DynamicTreeBrowser : UserControl
         }
     }
 
-    public delegate void LoadFailedHandler(Exception exception, ref bool flag);
+    public delegate void LoadFailedHandler(Exception exception, ref bool handled);
 
     public class StaticChildLoader : IChildLoader
     {
@@ -374,13 +374,13 @@ public partial class DynamicTreeBrowser : UserControl
         {
         }
 
-        public IBrowserItem[] LoadChildren(bool flag)
+        public IBrowserItem[] LoadChildren(bool refresh)
         {
             return _items;
         }
     }
 
-    public delegate void ProgressHandler(bool flag, string text, double value2);
+    public delegate void ProgressHandler(bool isRunning, string text, double progress);
 
     private ViewToggleButton[] _viewButtons;
 
@@ -407,13 +407,13 @@ public partial class DynamicTreeBrowser : UserControl
             {
                 ProgressChanged(value != null, null, -1.0);
             }
-            ViewToggleButton[] array = _viewButtons;
-            if (array != null)
+            ViewToggleButton[] items = _viewButtons;
+            if (items != null)
             {
-                ViewToggleButton[] array2 = array;
-                for (int num = 0; num < array2.Length; num++)
+                ViewToggleButton[] entries = items;
+                for (int entryIndex = 0; entryIndex < entries.Length; entryIndex++)
                 {
-                    array2[num].Enabled = value == null;
+                    entries[entryIndex].Enabled = value == null;
                 }
             }
         }
@@ -436,10 +436,10 @@ public partial class DynamicTreeBrowser : UserControl
         CurrentOperation = null;
         if (_viewButtons != null)
         {
-            ViewToggleButton[] array = _viewButtons;
-            for (int num = 0; num < array.Length; num++)
+            ViewToggleButton[] items = _viewButtons;
+            for (int index = 0; index < items.Length; index++)
             {
-                array[num].Dispose();
+                items[index].Dispose();
             }
             _viewButtons = null;
         }
@@ -463,32 +463,32 @@ public partial class DynamicTreeBrowser : UserControl
             }
             treeView1.ImageList = imageList2;
         }
-        IBrowserView[] array2 = browserModel.Views;
-        ToolStripButton[] array3;
-        if (array2 == null)
+        IBrowserView[] views = browserModel.Views;
+        ToolStripButton[] entries;
+        if (views == null)
         {
             _viewButtons = null;
-            array3 = null;
+            entries = null;
         }
         else
         {
-            ViewToggleButton[] array4 = new ViewToggleButton[array2.Length];
-            array3 = new ToolStripButton[array2.Length];
-            for (int num2 = 0; num2 < array2.Length; num2++)
+            ViewToggleButton[] viewToggleButtons = new ViewToggleButton[views.Length];
+            entries = new ToolStripButton[views.Length];
+            for (int viewIndex = 0; viewIndex < views.Length; viewIndex++)
             {
-                ViewToggleButton viewToggleButton = (ViewToggleButton)(array3[num2] = (array4[num2] = new ViewToggleButton(num2, array2[num2], this)));
-                if (treeView1.ImageList != null && array2[num2].Icon != null)
+                ViewToggleButton viewToggleButton = (ViewToggleButton)(entries[viewIndex] = (viewToggleButtons[viewIndex] = new ViewToggleButton(viewIndex, views[viewIndex], this)));
+                if (treeView1.ImageList != null && views[viewIndex].Icon != null)
                 {
-                    treeView1.ImageList.Images.Add(array2[num2].Icon);
+                    treeView1.ImageList.Images.Add(views[viewIndex].Icon);
                     viewToggleButton.TreeImageIndex = treeView1.ImageList.Images.Count - 1;
                 }
             }
-            _viewButtons = array4;
+            _viewButtons = viewToggleButtons;
         }
         LoadInto(treeView1.Nodes, browserModel.GetRootLoader(), null);
         if (ViewsChanged != null)
         {
-            ViewsChanged(flag: true, array3);
+            ViewsChanged(changed: true, entries);
         }
         if (treeView1.Nodes.Count > 0)
         {
@@ -508,12 +508,12 @@ public partial class DynamicTreeBrowser : UserControl
             }
             else if (childLoader.IsInstant)
             {
-                IBrowserItem[] array = childLoader.LoadChildren(flag: true);
+                IBrowserItem[] items = childLoader.LoadChildren(refresh: true);
                 treeNodeCollection.Clear();
-                if (array != null)
+                if (items != null)
                 {
-                    IBrowserItem[] array2 = array;
-                    foreach (IBrowserItem browserItem in array2)
+                    IBrowserItem[] entries = items;
+                    foreach (IBrowserItem browserItem in entries)
                     {
                         treeNodeCollection.Add(new ItemNode(browserItem, _viewButtons));
                     }
@@ -531,20 +531,20 @@ public partial class DynamicTreeBrowser : UserControl
                 OnTimerTick(null, null);
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            this.ReportError(ex);
+            this.ReportError(exception);
         }
     }
 
     private void ReportError(Exception exception)
     {
-        bool flag = false;
+        bool handled = false;
         if (LoadFailed != null)
         {
-            LoadFailed(exception, ref flag);
+            LoadFailed(exception, ref handled);
         }
-        if (!flag)
+        if (!handled)
         {
             if (exception is TargetInvocationException)
             {
@@ -599,16 +599,16 @@ public partial class DynamicTreeBrowser : UserControl
                 loadOperation.Complete(_viewButtons);
                 return;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                this.ReportError(ex);
+                this.ReportError(exception);
                 return;
             }
         }
         KeyValuePair<string, double> keyValuePair = loadOperation.GetProgress();
         if (ProgressChanged != null)
         {
-            ProgressChanged(flag: true, keyValuePair.Key, keyValuePair.Value);
+            ProgressChanged(isRunning: true, keyValuePair.Key, keyValuePair.Value);
         }
     }
 
@@ -624,9 +624,9 @@ public partial class DynamicTreeBrowser : UserControl
         }
     }
 
-    private void treeView1_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e2)
+    private void treeView1_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
     {
-        if (e2.Node is ItemNode itemNode)
+        if (e.Node is ItemNode itemNode)
         {
             itemNode.Item.Activate();
         }

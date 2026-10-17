@@ -122,7 +122,7 @@ public class XServerLaunchController : INotifyPropertyChanged
             ProgressText = "Launching X server...";
             process = Process.Start(text, XServerMode ?? "-multiwindow");
             DateTime now = DateTime.Now;
-            int num = 0;
+            int itemIndex = 0;
             while (true)
             {
                 try
@@ -139,15 +139,15 @@ public class XServerLaunchController : INotifyPropertyChanged
                 }
                 catch (Exception)
                 {
-                    if (process.HasExited || ((DateTime.Now - now).TotalSeconds > 5.0 && num > 0))
+                    if (process.HasExited || ((DateTime.Now - now).TotalSeconds > 5.0 && itemIndex > 0))
                     {
                         throw;
                     }
                 }
-                num++;
+                itemIndex++;
             }
         }
-        catch (Exception ex2)
+        catch (Exception exception)
         {
             if (process != null && process.HasExited)
             {
@@ -155,7 +155,7 @@ public class XServerLaunchController : INotifyPropertyChanged
             }
             else
             {
-                ErrorText = ex2.Message;
+                ErrorText = exception.Message;
             }
             ProgressText = null;
         }

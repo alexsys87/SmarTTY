@@ -402,9 +402,9 @@ public static class LocalFileSystem
         }
         if (fileAttributes != -1 && (fileAttributes & 0x400) == 0)
         {
-            FileInformation fileInfo1 = LocalFileSystem.GetFileInformation(localPath, out var size1, throwOnError: false);
-            FileInformation fileInfo2 = LocalFileSystem.GetFileInformation(targetLocalPath, out var size2, throwOnError: false);
-            if (fileInfo1.Attributes != 0 && fileInfo2.Attributes != 0 && ((fileInfo1.NumberOfLinks > 1 && fileInfo1.VolumeSerialNumber == fileInfo2.VolumeSerialNumber && fileInfo1.FileIndex == fileInfo2.FileIndex) || (fileInfo1.LastWriteTime == fileInfo2.LastWriteTime && size1 == size2)))
+            FileInformation sourceInfo = LocalFileSystem.GetFileInformation(localPath, out var sourceSize, throwOnError: false);
+            FileInformation targetInfo = LocalFileSystem.GetFileInformation(targetLocalPath, out var targetSize, throwOnError: false);
+            if (sourceInfo.Attributes != 0 && targetInfo.Attributes != 0 && ((sourceInfo.NumberOfLinks > 1 && sourceInfo.VolumeSerialNumber == targetInfo.VolumeSerialNumber && sourceInfo.FileIndex == targetInfo.FileIndex) || (sourceInfo.LastWriteTime == targetInfo.LastWriteTime && sourceSize == targetSize)))
             {
                 return;
             }

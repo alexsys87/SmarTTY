@@ -95,11 +95,11 @@ internal class TemplateSession : IDisposable
                 colIndex = 0;
             }
         }
-        _editor.ReplaceText(new TextDocument.TextPosition(identStartCol + 1, textPosition.Line), textPosition, flag: false, stringBuilder.ToString());
+        _editor.ReplaceText(new TextDocument.TextPosition(identStartCol + 1, textPosition.Line), textPosition, select: false, stringBuilder.ToString());
         ((EditableTextBrowser)_editor).RangeChanged += this.OnRangeChanged;
         ((EditableTextBrowser)_editor).LineChanged += OnLineChanged;
-        CodeEditorPP codeEditorPP2 = _editor;
-        codeEditorPP2._tabHandler = (CodeEditorPP.TabHandler)Delegate.Combine(codeEditorPP2._tabHandler, new CodeEditorPP.TabHandler(OnTab));
+        CodeEditorPP editor = _editor;
+        editor._tabHandler = (CodeEditorPP.TabHandler)Delegate.Combine(editor._tabHandler, new CodeEditorPP.TabHandler(OnTab));
         MoveToStop(isShiftTab: false);
     }
 
@@ -134,11 +134,11 @@ internal class TemplateSession : IDisposable
         {
             if (prevIndex != -1 && _stops[prevIndex].Part.Tag != null)
             {
-                _editor.RaisePlaceholderChanged(_stops[prevIndex].Line, _stops[prevIndex].Start.Column, _stops[prevIndex].End.Column, _stops[prevIndex].Part.Tag, flag: false);
+                _editor.RaisePlaceholderChanged(_stops[prevIndex].Line, _stops[prevIndex].Start.Column, _stops[prevIndex].End.Column, _stops[prevIndex].Part.Tag, isLast: false);
             }
             if (tabStop.Part.Tag != null)
             {
-                _editor.RaisePlaceholderChanged(tabStop.Line, tabStop.Start.Column, tabStop.End.Column, tabStop.Part.Tag, flag: true);
+                _editor.RaisePlaceholderChanged(tabStop.Line, tabStop.Start.Column, tabStop.End.Column, tabStop.Part.Tag, isLast: true);
             }
         }
         _highlightId = _editor.SetHighlight(_highlightId, _stops[_currentIndex].Start, _stops[_currentIndex].End, HighlightStyle);
