@@ -30,14 +30,14 @@ one: a dedicated unprivileged user, a host key and a client key pair under a tem
 directory, and `sshd` on a loopback port. It needs root, directly or through `sudo`.
 
 ```sh
-eval "$(tests/SshNetIntegrationTests/setup-sshd.sh)"
+set -a; eval "$(tests/SshNetIntegrationTests/setup-sshd.sh)"; set +a
 dotnet run --project tests/SshNetIntegrationTests
 ```
 
-The script prints the connection details as environment variables; the test reads them from
-there. Without them the live-server checks are skipped with a notice and only the API contract
-is verified. Set `SMARTTY_SSH_TEST_REQUIRED=1` to turn that skip into a failure, which is what
-CI does.
+The script prints the connection details as `NAME=value` lines; the test reads them from the
+environment. Without them the live-server checks are skipped with a notice and only the API
+contract is verified. Set `SMARTTY_SSH_TEST_REQUIRED=1` to turn that skip into a failure, which
+is what CI does. In a workflow the output can go straight to `$GITHUB_ENV`.
 
 CI runs the suite in the `sshnet` job of `.github/workflows/build.yml`.
 

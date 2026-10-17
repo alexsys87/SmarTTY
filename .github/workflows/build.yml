@@ -41,12 +41,13 @@ jobs:
       - name: Install OpenSSH server
         run: sudo apt-get update && sudo apt-get install -y openssh-server
 
+      - name: Provision the test SSH server
+        run: tests/SshNetIntegrationTests/setup-sshd.sh >> "$GITHUB_ENV"
+
       - name: Run SSH.NET integration tests
         env:
           SMARTTY_SSH_TEST_REQUIRED: 1
-        run: |
-          eval "$(tests/SshNetIntegrationTests/setup-sshd.sh)"
-          dotnet run --project tests/SshNetIntegrationTests -c Release
+        run: dotnet run --project tests/SshNetIntegrationTests -c Release
 
   build:
     name: Build SmarTTY (Release)

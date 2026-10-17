@@ -74,31 +74,38 @@ LogLevel VERBOSE
 Subsystem sftp internal-sftp
 CONF
 
-as_root "$sshd_binary" -t -f "$directory/sshd_config"
-# sshd refuses to start when its privilege separation directory is missing, which it can be on a fresh runner.
+# sshd needs its privilege separation directory even for a config test; it can be missing on a fresh runner.
 as_root mkdir -p /run/sshd
+as_root "$sshd_binary" -t -f "$directory/sshd_config"
 as_root "$sshd_binary" -f "$directory/sshd_config"
 
 # sshd needs a moment before it accepts connections.
+started=false
 for _ in $(seq 1 100); do
     if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
         exec 3<&- 3>&-
+        started=true
         break
     fi
     sleep 0.1
 done
+if [ "$started" != true ]; then
+    echo "sshd did not start listening on port $port." >&2
+    exit 1
+fi
 
 sshd_pid="$(cat "$directory/sshd.pid" 2>/dev/null || true)"
 
-# Printed as "export" lines so the caller can eval or source the output directly.
+# Printed as plain NAME=value lines: that is the format GITHUB_ENV expects, and a caller can
+# also read them with "set -a; eval \"$(...)\"; set +a".
 cat <<ENV
-export SMARTTY_SSH_TEST_HOST=127.0.0.1
-export SMARTTY_SSH_TEST_PORT=$port
-export SMARTTY_SSH_TEST_USER=$user
-export SMARTTY_SSH_TEST_PASSWORD=$password
-export SMARTTY_SSH_TEST_KEY=$client_key
-export SMARTTY_SSH_TEST_ENCRYPTED_KEY=$encrypted_key
-export SMARTTY_SSH_TEST_KEY_PASSPHRASE=$key_passphrase
-export SMARTTY_SSH_TEST_HOST_KEY_TYPE=ssh-ed25519
-export SMARTTY_SSH_TEST_DIR=$directory
+SMARTTY_SSH_TEST_HOST=127.0.0.1
+SMARTTY_SSH_TEST_PORT=$port
+SMARTTY_SSH_TEST_USER=$user
+SMARTTY_SSH_TEST_PASSWORD=$password
+SMARTTY_SSH_TEST_KEY=$client_key
+SMARTTY_SSH_TEST_ENCRYPTED_KEY=$encrypted_key
+SMARTTY_SSH_TEST_KEY_PASSPHRASE=$key_passphrase
+SMARTTY_SSH_TEST_HOST_KEY_TYPE=ssh-ed25519
+SMARTTY_SSH_TEST_DIR=$directory
 ENV
