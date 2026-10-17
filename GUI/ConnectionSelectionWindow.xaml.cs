@@ -683,26 +683,20 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 if (_CachedIcons == null)
                 {
                     List<BitmapImage> list = new List<BitmapImage>();
-                    try
+                    string[] embeddedIcons = new string[] { "computer.png", "computer-laptop.png", "SerialPort.png" };
+                    foreach (string iconName in embeddedIcons)
                     {
-                        string[] files = Directory.GetFiles(IconsFolder, "*.png");
-                        foreach (string text in files)
+                        try
                         {
-                            try
-                            {
-                                BitmapImage bitmapImage = new BitmapImage();
-                                bitmapImage.BeginInit();
-                                bitmapImage.UriSource = new Uri(text.Replace('\\', '/'));
-                                bitmapImage.EndInit();
-                                list.Add(bitmapImage);
-                            }
-                            catch
-                            {
-                            }
+                            BitmapImage bitmapImage = new BitmapImage();
+                            bitmapImage.BeginInit();
+                            bitmapImage.UriSource = new Uri("pack://application:,,,/icons/" + iconName, UriKind.Absolute);
+                            bitmapImage.EndInit();
+                            list.Add(bitmapImage);
                         }
-                    }
-                    catch
-                    {
+                        catch
+                        {
+                        }
                     }
                     _CachedIcons = list.ToArray();
                 }
@@ -1117,8 +1111,6 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
     private ToggleButton _ActiveIconPicker;
 
-    private static readonly string IconsFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "ConnectionIcons");
-
     private SmarTTYTheme _Theme;
 
     public ConnectionSelectionWindow(bool showRawConnections, string defaultItemNameOrCmdLine)
@@ -1319,19 +1311,24 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         iconPopup.IsOpen = true;
         try
         {
-            string text = Path.GetFileName((((FrameworkElement)_ActiveIconPicker).DataContext as IConnectionSettingsWrapper).Image.LocalPath).ToLower();
-            BitmapImage[] allIcons = Controller.AllIcons;
-            foreach (BitmapImage bitmapImage in allIcons)
+            Uri imageUri = (((FrameworkElement)_ActiveIconPicker).DataContext as IConnectionSettingsWrapper)?.Image;
+            if (imageUri != null)
             {
-                try
+                string text = Path.GetFileName(imageUri.OriginalString ?? imageUri.ToString()).ToLower();
+                BitmapImage[] allIcons = Controller.AllIcons;
+                foreach (BitmapImage bitmapImage in allIcons)
                 {
-                    if (bitmapImage.UriSource?.LocalPath.ToString()?.ToLower() == text)
+                    try
                     {
-                        ((Selector)lstIcons).SelectedItem = bitmapImage;
+                        string currentName = Path.GetFileName(bitmapImage.UriSource?.OriginalString ?? bitmapImage.UriSource?.ToString())?.ToLower();
+                        if (currentName == text)
+                        {
+                            ((Selector)lstIcons).SelectedItem = bitmapImage;
+                        }
                     }
-                }
-                catch
-                {
+                    catch
+                    {
+                    }
                 }
             }
         }
@@ -1350,27 +1347,24 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
     private static Uri MakeIconURI(string path)
     {
-        if (path == null)
+        if (string.IsNullOrEmpty(path))
         {
-            path = "Computer.png";
+            path = "computer.png";
         }
         try
         {
-            string text = Path.Combine(IconsFolder, path);
-            if (File.Exists(text))
+            if (Path.IsPathRooted(path) && File.Exists(path))
             {
-                return new Uri(text);
+                return new Uri(path);
             }
-            text = Path.Combine(IconsFolder, "computer.png");
-            if (File.Exists(text))
-            {
-                return new Uri(text);
-            }
+
+            string fileName = Path.GetFileName(path);
+            return new Uri("pack://application:,,,/icons/" + fileName, UriKind.Absolute);
         }
         catch
         {
+            return new Uri("pack://application:,,,/icons/computer.png", UriKind.Absolute);
         }
-        return null;
     }
 
     private void lstIcons_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1380,9 +1374,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         {
             ImageSource imageSource = e.AddedItems.OfType<ImageSource>().FirstOrDefault();
             BitmapImage bitmapImage = imageSource as BitmapImage;
-            if (bitmapImage != null)
+            if (bitmapImage != null && bitmapImage.UriSource != null)
             {
-                connectionSettingsWrapper.SetIcon(Path.GetFileName(bitmapImage.UriSource.LocalPath));
+                string fileName = Path.GetFileName(bitmapImage.UriSource.OriginalString ?? bitmapImage.UriSource.ToString());
+                connectionSettingsWrapper.SetIcon(fileName);
                 iconPopup.IsOpen = false;
             }
         }
