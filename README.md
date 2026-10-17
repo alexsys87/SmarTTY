@@ -89,7 +89,7 @@ msbuild SmarTTY.csproj -p:Configuration=Release
 
 Для загрузки пакета нужен доступ к NuGet; при ошибках сети или источника пакетов сначала устраните их.
 
-Сборка выполняется через `msbuild` из Visual Studio, а не через `dotnet build`. Команда `dotnet build` для этого проекта падает с ошибками MSB3822/MSB3823: задача `GenerateResource` из .NET SDK не умеет встраивать нестроковые ресурсы (изображения и значки из `.resx` файлов Windows Forms) при целевом фреймворке `net48`. `msbuild` использует тот же путь встраивания ресурсов, что и Visual Studio.
+Запускать команды `msbuild` следует из **Developer PowerShell for VS 2022** (или **Developer Command Prompt for VS 2022**), либо используя полный путь к `MSBuild.exe` из установки Visual Studio. Вызов команды `dotnet build` или `dotnet msbuild` для этого проекта падает с ошибками MSB3822/MSB3823: задача `GenerateResource` из .NET SDK не умеет встраивать нестроковые ресурсы (изображения и значки из `.resx` файлов Windows Forms) при целевом фреймворке `net48`.
 
 Альтернатива: откройте `SmarTTY.sln` в Visual Studio, восстановите пакеты NuGet, выберите `Release` и соберите решение. При переносе сборки копируйте всю выходную папку, а не только `SmarTTY.exe`.
 
