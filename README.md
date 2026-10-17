@@ -93,6 +93,20 @@ msbuild SmarTTY.csproj -p:Configuration=Release
 
 Альтернатива: откройте `SmarTTY.sln` в Visual Studio, восстановите пакеты NuGet, выберите `Release` и соберите решение. При переносе сборки копируйте всю выходную папку, а не только `SmarTTY.exe`.
 
+#### Сборка единого exe-файла
+
+Обычная сборка кладёт рядом с `SmarTTY.exe` зависимые сборки (`Renci.SshNet.dll`, `BouncyCastle.Cryptography.dll` и другие). Чтобы получить **один самодостаточный `SmarTTY.exe`**, соберите проект со свойством `SingleExe=true`: тогда зависимости встраиваются в исполняемый файл через [Costura.Fody](https://github.com/Fody/Costura).
+
+```powershell
+msbuild SmarTTY.csproj -t:Restore -p:Configuration=Release -p:SingleExe=true
+msbuild SmarTTY.csproj -p:Configuration=Release -p:SingleExe=true
+.\bin\Release\net48\SmarTTY.exe
+```
+
+В `bin\Release\net48\` рядом с `SmarTTY.exe` больше не будет зависимых сборок (`Renci.SshNet.dll` и других) — только сам исполняемый файл и, при наличии, отладочный `SmarTTY.pdb`. Свойство `SingleExe` действует только на время сборки и не меняет обычный вывод. Файл конфигурации встраивания — `FodyWeavers.xml` в корне проекта.
+
+CI собирает оба варианта: job `build` публикует обычную сборку как `SmarTTY-Release`, а job `single-exe` — единый файл как `SmarTTY-SingleExe`.
+
 Для SSH нужен доступный SSH-сервер и учётная запись на нём. Файловые функции и Smart Terminal рассчитаны на Unix/Linux-окружение с shell и стандартными командами. Для SCP необходима удалённая команда `scp`, для потоковой передачи каталогов — `tar`; для Smart Terminal по умолчанию используется `bash`. Ограниченная shell или SFTP-only доступ могут не поддерживать эти функции.
 
 ### 2. Первое SSH-подключение

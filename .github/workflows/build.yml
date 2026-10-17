@@ -71,3 +71,38 @@ jobs:
           name: SmarTTY-Release
           path: bin/Release/net48/
           if-no-files-found: error
+
+  single-exe:
+    name: Build SmarTTY single-file executable
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v3
+
+      - name: Restore NuGet packages
+        run: msbuild SmarTTY.csproj -t:Restore -p:Configuration=Release -p:SingleExe=true
+
+      - name: Build single-file executable
+        run: msbuild SmarTTY.csproj -p:Configuration=Release -p:SingleExe=true
+
+      - name: Verify the dependencies were embedded
+        shell: pwsh
+        run: |
+          $output = "bin/Release/net48"
+          $dlls = Get-ChildItem -Path $output -Filter *.dll
+          if ($dlls) {
+            Write-Error "Expected a self-contained executable, but found dependency DLLs: $($dlls.Name -join ', ')"
+          }
+          if (-not (Test-Path "$output/SmarTTY.exe")) {
+            Write-Error "$output/SmarTTY.exe was not produced"
+          }
+
+      - name: Upload single-file executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: SmarTTY-SingleExe
+          path: bin/Release/net48/SmarTTY.exe
+          if-no-files-found: error

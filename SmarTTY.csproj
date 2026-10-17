@@ -28,6 +28,16 @@
     <PackageReference Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 
+  <!--
+    Single-executable build: `msbuild -p:SingleExe=true` weaves the managed dependencies (SSH.NET and
+    its transitive assemblies) into SmarTTY.exe through Costura.Fody, so the output has no sibling DLLs.
+    A regular build stays multi-file, as documented in README.md.
+  -->
+  <ItemGroup Condition="'$(SingleExe)' == 'true'">
+    <PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
+    <PackageReference Include="Costura.Fody" Version="6.2.0" PrivateAssets="all" />
+  </ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="VisualTTY\XTermKeys.xml" LogicalName="VisualTTY.XTermKeys.xml" />
     <Resource Include="icons\**\*.png" />
