@@ -1,0 +1,15 @@
+# Keeps the NuGet dependencies up to date. SSH.NET is the important one: the tests in
+# tests/SshNetIntegrationTests verify it against a real OpenSSH server, and the version is
+# declared both in SmarTTY.csproj and in the test project, so both are updated together.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
