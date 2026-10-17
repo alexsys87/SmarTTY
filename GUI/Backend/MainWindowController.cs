@@ -419,7 +419,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm((_Controller.ActiveSession ?? throw new Exception("No session active")).Session, flag: false);
+                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm((_Controller.ActiveSession ?? throw new Exception("No session active")).Session, isUpload: false);
                 directoryTransferForm.LocalDirectory = _Controller.Settings.DefaultDownloadDirectory;
                 directoryTransferForm.FormClosed += Frm_FormClosed;
                 directoryTransferForm.Show();
@@ -448,7 +448,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm((_Controller.ActiveSession ?? throw new Exception("No session active")).Session, flag: true);
+                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm((_Controller.ActiveSession ?? throw new Exception("No session active")).Session, isUpload: true);
                 directoryTransferForm.RemoteDirectory = _Controller.Settings.DefaultUploadDirectory;
                 directoryTransferForm.FormClosed += Frm_FormClosed;
                 directoryTransferForm.Show();

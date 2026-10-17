@@ -312,7 +312,7 @@ public class QuickSyncRunner
                 {
                     throw new ArgumentException("Direction");
                 }
-                SyncPlan.UploadPlanner uploadPlanner = new SyncPlan.UploadPlanner(flag: remoteFileSet.Root.Files.Count <= 0 && remoteFileSet.Root.SubDirectories.Count <= 0 && remoteFileSet.Root.Symlinks.Count <= 0 && sshSession.RunCommandChecked("test -d \"" + syncSettings.RemotePath + "\"", requireSuccess: true) == null, syncSettings: syncSettings, remoteFileSet: remoteFileSet, localFileCache: localFileCache, syncCustomization: syncCustomization);
+                SyncPlan.UploadPlanner uploadPlanner = new SyncPlan.UploadPlanner(remoteIsEmpty: remoteFileSet.Root.Files.Count <= 0 && remoteFileSet.Root.SubDirectories.Count <= 0 && remoteFileSet.Root.Symlinks.Count <= 0 && sshSession.RunCommandChecked("test -d \"" + syncSettings.RemotePath + "\"", requireSuccess: true) == null, syncSettings: syncSettings, remoteFileSet: remoteFileSet, localFileCache: localFileCache, syncCustomization: syncCustomization);
                 uploadPlanner.Warning += (QuickSyncWarning quickSyncWarning, Exception exception) =>
                 {
                     syncEvents?.OnWarning(new SyncWarning
@@ -340,7 +340,7 @@ public class QuickSyncRunner
         {
             Stage = SyncStage.BuildingFileList
         });
-        foreach (LocalFileSystem.FindData item2 in LocalFileSystem.EnumerateDirectory(localPath, flag: false))
+        foreach (LocalFileSystem.FindData item2 in LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: false))
         {
             if (item2.HasAttribute(FileAttributes.ReparsePoint))
             {
@@ -716,7 +716,7 @@ public class QuickSyncRunner
                 case SyncPlan.ActionType.DeleteTargetFile:
                     try
                     {
-                        LocalFileSystem.DeleteFile(LocalPath.FromRaw(item2.Path), flag: true);
+                        LocalFileSystem.DeleteFile(LocalPath.FromRaw(item2.Path), resetReadOnly: true);
                         transferStatistics.DeletedFiles++;
                         if (flag2)
                         {
@@ -770,7 +770,7 @@ public class QuickSyncRunner
     public static void CacheLocalFiles(ILocalFileCache localFileCache, LocalPath localPath, bool flag)
     {
         ICachedDirectory cachedDirectory = localFileCache.GetDirectory(localPath);
-        foreach (LocalFileSystem.FindData item in LocalFileSystem.EnumerateDirectory(localPath, flag: true))
+        foreach (LocalFileSystem.FindData item in LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: true))
         {
             if (item.HasAttribute(FileAttributes.ReparsePoint))
             {

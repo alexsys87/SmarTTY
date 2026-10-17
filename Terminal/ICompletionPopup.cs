@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows.Forms;
 
 namespace SmarTTY.Terminal;
@@ -19,5 +19,5 @@ public interface ICompletionPopup
 
     void SetItemList(CompletionItem[] items);
 
-    CompletionItem GetSelectedItem(bool flag);
+    CompletionItem GetSelectedItem(bool onlyIfPrefixMatch);
 }

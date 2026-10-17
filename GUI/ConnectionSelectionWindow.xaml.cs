@@ -848,7 +848,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private void _Initiator_PasswordRequest(SshConnector sender, SSHConnectionSettings settings, ref string password, ref bool handled, bool requestingPassphrase)
         {
-            handled = PasswordRequestForm.ShowPrompt(settings, ref password, requestingPassphrase, flag2: false);
+            handled = PasswordRequestForm.ShowPrompt(settings, ref password, requestingPassphrase, isSudo: false);
         }
 
         private void _Initiator_ConnectionProgress(SshConnector sender, string text, Exception exception)
@@ -1106,7 +1106,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     UserName = userName,
                     AuthenticationType = AuthType.Password
                 };
-                _Initiator.ConnectAsync(sSHConnectionSettings, quickConnectionWindow2.txtPassword.Password, flag: false);
+                _Initiator.ConnectAsync(sSHConnectionSettings, quickConnectionWindow2.txtPassword.Password, forcePasswordAuth: false);
             }
             catch (Exception ex)
             {

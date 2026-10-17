@@ -563,7 +563,7 @@ internal class CompletionSession : IDisposable
             case '/':
                 break;
         }
-        CompletionItem selectedItem = _popup.GetSelectedItem(allowNull: true);
+        CompletionItem selectedItem = _popup.GetSelectedItem(onlyIfPrefixMatch: true);
         if (selectedItem.InsertText == null)
         {
             return false;

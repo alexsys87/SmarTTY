@@ -1,4 +1,4 @@
-﻿using SmarTTY.CodeEditing;
+using SmarTTY.CodeEditing;
 using SmarTTY.Completion;
 using SmarTTY.TextEditing;
 using System;
@@ -433,7 +433,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             _suggestionController = new SuggestionController(this);
         }
         _suggestionController.BackColor = SuggestionBackColor;
-        _suggestionController.Show(new SuggestionSource(this, items), flag: true, flag2: false);
+        _suggestionController.Show(new SuggestionSource(this, items), autoSize: true, allowMultiSelect: false);
         UpdateSuggestions();
     }
 
@@ -505,7 +505,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             }
             else
             {
-                _suggestionController.SelectMatch(text, flag: true);
+                _suggestionController.SelectMatch(text, exactMatch: true);
             }
         }
     }
@@ -582,59 +582,59 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
     }
 
-    public bool MoveToToken(bool flag2, bool flag3, bool flag4, TokenPredicate callback)
+    public bool MoveToToken(bool searchPrevious, bool isOpening, bool selectText, TokenPredicate callback)
     {
         if (_tokenCache == null)
         {
             return false;
         }
-        int num = ((!flag2) ? 1 : (-1));
-        int num2 = (flag2 ? (-1) : LineCount);
-        List<TokenCache.Token> list = _tokenCache.GetLineTokens(CaretPosition.Line);
-        int num3 = _tokenCache.FindTokenIndex(list, CaretPosition.Column, (!flag2) ? TokenCache.TokenSearchMode.Next : TokenCache.TokenSearchMode.Previous);
-        int num4 = CaretPosition.Line;
-        if (num3 == -1)
+        int step = ((!searchPrevious) ? 1 : (-1));
+        int limitLine = (searchPrevious ? (-1) : LineCount);
+        List<TokenCache.Token> tokens = _tokenCache.GetLineTokens(CaretPosition.Line);
+        int tokenIdx = _tokenCache.FindTokenIndex(tokens, CaretPosition.Column, (!searchPrevious) ? TokenCache.TokenSearchMode.Next : TokenCache.TokenSearchMode.Previous);
+        int currentLine = CaretPosition.Line;
+        if (tokenIdx == -1)
         {
-            num4 += num;
+            currentLine += step;
         }
-        for (int num5 = num4; num5 != num2; num5 += num)
+        for (int line = currentLine; line != limitLine; line += step)
         {
-            list = _tokenCache.GetLineTokens(num5);
-            int num6 = (flag2 ? (-1) : list.Count);
-            if (num3 == -1)
+            tokens = _tokenCache.GetLineTokens(line);
+            int limitToken = (searchPrevious ? (-1) : tokens.Count);
+            if (tokenIdx == -1)
             {
-                num3 = list.Count - 1;
+                tokenIdx = tokens.Count - 1;
             }
-            bool flag = false;
-            for (; num3 != num6 && num3 != -1 && num3 < list.Count; num3 += num)
+            bool jumped = false;
+            for (; tokenIdx != limitToken && tokenIdx != -1 && tokenIdx < tokens.Count; tokenIdx += step)
             {
-                TokenCache.Token token = list[num3];
+                TokenCache.Token token = tokens[tokenIdx];
                 if (token.Partner == null)
                 {
                     continue;
                 }
-                if ((token.Partner.StartPosition > token.StartPosition) != flag2)
+                if ((token.Partner.StartPosition > token.StartPosition) != searchPrevious)
                 {
-                    num3 = token.Partner.Index + num;
-                    num5 = token.Partner.LineNumber - num;
-                    flag = true;
+                    tokenIdx = token.Partner.Index + step;
+                    line = token.Partner.LineNumber - step;
+                    jumped = true;
                     break;
                 }
                 string text = GetLineOrNull(token.LineNumber).Substring(token.Start, token.End - token.Start);
                 if (callback(text))
                 {
-                    TextDocument.TextPosition textPosition = ((flag2 == flag3) ? token.StartPosition : token.EndPosition);
-                    if (!(textPosition == CaretPosition))
+                    TextDocument.TextPosition targetPos = ((searchPrevious == isOpening) ? token.StartPosition : token.EndPosition);
+                    if (!(targetPos == CaretPosition))
                     {
-                        SetSelection(flag4, CaretPosition);
-                        SetCaret(textPosition);
+                        SetSelection(selectText, CaretPosition);
+                        SetCaret(targetPos);
                         return true;
                     }
                 }
             }
-            if (!flag)
+            if (!jumped)
             {
-                num3 = (flag2 ? (-1) : 0);
+                tokenIdx = (searchPrevious ? (-1) : 0);
             }
         }
         return false;

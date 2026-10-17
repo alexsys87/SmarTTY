@@ -211,7 +211,7 @@ public class DirectoryCopier
             }
             tarExtractor.Log += this.Log;
             tarExtractor.Progress = OnTarProgress;
-            tarExtractor.ExtractAll(flag: true, flag2: false);
+            tarExtractor.ExtractAll(ignoreErrors: true, stripFirstDirectory: false);
             tarExtractor.CreateSymlinks(out symlinkList, remotePath);
             tarExtractor.AddStatisticsTo(directoryStatistics);
             CheckErrors(outputCollector);
@@ -242,7 +242,7 @@ public class DirectoryCopier
                     TarExtractor tarExtractor2 = new TarExtractor(sshShellChannel2.Output, localPath);
                     tarExtractor2.PreserveTimestamps = preserveTimestamps;
                     tarExtractor2.Progress = OnTarListProgress;
-                    tarExtractor2.ExtractAll(flag: true, flag2: false);
+                    tarExtractor2.ExtractAll(ignoreErrors: true, stripFirstDirectory: false);
                     tarExtractor2.CreateSymlinks(out symlinkList, remotePath);
                     tarExtractor2.AddStatisticsTo(directoryStatistics);
                     CheckErrors(outputCollector);

@@ -241,7 +241,7 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
         }
         if (_usePrefixedListing)
         {
-            lines = RemoteOpenFileForm.SortEntries(lines, flag: true);
+            lines = RemoteOpenFileForm.SortEntries(lines, isPrefixed: true);
         }
         foreach (string item in lines)
         {

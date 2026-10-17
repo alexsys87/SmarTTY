@@ -191,7 +191,7 @@ public static class ReparsePoints
         {
             if (!isDirectory)
             {
-                LocalFileSystem.DeleteFile(LocalPath.FromRaw(linkPath), flag: true);
+                LocalFileSystem.DeleteFile(LocalPath.FromRaw(linkPath), resetReadOnly: true);
             }
             throw;
         }

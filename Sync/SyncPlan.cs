@@ -58,7 +58,7 @@ internal class SyncPlan
             Dictionary<string, LocalFileSystem.FindData> result = new Dictionary<string, LocalFileSystem.FindData>(StringComparer.InvariantCultureIgnoreCase);
             try
             {
-                foreach (LocalFileSystem.FindData item in LocalFileSystem.EnumerateDirectory(localPath, flag: true))
+                foreach (LocalFileSystem.FindData item in LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: true))
                 {
                     result[item.FileName] = item;
                 }
@@ -284,7 +284,7 @@ internal class SyncPlan
             {
                 try
                 {
-                    foreach (LocalFileSystem.FindData childData in LocalFileSystem.EnumerateDirectory(fullLocalPath, flag: false))
+                    foreach (LocalFileSystem.FindData childData in LocalFileSystem.EnumerateDirectory(fullLocalPath, ignoreMissing: false))
                     {
                         PlanDelete(fullLocalPath, childData);
                     }
@@ -309,7 +309,7 @@ internal class SyncPlan
         {
             this._plan = new SyncPlan();
             HashSet<string> nameSet = DataExtensions.ToHashSet(names.EnsureNotNull(), StringComparer.InvariantCultureIgnoreCase);
-            foreach (LocalFileSystem.FindData findData in LocalFileSystem.EnumerateDirectory(localPath, flag: true))
+            foreach (LocalFileSystem.FindData findData in LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: true))
             {
                 if (findData.HasAttribute(FileAttributes.Directory) && nameSet.Contains(findData.FileName ?? ""))
                 {
@@ -403,7 +403,7 @@ internal class SyncPlan
             LocalFileSystem.FindData[] findDataArray;
             try
             {
-                findDataArray = LocalFileSystem.EnumerateDirectory(localPath, flag: true).ToArray();
+                findDataArray = LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: true).ToArray();
             }
             catch (Exception ex)
             {

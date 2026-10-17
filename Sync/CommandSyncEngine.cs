@@ -118,7 +118,7 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                 }
             }
             StatCommandBuilder statCommandBuilder = new StatCommandBuilder(_flavor);
-            string statCmd = statCommandBuilder.GetStatCommand(this._rootPath, flag: true);
+            string statCmd = statCommandBuilder.GetStatCommand(this._rootPath, followSymlinks: true);
             StatCommandBuilder.StatEntry rootEntry = RunCommand(statCmd)?.Select((string line) => statCommandBuilder.ParseEntry(line)).FirstOrDefault((StatCommandBuilder.StatEntry statEntry) => statEntry.Name != null) ?? default(StatCommandBuilder.StatEntry);
             List<ScanDirectory> pendingDirs = new List<ScanDirectory>();
             List<PendingSymlink> pendingLinks = new List<PendingSymlink>();
@@ -150,7 +150,7 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
             for (int i = 0; i < pendingLinks.Count; i++)
             {
                 streamWriter.WriteLine($"echo ---link#{i}");
-                streamWriter.WriteLine(statCommandBuilder.GetStatCommand(pendingLinks[i].ResolvedPath, flag: true) + $" || echo badlink:{i}");
+                streamWriter.WriteLine(statCommandBuilder.GetStatCommand(pendingLinks[i].ResolvedPath, followSymlinks: true) + $" || echo badlink:{i}");
             }
             streamWriter.Flush();
             List<string> scriptOutput = this._engine.RunScript(marker, memoryStream.ToArray());

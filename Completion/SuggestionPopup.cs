@@ -98,7 +98,7 @@ internal class SuggestionPopup
             _form.Show();
             _form.FocusList();
         }
-        _form.NotifyHost(flag: true);
+        _form.NotifyHost(active: true);
     }
 
     public void Hide()
@@ -106,7 +106,7 @@ internal class SuggestionPopup
         if (_form.Visible)
         {
             _form.Hide();
-            _form.NotifyHost(flag: false);
+            _form.NotifyHost(active: false);
         }
     }
 

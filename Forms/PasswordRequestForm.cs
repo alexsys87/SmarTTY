@@ -36,10 +36,10 @@ public partial class PasswordRequestForm : DpiAwareForm
         }
     }
 
-    public static bool ShowPrompt(SSHConnectionSettings sshConnectionSettings, ref string password, bool isPassphrase, bool topMost)
+    public static bool ShowPrompt(SSHConnectionSettings sshConnectionSettings, ref string password, bool isPassphrase, bool isSudo)
     {
         PasswordRequestForm passwordRequestForm = new PasswordRequestForm(sshConnectionSettings, password, isPassphrase);
-        passwordRequestForm.TopMost = topMost;
+        passwordRequestForm.TopMost = isSudo;
         if (passwordRequestForm.ShowModal() != DialogResult.OK)
         {
             return false;
