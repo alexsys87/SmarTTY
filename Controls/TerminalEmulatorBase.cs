@@ -61,13 +61,13 @@ public partial class TerminalEmulatorBase : TextEditorControl
             return false;
         }
 
-        private static string GetColorName(byte b2)
+        private static string GetColorName(byte colorIndex)
         {
-            if (b2 >= ColorNames.Length)
+            if (colorIndex >= ColorNames.Length)
             {
                 return "Invalid";
             }
-            return ColorNames[b2];
+            return ColorNames[colorIndex];
         }
 
         public override string ToString()
@@ -179,18 +179,18 @@ public partial class TerminalEmulatorBase : TextEditorControl
             _terminal = terminalEmulatorBase;
         }
 
-        public LineInfo GetLine(int value2)
+        public LineInfo GetLine(int line)
         {
-            if (value2 >= _lines.Count)
+            if (line >= _lines.Count)
             {
                 return null;
             }
-            return _lines[value2];
+            return _lines[line];
         }
 
-        internal void SetCells(int value2, int value3, int value4, CellStyle cellStyle, LinkCell[] items = null)
+        internal void SetCells(int row, int startColumn, int count, CellStyle cellStyle, LinkCell[] items = null)
         {
-            TextDocument.TextPosition textPosition = this._terminal.ToDocumentPosition(new Point(0, value2));
+            TextDocument.TextPosition textPosition = this._terminal.ToDocumentPosition(new Point(0, row));
             while (textPosition.Line >= this._lines.Count)
             {
                 if (cellStyle.IsDefault && items == null && !this._terminal.AlwaysTrackLines && this._terminal.HideMargins)
@@ -213,63 +213,63 @@ public partial class TerminalEmulatorBase : TextEditorControl
             lineInfo.Timestamp = DateTime.Now;
             if (lineInfo.Cells == null || lineInfo.Cells.Length < this._terminal._visibleColumns)
             {
-                CellStyle[] array = new CellStyle[this._terminal._visibleColumns];
+                CellStyle[] cellStyles = new CellStyle[this._terminal._visibleColumns];
                 if (lineInfo.Cells != null)
                 {
-                    lineInfo.Cells.CopyTo(array, 0);
+                    lineInfo.Cells.CopyTo(cellStyles, 0);
                 }
-                lineInfo.Cells = array;
+                lineInfo.Cells = cellStyles;
             }
-            if (value3 == -1 || value3 > this._terminal._visibleColumns)
+            if (startColumn == -1 || startColumn > this._terminal._visibleColumns)
             {
-                value3 = this._terminal._visibleColumns;
+                startColumn = this._terminal._visibleColumns;
             }
-            int num = this._terminal._visibleColumns - value3;
-            if (value4 == -1 || value4 > num)
+            int remainingColumns = this._terminal._visibleColumns - startColumn;
+            if (count == -1 || count > remainingColumns)
             {
-                value4 = num;
+                count = remainingColumns;
             }
-            for (int num2 = 0; num2 < value4; num2++)
+            for (int cellOffset = 0; cellOffset < count; cellOffset++)
             {
-                lineInfo.Cells[value3 + num2] = cellStyle;
-                if (items != null && num2 < items.Length)
+                lineInfo.Cells[startColumn + cellOffset] = cellStyle;
+                if (items != null && cellOffset < items.Length)
                 {
-                    lineInfo.Cells[value3 + num2]._link = items[num2];
+                    lineInfo.Cells[startColumn + cellOffset]._link = items[cellOffset];
                 }
                 else
                 {
-                    lineInfo.Cells[value3 + num2]._link = default;
+                    lineInfo.Cells[startColumn + cellOffset]._link = default;
                 }
             }
         }
 
-        public void ClearLine(int value2)
+        public void ClearLine(int line)
         {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(new Point(0, value2));
+            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(new Point(0, line));
             if (textPosition.Line < _lines.Count)
             {
                 _lines[textPosition.Line] = null;
             }
         }
 
-        public void RemoveLines(int value2, int value3)
+        public void RemoveLines(int line, int count)
         {
-            if (value2 < this._lines.Count)
+            if (line < this._lines.Count)
             {
-                value3 = Math.Min(value3, this._lines.Count - value2);
-                this._lines.RemoveRange(value2, value3);
+                count = Math.Min(count, this._lines.Count - line);
+                this._lines.RemoveRange(line, count);
             }
         }
 
-        public void InsertLines(int value2, int value3)
+        public void InsertLines(int line, int count)
         {
-            if (value2 < this._lines.Count)
+            if (line < this._lines.Count)
             {
-                this._lines.InsertRange(value2, new LineInfo[value3]);
+                this._lines.InsertRange(line, new LineInfo[count]);
             }
         }
 
-        public void DeleteCells(Point point, int value2)
+        public void DeleteCells(Point point, int count)
         {
             TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(point);
             if (textPosition.Line >= this._lines.Count || this._lines[textPosition.Line] == null)
@@ -279,21 +279,21 @@ public partial class TerminalEmulatorBase : TextEditorControl
             LineInfo lineInfo = this._lines[textPosition.Line];
             lineInfo.IsDimmed = false;
             lineInfo.IsWrapped = false;
-            for (int num = textPosition.Column; num < lineInfo.Cells.Length; num++)
+            for (int column = textPosition.Column; column < lineInfo.Cells.Length; column++)
             {
-                int num2 = num + value2;
-                if (num2 < lineInfo.Cells.Length)
+                int targetColumn = column + count;
+                if (targetColumn < lineInfo.Cells.Length)
                 {
-                    lineInfo.Cells[num] = lineInfo.Cells[num2];
+                    lineInfo.Cells[column] = lineInfo.Cells[targetColumn];
                 }
                 else
                 {
-                    lineInfo.Cells[num] = CellStyle.Default;
+                    lineInfo.Cells[column] = CellStyle.Default;
                 }
             }
         }
 
-        public void InsertCells(Point point, int value2)
+        public void InsertCells(Point point, int count)
         {
             TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(point);
             if (textPosition.Line < this._lines.Count && this._lines[textPosition.Line] != null)
@@ -301,13 +301,13 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 LineInfo lineInfo = this._lines[textPosition.Line];
                 lineInfo.IsDimmed = false;
                 lineInfo.IsWrapped = false;
-                for (int num = textPosition.Column + value2; num < lineInfo.Cells.Length; num++)
+                for (int column = textPosition.Column + count; column < lineInfo.Cells.Length; column++)
                 {
-                    lineInfo.Cells[num] = lineInfo.Cells[num - value2];
+                    lineInfo.Cells[column] = lineInfo.Cells[column - count];
                 }
-                for (int num2 = 0; num2 < value2; num2++)
+                for (int offset = 0; offset < count; offset++)
                 {
-                    lineInfo.Cells[textPosition.Column + num2] = lineInfo.Cells[textPosition.Column];
+                    lineInfo.Cells[textPosition.Column + offset] = lineInfo.Cells[textPosition.Column];
                 }
             }
         }
@@ -317,25 +317,25 @@ public partial class TerminalEmulatorBase : TextEditorControl
             _lines.Clear();
         }
 
-        internal void DimLines(int value2)
+        internal void DimLines(int lineCount)
         {
-            for (int num = 0; num < value2; num++)
+            for (int line = 0; line < lineCount; line++)
             {
-                if (num == _lines.Count)
+                if (line == _lines.Count)
                 {
                     _lines.Add(new LineInfo());
                 }
-                else if (_lines[num] == null)
+                else if (_lines[line] == null)
                 {
-                    _lines[num] = new LineInfo();
+                    _lines[line] = new LineInfo();
                 }
-                _lines[num].IsDimmed = true;
+                _lines[line].IsDimmed = true;
             }
         }
 
-        public void MarkWrapped(int value2)
+        public void MarkWrapped(int line)
         {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(new Point(0, value2));
+            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(new Point(0, line));
             while (textPosition.Line >= _lines.Count)
             {
                 _lines.Add(null);
@@ -358,24 +358,24 @@ public partial class TerminalEmulatorBase : TextEditorControl
         {
             NormalBrushes = new Brush[consolePalette.NormalColors.Length];
             this.BrightBrushes = new Brush[consolePalette.BrightColors.Length];
-            for (int num = 0; num < consolePalette.NormalColors.Length; num++)
+            for (int normalColorIndex = 0; normalColorIndex < consolePalette.NormalColors.Length; normalColorIndex++)
             {
-                NormalBrushes[num] = new SolidBrush(consolePalette.NormalColors[num]);
+                NormalBrushes[normalColorIndex] = new SolidBrush(consolePalette.NormalColors[normalColorIndex]);
             }
-            for (int num2 = 0; num2 < consolePalette.NormalColors.Length; num2++)
+            for (int brightColorIndex = 0; brightColorIndex < consolePalette.NormalColors.Length; brightColorIndex++)
             {
-                this.BrightBrushes[num2] = new SolidBrush(consolePalette.BrightColors[num2]);
+                this.BrightBrushes[brightColorIndex] = new SolidBrush(consolePalette.BrightColors[brightColorIndex]);
             }
         }
 
-        public Brush GetBrush(byte b2, bool flag)
+        public Brush GetBrush(byte colorIndex, bool bright)
         {
-            Brush[] array = (flag ? this.BrightBrushes : this.NormalBrushes);
-            if (b2 == 0 || b2 > array.Length)
+            Brush[] brushes = (bright ? this.BrightBrushes : this.NormalBrushes);
+            if (colorIndex == 0 || colorIndex > brushes.Length)
             {
                 return null;
             }
-            return array[b2 - 1];
+            return brushes[colorIndex - 1];
         }
     }
 
@@ -393,10 +393,10 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
         public int FirstRow { get; set; }
 
-        public ScreenBuffer(TerminalEmulatorBase terminalEmulatorBase, int value2 = int.MaxValue)
+        public ScreenBuffer(TerminalEmulatorBase terminalEmulatorBase, int maxScrollback = int.MaxValue)
         {
             Lines = new LineInfoStore(terminalEmulatorBase);
-            this.MaxScrollback = value2;
+            this.MaxScrollback = maxScrollback;
         }
     }
 
@@ -404,34 +404,34 @@ public partial class TerminalEmulatorBase : TextEditorControl
     {
         private bool[] _stops = new bool[0];
 
-        public void SetStop(int value2)
+        public void SetStop(int column)
         {
-            if (value2 > 65536)
+            if (column > 65536)
             {
-                value2 = 65536;
+                column = 65536;
             }
-            if (value2 >= _stops.Length)
+            if (column >= _stops.Length)
             {
-                Array.Resize(ref _stops, value2 + 1);
+                Array.Resize(ref _stops, column + 1);
             }
-            _stops[value2] = true;
+            _stops[column] = true;
         }
 
-        public int NextDistance(int value2, int value3)
+        public int NextDistance(int column, int tabSize)
         {
-            if (value2 >= this._stops.Length)
+            if (column >= this._stops.Length)
             {
-                if (value3 <= 0)
+                if (tabSize <= 0)
                 {
-                    value3 = 8;
+                    tabSize = 8;
                 }
-                return value3 - value2 % value3;
+                return tabSize - column % tabSize;
             }
-            for (int num = value2 + 1; num < this._stops.Length; num++)
+            for (int nextColumn = column + 1; nextColumn < this._stops.Length; nextColumn++)
             {
-                if (this._stops[num])
+                if (this._stops[nextColumn])
                 {
-                    return num - value2;
+                    return nextColumn - column;
                 }
             }
             return 1;
@@ -439,38 +439,38 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
         public void ClearAll()
         {
-            for (int num = 0; num < _stops.Length; num++)
+            for (int column = 0; column < _stops.Length; column++)
             {
-                _stops[num] = false;
+                _stops[column] = false;
             }
         }
 
-        internal void ClearStop(int value2)
+        internal void ClearStop(int column)
         {
-            if (value2 < _stops.Length)
+            if (column < _stops.Length)
             {
-                _stops[value2] = false;
+                _stops[column] = false;
             }
         }
 
-        internal int PreviousDistance(int value2)
+        internal int PreviousDistance(int column)
         {
-            if (value2 >= _stops.Length)
+            if (column >= _stops.Length)
             {
-                value2 = _stops.Length - 1;
+                column = _stops.Length - 1;
             }
-            if (value2 <= 0)
+            if (column <= 0)
             {
                 return 0;
             }
-            for (int num = value2 - 1; num > 0; num--)
+            for (int previousColumn = column - 1; previousColumn > 0; previousColumn--)
             {
-                if (_stops[num])
+                if (_stops[previousColumn])
                 {
-                    return value2 - num;
+                    return column - previousColumn;
                 }
             }
-            return value2;
+            return column;
         }
     }
 
@@ -485,11 +485,11 @@ public partial class TerminalEmulatorBase : TextEditorControl
             return $"Lines {Top}-{Bottom}";
         }
 
-        public bool Contains(int value2)
+        public bool Contains(int line)
         {
-            if (value2 >= Top)
+            if (line >= Top)
             {
-                return value2 <= Bottom;
+                return line <= Bottom;
             }
             return false;
         }
@@ -511,7 +511,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
             };
         }
 
-        public void Paint(Graphics graphics, Rectangle rectangle, SizeF sizeF, int value2, int value3, int value4, ReadonlyTextBrowser readonlyTextBrowser)
+        public void Paint(Graphics graphics, Rectangle rectangle, SizeF sizeF, int row, int topLine, int visibleRows, ReadonlyTextBrowser readonlyTextBrowser)
         {
             ScreenBuffer screenBuffer = this._terminal.ActiveBuffer;
             if (screenBuffer == null)
@@ -520,15 +520,15 @@ public partial class TerminalEmulatorBase : TextEditorControl
             }
             using (SolidBrush brush = new SolidBrush(this._terminal.ForeColor))
             {
-                for (int num = 0; num < value4; num++)
+                for (int rowOffset = 0; rowOffset < visibleRows; rowOffset++)
                 {
-                    LineInfo lineInfo = screenBuffer.Lines.GetLine(value3 + num);
+                    LineInfo lineInfo = screenBuffer.Lines.GetLine(topLine + rowOffset);
                     if (lineInfo != null && !(lineInfo.Timestamp == DateTime.MinValue))
                     {
-                        int num2 = (int)((float)rectangle.Top + (float)num * sizeF.Height);
-                        int bottom = num2 + (int)sizeF.Height;
+                        int y = (int)((float)rectangle.Top + (float)rowOffset * sizeF.Height);
+                        int bottom = y + (int)sizeF.Height;
                         string text = lineInfo.Timestamp.ToString(this._terminal.TimestampFormat);
-                        graphics.DrawString(text, readonlyTextBrowser.Font, brush, Rectangle.FromLTRB(rectangle.Left, num2, rectangle.Right, bottom), this._format);
+                        graphics.DrawString(text, readonlyTextBrowser.Font, brush, Rectangle.FromLTRB(rectangle.Left, y, rectangle.Right, bottom), this._format);
                     }
                 }
             }
@@ -536,12 +536,12 @@ public partial class TerminalEmulatorBase : TextEditorControl
             graphics.DrawLine(pen, rectangle.Right - 5, rectangle.Top, rectangle.Right - 5, rectangle.Bottom);
         }
 
-        public int MeasureWidth(ReadonlyTextBrowser readonlyTextBrowser, Graphics graphics, int value2)
+        public int MeasureWidth(ReadonlyTextBrowser readonlyTextBrowser, Graphics graphics, int line)
         {
             return (int)Math.Ceiling(graphics.MeasureString(DateTime.Now.ToString(_terminal.TimestampFormat), readonlyTextBrowser.Font).Width) + 10;
         }
 
-        public bool OnMouseDown(Point point, ReadonlyTextBrowser readonlyTextBrowser, int value2, int value3, SizeF sizeF, int value4)
+        public bool OnMouseDown(Point point, ReadonlyTextBrowser readonlyTextBrowser, int line, int row, SizeF sizeF, int column)
         {
             return true;
         }
@@ -607,9 +607,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
         set
         {
-            bool flag = _title != value;
+            bool titleChanged = _title != value;
             _title = value;
-            if (flag && TitleChanged != null)
+            if (titleChanged && TitleChanged != null)
             {
                 TitleChanged(this, EventArgs.Empty);
             }
@@ -712,7 +712,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
             SetDocument(_buffers[value].Document);
             CursorPosition = _buffers[_activeBufferIndex].Cursor;
             TopLine = ActiveBuffer.SavedTopLine;
-            SetSelection(flag: false, SelectionStart);
+            SetSelection(select: false, SelectionStart);
         }
     }
 
@@ -778,9 +778,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
         InitializeComponent();
         CaretWhenUnfocused = true;
         _allowPartialRows = false;
-        for (int num = 0; num < _buffers.Length; num++)
+        for (int bufferIndex = 0; bufferIndex < _buffers.Length; bufferIndex++)
         {
-            _buffers[num] = new ScreenBuffer(this, (num == 0) ? int.MaxValue : 0);
+            _buffers[bufferIndex] = new ScreenBuffer(this, (bufferIndex == 0) ? int.MaxValue : 0);
         }
         ActiveBufferIndex = 0;
         ClearMargins();
@@ -823,16 +823,16 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     protected TextDocument.TextPosition ToDocumentPosition(Point point)
     {
-        TextDocument.TextPosition result = new TextDocument.TextPosition(point.X, point.Y);
-        result.Line += ActiveBuffer.FirstRow;
-        return result;
+        TextDocument.TextPosition position = new TextDocument.TextPosition(point.X, point.Y);
+        position.Line += ActiveBuffer.FirstRow;
+        return position;
     }
 
     private TextDocument.TextPosition EnsureCursorPosition(Point point)
     {
-        TextDocument.TextPosition result = ToDocumentPosition(point);
-        EnsureDocumentSize(result);
-        return result;
+        TextDocument.TextPosition documentPosition = ToDocumentPosition(point);
+        EnsureDocumentSize(documentPosition);
+        return documentPosition;
     }
 
     private void InvalidateLayout()
@@ -860,19 +860,19 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     private void EnsureDocumentSize(TextDocument.TextPosition textPosition)
     {
-        bool flag = false;
+        bool scrolled = false;
         while (textPosition.Line >= base.EditableDocument.LineCount)
         {
             base.EditableDocument.AppendLine("");
-            flag = true;
+            scrolled = true;
         }
         int length = base.EditableDocument.GetLineText(textPosition.Line).Length;
         if (length < textPosition.Column)
         {
             base.EditableDocument.ReplaceInLine(textPosition.Line, length, 0, new string(' ', textPosition.Column - length));
-            flag = true;
+            scrolled = true;
         }
-        if (flag)
+        if (scrolled)
         {
             InvalidateLayout();
         }
@@ -883,53 +883,53 @@ public partial class TerminalEmulatorBase : TextEditorControl
         base.OnResize(e);
         if (ActiveBuffer != null)
         {
-            int num = base.EditableDocument.LineCount - ((ReadonlyTextBrowser)this)._visibleRows;
-            if (num < 0)
+            int topLine = base.EditableDocument.LineCount - ((ReadonlyTextBrowser)this)._visibleRows;
+            if (topLine < 0)
             {
-                num = 0;
+                topLine = 0;
             }
-            TopLine = num;
-            int num2 = num - ActiveBuffer.FirstRow;
-            ActiveBuffer.FirstRow = num;
-            if (num2 != 0)
+            TopLine = topLine;
+            int rowDelta = topLine - ActiveBuffer.FirstRow;
+            ActiveBuffer.FirstRow = topLine;
+            if (rowDelta != 0)
             {
-                MoveCursorBy(0, -num2);
+                MoveCursorBy(0, -rowDelta);
             }
             TrimScrollback();
             Redraw();
         }
     }
 
-    public void MoveCursorBy(int value2, int value3, bool flag = false)
+    public void MoveCursorBy(int deltaX, int deltaY, bool scroll = false)
     {
         Point point = _cursor;
-        point.Offset(value2, value3);
+        point.Offset(deltaX, deltaY);
         if (point.Y < 0)
         {
             point.Y = 0;
         }
-        MoveCursorTo(point, flag);
+        MoveCursorTo(point, scroll);
     }
 
-    protected void MoveCursorTo(Point point, bool flag2 = false)
+    protected void MoveCursorTo(Point point, bool scroll = false)
     {
-        bool flag = false;
-        if ((_scrollRegion != null) & flag2)
+        bool scrolled = false;
+        if ((_scrollRegion != null) & scroll)
         {
             while (point.Y > _scrollRegion.Bottom)
             {
-                DeleteLines(_scrollRegion.Top, 1, flag: true);
+                DeleteLines(_scrollRegion.Top, 1, scroll: true);
                 point.Y--;
                 ForceCaretUpdate();
             }
         }
         if (point.Y >= ((ReadonlyTextBrowser)this)._visibleRows)
         {
-            if (flag2)
+            if (scroll)
             {
                 ActiveBuffer.FirstRow += point.Y - ((ReadonlyTextBrowser)this)._visibleRows + 1;
                 point.Y = ((ReadonlyTextBrowser)this)._visibleRows - 1;
-                flag = true;
+                scrolled = true;
             }
             else
             {
@@ -938,7 +938,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
         CursorPosition = point;
         this.EnsureCursorPosition(_cursor);
-        if (flag)
+        if (scrolled)
         {
             TrimScrollback();
         }
@@ -948,20 +948,20 @@ public partial class TerminalEmulatorBase : TextEditorControl
     {
     }
 
-    public void WriteText(string text, bool flag = true)
+    public void WriteText(string text, bool moveCursor = true)
     {
         if (!string.IsNullOrEmpty(text))
         {
             Trace("'" + text + "'");
-            Point point = WriteAt(_cursor, text, CurrentStyle, flag: true, _insertMode);
-            if (flag)
+            Point point = WriteAt(_cursor, text, CurrentStyle, scroll: true, _insertMode);
+            if (moveCursor)
             {
                 CursorPosition = point;
             }
         }
     }
 
-    protected void RepeatPreviousChar(int value2)
+    protected void RepeatPreviousChar(int count)
     {
         TextDocument.TextPosition textPosition = ToDocumentPosition(CursorPosition);
         string text = base.EditableDocument.GetLineText(textPosition.Line);
@@ -976,7 +976,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         {
             cellStyle = lineInfo.Cells[textPosition.Column];
         }
-        WriteAt(CursorPosition, new string(ch, value2), cellStyle);
+        WriteAt(CursorPosition, new string(ch, count), cellStyle);
     }
 
     public void EraseInDisplay(EraseMode eraseMode)
@@ -987,26 +987,26 @@ public partial class TerminalEmulatorBase : TextEditorControl
             case EraseMode.ToEnd:
                 {
                     EraseInLine(eraseMode);
-                    for (int num = point.Y + 1; num < ((ReadonlyTextBrowser)this)._visibleRows; num++)
+                    for (int line = point.Y + 1; line < ((ReadonlyTextBrowser)this)._visibleRows; line++)
                     {
-                        ClearLineFrom(num, 0, CurrentStyle);
+                        ClearLineFrom(line, 0, CurrentStyle);
                     }
                     break;
                 }
             case EraseMode.ToStart:
                 {
                     EraseInLine(eraseMode);
-                    for (int num = 0; num < point.Y; num++)
+                    for (int lineBelowCursor = 0; lineBelowCursor < point.Y; lineBelowCursor++)
                     {
-                        ClearLineFrom(num, 0, CurrentStyle);
+                        ClearLineFrom(lineBelowCursor, 0, CurrentStyle);
                     }
                     break;
                 }
             case EraseMode.All:
                 {
-                    for (int num = 0; num < ((ReadonlyTextBrowser)this)._visibleRows; num++)
+                    for (int lineAboveCursor = 0; lineAboveCursor < ((ReadonlyTextBrowser)this)._visibleRows; lineAboveCursor++)
                     {
-                        ClearLineFrom(num, 0, CurrentStyle);
+                        ClearLineFrom(lineAboveCursor, 0, CurrentStyle);
                     }
                     break;
                 }
@@ -1030,19 +1030,19 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
     }
 
-    public void DeleteChars(int value2)
+    public void DeleteChars(int count)
     {
         TextDocument.TextPosition textPosition = ToDocumentPosition(CursorPosition);
-        base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, value2, "");
-        ActiveBuffer.Lines.DeleteCells(CursorPosition, value2);
+        base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, count, "");
+        ActiveBuffer.Lines.DeleteCells(CursorPosition, count);
         Redraw();
     }
 
-    public void InsertChars(int value2, char ch = ' ')
+    public void InsertChars(int count, char ch = ' ')
     {
         TextDocument.TextPosition textPosition = ToDocumentPosition(CursorPosition);
-        base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, new string(ch, value2));
-        ActiveBuffer.Lines.InsertCells(CursorPosition, value2);
+        base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, new string(ch, count));
+        ActiveBuffer.Lines.InsertCells(CursorPosition, count);
         Redraw();
     }
 
@@ -1051,31 +1051,31 @@ public partial class TerminalEmulatorBase : TextEditorControl
         return null;
     }
 
-    protected Point WriteAt(Point point, string text, CellStyle cellStyle, bool flag = true, bool flag2 = false)
+    protected Point WriteAt(Point point, string text, CellStyle cellStyle, bool scroll = true, bool insert = false)
     {
         if (_autoWrap && point.X >= _visibleColumns)
         {
             ActiveBuffer.Lines.MarkWrapped(point.Y);
             point = new Point(0, point.Y + 1);
         }
-        if (flag && point.Y >= ((ReadonlyTextBrowser)this)._visibleRows)
+        if (scroll && point.Y >= ((ReadonlyTextBrowser)this)._visibleRows)
         {
-            int num = point.Y - ((ReadonlyTextBrowser)this)._visibleRows + 1;
-            ActiveBuffer.FirstRow += num;
-            point.Offset(0, -num);
+            int scrollAmount = point.Y - ((ReadonlyTextBrowser)this)._visibleRows + 1;
+            ActiveBuffer.FirstRow += scrollAmount;
+            point.Offset(0, -scrollAmount);
         }
         this.EnsureCursorPosition(point);
         if (_autoWrap)
         {
-            int num2 = _visibleColumns - point.X;
-            if (text.Length > num2)
+            int availableColumns = _visibleColumns - point.X;
+            if (text.Length > availableColumns)
             {
-                point = WriteAt(point, text.Substring(0, num2), cellStyle);
-                int num4;
-                for (int num3 = num2; num3 < text.Length; num3 += num4)
+                point = WriteAt(point, text.Substring(0, availableColumns), cellStyle);
+                int chunkLength;
+                for (int chunkOffset = availableColumns; chunkOffset < text.Length; chunkOffset += chunkLength)
                 {
-                    num4 = Math.Min(text.Length - num3, _visibleColumns);
-                    point = WriteAt(point, text.Substring(num3, num4), cellStyle);
+                    chunkLength = Math.Min(text.Length - chunkOffset, _visibleColumns);
+                    point = WriteAt(point, text.Substring(chunkOffset, chunkLength), cellStyle);
                 }
                 return point;
             }
@@ -1091,25 +1091,25 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 _linkTracker = new LinkTracker(linkScanner, textPosition);
             }
         }
-        LinkCell[] array = _linkTracker?.Scan(text, textPosition);
-        if (flag2)
+        LinkCell[] linkCells = _linkTracker?.Scan(text, textPosition);
+        if (insert)
         {
             base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, text);
             ActiveBuffer.Lines.InsertCells(point, text.Length);
         }
         else
         {
-            int num5 = Math.Min(text.Length, length - textPosition.Column);
-            base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, num5, text);
+            int replaceLength = Math.Min(text.Length, length - textPosition.Column);
+            base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, replaceLength, text);
         }
-        ActiveBuffer.Lines.SetCells(point.Y, point.X, text.Length, cellStyle, array);
+        ActiveBuffer.Lines.SetCells(point.Y, point.X, text.Length, cellStyle, linkCells);
         InvalidateView();
         point.Offset(text.Length, 0);
-        if (flag && point.Y >= ((ReadonlyTextBrowser)this)._visibleRows)
+        if (scroll && point.Y >= ((ReadonlyTextBrowser)this)._visibleRows)
         {
-            int num6 = point.Y - ((ReadonlyTextBrowser)this)._visibleRows + 1;
-            ActiveBuffer.FirstRow += num6;
-            point.Offset(0, -num6);
+            int trailingScroll = point.Y - ((ReadonlyTextBrowser)this)._visibleRows + 1;
+            ActiveBuffer.FirstRow += trailingScroll;
+            point.Offset(0, -trailingScroll);
         }
         if (!_autoWrap)
         {
@@ -1119,26 +1119,26 @@ public partial class TerminalEmulatorBase : TextEditorControl
         return point;
     }
 
-    protected void ClearLineFrom(int value2, int value3, CellStyle cellStyle)
+    protected void ClearLineFrom(int line, int startColumn, CellStyle cellStyle)
     {
-        TextDocument.TextPosition textPosition = ToDocumentPosition(new Point(value3, value2));
+        TextDocument.TextPosition textPosition = ToDocumentPosition(new Point(startColumn, line));
         base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, -1, "");
-        if (value3 == 0)
+        if (startColumn == 0)
         {
-            ActiveBuffer.Lines.ClearLine(value2);
+            ActiveBuffer.Lines.ClearLine(line);
         }
         else
         {
-            ActiveBuffer.Lines.SetCells(textPosition.Line, value3, -1, CellStyle.Default);
+            ActiveBuffer.Lines.SetCells(textPosition.Line, startColumn, -1, CellStyle.Default);
         }
         this.EnsureCursorPosition(_cursor);
         if (!cellStyle.IsDefault)
         {
-            int num = _visibleColumns - value3;
-            if (num > 0)
+            int paddingLength = _visibleColumns - startColumn;
+            if (paddingLength > 0)
             {
-                base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, -1, new string(' ', num));
-                ActiveBuffer.Lines.SetCells(value2, value3, num, cellStyle);
+                base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, -1, new string(' ', paddingLength));
+                ActiveBuffer.Lines.SetCells(line, startColumn, paddingLength, cellStyle);
             }
         }
     }
@@ -1154,41 +1154,41 @@ public partial class TerminalEmulatorBase : TextEditorControl
         _palette = new BrushPalette(consolePalette);
     }
 
-    private ColorSpan CreateColorSpan(int value2, int value3, CellStyle cellStyle)
+    private ColorSpan CreateColorSpan(int start, int end, CellStyle cellStyle)
     {
-        Brush brush = ((cellStyle.Foreground != 0 || !cellStyle.Bold) ? _palette.GetBrush(cellStyle.Foreground, cellStyle.Bold) : _defaultForeBrush);
-        Brush brush2 = _palette.GetBrush(cellStyle.Background, flag: false);
+        Brush foregroundBrush = ((cellStyle.Foreground != 0 || !cellStyle.Bold) ? _palette.GetBrush(cellStyle.Foreground, cellStyle.Bold) : _defaultForeBrush);
+        Brush backgroundBrush = _palette.GetBrush(cellStyle.Background, bright: false);
         if (cellStyle.Inverse)
         {
-            Brush brush3 = brush;
-            brush = brush2;
-            brush2 = brush3;
-            if (brush == null)
+            Brush swapBrush = foregroundBrush;
+            foregroundBrush = backgroundBrush;
+            backgroundBrush = swapBrush;
+            if (foregroundBrush == null)
             {
-                brush = _defaultBackBrush;
+                foregroundBrush = _defaultBackBrush;
             }
-            if (brush2 == null)
+            if (backgroundBrush == null)
             {
-                brush2 = _defaultColors[0].Foreground;
+                backgroundBrush = _defaultColors[0].Foreground;
             }
         }
         if (cellStyle.Override != null && cellStyle.Override.Brush != null)
         {
-            brush = cellStyle.Override.Brush;
+            foregroundBrush = cellStyle.Override.Brush;
         }
         return new ColorSpan
         {
-            Foreground = brush,
-            Background = brush2,
-            Start = value2,
-            End = value3,
+            Foreground = foregroundBrush,
+            Background = backgroundBrush,
+            Start = start,
+            End = end,
             Underline = (cellStyle._link.Target?.IsActive ?? false)
         };
     }
 
-    protected override ColorSpan[] GetLineColorSpans(int value2)
+    protected override ColorSpan[] GetLineColorSpans(int line)
     {
-        LineInfo lineInfo = ActiveBuffer.Lines.GetLine(value2);
+        LineInfo lineInfo = ActiveBuffer.Lines.GetLine(line);
         if (lineInfo == null)
         {
             return null;
@@ -1210,11 +1210,11 @@ public partial class TerminalEmulatorBase : TextEditorControl
             return null;
         }
         CellStyle cellStyle = default;
-        int num = 0;
+        int spanStart = 0;
         List<ColorSpan> list = null;
-        for (int num2 = 0; num2 < lineInfo.Cells.Length; num2++)
+        for (int column = 0; column < lineInfo.Cells.Length; column++)
         {
-            if (cellStyle.StyleEquals(lineInfo.Cells[num2]))
+            if (cellStyle.StyleEquals(lineInfo.Cells[column]))
             {
                 continue;
             }
@@ -1224,10 +1224,10 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 {
                     list = new List<ColorSpan>();
                 }
-                list.Add(CreateColorSpan(num, num2, cellStyle));
+                list.Add(CreateColorSpan(spanStart, column, cellStyle));
             }
-            cellStyle = lineInfo.Cells[num2];
-            num = num2;
+            cellStyle = lineInfo.Cells[column];
+            spanStart = column;
         }
         if (!cellStyle.IsDefault)
         {
@@ -1235,7 +1235,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
             {
                 list = new List<ColorSpan>();
             }
-            list.Add(CreateColorSpan(num, lineInfo.Cells.Length, cellStyle));
+            list.Add(CreateColorSpan(spanStart, lineInfo.Cells.Length, cellStyle));
         }
         return list?.ToArray();
     }
@@ -1243,13 +1243,13 @@ public partial class TerminalEmulatorBase : TextEditorControl
     private void TrimScrollback()
     {
         ScreenBuffer screenBuffer = ActiveBuffer;
-        int num = screenBuffer.Document.LineCount - ((ReadonlyTextBrowser)this)._visibleRows;
-        if (num > screenBuffer.MaxScrollback)
+        int overflowLines = screenBuffer.Document.LineCount - ((ReadonlyTextBrowser)this)._visibleRows;
+        if (overflowLines > screenBuffer.MaxScrollback)
         {
-            int num2 = num - screenBuffer.MaxScrollback;
-            screenBuffer.Document.RemoveLines(0, num2);
-            screenBuffer.Lines.RemoveLines(0, num2);
-            ActiveBuffer.FirstRow -= num2;
+            int linesToRemove = overflowLines - screenBuffer.MaxScrollback;
+            screenBuffer.Document.RemoveLines(0, linesToRemove);
+            screenBuffer.Lines.RemoveLines(0, linesToRemove);
+            ActiveBuffer.FirstRow -= linesToRemove;
             if (ActiveBuffer.FirstRow < 0)
             {
                 ActiveBuffer.FirstRow = 0;
@@ -1285,56 +1285,56 @@ public partial class TerminalEmulatorBase : TextEditorControl
         base.EditableDocument.Clear();
         ActiveBuffer.FirstRow = 0;
         CursorPosition = new Point(0, 0);
-        SetSelection(flag: false, new TextDocument.TextPosition(0, 0));
+        SetSelection(select: false, new TextDocument.TextPosition(0, 0));
         ActiveBuffer.Lines.Clear();
         CurrentStyle = default;
         OnTextReplaced();
     }
 
-    private void DeleteLines(int value2, int value3, bool flag)
+    private void DeleteLines(int line, int count, bool scroll)
     {
-        if (flag)
+        if (scroll)
         {
-            int num3 = Math.Min(base.EditableDocument.LineCount, ActiveBuffer.FirstRow + ((ReadonlyTextBrowser)this)._visibleRows);
+            int insertLine = Math.Min(base.EditableDocument.LineCount, ActiveBuffer.FirstRow + ((ReadonlyTextBrowser)this)._visibleRows);
             if (_scrollRegion != null)
             {
-                num3 = Math.Min(num3, ActiveBuffer.FirstRow + _scrollRegion.Bottom + 1);
+                insertLine = Math.Min(insertLine, ActiveBuffer.FirstRow + _scrollRegion.Bottom + 1);
             }
-            base.EditableDocument.InsertText(new TextDocument.TextPosition(0, num3), new string('\n', value3));
-            ActiveBuffer.Lines.InsertLines(num3, value3);
+            base.EditableDocument.InsertText(new TextDocument.TextPosition(0, insertLine), new string('\n', count));
+            ActiveBuffer.Lines.InsertLines(insertLine, count);
         }
-        int num = value2 + ActiveBuffer.FirstRow;
-        int num2 = Math.Min(value3, base.EditableDocument.LineCount - num);
-        base.EditableDocument.RemoveLines(num, num2);
-        ActiveBuffer.Lines.RemoveLines(num, num2);
+        int documentLine = line + ActiveBuffer.FirstRow;
+        int linesToRemove = Math.Min(count, base.EditableDocument.LineCount - documentLine);
+        base.EditableDocument.RemoveLines(documentLine, linesToRemove);
+        ActiveBuffer.Lines.RemoveLines(documentLine, linesToRemove);
         OnTextReplaced();
     }
 
-    protected void ScrollRegionUp(int value2, int value3)
+    protected void ScrollRegionUp(int topLine, int count)
     {
-        DeleteLines(value2, value3, flag: true);
+        DeleteLines(topLine, count, scroll: true);
     }
 
-    protected void InsertBlankLines(int value2, int value3, bool flag = true)
+    protected void InsertBlankLines(int line, int count, bool redraw = true)
     {
-        int num = ((ReadonlyTextBrowser)this)._visibleRows;
-        if (_scrollRegion != null && _scrollRegion.Contains(value2))
+        int blankInsertLine = ((ReadonlyTextBrowser)this)._visibleRows;
+        if (_scrollRegion != null && _scrollRegion.Contains(line))
         {
-            num = _scrollRegion.Bottom + 1;
+            blankInsertLine = _scrollRegion.Bottom + 1;
         }
-        int num2 = value2 + ActiveBuffer.FirstRow;
-        base.EditableDocument.InsertText(new TextDocument.TextPosition(0, num2), new string('\n', value3));
-        ActiveBuffer.Lines.InsertLines(num2, value3);
-        if (flag && base.EditableDocument.LineCount > ActiveBuffer.FirstRow + num)
+        int documentLine = line + ActiveBuffer.FirstRow;
+        base.EditableDocument.InsertText(new TextDocument.TextPosition(0, documentLine), new string('\n', count));
+        ActiveBuffer.Lines.InsertLines(documentLine, count);
+        if (redraw && base.EditableDocument.LineCount > ActiveBuffer.FirstRow + blankInsertLine)
         {
-            DeleteLines(num, value3, flag: false);
+            DeleteLines(blankInsertLine, count, scroll: false);
         }
         OnTextReplaced();
     }
 
-    public string GetLineText(int value2)
+    public string GetLineText(int line)
     {
-        TextDocument.TextPosition textPosition = ToDocumentPosition(new Point(0, value2));
+        TextDocument.TextPosition textPosition = ToDocumentPosition(new Point(0, line));
         return base.EditableDocument.GetLineText(textPosition.Line);
     }
 
@@ -1347,19 +1347,19 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
     }
 
-    private string GetLineBreak(int value2)
+    private string GetLineBreak(int line)
     {
         ScreenBuffer screenBuffer = ActiveBuffer;
-        if (screenBuffer != null && screenBuffer.Lines?.GetLine(value2)?.IsWrapped == true)
+        if (screenBuffer != null && screenBuffer.Lines?.GetLine(line)?.IsWrapped == true)
         {
             return "";
         }
         return "\r\n";
     }
 
-    protected override string GetSelectedText(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2)
+    protected override string GetSelectedText(TextDocument.TextPosition start, TextDocument.TextPosition end)
     {
-        return base.EditableDocument.GetRangeText(textPosition, textPosition2, GetLineBreak);
+        return base.EditableDocument.GetRangeText(start, end, GetLineBreak);
     }
 
     public void SelectAllText()
@@ -1367,23 +1367,23 @@ public partial class TerminalEmulatorBase : TextEditorControl
         if (base.EditableDocument.LineCount != 0)
         {
             SetSelectionEnd(new TextDocument.TextPosition(base.EditableDocument.GetLineText(base.EditableDocument.LineCount - 1).Length, base.EditableDocument.LineCount - 1));
-            SetSelection(flag: true, new TextDocument.TextPosition(0, 0));
+            SetSelection(select: true, new TextDocument.TextPosition(0, 0));
         }
     }
 
-    public void SetScrollRegion(int value2, int value3)
+    public void SetScrollRegion(int top, int bottom)
     {
-        if ((value2 == 0 && value3 == ((ReadonlyTextBrowser)this)._visibleRows - 1) || value3 <= value2)
+        if ((top == 0 && bottom == ((ReadonlyTextBrowser)this)._visibleRows - 1) || bottom <= top)
         {
             ClearScrollRegion();
             return;
         }
         _scrollRegion = new ScrollRegion
         {
-            Top = value2,
-            Bottom = value3
+            Top = top,
+            Bottom = bottom
         };
-        CursorPosition = new Point(value2, 0);
+        CursorPosition = new Point(top, 0);
         this.EnsureCursorPosition(_cursor);
     }
 
@@ -1400,7 +1400,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         ActiveBuffer.Lines.DimLines(ToDocumentPosition(_cursor).Line + 1);
         if (_cursor.X > 0)
         {
-            MoveCursorBy(-CursorPosition.X, 1, flag: true);
+            MoveCursorBy(-CursorPosition.X, 1, scroll: true);
         }
         Redraw();
     }

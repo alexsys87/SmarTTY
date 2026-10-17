@@ -27,20 +27,20 @@ public struct TransferStatistics
     public int Symlinks;
 
     [SpecialName]
-    public static TransferStatistics Add(TransferStatistics transferStatistics, TransferStatistics transferStatistics2)
+    public static TransferStatistics Add(TransferStatistics left, TransferStatistics right)
     {
         return new TransferStatistics
         {
-            TotalBytes = transferStatistics.TotalBytes + transferStatistics2.TotalBytes,
-            TransferredBytes = transferStatistics.TransferredBytes + transferStatistics2.TransferredBytes,
-            UpToDateBytes = transferStatistics.UpToDateBytes + transferStatistics2.UpToDateBytes,
-            TotalFiles = transferStatistics.TotalFiles + transferStatistics2.TotalFiles,
-            CopiedFiles = transferStatistics.CopiedFiles + transferStatistics2.CopiedFiles,
-            UpToDateFiles = transferStatistics.UpToDateFiles + transferStatistics2.UpToDateFiles,
-            Directories = transferStatistics.Directories + transferStatistics2.Directories,
-            FilesToDelete = transferStatistics.FilesToDelete + transferStatistics2.FilesToDelete,
-            DeletedFiles = transferStatistics.DeletedFiles + transferStatistics2.DeletedFiles,
-            Symlinks = transferStatistics.Symlinks + transferStatistics2.Symlinks
+            TotalBytes = left.TotalBytes + right.TotalBytes,
+            TransferredBytes = left.TransferredBytes + right.TransferredBytes,
+            UpToDateBytes = left.UpToDateBytes + right.UpToDateBytes,
+            TotalFiles = left.TotalFiles + right.TotalFiles,
+            CopiedFiles = left.CopiedFiles + right.CopiedFiles,
+            UpToDateFiles = left.UpToDateFiles + right.UpToDateFiles,
+            Directories = left.Directories + right.Directories,
+            FilesToDelete = left.FilesToDelete + right.FilesToDelete,
+            DeletedFiles = left.DeletedFiles + right.DeletedFiles,
+            Symlinks = left.Symlinks + right.Symlinks
         };
     }
 

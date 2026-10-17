@@ -43,32 +43,32 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
         {
             get
             {
-                int num = 0;
-                int num2 = 0;
+                int itemIndex = 0;
+                int removedPackageCount = 0;
                 if (_AllPackages != null)
                 {
                     LinuxPackageInfo[] allPackages = _AllPackages;
-                    for (int num3 = 0; num3 < allPackages.Length; num3++)
+                    for (int allPackageIndex = 0; allPackageIndex < allPackages.Length; allPackageIndex++)
                     {
-                        switch (allPackages[num3].Action)
+                        switch (allPackages[allPackageIndex].Action)
                         {
                             case LinuxPackageInfo.PackageAction.Install:
-                                num++;
+                                itemIndex++;
                                 break;
                             case LinuxPackageInfo.PackageAction.Remove:
-                                num2++;
+                                removedPackageCount++;
                                 break;
                         }
                     }
                 }
                 List<string> list = new List<string>();
-                if (num > 0)
+                if (itemIndex > 0)
                 {
-                    list.Add($"install {num} package" + ((num == 1) ? "" : "s"));
+                    list.Add($"install {itemIndex} package" + ((itemIndex == 1) ? "" : "s"));
                 }
-                if (num2 > 0)
+                if (removedPackageCount > 0)
                 {
-                    list.Add($"remove {num2} package" + ((num2 == 1) ? "" : "s"));
+                    list.Add($"remove {removedPackageCount} package" + ((removedPackageCount == 1) ? "" : "s"));
                 }
                 string text = string.Join(", ", list.ToArray());
                 if (text.Length == 0)
@@ -190,13 +190,11 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                     ApplyFilter();
                 }), new object[0]);
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                Exception ex2 = ex;
-                Exception ex3 = ex2;
                 ((DispatcherObject)_Window).Dispatcher.BeginInvoke((Delegate)(Action)(() =>
                 {
-                    MessageBoxes.Exception(ex3);
+                    MessageBoxes.Exception(exception);
                     _Window.Close();
                 }), new object[0]);
             }
@@ -217,8 +215,8 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                 {
                 }
             }
-            LinuxPackageInfo[] array = _AllPackages ?? new LinuxPackageInfo[0];
-            foreach (LinuxPackageInfo linuxPackageInfo in array)
+            LinuxPackageInfo[] linuxPackageInfos = _AllPackages ?? new LinuxPackageInfo[0];
+            foreach (LinuxPackageInfo linuxPackageInfo in linuxPackageInfos)
             {
                 string name = linuxPackageInfo.Name;
                 if (name == null)
@@ -261,15 +259,15 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
         public string BuildCommandLine()
         {
             List<string> list = new List<string>();
-            LinuxPackageInfo[] array = _AllPackages.Where((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.Action == LinuxPackageInfo.PackageAction.Install).ToArray();
-            LinuxPackageInfo[] array2 = _AllPackages.Where((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.Action == LinuxPackageInfo.PackageAction.Remove).ToArray();
-            if (array.Length != 0)
+            LinuxPackageInfo[] items = _AllPackages.Where((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.Action == LinuxPackageInfo.PackageAction.Install).ToArray();
+            LinuxPackageInfo[] entries = _AllPackages.Where((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.Action == LinuxPackageInfo.PackageAction.Remove).ToArray();
+            if (items.Length != 0)
             {
-                list.Add(_Client.GetCommandLineForPackageOperation(array, LinuxPackageInfo.PackageAction.Install, Options));
+                list.Add(_Client.GetCommandLineForPackageOperation(items, LinuxPackageInfo.PackageAction.Install, Options));
             }
-            if (array2.Length != 0)
+            if (entries.Length != 0)
             {
-                list.Add(_Client.GetCommandLineForPackageOperation(array2, LinuxPackageInfo.PackageAction.Remove, Options));
+                list.Add(_Client.GetCommandLineForPackageOperation(entries, LinuxPackageInfo.PackageAction.Remove, Options));
             }
             string text = string.Join("&&", list.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
             return "sudo su -c \"" + text + "\"";

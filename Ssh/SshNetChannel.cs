@@ -52,9 +52,9 @@ internal sealed class SshNetChannel : IDisposable
                 DataEventData = GetType(assembly, "Renci.SshNet.Common.ChannelDataEventArgs").GetProperty("Data") ?? throw Missing("ChannelDataEventArgs.Data");
                 RequestEventInfo = GetType(assembly, "Renci.SshNet.Common.ChannelRequestEventArgs").GetProperty("Info") ?? throw Missing("ChannelRequestEventArgs.Info");
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                LoadError = ex;
+                LoadError = exception;
             }
         }
 
@@ -234,9 +234,9 @@ internal sealed class SshNetChannel : IDisposable
         {
             return method.Invoke(target, args);
         }
-        catch (TargetInvocationException ex) when (ex.InnerException != null)
+        catch (TargetInvocationException exception) when (exception.InnerException != null)
         {
-            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
             throw;
         }
     }

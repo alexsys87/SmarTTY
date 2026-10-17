@@ -105,13 +105,13 @@ public class RemotePathUtils
                 segments.Add(segment);
             }
         }
-        string result = string.Join("/", segments.ToArray());
+        string normalizedPath = string.Join("/", segments.ToArray());
         while (leadingSlashesCount > 0)
         {
-            result = "/" + result;
+            normalizedPath = "/" + normalizedPath;
             leadingSlashesCount--;
         }
-        return result;
+        return normalizedPath;
     }
 
     public static string NormalizeMixed(string path)
@@ -266,16 +266,16 @@ public class RemotePathUtils
         {
             return targetPath;
         }
-        string result = "";
+        string text = "";
         for (int i = commonCount; i < baseSegments.Length; i++)
         {
-            result = Combine(result, "..");
+            text = Combine(text, "..");
         }
         for (int j = commonCount; j < targetSegments.Length; j++)
         {
-            result = Combine(result, targetSegments[j]);
+            text = Combine(text, targetSegments[j]);
         }
-        return result;
+        return text;
     }
 
     public static string Combine(string basePath, string relativePath)

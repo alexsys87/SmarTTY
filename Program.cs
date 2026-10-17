@@ -27,7 +27,7 @@ internal class Program
         {
             MainWindow mainWindow = new MainWindow(connectionSelectionWindow.Controller.CreatedSession, connectionSelectionWindow.Controller.SelectedSettings, connectionSelectionWindow.Controller.Job?.Command, connectionSelectionWindow.Controller.Job?.EchoInitialCommand ?? false);
             mainWindow.Show();
-            mainWindow.Closed += (object obj, EventArgs e) =>
+            mainWindow.Closed += (object _, EventArgs e) =>
             {
                 Application.Current.Shutdown();
             };

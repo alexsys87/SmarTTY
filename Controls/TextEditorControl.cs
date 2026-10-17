@@ -28,9 +28,9 @@ public partial class TextEditorControl : EditableTextBrowser
         InitializeComponent();
     }
 
-    protected virtual string GetSelectedText(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2)
+    protected virtual string GetSelectedText(TextDocument.TextPosition start, TextDocument.TextPosition end)
     {
-        return base.EditableDocument.GetRangeText(textPosition, textPosition2);
+        return base.EditableDocument.GetRangeText(start, end);
     }
 
     public void CopyAll()
@@ -47,20 +47,20 @@ public partial class TextEditorControl : EditableTextBrowser
                 Clipboard.SetText(text);
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
-    public void CopySelection(bool flag = true)
+    public void CopySelection(bool select = true)
     {
         try
         {
             string text;
             if (!_hasSelection)
             {
-                if (!flag)
+                if (!select)
                 {
                     return;
                 }
@@ -79,9 +79,9 @@ public partial class TextEditorControl : EditableTextBrowser
                 Clipboard.SetText(text);
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -89,12 +89,12 @@ public partial class TextEditorControl : EditableTextBrowser
     {
         try
         {
-            ReplaceText(text: (!CodeEditorPP.IsWindows()) ? Clipboard.GetText() : Win32Clipboard.GetText(Handle), textPosition: CaretPosition, textPosition2: SelectionStart, flag: !_hasSelection);
+            ReplaceText(text: (!CodeEditorPP.IsWindows()) ? Clipboard.GetText() : Win32Clipboard.GetText(Handle), start: CaretPosition, end: SelectionStart, select: !_hasSelection);
             UpdateMaxLineWidth(-1);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -103,8 +103,8 @@ public partial class TextEditorControl : EditableTextBrowser
         CopySelection();
         if (!_hasSelection)
         {
-            int num = CaretPosition.Line;
-            ReplaceText(new TextDocument.TextPosition(0, num), new TextDocument.TextPosition(0, num + 1), flag: false, "");
+            int line = CaretPosition.Line;
+            ReplaceText(new TextDocument.TextPosition(0, line), new TextDocument.TextPosition(0, line + 1), select: false, "");
         }
         else
         {
@@ -112,28 +112,28 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
-    public string GetPaddingToColumn(int value2, int value3, int value4)
+    public string GetPaddingToColumn(int column, int columnIndex, int columnNumber)
     {
-        int num = IndexToColumn(value2, value3);
-        if (num >= value4)
+        int lineLength = IndexToColumn(column, columnIndex);
+        if (lineLength >= columnNumber)
         {
             return null;
         }
-        int num2 = value4 % TabSize;
-        int count = (value4 - num2 - num + TabSize - 1) / TabSize;
-        return new string('\t', count) + new string(' ', num2);
+        int value = columnNumber % TabSize;
+        int count = (columnNumber - value - lineLength + TabSize - 1) / TabSize;
+        return new string('\t', count) + new string(' ', value);
     }
 
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
         if (e.KeyChar == '\t' && ((_hasSelection && SelectionStart != CaretPosition) || (Control.ModifierKeys & Keys.Shift) == Keys.Shift))
         {
-            int num = 1;
+            int value = 1;
             if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
             {
-                num = -1;
+                value = -1;
             }
-            Indent(num);
+            Indent(value);
         }
         else
         {
@@ -141,18 +141,18 @@ public partial class TextEditorControl : EditableTextBrowser
             {
                 case '\r':
                     {
-                        string text2 = base.EditableDocument.GetLineTerminator(CaretPosition.Line, "\n");
-                        ReplaceText(CaretPosition, SelectionStart, !_hasSelection, text2 + GetIndentation(CaretPosition.Line));
+                        string content = base.EditableDocument.GetLineTerminator(CaretPosition.Line, "\n");
+                        ReplaceText(CaretPosition, SelectionStart, !_hasSelection, content + GetIndentation(CaretPosition.Line));
                         break;
                     }
                 case '\b':
                     if (_hasSelection)
                     {
-                        ReplaceText(SelectionEnd, SelectionStart, flag: false, "");
+                        ReplaceText(SelectionEnd, SelectionStart, select: false, "");
                     }
                     else
                     {
-                        ReplaceText(CaretPosition, GetMovedPosition(CaretMove.Left), flag: false, "");
+                        ReplaceText(CaretPosition, GetMovedPosition(CaretMove.Left), select: false, "");
                     }
                     UpdateMaxLineWidth(CaretPosition.Line);
                     break;
@@ -163,7 +163,7 @@ public partial class TextEditorControl : EditableTextBrowser
                     }
                     if (!_hasSelection && OverwriteMode && CaretPosition.Column < base.EditableDocument.GetLineText(CaretPosition.Line).Length)
                     {
-                        ReplaceText(CaretPosition, new TextDocument.TextPosition(CaretPosition.Column + 1, CaretPosition.Line), flag: false, new string(e.KeyChar, 1));
+                        ReplaceText(CaretPosition, new TextDocument.TextPosition(CaretPosition.Column + 1, CaretPosition.Line), select: false, new string(e.KeyChar, 1));
                     }
                     else
                     {
@@ -174,11 +174,11 @@ public partial class TextEditorControl : EditableTextBrowser
                         {
                             if (!_hasSelection)
                             {
-                                ReplaceText(CaretPosition, SelectionStart, flag: true, text);
+                                ReplaceText(CaretPosition, SelectionStart, select: true, text);
                             }
                             else
                             {
-                                ReplaceText(SelectionEnd, SelectionStart, flag: false, text);
+                                ReplaceText(SelectionEnd, SelectionStart, select: false, text);
                             }
                         }
                         if (textPosition.IsValid)
@@ -218,11 +218,11 @@ public partial class TextEditorControl : EditableTextBrowser
             {
                 if (_hasSelection)
                 {
-                    ReplaceText(SelectionEnd, SelectionStart, flag: false, "");
+                    ReplaceText(SelectionEnd, SelectionStart, select: false, "");
                 }
                 else
                 {
-                    ReplaceText(CaretPosition, GetMovedPosition(CaretMove.Right), flag: false, "");
+                    ReplaceText(CaretPosition, GetMovedPosition(CaretMove.Right), select: false, "");
                 }
                 UpdateMaxLineWidth(CaretPosition.Line);
             }
@@ -260,37 +260,37 @@ public partial class TextEditorControl : EditableTextBrowser
         ReplaceText(CaretPosition, SelectionStart, !((ReadonlyTextBrowser)this).HasSelection, text);
     }
 
-    public string GetWordAtCaret(out int value2, out int value3)
+    public string GetWordAtCaret(out int column, out int value)
     {
-        value2 = -1;
-        value3 = 0;
+        column = -1;
+        value = 0;
         string text = base.EditableDocument.GetLineText(CaretPosition.Line);
         if (CaretPosition.Column == 0)
         {
             return null;
         }
-        value2 = CaretPosition.Column;
-        while (value2 > 0 && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".IndexOf(text[value2 - 1]) != -1)
+        column = CaretPosition.Column;
+        while (column > 0 && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".IndexOf(text[column - 1]) != -1)
         {
-            value2--;
+            column--;
         }
-        int num;
-        for (num = CaretPosition.Column; num < text.Length && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".IndexOf(text[num]) != -1; num++)
+        int itemIndex;
+        for (itemIndex = CaretPosition.Column; itemIndex < text.Length && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".IndexOf(text[itemIndex]) != -1; itemIndex++)
         {
         }
-        value3 = num - value2;
-        return text.Substring(value2, value3);
+        value = itemIndex - column;
+        return text.Substring(column, value);
     }
 
     public void ReplaceWordAtCaret(string text)
     {
-        if (GetWordAtCaret(out var num, out var num2) == null || num2 == 0)
+        if (GetWordAtCaret(out var item, out var entry) == null || entry == 0)
         {
             InsertText(text);
         }
         else
         {
-            ReplaceText(new TextDocument.TextPosition(num, CaretPosition.Line), new TextDocument.TextPosition(num + num2, CaretPosition.Line), flag: false, text);
+            ReplaceText(new TextDocument.TextPosition(item, CaretPosition.Line), new TextDocument.TextPosition(item + entry, CaretPosition.Line), select: false, text);
         }
     }
 }

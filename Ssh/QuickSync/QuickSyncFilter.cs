@@ -131,7 +131,7 @@ public struct QuickSyncFilter
         }
         List<string> groupMasks = new List<string>();
         bool isIncludeGroup = false;
-        List<QuickSyncFilter> result = new List<QuickSyncFilter>();
+        List<QuickSyncFilter> items = new List<QuickSyncFilter>();
         foreach (string mask in masks)
         {
             bool isInclude = true;
@@ -143,7 +143,7 @@ public struct QuickSyncFilter
             }
             if (groupMasks.Count > 0 && isInclude != isIncludeGroup)
             {
-                result.Add(QuickSyncFilter.FromWildcard((isIncludeGroup ? "" : "-") + string.Join(";", groupMasks.ToArray()), ignoreCase));
+                items.Add(QuickSyncFilter.FromWildcard((isIncludeGroup ? "" : "-") + string.Join(";", groupMasks.ToArray()), ignoreCase));
                 groupMasks.Clear();
             }
             groupMasks.Add(cleanMask);
@@ -151,9 +151,9 @@ public struct QuickSyncFilter
         }
         if (groupMasks.Count > 0)
         {
-            result.Add(QuickSyncFilter.FromWildcard((isIncludeGroup ? "" : "-") + string.Join(";", groupMasks.ToArray()), ignoreCase));
+            items.Add(QuickSyncFilter.FromWildcard((isIncludeGroup ? "" : "-") + string.Join(";", groupMasks.ToArray()), ignoreCase));
         }
-        return result.ToArray();
+        return items.ToArray();
     }
 
     public bool IsMatch(string path)

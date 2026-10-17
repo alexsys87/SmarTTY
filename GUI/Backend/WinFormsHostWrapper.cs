@@ -9,18 +9,18 @@ internal class WinFormsHostWrapper : WindowsFormsHost
     {
         base.OnIsKeyboardFocusedChanged(e);
         object newValue = e.NewValue;
-        bool flag = false;
-        int num;
+        bool isKeyboardFocused = false;
+        int value;
         if (newValue is bool)
         {
-            flag = (bool)newValue;
-            num = 1;
+            isKeyboardFocused = (bool)newValue;
+            value = 1;
         }
         else
         {
-            num = 0;
+            value = 0;
         }
-        if (((uint)num & (flag ? 1u : 0u)) != 0 && ((WindowsFormsHost)this).Child != null)
+        if (((uint)value & (isKeyboardFocused ? 1u : 0u)) != 0 && ((WindowsFormsHost)this).Child != null)
         {
             ((WindowsFormsHost)this).Child.Focus();
         }

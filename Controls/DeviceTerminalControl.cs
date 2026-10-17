@@ -41,8 +41,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
             cbHEX.Checked = value;
             ToolStripLabel toolStripLabel = lblSend;
             ToolStripTextBox toolStripTextBox = txtHexInput;
-            bool flag = (btnSend.Visible = value);
-            bool visible = (toolStripTextBox.Visible = flag);
+            bool isVisible = (btnSend.Visible = value);
+            bool visible = (toolStripTextBox.Visible = isVisible);
             toolStripLabel.Visible = visible;
         }
     }
@@ -103,12 +103,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             cbBaudRate.Text = advancedSettings.BaudRate.ToString();
         }
-        TerminalEmulatorControl terminalEmulatorControl = terminalEmulatorControl1;
+        TerminalEmulatorControl terminal = terminalEmulatorControl1;
         Color backColor = (hexTerminalControl1.BackColor = deviceTerminalSettings.Colors.Background);
-        terminalEmulatorControl.BackColor = backColor;
-        TerminalEmulatorControl terminalEmulatorControl2 = terminalEmulatorControl1;
+        terminal.BackColor = backColor;
         backColor = (hexTerminalControl1.ForeColor = deviceTerminalSettings.Colors.Text);
-        terminalEmulatorControl2.ForeColor = backColor;
+        terminal.ForeColor = backColor;
         terminalEmulatorControl1.EnterSequence = GetLineEnding(deviceTerminalSettings.LineEnding);
         _brush = (hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo));
         HexMode = _deviceTerminalSettings.DisplayMode != DeviceTerminalSettings.CharacterDisplayMode.ASCII;
@@ -123,7 +122,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         Connect();
     }
 
-    private void Connect(bool flag = true, int value2 = 0)
+    private void Connect(bool resetTerminal = true, int value = 0)
     {
         if (_asyncTransportConnection != null)
         {
@@ -131,13 +130,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
             Thread.Sleep(300);
         }
         _asyncTransportConnection = null;
-        if (flag)
+        if (resetTerminal)
         {
             terminalEmulatorControl1.Reset();
         }
         IDeviceTransport deviceTransport = this._transportFactory.CreateTransport();
-        lblConnection.Text = "Connected to " + deviceTransport.GetDisplayName(flag: true);
-        _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, value2);
+        lblConnection.Text = "Connected to " + deviceTransport.GetDisplayName(includeParameters: true);
+        _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, value);
         _asyncTransportConnection.DataReceived += OnDataReceived;
         _asyncTransportConnection.StateChanged += OnConnectionStateChanged;
         _asyncTransportConnection.WriterIdleChanged += OnWriterIdleChanged;
@@ -148,7 +147,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
     }
 
-    private void OnConnectionStateChanged(object obj, ConnectionStateEnum connectionStateEnum, string text2)
+    private void OnConnectionStateChanged(object sender, ConnectionStateEnum connectionStateEnum, string value)
     {
         if (connectionStateEnum == ConnectionStateEnum.Connecting || connectionStateEnum == ConnectionStateEnum.Failed)
         {
@@ -167,32 +166,30 @@ public partial class DeviceTerminalControl : DpiAwareControl
         switch (connectionStateEnum)
         {
             case ConnectionStateEnum.Connecting:
-                lblConnecting.Text = text2;
+                lblConnecting.Text = value;
                 break;
             case ConnectionStateEnum.Disconnected:
                 {
-                    TerminalEmulatorControl terminalEmulatorControl = terminalEmulatorControl1;
-                    bool flag = (hexTerminalControl1.HideCaret = true);
-                    terminalEmulatorControl.HideCaret = flag;
-                    TerminalEmulatorControl terminalEmulatorControl2 = terminalEmulatorControl1;
+                    TerminalEmulatorControl terminal = terminalEmulatorControl1;
+                    bool changed = (hexTerminalControl1.HideCaret = true);
+                    terminal.HideCaret = changed;
                     Color backColor = (hexTerminalControl1.BackColor = _deviceTerminalSettings.Colors.Disconnected);
-                    terminalEmulatorControl2.BackColor = backColor;
+                    terminal.BackColor = backColor;
                     ToolStripLabel toolStripLabel = lblConnection;
                     string text = (lblConnecting.Text = "Connection closed");
                     toolStripLabel.Text = text;
                     break;
                 }
             case ConnectionStateEnum.Failed:
-                lblConnecting.Text = "Connection failed: " + text2;
+                lblConnecting.Text = "Connection failed: " + value;
                 break;
             case ConnectionStateEnum.Connected:
                 {
-                    TerminalEmulatorControl terminalEmulatorControl3 = terminalEmulatorControl1;
+                    TerminalEmulatorControl terminal = terminalEmulatorControl1;
                     Color backColor = (hexTerminalControl1.BackColor = _deviceTerminalSettings.Colors.Background);
-                    terminalEmulatorControl3.BackColor = backColor;
-                    TerminalEmulatorControl terminalEmulatorControl4 = terminalEmulatorControl1;
-                    bool flag = (hexTerminalControl1.HideCaret = false);
-                    terminalEmulatorControl4.HideCaret = flag;
+                    terminal.BackColor = backColor;
+                    bool updated = (hexTerminalControl1.HideCaret = false);
+                    terminal.HideCaret = updated;
                     break;
                 }
         }
@@ -206,17 +203,17 @@ public partial class DeviceTerminalControl : DpiAwareControl
             throw new Exception("Unspecified error");
         }
         deviceTransport.Open(null);
-        return deviceTransport.GetDisplayName(flag: true);
+        return deviceTransport.GetDisplayName(includeParameters: true);
     }
 
-    private void OnDataReceived(object obj, byte[] buffer, int value2)
+    private void OnDataReceived(object sender, byte[] buffer, int value)
     {
         if (_isHexMode)
         {
-            hexTerminalControl1.AppendData(buffer, value2);
+            hexTerminalControl1.AppendData(buffer, value);
             return;
         }
-        string text = Encoding.ASCII.GetString(buffer, 0, value2);
+        string text = Encoding.ASCII.GetString(buffer, 0, value);
         if (_deviceTerminalSettings != null && _deviceTerminalSettings.TreatLFAsCRLF)
         {
             text = text.Replace("\n", "\r\n");
@@ -224,7 +221,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         terminalEmulatorControl1.ProcessOutput(text);
     }
 
-    private void OnTerminalDataEntered(object obj, byte[] buffer, TerminalEmulatorControl.InputKind inputKind)
+    private void OnTerminalDataEntered(object sender, byte[] buffer, TerminalEmulatorControl.InputKind inputKind)
     {
         if (_asyncTransportConnection != null)
         {
@@ -233,19 +230,19 @@ public partial class DeviceTerminalControl : DpiAwareControl
         if (_deviceTerminalSettings.EchoTypedCharacters && inputKind != TerminalEmulatorControl.InputKind.MouseReport && !_isHexMode)
         {
             TerminalEmulatorBase.CellStyle cellStyle = terminalEmulatorControl1.CurrentStyle;
-            TerminalEmulatorBase.CellStyle cellStyle2 = cellStyle;
-            cellStyle2.Override = new TerminalEmulatorBase.CellStyle.ForegroundOverride
+            TerminalEmulatorBase.CellStyle overrideStyle = cellStyle;
+            overrideStyle.Override = new TerminalEmulatorBase.CellStyle.ForegroundOverride
             {
                 Brush = _brush
             };
-            terminalEmulatorControl1.CurrentStyle = cellStyle2;
+            terminalEmulatorControl1.CurrentStyle = overrideStyle;
             string text = Encoding.ASCII.GetString(buffer);
             switch (text)
             {
                 case "\r":
                 case "\n":
                 case "\r\n":
-                    terminalEmulatorControl1.MoveCursorBy(-terminalEmulatorControl1.CursorPosition.X, 1, flag: true);
+                    terminalEmulatorControl1.MoveCursorBy(-terminalEmulatorControl1.CursorPosition.X, 1, scroll: true);
                     break;
                 default:
                     terminalEmulatorControl1.WriteText(text);
@@ -291,36 +288,36 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         List<byte> list = new List<byte>();
         byte b = 0;
-        int num = 0;
-        char[] array = text.ToCharArray();
-        for (int num2 = 0; num2 < array.Length; num2++)
+        int itemIndex = 0;
+        char[] items = text.ToCharArray();
+        for (int arrayIndex = 0; arrayIndex < items.Length; arrayIndex++)
         {
-            char ch = array[num2];
+            char ch = items[arrayIndex];
             if (ch == ' ')
             {
-                if (num > 0)
+                if (itemIndex > 0)
                 {
                     list.Add(b);
-                    num = 0;
+                    itemIndex = 0;
                     b = 0;
                 }
                 continue;
             }
-            int num3 = HexDigitValue(ch);
-            if (num3 == -1)
+            int value = HexDigitValue(ch);
+            if (value == -1)
             {
                 throw new ArgumentException("Invalid HEX character: " + ch);
             }
-            if (num >= 2)
+            if (itemIndex >= 2)
             {
                 list.Add(b);
-                num = 0;
+                itemIndex = 0;
                 b = 0;
             }
-            b = (byte)((b << 4) | num3);
-            num++;
+            b = (byte)((b << 4) | value);
+            itemIndex++;
         }
-        if (num > 0)
+        if (itemIndex > 0)
         {
             list.Add(b);
         }
@@ -335,20 +332,20 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         try
         {
-            byte[] array = ((!sendAsHEXToolStripMenuItem.Checked) ? Encoding.ASCII.GetBytes(txtHexInput.Text) : ParseHexBytes(txtHexInput.Text));
-            _asyncTransportConnection.Send(array, array.Length);
+            byte[] items = ((!sendAsHEXToolStripMenuItem.Checked) ? Encoding.ASCII.GetBytes(txtHexInput.Text) : ParseHexBytes(txtHexInput.Text));
+            _asyncTransportConnection.Send(items, items.Length);
             if (_deviceTerminalSettings.EchoTypedCharacters)
             {
-                hexTerminalControl1.AppendData(array, array.Length, flag: true);
+                hexTerminalControl1.AppendData(items, items.Length, isEcho: true);
             }
             if ((Control.ModifierKeys & Keys.Alt) == 0)
             {
                 txtHexInput.Text = "";
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -438,9 +435,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 File.WriteAllText(_saveFileDialog.FileName, terminalEmulatorControl1.Text);
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -452,16 +449,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         try
         {
-            byte[] array = File.ReadAllBytes(_openFileDialog.FileName);
-            _asyncTransportConnection.Send(array, array.Length);
+            byte[] items = File.ReadAllBytes(_openFileDialog.FileName);
+            _asyncTransportConnection.Send(items, items.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
             {
-                hexTerminalControl1.AppendData(array, array.Length, flag: true);
+                hexTerminalControl1.AppendData(items, items.Length, isEcho: true);
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -490,7 +487,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         else if (((ReadonlyTextBrowser)terminalEmulatorControl1).HasSelection)
         {
-            terminalEmulatorControl1.CopySelection(flag: false);
+            terminalEmulatorControl1.CopySelection(select: false);
         }
     }
 
@@ -531,12 +528,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
             _asyncTransportConnection.Send(bytes, bytes.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
             {
-                hexTerminalControl1.AppendData(bytes, bytes.Length, flag: true);
+                hexTerminalControl1.AppendData(bytes, bytes.Length, isEcho: true);
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -568,7 +565,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
     }
 
-    private void changeSettingsToolStripMenuItem_Click(object sender, EventArgs e2)
+    private void changeSettingsToolStripMenuItem_Click(object sender, EventArgs e)
     {
         if (!(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serial))
         {
@@ -578,7 +575,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         if (serialPortSettingsForm.ShowModal() == DialogResult.OK)
         {
             serial.AdvancedSettings = serialPortSettingsForm.AdvancedSettings;
-            Connect(flag: false, 1000);
+            Connect(resetTerminal: false, 1000);
         }
     }
 
@@ -597,16 +594,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void ApplyBaudRate(string text)
     {
-        if (int.TryParse(text, out var result) && _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serial)
+        if (int.TryParse(text, out var baudRate) && _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serial)
         {
             if (serial.AdvancedSettings == null)
             {
                 serial.AdvancedSettings = new DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings();
             }
-            if (serial.AdvancedSettings.BaudRate != result)
+            if (serial.AdvancedSettings.BaudRate != baudRate)
             {
-                serial.AdvancedSettings.BaudRate = result;
-                Connect(flag: false, 1000);
+                serial.AdvancedSettings.BaudRate = baudRate;
+                Connect(resetTerminal: false, 1000);
             }
         }
     }

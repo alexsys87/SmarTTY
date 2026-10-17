@@ -295,9 +295,9 @@ internal class CompletionSession : IDisposable
                 OnItemsLoaded(itemsList);
             }));
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            _popup.DisplayException(ex);
+            _popup.DisplayException(exception);
             _isLoading = false;
         }
     }
@@ -349,21 +349,21 @@ internal class CompletionSession : IDisposable
 
     private string BuildInsertText(ListingTarget listingTarget, LsOutputParser.LsEntry lsEntry)
     {
-        string result = "";
+        string text = "";
         if (listingTarget.HasPrefix)
         {
-            result = listingTarget.Prefix;
-            if (!result.EndsWith("/"))
+            text = listingTarget.Prefix;
+            if (!text.EndsWith("/"))
             {
-                result += "/";
+                text += "/";
             }
         }
-        result += lsEntry.Name;
-        if (lsEntry.IsDirectory && !result.EndsWith("/"))
+        text += lsEntry.Name;
+        if (lsEntry.IsDirectory && !text.EndsWith("/"))
         {
-            result += "/";
+            text += "/";
         }
-        return result;
+        return text;
     }
 
     private static int CompareItems(CompletionItem first, CompletionItem second)

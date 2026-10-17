@@ -163,11 +163,11 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
             {
                 length = _text.Length - offset;
             }
-            string result = "";
+            string text = "";
             if (length != 0)
             {
                 OnChanged(isInsert: false, offset, length);
-                result = _text.Substring(offset, length);
+                text = _text.Substring(offset, length);
                 _text = _text.Remove(offset, length);
             }
             if (newText.Length != 0)
@@ -175,7 +175,7 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
                 OnChanged(isInsert: true, offset, newText.Length);
                 _text = _text.Insert(offset, newText);
             }
-            return result;
+            return text;
         }
     }
 
@@ -227,52 +227,52 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
             Line = textPosition.Line;
         }
 
-        public static bool operator ==(TextPosition textPosition, TextPosition textPosition2)
+        public static bool operator ==(TextPosition left, TextPosition right)
         {
-            if (textPosition.Column == textPosition2.Column)
+            if (left.Column == right.Column)
             {
-                return textPosition.Line == textPosition2.Line;
+                return left.Line == right.Line;
             }
             return false;
         }
 
-        public static bool operator !=(TextPosition textPosition, TextPosition textPosition2)
+        public static bool operator !=(TextPosition left, TextPosition right)
         {
-            if (textPosition.Column == textPosition2.Column)
+            if (left.Column == right.Column)
             {
-                return textPosition.Line != textPosition2.Line;
+                return left.Line != right.Line;
             }
             return true;
         }
 
-        public static bool operator <(TextPosition textPosition, TextPosition textPosition2)
+        public static bool operator <(TextPosition left, TextPosition right)
         {
-            if (textPosition.Line < textPosition2.Line)
+            if (left.Line < right.Line)
             {
                 return true;
             }
-            if (textPosition.Line > textPosition2.Line)
+            if (left.Line > right.Line)
             {
                 return false;
             }
-            if (textPosition.Column < textPosition2.Column)
+            if (left.Column < right.Column)
             {
                 return true;
             }
             return false;
         }
 
-        public static bool operator >(TextPosition textPosition, TextPosition textPosition2)
+        public static bool operator >(TextPosition left, TextPosition right)
         {
-            if (textPosition.Line > textPosition2.Line)
+            if (left.Line > right.Line)
             {
                 return true;
             }
-            if (textPosition.Line < textPosition2.Line)
+            if (left.Line < right.Line)
             {
                 return false;
             }
-            if (textPosition.Column > textPosition2.Column)
+            if (left.Column > right.Column)
             {
                 return true;
             }
@@ -284,21 +284,21 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
             return (Line << 16) ^ Column;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object sender)
         {
-            if (obj == null)
+            if (sender == null)
             {
                 return false;
             }
-            if (obj == (object)this)
+            if (sender == (object)this)
             {
                 return true;
             }
-            if (!(obj is TextPosition))
+            if (!(sender is TextPosition))
             {
                 return false;
             }
-            return this == ((TextPosition)obj);
+            return this == ((TextPosition)sender);
         }
 
         public override string ToString()

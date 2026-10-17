@@ -212,7 +212,7 @@ public class ShellCompletionAnalyzer : IDisposable
 
     private static List<string> SplitPath(List<string> pathLines)
     {
-        List<string> result = new List<string>();
+        List<string> items = new List<string>();
         if (pathLines != null)
         {
             foreach (string pathLine in pathLines)
@@ -220,11 +220,11 @@ public class ShellCompletionAnalyzer : IDisposable
                 string[] parts = pathLine.Split(':');
                 foreach (string part in parts)
                 {
-                    result.Add(part);
+                    items.Add(part);
                 }
             }
         }
-        return result;
+        return items;
     }
 
     public IEnumerable<string> GetExecutables(SshTerminalControl sshTerminalControl)

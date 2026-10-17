@@ -29,9 +29,9 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
         Controller.ReportException += Controller_ReportException;
     }
 
-    private void Controller_ReportException(Exception ex)
+    private void Controller_ReportException(Exception exception)
     {
-        if (ex is SecurityException)
+        if (exception is SecurityException)
         {
             PasswordBox passwordBox = txtPassword;
             if (passwordBox != null)
@@ -44,7 +44,7 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
                 ((UIElement)passwordBox2).Focus();
             }
         }
-        MessageBoxes.Exception(ex);
+        MessageBoxes.Exception(exception);
     }
 
     private void PasswordBox_Loaded(object sender, RoutedEventArgs e)
@@ -89,9 +89,9 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
             }
             Controller.Connect();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -115,11 +115,11 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
         string text = Controller?.HostName;
         if (text != null)
         {
-            int num = text.IndexOf('@');
-            if (num != -1)
+            int index = text.IndexOf('@');
+            if (index != -1)
             {
-                Controller.UserName = text.Substring(0, num);
-                Controller.HostName = text.Substring(num + 1);
+                Controller.UserName = text.Substring(0, index);
+                Controller.HostName = text.Substring(index + 1);
                 txtHostName.SelectionStart = txtHostName.Text.Length;
                 txtHostName.SelectionLength = 0;
             }

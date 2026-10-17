@@ -178,9 +178,9 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
             _pendingJob = remoteCommand;
             IsPolling = true;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             HideBusy();
             _pendingJob = null;
             IsPolling = false;

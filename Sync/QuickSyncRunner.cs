@@ -45,9 +45,9 @@ public class QuickSyncRunner
             _writer.WriteLine("--------------------------------------");
             _writer.WriteLine();
             _writer.WriteLine("Symlink action list:");
-            foreach (SyncPlan.SymlinkRequest item2 in syncPlan.Symlinks)
+            foreach (SyncPlan.SymlinkRequest entry in syncPlan.Symlinks)
             {
-                _writer.WriteLine("  " + item2.LinkPath + " => " + item2.Target + (item2.IsDirectory ? "(dir)" : "(file)"));
+                _writer.WriteLine("  " + entry.LinkPath + " => " + entry.Target + (entry.IsDirectory ? "(dir)" : "(file)"));
             }
             _writer.WriteLine("--------------------------------------");
             _writer.WriteLine();
@@ -161,37 +161,37 @@ public class QuickSyncRunner
 
         public string HostName => _session.HostName;
 
-        public HelperBuilder(SshSession sshSession, string text, string text2)
+        public HelperBuilder(SshSession sshSession, string text, string outputPath)
         {
             _session = sshSession;
             this._sourcePath = text;
-            this._outputPath = text2;
+            this._outputPath = outputPath;
         }
 
         public void Install(Action<string> action)
         {
             string text = _session.GetTempPath("SysprogsSync.cpp");
             action?.Invoke("Sending " + this._sourcePath + " to " + text + "...");
-            byte[] array = File.ReadAllBytes(this._sourcePath);
+            byte[] sourceBytes = File.ReadAllBytes(this._sourcePath);
             SshSession sshSession = _session;
-            long num = array.Length;
-            int? num2 = Convert.ToInt32("666", 8);
-            using (ScpChannelStream scpChannelStream = sshSession.OpenUpload(text, num, default, num2))
+            long fileLength = sourceBytes.Length;
+            int? fileMode = Convert.ToInt32("666", 8);
+            using (ScpChannelStream scpChannelStream = sshSession.OpenUpload(text, fileLength, default, fileMode))
             {
-                scpChannelStream.Write(array, 0, array.Length);
+                scpChannelStream.Write(sourceBytes, 0, sourceBytes.Length);
             }
             BuildFlags buildFlags = BuildFlags.Default;
-            BuildFlags buildFlags2;
+            BuildFlags previousBuildFlags;
             do
             {
-                string text2 = "g++ " + text + " -O3 -o " + _outputPath;
-                text2 = (((buildFlags & BuildFlags.UseRegexHeader) == 0) ? (text2 + " -std=c++11") : (text2 + " -DUSE_REGEX_H"));
+                string command = "g++ " + text + " -O3 -o " + _outputPath;
+                command = (((buildFlags & BuildFlags.UseRegexHeader) == 0) ? (command + " -std=c++11") : (command + " -DUSE_REGEX_H"));
                 if ((buildFlags & BuildFlags.LargeFileOffset) != 0)
                 {
-                    text2 += " -D_FILE_OFFSET_BITS=64";
+                    command += " -D_FILE_OFFSET_BITS=64";
                 }
-                List<string> coll = _session.RunCommand(text2, out var num3);
-                buildFlags2 = buildFlags;
+                List<string> coll = _session.RunCommand(command, out var exitCode);
+                previousBuildFlags = buildFlags;
                 foreach (string item in coll.EnsureNotNull())
                 {
                     action?.Invoke(item);
@@ -204,22 +204,22 @@ public class QuickSyncRunner
                         buildFlags |= BuildFlags.UseRegexHeader;
                     }
                 }
-                if (num3 != 0)
+                if (exitCode != 0)
                 {
                     continue;
                 }
-                List<string> coll2 = _session.RunCommand(_outputPath + " --selftest", out num3);
-                if (num3 == 0)
+                List<string> selftestOutput = _session.RunCommand(_outputPath + " --selftest", out exitCode);
+                if (exitCode == 0)
                 {
                     return;
                 }
-                foreach (string item2 in coll2.EnsureNotNull())
+                foreach (string entry in selftestOutput.EnsureNotNull())
                 {
-                    action?.Invoke(item2);
+                    action?.Invoke(entry);
                 }
                 buildFlags |= BuildFlags.UseRegexHeader;
             }
-            while (buildFlags != buildFlags2);
+            while (buildFlags != previousBuildFlags);
             throw new Exception("Failed to build remote SysprogsSync executable. Please try building it manually.");
         }
     }
@@ -232,9 +232,9 @@ public class QuickSyncRunner
 
         public LocalDirectoryContext GetChild(string text)
         {
-            LocalDirectoryContext result = new LocalDirectoryContext(Path.Combine(text));
-            result.Failed = this.Failed;
-            return result;
+            LocalDirectoryContext child = new LocalDirectoryContext(Path.Combine(text));
+            child.Failed = this.Failed;
+            return child;
         }
     }
 
@@ -258,7 +258,7 @@ public class QuickSyncRunner
         {
             syncEvents = new LoggingSyncEvents(syncEvents, streamWriter);
         }
-        TransferStatistics result;
+        TransferStatistics statistics;
         try
         {
             syncSettings.LocalPath = ((syncSettings.LocalPath == null) ? null : PathUtils.GetFullPathChecked(syncSettings.LocalPath));
@@ -287,7 +287,7 @@ public class QuickSyncRunner
                     });
                 };
                 SyncPlan syncPlan = downloadPlanner.BuildPlan();
-                result = downloadPlanner.Statistics;
+                statistics = downloadPlanner.Statistics;
                 (syncEvents as ISyncDiagnostics)?.OnPlanCreated(syncPlan);
                 LocalFileSystem.LinkOptions linkOptions = LocalFileSystem.LinkOptions.None;
                 if ((syncSettings.Options & SyncOptions.SkipSymlinks) == SyncOptions.SkipSymlinks)
@@ -303,7 +303,7 @@ public class QuickSyncRunner
                     linkOptions |= LocalFileSystem.LinkOptions.DeleteExtraneous;
                 }
                 using IRemoteFileSource remoteFileSource = syncEngine.BeginDownload(syncPlan.Actions);
-                this.ExecuteLocalActions(LocalPath.FromUserPath(syncSettings.LocalPath), syncPlan, remoteFileSource, syncEvents, ref result);
+                this.ExecuteLocalActions(LocalPath.FromUserPath(syncSettings.LocalPath), syncPlan, remoteFileSource, syncEvents, ref statistics);
                 CreateLinks(syncPlan, linkOptions, syncEvents);
             }
             else
@@ -321,17 +321,17 @@ public class QuickSyncRunner
                         Exception = exception
                     });
                 };
-                SyncPlan syncPlan2 = uploadPlanner.BuildPlan();
-                result = uploadPlanner.Statistics;
-                (syncEvents as ISyncDiagnostics)?.OnPlanCreated(syncPlan2);
-                syncEngine.Upload(syncPlan2.Actions, uploadPlanner.Files, ref result);
+                SyncPlan plan = uploadPlanner.BuildPlan();
+                statistics = uploadPlanner.Statistics;
+                (syncEvents as ISyncDiagnostics)?.OnPlanCreated(plan);
+                syncEngine.Upload(plan.Actions, uploadPlanner.Files, ref statistics);
             }
         }
         finally
         {
             (syncEvents as LoggingSyncEvents)?.WriteWarnings();
         }
-        return result;
+        return statistics;
     }
 
     private void ScanLocalDirectory(RemoteFileSet.RemoteDirectory remoteDirectory, LocalPath localPath, ISyncEvents syncEvents)
@@ -340,39 +340,39 @@ public class QuickSyncRunner
         {
             Stage = SyncStage.BuildingFileList
         });
-        foreach (LocalFileSystem.FindData item2 in LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: false))
+        foreach (LocalFileSystem.FindData entry in LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: false))
         {
-            if (item2.HasAttribute(FileAttributes.ReparsePoint))
+            if (entry.HasAttribute(FileAttributes.ReparsePoint))
             {
                 remoteDirectory.Symlinks.Add(new RemoteFileSet.RemoteDirectory.RemoteSymlink
                 {
-                    Name = item2.FileName,
-                    IsDirectory = item2.HasAttribute(FileAttributes.Directory)
+                    Name = entry.FileName,
+                    IsDirectory = entry.HasAttribute(FileAttributes.Directory)
                 });
             }
-            else if (item2.HasAttribute(FileAttributes.Directory))
+            else if (entry.HasAttribute(FileAttributes.Directory))
             {
-                RemoteFileSet.RemoteDirectory item = new RemoteFileSet.RemoteDirectory(remoteDirectory, item2.FileName);
+                RemoteFileSet.RemoteDirectory item = new RemoteFileSet.RemoteDirectory(remoteDirectory, entry.FileName);
                 try
                 {
-                    ScanLocalDirectory(item, localPath.Combine(item2.FileName), syncEvents);
+                    ScanLocalDirectory(item, localPath.Combine(entry.FileName), syncEvents);
                     remoteDirectory.SubDirectories.Add(item);
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
                     syncEvents?.OnWarning(new SyncWarning
                     {
-                        Exception = ex,
+                        Exception = exception,
                         Warning = new QuickSyncWarning(QuickSyncWarningType.UnreadableLocalDirectory, localPath.ToString(), 0)
                     });
                 }
             }
             else
             {
-                LocalFileSystem.FileStamp fileStamp = new LocalFileSystem.FileStamp(item2);
+                LocalFileSystem.FileStamp fileStamp = new LocalFileSystem.FileStamp(entry);
                 remoteDirectory.Files.Add(new RemoteFileSet.RemoteFileEntry
                 {
-                    Name = item2.FileName,
+                    Name = entry.FileName,
                     Size = fileStamp.Size,
                     ModifiedSeconds = fileStamp.UnixSeconds
                 });
@@ -417,9 +417,9 @@ public class QuickSyncRunner
         {
             return true;
         }
-        for (int num = 0; num < items.Length; num++)
+        for (int filterIndex = 0; filterIndex < items.Length; filterIndex++)
         {
-            QuickSyncFilter quickSyncFilter = items[num];
+            QuickSyncFilter quickSyncFilter = items[filterIndex];
             if (quickSyncFilter.IsMatch(text))
             {
                 return quickSyncFilter.Action == QuickSyncAction.Include;
@@ -443,7 +443,7 @@ public class QuickSyncRunner
         });
         SyncPlan syncPlan = downloadPlanner.PlanDeleteNames(localPath, items);
         TransferStatistics transferStatistics = downloadPlanner.Statistics;
-        this.ExecuteLocalActions(localPath, syncPlan, null, syncEvents, ref transferStatistics, flag2: true);
+        this.ExecuteLocalActions(localPath, syncPlan, null, syncEvents, ref transferStatistics, unused: true);
     }
 
     private ISyncEngine CreateEngine(SshSession sshSession, SyncSettings syncSettings, ISyncEvents syncEvents, ILocalFileCache localFileCache, ISyncCustomization syncCustomization)
@@ -456,21 +456,21 @@ public class QuickSyncRunner
         {
             return new FileByFileSyncEngine(sshSession, syncSettings, syncEvents, localFileCache, Tuning, syncCustomization);
         }
-        bool flag = (syncSettings.Options & SyncOptions.DisableHelper) == SyncOptions.DisableHelper;
-        bool flag2 = false;
+        bool disableHelper = (syncSettings.Options & SyncOptions.DisableHelper) == SyncOptions.DisableHelper;
+        bool useTar = false;
         if (_engineKind == SyncEngineKind.Tar)
         {
-            flag2 = true;
+            useTar = true;
         }
         else if (_engineKind == SyncEngineKind.Auto && (syncSettings.Options & SyncOptions.DisableTar) != SyncOptions.DisableTar && syncSettings.Direction == SyncDirection.Upload && sshSession.EnableOnTheFlyTar && ((syncSettings.QuickSyncOverwriteTrigger == QuickSyncOverwriteTrigger.LocalCache && localFileCache != null) || syncSettings.QuickSyncOverwriteTrigger == QuickSyncOverwriteTrigger.Always))
         {
-            flag2 = true;
+            useTar = true;
         }
-        if (flag2)
+        if (useTar)
         {
             return new TarSyncEngine(sshSession, syncSettings, syncEvents, localFileCache, Tuning, syncCustomization);
         }
-        if (sshSession.Tag == null && !flag)
+        if (sshSession.Tag == null && !disableHelper)
         {
             string text = this._helperLocator?.FindHelper(sshSession.HostName);
             if (text != null && sshSession.RunCommandChecked("test -f \"" + text + "\"", requireSuccess: true) != null)
@@ -479,28 +479,28 @@ public class QuickSyncRunner
             }
             else
             {
-                string text2 = "SysprogsSync-v1.2";
-                if (sshSession.RunCommandChecked("which -f \"" + text2 + "\"", requireSuccess: true) != null || sshSession.RunCommandChecked("which \"" + text2 + "\"", requireSuccess: true) != null)
+                string helperName = "SysprogsSync-v1.2";
+                if (sshSession.RunCommandChecked("which -f \"" + helperName + "\"", requireSuccess: true) != null || sshSession.RunCommandChecked("which \"" + helperName + "\"", requireSuccess: true) != null)
                 {
-                    sshSession.Tag = text2;
+                    sshSession.Tag = helperName;
                 }
                 else
                 {
-                    string text3 = sshSession.RunCommandChecked("pwd", requireSuccess: true)?.FirstOrDefault((string text5) => text5.StartsWith("/"));
-                    if (text3 == null)
+                    string homeDirectory = sshSession.RunCommandChecked("pwd", requireSuccess: true)?.FirstOrDefault((string path) => path.StartsWith("/"));
+                    if (homeDirectory == null)
                     {
-                        text3 = RemotePathUtils.GetDirectoryName(sshSession.GetTempPath("test"));
+                        homeDirectory = RemotePathUtils.GetDirectoryName(sshSession.GetTempPath("test"));
                     }
-                    text = text3 + "/.SysprogsSync/" + text2;
+                    text = homeDirectory + "/.SysprogsSync/" + helperName;
                     if (text != null && sshSession.RunCommandChecked("test -f \"" + text + "\"", requireSuccess: true) != null)
                     {
                         sshSession.Tag = text;
                     }
                     else
                     {
-                        string text4 = text3 + "/.SysprogsSync";
-                        sshSession.RunCommandChecked("mkdir -p \"" + text4 + "\"", requireSuccess: false);
-                        text = text4 + "/SysprogsSync-v1.2";
+                        string helperDirectory = homeDirectory + "/.SysprogsSync";
+                        sshSession.RunCommandChecked("mkdir -p \"" + helperDirectory + "\"", requireSuccess: false);
+                        text = helperDirectory + "/SysprogsSync-v1.2";
                         HelperBuilder helperBuilder = new HelperBuilder(sshSession, this._helperSourcePath, text);
                         try
                         {
@@ -521,7 +521,7 @@ public class QuickSyncRunner
                 }
             }
         }
-        if ((sshSession.Tag == null) | flag)
+        if ((sshSession.Tag == null) | disableHelper)
         {
             if (_engineKind == SyncEngineKind.SysprogsSync)
             {
@@ -562,52 +562,52 @@ public class QuickSyncRunner
                     LocalFileSystem.CreateDirectoryLink(LocalPath.FromRaw(item.LinkPath), item.Target, linkOptions, action);
                 }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
                 syncEvents?.OnWarning(new SyncWarning
                 {
-                    Exception = ex,
+                    Exception = exception,
                     Warning = new QuickSyncWarning(QuickSyncWarningType.CreateSymlinkFailed, item.LinkPath, 0)
                 });
             }
         }
     }
 
-    private static string GetRelativePath(LocalPath localPath, LocalPath localPath2)
+    private static string GetRelativePath(LocalPath sourcePath, LocalPath targetPath)
     {
-        if (localPath2.FullPath.StartsWith(localPath.FullPath, StringComparison.InvariantCultureIgnoreCase))
+        if (targetPath.FullPath.StartsWith(sourcePath.FullPath, StringComparison.InvariantCultureIgnoreCase))
         {
-            return localPath2.FullPath.Substring(localPath.FullPath.Length).TrimStart('\\').Replace('\\', '/');
+            return targetPath.FullPath.Substring(sourcePath.FullPath.Length).TrimStart('\\').Replace('\\', '/');
         }
-        return localPath2.FullPath;
+        return targetPath.FullPath;
     }
 
-    private void ExecuteLocalActions(LocalPath localPath, SyncPlan syncPlan, IRemoteFileSource remoteFileSource, ISyncEvents syncEvents, ref TransferStatistics transferStatistics, bool flag2 = false)
+    private void ExecuteLocalActions(LocalPath localPath, SyncPlan syncPlan, IRemoteFileSource remoteFileSource, ISyncEvents syncEvents, ref TransferStatistics transferStatistics, bool unused = false)
     {
         Stack<LocalDirectoryContext> stack = new Stack<LocalDirectoryContext>();
         LocalDirectoryContext item = new LocalDirectoryContext(localPath);
         LocalFileSystem.CreateDirectoryRecursive(localPath);
-        byte[] array = null;
-        foreach (SyncPlan.SyncAction item2 in syncPlan.Actions)
+        byte[] buffer = null;
+        foreach (SyncPlan.SyncAction action in syncPlan.Actions)
         {
-            switch (item2.Type)
+            switch (action.Type)
             {
                 case SyncPlan.ActionType.CreateAndEnterDirectory:
                 case SyncPlan.ActionType.EnterDirectory:
                     stack.Push(item);
-                    item = item.GetChild(item2.Path);
-                    if (!item.Failed && item2.Type == SyncPlan.ActionType.CreateAndEnterDirectory)
+                    item = item.GetChild(action.Path);
+                    if (!item.Failed && action.Type == SyncPlan.ActionType.CreateAndEnterDirectory)
                     {
                         try
                         {
                             LocalFileSystem.CreateDirectoryRecursive(item.Path);
                         }
-                        catch (Exception ex5)
+                        catch (Exception exception)
                         {
                             item.Failed = true;
                             syncEvents?.OnWarning(new SyncWarning
                             {
-                                Exception = ex5,
+                                Exception = exception,
                                 Warning = new QuickSyncWarning
                                 {
                                     Type = QuickSyncWarningType.CannotCreateTargetDirectory,
@@ -627,18 +627,18 @@ public class QuickSyncRunner
                 case SyncPlan.ActionType.TransferFile:
                     {
                         LocalFileSystem.NativeFile nativeFile = null;
-                        string text = GetRelativePath(localPath, item.Path.Combine(item2.Path));
+                        string text = GetRelativePath(localPath, item.Path.Combine(action.Path));
                         if (!item.Failed)
                         {
                             try
                             {
-                                nativeFile = LocalFileSystem.OpenFile(item.Path.Combine(item2.Path), LocalFileSystem.FileOpenMode.Create);
+                                nativeFile = LocalFileSystem.OpenFile(item.Path.Combine(action.Path), LocalFileSystem.FileOpenMode.Create);
                             }
-                            catch (Exception ex3)
+                            catch (Exception exception)
                             {
                                 syncEvents?.OnWarning(new SyncWarning
                                 {
-                                    Exception = ex3,
+                                    Exception = exception,
                                     Warning = new QuickSyncWarning
                                     {
                                         Type = QuickSyncWarningType.CannotCreateTargetFile,
@@ -647,8 +647,8 @@ public class QuickSyncRunner
                                 });
                             }
                         }
-                        bool flag = false;
-                        using (IRemoteFileStream remoteFileStream = remoteFileSource.OpenFile(item2.Argument))
+                        bool transferFailed = false;
+                        using (IRemoteFileStream remoteFileStream = remoteFileSource.OpenFile(action.Argument))
                         {
                             using (nativeFile)
                             {
@@ -666,12 +666,12 @@ public class QuickSyncRunner
                                 }
                                 while (true)
                                 {
-                                    int num = remoteFileStream.ReadChunk(ref array);
-                                    if (num == 0)
+                                    int bytesRead = remoteFileStream.ReadChunk(ref buffer);
+                                    if (bytesRead == 0)
                                     {
                                         break;
                                     }
-                                    transferStatistics.TransferredBytes += num;
+                                    transferStatistics.TransferredBytes += bytesRead;
                                     syncEvents?.OnProgress(new SyncProgress
                                     {
                                         Stage = SyncStage.Transferring,
@@ -679,32 +679,32 @@ public class QuickSyncRunner
                                         Transferred = transferStatistics.TransferredBytes,
                                         Total = transferStatistics.TotalBytes
                                     });
-                                    if (nativeFile == null || flag)
+                                    if (nativeFile == null || transferFailed)
                                     {
                                         continue;
                                     }
                                     try
                                     {
-                                        if (nativeFile.Write(array, num) != num)
+                                        if (nativeFile.Write(buffer, bytesRead) != bytesRead)
                                         {
                                             throw new IOException("Could not write all bytes to the file");
                                         }
                                     }
-                                    catch (Exception ex4)
+                                    catch (Exception exception)
                                     {
-                                        flag = true;
+                                        transferFailed = true;
                                         syncEvents?.OnWarning(new SyncWarning
                                         {
-                                            Exception = ex4,
+                                            Exception = exception,
                                             Warning = new QuickSyncWarning
                                             {
                                                 Type = QuickSyncWarningType.CannotUpdateLocalFile,
-                                                Path = item.Path.Combine(item2.Path).FullPath
+                                                Path = item.Path.Combine(action.Path).FullPath
                                             }
                                         });
                                     }
                                 }
-                                if (remoteFileStream.ErrorCode == 0 && !flag && nativeFile != null)
+                                if (remoteFileStream.ErrorCode == 0 && !transferFailed && nativeFile != null)
                                 {
                                     nativeFile.SetLastWriteTime(remoteFileStream.ModifiedTime);
                                     transferStatistics.CopiedFiles++;
@@ -716,9 +716,9 @@ public class QuickSyncRunner
                 case SyncPlan.ActionType.DeleteTargetFile:
                     try
                     {
-                        LocalFileSystem.DeleteFile(LocalPath.FromRaw(item2.Path), resetReadOnly: true);
+                        LocalFileSystem.DeleteFile(LocalPath.FromRaw(action.Path), resetReadOnly: true);
                         transferStatistics.DeletedFiles++;
-                        if (flag2)
+                        if (unused)
                         {
                             syncEvents?.OnProgress(new SyncProgress
                             {
@@ -728,15 +728,15 @@ public class QuickSyncRunner
                             });
                         }
                     }
-                    catch (Exception ex2)
+                    catch (Exception exception)
                     {
                         syncEvents?.OnWarning(new SyncWarning
                         {
-                            Exception = ex2,
+                            Exception = exception,
                             Warning = new QuickSyncWarning
                             {
                                 Type = QuickSyncWarningType.CannotDeleteTargetFile,
-                                Path = item.Path.Combine(item2.Path).FullPath
+                                Path = item.Path.Combine(action.Path).FullPath
                             }
                         });
                     }
@@ -744,17 +744,17 @@ public class QuickSyncRunner
                 case SyncPlan.ActionType.DeleteEmptyTargetDirectory:
                     try
                     {
-                        LocalFileSystem.DeleteDirectory(LocalPath.FromRaw(item2.Path));
+                        LocalFileSystem.DeleteDirectory(LocalPath.FromRaw(action.Path));
                     }
-                    catch (Exception ex)
+                    catch (Exception exception)
                     {
                         syncEvents?.OnWarning(new SyncWarning
                         {
-                            Exception = ex,
+                            Exception = exception,
                             Warning = new QuickSyncWarning
                             {
                                 Type = QuickSyncWarningType.CannotRemoveTargetDirectory,
-                                Path = item.Path.Combine(item2.Path).FullPath
+                                Path = item.Path.Combine(action.Path).FullPath
                             }
                         });
                     }
@@ -767,7 +767,7 @@ public class QuickSyncRunner
         });
     }
 
-    public static void CacheLocalFiles(ILocalFileCache localFileCache, LocalPath localPath, bool flag)
+    public static void CacheLocalFiles(ILocalFileCache localFileCache, LocalPath localPath, bool recursive)
     {
         ICachedDirectory cachedDirectory = localFileCache.GetDirectory(localPath);
         foreach (LocalFileSystem.FindData item in LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: true))
@@ -776,11 +776,11 @@ public class QuickSyncRunner
             {
                 try
                 {
-                    LocalPath localPath2 = localPath.Combine(item.FileName);
-                    KeyValuePair<string, bool> keyValuePair = ReparsePoints.ReadReparsePoint(localPath2.FullPath);
+                    LocalPath combinedPath = localPath.Combine(item.FileName);
+                    KeyValuePair<string, bool> keyValuePair = ReparsePoints.ReadReparsePoint(combinedPath.FullPath);
                     if (keyValuePair.Value)
                     {
-                        localFileCache.StoreSymlink(localPath2, keyValuePair.Key);
+                        localFileCache.StoreSymlink(combinedPath, keyValuePair.Key);
                     }
                 }
                 catch
@@ -789,9 +789,9 @@ public class QuickSyncRunner
             }
             else if (item.HasAttribute(FileAttributes.Directory))
             {
-                if (flag)
+                if (recursive)
                 {
-                    CacheLocalFiles(localFileCache, localPath.Combine(item.FileName), flag);
+                    CacheLocalFiles(localFileCache, localPath.Combine(item.FileName), recursive);
                 }
             }
             else

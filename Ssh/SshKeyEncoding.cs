@@ -5,16 +5,16 @@ namespace SmarTTY.Ssh;
 
 public class SshKeyEncoding
 {
-    public static void AppendMpInt(ref byte[] buffer, byte[] buffer2)
+    public static void AppendMpInt(ref byte[] buffer, byte[] value)
     {
-        int num = buffer2.Length;
-        if ((buffer2[0] & 0x80) != 0)
+        int length = value.Length;
+        if ((value[0] & 0x80) != 0)
         {
-            num++;
+            length++;
         }
         int index = buffer.Length;
-        Array.Resize(ref buffer, buffer.Length + num + 4);
-        BitConverter.GetBytes(IPAddress.HostToNetworkOrder(num)).CopyTo(buffer, index);
-        buffer2.CopyTo(buffer, buffer.Length - buffer2.Length);
+        Array.Resize(ref buffer, buffer.Length + length + 4);
+        BitConverter.GetBytes(IPAddress.HostToNetworkOrder(length)).CopyTo(buffer, index);
+        value.CopyTo(buffer, buffer.Length - value.Length);
     }
 }

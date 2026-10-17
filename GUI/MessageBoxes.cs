@@ -5,9 +5,9 @@ namespace SmarTTY.GUI;
 
 internal static class MessageBoxes
 {
-    public static void Exception(Exception ex)
+    public static void Exception(Exception exception)
     {
-        MessageBox.Show(ex.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+        MessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
     }
 
     internal static bool Ask(string text)

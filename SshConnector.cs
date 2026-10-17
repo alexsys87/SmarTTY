@@ -409,7 +409,7 @@ public partial class SshConnector : Component
                     sshSession = new SshSession(sshConnectionParameters, connectionAttempt.CancelEvent);
                     break;
                 }
-                catch (ProxyException ex) when (ex.Message.Contains("407"))
+                catch (ProxyException exception) when (exception.Message.Contains("407"))
                 {
                     bool proxyConfirmed = false;
                     InvokeOnUi(() =>
@@ -472,9 +472,9 @@ public partial class SshConnector : Component
             }
             RaiseConnected(sshSession, sshConnectionSettings);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            ReportStatus(connectionAttempt, "Error", ex);
+            ReportStatus(connectionAttempt, "Error", exception);
             if (sshSession != null)
             {
                 try

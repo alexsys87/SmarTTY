@@ -148,11 +148,11 @@ public partial class DpiAwareForm : Form
         try
         {
             _isScaling = true;
-            bool flag = false;
+            bool wasMaximized = false;
             if (WindowState == FormWindowState.Maximized)
             {
                 WindowState = FormWindowState.Normal;
-                flag = true;
+                wasMaximized = true;
             }
             Size size = new Size((int)((float)Width * ScaleFactor.Width), (int)((float)Height * ScaleFactor.Height));
             if (MinimumSize.Width > 10 && MinimumSize.Height > 10)
@@ -161,7 +161,7 @@ public partial class DpiAwareForm : Form
             }
             Scale(ScaleFactor);
             Size = size;
-            if (flag)
+            if (wasMaximized)
             {
                 WindowState = FormWindowState.Maximized;
             }
@@ -185,38 +185,38 @@ public partial class DpiAwareForm : Form
         }
     }
 
-    internal static void ScaleDpiChildren(Control control2)
+    internal static void ScaleDpiChildren(Control parentControl)
     {
-        if (control2 is DpiAwareControl)
+        if (parentControl is DpiAwareControl)
         {
-            (control2 as DpiAwareControl).MarkScaled();
+            (parentControl as DpiAwareControl).MarkScaled();
         }
-        if (!control2.HasChildren)
+        if (!parentControl.HasChildren)
         {
             return;
         }
-        foreach (Control control in control2.Controls)
+        foreach (Control control in parentControl.Controls)
         {
             DpiAwareForm.ScaleDpiChildren(control);
         }
     }
 
-    public static void ConfigureToolStrip(ToolStrip toolStrip2, bool flag = true)
+    public static void ConfigureToolStrip(ToolStrip toolStrip, bool useBorderlessRenderer = true)
     {
-        toolStrip2.AutoSize = false;
-        toolStrip2.Height = 27;
+        toolStrip.AutoSize = false;
+        toolStrip.Height = 27;
         if (IsHighDpi)
         {
-            toolStrip2.ImageScalingSize = new Size((int)((float)toolStrip2.ImageScalingSize.Width * ScaleFactor.Width), (int)((float)toolStrip2.ImageScalingSize.Height * ScaleFactor.Height));
+            toolStrip.ImageScalingSize = new Size((int)((float)toolStrip.ImageScalingSize.Width * ScaleFactor.Width), (int)((float)toolStrip.ImageScalingSize.Height * ScaleFactor.Height));
         }
-        toolStrip2.Paint += (object obj, PaintEventArgs e) =>
+        toolStrip.Paint += (object sender, PaintEventArgs e) =>
         {
-            if (!(obj is ToolStrip toolStrip))
+            if (!(sender is ToolStrip paintedToolStrip))
             {
                 return;
             }
             Pen pen = new Pen(Color.Gray);
-            foreach (ToolStripItem item in toolStrip.Items)
+            foreach (ToolStripItem item in paintedToolStrip.Items)
             {
                 if (item is ToolStripComboBox { Visible: not false } toolStripComboBox)
                 {
@@ -225,14 +225,14 @@ public partial class DpiAwareForm : Form
                 }
                 if (item is ToolStripTextBox { Visible: not false } toolStripTextBox)
                 {
-                    Rectangle rect2 = new Rectangle(toolStripTextBox.TextBox.Location.X - 1, toolStripTextBox.TextBox.Location.Y - 1, toolStripTextBox.TextBox.Size.Width + 1, toolStripTextBox.TextBox.Size.Height + 1);
-                    e.Graphics.DrawRectangle(pen, rect2);
+                    Rectangle textBoxRect = new Rectangle(toolStripTextBox.TextBox.Location.X - 1, toolStripTextBox.TextBox.Location.Y - 1, toolStripTextBox.TextBox.Size.Width + 1, toolStripTextBox.TextBox.Size.Height + 1);
+                    e.Graphics.DrawRectangle(pen, textBoxRect);
                 }
             }
         };
-        if (flag)
+        if (useBorderlessRenderer)
         {
-            toolStrip2.Renderer = new BorderlessToolStripRenderer();
+            toolStrip.Renderer = new BorderlessToolStripRenderer();
         }
     }
 }

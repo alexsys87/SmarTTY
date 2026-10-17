@@ -150,45 +150,45 @@ public class XmlStorage
         xmlSerializer.Serialize(stream, item);
     }
 
-    public static void SaveToStream(object obj, Stream stream, params Type[] items)
+    public static void SaveToStream(object sender, Stream stream, params Type[] items)
     {
-        GetSerializer(obj.GetType(), items).Serialize(stream, obj);
+        GetSerializer(sender.GetType(), items).Serialize(stream, sender);
     }
 
-    public static byte[] SaveToBytes(object obj, params Type[] items)
+    public static byte[] SaveToBytes(object sender, params Type[] items)
     {
-        XmlSerializer xmlSerializer = GetSerializer(obj.GetType(), items);
+        XmlSerializer xmlSerializer = GetSerializer(sender.GetType(), items);
         using MemoryStream memoryStream = new MemoryStream();
-        xmlSerializer.Serialize(memoryStream, obj);
+        xmlSerializer.Serialize(memoryStream, sender);
         return memoryStream.ToArray();
     }
 
-    public static void SaveToStreamTyped<_Ty>(object obj, Stream stream, params Type[] items)
+    public static void SaveToStreamTyped<_Ty>(object sender, Stream stream, params Type[] items)
     {
-        GetSerializer(typeof(_Ty), items).Serialize(stream, obj);
+        GetSerializer(typeof(_Ty), items).Serialize(stream, sender);
     }
 
-    public static string Serialize(object obj, params Type[] items)
+    public static string Serialize(object sender, params Type[] items)
     {
-        if (obj == null)
+        if (sender == null)
         {
             return null;
         }
-        XmlSerializer xmlSerializer = GetSerializer(obj.GetType(), items);
+        XmlSerializer xmlSerializer = GetSerializer(sender.GetType(), items);
         using StringWriter stringWriter = new StringWriter();
-        xmlSerializer.Serialize(stringWriter, obj);
+        xmlSerializer.Serialize(stringWriter, sender);
         return stringWriter.ToString();
     }
 
-    public static string SerializeAs<_Type>(object obj)
+    public static string SerializeAs<_Type>(object sender)
     {
-        if (obj == null)
+        if (sender == null)
         {
             return null;
         }
         XmlSerializer xmlSerializer = GetSerializer(typeof(_Type), new Type[0]);
         using StringWriter stringWriter = new StringWriter();
-        xmlSerializer.Serialize(stringWriter, obj);
+        xmlSerializer.Serialize(stringWriter, sender);
         return stringWriter.ToString();
     }
 

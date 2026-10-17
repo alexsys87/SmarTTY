@@ -82,7 +82,7 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         Searcher = new TextSearcher(term);
         Title = term.Title;
         term.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
-        term.TitleChanged += (object obj, EventArgs e10) =>
+        term.TitleChanged += (object sender, EventArgs e) =>
         {
             normalTabContext.Title = term.Title;
         };

@@ -103,17 +103,17 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
         {
             using (Graphics graphics = Graphics.FromHwnd(new WindowInteropHelper((Window)this).Handle))
             {
-                string[] array = new string[5] { "M", "|", ".", "l", "L" };
-                float num = graphics.MeasureString(array[0], fontDialog.Font).Width;
-                float num2 = num;
-                string[] array2 = array;
-                foreach (string text in array2)
+                string[] strings = new string[5] { "M", "|", ".", "l", "L" };
+                float value = graphics.MeasureString(strings[0], fontDialog.Font).Width;
+                float currentValue = value;
+                string[] items = strings;
+                foreach (string text in items)
                 {
                     SizeF sizeF = graphics.MeasureString(text, fontDialog.Font, 32767, StringFormat.GenericTypographic);
-                    num = Math.Min(num, sizeF.Width);
-                    num2 = Math.Max(num, sizeF.Width);
+                    value = Math.Min(value, sizeF.Width);
+                    currentValue = Math.Max(value, sizeF.Width);
                 }
-                if (Math.Abs(num - num2) > 1f)
+                if (Math.Abs(value - currentValue) > 1f)
                 {
                     MessageBoxes.Error("The font you have selected is not a monospace font. The console window requires a monospace font, e.g. Courier New.");
                     return;
@@ -141,53 +141,53 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
     public void EditColor(Border b)
     {
         BindingExpression bindingExpression = ((FrameworkElement)b).GetBindingExpression(Border.BackgroundProperty);
-        object obj;
+        object sender;
         if (bindingExpression == null)
         {
-            obj = null;
+            sender = null;
         }
         else
         {
             Binding parentBinding = bindingExpression.ParentBinding;
             if (parentBinding == null)
             {
-                obj = null;
+                sender = null;
             }
             else
             {
                 PropertyPath path = parentBinding.Path;
-                obj = ((path != null) ? path.Path : null);
+                sender = ((path != null) ? path.Path : null);
             }
         }
-        string text = (string)obj;
-        object obj2 = ((FrameworkElement)b).DataContext;
-        if (text == null || obj2 == null)
+        string text = (string)sender;
+        object dataContext = ((FrameworkElement)b).DataContext;
+        if (text == null || dataContext == null)
         {
             return;
         }
-        string[] array = text.Split('.');
-        for (int num = 0; num < array.Length - 1; num++)
+        string[] parts = text.Split('.');
+        for (int arrayIndex = 0; arrayIndex < parts.Length - 1; arrayIndex++)
         {
-            object obj3 = obj2.GetType().GetProperty(array[num])?.GetValue(obj2, new object[0]);
-            if (obj3 == null)
+            object propertyValue = dataContext.GetType().GetProperty(parts[arrayIndex])?.GetValue(dataContext, new object[0]);
+            if (propertyValue == null)
             {
-                obj3 = obj2.GetType().GetField(array[num])?.GetValue(obj2);
+                propertyValue = dataContext.GetType().GetField(parts[arrayIndex])?.GetValue(dataContext);
             }
-            if (obj3 == null)
+            if (propertyValue == null)
             {
                 return;
             }
-            obj2 = obj3;
+            dataContext = propertyValue;
         }
-        PropertyInfo property = obj2.GetType().GetProperty(array.Last());
-        if (property != null && property.GetValue(obj2, new object[0]) is DeviceTerminalSettings.ColorWrapper colorWrapper)
+        PropertyInfo property = dataContext.GetType().GetProperty(parts.Last());
+        if (property != null && property.GetValue(dataContext, new object[0]) is DeviceTerminalSettings.ColorWrapper colorWrapper)
         {
             ColorDialog colorDialog = new ColorDialog();
             colorDialog.Color = colorWrapper;
             if (colorDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                DeviceTerminalSettings.ColorWrapper colorWrapper2 = colorDialog.Color;
-                property.SetValue(obj2, colorWrapper2, new object[0]);
+                DeviceTerminalSettings.ColorWrapper selectedColor = colorDialog.Color;
+                property.SetValue(dataContext, selectedColor, new object[0]);
                 ((BindingExpressionBase)bindingExpression).UpdateTarget();
             }
         }
@@ -214,7 +214,7 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
         {
             return;
         }
-        int.TryParse(txtCutoffValue.Text, out var result);
+        int.TryParse(txtCutoffValue.Text, out var cutoffKilobytes);
         if (((ToggleButton)cbCutoff).IsChecked != true)
         {
             _ClonedSettings.LargeBlockCutoffPoint = 0;
@@ -223,13 +223,13 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
         switch (((Selector)lbCutoffUnit).SelectedIndex)
         {
             case 0:
-                _ClonedSettings.LargeBlockCutoffPoint = result;
+                _ClonedSettings.LargeBlockCutoffPoint = cutoffKilobytes;
                 break;
             case 1:
-                _ClonedSettings.LargeBlockCutoffPoint = result * 1024;
+                _ClonedSettings.LargeBlockCutoffPoint = cutoffKilobytes * 1024;
                 break;
             case 2:
-                _ClonedSettings.LargeBlockCutoffPoint = result * 1024 * 1024;
+                _ClonedSettings.LargeBlockCutoffPoint = cutoffKilobytes * 1024 * 1024;
                 break;
         }
     }

@@ -20,13 +20,13 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
             private int _removedLength;
 
-            public ReplaceInLineCommand(EditableTextBrowser editableTextBrowser, int value2, int value3, int value4, string text)
+            public ReplaceInLineCommand(EditableTextBrowser editableTextBrowser, int line, int column, int removedLength, string text)
                 : base(editableTextBrowser)
             {
                 this._newText = text;
-                this._line = value2;
-                this._removedLength = value4;
-                this._column = value3;
+                this._line = line;
+                this._removedLength = removedLength;
+                this._column = column;
             }
 
             public override void Undo(EditableTextBrowser editableTextBrowser)
@@ -61,13 +61,13 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
             private bool _useExistingLineEnding;
 
-            public ReplaceRangeCommand(EditableTextBrowser editableTextBrowser, TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, string text, bool flag)
+            public ReplaceRangeCommand(EditableTextBrowser editableTextBrowser, TextDocument.TextPosition start, TextDocument.TextPosition end, string text, bool modified)
                 : base(editableTextBrowser)
             {
-                this._start = textPosition;
-                this._end = textPosition2;
+                this._start = start;
+                this._end = end;
                 this._newText = text;
-                this._useExistingLineEnding = flag;
+                this._useExistingLineEnding = modified;
             }
 
             public override void Execute(EditableTextBrowser editableTextBrowser)
@@ -108,67 +108,67 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
             private string[] _removedIndents;
 
-            public IndentCommand(EditableTextBrowser editableTextBrowser, int value2)
+            public IndentCommand(EditableTextBrowser editableTextBrowser, int levels)
                 : base(editableTextBrowser)
             {
                 this._lines = editableTextBrowser.SelectedLines;
-                _levels = value2;
+                _levels = levels;
             }
 
-            private void ApplyIndent(EditableTextBrowser editableTextBrowser, int value2)
+            private void ApplyIndent(EditableTextBrowser editableTextBrowser, int levels)
             {
-                if (value2 > 0)
+                if (levels > 0)
                 {
-                    string text = new string('\t', value2);
-                    for (int num = this._lines.First; num <= this._lines.Last; num++)
+                    string text = new string('\t', levels);
+                    for (int line = this._lines.First; line <= this._lines.Last; line++)
                     {
-                        editableTextBrowser.Doc.ReplaceInLine(num, 0, 0, text);
-                        editableTextBrowser.OnLineChanged(num, 0, 0, text.Length);
-                        editableTextBrowser.InvalidateLine(num);
+                        editableTextBrowser.Doc.ReplaceInLine(line, 0, 0, text);
+                        editableTextBrowser.OnLineChanged(line, 0, 0, text.Length);
+                        editableTextBrowser.InvalidateLine(line);
                         editableTextBrowser.UpdateLayout();
                     }
                 }
                 else
                 {
-                    if (value2 >= 0)
+                    if (levels >= 0)
                     {
                         return;
                     }
                     _removedIndents = new string[this._lines.Count];
-                    for (int num2 = this._lines.First; num2 <= this._lines.Last; num2++)
+                    for (int currentLine = this._lines.First; currentLine <= this._lines.Last; currentLine++)
                     {
-                        string text2 = editableTextBrowser.Doc.GetLineText(num2) + " \t";
-                        if (text2.Length == 0)
+                        string lineText = editableTextBrowser.Doc.GetLineText(currentLine) + " \t";
+                        if (lineText.Length == 0)
                         {
                             continue;
                         }
-                        int num3 = 0;
-                        for (int num4 = 0; num4 < -value2; num4++)
+                        int indentWidth = 0;
+                        for (int level = 0; level < -levels; level++)
                         {
-                            if (text2[num3] == '\t')
+                            if (lineText[indentWidth] == '\t')
                             {
-                                num3++;
+                                indentWidth++;
                                 continue;
                             }
-                            if (text2[num3] != ' ')
+                            if (lineText[indentWidth] != ' ')
                             {
                                 break;
                             }
-                            for (int num5 = 0; num5 < editableTextBrowser.TabSize; num5++)
+                            for (int tabOffset = 0; tabOffset < editableTextBrowser.TabSize; tabOffset++)
                             {
-                                if (text2[++num3] != ' ')
+                                if (lineText[++indentWidth] != ' ')
                                 {
                                     break;
                                 }
                             }
                         }
-                        if (num3 >= text2.Length - 2)
+                        if (indentWidth >= lineText.Length - 2)
                         {
-                            num3 = text2.Length - 1 - 2;
+                            indentWidth = lineText.Length - 1 - 2;
                         }
-                        _removedIndents[num2 - this._lines.First] = editableTextBrowser.Doc.ReplaceInLine(num2, 0, num3, "");
-                        editableTextBrowser.OnLineChanged(num2, 0, num3, 0);
-                        editableTextBrowser.InvalidateLine(num2);
+                        _removedIndents[currentLine - this._lines.First] = editableTextBrowser.Doc.ReplaceInLine(currentLine, 0, indentWidth, "");
+                        editableTextBrowser.OnLineChanged(currentLine, 0, indentWidth, 0);
+                        editableTextBrowser.InvalidateLine(currentLine);
                         editableTextBrowser.UpdateLayout();
                     }
                 }
@@ -183,10 +183,10 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
             {
                 if (_levels < 0)
                 {
-                    for (int num = this._lines.First; num <= this._lines.Last; num++)
+                    for (int line = this._lines.First; line <= this._lines.Last; line++)
                     {
-                        editableTextBrowser.Doc.ReplaceInLine(num, 0, 0, _removedIndents[num - this._lines.First]);
-                        editableTextBrowser.OnLineChanged(num, 0, 0, _removedIndents[num - this._lines.First].Length);
+                        editableTextBrowser.Doc.ReplaceInLine(line, 0, 0, _removedIndents[line - this._lines.First]);
+                        editableTextBrowser.OnLineChanged(line, 0, 0, _removedIndents[line - this._lines.First].Length);
                     }
                 }
                 else
@@ -244,20 +244,20 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
             public override void Execute(EditableTextBrowser editableTextBrowser)
             {
-                for (int num = this._firstLine; num <= _lastLine; num++)
+                for (int line = this._firstLine; line <= _lastLine; line++)
                 {
-                    editableTextBrowser.Doc.ReplaceInLine(num, 0, 0, _prefix);
-                    editableTextBrowser.OnLineChanged(num, 0, 0, _prefix.Length);
+                    editableTextBrowser.Doc.ReplaceInLine(line, 0, 0, _prefix);
+                    editableTextBrowser.OnLineChanged(line, 0, 0, _prefix.Length);
                 }
                 editableTextBrowser.Redraw();
             }
 
             public override void Undo(EditableTextBrowser editableTextBrowser)
             {
-                for (int num = this._firstLine; num <= _lastLine; num++)
+                for (int line = this._firstLine; line <= _lastLine; line++)
                 {
-                    editableTextBrowser.Doc.ReplaceInLine(num, 0, _prefix.Length, "");
-                    editableTextBrowser.OnLineChanged(num, 0, _prefix.Length, 0);
+                    editableTextBrowser.Doc.ReplaceInLine(line, 0, _prefix.Length, "");
+                    editableTextBrowser.OnLineChanged(line, 0, _prefix.Length, 0);
                 }
                 RestoreSelection(editableTextBrowser);
             }
@@ -313,14 +313,14 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
             public override void Execute(EditableTextBrowser editableTextBrowser)
             {
                 _prefixColumns = new int[_lastLine - _firstLine + 1];
-                for (int num = _firstLine; num <= _lastLine; num++)
+                for (int line = _firstLine; line <= _lastLine; line++)
                 {
-                    int num2 = FindPrefix(editableTextBrowser.EditableDocument.GetLineText(num), _prefix);
-                    if (num2 != -1)
+                    int prefixColumn = FindPrefix(editableTextBrowser.EditableDocument.GetLineText(line), _prefix);
+                    if (prefixColumn != -1)
                     {
-                        _prefixColumns[num - _firstLine] = num2;
-                        editableTextBrowser.Doc.ReplaceInLine(num, num2, _prefix.Length, "");
-                        editableTextBrowser.OnLineChanged(num, num2, _prefix.Length, 0);
+                        _prefixColumns[line - _firstLine] = prefixColumn;
+                        editableTextBrowser.Doc.ReplaceInLine(line, prefixColumn, _prefix.Length, "");
+                        editableTextBrowser.OnLineChanged(line, prefixColumn, _prefix.Length, 0);
                     }
                 }
                 editableTextBrowser.Redraw();
@@ -328,10 +328,10 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
             public override void Undo(EditableTextBrowser editableTextBrowser)
             {
-                for (int num = _firstLine; num <= _lastLine; num++)
+                for (int line = _firstLine; line <= _lastLine; line++)
                 {
-                    editableTextBrowser.Doc.ReplaceInLine(num, _prefixColumns[num - _firstLine], 0, _prefix);
-                    editableTextBrowser.OnLineChanged(num, _prefixColumns[num - _firstLine], 0, _prefix.Length);
+                    editableTextBrowser.Doc.ReplaceInLine(line, _prefixColumns[line - _firstLine], 0, _prefix);
+                    editableTextBrowser.OnLineChanged(line, _prefixColumns[line - _firstLine], 0, _prefix.Length);
                 }
                 RestoreSelection(editableTextBrowser);
             }
@@ -364,11 +364,11 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
         public abstract void Execute(EditableTextBrowser editableTextBrowser);
     }
 
-    public delegate void ModifiedChangedHandler(EditableTextBrowser editableTextBrowser, bool flag);
+    public delegate void ModifiedChangedHandler(EditableTextBrowser editableTextBrowser, bool modified);
 
-    public delegate void LineChangedHandler(EditableTextBrowser editableTextBrowser, int value2, int value3, int value4, int value5);
+    public delegate void LineChangedHandler(EditableTextBrowser editableTextBrowser, int line, int column, int addedLength, int removedLength);
 
-    public delegate void RangeChangedHandler(EditableTextBrowser editableTextBrowser, TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, TextDocument.TextPosition textPosition3);
+    public delegate void RangeChangedHandler(EditableTextBrowser editableTextBrowser, TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd);
 
     private Stack<EditCommand> _undoStack = new Stack<EditCommand>();
 
@@ -455,104 +455,104 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
         InitializeComponent();
     }
 
-    private void DeleteRange(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2)
+    private void DeleteRange(TextDocument.TextPosition start, TextDocument.TextPosition end)
     {
-        if (textPosition.Line == textPosition2.Line)
+        if (start.Line == end.Line)
         {
-            Doc.ReplaceInLine(textPosition.Line, textPosition.Column, textPosition2.Column - textPosition.Column, "");
+            Doc.ReplaceInLine(start.Line, start.Column, end.Column - start.Column, "");
         }
         else
         {
-            Doc.ReplaceInLine(textPosition.Line, textPosition.Column, -1, "");
-            Doc.ReplaceInLine(textPosition2.Line, 0, textPosition2.Column, "");
-            int num = textPosition2.Line - textPosition.Line - 1;
-            if (num != 0)
+            Doc.ReplaceInLine(start.Line, start.Column, -1, "");
+            Doc.ReplaceInLine(end.Line, 0, end.Column, "");
+            int removedLineCount = end.Line - start.Line - 1;
+            if (removedLineCount != 0)
             {
-                Doc.RemoveLines(textPosition.Line + 1, num);
-                textPosition2.Line -= num;
+                Doc.RemoveLines(start.Line + 1, removedLineCount);
+                end.Line -= removedLineCount;
             }
-            Doc.JoinWithNextLine(textPosition.Line);
+            Doc.JoinWithNextLine(start.Line);
         }
-        SetCaret(textPosition);
+        SetCaret(start);
         base._hasSelection = false;
     }
 
-    public virtual void ReplaceText(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, bool flag, string text)
+    public virtual void ReplaceText(TextDocument.TextPosition start, TextDocument.TextPosition end, bool select, string text)
     {
         if (!_readOnly)
         {
-            ReplaceTextCore(textPosition, textPosition2, flag, text);
+            ReplaceTextCore(start, end, select, text);
         }
     }
 
-    protected void ReplaceTextCore(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, bool flag, string text3)
+    protected void ReplaceTextCore(TextDocument.TextPosition start, TextDocument.TextPosition end, bool select, string replacement)
     {
-        if (flag)
+        if (select)
         {
-            textPosition2 = textPosition;
+            end = start;
         }
         if (SingleLine)
         {
-            text3 = text3.Replace("\r\n", "").Replace("\n", "");
+            replacement = replacement.Replace("\r\n", "").Replace("\n", "");
         }
-        if (textPosition.Column == -1)
+        if (start.Column == -1)
         {
-            textPosition.Column = GetLineOrNull(textPosition.Line).Length;
+            start.Column = GetLineOrNull(start.Line).Length;
         }
-        if (textPosition2.Column == -1)
+        if (end.Column == -1)
         {
-            textPosition2.Column = GetLineOrNull(textPosition2.Line).Length;
+            end.Column = GetLineOrNull(end.Line).Length;
         }
-        if (text3 == "" && textPosition2.Column == 0 && textPosition2.Line == textPosition.Line + 1 && textPosition.Column == EditableDocument.GetLineText(textPosition.Line).Length)
+        if (replacement == "" && end.Column == 0 && end.Line == start.Line + 1 && start.Column == EditableDocument.GetLineText(start.Line).Length)
         {
-            string text = GetIndentation(textPosition.Line);
-            string text2 = EditableDocument.GetLineText(textPosition2.Line);
-            int num;
-            for (num = 0; num < Math.Min(text2.Length, text.Length) && text2[num] == text[num]; num++)
+            string text = GetIndentation(start.Line);
+            string lineText = EditableDocument.GetLineText(end.Line);
+            int commonPrefixLength;
+            for (commonPrefixLength = 0; commonPrefixLength < Math.Min(lineText.Length, text.Length) && lineText[commonPrefixLength] == text[commonPrefixLength]; commonPrefixLength++)
             {
             }
-            textPosition2.Column = num;
+            end.Column = commonPrefixLength;
         }
-        if (textPosition.Line == textPosition2.Line && text3.IndexOfAny(new char[2] { '\r', '\n' }) == -1)
+        if (start.Line == end.Line && replacement.IndexOfAny(new char[2] { '\r', '\n' }) == -1)
         {
-            ExecuteCommand(new EditCommand.ReplaceInLineCommand(this, textPosition.Line, Math.Min(textPosition.Column, textPosition2.Column), Math.Abs(textPosition.Column - textPosition2.Column), text3));
+            ExecuteCommand(new EditCommand.ReplaceInLineCommand(this, start.Line, Math.Min(start.Column, end.Column), Math.Abs(start.Column - end.Column), replacement));
             return;
         }
-        TextDocument.TextPosition textPosition3;
-        TextDocument.TextPosition textPosition4;
-        if (flag)
+        TextDocument.TextPosition rangeStart;
+        TextDocument.TextPosition rangeEnd;
+        if (select)
         {
-            textPosition3 = (textPosition4 = textPosition);
+            rangeStart = (rangeEnd = start);
         }
-        else if (textPosition < textPosition2)
+        else if (start < end)
         {
-            textPosition3 = textPosition;
-            textPosition4 = textPosition2;
+            rangeStart = start;
+            rangeEnd = end;
         }
         else
         {
-            textPosition3 = textPosition2;
-            textPosition4 = textPosition;
+            rangeStart = end;
+            rangeEnd = start;
         }
-        ExecuteCommand(new EditCommand.ReplaceRangeCommand(this, textPosition3, textPosition4, text3, _useExistingLineEnding));
+        ExecuteCommand(new EditCommand.ReplaceRangeCommand(this, rangeStart, rangeEnd, replacement, _useExistingLineEnding));
     }
 
-    public void Indent(int value2)
+    public void Indent(int levels)
     {
-        ExecuteCommand(new EditCommand.IndentCommand(this, value2));
+        ExecuteCommand(new EditCommand.IndentCommand(this, levels));
     }
 
-    private static int FindPrefix(string text, string text2)
+    private static int FindPrefix(string text, string prefix)
     {
-        for (int num = 0; num < text.Length - text2.Length + 1; num++)
+        for (int offset = 0; offset < text.Length - prefix.Length + 1; offset++)
         {
-            if (text[num] != ' ' && text[num] != '\t')
+            if (text[offset] != ' ' && text[offset] != '\t')
             {
-                if (!(text.Substring(num, text2.Length) == text2))
+                if (!(text.Substring(offset, prefix.Length) == prefix))
                 {
                     break;
                 }
-                return num;
+                return offset;
             }
         }
         return -1;
@@ -560,12 +560,12 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     public void ToggleLinePrefix(string text)
     {
-        int num = CaretPosition.Line;
-        if (base.HasSelection && SelectionStart.Line < num)
+        int line = CaretPosition.Line;
+        if (base.HasSelection && SelectionStart.Line < line)
         {
-            num = SelectionStart.Line;
+            line = SelectionStart.Line;
         }
-        if (FindPrefix(EditableDocument.GetLineText(num), text) == -1)
+        if (FindPrefix(EditableDocument.GetLineText(line), text) == -1)
         {
             ExecuteCommand(new EditCommand.AddLinePrefixCommand(this, text));
         }
@@ -575,11 +575,11 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
         }
     }
 
-    protected virtual void OnLineChanged(int value2, int value3, int value4, int value5)
+    protected virtual void OnLineChanged(int line, int column, int addedLength, int removedLength)
     {
-        if (value2 == CaretPosition.Line)
+        if (line == CaretPosition.Line)
         {
-            string text = EditableDocument.GetLineText(value2);
+            string text = EditableDocument.GetLineText(line);
             if (CaretPosition.Column > text.Length)
             {
                 SetCaretColumn(text.Length);
@@ -587,16 +587,16 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
         }
         if (LineChanged != null)
         {
-            LineChanged(this, value2, value3, value4, value5);
+            LineChanged(this, line, column, addedLength, removedLength);
         }
         IsModified = true;
     }
 
-    protected virtual void OnRangeChanged(TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, TextDocument.TextPosition textPosition3)
+    protected virtual void OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
         if (RangeChanged != null)
         {
-            RangeChanged(this, textPosition, textPosition2, textPosition3);
+            RangeChanged(this, start, oldEnd, newEnd);
         }
         IsModified = true;
     }

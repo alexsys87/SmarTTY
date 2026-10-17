@@ -112,7 +112,7 @@ internal static class SshIntegrationTests
         using (SshSession interactive = new SshSession(_environment.Parameters()))
         {
             bool prompted = false;
-            bool result = interactive.AuthenticateKeyboardInteractive(_environment.User, (string name, string instruction, SshSession.KeyboardInteractivePrompt[] prompts, string[] responses) =>
+            bool changed = interactive.AuthenticateKeyboardInteractive(_environment.User, (string name, string instruction, SshSession.KeyboardInteractivePrompt[] prompts, string[] responses) =>
             {
                 prompted = true;
                 for (int i = 0; i < responses.Length; i++)
@@ -120,7 +120,7 @@ internal static class SshIntegrationTests
                     responses[i] = _environment.Password;
                 }
             });
-            Test.Check(result, "keyboard-interactive authentication succeeds");
+            Test.Check(changed, "keyboard-interactive authentication succeeds");
             Test.Check(prompted, "the keyboard-interactive prompt callback ran");
             Test.Check(interactive.IsAuthenticated, "the keyboard-interactive session is authenticated");
         }

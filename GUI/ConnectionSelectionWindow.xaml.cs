@@ -132,12 +132,12 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         internal State CheckMachine(SSHConnectionSettings connection)
         {
-            int num = connection.HostName.IndexOf(':');
-            if (num == -1)
+            int index = connection.HostName.IndexOf(':');
+            if (index == -1)
             {
                 return CheckMachine(connection.HostName, 22);
             }
-            return CheckMachine(connection.HostName.Substring(0, num), int.Parse(connection.HostName.Substring(num + 1)));
+            return CheckMachine(connection.HostName.Substring(0, index), int.Parse(connection.HostName.Substring(index + 1)));
         }
     }
 
@@ -260,20 +260,19 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 NewSSHConnectionWindow newSSHConnectionWindow = new NewSSHConnectionWindow(Connection, customization);
                 newSSHConnectionWindow.Owner = wnd;
                 newSSHConnectionWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                NewSSHConnectionWindow newSSHConnectionWindow2 = newSSHConnectionWindow;
-                MainWindow.ApplyTheme((Window)newSSHConnectionWindow2, (wnd as ConnectionSelectionWindow)?._Theme ?? SmarTTYTheme.Dark, ref newSSHConnectionWindow2._ThemeDictionary);
-                if (newSSHConnectionWindow2.ShowDialog() == true && newSSHConnectionWindow2.Controller.CreatedSession != null)
+                MainWindow.ApplyTheme((Window)newSSHConnectionWindow, (wnd as ConnectionSelectionWindow)?._Theme ?? SmarTTYTheme.Dark, ref newSSHConnectionWindow._ThemeDictionary);
+                if (newSSHConnectionWindow.ShowDialog() == true && newSSHConnectionWindow.Controller.CreatedSession != null)
                 {
-                    _Manager?.SaveSshConnection(newSSHConnectionWindow2.Controller.FinalSettings);
-                    newSSHConnectionWindow2.Controller.CreatedSession.Dispose();
+                    _Manager?.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
+                    newSSHConnectionWindow.Controller.CreatedSession.Dispose();
                 }
             }
 
             public bool MatchesFilter(string filter)
             {
                 SSHConnectionSettings connection = Connection;
-                int num = filter.IndexOf('@');
-                if (num == -1)
+                int index = filter.IndexOf('@');
+                if (index == -1)
                 {
                     if (connection.ConnectionAlias != null && connection.ConnectionAlias.IndexOf(filter, StringComparison.InvariantCultureIgnoreCase) != -1)
                     {
@@ -289,9 +288,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     }
                     return true;
                 }
-                string value = filter.Substring(0, num);
-                string value2 = filter.Substring(num + 1);
-                if (connection.HostName != null && connection.HostName.IndexOf(value2, StringComparison.InvariantCultureIgnoreCase) != -1)
+                string value = filter.Substring(0, index);
+                string substring = filter.Substring(index + 1);
+                if (connection.HostName != null && connection.HostName.IndexOf(substring, StringComparison.InvariantCultureIgnoreCase) != -1)
                 {
                     if (connection.UserName != null)
                     {
@@ -514,9 +513,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 Description = serConn.DeviceDescription;
                 string comPortName = serConn.ComPortName;
-                if (comPortName != null && comPortName.StartsWith("COM", StringComparison.InvariantCultureIgnoreCase) && int.TryParse(serConn.ComPortName.Substring(3), out var result))
+                if (comPortName != null && comPortName.StartsWith("COM", StringComparison.InvariantCultureIgnoreCase) && int.TryParse(serConn.ComPortName.Substring(3), out var comPortNumber))
                 {
-                    Number = result;
+                    Number = comPortNumber;
                 }
                 else
                 {
@@ -723,18 +722,18 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 List<IConnectionSettingsWrapper> list = new List<IConnectionSettingsWrapper>();
                 try
                 {
-                    SetupApiDeviceSet.ComPortInfo[] array = new SetupApiDeviceSet(new Guid("4d36e978-e325-11ce-bfc1-08002be10318")).EnumerateComPorts().ToArray();
-                    if (array.SequenceEqual(second))
+                    SetupApiDeviceSet.ComPortInfo[] items = new SetupApiDeviceSet(new Guid("4d36e978-e325-11ce-bfc1-08002be10318")).EnumerateComPorts().ToArray();
+                    if (items.SequenceEqual(second))
                     {
                         continue;
                     }
-                    second = array;
-                    SetupApiDeviceSet.ComPortInfo[] array2 = array;
-                    for (int num = 0; num < array2.Length; num++)
+                    second = items;
+                    SetupApiDeviceSet.ComPortInfo[] entries = items;
+                    for (int portIndex = 0; portIndex < entries.Length; portIndex++)
                     {
-                        SetupApiDeviceSet.ComPortInfo port = array2[num];
-                        string serialNumber = SetupApiDeviceSet.GetUsbSerialNumber(port.InstanceId, out var flag);
-                        if (!flag)
+                        SetupApiDeviceSet.ComPortInfo port = entries[portIndex];
+                        string serialNumber = SetupApiDeviceSet.GetUsbSerialNumber(port.InstanceId, out var item);
+                        if (!item)
                         {
                             serialNumber = null;
                         }
@@ -744,8 +743,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                             RawConnectionSettings rawConnectionSettings = new RawConnectionSettings();
                             DeviceTerminalSettings deviceTerminalSettings = new DeviceTerminalSettings();
                             DeviceTerminalSettings.ConnectionSettings.Serial serial = new DeviceTerminalSettings.ConnectionSettings.Serial();
-                            int num2 = port.PortNumber;
-                            serial.ComPortName = "COM" + num2;
+                            int portNumber = port.PortNumber;
+                            serial.ComPortName = "COM" + portNumber;
                             deviceTerminalSettings.Connection = serial;
                             rawConnectionSettings.Settings = deviceTerminalSettings;
                             value = rawConnectionSettings;
@@ -804,7 +803,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 ConnectWithSettings(new SettingsWrappers.SSH(conn: (Job = XmlStorage.LoadFromFile<SmarTTYJob>(defaultItemName.Substring(5), new Type[0])).Settings, mgr: _Connections));
                 return;
             }
-            IConnectionSettingsWrapper connectionSettingsWrapper = FilteredSettings.FirstOrDefault((IConnectionSettingsWrapper connectionSettingsWrapper2) => connectionSettingsWrapper2.Title == defaultItemName);
+            IConnectionSettingsWrapper connectionSettingsWrapper = FilteredSettings.FirstOrDefault((IConnectionSettingsWrapper candidate) => candidate.Title == defaultItemName);
             if (connectionSettingsWrapper != null)
             {
                 ConnectWithSettings(connectionSettingsWrapper);
@@ -835,9 +834,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 SelectedSettings = settings;
                 SessionCreated?.Invoke();
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -893,9 +892,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
             else
             {
-                foreach (IConnectionSettingsWrapper item2 in list)
+                foreach (IConnectionSettingsWrapper entry in list)
                 {
-                    item2.IsInactive = false;
+                    entry.IsInactive = false;
                 }
             }
             list.Sort(CompareConnections);
@@ -964,15 +963,15 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             if (_ShowRawConnections)
             {
                 _KnownSerialPortSettings.Clear();
-                foreach (RawConnectionSettings item2 in _Connections.RawConnections)
+                foreach (RawConnectionSettings entry in _Connections.RawConnections)
                 {
-                    if (item2.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serConn)
+                    if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serConn)
                     {
-                        _KnownSerialPortSettings[new SerialPortKey(serConn)] = item2;
+                        _KnownSerialPortSettings[new SerialPortKey(serConn)] = entry;
                     }
-                    else if (item2.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp)
+                    else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp)
                     {
-                        _StaticItems.Add(new SettingsWrappers.Telnet(_Connections, item2));
+                        _StaticItems.Add(new SettingsWrappers.Telnet(_Connections, entry));
                     }
                 }
             }
@@ -1031,16 +1030,15 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             NewSSHConnectionWindow newSSHConnectionWindow = new NewSSHConnectionWindow(null, customization);
             newSSHConnectionWindow.Owner = wnd;
             newSSHConnectionWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            NewSSHConnectionWindow newSSHConnectionWindow2 = newSSHConnectionWindow;
-            MainWindow.ApplyTheme((Window)newSSHConnectionWindow2, (wnd as ConnectionSelectionWindow)?._Theme ?? SmarTTYTheme.Dark, ref newSSHConnectionWindow2._ThemeDictionary);
-            if (newSSHConnectionWindow2.ShowDialog() == true && newSSHConnectionWindow2.Controller.CreatedSession != null)
+            MainWindow.ApplyTheme((Window)newSSHConnectionWindow, (wnd as ConnectionSelectionWindow)?._Theme ?? SmarTTYTheme.Dark, ref newSSHConnectionWindow._ThemeDictionary);
+            if (newSSHConnectionWindow.ShowDialog() == true && newSSHConnectionWindow.Controller.CreatedSession != null)
             {
-                if (newSSHConnectionWindow2.Controller.SaveSettings)
+                if (newSSHConnectionWindow.Controller.SaveSettings)
                 {
-                    _Connections.SaveSshConnection(newSSHConnectionWindow2.Controller.FinalSettings);
+                    _Connections.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
                 }
-                CreatedSession = newSSHConnectionWindow2.Controller.CreatedSession;
-                SelectedSettings = newSSHConnectionWindow2.Controller.FinalSettings;
+                CreatedSession = newSSHConnectionWindow.Controller.CreatedSession;
+                SelectedSettings = newSSHConnectionWindow.Controller.FinalSettings;
                 return true;
             }
             return false;
@@ -1093,13 +1091,13 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             try
             {
                 string text = quickConnectionWindow2.txtMachine.Text;
-                int num = text.IndexOf('@');
-                if (num == -1)
+                int index = text.IndexOf('@');
+                if (index == -1)
                 {
                     throw new Exception("Expected: username@hostname");
                 }
-                string userName = text.Substring(0, num);
-                text = text.Substring(num + 1);
+                string userName = text.Substring(0, index);
+                text = text.Substring(index + 1);
                 SSHConnectionSettings sSHConnectionSettings = new SSHConnectionSettings
                 {
                     HostName = text,
@@ -1108,9 +1106,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 };
                 _Initiator.ConnectAsync(sSHConnectionSettings, quickConnectionWindow2.txtPassword.Password, forcePasswordAuth: false);
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
     }
@@ -1171,9 +1169,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 Controller.ConnectWithSettings(wrp);
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                MessageBoxes.Exception(ex);
+                MessageBoxes.Exception(exception);
             }
         }
         base.OnPreviewKeyDown(e);
@@ -1186,22 +1184,22 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         {
             return "Last used: today";
         }
-        int num = (int)(now.Date - lastUseTime.Date).TotalDays;
-        if (num == 1)
+        int totalDays = (int)(now.Date - lastUseTime.Date).TotalDays;
+        if (totalDays == 1)
         {
             return "Last used: yesterday";
         }
-        if (num < 365)
+        if (totalDays < 365)
         {
-            return $"Last used: {num} days ago";
+            return $"Last used: {totalDays} days ago";
         }
         return "Last used: over a year ago";
     }
 
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
-        object obj = ((sender is Button) ? sender : null);
-        if (!(((obj != null) ? ((FrameworkElement)obj).DataContext : null) is IConnectionSettingsWrapper connectionSettingsWrapper) || ((Control.ModifierKeys & Keys.Shift) != Keys.Shift && !MessageBoxes.Ask("Delete " + connectionSettingsWrapper.Title + "?\nTip: hold 'shift' to suppress this message.")))
+        object buttonElement = ((sender is Button) ? sender : null);
+        if (!(((buttonElement != null) ? ((FrameworkElement)buttonElement).DataContext : null) is IConnectionSettingsWrapper connectionSettingsWrapper) || ((Control.ModifierKeys & Keys.Shift) != Keys.Shift && !MessageBoxes.Ask("Delete " + connectionSettingsWrapper.Title + "?\nTip: hold 'shift' to suppress this message.")))
         {
             return;
         }
@@ -1210,9 +1208,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             connectionSettingsWrapper.Delete();
             Controller.RefreshAll();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -1220,13 +1218,13 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     {
         try
         {
-            object obj = ((sender is Button) ? sender : null);
-            (((obj != null) ? ((FrameworkElement)obj).DataContext : null) as IConnectionSettingsWrapper)?.Edit((Window)this);
+            object buttonElement = ((sender is Button) ? sender : null);
+            (((buttonElement != null) ? ((FrameworkElement)buttonElement).DataContext : null) as IConnectionSettingsWrapper)?.Edit((Window)this);
             Controller.RefreshAll();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 
@@ -1236,15 +1234,15 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         {
             return;
         }
-        IConnectionSettingsWrapper[] array = connectionList.SelectedItems.OfType<IConnectionSettingsWrapper>().ToArray();
-        if (array.Length == 0)
+        IConnectionSettingsWrapper[] items = connectionList.SelectedItems.OfType<IConnectionSettingsWrapper>().ToArray();
+        if (items.Length == 0)
         {
             return;
         }
-        string text = array.First().Title;
-        if (array.Length > 1)
+        string text = items.First().Title;
+        if (items.Length > 1)
         {
-            text = $"{array.Length} items";
+            text = $"{items.Length} items";
         }
         if (!MessageBoxes.Ask("Delete " + text + "?"))
         {
@@ -1252,16 +1250,16 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         }
         try
         {
-            IConnectionSettingsWrapper[] array2 = array;
-            for (int num = 0; num < array2.Length; num++)
+            IConnectionSettingsWrapper[] entries = items;
+            for (int settingsIndex = 0; settingsIndex < entries.Length; settingsIndex++)
             {
-                array2[num].Delete();
+                entries[settingsIndex].Delete();
             }
             Controller.RefreshAll();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
     }
 

@@ -360,9 +360,9 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
                     _pending.RemoveRange(0, idx);
                 }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                StderrLine?.Invoke("Failed to process SysprogsSync output: " + ex.Message);
+                StderrLine?.Invoke("Failed to process SysprogsSync output: " + exception.Message);
                 _corrupted = true;
             }
         }
@@ -435,14 +435,14 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
                 Warning = quickSyncWarning
             });
         };
-        RemoteFileSet result = remoteFileSetReader.Read();
+        RemoteFileSet remoteFileSet = remoteFileSetReader.Read();
         if (_settings.Direction == SyncDirection.Upload)
         {
             _uploadStarted = true;
-            return result;
+            return remoteFileSet;
         }
         _fileSetRead = true;
-        return result;
+        return remoteFileSet;
     }
 
     public void Upload(List<SyncPlan.SyncAction> actions, List<LocalPath> localPaths, ref TransferStatistics transferStatistics)
@@ -527,11 +527,11 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
                                 fileStamps[action.Argument] = fileStamp;
                             }
                         }
-                        catch (Exception ex)
+                        catch (Exception exception)
                         {
                             _events?.OnWarning(new SyncWarning
                             {
-                                Exception = ex,
+                                Exception = exception,
                                 Warning = new QuickSyncWarning(QuickSyncWarningType.CannotReadLocalFile, localPaths[action.Argument].FullPath, 0)
                             });
                         }

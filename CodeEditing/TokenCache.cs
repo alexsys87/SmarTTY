@@ -20,9 +20,9 @@ public class TokenCache
 
         public Token TakeFirst()
         {
-            object obj = _tokens.Keys.GetEnumerator();
-            ((IEnumerator)obj).MoveNext();
-            Token current = ((IEnumerator<Token>)obj).Current;
+            object sender = _tokens.Keys.GetEnumerator();
+            ((IEnumerator)sender).MoveNext();
+            Token current = ((IEnumerator<Token>)sender).Current;
             _tokens.Remove(current);
             return current;
         }
@@ -74,18 +74,18 @@ public class TokenCache
 
         public readonly int TrailingBlankLines = 1;
 
-        public static RegionStyle Ellipsis = new RegionStyle(FoldBoundary.TokenEnd, FoldBoundary.TokenEnd, flag: false, LabelSource.FixedText, "...", flag2: true);
+        public static RegionStyle Ellipsis = new RegionStyle(FoldBoundary.TokenEnd, FoldBoundary.TokenEnd, unusedFlag: false, LabelSource.FixedText, "...", openingOnNextLine: true);
 
-        public static RegionStyle Plain = new RegionStyle(FoldBoundary.LineStart, FoldBoundary.LineStart, flag: false, LabelSource.NextToken, null, flag2: false);
+        public static RegionStyle Plain = new RegionStyle(FoldBoundary.LineStart, FoldBoundary.LineStart, unusedFlag: false, LabelSource.NextToken, null, openingOnNextLine: false);
 
-        public RegionStyle(FoldBoundary foldBoundary, FoldBoundary foldBoundary2, bool flag, LabelSource labelSource, string text, bool flag2)
+        public RegionStyle(FoldBoundary startBoundary, FoldBoundary endBoundary, bool unusedFlag, LabelSource labelSource, string text, bool openingOnNextLine)
         {
-            StartBoundary = foldBoundary;
-            this.EndBoundary = foldBoundary2;
-            this.UnusedFlag = flag;
+            StartBoundary = startBoundary;
+            this.EndBoundary = endBoundary;
+            this.UnusedFlag = unusedFlag;
             LabelKind = labelSource;
             Text = text;
-            this.OpeningOnNextLine = flag2;
+            this.OpeningOnNextLine = openingOnNextLine;
         }
     }
 
@@ -234,23 +234,23 @@ public class TokenCache
             _partner = null;
         }
 
-        internal void ReleasePartner(object obj)
+        internal void ReleasePartner(object sender)
         {
             if (_partner != null)
             {
                 if (_partner._line.Line != -1)
                 {
-                    if (obj is UnpairedTokenSet)
+                    if (sender is UnpairedTokenSet)
                     {
-                        ((UnpairedTokenSet)obj).Add(_partner);
+                        ((UnpairedTokenSet)sender).Add(_partner);
                     }
                     else
                     {
-                        if (!(obj is Queue<Token>))
+                        if (!(sender is Queue<Token>))
                         {
                             throw new InvalidOperationException();
                         }
-                        ((Queue<Token>)obj).Enqueue(_partner);
+                        ((Queue<Token>)sender).Enqueue(_partner);
                     }
                 }
                 _partner._partner = null;

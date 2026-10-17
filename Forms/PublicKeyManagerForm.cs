@@ -118,9 +118,9 @@ public partial class PublicKeyManagerForm : DpiAwareForm
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -142,9 +142,9 @@ public partial class PublicKeyManagerForm : DpiAwareForm
                 RefreshKeyStatus();
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -160,9 +160,9 @@ public partial class PublicKeyManagerForm : DpiAwareForm
             this.ShowKey();
             RefreshKeyStatus();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 

@@ -475,12 +475,12 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
             }
             return lines;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
             _events.OnWarning(new SyncWarning
             {
                 Warning = new QuickSyncWarning(QuickSyncWarningType.RemoteCommandFailed, command, 0),
-                Exception = ex
+                Exception = exception
             });
             return null;
         }

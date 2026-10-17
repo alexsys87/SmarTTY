@@ -48,9 +48,9 @@ internal class SerialTransport : IDeviceTransport, IDisposable
         Close();
     }
 
-    public string GetDisplayName(bool flag)
+    public string GetDisplayName(bool includeParameters)
     {
-        if ((this._serial.AdvancedSettings != null) & flag)
+        if ((this._serial.AdvancedSettings != null) & includeParameters)
         {
             return $"{this._serial.ComPortName} ({this._serial.AdvancedSettings.BaudRate} bps)";
         }

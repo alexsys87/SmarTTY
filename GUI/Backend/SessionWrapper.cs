@@ -154,17 +154,17 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         set
         {
-            ITabContext obj = null;
+            ITabContext sender = null;
             if (_ActiveTabIndex >= 0 && _ActiveTabIndex <= Tabs.Count)
             {
-                obj = Tabs[_ActiveTabIndex];
+                sender = Tabs[_ActiveTabIndex];
             }
             _ActiveTabIndex = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ActiveTabIndex"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ActiveTab"));
             if (_TabUpdateInProgress == 0)
             {
-                (ActiveTab as PseudoTabContext)?.ActivationHandler?.Invoke(obj);
+                (ActiveTab as PseudoTabContext)?.ActivationHandler?.Invoke(sender);
             }
             _Controller.OnActiveTabChanged(this, ActiveTab);
         }
@@ -208,9 +208,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             else
             {
                 PseudoTabContext[] newTabShortcuts = _NewTabShortcuts;
-                foreach (PseudoTabContext item2 in newTabShortcuts)
+                foreach (PseudoTabContext entry in newTabShortcuts)
                 {
-                    Tabs.Remove(item2);
+                    Tabs.Remove(entry);
                 }
             }
             foreach (ITabContext tab in Tabs)
@@ -342,7 +342,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             Session = session,
             ConfirmOverwrite = MessageBoxes.AskWarn
         };
-        session.ConnectionLost += (object obj, EventArgs e10) =>
+        session.ConnectionLost += (object sender, EventArgs e) =>
         {
             _Controller.BeginInvoke(() =>
             {
@@ -366,13 +366,13 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     public void AttachChannelToControl(TerminalEmulatorControl ctl, SshShellChannel chn, bool isAutoLaunchedCommand)
     {
         Utf8StreamDecoder reader = new Utf8StreamDecoder();
-        chn.DataReceived += (object obj, byte[] data, int offset, int length, int num) =>
+        chn.DataReceived += (object sender, byte[] data, int offset, int length, int value) =>
         {
             AppendText(ctl, reader.Decode(data, offset, length), data, offset, length);
         };
         if (isAutoLaunchedCommand)
         {
-            chn.Finished += (object obj) =>
+            chn.Finished += (object _) =>
             {
                 _Controller.BeginInvoke(() =>
                 {
@@ -385,7 +385,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         else
         {
-            chn.Finished += (object obj) =>
+            chn.Finished += (object _) =>
             {
                 _Controller.BeginInvoke(() =>
                 {
@@ -400,11 +400,11 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     public EditorTabContext TryActivateEditorForFile(string fn)
     {
         fn = RemotePathUtils.NormalizeUnix(fn);
-        for (int num = 0; num < Tabs.Count; num++)
+        for (int tabIndex = 0; tabIndex < Tabs.Count; tabIndex++)
         {
-            if (Tabs[num] is EditorTabContext editorTabContext && editorTabContext.FilePath == fn)
+            if (Tabs[tabIndex] is EditorTabContext editorTabContext && editorTabContext.FilePath == fn)
             {
-                ActiveTabIndex = num;
+                ActiveTabIndex = tabIndex;
                 return editorTabContext;
             }
         }
@@ -509,11 +509,11 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 }
             case NotifyCollectionChangedAction.Add:
                 {
-                    foreach (ITabContext item2 in from tabContext in e.NewItems.OfType<ITabContext>()
+                    foreach (ITabContext entry in from tabContext in e.NewItems.OfType<ITabContext>()
                                                   where !(tabContext is PseudoTabContext)
                                                   select tabContext)
                     {
-                        _PagesInLastUsedOrder.Insert(0, item2);
+                        _PagesInLastUsedOrder.Insert(0, entry);
                     }
                     break;
                 }
@@ -540,9 +540,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             Tabs.Insert(firstPseudoPage, item);
             ActiveTabIndex = firstPseudoPage;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBoxes.Exception(ex);
+            MessageBoxes.Exception(exception);
         }
         finally
         {
@@ -584,19 +584,19 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public void CloseFirstMatchingPage(Predicate<ITabContext> pred, bool closeSessionIfEmpty)
     {
-        for (int num = 0; num < Tabs.Count; num++)
+        for (int tabIndex = 0; tabIndex < Tabs.Count; tabIndex++)
         {
-            ITabContext tabContext = Tabs[num];
+            ITabContext tabContext = Tabs[tabIndex];
             if (pred(tabContext))
             {
-                if (ActiveTabIndex == num)
+                if (ActiveTabIndex == tabIndex)
                 {
                     ActiveTabIndex = Math.Max(0, ActiveTabIndex - 1);
                 }
                 try
                 {
                     _TabUpdateInProgress++;
-                    Tabs.RemoveAt(num);
+                    Tabs.RemoveAt(tabIndex);
                 }
                 finally
                 {
@@ -636,10 +636,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             m_CtrlTabScrollIndex = _PagesInLastUsedOrder.Count - 1;
         }
         m_bCtrlTabActive = true;
-        int num = Tabs.IndexOf(_PagesInLastUsedOrder[m_CtrlTabScrollIndex]);
-        if (num != -1)
+        int index = Tabs.IndexOf(_PagesInLastUsedOrder[m_CtrlTabScrollIndex]);
+        if (index != -1)
         {
-            ActiveTabIndex = num;
+            ActiveTabIndex = index;
         }
     }
 

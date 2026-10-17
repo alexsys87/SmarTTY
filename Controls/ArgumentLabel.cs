@@ -44,14 +44,14 @@ public partial class ArgumentLabel : UserControl
             if (_signature != null)
             {
                 string text = "";
-                string text2 = _signature.Separator;
-                for (int num = 0; num < _signature.ParameterCount; num++)
+                string separator = _signature.Separator;
+                for (int parameterCountIndex = 0; parameterCountIndex < _signature.ParameterCount; parameterCountIndex++)
                 {
                     if (text != "")
                     {
-                        text += text2;
+                        text += separator;
                     }
-                    text += _signature.GetParameter(num).Text;
+                    text += _signature.GetParameter(parameterCountIndex).Text;
                 }
                 return text;
             }
@@ -72,29 +72,29 @@ public partial class ArgumentLabel : UserControl
         {
             return graphics.MeasureString(Text, Font);
         }
-        int num = 0;
-        int num2 = 0;
+        int total = 0;
+        int sum = 0;
         string text = _signature.Separator;
         Font font = new Font(Font, FontStyle.Bold);
-        for (int num3 = 0; num3 < _signature.ParameterCount; num3++)
+        for (int parameterCountIndex = 0; parameterCountIndex < _signature.ParameterCount; parameterCountIndex++)
         {
-            if (num3 == _signature.ParameterCount - 1)
+            if (parameterCountIndex == _signature.ParameterCount - 1)
             {
                 text = "";
             }
-            Size size = Size.Ceiling(graphics.MeasureString(_signature.GetParameter(num3).Text + text, font));
+            Size size = Size.Ceiling(graphics.MeasureString(_signature.GetParameter(parameterCountIndex).Text + text, font));
             if (_signature.IsVertical)
             {
-                num = Math.Max(num, size.Width);
-                num2 += size.Height;
+                total = Math.Max(total, size.Width);
+                sum += size.Height;
             }
             else
             {
-                num += size.Width;
-                num2 = Math.Max(num2, size.Height);
+                total += size.Width;
+                sum = Math.Max(sum, size.Height);
             }
         }
-        return new SizeF(num, num2);
+        return new SizeF(total, sum);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -108,27 +108,27 @@ public partial class ArgumentLabel : UserControl
             e.Graphics.DrawString(base.Text, Font, Brushes.Black, ClientRectangle, stringFormat);
             return;
         }
-        int num = 0;
-        int num2 = (int)((float)Height - MeasureSignature().Height) / 2;
+        int total = 0;
+        int sum = (int)((float)Height - MeasureSignature().Height) / 2;
         string text = _signature.Separator;
         Font font = new Font(Font, FontStyle.Bold);
-        for (int num3 = 0; num3 < _signature.ParameterCount; num3++)
+        for (int parameterCountIndex = 0; parameterCountIndex < _signature.ParameterCount; parameterCountIndex++)
         {
-            if (num3 == _signature.ParameterCount - 1)
+            if (parameterCountIndex == _signature.ParameterCount - 1)
             {
                 text = "";
             }
-            Font font2 = ((num3 == _activeIndex) ? font : Font);
-            string text2 = _signature.GetParameter(num3).Text + text;
-            Size size = Size.Ceiling(e.Graphics.MeasureString(text2, font2));
-            e.Graphics.DrawString(text2, font2, Brushes.Black, new Rectangle(num, num2, size.Width, size.Height), stringFormat);
+            Font labelFont = ((parameterCountIndex == _activeIndex) ? font : Font);
+            string value = _signature.GetParameter(parameterCountIndex).Text + text;
+            Size size = Size.Ceiling(e.Graphics.MeasureString(value, labelFont));
+            e.Graphics.DrawString(value, labelFont, Brushes.Black, new Rectangle(total, sum, size.Width, size.Height), stringFormat);
             if (_signature.IsVertical)
             {
-                num2 += size.Height;
+                sum += size.Height;
             }
             else
             {
-                num += size.Width;
+                total += size.Width;
             }
         }
     }

@@ -76,14 +76,14 @@ public partial class DirectoryTransferForm : DpiAwareForm
         }
     }
 
-    private void SwapControls(Control control1, Control control2)
+    private void SwapControls(Control firstControl, Control secondControl)
     {
-        Point location = control1.Location;
-        control1.Location = control2.Location;
-        control2.Location = location;
-        int tabIndex = control1.TabIndex;
-        control1.TabIndex = control2.TabIndex;
-        control2.TabIndex = tabIndex;
+        Point location = firstControl.Location;
+        firstControl.Location = secondControl.Location;
+        secondControl.Location = location;
+        int tabIndex = firstControl.TabIndex;
+        firstControl.TabIndex = secondControl.TabIndex;
+        secondControl.TabIndex = tabIndex;
     }
 
     private void btnDownload_Click(object sender, EventArgs e)
@@ -116,9 +116,9 @@ public partial class DirectoryTransferForm : DpiAwareForm
         Button button = btnDownload;
         RadioButton radioButton = rbTar;
         bool disabledState = (rbSCP.Enabled = false);
-        bool flag3 = (radioButton.Enabled = disabledState);
-        bool flag5 = (button.Enabled = flag3);
-        bool enabled = (textBox2.Enabled = flag5);
+        bool isEnabled = (radioButton.Enabled = disabledState);
+        bool downloadButtonEnabled = (button.Enabled = isEnabled);
+        bool enabled = (textBox2.Enabled = downloadButtonEnabled);
         textBox.Enabled = enabled;
         progressBar1.Visible = true;
     }
@@ -147,9 +147,9 @@ public partial class DirectoryTransferForm : DpiAwareForm
         catch (OperationCanceledException)
         {
         }
-        catch (Exception ex)
+        catch (Exception transferException)
         {
-            exception = ex;
+            exception = transferException;
         }
         try
         {
@@ -162,9 +162,9 @@ public partial class DirectoryTransferForm : DpiAwareForm
                 Button button = btnDownload;
                 RadioButton radioButton = rbTar;
                 bool enabledState = (rbSCP.Enabled = true);
-                bool flag3 = (radioButton.Enabled = enabledState);
-                bool flag5 = (button.Enabled = flag3);
-                bool enabled = (textBox2.Enabled = flag5);
+                bool isEnabled = (radioButton.Enabled = enabledState);
+                bool downloadButtonEnabled = (button.Enabled = isEnabled);
+                bool enabled = (textBox2.Enabled = downloadButtonEnabled);
                 textBox.Enabled = enabled;
                 progressBar1.Visible = false;
                 if (_errorLog.Length != 0)
@@ -278,10 +278,10 @@ public partial class DirectoryTransferForm : DpiAwareForm
     {
         _remoteFolderDialog.InitialFolder = txtRemoteDir.Text;
         _remoteFolderDialog.HostName = this._session.HostName;
-        string result = _remoteFolderDialog.ShowDialog();
-        if (result != null)
+        string dialogResult = _remoteFolderDialog.ShowDialog();
+        if (dialogResult != null)
         {
-            txtRemoteDir.Text = result;
+            txtRemoteDir.Text = dialogResult;
         }
     }
 

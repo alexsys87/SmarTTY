@@ -194,10 +194,10 @@ public class GlobalSettings : INotifyPropertyChanged
     {
         get
         {
-            bool flag = false;
+            bool changed = false;
             try
             {
-                flag = File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "portable.txt"));
+                changed = File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "portable.txt"));
             }
             catch
             {
@@ -207,7 +207,7 @@ public class GlobalSettings : INotifyPropertyChanged
             {
                 text = text.Substring(0, text.Length - 4);
             }
-            if (flag)
+            if (changed)
             {
                 return Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "PortableSettings");
             }

@@ -66,10 +66,10 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             }
         }
 
-        internal void SetInput(string text, int value2)
+        internal void SetInput(string text, int position)
         {
             _input = text;
-            _position = value2;
+            _position = position;
         }
 
         internal void SetDescription(string text)
@@ -88,7 +88,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
-    public delegate void TerminalSizeChangedHandler(TerminalEmulatorControl terminalEmulatorControl, int value2, int value3);
+    public delegate void TerminalSizeChangedHandler(TerminalEmulatorControl terminalEmulatorControl, int columns, int rows);
 
     public enum InputKind
     {
@@ -98,7 +98,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         Paste
     }
 
-    public delegate void TerminalDataHandler(object obj, byte[] buffer, InputKind inputKind);
+    public delegate void TerminalDataHandler(object sender, byte[] buffer, InputKind inputKind);
 
     public enum MouseReportingMode
     {
@@ -202,20 +202,20 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     {
         get
         {
-            int num = 0;
+            int modifiers = 0;
             if ((Control.ModifierKeys & Keys.Shift) != 0)
             {
-                num |= 4;
+                modifiers |= 4;
             }
             if ((Control.ModifierKeys & Keys.Alt) != 0)
             {
-                num |= 8;
+                modifiers |= 8;
             }
             if ((Control.ModifierKeys & Keys.Control) != 0)
             {
-                num |= 0x10;
+                modifiers |= 0x10;
             }
-            return num;
+            return modifiers;
         }
     }
 
@@ -261,40 +261,40 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         return base.IsWordChar(ch);
     }
 
-    public void ProcessOutput(string text2)
+    public void ProcessOutput(string output)
     {
         if (_incompleteEscape != null)
         {
-            text2 = _incompleteEscape + text2;
+            output = _incompleteEscape + output;
             _incompleteEscape = null;
         }
-        if (text2 == null)
+        if (output == null)
         {
             return;
         }
-        if (MaxChunkLength != 0 && text2.Length > MaxChunkLength)
+        if (MaxChunkLength != 0 && output.Length > MaxChunkLength)
         {
-            text2 = $"\r\n--- skipped {text2.Length - MaxChunkLength} bytes ---\r\n" + text2.Substring(text2.Length - MaxChunkLength);
+            output = $"\r\n--- skipped {output.Length - MaxChunkLength} bytes ---\r\n" + output.Substring(output.Length - MaxChunkLength);
             GC.Collect();
         }
-        int num = 0;
+        int segmentStart = 0;
         try
         {
             BeginBatch();
-            for (int num2 = 0; num2 < text2.Length; num2++)
+            for (int charIndex = 0; charIndex < output.Length; charIndex++)
             {
-                if (text2[num2] >= ' ')
+                if (output[charIndex] >= ' ')
                 {
                     continue;
                 }
-                WriteText(text2.Substring(num, num2 - num));
-                if (text2[num2] != '\u001b')
+                WriteText(output.Substring(segmentStart, charIndex - segmentStart));
+                if (output[charIndex] != '\u001b')
                 {
                     base.ResetLinkTracking();
                 }
-                num = num2 + 1;
+                segmentStart = charIndex + 1;
                 EscapeTrace escapeTrace = null;
-                switch (text2[num2])
+                switch (output[charIndex])
                 {
                     case '\r':
                         Trace("<CR>");
@@ -302,7 +302,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                         break;
                     case '\n':
                         Trace("<LF>");
-                        MoveCursorBy(0, 1, flag: true);
+                        MoveCursorBy(0, 1, scroll: true);
                         break;
                     case '\t':
                         Trace("<TAB>");
@@ -325,9 +325,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                         break;
                     case '\u001b':
                         {
-                            int num3 = ParseEscapeSequence(text2, num2, out var text, escapeTrace);
-                            num2 += num3 - 1;
-                            num += num3 - 1;
+                            int consumed = ParseEscapeSequence(output, charIndex, out var text, escapeTrace);
+                            charIndex += consumed - 1;
+                            segmentStart += consumed - 1;
                             if (text != null)
                             {
                                 WriteText(text);
@@ -337,14 +337,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     default:
                         if (ShowUnrecognizedAsHex)
                         {
-                            WriteText($"\\{(int)text2[num2]}");
+                            WriteText($"\\{(int)output[charIndex]}");
                         }
                         break;
                 }
             }
-            if (num < text2.Length)
+            if (segmentStart < output.Length)
             {
-                WriteText(text2.Substring(num, text2.Length - num));
+                WriteText(output.Substring(segmentStart, output.Length - segmentStart));
             }
         }
         finally
@@ -354,16 +354,16 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     }
 
     [DllImport("winmm.dll", SetLastError = true)]
-    private static extern bool PlaySound(string text, UIntPtr handle, uint value2);
+    private static extern bool PlaySound(string text, UIntPtr handle, uint colorIndex);
 
-    public static string ForegroundCode(int value2)
+    public static string ForegroundCode(int colorIndex)
     {
-        return $"{'\u001b'}[{30 + value2}m";
+        return $"{'\u001b'}[{30 + colorIndex}m";
     }
 
-    public static string Colorize(string text, int value2)
+    public static string Colorize(string text, int colorIndex)
     {
-        return ForegroundCode(value2) + text + ResetSequence;
+        return ForegroundCode(colorIndex) + text + ResetSequence;
     }
 
     private void PlayBell()
@@ -405,58 +405,58 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
-    private static int[] ParseParameters(string[] items, params int[] items2)
+    private static int[] ParseParameters(string[] items, params int[] defaults)
     {
-        int[] array = new int[Math.Max(items.Length, items2.Length)];
-        for (int num = 0; num < array.Length; num++)
+        int[] parameters = new int[Math.Max(items.Length, defaults.Length)];
+        for (int parameterIndex = 0; parameterIndex < parameters.Length; parameterIndex++)
         {
-            if (num >= items.Length || !int.TryParse(items[num], out array[num]))
+            if (parameterIndex >= items.Length || !int.TryParse(items[parameterIndex], out parameters[parameterIndex]))
             {
-                array[num] = items2[num];
+                parameters[parameterIndex] = defaults[parameterIndex];
             }
         }
-        return array;
+        return parameters;
     }
 
-    private int ParseEscapeSequence(string text, int value2, out string text2, EscapeTrace escapeTrace = null)
+    private int ParseEscapeSequence(string text, int position, out string parsedText, EscapeTrace escapeTrace = null)
     {
-        text2 = null;
-        escapeTrace?.SetInput(text, value2);
-        if (value2 + 1 >= text.Length)
+        parsedText = null;
+        escapeTrace?.SetInput(text, position);
+        if (position + 1 >= text.Length)
         {
-            _incompleteEscape = text.Substring(value2);
+            _incompleteEscape = text.Substring(position);
             return 1;
         }
-        switch (text[value2 + 1])
+        switch (text[position + 1])
         {
             case ']':
                 {
-                    int num = AnsiEscapeUtils.FindOscEnd(text, value2 + 1, out var num2);
-                    if (num == -1)
+                    int oscEnd = AnsiEscapeUtils.FindOscEnd(text, position + 1, out var belEnd);
+                    if (oscEnd == -1)
                     {
                         escapeTrace?.SetWarning("Invalid ST/BEL");
-                        _incompleteEscape = text.Substring(value2);
+                        _incompleteEscape = text.Substring(position);
                         return _incompleteEscape.Length;
                     }
-                    ExecuteOsc(text.Substring(value2 + 2, num - value2 - 2).Split(';'), escapeTrace);
-                    return num2 + 1;
+                    ExecuteOsc(text.Substring(position + 2, oscEnd - position - 2).Split(';'), escapeTrace);
+                    return belEnd + 1;
                 }
             case '[':
                 {
-                    int num = AnsiEscapeUtils.FindCsiEnd(text, value2 + 2);
-                    if (num == -1)
+                    int csiEnd = AnsiEscapeUtils.FindCsiEnd(text, position + 2);
+                    if (csiEnd == -1)
                     {
                         escapeTrace?.SetWarning("Invalid CSI");
-                        _incompleteEscape = text.Substring(value2);
+                        _incompleteEscape = text.Substring(position);
                         return _incompleteEscape.Length;
                     }
-                    int num3 = 0;
-                    if (text[value2 + 2] == '?')
+                    int parameterStart = 0;
+                    if (text[position + 2] == '?')
                     {
-                        num3 = 1;
+                        parameterStart = 1;
                     }
-                    ExecuteCsi(text[num], text.Substring(value2 + 2 + num3, num - value2 - 2 - num3).Split(';'), num3 != 0, escapeTrace);
-                    return num - value2 + 1;
+                    ExecuteCsi(text[csiEnd], text.Substring(position + 2 + parameterStart, csiEnd - position - 2 - parameterStart).Split(';'), parameterStart != 0, escapeTrace);
+                    return csiEnd - position + 1;
                 }
             case ' ':
             case '#':
@@ -465,12 +465,12 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             case ')':
             case '*':
             case '+':
-                if (text.Length - value2 < 3)
+                if (text.Length - position < 3)
                 {
-                    _incompleteEscape = text.Substring(value2);
+                    _incompleteEscape = text.Substring(position);
                     return _incompleteEscape.Length;
                 }
-                escapeTrace?.SetRaw("[ESC]" + text.Substring(value2, 2));
+                escapeTrace?.SetRaw("[ESC]" + text.Substring(position, 2));
                 return 3;
             case '>':
                 _applicationKeypad = false;
@@ -504,7 +504,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 }
                 else
                 {
-                    MoveCursorBy(0, 1, flag: true);
+                    MoveCursorBy(0, 1, scroll: true);
                 }
                 return 2;
             case 'M':
@@ -515,127 +515,127 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 }
                 else
                 {
-                    MoveCursorBy(0, -1, flag: true);
+                    MoveCursorBy(0, -1, scroll: true);
                 }
                 return 2;
             case 'E':
                 escapeTrace?.SetDescription("Got to next line");
-                MoveCursorBy(-base.CursorPosition.X, 1, flag: true);
+                MoveCursorBy(-base.CursorPosition.X, 1, scroll: true);
                 return 2;
             default:
                 return 2;
         }
     }
 
-    internal bool ExecuteCsi(char ch, string[] items, bool flag, EscapeTrace escapeTrace = null)
+    internal bool ExecuteCsi(char ch, string[] items, bool set, EscapeTrace escapeTrace = null)
     {
-        escapeTrace?.SetRaw(string.Format("Unknown CSI command: {2}{0}, DEC={1}", ch, flag, string.Join(";", items)));
-        int result = 0;
-        int num = 1;
-        if (items.Length != 0 && int.TryParse(items[0], out result))
+        escapeTrace?.SetRaw(string.Format("Unknown CSI command: {2}{0}, DEC={1}", ch, set, string.Join(";", items)));
+        int count = 0;
+        int repeatCount = 1;
+        if (items.Length != 0 && int.TryParse(items[0], out count))
         {
-            num = result;
+            repeatCount = count;
         }
         switch (ch)
         {
             case '@':
-                InsertChars(num);
-                escapeTrace?.SetDescription($"Insert char at {num}");
+                InsertChars(repeatCount);
+                escapeTrace?.SetDescription($"Insert char at {repeatCount}");
                 return true;
             case 'A':
-                escapeTrace?.SetDescription($"Go up {num}");
-                MoveCursorBy(0, -num);
+                escapeTrace?.SetDescription($"Go up {repeatCount}");
+                MoveCursorBy(0, -repeatCount);
                 return true;
             case 'B':
-                escapeTrace?.SetDescription($"Go down {num}");
-                MoveCursorBy(0, num);
+                escapeTrace?.SetDescription($"Go down {repeatCount}");
+                MoveCursorBy(0, repeatCount);
                 return true;
             case 'C':
-                escapeTrace?.SetDescription($"Go left {num}");
-                MoveCursorBy(num, 0);
+                escapeTrace?.SetDescription($"Go left {repeatCount}");
+                MoveCursorBy(repeatCount, 0);
                 return true;
             case 'D':
-                escapeTrace?.SetDescription($"Go right {num}");
-                MoveCursorBy(-num, 0);
+                escapeTrace?.SetDescription($"Go right {repeatCount}");
+                MoveCursorBy(-repeatCount, 0);
                 return true;
             case 'E':
-                escapeTrace?.SetDescription($"Go to start of relative line {num}");
-                MoveCursorBy(-base.CursorPosition.X, num);
+                escapeTrace?.SetDescription($"Go to start of relative line {repeatCount}");
+                MoveCursorBy(-base.CursorPosition.X, repeatCount);
                 return true;
             case 'F':
-                escapeTrace?.SetDescription($"Go to start of relative line -{num}");
-                MoveCursorBy(-base.CursorPosition.X, -num);
+                escapeTrace?.SetDescription($"Go to start of relative line -{repeatCount}");
+                MoveCursorBy(-base.CursorPosition.X, -repeatCount);
                 return true;
             case 'G':
             case '`':
-                escapeTrace?.SetDescription($"Set X= {num}");
-                base.CursorPosition = new Point(num - 1, base.CursorPosition.Y);
+                escapeTrace?.SetDescription($"Set X= {repeatCount}");
+                base.CursorPosition = new Point(repeatCount - 1, base.CursorPosition.Y);
                 return true;
             case 'H':
             case 'f':
                 {
-                    int[] array2 = ParseParameters(items, 1, 1);
-                    escapeTrace?.SetDescription($"GOTOXY {array2[1]}, {array2[0]}");
-                    base.CursorPosition = new Point(array2[1] - 1, array2[0] - 1);
+                    int[] coordinates = ParseParameters(items, 1, 1);
+                    escapeTrace?.SetDescription($"GOTOXY {coordinates[1]}, {coordinates[0]}");
+                    base.CursorPosition = new Point(coordinates[1] - 1, coordinates[0] - 1);
                     return true;
                 }
             case 'd':
-                escapeTrace?.SetDescription($"Set Y= {num}");
-                base.CursorPosition = new Point(base.CursorPosition.X, num - 1);
+                escapeTrace?.SetDescription($"Set Y= {repeatCount}");
+                base.CursorPosition = new Point(base.CursorPosition.X, repeatCount - 1);
                 return true;
             case 'I':
                 {
-                    escapeTrace?.SetDescription($"Go {num} tabs");
-                    for (int num4 = 0; num4 < num; num4++)
+                    escapeTrace?.SetDescription($"Go {repeatCount} tabs");
+                    for (int tabIndex = 0; tabIndex < repeatCount; tabIndex++)
                     {
                         MoveCursorBy(Tabs.NextDistance(base.CursorPosition.X, _tabWidth), 0);
                     }
                     return true;
                 }
             case 'J':
-                escapeTrace?.SetDescription($"Erase terminal {(EraseMode)result}");
-                if ((uint)result <= 2u)
+                escapeTrace?.SetDescription($"Erase terminal {(EraseMode)count}");
+                if ((uint)count <= 2u)
                 {
-                    EraseInDisplay((EraseMode)result);
+                    EraseInDisplay((EraseMode)count);
                 }
                 InvalidateView();
                 return true;
             case 'K':
-                escapeTrace?.SetDescription($"Erase line {(EraseMode)result}");
-                if ((uint)result <= 2u)
+                escapeTrace?.SetDescription($"Erase line {(EraseMode)count}");
+                if ((uint)count <= 2u)
                 {
-                    EraseInLine((EraseMode)result);
+                    EraseInLine((EraseMode)count);
                 }
                 InvalidateView();
                 return true;
             case 'L':
-                escapeTrace?.SetDescription($"Insert {num} lines");
-                InsertBlankLines(base.CursorPosition.Y, num);
+                escapeTrace?.SetDescription($"Insert {repeatCount} lines");
+                InsertBlankLines(base.CursorPosition.Y, repeatCount);
                 return true;
             case 'M':
-                escapeTrace?.SetDescription($"Remove {num} lines");
-                ScrollRegionUp(base.CursorPosition.Y, num);
+                escapeTrace?.SetDescription($"Remove {repeatCount} lines");
+                ScrollRegionUp(base.CursorPosition.Y, repeatCount);
                 return true;
             case 'P':
-                escapeTrace?.SetDescription($"Erase {num} chars");
-                DeleteChars(num);
+                escapeTrace?.SetDescription($"Erase {repeatCount} chars");
+                DeleteChars(repeatCount);
                 return true;
             case 'S':
-                escapeTrace?.SetDescription($"Remove {num} lines from clip region top");
-                ScrollRegionUp(base.ScrollTop, num);
+                escapeTrace?.SetDescription($"Remove {repeatCount} lines from clip region top");
+                ScrollRegionUp(base.ScrollTop, repeatCount);
                 return true;
             case 'T':
-                escapeTrace?.SetDescription($"Insert {num} lines to clip region top");
-                InsertBlankLines(base.ScrollTop, num);
+                escapeTrace?.SetDescription($"Insert {repeatCount} lines to clip region top");
+                InsertBlankLines(base.ScrollTop, repeatCount);
                 return true;
             case 'X':
-                escapeTrace?.SetDescription($"Pad {num} chars");
-                WriteText(new string(' ', num), flag: false);
+                escapeTrace?.SetDescription($"Pad {repeatCount} chars");
+                WriteText(new string(' ', repeatCount), moveCursor: false);
                 return true;
             case 'Z':
                 {
-                    escapeTrace?.SetDescription($"Go {num} tabs back");
-                    for (int num3 = 0; num3 < num; num3++)
+                    escapeTrace?.SetDescription($"Go {repeatCount} tabs back");
+                    for (int backTabIndex = 0; backTabIndex < repeatCount; backTabIndex++)
                     {
                         MoveCursorBy(-Tabs.PreviousDistance(base.CursorPosition.X), 0);
                     }
@@ -643,11 +643,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 }
             case 'b':
                 escapeTrace?.SetDescription("Clone char");
-                RepeatPreviousChar(num);
+                RepeatPreviousChar(repeatCount);
                 return true;
             case 'g':
                 escapeTrace?.SetDescription("Clear/reset tab");
-                switch (result)
+                switch (count)
                 {
                     case 0:
                         Tabs.ClearStop(base.CursorPosition.X);
@@ -659,21 +659,21 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 return true;
             case 'm':
                 {
-                    string[] array = items;
-                    for (int num2 = 0; num2 < array.Length; num2++)
+                    string[] parameters = items;
+                    for (int parameterIndex = 0; parameterIndex < parameters.Length; parameterIndex++)
                     {
-                        int.TryParse(array[num2], out var result6);
-                        if (result6 >= 30 && result6 <= 37)
+                        int.TryParse(parameters[parameterIndex], out var parameter);
+                        if (parameter >= 30 && parameter <= 37)
                         {
-                            CurrentStyle.Foreground = (byte)(1 + result6 - 30);
+                            CurrentStyle.Foreground = (byte)(1 + parameter - 30);
                             continue;
                         }
-                        if (result6 >= 40 && result6 <= 47)
+                        if (parameter >= 40 && parameter <= 47)
                         {
-                            CurrentStyle.Background = (byte)(1 + result6 - 40);
+                            CurrentStyle.Background = (byte)(1 + parameter - 40);
                             continue;
                         }
-                        switch (result6)
+                        switch (parameter)
                         {
                             case 0:
                                 CurrentStyle = TerminalEmulatorBase.CellStyle.Default;
@@ -704,13 +704,13 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                             case 95:
                             case 96:
                             case 97:
-                                CurrentStyle.Foreground = (byte)(1 + result6 - 90);
+                                CurrentStyle.Foreground = (byte)(1 + parameter - 90);
                                 CurrentStyle.Bold = true;
                                 continue;
                         }
-                        if (result6 >= 100 && result6 <= 107)
+                        if (parameter >= 100 && parameter <= 107)
                         {
-                            CurrentStyle.Background = (byte)(1 + result6 - 100);
+                            CurrentStyle.Background = (byte)(1 + parameter - 100);
                             CurrentStyle.Bold = true;
                         }
                     }
@@ -720,15 +720,15 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             case 'h':
             case 'l':
                 {
-                    string[] array = items;
-                    for (int num2 = 0; num2 < array.Length; num2++)
+                    string[] sgrParameters = items;
+                    for (int sgrParameterIndex = 0; sgrParameterIndex < sgrParameters.Length; sgrParameterIndex++)
                     {
-                        if (int.TryParse(array[num2], out var result5))
+                        if (int.TryParse(sgrParameters[sgrParameterIndex], out var mode))
                         {
-                            SetMode(result5, flag, ch == 'h', escapeTrace);
-                            if (flag && result5 < _privateModes.Length)
+                            SetMode(mode, set, ch == 'h', escapeTrace);
+                            if (set && mode < _privateModes.Length)
                             {
-                                _privateModes[result5] = ch == 'h';
+                                _privateModes[mode] = ch == 'h';
                             }
                         }
                     }
@@ -747,51 +747,51 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 return true;
             case 's':
                 escapeTrace?.SetDescription("Save features: " + string.Join(";", items));
-                if (flag)
+                if (set)
                 {
-                    string[] array = items;
-                    for (int num2 = 0; num2 < array.Length; num2++)
+                    string[] modeParameters = items;
+                    for (int modeParameterIndex = 0; modeParameterIndex < modeParameters.Length; modeParameterIndex++)
                     {
-                        if (int.TryParse(array[num2], out var result7) && result7 < _privateModes.Length)
+                        if (int.TryParse(modeParameters[modeParameterIndex], out var modeValue) && modeValue < _privateModes.Length)
                         {
-                            _savedPrivateModes[result7] = _privateModes[result7];
+                            _savedPrivateModes[modeValue] = _privateModes[modeValue];
                         }
                     }
                 }
                 return true;
             case 'r':
-                if (flag)
+                if (set)
                 {
                     escapeTrace?.SetDescription("Restore features: " + string.Join(";", items));
-                    string[] array = items;
-                    for (int num2 = 0; num2 < array.Length; num2++)
+                    string[] savedModeParameters = items;
+                    for (int savedModeParameterIndex = 0; savedModeParameterIndex < savedModeParameters.Length; savedModeParameterIndex++)
                     {
-                        if (int.TryParse(array[num2], out var result2) && result2 < _privateModes.Length)
+                        if (int.TryParse(savedModeParameters[savedModeParameterIndex], out var savedModeValue) && savedModeValue < _privateModes.Length)
                         {
-                            SetMode(result2, flag: true, _savedPrivateModes[result2], escapeTrace);
-                            _privateModes[result2] = _savedPrivateModes[result2];
+                            SetMode(savedModeValue, set: true, _savedPrivateModes[savedModeValue], escapeTrace);
+                            _privateModes[savedModeValue] = _savedPrivateModes[savedModeValue];
                         }
                     }
                 }
                 else
                 {
-                    if (items.Length < 1 || !int.TryParse(items[0], out var result3))
+                    if (items.Length < 1 || !int.TryParse(items[0], out var top))
                     {
-                        result3 = 0;
+                        top = 0;
                     }
-                    if (items.Length < 2 || !int.TryParse(items[1], out var result4))
+                    if (items.Length < 2 || !int.TryParse(items[1], out var bottom))
                     {
-                        result4 = 0;
+                        bottom = 0;
                     }
-                    if (result3 == 0 || result4 == 0 || result4 < result3)
+                    if (top == 0 || bottom == 0 || bottom < top)
                     {
                         escapeTrace?.SetDescription("Reset clip region");
                         ClearScrollRegion();
                     }
                     else
                     {
-                        escapeTrace?.SetDescription($"Set clip region to {result3}..{result4}");
-                        SetScrollRegion(result3 - 1, result4 - 1);
+                        escapeTrace?.SetDescription($"Set clip region to {top}..{bottom}");
+                        SetScrollRegion(top - 1, bottom - 1);
                     }
                 }
                 return true;
@@ -800,31 +800,31 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
-    private void SetMode(int value2, bool flag, bool flag2, EscapeTrace escapeTrace)
+    private void SetMode(int mode, bool set, bool enabled, EscapeTrace escapeTrace)
     {
         escapeTrace?.SetDescription($"Terminal feature: {CurrentStyle}");
-        if (flag)
+        if (set)
         {
-            switch (value2)
+            switch (mode)
             {
                 case 1:
-                    this._applicationCursorKeys = flag2;
+                    this._applicationCursorKeys = enabled;
                     break;
                 case 25:
-                    HideCaret = !flag2;
+                    HideCaret = !enabled;
                     break;
                 case 47:
                 case 1049:
-                    base.ActiveBufferIndex = (flag2 ? 1 : 0);
+                    base.ActiveBufferIndex = (enabled ? 1 : 0);
                     break;
                 case 9:
                 case 1000:
                 case 1001:
                 case 1002:
                 case 1003:
-                    if (flag2)
+                    if (enabled)
                     {
-                        MouseMode = (MouseReportingMode)value2;
+                        MouseMode = (MouseReportingMode)mode;
                     }
                     else
                     {
@@ -833,9 +833,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     break;
             }
         }
-        else if (value2 == 4)
+        else if (mode == 4)
         {
-            _insertMode = flag2;
+            _insertMode = enabled;
         }
     }
 
@@ -851,11 +851,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             return false;
         }
-        if (!int.TryParse(items[0], out var result))
+        if (!int.TryParse(items[0], out var eraseCode))
         {
             return false;
         }
-        if ((uint)result <= 2u)
+        if ((uint)eraseCode <= 2u)
         {
             base.Title = items[1];
             return true;
@@ -934,16 +934,16 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             return;
         }
-        bool flag = _keyMap.IsNumPadKey(e.KeyCode, _extendedKey);
-        string text = _keyMap.GetEscapeSequence(e.KeyCode, _applicationKeypad, this._applicationCursorKeys, flag);
+        bool numPad = _keyMap.IsNumPadKey(e.KeyCode, _extendedKey);
+        string text = _keyMap.GetEscapeSequence(e.KeyCode, _applicationKeypad, this._applicationCursorKeys, numPad);
         if (text != null)
         {
             text = text.Insert(0, "\u001b");
-            int num = (e.Control ? 4 : 0) | (e.Alt ? 2 : 0) | (e.Shift ? 1 : 0);
-            if (num != 0)
+            int modifiers = (e.Control ? 4 : 0) | (e.Alt ? 2 : 0) | (e.Shift ? 1 : 0);
+            if (modifiers != 0)
             {
-                int num2 = num + 1;
-                text = ((text.Length != 3 || text[0] != '\u001b' || text[1] != 'O') ? text.Insert(text.Length - 1, ";" + num2) : $"\u001b[1;{num2}{text[2]}");
+                int modifierCode = modifiers + 1;
+                text = ((text.Length != 3 || text[0] != '\u001b' || text[1] != 'O') ? text.Insert(text.Length - 1, ";" + modifierCode) : $"\u001b[1;{modifierCode}{text[2]}");
             }
             SendText(text, InputKind.KeySequence);
             e.SuppressKeyPress = true;
@@ -1032,47 +1032,47 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
-    private static byte EncodeMouseValue(int value2)
+    private static byte EncodeMouseValue(int mouseCode)
     {
-        int num = value2 + 32;
-        if (num >= 255)
+        int encoded = mouseCode + 32;
+        if (encoded >= 255)
         {
             return byte.MaxValue;
         }
-        return (byte)num;
+        return (byte)encoded;
     }
 
-    private void HandleMouseButton(MouseEventArgs e2, bool flag)
+    private void HandleMouseButton(MouseEventArgs e, bool release)
     {
-        int num;
-        if (!flag)
+        int buttonCode;
+        if (!release)
         {
-            num = 3;
+            buttonCode = 3;
         }
         else
         {
-            switch (e2.Button)
+            switch (e.Button)
             {
                 default:
                     return;
                 case MouseButtons.Left:
-                    num = 0;
+                    buttonCode = 0;
                     break;
                 case MouseButtons.Right:
-                    num = 2;
+                    buttonCode = 2;
                     break;
                 case MouseButtons.Middle:
-                    num = 1;
+                    buttonCode = 1;
                     break;
             }
         }
-        Point point = HitTestCell(e2.Location);
+        Point point = HitTestCell(e.Location);
         switch (_mouseMode)
         {
             default:
                 return;
             case MouseReportingMode.X10:
-                if (!flag)
+                if (!release)
                 {
                     return;
                 }
@@ -1081,37 +1081,37 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             case MouseReportingMode.Highlight:
             case MouseReportingMode.ButtonEvent:
             case MouseReportingMode.AnyEvent:
-                num |= MouseModifierBits;
+                buttonCode |= MouseModifierBits;
                 break;
         }
-        SendMouseReport(num, point.X, point.Y);
+        SendMouseReport(buttonCode, point.X, point.Y);
     }
 
     private void HandleMouseWheel(MouseEventArgs e)
     {
         Point point = HitTestCell(e.Location);
-        int num = 64 + ((e.Delta <= 0) ? 1 : 0);
+        int wheelCode = 64 + ((e.Delta <= 0) ? 1 : 0);
         MouseReportingMode mouseReportingMode = _mouseMode;
         if (mouseReportingMode != MouseReportingMode.X10 && (uint)(mouseReportingMode - 1000) <= 3u)
         {
-            num |= MouseModifierBits;
-            SendMouseReport(num, point.X, point.Y);
+            wheelCode |= MouseModifierBits;
+            SendMouseReport(wheelCode, point.X, point.Y);
         }
     }
 
-    private void HandleMouseMove(MouseEventArgs e2)
+    private void HandleMouseMove(MouseEventArgs e)
     {
-        int num = 0;
-        switch (e2.Button)
+        int buttonCode = 0;
+        switch (e.Button)
         {
             case MouseButtons.Left:
-                num = 0;
+                buttonCode = 0;
                 break;
             case MouseButtons.Right:
-                num = 2;
+                buttonCode = 2;
                 break;
             case MouseButtons.Middle:
-                num = 1;
+                buttonCode = 1;
                 break;
         }
         switch (_mouseMode)
@@ -1119,7 +1119,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             default:
                 return;
             case MouseReportingMode.ButtonEvent:
-                if (e2.Button == MouseButtons.None)
+                if (e.Button == MouseButtons.None)
                 {
                     return;
                 }
@@ -1127,24 +1127,24 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             case MouseReportingMode.AnyEvent:
                 break;
         }
-        Point point = HitTestCell(e2.Location);
+        Point point = HitTestCell(e.Location);
         if (!(point == _lastMouseCell))
         {
             _lastMouseCell = point;
-            SendMouseReport(num + 32, point.X, point.Y);
+            SendMouseReport(buttonCode + 32, point.X, point.Y);
         }
     }
 
-    private void SendMouseReport(int value2, int value3, int value4)
+    private void SendMouseReport(int buttonCode, int x, int y)
     {
         SendBytes(new byte[6]
         {
             27,
             91,
             77,
-            EncodeMouseValue(value2),
-            EncodeMouseValue(value3 + 1),
-            EncodeMouseValue(value4 + 1)
+            EncodeMouseValue(buttonCode),
+            EncodeMouseValue(x + 1),
+            EncodeMouseValue(y + 1)
         }, InputKind.MouseReport);
     }
 
@@ -1152,7 +1152,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     {
         if (_mouseMode != MouseReportingMode.Off && TextArea.Contains(e.Location))
         {
-            HandleMouseButton(e, flag: true);
+            HandleMouseButton(e, release: true);
             return;
         }
         if (e.Button == MouseButtons.Middle)
@@ -1166,7 +1166,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     {
         if (_mouseMode != MouseReportingMode.Off && TextArea.Contains(e.Location))
         {
-            HandleMouseButton(e, flag: false);
+            HandleMouseButton(e, release: false);
         }
         else
         {
@@ -1202,9 +1202,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             }
             SendText(text, InputKind.Paste);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            MessageBox.Show(ex.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            MessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -1284,14 +1284,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
-    public void WriteLog(byte[] buffer, int value2, int value3)
+    public void WriteLog(byte[] buffer, int offset, int count)
     {
         try
         {
             FileStream fileStream = _logStream;
             if (fileStream != null)
             {
-                fileStream.Write(buffer, value2, value3);
+                fileStream.Write(buffer, offset, count);
                 fileStream.Flush();
             }
         }

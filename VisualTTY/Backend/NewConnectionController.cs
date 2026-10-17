@@ -295,17 +295,17 @@ public class NewConnectionController : INotifyPropertyChanged
             {
                 throw new Exception("Please specify the proxy server address");
             }
-            int num = text.LastIndexOf('@');
-            if (num != -1)
+            int lastIndex = text.LastIndexOf('@');
+            if (lastIndex != -1)
             {
-                _Settings.ProxyAuth = text.Substring(0, num);
-                text = text.Substring(num + 1);
+                _Settings.ProxyAuth = text.Substring(0, lastIndex);
+                text = text.Substring(lastIndex + 1);
             }
-            num = text.IndexOf(':');
-            if (num != -1 && int.TryParse(text.Substring(num + 1), out var result))
+            lastIndex = text.IndexOf(':');
+            if (lastIndex != -1 && int.TryParse(text.Substring(lastIndex + 1), out var proxyPort))
             {
-                _Settings.ProxyServer = text.Substring(0, num);
-                _Settings.ProxyPort = result;
+                _Settings.ProxyServer = text.Substring(0, lastIndex);
+                _Settings.ProxyPort = proxyPort;
             }
         }
         else
@@ -364,11 +364,11 @@ public class NewConnectionController : INotifyPropertyChanged
         }
         UpdateSettingsFieldsOrThrow();
         ProgressText = "Connecting...";
-        bool flag = AuthenticationType == AuthType.Password;
+        bool password = AuthenticationType == AuthType.Password;
         SshConnector backgroundSessionInitiator = _BackgroundSessionInitiator;
         SSHConnectionSettings settings = _Settings;
         string text;
-        if (flag)
+        if (password)
         {
             text = Password;
         }
@@ -376,14 +376,14 @@ public class NewConnectionController : INotifyPropertyChanged
         {
             text = (HasPassphrase ? Passphrase : null);
         }
-        backgroundSessionInitiator.ConnectAsync(settings, text, SetupPublicKey & flag);
+        backgroundSessionInitiator.ConnectAsync(settings, text, SetupPublicKey & password);
     }
 
-    private void DoReportException(Exception ex)
+    private void DoReportException(Exception exception)
     {
         _Dispatcher.BeginInvoke((Delegate)(Action)(() =>
         {
-            ReportException?.Invoke(ex);
+            ReportException?.Invoke(exception);
         }), new object[0]);
     }
 
@@ -398,9 +398,9 @@ public class NewConnectionController : INotifyPropertyChanged
                 DoReportException(exception);
             }
         }
-        catch (Exception ex)
+        catch (Exception progressException)
         {
-            DoReportException(ex);
+            DoReportException(progressException);
         }
     }
 
@@ -411,12 +411,12 @@ public class NewConnectionController : INotifyPropertyChanged
             CreatedSession = connectedSession;
             _Dispatcher.BeginInvoke((Delegate)(Action)(() =>
             {
-                CloseRequested?.Invoke(obj: true);
+                CloseRequested?.Invoke(true);
             }), new object[0]);
         }
-        catch (Exception ex)
+        catch (Exception progressException)
         {
-            DoReportException(ex);
+            DoReportException(progressException);
         }
     }
 
@@ -426,9 +426,9 @@ public class NewConnectionController : INotifyPropertyChanged
         {
             handled = ProxyAuthForm.ShowPrompt(realm, ref auth);
         }
-        catch (Exception ex)
+        catch (Exception progressException)
         {
-            DoReportException(ex);
+            DoReportException(progressException);
         }
     }
 
@@ -436,7 +436,7 @@ public class NewConnectionController : INotifyPropertyChanged
     {
         if (ProgressText == null)
         {
-            CloseRequested?.Invoke(obj: false);
+            CloseRequested?.Invoke(false);
             return;
         }
         _BackgroundSessionInitiator.CancelConnection();

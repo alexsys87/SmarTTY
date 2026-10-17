@@ -442,15 +442,15 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
 
     public FoldedLineInfo[] GetCollapsedRegions()
     {
-        List<FoldedLineInfo> result = new List<FoldedLineInfo>();
+        List<FoldedLineInfo> items = new List<FoldedLineInfo>();
         foreach (FoldedRegion region in _regions.Values)
         {
-            result.Add(new FoldedLineInfo
+            items.Add(new FoldedLineInfo
             {
                 Line = region.HeaderLine,
                 Text = _tokenCache.Document.GetLineText(region.HeaderLine)
             });
         }
-        return result.ToArray();
+        return items.ToArray();
     }
 }

@@ -28,7 +28,7 @@ public partial class HexTerminalControl
 	{
 		components = new Container();
 		HighlightStyle highlightStyle = new HighlightStyle();
-		HighlightStyle highlightStyle2 = new HighlightStyle();
+		HighlightStyle selectionHighlightStyle = new HighlightStyle();
 		termHex = new TerminalEmulatorBase();
 		termText = new TerminalEmulatorBase();
 		_resizeTimer = new Timer(components);
@@ -87,7 +87,7 @@ public partial class HexTerminalControl
 		termText.ShowLineNumbers = true;
 		termText.TopLine = 0;
 		termText.Location = new Point(485, 0);
-		termText.SelectionStyle = highlightStyle2;
+		termText.SelectionStyle = selectionHighlightStyle;
 		termText.Margin = new Padding(5, 4, 5, 4);
 		termText.Name = "termText";
 		((ReadonlyTextBrowser)termText).OverwriteMode = false;

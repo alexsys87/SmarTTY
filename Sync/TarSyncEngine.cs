@@ -66,7 +66,7 @@ internal class TarSyncEngine : CommandSyncEngine
         return "TAR synchronization engine";
     }
 
-    public override IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> items)
+    public override IRemoteFileSource BeginDownload(IEnumerable<SyncPlan.SyncAction> actions)
     {
         throw new NotSupportedException("Incoming sync transfers via tar are not yet supported");
     }
@@ -258,7 +258,7 @@ internal class TarSyncEngine : CommandSyncEngine
                         {
                             throw;
                         }
-                        catch (Exception ex)
+                        catch (Exception exception)
                         {
                             if (headerWritten)
                             {
@@ -266,7 +266,7 @@ internal class TarSyncEngine : CommandSyncEngine
                             }
                             base._events.OnWarning(new SyncWarning
                             {
-                                Exception = ex,
+                                Exception = exception,
                                 Warning = new QuickSyncWarning(warningType, localPaths[action.Argument].FullPath, 0)
                             });
                         }

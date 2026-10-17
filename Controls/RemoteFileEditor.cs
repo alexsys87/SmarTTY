@@ -65,15 +65,15 @@ public partial class RemoteFileEditor : CodeEditorPP
             using (ScpDownloadStream scpDownloadStream = _context.Session.OpenDownload(RemotePath))
             {
                 Utf8StreamDecoder utf8StreamDecoder = new Utf8StreamDecoder();
-                byte[] array = new byte[65536];
+                byte[] bytes = new byte[65536];
                 while (true)
                 {
-                    int num = scpDownloadStream.Read(array, 0, array.Length);
-                    if (num <= 0)
+                    int value = scpDownloadStream.Read(bytes, 0, bytes.Length);
+                    if (value <= 0)
                     {
                         break;
                     }
-                    text += utf8StreamDecoder.Decode(array, 0, num);
+                    text += utf8StreamDecoder.Decode(bytes, 0, value);
                     BeginInvoke((ThreadStart)(() =>
                     {
                         try
@@ -95,12 +95,12 @@ public partial class RemoteFileEditor : CodeEditorPP
             {
                 try
                 {
-                    EditableTextDocument editableTextDocument2 = new EditableTextDocument
+                    EditableTextDocument document = new EditableTextDocument
                     {
                         DefaultLineEnding = TextDocument.LineEnding.Lf
                     };
-                    editableTextDocument2.SetText(text);
-                    SetDocument(editableTextDocument2);
+                    document.SetText(text);
+                    SetDocument(document);
                     ((EditableTextBrowser)this).ReadOnly = false;
                     try
                     {
@@ -118,10 +118,8 @@ public partial class RemoteFileEditor : CodeEditorPP
                 }
             }));
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Exception ex2 = ex;
-            Exception exception = ex2;
             BeginInvoke((ThreadStart)(() =>
             {
                 try
@@ -143,13 +141,13 @@ public partial class RemoteFileEditor : CodeEditorPP
             Save();
             return true;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            if (ex is OperationCanceledException)
+            if (exception is OperationCanceledException)
             {
                 return false;
             }
-            ReportError(ex);
+            ReportError(exception);
             return false;
         }
     }
@@ -159,19 +157,19 @@ public partial class RemoteFileEditor : CodeEditorPP
         string text = _settings.Editor.TemporaryDirectory + "/" + Guid.NewGuid().ToString() + ".txt";
         try
         {
-            string text2 = base.EditableDocument.GetText();
-            if (text2.Contains("\r\n") && MessageBox.Show("Convert CRLF line endings to LF endings?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            string value = base.EditableDocument.GetText();
+            if (value.Contains("\r\n") && MessageBox.Show("Convert CRLF line endings to LF endings?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 base.EditableDocument.SetLineEnding(TextDocument.LineEnding.Lf);
-                text2 = base.EditableDocument.GetText();
+                value = base.EditableDocument.GetText();
             }
-            byte[] bytes = Encoding.UTF8.GetBytes(text2);
+            byte[] bytes = Encoding.UTF8.GetBytes(value);
             using (ScpChannelStream scpChannelStream = _context.Session.OpenUpload(text, bytes.Length))
             {
                 scpChannelStream.Write(bytes, 0, bytes.Length);
             }
-            string text3 = $"cat \"{text}\" > \"{RemotePath}\"";
-            if (_context.Session.RunCommandChecked(text3, requireSuccess: true) != null)
+            string content = $"cat \"{text}\" > \"{RemotePath}\"";
+            if (_context.Session.RunCommandChecked(content, requireSuccess: true) != null)
             {
                 ((EditableTextBrowser)this).IsModified = false;
                 return;
@@ -180,9 +178,9 @@ public partial class RemoteFileEditor : CodeEditorPP
             {
                 throw new OperationCanceledException();
             }
-            string text4 = "sudo sh -c '" + text3 + "'";
-            SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(text4, "xterm");
-            using (SudoConfirmationForm sudoConfirmationForm = new SudoConfirmationForm(sshShellChannel, text4))
+            string sudoCommand = "sudo sh -c '" + content + "'";
+            SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(sudoCommand, "xterm");
+            using (SudoConfirmationForm sudoConfirmationForm = new SudoConfirmationForm(sshShellChannel, sudoCommand))
             {
                 sudoConfirmationForm.ShowModal();
             }

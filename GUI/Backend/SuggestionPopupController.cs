@@ -153,7 +153,7 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
         _Args = e;
         _VirtualTerminalPopup = popup;
         IsOpen = true;
-        popup.Closed += (object obj, EventArgs e10) =>
+        popup.Closed += (object sender, EventArgs e) =>
         {
             IsOpen = false;
         };
@@ -213,11 +213,11 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
             return;
         }
         int selectedIndex = -1;
-        for (int num = 0; num < Items.Length; num++)
+        for (int itemIndex = 0; itemIndex < Items.Length; itemIndex++)
         {
-            if (Items[num].Text.StartsWith(_Filter ?? ""))
+            if (Items[itemIndex].Text.StartsWith(_Filter ?? ""))
             {
-                selectedIndex = num;
+                selectedIndex = itemIndex;
                 break;
             }
         }
@@ -261,9 +261,9 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
         return false;
     }
 
-    public void DisplayException(Exception ex)
+    public void DisplayException(Exception exception)
     {
-        _Exception = ex;
+        _Exception = exception;
         AllEntries = null;
         UpdateFilteredItems();
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("NoItemsHint"));

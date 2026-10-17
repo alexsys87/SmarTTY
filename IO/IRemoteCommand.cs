@@ -11,7 +11,7 @@ public interface IRemoteCommand : IDisposable
 
     string ErrorText { get; }
 
-    bool WaitForExit(int value2);
+    bool WaitForExit(int value);
 
     void SendInput(string text);
 }

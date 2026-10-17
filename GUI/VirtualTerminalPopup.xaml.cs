@@ -19,18 +19,18 @@ public partial class VirtualTerminalPopup : UserControl, IComponentConnector, IS
     {
         InitializeComponent();
         _Controller = controller;
-        object obj = this.Resources[(object)"hint"];
-        _ToolTop = obj as ToolTip;
+        object sender = this.Resources[(object)"hint"];
+        _ToolTop = sender as ToolTip;
     }
 
     private void ListBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        SuggestionPopupController obj = this.DataContext as SuggestionPopupController;
-        if (obj != null)
+        SuggestionPopupController controller = this.DataContext as SuggestionPopupController;
+        if (controller != null)
         {
             object originalSource = ((RoutedEventArgs)e).OriginalSource;
-            object obj2 = ((originalSource is FrameworkElement) ? originalSource : null);
-            obj.OnItemMouseDown(((obj2 != null) ? ((FrameworkElement)obj2).DataContext : null) as SuggestionPopupController.Item);
+            object sourceElement = ((originalSource is FrameworkElement) ? originalSource : null);
+            controller.OnItemMouseDown(((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as SuggestionPopupController.Item);
         }
     }
 
@@ -46,15 +46,15 @@ public partial class VirtualTerminalPopup : UserControl, IComponentConnector, IS
         {
             return;
         }
-        object obj = e.AddedItems[0];
-        listBox.ScrollIntoView(obj);
-        DependencyObject dependencyObject = ((ItemsControl)listBox).ItemContainerGenerator.ContainerFromItem(obj);
+        object selectedItem = e.AddedItems[0];
+        listBox.ScrollIntoView(selectedItem);
+        DependencyObject dependencyObject = ((ItemsControl)listBox).ItemContainerGenerator.ContainerFromItem(selectedItem);
         ListBoxItem lbi = dependencyObject as ListBoxItem;
         if (lbi == null)
         {
             return;
         }
-        SuggestionPopupController.Item castItem = obj as SuggestionPopupController.Item;
+        SuggestionPopupController.Item castItem = selectedItem as SuggestionPopupController.Item;
         if (castItem != null && castItem.Entry.Summary != null)
         {
             this.Dispatcher.BeginInvoke((Delegate)(Action)(() =>
@@ -68,8 +68,8 @@ public partial class VirtualTerminalPopup : UserControl, IComponentConnector, IS
 
     private void ShortcutButton_Click(object sender, RoutedEventArgs e)
     {
-        object obj = ((sender is FrameworkElement) ? sender : null);
-        if ((((obj != null) ? ((FrameworkElement)obj).DataContext : null) as SuggestionPopupController.Item)?.Entry.Summary is VirtualTerminalPopupSummary.FileOrDirectoryInfo fdi)
+        object sourceElement = ((sender is FrameworkElement) ? sender : null);
+        if ((((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as SuggestionPopupController.Item)?.Entry.Summary is VirtualTerminalPopupSummary.FileOrDirectoryInfo fdi)
         {
             _Controller.HandleShortcut(fdi);
         }

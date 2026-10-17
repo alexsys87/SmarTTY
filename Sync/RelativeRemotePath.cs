@@ -9,13 +9,13 @@ internal struct RelativeRemotePath(string relativePath)
 
     public RelativeRemotePath Combine(string childPath)
     {
-        string result = Path;
-        if (result.IsNonTrivial())
+        string text = Path;
+        if (text.IsNonTrivial())
         {
-            result += "/";
+            text += "/";
         }
-        result += childPath;
-        return new RelativeRemotePath(result);
+        text += childPath;
+        return new RelativeRemotePath(text);
     }
 
     public RelativeRemotePath GetParent()

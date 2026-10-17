@@ -135,10 +135,10 @@ public class TarExtractor
 
     private bool IsCaseCollision(string filePath)
     {
-        bool result = _caseInsensitiveNames.Contains(filePath) && !_exactNames.Contains(filePath);
+        bool contains = _caseInsensitiveNames.Contains(filePath) && !_exactNames.Contains(filePath);
         _exactNames.Add(filePath);
         _caseInsensitiveNames.Add(filePath);
-        return result;
+        return contains;
     }
 
     private bool ExtractNextEntry(bool ignoreErrors, bool stripFirstDirectory)
@@ -229,14 +229,14 @@ public class TarExtractor
                     {
                         Directory.CreateDirectory(fullPath);
                     }
-                    catch (Exception ex)
+                    catch (Exception exception)
                     {
                         if (Log != null)
                         {
-                            Log(this, $"Cannot create {fullPath}: {ex.Message}");
+                            Log(this, $"Cannot create {fullPath}: {exception.Message}");
                         }
                         bool currentIgnoreErrors = ignoreErrors;
-                        if (ex is PathTooLongException)
+                        if (exception is PathTooLongException)
                         {
                             PathTooLongEventArgs pathTooLongEventArgs = new PathTooLongEventArgs
                             {
@@ -331,14 +331,14 @@ public class TarExtractor
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
                 if (Log != null)
                 {
-                    Log(this, $"Cannot create {fullPath}: {ex.Message}");
+                    Log(this, $"Cannot create {fullPath}: {exception.Message}");
                 }
                 bool currentIgnoreErrors = ignoreErrors;
-                if (ex is PathTooLongException || (_longPathMode && ex is DirectoryNotFoundException))
+                if (exception is PathTooLongException || (_longPathMode && exception is DirectoryNotFoundException))
                 {
                     PathTooLongEventArgs pathTooLongEventArgs = new PathTooLongEventArgs
                     {

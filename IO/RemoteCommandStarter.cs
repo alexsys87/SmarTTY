@@ -1,4 +1,4 @@
 ﻿
 namespace SmarTTY.IO;
 
-public delegate void RemoteCommandStarter(string text, string text2, ref IRemoteCommand remoteCommand);
+public delegate void RemoteCommandStarter(string text, string command, ref IRemoteCommand remoteCommand);

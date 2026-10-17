@@ -10,12 +10,12 @@ public static class SshKeyExtensions
         return sshKeyPair.Algorithm + " " + Convert.ToBase64String(sshKeyPair.GetPublicKeyBlob()) + " " + text;
     }
 
-    public static PublicKeyType ResolveAuto(this PublicKeyType publicKeyType, PublicKeyType publicKeyType2)
+    public static PublicKeyType ResolveAuto(this PublicKeyType requestedType, PublicKeyType fallbackType)
     {
-        if (publicKeyType == PublicKeyType.Auto)
+        if (requestedType == PublicKeyType.Auto)
         {
-            return publicKeyType2;
+            return fallbackType;
         }
-        return publicKeyType;
+        return requestedType;
     }
 }

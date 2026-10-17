@@ -150,25 +150,25 @@ public class SshSession : IDisposable
                         }
                         request = _request;
                     }
-                    AuthenticationResult result = AuthenticationResult.Failure;
+                    AuthenticationResult failure = AuthenticationResult.Failure;
                     Exception error = null;
                     try
                     {
-                        result = request(session);
+                        failure = request(session);
                     }
-                    catch (Exception ex)
+                    catch (Exception exception)
                     {
-                        error = ex;
+                        error = exception;
                     }
                     lock (_sync)
                     {
                         _request = null;
-                        _result = result;
+                        _result = failure;
                         _error = error;
                         _requestDone = true;
                         Monitor.PulseAll(_sync);
                     }
-                    if (result == AuthenticationResult.Success)
+                    if (failure == AuthenticationResult.Success)
                     {
                         return AuthenticationResult.Success;
                     }
@@ -384,9 +384,9 @@ public class SshSession : IDisposable
                 session.Disconnected += (object sender, EventArgs e) => RaiseConnectionLost();
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            _connectError = ex;
+            _connectError = exception;
         }
         finally
         {
@@ -555,9 +555,9 @@ public class SshSession : IDisposable
         if (RunAuthentication(userName, (Session session) =>
         {
             using NoneAuthenticationMethod method = new NoneAuthenticationMethod(userName);
-            AuthenticationResult result = method.Authenticate(session);
+            AuthenticationResult authResult = method.Authenticate(session);
             allowed = method.AllowedAuthentications;
-            return result;
+            return authResult;
         }))
         {
             return AuthMethods.None;
@@ -758,12 +758,12 @@ public class SshSession : IDisposable
     /// </summary>
     public List<string> RunCommandChecked(string command, bool requireSuccess, string terminalType = null)
     {
-        List<string> result = RunCommand(command, out int? exitStatus, terminalType);
+        List<string> output = RunCommand(command, out int? exitStatus, terminalType);
         if (requireSuccess && exitStatus != 0)
         {
             return null;
         }
-        return result;
+        return output;
     }
 
     public ScpChannelStream OpenUpload(string path, long length, DateTime modifyTime = default(DateTime), int? mode = null)
@@ -777,9 +777,9 @@ public class SshSession : IDisposable
         {
             return ScpChannelStream.OpenUpload(this, path, length, modifyTime, mode ?? Convert.ToInt32("644", 8));
         }
-        catch (Exception ex) when (!(ex is RemotePathException))
+        catch (Exception exception) when (!(exception is RemotePathException))
         {
-            throw DiagnoseUploadError(path) ?? new RemoteOperationException(ex.Message + " while trying to upload " + path);
+            throw DiagnoseUploadError(path) ?? new RemoteOperationException(exception.Message + " while trying to upload " + path);
         }
     }
 
@@ -790,9 +790,9 @@ public class SshSession : IDisposable
         {
             return ScpDownloadStream.Open(this, path);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            throw new RemoteOperationException(ex.Message + " while trying to download " + path);
+            throw new RemoteOperationException(exception.Message + " while trying to download " + path);
         }
     }
 

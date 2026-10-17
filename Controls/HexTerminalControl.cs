@@ -19,11 +19,11 @@ public partial class HexTerminalControl : DpiAwareControl
 
         public List<byte> Bytes = new List<byte>();
 
-        internal bool CanAppend(bool flag)
+        internal bool CanAppend(bool isEcho)
         {
             if (!IsBreak)
             {
-                return this.IsEcho == flag;
+                return this.IsEcho == isEcho;
             }
             return false;
         }
@@ -66,8 +66,8 @@ public partial class HexTerminalControl : DpiAwareControl
         set
         {
             TerminalEmulatorBase terminalEmulatorBase = termHex;
-            bool flag = (termText.HideCaret = value);
-            terminalEmulatorBase.HideCaret = flag;
+            bool hideCaret = (termText.HideCaret = value);
+            terminalEmulatorBase.HideCaret = hideCaret;
         }
     }
 
@@ -168,53 +168,53 @@ public partial class HexTerminalControl : DpiAwareControl
         InitializeComponent();
     }
 
-    public void AppendData(byte[] buffer, int value2, bool flag = false)
+    public void AppendData(byte[] buffer, int count, bool isEcho = false)
     {
         if (buffer == null)
         {
             return;
         }
-        if (_lastDataTime != DateTime.MinValue && ((HexSettings.BreaksAroundEcho && flag != _lastWasEcho) || (HexSettings.TimeoutForAutoBreak > 0 && (DateTime.Now - _lastDataTime).TotalMilliseconds >= (double)HexSettings.TimeoutForAutoBreak)))
+        if (_lastDataTime != DateTime.MinValue && ((HexSettings.BreaksAroundEcho && isEcho != _lastWasEcho) || (HexSettings.TimeoutForAutoBreak > 0 && (DateTime.Now - _lastDataTime).TotalMilliseconds >= (double)HexSettings.TimeoutForAutoBreak)))
         {
-            termHex.MoveCursorBy(-termHex.CursorPosition.X, 1, flag: true);
-            termText.MoveCursorBy(-termText.CursorPosition.X, 1, flag: true);
+            termHex.MoveCursorBy(-termHex.CursorPosition.X, 1, scroll: true);
+            termText.MoveCursorBy(-termText.CursorPosition.X, 1, scroll: true);
             _chunks.Add(new DataChunk
             {
                 IsBreak = true
             });
         }
-        if (_chunks.Count > 0 && _chunks[_chunks.Count - 1].CanAppend(flag))
+        if (_chunks.Count > 0 && _chunks[_chunks.Count - 1].CanAppend(isEcho))
         {
-            for (int num = 0; num < value2; num++)
+            for (int byteIndex = 0; byteIndex < count; byteIndex++)
             {
-                _chunks[_chunks.Count - 1].Bytes.Add(buffer[num]);
+                _chunks[_chunks.Count - 1].Bytes.Add(buffer[byteIndex]);
             }
         }
         else
         {
             DataChunk dataChunk = new DataChunk
             {
-                IsEcho = flag
+                IsEcho = isEcho
             };
-            for (int num2 = 0; num2 < value2; num2++)
+            for (int chunkByteIndex = 0; chunkByteIndex < count; chunkByteIndex++)
             {
-                dataChunk.Bytes.Add(buffer[num2]);
+                dataChunk.Bytes.Add(buffer[chunkByteIndex]);
             }
             _chunks.Add(dataChunk);
         }
         _lastDataTime = DateTime.Now;
-        _lastWasEcho = flag;
-        RenderData(buffer, value2, flag);
+        _lastWasEcho = isEcho;
+        RenderData(buffer, count, isEcho);
     }
 
-    private void RenderData(byte[] buffer, int value2, bool flag)
+    private void RenderData(byte[] buffer, int count, bool isEcho)
     {
         try
         {
-            int num = (termHex.CursorPosition.X + 1) / 3;
+            int currentColumn = (termHex.CursorPosition.X + 1) / 3;
             StringBuilder stringBuilder = new StringBuilder(_bytesPerLine * 4);
-            StringBuilder stringBuilder2 = new StringBuilder(_bytesPerLine * 2);
-            if (flag)
+            StringBuilder hexTextBuilder = new StringBuilder(_bytesPerLine * 2);
+            if (isEcho)
             {
                 termText.CurrentStyle = (termHex.CurrentStyle = new TerminalEmulatorBase.CellStyle
                 {
@@ -224,41 +224,41 @@ public partial class HexTerminalControl : DpiAwareControl
                     }
                 });
             }
-            for (int num2 = 0; num2 < value2; num2++)
+            for (int byteIndex = 0; byteIndex < count; byteIndex++)
             {
-                byte b2 = buffer[num2];
-                if (num >= _bytesPerLine)
+                byte currentByte = buffer[byteIndex];
+                if (currentColumn >= _bytesPerLine)
                 {
                     termHex.WriteText(stringBuilder.ToString());
-                    termText.WriteText(stringBuilder2.ToString());
-                    termHex.MoveCursorBy(-termHex.CursorPosition.X, 1, flag: true);
-                    termText.MoveCursorBy(-termText.CursorPosition.X, 1, flag: true);
-                    int length = (stringBuilder2.Length = 0);
+                    termText.WriteText(hexTextBuilder.ToString());
+                    termHex.MoveCursorBy(-termHex.CursorPosition.X, 1, scroll: true);
+                    termText.MoveCursorBy(-termText.CursorPosition.X, 1, scroll: true);
+                    int length = (hexTextBuilder.Length = 0);
                     stringBuilder.Length = length;
-                    num = 0;
+                    currentColumn = 0;
                 }
-                if (num != 0)
+                if (currentColumn != 0)
                 {
                     stringBuilder.Append(" ");
                 }
-                num++;
-                stringBuilder.AppendFormat("{0:x2}", b2);
+                currentColumn++;
+                stringBuilder.AppendFormat("{0:x2}", currentByte);
                 string text = "";
-                if (b2 >= 32)
+                if (currentByte >= 32)
                 {
-                    text = Encoding.ASCII.GetString(new byte[1] { b2 });
+                    text = Encoding.ASCII.GetString(new byte[1] { currentByte });
                 }
                 if (text.Length == 1)
                 {
-                    stringBuilder2.Append(text);
+                    hexTextBuilder.Append(text);
                 }
                 else
                 {
-                    stringBuilder2.Append(".");
+                    hexTextBuilder.Append(".");
                 }
             }
             termHex.WriteText(stringBuilder.ToString());
-            termText.WriteText(stringBuilder2.ToString());
+            termText.WriteText(hexTextBuilder.ToString());
         }
         finally
         {
@@ -292,25 +292,25 @@ public partial class HexTerminalControl : DpiAwareControl
     {
         if (HexSettings.ShowTextView)
         {
-            int num = termHex.ScrollBarWidth;
-            int num2 = termText.ScrollBarWidth;
-            int num3 = Width - SystemInformation.VerticalScrollBarWidth - num - num2;
-            termText.Width = num3 / 4 + num2 + SystemInformation.VerticalScrollBarWidth;
+            int hexScrollBarWidth = termHex.ScrollBarWidth;
+            int textScrollBarWidth = termText.ScrollBarWidth;
+            int textWidth = Width - SystemInformation.VerticalScrollBarWidth - hexScrollBarWidth - textScrollBarWidth;
+            termText.Width = textWidth / 4 + textScrollBarWidth + SystemInformation.VerticalScrollBarWidth;
             termHex.Width = Width - termText.Width - 2;
         }
         else
         {
             termHex.Width = Width;
         }
-        int num4 = termHex.TerminalSize.Width / 3;
-        if (num4 < 1)
+        int bytesPerLineLimit = termHex.TerminalSize.Width / 3;
+        if (bytesPerLineLimit < 1)
         {
-            num4 = 1;
+            bytesPerLineLimit = 1;
         }
-        _bytesPerLine = Math.Min(num4, HexSettings.MaximumBytesPerLine);
+        _bytesPerLine = Math.Min(bytesPerLineLimit, HexSettings.MaximumBytesPerLine);
     }
 
-    private void SyncSelectionToText(ReadonlyTextBrowser readonlyTextBrowser, TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, bool flag)
+    private void SyncSelectionToText(ReadonlyTextBrowser readonlyTextBrowser, TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool select)
     {
         if (_syncingSelection)
         {
@@ -319,20 +319,20 @@ public partial class HexTerminalControl : DpiAwareControl
         try
         {
             _syncingSelection = true;
-            TextDocument.TextPosition textPosition3 = termHex.SelectionStart;
-            TextDocument.TextPosition textPosition4 = termHex.SelectionEnd;
-            if (textPosition4 < textPosition3)
+            TextDocument.TextPosition selectionStart = termHex.SelectionStart;
+            TextDocument.TextPosition selectionEnd = termHex.SelectionEnd;
+            if (selectionEnd < selectionStart)
             {
-                textPosition3.Column = (textPosition3.Column + 2) / 3;
-                textPosition4.Column = (textPosition4.Column + 1) / 3;
+                selectionStart.Column = (selectionStart.Column + 2) / 3;
+                selectionEnd.Column = (selectionEnd.Column + 1) / 3;
             }
             else
             {
-                textPosition3.Column = (textPosition3.Column + 1) / 3;
-                textPosition4.Column = (textPosition4.Column + 2) / 3;
+                selectionStart.Column = (selectionStart.Column + 1) / 3;
+                selectionEnd.Column = (selectionEnd.Column + 2) / 3;
             }
-            termText.SetSelection(((ReadonlyTextBrowser)termHex).HasSelection, new TextDocument.TextPosition(textPosition3.Column, textPosition3.Line));
-            termText.SetSelectionEnd(new TextDocument.TextPosition(textPosition4.Column, textPosition4.Line));
+            termText.SetSelection(((ReadonlyTextBrowser)termHex).HasSelection, new TextDocument.TextPosition(selectionStart.Column, selectionStart.Line));
+            termText.SetSelectionEnd(new TextDocument.TextPosition(selectionEnd.Column, selectionEnd.Line));
         }
         finally
         {
@@ -340,7 +340,7 @@ public partial class HexTerminalControl : DpiAwareControl
         }
     }
 
-    private void SyncSelectionToHex(ReadonlyTextBrowser readonlyTextBrowser, TextDocument.TextPosition textPosition, TextDocument.TextPosition textPosition2, bool flag)
+    private void SyncSelectionToHex(ReadonlyTextBrowser readonlyTextBrowser, TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool select)
     {
         if (_syncingSelection)
         {
@@ -349,20 +349,20 @@ public partial class HexTerminalControl : DpiAwareControl
         try
         {
             _syncingSelection = true;
-            TextDocument.TextPosition textPosition3 = termText.SelectionStart;
-            TextDocument.TextPosition textPosition4 = termText.SelectionEnd;
-            if (textPosition4 < textPosition3)
+            TextDocument.TextPosition selectionStart = termText.SelectionStart;
+            TextDocument.TextPosition selectionEnd = termText.SelectionEnd;
+            if (selectionEnd < selectionStart)
             {
-                textPosition3.Column = Math.Max(0, textPosition3.Column * 3 - 1);
-                textPosition4.Column *= 3;
+                selectionStart.Column = Math.Max(0, selectionStart.Column * 3 - 1);
+                selectionEnd.Column *= 3;
             }
             else
             {
-                textPosition3.Column *= 3;
-                textPosition4.Column = Math.Max(0, textPosition4.Column * 3 - 1);
+                selectionStart.Column *= 3;
+                selectionEnd.Column = Math.Max(0, selectionEnd.Column * 3 - 1);
             }
-            termHex.SetSelection(((ReadonlyTextBrowser)termText).HasSelection, new TextDocument.TextPosition(textPosition3.Column, textPosition3.Line));
-            termHex.SetSelectionEnd(new TextDocument.TextPosition(textPosition4.Column, textPosition4.Line));
+            termHex.SetSelection(((ReadonlyTextBrowser)termText).HasSelection, new TextDocument.TextPosition(selectionStart.Column, selectionStart.Line));
+            termHex.SetSelectionEnd(new TextDocument.TextPosition(selectionEnd.Column, selectionEnd.Line));
         }
         finally
         {
@@ -382,7 +382,7 @@ public partial class HexTerminalControl : DpiAwareControl
         }
         if (((ReadonlyTextBrowser)source).HasSelection)
         {
-            source.CopySelection(flag: false);
+            source.CopySelection(select: false);
         }
     }
 
@@ -450,8 +450,8 @@ public partial class HexTerminalControl : DpiAwareControl
         {
             if (item.IsBreak)
             {
-                termHex.MoveCursorBy(-termHex.CursorPosition.X, 1, flag: true);
-                termText.MoveCursorBy(-termText.CursorPosition.X, 1, flag: true);
+                termHex.MoveCursorBy(-termHex.CursorPosition.X, 1, scroll: true);
+                termText.MoveCursorBy(-termText.CursorPosition.X, 1, scroll: true);
             }
             else
             {

@@ -58,11 +58,11 @@ public class CommandCompletion
             {
                 _Regex = new Regex(value, RegexOptions.None, TimeSpan.FromMilliseconds(100));
             }
-            catch (ArgumentException ex)
+            catch (ArgumentException exception)
             {
                 // Do not turn a broken restricted rule into an unrestricted command rule.
                 _invalidRegex = true;
-                Trace.TraceWarning("Ignoring invalid command completion regex: " + ex.Message);
+                Trace.TraceWarning("Ignoring invalid command completion regex: " + exception.Message);
             }
         }
     }

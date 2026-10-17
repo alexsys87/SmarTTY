@@ -33,7 +33,7 @@ internal class TcpTransport : IDeviceTransport, IDisposable
         return _tcpClient.GetStream();
     }
 
-    public string GetDisplayName(bool flag)
+    public string GetDisplayName(bool includeParameters)
     {
         return _tcp.Host + ":" + _tcp.Port;
     }

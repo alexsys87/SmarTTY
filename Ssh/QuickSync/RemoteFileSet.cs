@@ -396,15 +396,15 @@ public class RemoteFileSet
 
         private RemoteFileEntry ReadFileEntry(RemoteDirectory remoteDirectory)
         {
-            RemoteFileEntry result = new RemoteFileEntry
+            RemoteFileEntry entry = new RemoteFileEntry
             {
                 Size = this._reader.ReadInt64(),
                 ModifiedSeconds = this._reader.ReadInt32() - _timeOffsetSeconds,
                 Id = this._reader.ReadInt32(),
                 Name = this._reader.ReadString()
             };
-            RegisterFile(result.Id, remoteDirectory, result.Name);
-            return result;
+            RegisterFile(entry.Id, remoteDirectory, entry.Name);
+            return entry;
         }
     }
 
