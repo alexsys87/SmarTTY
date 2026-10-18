@@ -269,6 +269,12 @@ public class GlobalSettings : INotifyPropertyChanged
             // character, which made the Smart Terminal hijack typing (Space/Enter
             // substituted the auto-selected command). Turn it off once for existing
             // configurations; it can still be re-enabled in Settings afterwards.
+            // Guard against a missing/empty node surviving deserialization: if that
+            // happened, leaving VirtualTerminal/CompletionTriggers null would make
+            // the Smart Terminal console throw a NullReferenceException on the very
+            // first keypress (in SshTerminalControl.OnKeyPress), so typed characters
+            // would never appear and Enter would not execute the command.
+            VirtualTerminal ??= new VirtualTerminalSettings();
             VirtualTerminal.CompletionTriggers ??= new AutoCompletionTriggers();
             VirtualTerminal.CompletionTriggers.FirstCharacterInWord = false;
             CompletionTriggersMigratedV2 = true;
