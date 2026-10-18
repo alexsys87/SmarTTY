@@ -59,6 +59,27 @@ internal static class SettingsChecks
         check(telnet.FileNameBase != rawTcp.Settings.Connection.FileNameBase, "telnet and raw TCP to the same host:port do not share a file");
         check(telnet.FileNameBase == "telnet_10.0.0.7_2323", "telnet file name base");
 
+        // telnet options: defaults, round trip, files written before they existed
+        check(telnet.TerminalType == "xterm" && telnet.LocalEcho == DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Auto
+            && !telnet.ActiveNegotiation && telnet.KeepAliveSeconds == 0, "telnet options: defaults");
+        check(((DeviceTerminalSettings.ConnectionSettings.Telnet)loaded.Settings.Connection).LocalEcho == DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Auto,
+            "telnet options: a file saved before they existed gets the defaults");
+        DeviceTerminalSettings.ConnectionSettings.Telnet custom = new DeviceTerminalSettings.ConnectionSettings.Telnet
+        {
+            Host = "sw1",
+            Port = 23,
+            TerminalType = "vt100",
+            LocalEcho = DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Never,
+            ActiveNegotiation = true,
+            KeepAliveSeconds = 45
+        };
+        RawConnectionSettings customLoaded = RoundTrip(new RawConnectionSettings { Settings = new DeviceTerminalSettings { Connection = custom } }, out string customXml);
+        DeviceTerminalSettings.ConnectionSettings.Telnet back = (DeviceTerminalSettings.ConnectionSettings.Telnet)customLoaded.Settings.Connection;
+        check(back.TerminalType == "vt100" && back.LocalEcho == DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Never && back.ActiveNegotiation && back.KeepAliveSeconds == 45,
+            "telnet options: survive the round trip");
+        DeviceTerminalSettings.ConnectionSettings.Telnet customCopy = (DeviceTerminalSettings.ConnectionSettings.Telnet)custom.Clone();
+        check(customCopy.TerminalType == "vt100" && customCopy.KeepAliveSeconds == 45 && customCopy.ActiveNegotiation, "telnet options: Clone() keeps them");
+
         DeviceTerminalSettings.ConnectionSettings.Tcp copy = telnet.Clone();
         check(copy is DeviceTerminalSettings.ConnectionSettings.Telnet && !ReferenceEquals(copy, telnet), "Clone() of a telnet endpoint is a separate telnet endpoint");
         copy.Port = 1;

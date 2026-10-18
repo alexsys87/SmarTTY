@@ -333,6 +333,103 @@ internal static class Program
             Check(threw, "an invalid buffer range is rejected");
         }
 
+        // --- active negotiation: our offers, and the server's answers to them are not answered again ---
+        {
+            FakeConnection connection = new FakeConnection(
+                B(IAC, WILL, TelnetStream.OptSuppressGoAhead, IAC, DO, TelnetStream.OptSuppressGoAhead, IAC, DO, TelnetStream.OptTerminalType, IAC, DO, TelnetStream.OptNaws));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { ActiveNegotiation = true, Columns = 100, Rows = 30 });
+            stream.Start();
+            CheckBytes(connection.TakeWritten(),
+                B(IAC, DO, TelnetStream.OptSuppressGoAhead, IAC, WILL, TelnetStream.OptSuppressGoAhead, IAC, WILL, TelnetStream.OptTerminalType, IAC, WILL, TelnetStream.OptNaws),
+                "active negotiation: SGA, terminal type and window size are offered at start");
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), B(IAC, SB, TelnetStream.OptNaws, 0, 100, 0, 30, IAC, SE),
+                "active negotiation: the server's agreement is not answered again, the window size follows");
+            Check(stream.NawsEnabled, "active negotiation: NAWS is on after the server agreed");
+        }
+        {
+            // the answer-only mode says nothing at start
+            FakeConnection connection = new FakeConnection();
+            new TelnetStream(connection, new TelnetOptions()).Start();
+            Check(connection.Written.Length == 0, "default mode: nothing is sent at start");
+        }
+        {
+            // an offer that the server refuses is dropped without a word, and can be asked for again later
+            FakeConnection connection = new FakeConnection(B(IAC, DONT, TelnetStream.OptTerminalType, IAC, WONT, TelnetStream.OptSuppressGoAhead));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { ActiveNegotiation = true });
+            stream.Start();
+            connection.TakeWritten();
+            ReadAll(stream);
+            Check(connection.Written.Length == 0 && !stream.NawsEnabled, "active negotiation: a refusal of our offer is not answered");
+        }
+        {
+            // the terminal type is the configured one
+            FakeConnection connection = new FakeConnection(B(IAC, DO, TelnetStream.OptTerminalType, IAC, SB, TelnetStream.OptTerminalType, 1, IAC, SE));
+            ReadAll(new TelnetStream(connection, new TelnetOptions { TerminalType = "vt100" }));
+            CheckBytes(connection.TakeWritten(),
+                Cat(B(IAC, WILL, TelnetStream.OptTerminalType), B(IAC, SB, TelnetStream.OptTerminalType, 0), Text("vt100"), B(IAC, SE)),
+                "the configured terminal type is reported");
+        }
+
+        // --- remote echo: reported once for every change ---
+        {
+            FakeConnection connection = new FakeConnection(B(IAC, WILL, TelnetStream.OptEcho), Text("login: "), B(IAC, WONT, TelnetStream.OptEcho), Text("x"));
+            TelnetStream stream = new TelnetStream(connection);
+            int changes = 0;
+            bool lastValue = false;
+            stream.RemoteEchoChanged += (sender, args) =>
+            {
+                changes++;
+                lastValue = stream.RemoteEcho;
+            };
+            Check(!stream.RemoteEcho, "remote echo: off at the start");
+            byte[] buffer = new byte[64];
+            int count = stream.Read(buffer, 0, buffer.Length);
+            Check(count == 7 && changes == 1 && lastValue && stream.RemoteEcho, "remote echo: WILL ECHO is reported as on, before the data that follows");
+            count = stream.Read(buffer, 0, buffer.Length);
+            Check(count == 1 && changes == 2 && !lastValue && !stream.RemoteEcho, "remote echo: WONT ECHO is reported as off");
+        }
+        {
+            // a repeated WILL ECHO is not a change
+            FakeConnection connection = new FakeConnection(B(IAC, WILL, TelnetStream.OptEcho, IAC, WILL, TelnetStream.OptEcho), Text("a"));
+            TelnetStream stream = new TelnetStream(connection);
+            int changes = 0;
+            stream.RemoteEchoChanged += (sender, args) => changes++;
+            ReadAll(stream);
+            Check(changes == 1, "remote echo: a repeated WILL ECHO is reported once");
+        }
+
+        // --- BINARY: CR is just a byte when both sides agreed ---
+        {
+            FakeConnection connection = new FakeConnection(B(IAC, WILL, TelnetStream.OptBinary, IAC, DO, TelnetStream.OptBinary), Cat(Text("a"), B(13, 0), Text("b")));
+            TelnetStream stream = new TelnetStream(connection);
+            CheckBytes(ReadAll(stream), Cat(Text("a"), B(13, 0), Text("b")), "binary: CR NUL is data when the server sends binary");
+            CheckBytes(connection.TakeWritten(), B(IAC, DO, TelnetStream.OptBinary, IAC, WILL, TelnetStream.OptBinary), "binary: accepted in both directions");
+            stream.Write(B(13), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(13), "binary: a bare CR is sent as it is");
+            stream.Write(B(0xFF), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(0xFF, 0xFF), "binary: 0xFF is still doubled");
+        }
+        {
+            // when only one direction is binary the other one keeps the NVT rules
+            FakeConnection connection = new FakeConnection(B(IAC, DO, TelnetStream.OptBinary), Cat(Text("a"), B(13, 0), Text("b")));
+            TelnetStream stream = new TelnetStream(connection);
+            CheckBytes(ReadAll(stream), Cat(Text("a"), B(13), Text("b")), "binary: sending binary does not change how CR NUL is received");
+            connection.TakeWritten();
+            stream.Write(B(13), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(13), "binary: our direction is binary after DO BINARY");
+        }
+
+        // --- commands sent by the user ---
+        {
+            FakeConnection connection = new FakeConnection();
+            TelnetStream stream = new TelnetStream(connection);
+            stream.SendCommand(TelnetStream.AreYouThere);
+            stream.SendCommand(TelnetStream.Break);
+            stream.SendCommand(TelnetStream.NOP);
+            CheckBytes(connection.TakeWritten(), B(IAC, 246, IAC, 243, IAC, 241), "AYT, Break and NOP are sent as IAC commands");
+        }
+
         // --- saved telnet connections (settings classes) ---
         SettingsChecks.Run(Check);
 

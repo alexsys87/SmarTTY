@@ -13,10 +13,12 @@ namespace SmarTTY.Transport;
 ///
 /// Supported options (everything else is politely refused with WONT / DONT):
 ///   ECHO (1) and SUPPRESS-GO-AHEAD (3) - the server echoes and the session is character-at-a-time,
+///   BINARY (0)                         - 8-bit clean data, CR is not followed by NUL any more,
 ///   TERMINAL-TYPE (24)                 - answers with the configured terminal type,
 ///   NAWS (31)                          - reports the terminal size, again whenever it changes.
-/// We only ever answer: no option is offered on our own initiative, so a server that does not speak Telnet is not
-/// confronted with unexpected commands.
+/// By default we only answer: no option is offered on our own initiative, so a server that does not speak Telnet is
+/// not confronted with unexpected commands. With <see cref="TelnetOptions.ActiveNegotiation"/> the terminal type,
+/// the window size and SUPPRESS-GO-AHEAD are offered right after <see cref="Start"/>, as most telnet clients do.
 ///
 /// One thread may read while another one writes. All the protocol state, and every write to the underlying
 /// stream, is guarded by one lock, so a negotiation reply never lands in the middle of the user's data.
@@ -25,6 +27,12 @@ internal sealed class TelnetStream : Stream
 {
     // Commands (RFC 854).
     internal const byte SE = 240;
+    internal const byte NOP = 241;
+    internal const byte Break = 243;
+    internal const byte InterruptProcess = 244;
+    internal const byte AreYouThere = 246;
+    internal const byte EraseCharacter = 247;
+    internal const byte EraseLine = 248;
     internal const byte SB = 250;
     internal const byte WILL = 251;
     internal const byte WONT = 252;
@@ -33,6 +41,7 @@ internal sealed class TelnetStream : Stream
     internal const byte IAC = 255;
 
     // Options.
+    internal const byte OptBinary = 0;
     internal const byte OptEcho = 1;
     internal const byte OptSuppressGoAhead = 3;
     internal const byte OptTerminalType = 24;
@@ -69,9 +78,20 @@ internal sealed class TelnetStream : Stream
         SubIac
     }
 
+    // Where an option stands. 'Requested' is our own offer (WILL / DO sent at start) that has not been answered
+    // yet: the answer must not be answered again, or both sides would go on confirming each other forever.
+    private enum OptionState : byte
+    {
+        Off,
+        Requested,
+        On
+    }
+
     private readonly Stream _inner;
 
     private readonly string _terminalType;
+
+    private readonly bool _activeNegotiation;
 
     // Guards everything below and every write to _inner.
     private readonly object _lock = new object();
@@ -80,10 +100,12 @@ internal sealed class TelnetStream : Stream
 
     private readonly MemoryStream _pendingReplies = new MemoryStream();
 
-    // The server's side of an option is on (we answered DO) / our side of an option is on (we answered WILL).
-    private readonly bool[] _remoteEnabled = new bool[256];
+    // The server's side of an option (WILL from it, DO from us) and our side of it (WILL from us, DO from it).
+    private readonly OptionState[] _remote = new OptionState[256];
 
-    private readonly bool[] _localEnabled = new bool[256];
+    private readonly OptionState[] _local = new OptionState[256];
+
+    private bool _echoReported;
 
     private readonly byte[] _subData = new byte[MaxSubnegotiationLength];
 
@@ -100,11 +122,72 @@ internal sealed class TelnetStream : Stream
     private int _rows;
 
     public TelnetStream(Stream inner, string terminalType = DefaultTerminalType, int columns = DefaultColumns, int rows = DefaultRows)
+        : this(inner, new TelnetOptions { TerminalType = terminalType, Columns = columns, Rows = rows })
+    {
+    }
+
+    public TelnetStream(Stream inner, TelnetOptions options)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
-        _terminalType = string.IsNullOrEmpty(terminalType) ? DefaultTerminalType : terminalType;
-        _columns = ClampSize(columns, DefaultColumns);
-        _rows = ClampSize(rows, DefaultRows);
+        options = options ?? new TelnetOptions();
+        _terminalType = string.IsNullOrWhiteSpace(options.TerminalType) ? DefaultTerminalType : options.TerminalType.Trim();
+        _activeNegotiation = options.ActiveNegotiation;
+        _columns = ClampSize(options.Columns, DefaultColumns);
+        _rows = ClampSize(options.Rows, DefaultRows);
+    }
+
+    /// <summary>
+    /// Raised on the reading thread when the server starts or stops echoing what is typed (option ECHO). A client
+    /// that wants "local echo only when the server does not echo" follows this.
+    /// </summary>
+    public event EventHandler RemoteEchoChanged;
+
+    /// <summary>True while the server has told us (WILL ECHO) that it echoes what we send.</summary>
+    public bool RemoteEcho
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _remote[OptEcho] == OptionState.On;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Makes the first move when active negotiation was asked for: offers SUPPRESS-GO-AHEAD (both ways), the terminal
+    /// type and the window size. Does nothing in the default, answer-only mode. Call once, right after connecting.
+    /// </summary>
+    public void Start()
+    {
+        if (!_activeNegotiation)
+        {
+            return;
+        }
+        lock (_lock)
+        {
+            _remote[OptSuppressGoAhead] = OptionState.Requested;
+            _local[OptSuppressGoAhead] = OptionState.Requested;
+            _local[OptTerminalType] = OptionState.Requested;
+            _local[OptNaws] = OptionState.Requested;
+            byte[] offer =
+            {
+                IAC, DO, OptSuppressGoAhead,
+                IAC, WILL, OptSuppressGoAhead,
+                IAC, WILL, OptTerminalType,
+                IAC, WILL, OptNaws
+            };
+            _inner.Write(offer, 0, offer.Length);
+        }
+    }
+
+    /// <summary>Sends a Telnet command (Break, Interrupt Process, Are You There, NOP, ...).</summary>
+    public void SendCommand(byte command)
+    {
+        lock (_lock)
+        {
+            _inner.Write(new[] { IAC, command }, 0, 2);
+        }
     }
 
     public override bool CanRead => true;
@@ -128,7 +211,7 @@ internal sealed class TelnetStream : Stream
         {
             lock (_lock)
             {
-                return _localEnabled[OptNaws];
+                return _local[OptNaws] == OptionState.On;
             }
         }
     }
@@ -142,7 +225,7 @@ internal sealed class TelnetStream : Stream
         {
             _columns = ClampSize(columns, _columns);
             _rows = ClampSize(rows, _rows);
-            if (_localEnabled[OptNaws])
+            if (_local[OptNaws] == OptionState.On)
             {
                 byte[] message = BuildWindowSizeMessage();
                 _inner.Write(message, 0, message.Length);
@@ -167,10 +250,19 @@ internal sealed class TelnetStream : Stream
                 return 0;
             }
             int produced;
+            bool echoChanged;
             lock (_lock)
             {
                 produced = Process(_readBuffer, received, buffer, offset);
                 FlushReplies();
+                bool echoNow = _remote[OptEcho] == OptionState.On;
+                echoChanged = echoNow != _echoReported;
+                _echoReported = echoNow;
+            }
+            if (echoChanged)
+            {
+                // Outside the lock: the handler may call back into the stream.
+                RemoteEchoChanged?.Invoke(this, EventArgs.Empty);
             }
             if (produced > 0)
             {
@@ -187,9 +279,10 @@ internal sealed class TelnetStream : Stream
         {
             return;
         }
-        byte[] encoded = EncodeOutgoing(buffer, offset, count);
         lock (_lock)
         {
+            // In binary mode (both sides agreed) a CR is just a byte.
+            byte[] encoded = EncodeOutgoing(buffer, offset, count, _local[OptBinary] == OptionState.On);
             _inner.Write(encoded, 0, encoded.Length);
         }
     }
@@ -227,6 +320,11 @@ internal sealed class TelnetStream : Stream
     /// </summary>
     internal static byte[] EncodeOutgoing(byte[] buffer, int offset, int count)
     {
+        return EncodeOutgoing(buffer, offset, count, binary: false);
+    }
+
+    internal static byte[] EncodeOutgoing(byte[] buffer, int offset, int count, bool binary)
+    {
         MemoryStream result = new MemoryStream(count + 8);
         int end = offset + count;
         for (int i = offset; i < end; i++)
@@ -237,7 +335,7 @@ internal sealed class TelnetStream : Stream
             {
                 result.WriteByte(IAC);
             }
-            else if (b == CR)
+            else if (b == CR && !binary)
             {
                 bool followedByLineFeedOrNul = i + 1 < end && (buffer[i + 1] == LF || buffer[i + 1] == NUL);
                 if (!followedByLineFeedOrNul)
@@ -264,7 +362,7 @@ internal sealed class TelnetStream : Stream
                     {
                         _state = ParseState.Iac;
                     }
-                    else if (b == NUL && _previousWasCr)
+                    else if (b == NUL && _previousWasCr && _remote[OptBinary] != OptionState.On)
                     {
                         // CR NUL is a bare carriage return: the NUL is only there to tell it from CR LF.
                         _previousWasCr = false;
@@ -375,17 +473,32 @@ internal sealed class TelnetStream : Stream
     }
 
     // An option is switched on or off once; a repeated request is not answered again, which keeps two
-    // clients that both answer everything from talking to each other forever.
+    // clients that both answer everything from talking to each other forever. The answer to our own offer
+    // (state Requested) is taken in silently for the same reason.
+
+    private static bool AcceptsFromServer(byte option)
+    {
+        return option == OptEcho || option == OptSuppressGoAhead || option == OptBinary;
+    }
+
+    private static bool AcceptsFromUs(byte option)
+    {
+        return option == OptSuppressGoAhead || option == OptTerminalType || option == OptNaws || option == OptBinary;
+    }
 
     private void OnWill(byte option)
     {
-        if (_remoteEnabled[option])
+        switch (_remote[option])
         {
-            return;
+            case OptionState.On:
+                return;
+            case OptionState.Requested:
+                _remote[option] = OptionState.On;
+                return;
         }
-        if (option == OptEcho || option == OptSuppressGoAhead)
+        if (AcceptsFromServer(option))
         {
-            _remoteEnabled[option] = true;
+            _remote[option] = OptionState.On;
             Reply(IAC, DO, option);
         }
         else
@@ -396,23 +509,32 @@ internal sealed class TelnetStream : Stream
 
     private void OnWont(byte option)
     {
-        if (_remoteEnabled[option])
+        switch (_remote[option])
         {
-            _remoteEnabled[option] = false;
-            Reply(IAC, DONT, option);
+            case OptionState.On:
+                _remote[option] = OptionState.Off;
+                Reply(IAC, DONT, option);
+                break;
+            case OptionState.Requested:
+                _remote[option] = OptionState.Off;
+                break;
         }
     }
 
     private void OnDo(byte option)
     {
-        if (_localEnabled[option])
+        OptionState previous = _local[option];
+        if (previous == OptionState.On)
         {
             return;
         }
-        if (option == OptSuppressGoAhead || option == OptTerminalType || option == OptNaws)
+        if (previous == OptionState.Requested || AcceptsFromUs(option))
         {
-            _localEnabled[option] = true;
-            Reply(IAC, WILL, option);
+            _local[option] = OptionState.On;
+            if (previous == OptionState.Off)
+            {
+                Reply(IAC, WILL, option);
+            }
             if (option == OptNaws)
             {
                 byte[] message = BuildWindowSizeMessage();
@@ -427,16 +549,21 @@ internal sealed class TelnetStream : Stream
 
     private void OnDont(byte option)
     {
-        if (_localEnabled[option])
+        switch (_local[option])
         {
-            _localEnabled[option] = false;
-            Reply(IAC, WONT, option);
+            case OptionState.On:
+                _local[option] = OptionState.Off;
+                Reply(IAC, WONT, option);
+                break;
+            case OptionState.Requested:
+                _local[option] = OptionState.Off;
+                break;
         }
     }
 
     private void OnSubnegotiation()
     {
-        if (_subOption == OptTerminalType && _localEnabled[OptTerminalType] && _subLength >= 1 && _subData[0] == TerminalTypeSend)
+        if (_subOption == OptTerminalType && _local[OptTerminalType] == OptionState.On && _subLength >= 1 && _subData[0] == TerminalTypeSend)
         {
             Reply(IAC, SB, OptTerminalType);
             _pendingReplies.WriteByte(TerminalTypeIs);
@@ -518,4 +645,17 @@ internal sealed class TelnetStream : Stream
             throw new ArgumentOutOfRangeException(offset < 0 ? nameof(offset) : nameof(count));
         }
     }
+}
+
+/// <summary>What a <see cref="TelnetStream"/> needs to know about the terminal and the way to negotiate.</summary>
+internal sealed class TelnetOptions
+{
+    public string TerminalType { get; set; } = TelnetStream.DefaultTerminalType;
+
+    public int Columns { get; set; } = TelnetStream.DefaultColumns;
+
+    public int Rows { get; set; } = TelnetStream.DefaultRows;
+
+    /// <summary>Offer the terminal type, the window size and SUPPRESS-GO-AHEAD right after connecting.</summary>
+    public bool ActiveNegotiation { get; set; }
 }

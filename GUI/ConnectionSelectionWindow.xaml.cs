@@ -833,6 +833,19 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 ConnectWithSettings(new SettingsWrappers.SSH(_Connections, conn));
                 return;
             }
+            if (defaultItemName.StartsWith("/telnet:", StringComparison.InvariantCultureIgnoreCase))
+            {
+                // /telnet:host or /telnet:host:port - a telnet connection that is not saved anywhere.
+                try
+                {
+                    PendingRawConnectionSettings = NewTelnetSettings(DeviceTerminalSettings.ConnectionSettings.Telnet.Parse(defaultItemName.Substring("/telnet:".Length)));
+                }
+                catch (FormatException exception)
+                {
+                    MessageBoxes.Exception(exception);
+                }
+                return;
+            }
             if (defaultItemName.StartsWith("/job:", StringComparison.InvariantCultureIgnoreCase))
             {
                 ConnectWithSettings(new SettingsWrappers.SSH(conn: (Job = XmlStorage.LoadFromFile<SmarTTYJob>(defaultItemName.Substring(5), new Type[0])).Settings, mgr: _Connections));
@@ -1217,6 +1230,12 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         MainWindow.ApplyTheme((Window)this, _Theme, ref themeDictionary);
         this.DataContext = (Controller = new ControllerImpl(this.Dispatcher, showRawConnections, defaultItemNameOrCmdLine, GuiPreferencesStore.Current));
         Controller.SessionCreated += Controller_SessionCreated;
+        if (Controller.PendingRawConnectionSettings != null)
+        {
+            // A COM/TCP/telnet connection named on the command line is already chosen (the controller could not tell
+            // the window yet): there is nothing left to ask, so the window closes as soon as it is shown.
+            Loaded += (sender, args) => Close();
+        }
         try
         {
             GuiPreferencesStore.Current?.ConnectionWindow.Apply((Window)this);

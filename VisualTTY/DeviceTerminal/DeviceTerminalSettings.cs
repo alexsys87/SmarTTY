@@ -104,7 +104,32 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
         [XmlType("com.sysprogs.terminal.connection.telnet")]
         public class Telnet : Tcp
         {
+            /// <summary>When typed characters are shown by the terminal itself instead of waiting for the server's echo.</summary>
+            public enum LocalEchoMode
+            {
+                /// <summary>Until the server announces that it echoes (option ECHO), and not any more after that.</summary>
+                Auto,
+                Always,
+                Never
+            }
+
             public const int DefaultPort = 23;
+
+            public const string DefaultTerminalType = "xterm";
+
+            /// <summary>Reported to the server when it asks (option TERMINAL-TYPE).</summary>
+            public string TerminalType { get; set; } = DefaultTerminalType;
+
+            public LocalEchoMode LocalEcho { get; set; } = LocalEchoMode.Auto;
+
+            /// <summary>
+            /// Offer the terminal type, the window size and suppress-go-ahead at connect, as most telnet clients do,
+            /// instead of waiting until the server asks for them.
+            /// </summary>
+            public bool ActiveNegotiation { get; set; }
+
+            /// <summary>Send a harmless NOP command this often to keep an idle connection open; 0 switches it off.</summary>
+            public int KeepAliveSeconds { get; set; }
 
             /// <summary>
             /// Saved telnet and raw TCP connections to the same host and port are different connections,

@@ -167,6 +167,111 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _asyncTransportConnection?.SetTerminalSize(columns, rows);
     }
 
+    // --- telnet: local echo that follows the server, and the "Telnet" commands in the context menu ---
+
+    private TelnetTransport _telnetTransport;
+
+    private ToolStripMenuItem _telnetMenu;
+
+    private void SetLocalEcho(bool echo)
+    {
+        // The same three things the "Echo typed characters" menu item changes.
+        _deviceTerminalSettings.EchoTypedCharacters = echo;
+        echoTypedCharactersToolStripMenuItem.Checked = echo;
+        _serialTerminalControl.LocalEcho = echo;
+    }
+
+    // Called for every new telnet connection (also when it is reconnected): applies the local echo mode and, in
+    // the automatic mode, keeps the echo opposite to the server's.
+    private void AttachTelnet(TelnetTransport transport, DeviceTerminalSettings.ConnectionSettings.Telnet settings)
+    {
+        _telnetTransport = transport;
+        switch (settings.LocalEcho)
+        {
+            case DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Always:
+                SetLocalEcho(true);
+                break;
+            case DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Never:
+                SetLocalEcho(false);
+                break;
+            default:
+                // Nobody echoes until the server says it does.
+                SetLocalEcho(true);
+                transport.RemoteEchoChanged += (sender, args) => OnTelnetRemoteEchoChanged(transport);
+                break;
+        }
+    }
+
+    private void OnTelnetRemoteEchoChanged(TelnetTransport transport)
+    {
+        // Raised on the reading thread.
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return;
+        }
+        try
+        {
+            BeginInvoke((Action)(() =>
+            {
+                // A reconnect creates a new transport; the news of an old one is of no interest.
+                if (!IsDisposed && ReferenceEquals(transport, _telnetTransport))
+                {
+                    SetLocalEcho(!transport.RemoteEcho);
+                }
+            }));
+        }
+        catch (InvalidOperationException)
+        {
+            // The window is closing.
+        }
+    }
+
+    private void UpdateTelnetMenu(bool telnet)
+    {
+        if (!telnet)
+        {
+            if (_telnetMenu != null)
+            {
+                _telnetMenu.Visible = false;
+            }
+            return;
+        }
+        if (_telnetMenu == null)
+        {
+            _telnetMenu = new ToolStripMenuItem("Telnet");
+            AddTelnetCommand("Send Break", TelnetStream.Break);
+            AddTelnetCommand("Send Interrupt Process (IP)", TelnetStream.InterruptProcess);
+            AddTelnetCommand("Send Are You There (AYT)", TelnetStream.AreYouThere);
+            AddTelnetCommand("Send Erase Line", TelnetStream.EraseLine);
+            AddTelnetCommand("Send NOP", TelnetStream.NOP);
+            _telnetMenu.DropDownOpening += (sender, args) =>
+            {
+                bool connected = _connectionState == ConnectionStateEnum.Connected && _telnetTransport != null;
+                foreach (ToolStripItem item in _telnetMenu.DropDownItems)
+                {
+                    item.Enabled = connected;
+                }
+            };
+            contextMenuStrip1.Items.Add(_telnetMenu);
+        }
+        _telnetMenu.Visible = true;
+    }
+
+    private void AddTelnetCommand(string text, byte command)
+    {
+        _telnetMenu.DropDownItems.Add(new ToolStripMenuItem(text, null, (sender, args) =>
+        {
+            try
+            {
+                _telnetTransport?.SendCommand(command);
+            }
+            catch (Exception)
+            {
+                // The connection is gone; the status line says so.
+            }
+        }));
+    }
+
     private void ReplaceTerminalControl()
     {
         // Remove the old control
@@ -400,6 +505,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             sendImmediatelyToolStripMenuItem.Checked = deviceTerminalSettings.HexSettings.AutoSend;
         }
         changeSettingsToolStripMenuItem.Visible = _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial;
+        UpdateTelnetMenu(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
         Connect();
     }
 
@@ -424,6 +530,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         Interlocked.Exchange(ref _bytesSent, 0L);
         Interlocked.Exchange(ref _bytesReceived, 0L);
         _connectionState = ConnectionStateEnum.Connecting;
+        _telnetTransport = null;
+        if (deviceTransport is TelnetTransport telnetTransport && _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet telnetSettings)
+        {
+            AttachTelnet(telnetTransport, telnetSettings);
+        }
         _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, value);
         _asyncTransportConnection.DataReceived += OnDataReceived;
         _asyncTransportConnection.StateChanged += OnConnectionStateChanged;

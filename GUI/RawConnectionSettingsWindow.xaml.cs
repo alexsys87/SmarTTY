@@ -92,6 +92,44 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public bool IsTelnet => Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet;
 
+        public class TelnetLocalEchoChoice
+        {
+            public DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode Value { get; set; }
+
+            public string Text { get; set; }
+        }
+
+        public System.Collections.Generic.IReadOnlyList<TelnetLocalEchoChoice> TelnetLocalEchoChoices { get; } = new TelnetLocalEchoChoice[]
+        {
+            new TelnetLocalEchoChoice { Value = DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Auto, Text = "Automatic (until the server echoes)" },
+            new TelnetLocalEchoChoice { Value = DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Always, Text = "Always on" },
+            new TelnetLocalEchoChoice { Value = DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Never, Text = "Always off" }
+        };
+
+        // The telnet options live here while the window is open; the connection object is rebuilt from the
+        // endpoint text (EffectiveConnectionSettings), so they are copied into it every time.
+        public string TelnetTerminalType { get; set; } = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalType;
+
+        public DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode TelnetLocalEcho { get; set; }
+
+        public bool TelnetActiveNegotiation { get; set; }
+
+        private int _TelnetKeepAliveSeconds;
+
+        public int TelnetKeepAliveSeconds
+        {
+            get
+            {
+                return _TelnetKeepAliveSeconds;
+            }
+            set
+            {
+                _TelnetKeepAliveSeconds = Math.Max(0, Math.Min(value, 86400));
+            }
+        }
+
+        public Visibility TelnetSettingsVisibility => IsTelnet ? Visibility.Visible : Visibility.Collapsed;
+
         public DeviceTerminalSettings.ConnectionSettings EffectiveConnectionSettings
         {
             get
@@ -120,7 +158,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     return new DeviceTerminalSettings.ConnectionSettings.Telnet
                     {
                         Host = host,
-                        Port = port
+                        Port = port,
+                        TerminalType = string.IsNullOrWhiteSpace(TelnetTerminalType) ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalType : TelnetTerminalType.Trim(),
+                        LocalEcho = TelnetLocalEcho,
+                        ActiveNegotiation = TelnetActiveNegotiation,
+                        KeepAliveSeconds = TelnetKeepAliveSeconds
                     };
                 }
                 return new DeviceTerminalSettings.ConnectionSettings.Tcp
@@ -155,6 +197,13 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             }
             else if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
             {
+                if (tcp is DeviceTerminalSettings.ConnectionSettings.Telnet telnet)
+                {
+                    TelnetTerminalType = telnet.TerminalType;
+                    TelnetLocalEcho = telnet.LocalEcho;
+                    TelnetActiveNegotiation = telnet.ActiveNegotiation;
+                    TelnetKeepAliveSeconds = telnet.KeepAliveSeconds;
+                }
                 SerialSettingsVisibility = Visibility.Collapsed;
                 TCPSettingsVisibility = Visibility.Visible;
                 if (!string.IsNullOrEmpty(tcp.Host))
