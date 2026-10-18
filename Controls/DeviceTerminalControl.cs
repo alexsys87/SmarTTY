@@ -1,6 +1,7 @@
-﻿using SmarTTY.Forms;
+using SmarTTY.Forms;
 using SmarTTY.Native;
 using SmarTTY.Terminal;
+using SmarTTY.TextEditing;
 using SmarTTY.Transport;
 using System;
 using System.Collections.Generic;
@@ -56,7 +57,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             _isHexMode = value;
             hexTerminalControl1.Visible = value;
-            terminalEmulatorControl1.Visible = !value;
+            _serialTerminalControl.Visible = !value;
             cbASCII.Checked = !value;
             cbHEX.Checked = value;
             ToolStripLabel toolStripLabel = lblSend;
@@ -67,6 +68,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
     }
 
+    private SerialTerminalControl _serialTerminalControl;
+
     public DeviceTerminalControl()
     {
         InitializeComponent();
@@ -74,6 +77,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         Disposed += DeviceTerminalControl_Disposed;
         pnlConnectionInProgress.BringToFront();
         toolStrip1.SendToBack();
+        
+        // Replace the designer-created TerminalEmulatorControl with our SerialTerminalControl
+        ReplaceTerminalControl();
+        
         foreach (TerminalEncodings.Choice choice in TerminalEncodings.All)
         {
             cbEncoding.Items.Add(choice);
@@ -81,12 +88,84 @@ public partial class DeviceTerminalControl : DpiAwareControl
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
     }
 
+    private void ReplaceTerminalControl()
+    {
+        // Remove the old control
+        if (terminalEmulatorControl1 != null)
+        {
+            terminalEmulatorControl1.DataEntered -= OnTerminalDataEntered;
+            terminalEmulatorControl1.KeyDown -= OnTerminalKeyDown;
+            Controls.Remove(terminalEmulatorControl1);
+            terminalEmulatorControl1.Dispose();
+        }
+
+        // Create and configure the new SerialTerminalControl
+        _serialTerminalControl = new SerialTerminalControl
+        {
+            ActiveBufferIndex = 0,
+            AutoScroll = true,
+            AutoWrap = true,
+            BackColor = Color.Black,
+            BellMode = TerminalEmulatorControl.BeepMode.None,
+            BellSoundFile = null,
+            NoLeftPadding = false,
+            NormalTextColor = Color.White,
+            CaptureDialogKeys = false,
+            CaretBounds = new Rectangle(0, 0, 0, 0),
+            TerminalMode = true,
+            ContextMenuStrip = contextMenuStrip1,
+            TabWidth = 8,
+            Dock = DockStyle.Fill,
+            LayoutSuspended = false,
+            Font = new Font("Courier New", 12f, FontStyle.Regular, GraphicsUnit.Point, 204),
+            ForeColor = Color.LightGray,
+            NavigationLocked = true,
+            NoHorizontalScroll = false,
+            HideCaret = false,
+            HideMargins = true,
+            HorizontalScrollBarVisible = false,
+            ForwardAltF4 = false,
+            MaxChunkLength = 0,
+            ShowLineNumbers = true,
+            TopLine = 0,
+            Location = new Point(0, 0),
+            SelectionStyle = new HighlightStyle(),
+            Margin = new Padding(5, 4, 5, 4),
+            UnusedValue = 0,
+            MouseMode = TerminalEmulatorControl.MouseReportingMode.Off,
+            Name = "serialTerminalControl1",
+            EnterSequence = null,
+            OverwriteMode = false,
+            ReadOnly = true,
+            CaretWhenUnfocused = false,
+            ShowUnrecognizedAsHex = false,
+            SingleLine = false,
+            Size = new Size(634, 236),
+            SmartAutoScroll = false,
+            TabIndex = 0,
+            TabSize = 4,
+            ScrollbackLimit = int.MaxValue,
+            Title = null,
+            GroupBinaryDigits = false,
+            IsModified = false,
+            VerticalScrollBarVisible = true,
+            Dispatcher = null
+        };
+
+        // Hook up events
+        _serialTerminalControl.DataEntered += OnTerminalDataEntered;
+        _serialTerminalControl.KeyDown += OnTerminalKeyDown;
+
+        // Add to controls at the same position as the old control
+        Controls.Add(_serialTerminalControl);
+        Controls.SetChildIndex(_serialTerminalControl, Controls.GetChildIndex(hexTerminalControl1));
+    }
+
     private void SetTextEncoding(string encodingName)
     {
         _textEncoding = TerminalEncodings.Resolve(encodingName);
         _textDecoder = new TextStreamDecoder(_textEncoding);
-        terminalEmulatorControl1.InputEncoding = _textEncoding;
-        _logWriter?.SetEncoding(_textEncoding);
+        _serialTerminalControl.InputEncoding = _textEncoding;
     }
 
     private void SelectEncodingInToolbar(string encodingName)
@@ -212,17 +291,18 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             cbBaudRate.Text = advancedSettings.BaudRate.ToString();
         }
-        TerminalEmulatorControl terminal = terminalEmulatorControl1;
+        SerialTerminalControl terminal = _serialTerminalControl;
         Color backColor = (hexTerminalControl1.BackColor = deviceTerminalSettings.Colors.Background);
         terminal.BackColor = backColor;
         backColor = (hexTerminalControl1.ForeColor = deviceTerminalSettings.Colors.Text);
         terminal.ForeColor = backColor;
-        terminalEmulatorControl1.EnterSequence = GetLineEnding(deviceTerminalSettings.LineEnding);
+        _serialTerminalControl.EnterSequence = GetLineEnding(deviceTerminalSettings.LineEnding);
         SetTextEncoding(deviceTerminalSettings.TextEncoding);
         SelectEncodingInToolbar(deviceTerminalSettings.TextEncoding);
         _brush = (hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo));
         HexMode = _deviceTerminalSettings.DisplayMode != DeviceTerminalSettings.CharacterDisplayMode.ASCII;
         echoTypedCharactersToolStripMenuItem.Checked = _deviceTerminalSettings.EchoTypedCharacters;
+        _serialTerminalControl.LocalEcho = _deviceTerminalSettings.EchoTypedCharacters;
         if (_isHexMode)
         {
             hexTerminalControl1.HexSettings = deviceTerminalSettings.HexSettings;
@@ -243,7 +323,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _asyncTransportConnection = null;
         if (resetTerminal)
         {
-            terminalEmulatorControl1.Reset();
+            _serialTerminalControl.Reset();
         }
         // A half-received character from the previous connection must not be glued to the new data.
         _textDecoder.Reset();
@@ -306,7 +386,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         else
         {
-            terminalEmulatorControl1.Focus();
+            _serialTerminalControl.Focus();
         }
     }
 
@@ -316,6 +396,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         try
         {
             ApplyConnectionState(connectionStateEnum, value);
+            if (connectionStateEnum == ConnectionStateEnum.Connected)
+            {
+                _serialTerminalControl.BeginNewSession();
+            }
         }
         finally
         {
@@ -346,7 +430,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 break;
             case ConnectionStateEnum.Disconnected:
                 {
-                    TerminalEmulatorControl terminal = terminalEmulatorControl1;
+                    SerialTerminalControl terminal = _serialTerminalControl;
                     bool changed = (hexTerminalControl1.HideCaret = true);
                     terminal.HideCaret = changed;
                     Color backColor = (hexTerminalControl1.BackColor = _deviceTerminalSettings.Colors.Disconnected);
@@ -361,7 +445,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 break;
             case ConnectionStateEnum.Connected:
                 {
-                    TerminalEmulatorControl terminal = terminalEmulatorControl1;
+                    SerialTerminalControl terminal = _serialTerminalControl;
                     Color backColor = (hexTerminalControl1.BackColor = _deviceTerminalSettings.Colors.Background);
                     terminal.BackColor = backColor;
                     bool updated = (hexTerminalControl1.HideCaret = false);
@@ -405,7 +489,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             text = text.Replace("\n", "\r\n");
         }
-        terminalEmulatorControl1.ProcessOutput(text);
+        _serialTerminalControl.OnDataReceived(text);
     }
 
     private void OnTerminalDataEntered(object sender, byte[] buffer, TerminalEmulatorControl.InputKind inputKind)
@@ -414,29 +498,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             SendToDevice(buffer, buffer.Length);
         }
-        if (_deviceTerminalSettings.EchoTypedCharacters && inputKind != TerminalEmulatorControl.InputKind.MouseReport && !_isHexMode)
-        {
-            TerminalEmulatorBase.CellStyle cellStyle = terminalEmulatorControl1.CurrentStyle;
-            TerminalEmulatorBase.CellStyle overrideStyle = cellStyle;
-            overrideStyle.Override = new TerminalEmulatorBase.CellStyle.ForegroundOverride
-            {
-                Brush = _brush
-            };
-            terminalEmulatorControl1.CurrentStyle = overrideStyle;
-            string text = _textEncoding.GetString(buffer);
-            switch (text)
-            {
-                case "\r":
-                case "\n":
-                case "\r\n":
-                    terminalEmulatorControl1.MoveCursorBy(-terminalEmulatorControl1.CursorPosition.X, 1, scroll: true);
-                    break;
-                default:
-                    terminalEmulatorControl1.WriteText(text);
-                    break;
-            }
-            terminalEmulatorControl1.CurrentStyle = cellStyle;
-        }
+        // Echo is now handled by SerialTerminalControl locally
+        // The device may also echo back, which will be handled by OnDataReceived
     }
 
     private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
@@ -602,7 +665,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     public void ClearOutput()
     {
-        terminalEmulatorControl1.Reset();
+        _serialTerminalControl.Reset();
         hexTerminalControl1.Clear();
     }
 
@@ -620,7 +683,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             }
             else
             {
-                File.WriteAllText(_saveFileDialog.FileName, terminalEmulatorControl1.Text);
+                File.WriteAllText(_saveFileDialog.FileName, _serialTerminalControl.Text);
             }
         }
         catch (Exception exception)
@@ -658,7 +721,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         else
         {
-            Win32Clipboard.SetText(Handle, terminalEmulatorControl1.Text);
+            Win32Clipboard.SetText(Handle, _serialTerminalControl.Text);
         }
     }
 
@@ -673,15 +736,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             hexTerminalControl1.CopySelection();
         }
-        else if (((ReadonlyTextBrowser)terminalEmulatorControl1).HasSelection)
+        else if (((ReadonlyTextBrowser)_serialTerminalControl).HasSelection)
         {
-            terminalEmulatorControl1.CopySelection(select: false);
+            _serialTerminalControl.CopySelection(select: false);
         }
     }
 
     private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
     {
-        copyToolStripMenuItem.Enabled = HexMode ? hexTerminalControl1.HasSelection : ((ReadonlyTextBrowser)terminalEmulatorControl1).HasSelection;
+        copyToolStripMenuItem.Enabled = HexMode ? hexTerminalControl1.HasSelection : ((ReadonlyTextBrowser)_serialTerminalControl).HasSelection;
     }
 
     private void OnTerminalKeyDown(object sender, KeyEventArgs e)
@@ -889,6 +952,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         DeviceTerminalSettings deviceTerminalSettings = _deviceTerminalSettings;
         bool echoTypedCharacters = (echoTypedCharactersToolStripMenuItem.Checked = !echoTypedCharactersToolStripMenuItem.Checked);
         deviceTerminalSettings.EchoTypedCharacters = echoTypedCharacters;
+        _serialTerminalControl.LocalEcho = echoTypedCharacters;
     }
 
     public void Disconnect(string text = null)

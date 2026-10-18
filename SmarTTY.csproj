@@ -84,6 +84,9 @@
     <Compile Update="Controls\SshTerminalControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\SerialTerminalControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="Controls\SuggestionListView.cs">
       <SubType>Component</SubType>
     </Compile>
