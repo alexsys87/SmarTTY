@@ -90,6 +90,8 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             }
         }
 
+        public bool IsTelnet => Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet;
+
         public DeviceTerminalSettings.ConnectionSettings EffectiveConnectionSettings
         {
             get
@@ -105,12 +107,21 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 if (colonIdx == -1)
                 {
                     host = endpoint;
-                    port = 0;
+                    // A telnet server is expected on the telnet port unless another one is given.
+                    port = IsTelnet ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort : 0;
                 }
                 else
                 {
                     host = endpoint.Substring(0, colonIdx);
                     port = int.Parse(endpoint.Substring(colonIdx + 1));
+                }
+                if (IsTelnet)
+                {
+                    return new DeviceTerminalSettings.ConnectionSettings.Telnet
+                    {
+                        Host = host,
+                        Port = port
+                    };
                 }
                 return new DeviceTerminalSettings.ConnectionSettings.Tcp
                 {
@@ -119,6 +130,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 };
             }
         }
+
+        public string TCPSettingsHeader => IsTelnet
+            ? "Telnet connection settings (default port " + DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort + ")"
+            : "Raw TCP connection settings";
 
         public string SerialSettingsHeader { get; }
 
@@ -277,6 +292,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         InitializeComponent();
         this.DataContext = (_Controller = new ControllerImpl(settings, showSaveCheckbox));
         _TestOnOK = testOnOK;
+        if (_Controller.IsTelnet)
+        {
+            Title = "Telnet Terminal Settings";
+        }
     }
 
     protected override void OnClosed(EventArgs e)

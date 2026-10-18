@@ -1212,11 +1212,8 @@ public class MainWindowController : INotifyPropertyChanged
         }
         else if (source.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
         {
-            clone.Connection = new DeviceTerminalSettings.ConnectionSettings.Tcp
-            {
-                Host = tcp.Host,
-                Port = tcp.Port
-            };
+            // Clone() keeps the kind of the endpoint: a telnet connection must stay a telnet connection.
+            clone.Connection = tcp.Clone();
         }
         return clone;
     }

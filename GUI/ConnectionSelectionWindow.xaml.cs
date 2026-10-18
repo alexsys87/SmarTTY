@@ -464,7 +464,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public string Title => (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.Host + ":" + (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.Port.ToString();
 
-            public string Detail1 => "raw tcp";
+            public virtual string Detail1 => "raw tcp";
 
             public string Detail2 => FormatLastUsedString(DateTime.FromFileTime(Settings.Settings.LastConnectionTime));
 
@@ -490,6 +490,20 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 return false;
             }
         }
+
+        /// <summary>
+        /// A saved telnet connection. It is a raw TCP item with a different kind label: it is listed, probed,
+        /// edited and deleted like one, but counted and filtered separately (check for it before RawTcp).
+        /// </summary>
+        public class Telnet : RawTcp
+        {
+            public override string Detail1 => "telnet";
+
+            public Telnet(SavedConnectionStore mgr, RawConnectionSettings settings)
+                : base(mgr, settings)
+            {
+            }
+        }
     }
 
     public class ControllerImpl : INotifyPropertyChanged, IDisposable
@@ -499,6 +513,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             public int SSH { get; set; }
 
             public int RawTcp { get; set; }
+
+            public int Telnet { get; set; }
 
             public int Serial { get; set; }
         }
@@ -663,6 +679,20 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 _ShownTypes.RawTcp = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShowRawTcp"));
+                UpdateFilteredItems();
+            }
+        }
+
+        public bool ShowTelnet
+        {
+            get
+            {
+                return !_ShownTypes.HideTelnet;
+            }
+            set
+            {
+                _ShownTypes.HideTelnet = !value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShowTelnet"));
                 UpdateFilteredItems();
             }
         }
@@ -881,6 +911,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 {
                     connectionCounts.Serial++;
                 }
+                else if (item is SettingsWrappers.Telnet)
+                {
+                    connectionCounts.Telnet++;
+                }
                 else if (item is SettingsWrappers.RawTcp)
                 {
                     connectionCounts.RawTcp++;
@@ -951,6 +985,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 return ShowSerial;
             }
+            if (item is SettingsWrappers.Telnet)
+            {
+                return ShowTelnet;
+            }
             if (item is SettingsWrappers.RawTcp)
             {
                 return ShowRawTcp;
@@ -973,6 +1011,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serConn)
                     {
                         _KnownSerialPortSettings[new SerialPortKey(serConn)] = entry;
+                    }
+                    else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet)
+                    {
+                        _StaticItems.Add(new SettingsWrappers.Telnet(_Connections, entry));
                     }
                     else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp)
                     {
@@ -1057,10 +1099,33 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         public bool CreateNewRawTcpConnection(Window wnd)
         {
-            RawConnectionSettingsWindow rawConnectionSettingsWindow = new RawConnectionSettingsWindow(new DeviceTerminalSettings
+            return CreateNewTcpConnection(wnd, new DeviceTerminalSettings
             {
                 Connection = new DeviceTerminalSettings.ConnectionSettings.Tcp()
-            }, testOnOK: true, showSaveCheckbox: true);
+            });
+        }
+
+        public bool CreateNewTelnetConnection(Window wnd)
+        {
+            return CreateNewTcpConnection(wnd, NewTelnetSettings(new DeviceTerminalSettings.ConnectionSettings.Telnet
+            {
+                Port = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort
+            }));
+        }
+
+        // A telnet session ends a line with CR LF; the server normally echoes what is typed, so local echo stays off.
+        private static DeviceTerminalSettings NewTelnetSettings(DeviceTerminalSettings.ConnectionSettings.Telnet connection)
+        {
+            return new DeviceTerminalSettings
+            {
+                Connection = connection,
+                LineEnding = DeviceTerminalSettings.LineEndingType.CRLF
+            };
+        }
+
+        private bool CreateNewTcpConnection(Window wnd, DeviceTerminalSettings initialSettings)
+        {
+            RawConnectionSettingsWindow rawConnectionSettingsWindow = new RawConnectionSettingsWindow(initialSettings, testOnOK: true, showSaveCheckbox: true);
             rawConnectionSettingsWindow.Owner = wnd;
             RawConnectionSettingsWindow rawConnectionSettingsWindow2 = rawConnectionSettingsWindow;
             if (rawConnectionSettingsWindow2.ShowDialog() != true)
@@ -1110,6 +1175,26 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     AuthenticationType = AuthType.Password
                 };
                 _Initiator.ConnectAsync(sSHConnectionSettings, quickConnectionWindow2.txtPassword.Password, forcePasswordAuth: false);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
+        /// <summary>Telnet to "host" or "host:port" without saving anything (port 23 when none is given).</summary>
+        internal void CreateQuickTelnetConnection(Window parent)
+        {
+            QuickConnectionWindow quickConnectionWindow = new QuickConnectionWindow(telnet: true);
+            quickConnectionWindow.Owner = parent;
+            if (quickConnectionWindow.ShowDialog() != true)
+            {
+                return;
+            }
+            try
+            {
+                PendingRawConnectionSettings = NewTelnetSettings(DeviceTerminalSettings.ConnectionSettings.Telnet.Parse(quickConnectionWindow.txtMachine.Text));
+                SessionCreated?.Invoke();
             }
             catch (Exception exception)
             {
@@ -1319,6 +1404,14 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         }
     }
 
+    private void NewTelnet_Click(object sender, RoutedEventArgs e)
+    {
+        if (Controller.CreateNewTelnetConnection((Window)this))
+        {
+            this.Close();
+        }
+    }
+
     private void connectionList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
     }
@@ -1427,5 +1520,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     private void QuickConnect_Click(object sender, RoutedEventArgs e)
     {
         Controller.CreateQuickConnection((Window)this, _Theme);
+    }
+
+    private void QuickTelnet_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.CreateQuickTelnetConnection((Window)this);
     }
 }

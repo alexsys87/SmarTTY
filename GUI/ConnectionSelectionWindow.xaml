@@ -78,6 +78,21 @@
               <TextBlock Text="{Binding Path=ConnectionCounts.RawTcp, StringFormat=Raw TCP ({0})}" />
             </StackPanel>
           </ToggleButton>
+          <ToggleButton IsChecked="{Binding ShowTelnet}">
+            <FrameworkElement.Style>
+              <Style BasedOn="{StaticResource {x:Type ToggleButton}}" TargetType="{x:Type ToggleButton}">
+                <Style.Triggers>
+                  <DataTrigger Value="0" Binding="{Binding Path=ConnectionCounts.Telnet}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </FrameworkElement.Style>
+            <StackPanel Orientation="Horizontal">
+              <Image Width="16" Height="16" Source="../icons/term16.png" />
+              <TextBlock Text="{Binding Path=ConnectionCounts.Telnet, StringFormat=Telnet ({0})}" />
+            </StackPanel>
+          </ToggleButton>
         </StackPanel>
       </Border>
       <ToggleButton Name="btnSort" VerticalAlignment="Center" Margin="2" Style="{StaticResource DynamicToggleButtonStyle}">
@@ -328,9 +343,9 @@
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
-      <StackPanel Orientation="Horizontal" Margin="5 10 10 10" Grid.ColumnSpan="2">
+      <WrapPanel Orientation="Horizontal" Margin="5 10 10 5" Grid.ColumnSpan="2">
         <FrameworkElement.Style>
-          <Style TargetType="{x:Type StackPanel}">
+          <Style TargetType="{x:Type WrapPanel}">
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
               <DataTrigger Binding="{Binding ProgressText}" Value="{x:Null}">
@@ -342,7 +357,7 @@
         <FrameworkElement.Resources>
           <ResourceDictionary>
             <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}" BasedOn="{StaticResource HyperlinkButton}">
-              <Setter Property="Margin" Value="0 0 30 0" />
+              <Setter Property="Margin" Value="0 0 30 5" />
               <Style.Resources>
                 <ResourceDictionary>
                   <Style x:Key="{x:Type Image}" TargetType="{x:Type Image}">
@@ -368,10 +383,22 @@
             <AccessText Text="New _Raw TCP connection..." />
           </StackPanel>
         </Button>
+        <Button HorizontalAlignment="Left" Click="NewTelnet_Click">
+          <StackPanel Orientation="Horizontal">
+            <Image Source="../Icons/term16.png" />
+            <AccessText Text="New _Telnet connection..." />
+          </StackPanel>
+        </Button>
         <Button HorizontalAlignment="Left" Click="QuickConnect_Click">
           <StackPanel Orientation="Horizontal">
             <Image Source="../Icons/event16.png" />
             <AccessText Text="_Quick SSH connection..." />
+          </StackPanel>
+        </Button>
+        <Button HorizontalAlignment="Left" Click="QuickTelnet_Click">
+          <StackPanel Orientation="Horizontal">
+            <Image Source="../Icons/event16.png" />
+            <AccessText Text="Quick telnet _connection..." />
           </StackPanel>
         </Button>
         <Button HorizontalAlignment="Left" Click="ImportSettings_Click">
@@ -386,7 +413,7 @@
             <AccessText Text="E_xport settings..." />
           </StackPanel>
         </Button>
-      </StackPanel>
+      </WrapPanel>
       <TextBlock VerticalAlignment="Center" Margin="0 0 5 0" Text="{Binding ProgressText}">
         <FrameworkElement.Style>
           <Style TargetType="{x:Type TextBlock}">

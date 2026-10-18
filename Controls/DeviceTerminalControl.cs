@@ -152,12 +152,19 @@ public partial class DeviceTerminalControl : DpiAwareControl
         
         // Replace the designer-created TerminalEmulatorControl with our SerialTerminalControl
         ReplaceTerminalControl();
+        // A telnet server may ask for the terminal size (and wants to hear about changes); other transports ignore it.
+        _serialTerminalControl.TerminalSizeChanged += OnTerminalSizeChanged;
         
         foreach (TerminalEncodings.Choice choice in TerminalEncodings.All)
         {
             cbEncoding.Items.Add(choice);
         }
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
+    }
+
+    private void OnTerminalSizeChanged(TerminalEmulatorControl terminal, int columns, int rows)
+    {
+        _asyncTransportConnection?.SetTerminalSize(columns, rows);
     }
 
     private void ReplaceTerminalControl()
@@ -308,6 +315,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             return () => new SerialTransport(connectionSettings as DeviceTerminalSettings.ConnectionSettings.Serial);
         }
+        // Telnet derives from Tcp, so it has to be recognized first.
+        if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Telnet telnet)
+        {
+            return () => new TelnetTransport(telnet);
+        }
         if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Tcp)
         {
             return () => new TcpTransport(connectionSettings as DeviceTerminalSettings.ConnectionSettings.Tcp);
@@ -416,6 +428,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _asyncTransportConnection.DataReceived += OnDataReceived;
         _asyncTransportConnection.StateChanged += OnConnectionStateChanged;
         _asyncTransportConnection.WriterIdleChanged += OnWriterIdleChanged;
+        Size terminalSize = _serialTerminalControl.TerminalSize;
+        _asyncTransportConnection.SetTerminalSize(terminalSize.Width, terminalSize.Height);
         _asyncTransportConnection.Start();
     }
 

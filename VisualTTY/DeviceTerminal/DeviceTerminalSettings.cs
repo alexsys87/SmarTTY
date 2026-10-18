@@ -9,6 +9,7 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 {
     [XmlInclude(typeof(Serial))]
     [XmlInclude(typeof(Tcp))]
+    [XmlInclude(typeof(Telnet))]
     public abstract class ConnectionSettings
     {
         [XmlType("com.sysprogs.terminal.connection.serial")]
@@ -85,6 +86,93 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
                     return Port > 0;
                 }
                 return false;
+            }
+
+            /// <summary>Copy of the endpoint that keeps its kind (a telnet endpoint stays a telnet endpoint).</summary>
+            public Tcp Clone()
+            {
+                return (Tcp)MemberwiseClone();
+            }
+        }
+
+        /// <summary>
+        /// A telnet endpoint: a TCP connection that speaks the Telnet protocol (the server's option negotiation is
+        /// answered and the commands are not shown), as opposed to <see cref="Tcp"/>, which shows every byte as it is.
+        /// Telnet derives from Tcp, so everything that only needs host and port treats both alike; code that must
+        /// tell them apart checks for Telnet first.
+        /// </summary>
+        [XmlType("com.sysprogs.terminal.connection.telnet")]
+        public class Telnet : Tcp
+        {
+            public const int DefaultPort = 23;
+
+            /// <summary>
+            /// Saved telnet and raw TCP connections to the same host and port are different connections,
+            /// so they must not share a file.
+            /// </summary>
+            [XmlIgnore]
+            public override string FileNameBase => "telnet_" + Host + "_" + Port;
+
+            /// <summary>
+            /// Reads what a user types for a quick connection: "host", "host:port", "[ipv6]:port", a bare IPv6 address,
+            /// each with an optional "telnet://" in front. The port is <see cref="DefaultPort"/> when none is given.
+            /// </summary>
+            public static Telnet Parse(string text)
+            {
+                const string expected = "Expected: hostname or hostname:port";
+                text = (text ?? "").Trim();
+                if (text.StartsWith("telnet://", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    text = text.Substring("telnet://".Length).TrimEnd('/');
+                }
+                string host = text;
+                int port = DefaultPort;
+                if (text.StartsWith("[", System.StringComparison.Ordinal))
+                {
+                    int closing = text.IndexOf(']');
+                    if (closing == -1)
+                    {
+                        throw new System.FormatException(expected);
+                    }
+                    host = text.Substring(1, closing - 1);
+                    string rest = text.Substring(closing + 1);
+                    if (rest.StartsWith(":", System.StringComparison.Ordinal))
+                    {
+                        port = ParsePort(rest.Substring(1));
+                    }
+                    else if (rest.Length != 0)
+                    {
+                        throw new System.FormatException(expected);
+                    }
+                }
+                else
+                {
+                    int colon = text.IndexOf(':');
+                    // A single colon separates the port; several colons are an IPv6 address without a port.
+                    if (colon != -1 && colon == text.LastIndexOf(':'))
+                    {
+                        host = text.Substring(0, colon);
+                        port = ParsePort(text.Substring(colon + 1));
+                    }
+                }
+                if (host.Length == 0)
+                {
+                    throw new System.FormatException(expected);
+                }
+                return new Telnet
+                {
+                    Host = host,
+                    Port = port
+                };
+            }
+
+            private static int ParsePort(string text)
+            {
+                if (!int.TryParse(text.Trim(), out int port) || port < 1 || port > 65535)
+                {
+                    throw new System.FormatException("Invalid port number: '" + text + "' (expected 1-65535)");
+                }
+                return port;
             }
         }
 
