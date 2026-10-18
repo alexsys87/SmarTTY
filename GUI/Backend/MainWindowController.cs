@@ -23,6 +23,7 @@ using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Threading;
 using VisualTTY;
+using VisualTTY.DeviceTerminal;
 using Control = System.Windows.Forms.Control;
 using KeyEventArgs = System.Windows.Forms.KeyEventArgs;
 using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
@@ -117,6 +118,21 @@ public class MainWindowController : INotifyPropertyChanged
             _Controller = mainWindowController;
         }
 
+        /// <summary>Returns the active SSH session, or throws a readable error when a COM/TCP tab (or nothing) is active.</summary>
+        private SessionWrapper RequireSshSession(string feature)
+        {
+            SessionWrapper activeSession = _Controller.ActiveSession;
+            if (activeSession == null || activeSession.IsPlaceholder)
+            {
+                throw new Exception("No session active");
+            }
+            if (activeSession.IsDevice)
+            {
+                throw new Exception(feature + " is available only in SSH sessions.");
+            }
+            return activeSession;
+        }
+
         internal void SaveFile()
         {
             try
@@ -131,8 +147,14 @@ public class MainWindowController : INotifyPropertyChanged
 
         internal void NewSession()
         {
-            ConnectionSelectionWindow connectionSelectionWindow = new ConnectionSelectionWindow(showRawConnections: false, null);
-            if (connectionSelectionWindow.ShowDialog() == true && connectionSelectionWindow.Controller.CreatedSession != null)
+            ConnectionSelectionWindow connectionSelectionWindow = new ConnectionSelectionWindow(showRawConnections: true, null);
+            bool? dialogResult = connectionSelectionWindow.ShowDialog();
+            DeviceTerminalSettings pendingDevice = connectionSelectionWindow.Controller.TakePendingRawConnectionSettings();
+            if (pendingDevice != null)
+            {
+                _Controller.AddDeviceSession(pendingDevice);
+            }
+            else if (dialogResult == true && connectionSelectionWindow.Controller.CreatedSession != null)
             {
                 _Controller.AddSession(connectionSelectionWindow.Controller.CreatedSession, connectionSelectionWindow.Controller.SelectedSettings, createFirstPage: true);
             }
@@ -204,11 +226,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                SessionWrapper activeSession = _Controller.ActiveSession;
-                if (activeSession == null)
-                {
-                    throw new Exception("No session is active");
-                }
+                SessionWrapper activeSession = RequireSshSession("Opening remote files");
                 tabWithCurrentDir = tabWithCurrentDir ?? activeSession.ActiveTab;
                 RemoteOpenFileDialog remoteOpenFileDialog = activeSession.CreateRemoteOpenFileDialog();
                 string text = activeSession.TryExtractCurrentDir(tabWithCurrentDir) ?? activeSession.LastDownloadDir;
@@ -319,12 +337,24 @@ public class MainWindowController : INotifyPropertyChanged
 
         internal void Copy()
         {
-            _Controller.ActiveSession?.ActiveTab?.EditorControl?.CopySelection();
+            ITabContext activeTab = _Controller.ActiveSession?.ActiveTab;
+            if (activeTab is DeviceTabContext deviceTab)
+            {
+                deviceTab.Terminal.CopySelection();
+                return;
+            }
+            activeTab?.EditorControl?.CopySelection();
         }
 
         internal void Paste()
         {
-            _Controller.ActiveSession?.ActiveTab?.EditorControl?.Paste();
+            ITabContext activeTab = _Controller.ActiveSession?.ActiveTab;
+            if (activeTab is DeviceTabContext deviceTab)
+            {
+                deviceTab.Terminal.Paste();
+                return;
+            }
+            activeTab?.EditorControl?.Paste();
         }
 
         internal void CopyAll()
@@ -334,6 +364,10 @@ public class MainWindowController : INotifyPropertyChanged
 
         internal void SCPTransfers()
         {
+            if (_Controller.ActiveSession?.IsDevice == true)
+            {
+                return;
+            }
             _Controller.ActiveSession?.SCPController?.Show();
         }
 
@@ -341,11 +375,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                SessionWrapper activeSession = _Controller.ActiveSession;
-                if (activeSession == null)
-                {
-                    throw new Exception("No session active");
-                }
+                SessionWrapper activeSession = RequireSshSession("File transfer");
                 SCPUploadForm scpUploadForm = new SCPUploadForm(activeSession.ExecuteAsyncCommand);
                 scpUploadForm.RemoteDirectory = _Controller.Settings.DefaultUploadDirectory;
                 if (scpUploadForm.ShowModal() == DialogResult.OK)
@@ -392,6 +422,10 @@ public class MainWindowController : INotifyPropertyChanged
                         terminal.UpdateLayout();
                         terminal.Redraw();
                     }
+                    else if (tab is DeviceTabContext deviceTab)
+                    {
+                        deviceTab.ApplyCommonSettings();
+                    }
                     else if (tab is EditorTabContext editorTabContext)
                     {
                         _Controller.ApplyEditorSettings(editorTabContext.Editor);
@@ -403,10 +437,14 @@ public class MainWindowController : INotifyPropertyChanged
 
         internal void SetupPublicKey()
         {
-            SessionWrapper activeSession = _Controller.ActiveSession;
-            if (activeSession != null)
+            try
             {
+                SessionWrapper activeSession = RequireSshSession("Public key authentication");
                 new PublicKeyManagerForm(activeSession.Session, activeSession.Settings).ShowModal();
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
             }
         }
 
@@ -419,7 +457,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm((_Controller.ActiveSession ?? throw new Exception("No session active")).Session, isUpload: false);
+                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm(RequireSshSession("Directory transfer").Session, isUpload: false);
                 directoryTransferForm.LocalDirectory = _Controller.Settings.DefaultDownloadDirectory;
                 directoryTransferForm.FormClosed += Frm_FormClosed;
                 directoryTransferForm.Show();
@@ -448,7 +486,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm((_Controller.ActiveSession ?? throw new Exception("No session active")).Session, isUpload: true);
+                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm(RequireSshSession("Directory transfer").Session, isUpload: true);
                 directoryTransferForm.RemoteDirectory = _Controller.Settings.DefaultUploadDirectory;
                 directoryTransferForm.FormClosed += Frm_FormClosed;
                 directoryTransferForm.Show();
@@ -463,11 +501,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                SessionWrapper activeSession = _Controller.ActiveSession;
-                if (activeSession == null)
-                {
-                    throw new Exception("No session active");
-                }
+                SessionWrapper activeSession = RequireSshSession("File transfer");
                 if (fn == null)
                 {
                     fn = activeSession.CreateRemoteOpenFileDialog().ShowDialog();
@@ -501,11 +535,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                SessionWrapper activeSession = _Controller.ActiveSession;
-                if (activeSession == null)
-                {
-                    throw new Exception("No session active");
-                }
+                SessionWrapper activeSession = RequireSshSession("File transfer");
                 string text = activeSession.TryExtractCurrentDir() ?? activeSession.LastDownloadDir;
                 SCPDownloadForm scpDownloadForm = new SCPDownloadForm(activeSession.ExecuteAsyncCommand, text, showCheckBox: true)
                 {
@@ -639,6 +669,17 @@ public class MainWindowController : INotifyPropertyChanged
                     Status1 = "No active session";
                     Status2 = null;
                     ProgressVisibility = Visibility.Collapsed;
+                    return;
+                }
+                if (activeSession.IsDevice)
+                {
+                    Status1 = activeSession.DeviceStatusText;
+                    Status2 = activeSession.DeviceTrafficText;
+                    ProgressVisibility = Visibility.Collapsed;
+                    return;
+                }
+                if (activeSession.IsPlaceholder)
+                {
                     return;
                 }
                 SCPController.SCPStatistics valueOrDefault = (_Controller.ActiveSession?.SCPController?.SendUpdateEventsAndGetStatistics()).GetValueOrDefault();
@@ -781,7 +822,7 @@ public class MainWindowController : INotifyPropertyChanged
             int oldValue = Math.Max(Math.Min(_ActiveSessionIndex, FirstPseudoPage - 1), 0);
             _ActiveSessionIndex = value;
             SessionWrapper activeSession = ActiveSession;
-            if (activeSession != null && activeSession.Session == null)
+            if (activeSession != null && activeSession.IsPlaceholder)
             {
                 Dispatcher.BeginInvoke((Delegate)(Action)(() =>
                 {
@@ -810,7 +851,7 @@ public class MainWindowController : INotifyPropertyChanged
 
     public ObservableCollection<SessionWrapper> AllSessions { get; } = new ObservableCollection<SessionWrapper>();
 
-    private int FirstPseudoPage => Enumerable.Range(0, AllSessions.Count).FirstOrDefault((int index) => AllSessions[index].Session == null);
+    private int FirstPseudoPage => Enumerable.Range(0, AllSessions.Count).FirstOrDefault((int index) => AllSessions[index].IsPlaceholder);
 
     public bool HideTabHeaders
     {
@@ -1086,7 +1127,13 @@ public class MainWindowController : INotifyPropertyChanged
 
     private void CopyAll()
     {
-        (ActiveSession?.ActiveTab?.EditorControl)?.CopyAll();
+        ITabContext activeTab = ActiveSession?.ActiveTab;
+        if (activeTab is DeviceTabContext deviceTab)
+        {
+            deviceTab.Terminal.CopyAll();
+            return;
+        }
+        (activeTab?.EditorControl)?.CopyAll();
     }
 
     internal TcpClient CreateX11Connection()
@@ -1104,19 +1151,94 @@ public class MainWindowController : INotifyPropertyChanged
         }
         sessionWrapper.ShowNewSessionTab = AllSessions.Count == 1;
         AllSessions.Insert(firstPseudoPage, sessionWrapper);
-        AllSessions.CollectionChanged += AllSessions_CollectionChanged;
+        HookSessionCollection();
         ActiveSessionIndex = firstPseudoPage;
         return sessionWrapper;
+    }
+
+    private bool _SessionCollectionHooked;
+
+    private void HookSessionCollection()
+    {
+        if (!_SessionCollectionHooked)
+        {
+            _SessionCollectionHooked = true;
+            AllSessions.CollectionChanged += AllSessions_CollectionChanged;
+        }
+    }
+
+    /// <summary>
+    /// Opens a COM-port or raw-TCP terminal as a session next to the SSH sessions.
+    /// Different ports can be open at the same time. A port that is already open is not opened a second time:
+    /// its existing session is activated instead (and reconnected if it was closed), because a COM port has one owner.
+    /// </summary>
+    internal SessionWrapper AddDeviceSession(DeviceTerminalSettings settings)
+    {
+        if (settings?.Connection == null || !settings.Connection.IsValid())
+        {
+            throw new ArgumentException("The device connection is not specified.", nameof(settings));
+        }
+        string exclusiveKey = DeviceTabContext.MakeExclusiveKey(settings.Connection);
+        if (exclusiveKey != null)
+        {
+            SessionWrapper existing = AllSessions.FirstOrDefault((SessionWrapper candidate) => candidate.DeviceExclusiveKey == exclusiveKey);
+            if (existing != null)
+            {
+                ActiveSessionIndex = AllSessions.IndexOf(existing);
+                existing.DeviceTab?.Terminal.ReconnectIfClosed();
+                return existing;
+            }
+        }
+        int firstPseudoPage = FirstPseudoPage;
+        DeviceTerminalSettings sessionSettings = CloneForSession(settings);
+        string title = MakeUniqueDeviceTitle(DeviceTerminalControl.GetConnectionTitle(sessionSettings.Connection));
+        SessionWrapper sessionWrapper = SessionWrapper.CreateDeviceSession(this, sessionSettings, title);
+        sessionWrapper.ShowNewSessionTab = AllSessions.Count == 1;
+        AllSessions.Insert(firstPseudoPage, sessionWrapper);
+        HookSessionCollection();
+        ActiveSessionIndex = firstPseudoPage;
+        return sessionWrapper;
+    }
+
+    // Every tab works on its own copy: changing the baud rate or the encoding in one tab must not leak into the
+    // saved connection list item it was opened from, or into another tab opened from the same item.
+    private static DeviceTerminalSettings CloneForSession(DeviceTerminalSettings source)
+    {
+        DeviceTerminalSettings clone = source.Clone();
+        if (source.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serial)
+        {
+            clone.Connection = serial.Clone();
+        }
+        else if (source.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
+        {
+            clone.Connection = new DeviceTerminalSettings.ConnectionSettings.Tcp
+            {
+                Host = tcp.Host,
+                Port = tcp.Port
+            };
+        }
+        return clone;
+    }
+
+    private string MakeUniqueDeviceTitle(string baseTitle)
+    {
+        string title = baseTitle;
+        int suffix = 2;
+        while (AllSessions.Any((SessionWrapper candidate) => candidate.IsDevice && string.Equals(candidate.Title, title, StringComparison.OrdinalIgnoreCase)))
+        {
+            title = baseTitle + " #" + suffix++;
+        }
+        return title;
     }
 
     private void AllSessions_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("HideHeaders"));
-        if (AllSessions.Count == 2 && AllSessions[0].Session != null)
+        if (AllSessions.Count == 2 && !AllSessions[0].IsPlaceholder)
         {
             AllSessions[0].ShowNewSessionTab = true;
         }
-        else if (AllSessions.Count > 2 && AllSessions[0].Session != null)
+        else if (AllSessions.Count > 2 && !AllSessions[0].IsPlaceholder)
         {
             AllSessions[0].ShowNewSessionTab = false;
         }
@@ -1240,7 +1362,7 @@ public class MainWindowController : INotifyPropertyChanged
     public void CloseSession(SessionWrapper session)
     {
         AllSessions.Remove(session);
-        if (AllSessions.Count((SessionWrapper sessionWrapper) => sessionWrapper.Session != null) == 0)
+        if (AllSessions.Count((SessionWrapper sessionWrapper) => !sessionWrapper.IsPlaceholder) == 0)
         {
             OnLastSessionClosed?.Invoke();
         }
@@ -1393,15 +1515,19 @@ public class MainWindowController : INotifyPropertyChanged
         if (NewConnectionController == null)
         {
             CommonGUIPreferences commonGUIPreferences = GuiPreferencesStore.Current;
-            NewConnectionController = new ConnectionSelectionWindow.ControllerImpl(Dispatcher, showRawConnections: false, null, new CommonGUIPreferences
+            // COM ports and saved raw TCP endpoints are offered here as well (showRawConnections), so they open as
+            // tabs of this window; the update thread is what discovers the COM ports that are currently present.
+            NewConnectionController = new ConnectionSelectionWindow.ControllerImpl(Dispatcher, showRawConnections: true, null, new CommonGUIPreferences
             {
                 ProbeConnections = commonGUIPreferences.ProbeConnections,
                 SortMode = commonGUIPreferences.SortMode,
                 ShownConnections = new ShownConnectionTypes
                 {
-                    SSH = true
+                    SSH = true,
+                    RawTcp = true,
+                    Serial = true
                 }
-            }, suppressUpdateThread: true);
+            }, suppressUpdateThread: false);
             NewConnectionController.SessionCreated += NewConnectionController_SessionCreated;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("NewConnectionController"));
         }
@@ -1411,7 +1537,22 @@ public class MainWindowController : INotifyPropertyChanged
     {
         BeginInvoke(() =>
         {
-            AddSession(NewConnectionController.CreatedSession, NewConnectionController.SelectedSettings, createFirstPage: true);
+            DeviceTerminalSettings pendingDevice = NewConnectionController.TakePendingRawConnectionSettings();
+            try
+            {
+                if (pendingDevice != null)
+                {
+                    AddDeviceSession(pendingDevice);
+                }
+                else
+                {
+                    AddSession(NewConnectionController.CreatedSession, NewConnectionController.SelectedSettings, createFirstPage: true);
+                }
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
             CloseNewConnectionPopup?.Invoke();
         });
     }
@@ -1482,7 +1623,7 @@ public class MainWindowController : INotifyPropertyChanged
         SessionWrapper[] items = AllSessions.ToArray();
         foreach (SessionWrapper sessionWrapper in items)
         {
-            if (sessionWrapper.Session != null)
+            if (!sessionWrapper.IsPlaceholder)
             {
                 sessionWrapper.Dispose();
             }

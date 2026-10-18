@@ -4,6 +4,7 @@ using SmarTTY.Forms;
 using SmarTTY.IO;
 using SmarTTY.Terminal;
 using SmarTTY.Transport;
+using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,6 +13,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using VisualTTY;
+using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.GUI.Backend;
 
@@ -111,9 +113,46 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     private object _Sync = new object();
 
+    private string _DeviceTitle;
+
     public ObservableCollection<ITabContext> Tabs { get; } = new ObservableCollection<ITabContext>();
 
-    public string Title => Settings?.HostName;
+    /// <summary>
+    /// Settings of a COM/TCP terminal when this wrapper is a device session; null for SSH sessions and for the
+    /// "new connection" placeholder. A device session owns exactly one <see cref="DeviceTabContext"/> and has no
+    /// SSH session, SCP transfers or "new terminal tab" shortcuts.
+    /// </summary>
+    public DeviceTerminalSettings DeviceSettings { get; }
+
+    public bool IsDevice => DeviceSettings != null;
+
+    /// <summary>True for the trailing "connect to another target" pseudo session (neither SSH nor device).</summary>
+    public bool IsPlaceholder => Session == null && DeviceSettings == null;
+
+    public System.Windows.Visibility SshOnlyVisibility => IsDevice ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+
+    public DeviceTabContext DeviceTab => Tabs.OfType<DeviceTabContext>().FirstOrDefault();
+
+    /// <summary>Non-null for a COM port: the key that must be unique among open sessions.</summary>
+    public string DeviceExclusiveKey => IsDevice ? DeviceTabContext.MakeExclusiveKey(DeviceSettings.Connection) : null;
+
+    /// <summary>Connection state and transferred bytes of a device session, for the status bar.</summary>
+    public string DeviceStatusText => DeviceTab?.Terminal.StatusText;
+
+    public string DeviceTrafficText
+    {
+        get
+        {
+            DeviceTerminalControl terminal = DeviceTab?.Terminal;
+            if (terminal == null)
+            {
+                return null;
+            }
+            return $"{StringUtils.FormatSize(terminal.BytesSent)}B sent, {StringUtils.FormatSize(terminal.BytesReceived)}B received";
+        }
+    }
+
+    public string Title => IsDevice ? _DeviceTitle : Settings?.HostName;
 
     public string TitleWithStatus
     {
@@ -124,6 +163,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             {
                 text += " [inactive]";
             }
+            else if (IsDevice && DeviceTab != null && (DeviceTab.Terminal.ConnectionState == ConnectionStateEnum.Disconnected || DeviceTab.Terminal.ConnectionState == ConnectionStateEnum.Failed))
+            {
+                text += " [disconnected]";
+            }
             return text;
         }
     }
@@ -132,6 +175,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     {
         get
         {
+            if (IsDevice)
+            {
+                return (DeviceSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial) ? IconType.Serial : IconType.Network;
+            }
             if (Session == null)
             {
                 return IconType.Add;
@@ -268,7 +315,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    public string TitleWithUserName => Settings?.UserName + "@" + Settings?.HostName;
+    public string TitleWithUserName => IsDevice ? _DeviceTitle : Settings?.UserName + "@" + Settings?.HostName;
 
     public VirtualTerminalSettings VTSettings => _Controller.Settings.VirtualTerminal;
 
@@ -326,6 +373,83 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             Tabs.Add(item);
         }
+    }
+
+    private SessionWrapper(MainWindowController controllerImpl, DeviceTerminalSettings deviceSettings)
+    {
+        SCPController = new SCPController(this);
+        _Controller = controllerImpl;
+        DeviceSettings = deviceSettings;
+        Tabs.CollectionChanged += Tabs_CollectionChanged;
+        _NewTabShortcuts = new PseudoTabContext[0];
+    }
+
+    /// <summary>Creates a session for a COM/TCP terminal with its single terminal tab.</summary>
+    internal static SessionWrapper CreateDeviceSession(MainWindowController controller, DeviceTerminalSettings settings, string title)
+    {
+        SessionWrapper session = new SessionWrapper(controller, settings);
+        session._DeviceTitle = title;
+        session.AddDeviceTab();
+        return session;
+    }
+
+    private void AddDeviceTab()
+    {
+        try
+        {
+            _TabUpdateInProgress++;
+            Tabs.Insert(0, new DeviceTabContext(this, DeviceSettings));
+        }
+        finally
+        {
+            _TabUpdateInProgress--;
+        }
+    }
+
+    /// <summary>Settings shared by all tabs (font, palette, key behavior), for device terminals.</summary>
+    internal GlobalSettings CommonSettings => _Controller.Settings;
+
+    /// <summary>Toggles the main window full screen mode (Alt+Enter in a device terminal).</summary>
+    internal void ToggleFullScreenFromDevice()
+    {
+        _Controller.BeginInvoke(() => _Controller.FullScreenMode = !_Controller.FullScreenMode);
+    }
+
+    /// <summary>Closes a device tab after the key handler that asked for it has returned (Ctrl+W).</summary>
+    internal void CloseDeviceTabFromKeyboard(DeviceTabContext tab)
+    {
+        _Controller.BeginInvoke(() => tab.Close());
+    }
+
+    internal void OnDeviceStatusChanged()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("TitleWithStatus"));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("DeviceStatusText"));
+    }
+
+    /// <summary>Closes the terminal of a device session, which ends the session itself.</summary>
+    internal void CloseDeviceTab(DeviceTabContext tab)
+    {
+        int tabIndex = Tabs.IndexOf(tab);
+        if (tabIndex < 0)
+        {
+            return;
+        }
+        if (ActiveTabIndex == tabIndex)
+        {
+            ActiveTabIndex = Math.Max(0, ActiveTabIndex - 1);
+        }
+        try
+        {
+            _TabUpdateInProgress++;
+            Tabs.RemoveAt(tabIndex);
+        }
+        finally
+        {
+            _TabUpdateInProgress--;
+        }
+        tab.Dispose();
+        _Controller.CloseSession(this);
     }
 
     private void AttachNewSession(SshSession session)
@@ -471,6 +595,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public void UploadFiles(string[] files)
     {
+        if (IsDevice)
+        {
+            return;
+        }
         string dir = _Controller.Settings.DefaultUploadDirectory;
         ExpandHomeDirIfNeeded(ref dir);
         _Controller.Settings.DefaultUploadDirectory = dir;
@@ -531,6 +659,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public void CreateNewTerminalPage(bool virtualMode = false, InitialCommand command = default(InitialCommand), string initialDirForVirtualMode = null)
     {
+        if (IsDevice)
+        {
+            // One owner per device: a second terminal on the same COM port (or a clone of the connection) is not offered.
+            MessageBoxes.Info("A COM/TCP session has a single terminal. Open another port from the 'Connect to another target' list, or close this tab first.");
+            return;
+        }
         try
         {
             _TabUpdateInProgress++;
@@ -606,7 +740,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 break;
             }
         }
-        if (FirstPseudoPage == 0)
+        // A device session keeps no pseudo tabs of its own, so "no pseudo page" must not be read as "no tabs left".
+        if (!IsDevice && FirstPseudoPage == 0)
         {
             _Controller.CloseSession(this);
         }
@@ -616,6 +751,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     {
         Session?.Dispose();
         TransferManager?.Dispose();
+        foreach (DeviceTabContext deviceTab in Tabs.OfType<DeviceTabContext>().ToList())
+        {
+            deviceTab.Dispose();
+        }
     }
 
     internal void OnCtrlTabPressed(bool bShift)

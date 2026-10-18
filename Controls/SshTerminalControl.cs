@@ -324,7 +324,9 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     protected virtual bool IsCommandRunning => _inputLine == null;
 
-    protected override bool UsesTerminalInput => _inputLine != null;
+    // At the prompt (_inputLine != null) the user edits the local input line, so keys must NOT be
+    // forwarded to the remote channel; only while a command is running do they go to the terminal.
+    protected override bool UsesTerminalInput => _inputLine == null;
 
     protected virtual bool HasInputLine => _inputLine != null;
 
@@ -806,7 +808,7 @@ public class SshTerminalControl : TerminalEmulatorControl
                         return;
                     }
                 default:
-                    if (e.KeyChar > ' ' && _context.VTSettings.CompletionTriggers.FirstCharacterInWord)
+                    if (e.KeyChar > ' ' && AtWordStartTriggerEnabled())
                     {
                         isAtWordStart = _inputLine?.IsAtWordStart;
                     }
@@ -820,13 +822,13 @@ public class SshTerminalControl : TerminalEmulatorControl
                 switch (e.KeyChar)
                 {
                     case ' ':
-                        if (_context.VTSettings.CompletionTriggers.Space)
+                        if (CompletionTriggers().Space)
                         {
                             ShowCompletions(CompletionTrigger.Auto);
                         }
                         break;
                     case '/':
-                        if (_context.VTSettings.CompletionTriggers.Slash)
+                        if (CompletionTriggers().Slash)
                         {
                             ShowCompletions();
                         }
@@ -846,19 +848,19 @@ public class SshTerminalControl : TerminalEmulatorControl
         switch (e.KeyChar)
         {
             case ' ':
-                if (_context.VTSettings.CompletionTriggers.Space)
+                if (CompletionTriggers().Space)
                 {
                     ShowCompletions(CompletionTrigger.Auto);
                 }
                 break;
             case '/':
-                if (_context.VTSettings.CompletionTriggers.Slash)
+                if (CompletionTriggers().Slash)
                 {
                     ShowCompletions();
                 }
                 break;
             default:
-                if (_context.VTSettings.CompletionTriggers.FirstCharacterInWord && isAtWordStart == true)
+                if (AtWordStartTriggerEnabled() && isAtWordStart == true)
                 {
                     ShowCompletions((e.KeyChar != '-') ? CompletionTrigger.Auto : CompletionTrigger.Options);
                 }
@@ -868,6 +870,16 @@ public class SshTerminalControl : TerminalEmulatorControl
             case '\r':
                 break;
         }
+    }
+
+    private AutoCompletionTriggers CompletionTriggers()
+    {
+        return _context?.VTSettings?.CompletionTriggers ?? new AutoCompletionTriggers();
+    }
+
+    private bool AtWordStartTriggerEnabled()
+    {
+        return CompletionTriggers().FirstCharacterInWord;
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -942,7 +954,7 @@ public class SshTerminalControl : TerminalEmulatorControl
                             break;
                         }
                     case Keys.Space:
-                        if (_context.VTSettings.CompletionTriggers.CtrlSpace)
+                        if (CompletionTriggers().CtrlSpace)
                         {
                             ShowCompletions();
                             e.Handled = true;

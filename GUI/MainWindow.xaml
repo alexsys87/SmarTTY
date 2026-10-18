@@ -39,6 +39,12 @@
             <DataTrigger Value="AddVirtual" Binding="{Binding Icon}">
               <Setter Property="Source" Value="../icons/event16.png" />
             </DataTrigger>
+            <DataTrigger Value="Serial" Binding="{Binding Icon}">
+              <Setter Property="Source" Value="../icons/com16.png" />
+            </DataTrigger>
+            <DataTrigger Value="Network" Binding="{Binding Icon}">
+              <Setter Property="Source" Value="../icons/net16.png" />
+            </DataTrigger>
             <DataTrigger Binding="{Binding Title}" Value="{x:Null}">
               <Setter Property="Margin" Value="0" />
             </DataTrigger>
@@ -67,6 +73,32 @@
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
+                <Style x:Key="TabMinimizeButton" TargetType="{x:Type Button}">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate>
+                                <Border Name="Glyph" Width="8" Height="8" Background="Transparent">
+                                    <Rectangle Name="Bar" Width="8" Height="2" VerticalAlignment="Center" Fill="#FF888888" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="UIElement.IsMouseOver" Value="True">
+                                        <Setter TargetName="Bar" Property="Rectangle.Fill" Value="#FFCC0000" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                    <Setter Property="Background" Value="{DynamicResource {x:Static styles:StyleKeys.ActiveTabBackground}}" />
+                    <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="FrameworkElement.ToolTip" Value="Collapse" />
+                    <EventSetter Event="Click" Handler="MinimizeDeviceTabWindow_Click" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsDevice}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+
         <Style x:Key="TitleText" TargetType="{x:Type TextBlock}">
           <Style.Triggers>
             <DataTrigger Binding="{Binding Title}" Value="{x:Null}">
@@ -78,12 +110,12 @@
     </FrameworkElement.Resources>
     <Menu Grid.Row="0" Padding="0 2 0 2" Visibility="{Binding MainMenuVisibility}">
       <MenuItem Header="_File">
-        <MenuItem Header="_New Tab" Click="NewTab_Click">
+        <MenuItem Header="_New Tab" Click="NewTab_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/add16.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="_Open a remote file" Click="OpenFile_Click">
+        <MenuItem Header="_Open a remote file" Click="OpenFile_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/open16.png" />
           </MenuItem.Icon>
@@ -126,7 +158,7 @@
         <MenuItem Header="Copy _All" Click="CopyAll_Click" />
       </MenuItem>
       <MenuItem Header="_View">
-        <MenuItem Header="_SCP Transfers" Click="SCPTransfers_Click">
+        <MenuItem Header="_SCP Transfers" Click="SCPTransfers_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/transfers.png" />
           </MenuItem.Icon>
@@ -137,7 +169,7 @@
         <MenuItem Header="_Minimalistic mode" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.MinimalisticMode}" />
         <MenuItem Header="_Full-screen mode" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.FullScreenMode}" />
       </MenuItem>
-      <MenuItem Header="S_CP">
+      <MenuItem Header="S_CP" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
         <MenuItem Header="_Download a file" Click="Download_Click">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/download.png" />
@@ -165,12 +197,12 @@
         </MenuItem>
       </MenuItem>
       <MenuItem Header="_Tools">
-        <MenuItem Header="Manage Linux _Packages" Click="ManagePackages_Click">
+        <MenuItem Header="Manage Linux _Packages" Click="ManagePackages_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/archive16.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="_Public key authentication" Click="PublicKey_Click">
+        <MenuItem Header="_Public key authentication" Click="PublicKey_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/pubkey.png" />
           </MenuItem.Icon>
@@ -247,13 +279,14 @@
                 <FrameworkElement.Style>
                   <Style TargetType="{x:Type Grid}">
                     <Style.Triggers>
-                      <DataTrigger Binding="{Binding Session}" Value="{x:Null}">
+                      <DataTrigger Binding="{Binding IsPlaceholder}" Value="True">
                         <Setter Property="Visibility" Value="Collapsed" />
                       </DataTrigger>
                     </Style.Triggers>
                   </Style>
                 </FrameworkElement.Style>
                 <Grid.ColumnDefinitions>
+                  <ColumnDefinition />
                   <ColumnDefinition />
                   <ColumnDefinition />
                   <ColumnDefinition />
@@ -270,6 +303,7 @@
                     </Style>
                   </FrameworkElement.Style>
                 </Image>
+                <Button Grid.Column="3" Margin="2 0 0 0" Style="{StaticResource TabMinimizeButton}" />
                 <Button Grid.Column="2" Style="{StaticResource TabCloseButton}" />
                 <TextBlock Grid.Column="1" Style="{StaticResource TitleText}" Text="{Binding Title}" />
               </Grid>
@@ -278,7 +312,7 @@
                   <Style TargetType="{x:Type ToggleButton}">
                     <Setter Property="Visibility" Value="Collapsed" />
                     <Style.Triggers>
-                      <DataTrigger Binding="{Binding Session}" Value="{x:Null}">
+                      <DataTrigger Binding="{Binding IsPlaceholder}" Value="True">
                         <Setter Property="Visibility" Value="Visible" />
                       </DataTrigger>
                     </Style.Triggers>

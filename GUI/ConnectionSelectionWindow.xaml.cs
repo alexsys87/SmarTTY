@@ -597,6 +597,17 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         public DeviceTerminalSettings PendingRawConnectionSettings { get; private set; }
 
+        /// <summary>
+        /// Returns the COM/TCP connection chosen by the user and forgets it, so that a later SSH connection made
+        /// with the same controller is not mistaken for it.
+        /// </summary>
+        public DeviceTerminalSettings TakePendingRawConnectionSettings()
+        {
+            DeviceTerminalSettings pending = PendingRawConnectionSettings;
+            PendingRawConnectionSettings = null;
+            return pending;
+        }
+
         public string Filter
         {
             get

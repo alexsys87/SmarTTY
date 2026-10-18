@@ -71,6 +71,21 @@ public partial class HexTerminalControl : DpiAwareControl
         }
     }
 
+    /// <summary>Copies the selection to the clipboard as soon as it is made (applies to both the HEX and the text view).</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool CopyOnSelect
+    {
+        get
+        {
+            return termHex.CopyOnSelect;
+        }
+        set
+        {
+            termHex.CopyOnSelect = value;
+            termText.CopyOnSelect = value;
+        }
+    }
+
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public DeviceTerminalSettings.HexTerminalSettings HexSettings
     {

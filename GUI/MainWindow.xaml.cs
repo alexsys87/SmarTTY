@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.GUI.Backend;
 using SmarTTY.Transport;
@@ -12,6 +12,7 @@ using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Threading;
 using VisualTTY;
+using VisualTTY.DeviceTerminal;
 using DataFormats = System.Windows.DataFormats;
 using DragDropEffects = System.Windows.DragDropEffects;
 using DragEventArgs = System.Windows.DragEventArgs;
@@ -33,7 +34,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         IsEnabled = false
     };
 
-    public readonly MainWindowController Controller;
+    public MainWindowController Controller;
 
     private ToggleButton _LastActiveNewConnectionButton;
 
@@ -43,7 +44,16 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private GridLength? _FilesWidth = new GridLength(200.0);
 
-    public MainWindow(SshSession session, SSHConnectionSettings connectionSettings, string initialCommand = null, bool echoInitialCommand = false)
+    /// <summary>Opens the window with a COM-port or raw-TCP terminal as its first session (no SSH connection).</summary>
+    public MainWindow(DeviceTerminalSettings deviceSettings)
+    {
+        InitializeWindow();
+        _InitialCommand = default(InitialCommand);
+        Controller.AddDeviceSession(deviceSettings);
+        _ResizeTimer.Tick += _ResizeTimer_Tick;
+    }
+
+    private void InitializeWindow()
     {
         ApplyTheme((Window)this, SmarTTYTheme.Dark, ref _ThemeDictionary);
         InitializeComponent();
@@ -55,13 +65,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         catch
         {
         }
-        _InitialCommand = new InitialCommand(initialCommand, echoInitialCommand);
         this.DataContext = (Controller = new MainWindowController(this));
         Controller.CloseNewConnectionPopup += () =>
         {
             NewConnectionPopup.IsOpen = false;
         };
         Controller.OnLastSessionClosed += base.Close;
+    }
+
+    public MainWindow(SshSession session, SSHConnectionSettings connectionSettings, string initialCommand = null, bool echoInitialCommand = false)
+    {
+        InitializeWindow();
+        _InitialCommand = new InitialCommand(initialCommand, echoInitialCommand);
         SessionWrapper sessionWrapper = Controller.AddSession(session, connectionSettings, createFirstPage: false);
         VirtualTerminalMode virtualTerminalMode = Controller.Settings.VirtualTerminal.DefaultMode;
         if (_InitialCommand.Command == null && virtualTerminalMode == VirtualTerminalMode.Ask)
@@ -337,14 +352,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            Controller.ActiveSession?.UploadFiles(files);
+            SessionWrapper dropSession = Controller.ActiveSession;
+            if (dropSession != null && !dropSession.IsDevice)
+            {
+                dropSession.UploadFiles(files);
+            }
         }
     }
 
     protected override void OnDragEnter(DragEventArgs e)
     {
         base.OnDragEnter(e);
-        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        if (e.Data.GetDataPresent(DataFormats.FileDrop) && Controller.ActiveSession?.IsDevice != true)
         {
             e.Effects = (DragDropEffects)1;
         }
@@ -360,6 +379,23 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         {
             object sourceElement = ((sender is FrameworkElement) ? sender : null);
             (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as ICloseableElement)?.Close();
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    // Minimizes the main application window when the "collapse" button on a device (COM/raw TCP)
+    // session tab header is pressed. The button is only shown on device sessions (see TabMinimizeButton).
+    private void MinimizeDeviceTabWindow_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is FrameworkElement element)
+            {
+                Window.GetWindow(element).WindowState = WindowState.Minimized;
+            }
         }
         catch (Exception exception)
         {
@@ -576,7 +612,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     private void ManagePackages_Click(object sender, RoutedEventArgs e)
     {
         SessionWrapper activeSession = Controller.ActiveSession;
-        if (activeSession == null)
+        if (activeSession == null || activeSession.IsDevice)
         {
             return;
         }
@@ -599,7 +635,9 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
-        if (Controller.ActiveSession?.ActiveTab?.EditorControl is TerminalEmulatorControl terminalEmulatorControl)
+        // COM/TCP tabs follow the same F10 and Alt+letter rules as SSH terminals (the shared "Action for Alt+letter" option).
+        ITabContext activeTab = Controller.ActiveSession?.ActiveTab;
+        if ((activeTab?.EditorControl as TerminalEmulatorControl ?? (activeTab as DeviceTabContext)?.Terminal.FocusedTextTerminal) is TerminalEmulatorControl terminalEmulatorControl)
         {
             if ((int)e.Key == 156 && (int)e.SystemKey == 99)
             {

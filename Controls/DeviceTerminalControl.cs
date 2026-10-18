@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Threading;
+using VisualTTY;
 using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Controls;
@@ -22,6 +23,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private AsyncTransportConnection _asyncTransportConnection;
 
     private DeviceTerminalSettings _deviceTerminalSettings;
+
+    // Appearance and key behavior shared with the SSH tabs (Settings window). Everything that is specific to one
+    // device (colors, line ending, encoding, baud rate, ...) stays in _deviceTerminalSettings.
+    private GlobalSettings _commonSettings;
 
     private Brush _brush;
 
@@ -153,6 +158,45 @@ public partial class DeviceTerminalControl : DpiAwareControl
         return null;
     }
 
+    /// <summary>
+    /// Applies the settings that SSH tabs share through the Settings window: font, ANSI palette and the key and
+    /// mouse behavior (Shift+PageUp/Down, mouse wheel, Alt+letter, Ctrl-C/V, Ctrl+W, copy on selection).
+    /// Per-device values (background/text/echo/disconnected colors, line ending, encoding, ...) are not touched,
+    /// so this can be called again at any time, e.g. after the user changes the shared settings.
+    /// </summary>
+    public void ApplyCommonSettings(GlobalSettings settings)
+    {
+        if (settings == null)
+        {
+            return;
+        }
+        _commonSettings = settings;
+        TerminalEmulatorControl terminal = terminalEmulatorControl1;
+        terminal.AppSettings = settings;
+        terminal.CopyOnSelect = settings.CopyOnSelection;
+        hexTerminalControl1.CopyOnSelect = settings.CopyOnSelection;
+        terminal.SetPalette(settings.PaletteOverride ?? ConsolePalette.PuTTY);
+        try
+        {
+            // Same rule as for SSH tabs: without a configured font the control keeps its own default.
+            if (!string.IsNullOrEmpty(settings.FontName) && settings.FontSize != 0f)
+            {
+                hexTerminalControl1.Font = new Font(settings.FontName, settings.FontSize);
+                terminal.Font = new Font(settings.FontName, settings.FontSize);
+            }
+        }
+        catch
+        {
+            // An uninstalled font must not break the terminal; the previous font stays.
+        }
+        if (terminal.IsHandleCreated)
+        {
+            terminal.UpdateLayout();
+            terminal.Redraw();
+            hexTerminalControl1.Invalidate(true);
+        }
+    }
+
     public void ApplySettings(DeviceTerminalSettings deviceTerminalSettings)
     {
         _deviceTerminalSettings = deviceTerminalSettings;
@@ -205,7 +249,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _textDecoder.Reset();
         _logWriter?.ResetDecoder();
         IDeviceTransport deviceTransport = this._transportFactory.CreateTransport();
-        lblConnection.Text = "Connected to " + deviceTransport.GetDisplayName(includeParameters: true);
+        _transportDisplayName = deviceTransport.GetDisplayName(includeParameters: true);
+        lblConnection.Text = "Connected to " + _transportDisplayName;
+        Interlocked.Exchange(ref _bytesSent, 0L);
+        Interlocked.Exchange(ref _bytesReceived, 0L);
+        _connectionState = ConnectionStateEnum.Connecting;
         _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, value);
         _asyncTransportConnection.DataReceived += OnDataReceived;
         _asyncTransportConnection.StateChanged += OnConnectionStateChanged;
@@ -217,7 +265,65 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
     }
 
+    private void SendToDevice(byte[] buffer, int count)
+    {
+        AsyncTransportConnection connection = _asyncTransportConnection;
+        if (connection == null)
+        {
+            throw new InvalidOperationException("The connection is closed. Use Reconnect first.");
+        }
+        connection.Send(buffer, count);
+        Interlocked.Add(ref _bytesSent, count);
+    }
+
+    /// <summary>Reopens the connection when it is closed or failed; an established connection is left alone.</summary>
+    public void ReconnectIfClosed()
+    {
+        if (_transportFactory != null && (_connectionState == ConnectionStateEnum.Disconnected || _connectionState == ConnectionStateEnum.Failed))
+        {
+            Connect();
+        }
+    }
+
+    /// <summary>Pastes the clipboard text into the device (same as the context menu command).</summary>
+    public void Paste()
+    {
+        pasteToolStripMenuItem_Click(this, EventArgs.Empty);
+    }
+
+    /// <summary>Copies the whole output (text or HEX dump, depending on the mode) to the clipboard.</summary>
+    public void CopyAll()
+    {
+        copyAllToolStripMenuItem_Click(this, EventArgs.Empty);
+    }
+
+    /// <summary>Moves the keyboard focus to the active output view so typed characters reach the device.</summary>
+    public void FocusTerminal()
+    {
+        if (HexMode)
+        {
+            hexTerminalControl1.Focus();
+        }
+        else
+        {
+            terminalEmulatorControl1.Focus();
+        }
+    }
+
     private void OnConnectionStateChanged(object sender, ConnectionStateEnum connectionStateEnum, string value)
+    {
+        _connectionState = connectionStateEnum;
+        try
+        {
+            ApplyConnectionState(connectionStateEnum, value);
+        }
+        finally
+        {
+            RaiseStatusChanged();
+        }
+    }
+
+    private void ApplyConnectionState(ConnectionStateEnum connectionStateEnum, string value)
     {
         if (connectionStateEnum == ConnectionStateEnum.Connecting || connectionStateEnum == ConnectionStateEnum.Failed)
         {
@@ -306,7 +412,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         if (_asyncTransportConnection != null)
         {
-            _asyncTransportConnection.Send(buffer, buffer.Length);
+            SendToDevice(buffer, buffer.Length);
         }
         if (_deviceTerminalSettings.EchoTypedCharacters && inputKind != TerminalEmulatorControl.InputKind.MouseReport && !_isHexMode)
         {
@@ -414,7 +520,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         try
         {
             byte[] items = ((!sendAsHEXToolStripMenuItem.Checked) ? _textEncoding.GetBytes(txtHexInput.Text) : ParseHexBytes(txtHexInput.Text));
-            _asyncTransportConnection.Send(items, items.Length);
+            SendToDevice(items, items.Length);
             if (_deviceTerminalSettings.EchoTypedCharacters)
             {
                 hexTerminalControl1.AppendData(items, items.Length, isEcho: true);
@@ -532,7 +638,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         try
         {
             byte[] items = File.ReadAllBytes(_openFileDialog.FileName);
-            _asyncTransportConnection.Send(items, items.Length);
+            SendToDevice(items, items.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
             {
                 hexTerminalControl1.AppendData(items, items.Length, isEcho: true);
@@ -580,11 +686,29 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void OnTerminalKeyDown(object sender, KeyEventArgs e)
     {
-        // Ctrl+C is sent to the device (e.g. SIGINT for a Linux console), so clipboard
-        // operations use Ctrl+Shift+C / Ctrl+Shift+V like in common Linux terminals.
+        GlobalSettings common = _commonSettings;
+        if (common != null && common.UseCtrlShortcuts && e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.W)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            CloseTabRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+        if (!e.Control && e.Alt && !e.Shift && e.KeyCode == Keys.Return)
+        {
+            // Not a character for the device: toggle full screen like in SSH tabs.
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            FullScreenToggleRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+        // By default Ctrl+C is sent to the device (e.g. SIGINT for a Linux console), so clipboard
+        // operations use Ctrl+Shift+C / Ctrl+Shift+V like in common Linux terminals. When the shared option
+        // "Ctrl-C/Ctrl-X/Ctrl-V = Copy/Cut/Paste" is on, plain Ctrl+C / Ctrl+V work on the clipboard (as in SSH tabs).
         // The HEX view never sends Ctrl+C to the device, so plain Ctrl+C copies there as well.
-        bool copy = e.Control && !e.Alt && e.KeyCode == Keys.C && (e.Shift || HexMode);
-        bool paste = e.Control && e.Shift && !e.Alt && e.KeyCode == Keys.V;
+        bool interceptClipboard = common != null && common.InterceptCtrlClipboardShortcuts;
+        bool copy = e.Control && !e.Alt && e.KeyCode == Keys.C && (e.Shift || HexMode || interceptClipboard);
+        bool paste = e.Control && !e.Alt && e.KeyCode == Keys.V && (e.Shift || interceptClipboard);
         if (copy)
         {
             CopySelection();
@@ -611,7 +735,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 return;
             }
             byte[] bytes = _textEncoding.GetBytes(text);
-            _asyncTransportConnection.Send(bytes, bytes.Length);
+            SendToDevice(bytes, bytes.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
             {
                 hexTerminalControl1.AppendData(bytes, bytes.Length, isEcho: true);
