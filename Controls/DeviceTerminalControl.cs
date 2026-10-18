@@ -36,6 +36,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private bool _updatingEncodingSelection;
 
+    // Continuous log of received data; null while not recording.
+    private TerminalLogWriter _logWriter;
+
+    private int _lastLogButtonUpdate;
+
     public bool HexMode
     {
         get
@@ -76,6 +81,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _textEncoding = TerminalEncodings.Resolve(encodingName);
         _textDecoder = new TextStreamDecoder(_textEncoding);
         terminalEmulatorControl1.InputEncoding = _textEncoding;
+        _logWriter?.SetEncoding(_textEncoding);
     }
 
     private void SelectEncodingInToolbar(string encodingName)
@@ -115,6 +121,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void DeviceTerminalControl_Disposed(object sender, EventArgs e)
     {
+        _logWriter?.Dispose();
+        _logWriter = null;
         if (_asyncTransportConnection != null)
         {
             _asyncTransportConnection.Dispose();
@@ -195,6 +203,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         // A half-received character from the previous connection must not be glued to the new data.
         _textDecoder.Reset();
+        _logWriter?.ResetDecoder();
         IDeviceTransport deviceTransport = this._transportFactory.CreateTransport();
         lblConnection.Text = "Connected to " + deviceTransport.GetDisplayName(includeParameters: true);
         _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, value);
@@ -269,6 +278,17 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void OnDataReceived(object sender, byte[] buffer, int value)
     {
+        // The log gets the raw stream before it is split into text or hex, so recording does not depend on the display mode.
+        if (_logWriter != null)
+        {
+            _logWriter.Write(buffer, 0, value);
+            int now = Environment.TickCount;
+            if (now - _lastLogButtonUpdate > 500)
+            {
+                _lastLogButtonUpdate = now;
+                UpdateLogButton();
+            }
+        }
         if (_isHexMode)
         {
             hexTerminalControl1.AppendData(buffer, value);
@@ -601,6 +621,133 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
+    }
+
+    private void btnLog_Click(object sender, EventArgs e)
+    {
+        if (_logWriter != null)
+        {
+            StopLogging();
+        }
+        else
+        {
+            StartLogging();
+        }
+    }
+
+    private void StartLogging()
+    {
+        // The format follows the chosen file type; hex mode suggests the hex dump, text mode the text log.
+        using SaveFileDialog dialog = new SaveFileDialog
+        {
+            Title = "Record received data (appended if the file already exists)",
+            Filter = "Text log (UTF-8) (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin",
+            FilterIndex = HexMode ? 2 : 1,
+            FileName = SuggestLogFileName(),
+            AddExtension = true,
+            OverwritePrompt = false
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        TerminalLogFormat format = dialog.FilterIndex switch
+        {
+            2 => TerminalLogFormat.HexDump,
+            3 => TerminalLogFormat.RawBytes,
+            _ => TerminalLogFormat.Text,
+        };
+        try
+        {
+            TerminalLogWriter writer = new TerminalLogWriter(dialog.FileName, format, _textEncoding, append: true);
+            writer.Failed += OnLogFailed;
+            _logWriter = writer;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            return;
+        }
+        UpdateLogButton();
+    }
+
+    private void StopLogging()
+    {
+        TerminalLogWriter writer = _logWriter;
+        _logWriter = null;
+        if (writer != null)
+        {
+            writer.Failed -= OnLogFailed;
+            writer.Dispose();
+        }
+        btnLog.Text = "Start log";
+        btnLog.ForeColor = toolStrip1.ForeColor;
+        btnLog.ToolTipText = "Continuously record received data to a file";
+    }
+
+    private void UpdateLogButton()
+    {
+        TerminalLogWriter writer = _logWriter;
+        if (writer == null)
+        {
+            return;
+        }
+        string format = writer.Format switch
+        {
+            TerminalLogFormat.HexDump => "a hex dump",
+            TerminalLogFormat.RawBytes => "raw bytes",
+            _ => "text (UTF-8)",
+        };
+        btnLog.Text = "Stop log (" + FormatByteCount(writer.BytesWritten) + ")";
+        btnLog.ForeColor = Color.Firebrick;
+        btnLog.ToolTipText = "Recording to " + writer.FilePath + " as " + format + ". Click to stop.";
+    }
+
+    private void OnLogFailed(Exception exception)
+    {
+        // Raised from inside the data callback: stop and report after it has finished, and only if
+        // the failed writer is still the current one (the user may have restarted logging meanwhile).
+        try
+        {
+            BeginInvoke(new Action(() =>
+            {
+                if (_logWriter != null && !_logWriter.IsActive)
+                {
+                    StopLogging();
+                    MessageBox.Show("Logging stopped: " + exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }));
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private string SuggestLogFileName()
+    {
+        string name = _deviceTerminalSettings?.Connection?.FileNameBase;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = "terminal";
+        }
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+        {
+            name = name.Replace(invalid, '_');
+        }
+        return name + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+    }
+
+    private static string FormatByteCount(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return bytes + " B";
+        }
+        if (bytes < 1024 * 1024)
+        {
+            return (bytes / 1024.0).ToString("0.0") + " KB";
+        }
+        return (bytes / (1024.0 * 1024.0)).ToString("0.0") + " MB";
     }
 
     private void cbASCII_Click(object sender, EventArgs e)

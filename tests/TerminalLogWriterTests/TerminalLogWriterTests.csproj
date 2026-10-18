@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Terminal/TerminalLogWriter.cs" Link="TerminalLogWriter.cs" />
+    <Compile Include="../../Terminal/TextStreamDecoder.cs" Link="TextStreamDecoder.cs" />
+  </ItemGroup>
+</Project>
