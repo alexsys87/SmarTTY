@@ -1,5 +1,6 @@
 ﻿using SmarTTY.Forms;
 using SmarTTY.Native;
+using SmarTTY.Terminal;
 using SmarTTY.Transport;
 using System;
 using System.Collections.Generic;
@@ -25,6 +26,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private Brush _brush;
 
     private bool _isHexMode;
+
+    // Text exchanged with the device (received text, typed and pasted input, echo, "Send" box) always goes
+    // through this one encoding, so what is shown and what is sent cannot disagree with each other.
+    private Encoding _textEncoding = Encoding.UTF8;
+
+    // Chunks of the stream are decoded with state, so a multi-byte character split between two reads is not corrupted.
+    private TextStreamDecoder _textDecoder = new TextStreamDecoder(Encoding.UTF8);
+
+    private bool _updatingEncodingSelection;
 
     public bool HexMode
     {
@@ -54,6 +64,53 @@ public partial class DeviceTerminalControl : DpiAwareControl
         Disposed += DeviceTerminalControl_Disposed;
         pnlConnectionInProgress.BringToFront();
         toolStrip1.SendToBack();
+        foreach (TerminalEncodings.Choice choice in TerminalEncodings.All)
+        {
+            cbEncoding.Items.Add(choice);
+        }
+        SelectEncodingInToolbar(TerminalEncodings.DefaultName);
+    }
+
+    private void SetTextEncoding(string encodingName)
+    {
+        _textEncoding = TerminalEncodings.Resolve(encodingName);
+        _textDecoder = new TextStreamDecoder(_textEncoding);
+        terminalEmulatorControl1.InputEncoding = _textEncoding;
+    }
+
+    private void SelectEncodingInToolbar(string encodingName)
+    {
+        _updatingEncodingSelection = true;
+        try
+        {
+            cbEncoding.SelectedItem = null;
+            foreach (TerminalEncodings.Choice choice in TerminalEncodings.All)
+            {
+                if (string.Equals(choice.Name, encodingName, StringComparison.OrdinalIgnoreCase))
+                {
+                    cbEncoding.SelectedItem = choice;
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            _updatingEncodingSelection = false;
+        }
+    }
+
+    private void cbEncoding_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        if (_updatingEncodingSelection || _deviceTerminalSettings == null)
+        {
+            return;
+        }
+        if (cbEncoding.SelectedItem is TerminalEncodings.Choice choice)
+        {
+            // Applies to data received from now on; text already on the screen is not re-decoded.
+            _deviceTerminalSettings.TextEncoding = choice.Name;
+            SetTextEncoding(choice.Name);
+        }
     }
 
     private void DeviceTerminalControl_Disposed(object sender, EventArgs e)
@@ -109,6 +166,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         backColor = (hexTerminalControl1.ForeColor = deviceTerminalSettings.Colors.Text);
         terminal.ForeColor = backColor;
         terminalEmulatorControl1.EnterSequence = GetLineEnding(deviceTerminalSettings.LineEnding);
+        SetTextEncoding(deviceTerminalSettings.TextEncoding);
+        SelectEncodingInToolbar(deviceTerminalSettings.TextEncoding);
         _brush = (hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo));
         HexMode = _deviceTerminalSettings.DisplayMode != DeviceTerminalSettings.CharacterDisplayMode.ASCII;
         echoTypedCharactersToolStripMenuItem.Checked = _deviceTerminalSettings.EchoTypedCharacters;
@@ -134,6 +193,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             terminalEmulatorControl1.Reset();
         }
+        // A half-received character from the previous connection must not be glued to the new data.
+        _textDecoder.Reset();
         IDeviceTransport deviceTransport = this._transportFactory.CreateTransport();
         lblConnection.Text = "Connected to " + deviceTransport.GetDisplayName(includeParameters: true);
         _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, value);
@@ -213,7 +274,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             hexTerminalControl1.AppendData(buffer, value);
             return;
         }
-        string text = Encoding.ASCII.GetString(buffer, 0, value);
+        string text = _textDecoder.Decode(buffer, 0, value);
         if (_deviceTerminalSettings != null && _deviceTerminalSettings.TreatLFAsCRLF)
         {
             text = text.Replace("\n", "\r\n");
@@ -236,7 +297,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 Brush = _brush
             };
             terminalEmulatorControl1.CurrentStyle = overrideStyle;
-            string text = Encoding.ASCII.GetString(buffer);
+            string text = _textEncoding.GetString(buffer);
             switch (text)
             {
                 case "\r":
@@ -332,7 +393,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         try
         {
-            byte[] items = ((!sendAsHEXToolStripMenuItem.Checked) ? Encoding.ASCII.GetBytes(txtHexInput.Text) : ParseHexBytes(txtHexInput.Text));
+            byte[] items = ((!sendAsHEXToolStripMenuItem.Checked) ? _textEncoding.GetBytes(txtHexInput.Text) : ParseHexBytes(txtHexInput.Text));
             _asyncTransportConnection.Send(items, items.Length);
             if (_deviceTerminalSettings.EchoTypedCharacters)
             {
@@ -385,7 +446,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void hexTerminalControl1_KeyPress(object sender, KeyPressEventArgs e)
     {
-        if (e.KeyChar >= ' ' && e.KeyChar <= 'z' && (!sendAsHEXToolStripMenuItem.Checked || HexDigitValue(e.KeyChar) != -1))
+        // In character mode any printable character is accepted (Cyrillic included); it is encoded with the selected encoding on send.
+        if (sendAsHEXToolStripMenuItem.Checked ? HexDigitValue(e.KeyChar) != -1 : !char.IsControl(e.KeyChar))
         {
             txtHexInput.Text += e.KeyChar;
             txtHexInput.SelectionStart = txtHexInput.Text.Length;
@@ -524,7 +586,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         try
         {
             string text = Win32Clipboard.GetText(Handle);
-            byte[] bytes = Encoding.ASCII.GetBytes(text);
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+            byte[] bytes = _textEncoding.GetBytes(text);
             _asyncTransportConnection.Send(bytes, bytes.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
             {

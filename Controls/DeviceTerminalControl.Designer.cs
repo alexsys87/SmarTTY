@@ -74,6 +74,10 @@ public partial class DeviceTerminalControl
 
 	private ToolStripComboBox cbBaudRate;
 
+	private ToolStripLabel lblEncoding;
+
+	private ToolStripComboBox cbEncoding;
+
 	protected override void Dispose(bool disposing)
 	{
 		if (disposing && components != null)
@@ -112,6 +116,8 @@ public partial class DeviceTerminalControl
 		changeSettingsToolStripMenuItem = new ToolStripMenuItem();
 		lblBaudRate = new ToolStripLabel();
 		cbBaudRate = new ToolStripComboBox();
+		lblEncoding = new ToolStripLabel();
+		cbEncoding = new ToolStripComboBox();
 		contextMenuStrip1 = new ContextMenuStrip(components);
 		copyToolStripMenuItem = new ToolStripMenuItem();
 		copyAllToolStripMenuItem = new ToolStripMenuItem();
@@ -157,10 +163,10 @@ public partial class DeviceTerminalControl
 		lblConnecting.TabIndex = 0;
 		lblConnecting.Text = "Connecting...";
 		lblConnecting.TextAlign = ContentAlignment.TopCenter;
-		toolStrip1.Items.AddRange(new ToolStripItem[12]
+		toolStrip1.Items.AddRange(new ToolStripItem[14]
 		{
 			lblConnection, btnDisconnect, btnReconnect, btnSend, txtHexInput, lblSend, toolStripButton1, toolStripButton3, toolStripButton2, toolStripDropDownButton1,
-			lblBaudRate, cbBaudRate
+			lblBaudRate, cbBaudRate, lblEncoding, cbEncoding
 		});
 		toolStrip1.Location = new Point(0, 0);
 		toolStrip1.Name = "toolStrip1";
@@ -272,6 +278,14 @@ public partial class DeviceTerminalControl
 		cbBaudRate.SelectedIndexChanged += cbBaudRate_SelectedIndexChanged;
 		cbBaudRate.Leave += cbBaudRate_Leave;
 		cbBaudRate.KeyDown += cbBaudRate_KeyDown;
+		lblEncoding.Name = "lblEncoding";
+		lblEncoding.Size = new Size(58, 22);
+		lblEncoding.Text = "Encoding:";
+		cbEncoding.DropDownStyle = ComboBoxStyle.DropDownList;
+		cbEncoding.Name = "cbEncoding";
+		cbEncoding.Size = new Size(170, 25);
+		cbEncoding.ToolTipText = "Text encoding used to decode received data and to encode typed and pasted text";
+		cbEncoding.SelectedIndexChanged += cbEncoding_SelectedIndexChanged;
 		contextMenuStrip1.Items.AddRange(new ToolStripItem[3] { copyToolStripMenuItem, copyAllToolStripMenuItem, pasteToolStripMenuItem });
 		contextMenuStrip1.Name = "contextMenuStrip1";
 		contextMenuStrip1.Size = new Size(200, 70);

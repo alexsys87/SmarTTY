@@ -260,6 +260,13 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
     public bool TreatLFAsCRLF { get; set; }
 
+    /// <summary>
+    /// Encoding of the text exchanged with the device (see <see cref="TerminalEncodings"/>). It is used to decode
+    /// received data and to encode typed and pasted text. Settings saved before this option existed have no
+    /// value in the file and get the UTF-8 default.
+    /// </summary>
+    public string TextEncoding { get; set; } = TerminalEncodings.DefaultName;
+
     public event PropertyChangedEventHandler PropertyChanged;
 
     private void OnPropertyChanged(string name)

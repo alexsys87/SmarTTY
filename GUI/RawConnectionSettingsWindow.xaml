@@ -274,6 +274,7 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <CheckBox VerticalContentAlignment="Center" Grid.ColumnSpan="2" IsChecked="{Binding Path=Settings.EchoTypedCharacters}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
           <TextBlock Text="Echo back typed characters (with different color)" />
@@ -305,8 +306,10 @@
         <CheckBox Grid.Row="2" Grid.Column="1" VerticalContentAlignment="Center" IsChecked="{Binding Path=Settings.TreatLFAsCRLF}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
           <TextBlock Text="Treat incoming LF as CRLF when in text mode" />
         </CheckBox>
-        <TextBlock Text="Display mode:" Grid.Row="3" Style="{StaticResource HeaderText}" />
-        <ListBox Grid.Column="1" Grid.Row="3" SelectedItem="{Binding Path=EffectiveDisplayMode}">
+        <TextBlock Text="Text encoding:" Grid.Row="3" Style="{StaticResource HeaderText}" />
+        <ComboBox Grid.Column="1" Grid.Row="3" Margin="0 2 0 2" HorizontalAlignment="Left" MinWidth="220" ItemsSource="{Binding TextEncodings}" DisplayMemberPath="DisplayName" SelectedValuePath="Name" SelectedValue="{Binding Path=Settings.TextEncoding}" ToolTip="Encoding of the text exchanged with the device: used to decode received data and to encode typed and pasted text." />
+        <TextBlock Text="Display mode:" Grid.Row="4" Style="{StaticResource HeaderText}" />
+        <ListBox Grid.Column="1" Grid.Row="4" SelectedItem="{Binding Path=EffectiveDisplayMode}">
           <ItemsControl.ItemsSource>
             <coll:ArrayList>
               <local:EffectiveDisplayMode>Text</local:EffectiveDisplayMode>
@@ -336,8 +339,8 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ListBox>
-        <TextBlock Text="Send data:" Grid.Row="4" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
-        <ListBox Grid.Column="1" Grid.Row="4" SelectedItem="{Binding Path=Settings.HexSettings.AutoSend}" IsEnabled="{Binding HexModeEnabled}">
+        <TextBlock Text="Send data:" Grid.Row="5" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
+        <ListBox Grid.Column="1" Grid.Row="5" SelectedItem="{Binding Path=Settings.HexSettings.AutoSend}" IsEnabled="{Binding HexModeEnabled}">
           <ItemsControl.ItemsSource>
             <coll:ArrayList>
               <sys:Boolean>true</sys:Boolean>
@@ -363,8 +366,8 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ListBox>
-        <TextBlock Text="Interpret typed data as:" Grid.Row="5" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
-        <ListBox Grid.Column="1" Grid.Row="5" SelectedItem="{Binding Path=Settings.HexSettings.SendAsHex}" IsEnabled="{Binding HexModeEnabled}">
+        <TextBlock Text="Interpret typed data as:" Grid.Row="6" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
+        <ListBox Grid.Column="1" Grid.Row="6" SelectedItem="{Binding Path=Settings.HexSettings.SendAsHex}" IsEnabled="{Binding HexModeEnabled}">
           <ItemsControl.ItemsSource>
             <coll:ArrayList>
               <sys:Boolean>false</sys:Boolean>
@@ -390,13 +393,13 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ListBox>
-        <TextBlock Text="Maximum bytes per line:" Grid.Row="6" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
-        <TextBox Grid.Row="6" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Path=Settings.HexSettings.MaximumBytesPerLine}" IsEnabled="{Binding HexModeEnabled}" TextChanged="ComboBox_TextChanged" />
-        <TextBlock Text="Additional line breaks" Grid.Row="7" Style="{StaticResource PaddedHeaderText}" Grid.ColumnSpan="2" IsEnabled="{Binding HexModeEnabled}" />
-        <CheckBox Grid.Row="8" Grid.ColumnSpan="2" Margin="60 5 0 5" VerticalContentAlignment="Center" IsChecked="{Binding Path=Settings.HexSettings.BreaksAroundEcho}" IsEnabled="{Binding HexModeEnabled}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
+        <TextBlock Text="Maximum bytes per line:" Grid.Row="7" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
+        <TextBox Grid.Row="7" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Path=Settings.HexSettings.MaximumBytesPerLine}" IsEnabled="{Binding HexModeEnabled}" TextChanged="ComboBox_TextChanged" />
+        <TextBlock Text="Additional line breaks" Grid.Row="8" Style="{StaticResource PaddedHeaderText}" Grid.ColumnSpan="2" IsEnabled="{Binding HexModeEnabled}" />
+        <CheckBox Grid.Row="9" Grid.ColumnSpan="2" Margin="60 5 0 5" VerticalContentAlignment="Center" IsChecked="{Binding Path=Settings.HexSettings.BreaksAroundEcho}" IsEnabled="{Binding HexModeEnabled}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
           <TextBlock Text="Between echoed and received data" />
         </CheckBox>
-        <CheckBox Name="cbInactivity" Grid.Row="9" Grid.ColumnSpan="2" Margin="60 5 0 5" VerticalContentAlignment="Center" IsEnabled="{Binding HexModeEnabled}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
+        <CheckBox Name="cbInactivity" Grid.Row="10" Grid.ColumnSpan="2" Margin="60 5 0 5" VerticalContentAlignment="Center" IsEnabled="{Binding HexModeEnabled}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
           <StackPanel Orientation="Horizontal">
             <TextBlock Text="After " VerticalAlignment="Center" />
             <TextBox Width="60" VerticalAlignment="Center" Text="{Binding Path=Settings.HexSettings.TimeoutForAutoBreak}" TextChanged="ComboBox_TextChanged" />
