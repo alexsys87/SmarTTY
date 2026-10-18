@@ -368,6 +368,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _textEncoding = TerminalEncodings.Resolve(encodingName);
         _textDecoder = new TextStreamDecoder(_textEncoding);
         _serialTerminalControl.InputEncoding = _textEncoding;
+        // A recording in progress follows the change, so a text log matches what the terminal shows.
+        _logWriter?.SetEncoding(_textEncoding);
     }
 
     private void SelectEncodingInToolbar(string encodingName)
