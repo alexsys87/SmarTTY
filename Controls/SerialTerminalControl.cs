@@ -5,6 +5,7 @@ using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
@@ -131,6 +132,370 @@ public class SerialTerminalControl : TerminalEmulatorControl
     private bool _autoDetectPrompt = true;
     private bool _localEcho = true;
 
+    // Completion infrastructure
+    private enum CompletionTarget
+    {
+        Command,
+        Path,
+        Directory
+    }
+
+    private class LocalCompletionSession : IDisposable
+    {
+        private readonly SerialTerminalControl _terminal;
+        private readonly CompletionTarget _target;
+        private readonly string _commandText;
+        private readonly int _tokenStart;
+        private readonly int _tokenEnd;
+        private readonly ICompletionPopup _popup;
+        private readonly bool _autoApply;
+        private List<CompletionItem> _items;
+        private bool _isLoading;
+
+        public event EventHandler<CompletionSession.AppliedEventArgs> ItemApplied;
+
+        public LocalCompletionSession(SerialTerminalControl terminal, string commandText, CompletionTarget target, int tokenStart, int tokenEnd, ICompletionPopup popup, bool autoApply)
+        {
+            _terminal = terminal;
+            _target = target;
+            _commandText = commandText;
+            _tokenStart = tokenStart;
+            _tokenEnd = tokenEnd;
+            _popup = popup;
+            _autoApply = autoApply;
+            _popup.ItemSelected += OnItemSelected;
+            LoadItems();
+            UpdatePopup();
+        }
+
+        private string GetTokenText()
+        {
+            if (_tokenStart >= 0 && _tokenEnd <= _commandText.Length && _tokenStart <= _tokenEnd)
+            {
+                return _commandText.Substring(_tokenStart, _tokenEnd - _tokenStart);
+            }
+            return "";
+        }
+
+        private void LoadItems()
+        {
+            try
+            {
+                List<CompletionItem> itemsList = new List<CompletionItem>();
+                string tokenText = GetTokenText();
+                string filterText = tokenText.Trim('\'', '"');
+
+                if (_target == CompletionTarget.Command && string.IsNullOrEmpty(filterText))
+                {
+                    // Built-in local commands
+                    itemsList.AddRange(GetBuiltInCommands());
+                    // Local executables from PATH
+                    itemsList.AddRange(GetLocalExecutables(filterText));
+                }
+                else if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
+                {
+                    // Local filesystem paths
+                    itemsList.AddRange(GetLocalPaths(filterText, _target == CompletionTarget.Directory));
+                }
+
+                _items = itemsList;
+                _isLoading = false;
+                _terminal.BeginInvoke((Action)(() => OnItemsLoaded()));
+            }
+            catch (Exception ex)
+            {
+                _popup.DisplayException(ex);
+                _isLoading = false;
+            }
+        }
+
+        private IEnumerable<CompletionItem> GetBuiltInCommands()
+        {
+            // Built-in commands available in serial terminal
+            string[] builtins = new[]
+            {
+                "help", "clear", "history", "exit", "quit",
+                "cd", "pwd", "ls", "dir", "cat", "type",
+                "echo", "set", "unset", "export", "env",
+                "send", "sendhex", "sendfile", "recv", "recvfile",
+                "break", "reset", "reconnect", "disconnect",
+                "log", "logstart", "logstop", "baud", "settings"
+            };
+
+            foreach (string cmd in builtins)
+            {
+                yield return new CompletionItem
+                {
+                    Icon = VirtualTerminalPopupItemIcon.Command,
+                    Text = cmd,
+                    InsertText = cmd,
+                    Summary = new VirtualTerminalPopupSummary.OptionInfo
+                    {
+                        Option = cmd,
+                        Description = new CommandCompletion.OptionDescription { Summary = $"Built-in command: {cmd}" }
+                    }
+                };
+            }
+        }
+
+        private IEnumerable<CompletionItem> GetLocalExecutables(string filter)
+        {
+            string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+            string[] pathDirs = pathEnv.Split(Path.PathSeparator);
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string dir in pathDirs)
+            {
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                foreach (string file in EnumerateFilesSafe(dir))
+                {
+                    string name = Path.GetFileNameWithoutExtension(file);
+                    if (seen.Add(name) && (string.IsNullOrEmpty(filter) || name.StartsWith(filter, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        yield return new CompletionItem
+                        {
+                            Icon = VirtualTerminalPopupItemIcon.Command,
+                            Text = name,
+                            InsertText = name,
+                            Summary = new VirtualTerminalPopupSummary.PathInfo { FullPath = file }
+                        };
+                    }
+                }
+            }
+        }
+
+        private IEnumerable<CompletionItem> GetLocalPaths(string filter, bool directoriesOnly)
+        {
+            string path = filter;
+            string directory;
+            string prefix;
+
+            // Handle relative paths
+            if (path.StartsWith("~"))
+            {
+                path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + path.Substring(1);
+            }
+
+            int lastSlash = Math.Max(path.LastIndexOf('/'), path.LastIndexOf('\\'));
+            if (lastSlash >= 0)
+            {
+                directory = path.Substring(0, lastSlash + 1);
+                prefix = path.Substring(lastSlash + 1);
+            }
+            else
+            {
+                directory = Environment.CurrentDirectory + Path.DirectorySeparatorChar;
+                prefix = path;
+            }
+
+            if (!Directory.Exists(directory))
+            {
+                // Try to find parent directory
+                DirectoryInfo di = new DirectoryInfo(directory);
+                while (di != null && !di.Exists)
+                {
+                    di = di.Parent;
+                }
+                if (di != null)
+                {
+                    directory = di.FullName + Path.DirectorySeparatorChar;
+                }
+                else
+                {
+                    yield break;
+                }
+            }
+
+            if (directoriesOnly)
+            {
+                foreach (string dir in EnumerateDirectoriesSafe(directory))
+                {
+                    string name = Path.GetFileName(dir);
+                    if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        yield return new CompletionItem
+                        {
+                            Icon = VirtualTerminalPopupItemIcon.Directory,
+                            Text = name,
+                            InsertText = name + Path.DirectorySeparatorChar,
+                            Summary = new VirtualTerminalPopupSummary.FileOrDirectoryInfo
+                            {
+                                FullPath = dir,
+                                IsDirectory = true
+                            }
+                        };
+                    }
+                }
+            }
+            else
+            {
+                // Directories first
+                foreach (string dir in EnumerateDirectoriesSafe(directory))
+                {
+                    string name = Path.GetFileName(dir);
+                    if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        yield return new CompletionItem
+                        {
+                            Icon = VirtualTerminalPopupItemIcon.Directory,
+                            Text = name,
+                            InsertText = name + Path.DirectorySeparatorChar,
+                            Summary = new VirtualTerminalPopupSummary.FileOrDirectoryInfo
+                            {
+                                FullPath = dir,
+                                IsDirectory = true
+                            }
+                        };
+                    }
+                }
+                // Then files
+                foreach (string file in EnumerateFilesSafe(directory))
+                {
+                    string name = Path.GetFileName(file);
+                    if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        yield return new CompletionItem
+                        {
+                            Icon = VirtualTerminalPopupItemIcon.File,
+                            Text = name,
+                            InsertText = name,
+                            Summary = new VirtualTerminalPopupSummary.FileOrDirectoryInfo
+                            {
+                                FullPath = file,
+                                IsDirectory = false
+                            }
+                        };
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<string> EnumerateFilesSafe(string directory)
+        {
+            try
+            {
+                return Directory.GetFiles(directory);
+            }
+            catch
+            {
+                return new string[0];
+            }
+        }
+
+        private static IEnumerable<string> EnumerateDirectoriesSafe(string directory)
+        {
+            try
+            {
+                return Directory.GetDirectories(directory);
+            }
+            catch
+            {
+                return new string[0];
+            }
+        }
+
+        private void OnItemsLoaded()
+        {
+            _isLoading = false;
+            UpdatePopup();
+            if (_autoApply)
+            {
+                ApplyBestMatch();
+            }
+        }
+
+        private void UpdatePopup()
+        {
+            if (_items == null) return;
+
+            string tokenText = GetTokenText();
+            string filter = tokenText.Trim('\'', '"');
+
+            var filtered = _items.Where(item => item.Text.StartsWith(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
+            _popup.SetItemList(filtered);
+            _popup.SetFilter(filter);
+        }
+
+        private void ApplyBestMatch()
+        {
+            string tokenText = GetTokenText();
+            string filter = tokenText.Trim('\'', '"');
+
+            var matches = _items.Where(item => item.Text.StartsWith(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (matches.Length == 1)
+            {
+                ApplyItem(matches[0], commit: false);
+            }
+            else if (matches.Length > 1)
+            {
+                string common = matches[0].Text;
+                foreach (var item in matches.Skip(1))
+                {
+                    common = CommonPrefix(common, item.Text);
+                }
+                if (common.Length > 0 && common != filter)
+                {
+                    ApplyItem(new CompletionItem { Text = common, InsertText = common }, commit: false);
+                }
+            }
+        }
+
+        private static string CommonPrefix(string first, string second)
+        {
+            int limit = Math.Min(first.Length, second.Length);
+            for (int i = 0; i < limit; i++)
+            {
+                if (first[i] != second[i])
+                {
+                    return first.Substring(0, i);
+                }
+            }
+            return first.Substring(0, limit);
+        }
+
+        private void OnItemSelected(CompletionItem item, Keys keys)
+        {
+            ApplyItem(item, keys == Keys.Return);
+        }
+
+        private void ApplyItem(CompletionItem item, bool commit, string suffix = "")
+        {
+            if (item.InsertText == null) return;
+
+            string insertText = item.InsertText;
+            bool isDir = insertText.EndsWith(Path.DirectorySeparatorChar.ToString());
+
+            if (isDir)
+            {
+                if (suffix == Path.DirectorySeparatorChar.ToString()) suffix = "";
+                else if (commit) insertText = insertText.TrimEnd(Path.DirectorySeparatorChar);
+            }
+
+            string newText = _commandText.Substring(0, _tokenStart) + insertText + _commandText.Substring(_tokenEnd) + suffix;
+            int caretOffset = 0;
+
+            var args = new CompletionSession.AppliedEventArgs
+            {
+                NewText = newText,
+                CaretIndex = _tokenStart + insertText.Length + (suffix ?? "").Length + caretOffset,
+                Commit = commit,
+                Item = item,
+                IsDirectory = isDir
+            };
+            ItemApplied?.Invoke(this, args);
+        }
+
+        public void Dispose()
+        {
+            _popup?.Close();
+        }
+    }
+
+    private LocalCompletionSession _completionSession;
+    private ICompletionPopup _completionPopup;
+
+    public event EventHandler<CompletionPopupRequest> CompletionPopupRequested;
+
     public SerialTerminalControl()
     {
     }
@@ -255,6 +620,32 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        // Handle completion popup key events
+        if (_completionPopup != null && _completionPopup.TryHandleKeyEvent(e))
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            return;
+        }
+
+        // Handle completion (Tab)
+        if (e.KeyCode == Keys.Tab && !e.Control && !e.Shift && !e.Alt && _inputLine != null)
+        {
+            ShowCompletions();
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            return;
+        }
+
+        // Handle completion (Ctrl+Space)
+        if (e.Control && !e.Shift && !e.Alt && e.KeyCode == Keys.Space && _inputLine != null)
+        {
+            ShowCompletions();
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            return;
+        }
+
         // Handle history search (Ctrl+R)
         if (e.Control && !e.Shift && !e.Alt && e.KeyCode == Keys.R)
         {
@@ -283,13 +674,23 @@ public class SerialTerminalControl : TerminalEmulatorControl
             }
         }
 
-        // Handle Escape to cancel history search
-        if (e.KeyCode == Keys.Escape && _historySearch != null)
+        // Handle Escape to cancel history search or completion
+        if (e.KeyCode == Keys.Escape)
         {
-            CancelHistorySearch();
-            e.Handled = true;
-            e.SuppressKeyPress = true;
-            return;
+            if (_historySearch != null)
+            {
+                CancelHistorySearch();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                return;
+            }
+            if (_completionSession != null)
+            {
+                CloseCompletion();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                return;
+            }
         }
 
         // Handle Enter to submit command
@@ -322,6 +723,137 @@ public class SerialTerminalControl : TerminalEmulatorControl
         base.OnKeyDown(e);
     }
 
+    private void ShowCompletions()
+    {
+        if (_inputLine == null) return;
+
+        // Close existing completion
+        if (_completionSession != null)
+        {
+            CloseCompletion();
+        }
+
+        string text = _inputLine.Text;
+        int caretIndex = _inputLine.CaretIndex;
+
+        // Tokenize the input to find the current token
+        var tokens = Tokenize(text);
+        int? matchIndex = null;
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            if (tokens[i].Contains(caretIndex))
+            {
+                matchIndex = i;
+                break;
+            }
+        }
+
+        CompletionTarget target = CompletionTarget.Command;
+        int tokenStart = 0;
+        int tokenEnd = text.Length;
+
+        if (matchIndex.HasValue)
+        {
+            var token = tokens[matchIndex.Value];
+            tokenStart = token.Start;
+            tokenEnd = token.End;
+            
+            // Determine completion target based on position
+            if (matchIndex == 0)
+            {
+                target = CompletionTarget.Command;
+            }
+            else
+            {
+                // Check if previous token is "cd" for directory completion
+                var prevToken = tokens[matchIndex.Value - 1];
+                string prevText = prevToken.Extract(text);
+                if (prevText == "cd" || prevText == "ls" || prevText == "dir")
+                {
+                    target = CompletionTarget.Directory;
+                }
+                else
+                {
+                    target = CompletionTarget.Path;
+                }
+            }
+        }
+        else if (tokens.Length > 0)
+        {
+            // Caret is after the last token
+            var lastToken = tokens[tokens.Length - 1];
+            tokenStart = lastToken.End;
+            tokenEnd = lastToken.End;
+            
+            string prevText = lastToken.Extract(text);
+            if (prevText == "cd" || prevText == "ls" || prevText == "dir")
+            {
+                target = CompletionTarget.Directory;
+            }
+            else
+            {
+                target = CompletionTarget.Path;
+            }
+        }
+
+        // Request completion popup
+        var request = new CompletionPopupRequest
+        {
+            ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))),
+            LineHeight = LineHeight,
+            Items = null,
+            StatusText = "Loading suggestions...",
+            Title = target == CompletionTarget.Command ? "Commands" : (target == CompletionTarget.Directory ? "Directories" : "Files"),
+            Icon = target == CompletionTarget.Command ? VirtualTerminalPopupIcon.Command : VirtualTerminalPopupIcon.Directory
+        };
+
+        CompletionPopupRequested?.Invoke(this, request);
+
+        if (request.Popup != null)
+        {
+            _completionPopup = request.Popup;
+            _completionSession = new LocalCompletionSession(this, text, target, tokenStart, tokenEnd, _completionPopup, true);
+            _completionSession.ItemApplied += OnCompletionApplied;
+        }
+    }
+
+    private void OnCompletionApplied(object sender, CompletionSession.AppliedEventArgs args)
+    {
+        if (_inputLine != null)
+        {
+            _inputLine.SetText(args.NewText);
+            RewrapInput();
+            _inputLine.SetCaretIndex(args.CaretIndex - _inputLine.Prompt.Length);
+            UpdateCaretFromInputLine();
+        }
+
+        if (args.Commit)
+        {
+            SubmitCommand();
+        }
+        else
+        {
+            // Continue completion if it's a directory
+            if (args.IsDirectory)
+            {
+                ShowCompletions();
+            }
+        }
+    }
+
+    private void CloseCompletion()
+    {
+        _completionSession?.Dispose();
+        _completionSession = null;
+        _completionPopup = null;
+    }
+
+    // Tokenize input text for completion
+    private static CompletionSession.Token[] Tokenize(string text)
+    {
+        return CompletionSession.Tokenize(text);
+    }
+
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
         if (_inputLine == null)
@@ -342,6 +874,13 @@ public class SerialTerminalControl : TerminalEmulatorControl
             {
                 SendText(e.KeyChar.ToString(), InputKind.Typed);
             }
+
+            // Trigger completion on space or slash (for paths)
+            if ((e.KeyChar == ' ' || e.KeyChar == '/') && _completionPopup == null)
+            {
+                ShowCompletions();
+            }
+
             e.Handled = true;
             return;
         }

@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using Microsoft.Win32;
 using SmarTTY.Controls;
 using SmarTTY.Forms;
@@ -1193,6 +1193,7 @@ public class MainWindowController : INotifyPropertyChanged
         DeviceTerminalSettings sessionSettings = CloneForSession(settings);
         string title = MakeUniqueDeviceTitle(DeviceTerminalControl.GetConnectionTitle(sessionSettings.Connection));
         SessionWrapper sessionWrapper = SessionWrapper.CreateDeviceSession(this, sessionSettings, title);
+        sessionWrapper.DeviceTab.Terminal.CompletionPopupRequested += MainWindowController_VirtualTerminalPopupRequested;
         sessionWrapper.ShowNewSessionTab = AllSessions.Count == 1;
         AllSessions.Insert(firstPseudoPage, sessionWrapper);
         HookSessionCollection();
