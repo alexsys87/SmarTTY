@@ -68,6 +68,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// <summary>Raised when the user presses Alt+Enter (full screen on/off, as in SSH tabs).</summary>
     public event EventHandler FullScreenToggleRequested;
 
+    /// <summary>
+    /// Raised when the text terminal opens the command/directory/files completion popup. The controller turns this
+    /// into the same suggestion popup that the SSH tabs use.
+    /// </summary>
+    public event EventHandler<CompletionPopupRequest> CompletionPopupRequested;
+
     public long BytesSent => Interlocked.Read(ref _bytesSent);
 
     public long BytesReceived => Interlocked.Read(ref _bytesReceived);
@@ -221,6 +227,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // Hook up events
         _serialTerminalControl.DataEntered += OnTerminalDataEntered;
         _serialTerminalControl.KeyDown += OnTerminalKeyDown;
+        _serialTerminalControl.CompletionPopupRequested += OnSerialCompletionPopupRequested;
 
         // Add to controls at the same position as the old control
         Controls.Add(_serialTerminalControl);
@@ -277,6 +284,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             _asyncTransportConnection.Dispose();
         }
+    }
+
+    private void OnSerialCompletionPopupRequested(object sender, CompletionPopupRequest e)
+    {
+        CompletionPopupRequested?.Invoke(this, e);
     }
 
     private static string GetLineEnding(DeviceTerminalSettings.LineEndingType lineEndingType)
