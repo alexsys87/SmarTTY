@@ -11,6 +11,12 @@ using System.Text;
 using System.Windows.Forms;
 using VisualTTY;
 
+// The file uses C# 8 nullable reference type annotations (e.g. InputLine?,
+// string?) but the net48 project has no	#nullable context enabled; enable the
+// annotations context only so those '?' markers are valid without turning on
+// nullable warnings project-wide.
+#nullable enable annotations
+
 namespace SmarTTY.Controls;
 
 public class SerialTerminalControl : TerminalEmulatorControl
