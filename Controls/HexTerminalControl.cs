@@ -1,4 +1,4 @@
-﻿using SmarTTY.TextEditing;
+using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -165,6 +165,12 @@ public partial class HexTerminalControl : DpiAwareControl
     }
 
     public string HexText => termHex.Text;
+
+    /// <summary>
+    /// The HEX dump editor. Its displayed text is lowercase HEX byte pairs separated by single spaces
+    /// (e.g. "0a 0d"), so the shared search bar finds byte sequences by a case-insensitive string search.
+    /// </summary>
+    public TextEditorControl SearchTextEditor => termHex;
 
     public bool TextScrollBarVisible
     {

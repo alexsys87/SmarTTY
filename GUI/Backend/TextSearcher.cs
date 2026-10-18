@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
 using System.ComponentModel;
@@ -7,7 +7,9 @@ namespace SmarTTY.GUI.Backend;
 
 public class TextSearcher : INotifyPropertyChanged
 {
-    private TextEditorControl _Editor;
+    private readonly Func<TextEditorControl> _GetEditor;
+
+    private readonly Func<string, string> _NormalizeQuery;
 
     private bool _IsVisible;
 
@@ -57,15 +59,37 @@ public class TextSearcher : INotifyPropertyChanged
     public event PropertyChangedEventHandler PropertyChanged;
 
     public TextSearcher(TextEditorControl e)
+        : this(() => e, null)
     {
-        _Editor = e;
+    }
+
+    /// <summary>
+    /// Creates a searcher that resolves the editor lazily on every search (so a terminal tab can switch between its
+    /// ASCII text view and its HEX dump view) and optionally rewrites the query before searching (the HEX view
+    /// expects lowercase byte pairs separated by spaces, e.g. "0A0D" becomes "0a 0d").
+    /// </summary>
+    public TextSearcher(Func<TextEditorControl> getEditor, Func<string, string> normalizeQuery)
+    {
+        _GetEditor = getEditor;
+        _NormalizeQuery = normalizeQuery;
     }
 
     public void Search(bool up)
     {
         try
         {
-            TextEditorControl editor = _Editor;
+            Func<TextEditorControl> getEditor = _GetEditor;
+            TextEditorControl editor = (getEditor != null) ? getEditor() : null;
+            if (editor == null)
+            {
+                return;
+            }
+            string query = SearchedText;
+            Func<string, string> normalizeQuery = _NormalizeQuery;
+            if (normalizeQuery != null)
+            {
+                query = normalizeQuery(query);
+            }
             TextDocument.TextPosition textPosition = new TextDocument.TextPosition(0, 0);
             if (editor.SelectionStart.IsValid)
             {
@@ -82,9 +106,9 @@ public class TextSearcher : INotifyPropertyChanged
             {
                 textPosition = editor.SelectionEnd;
             }
-            if (!editor.Find(textPosition, SearchedText, up, !CaseSensitive, wrapAround: true, ReadonlyTextBrowser.FindSelectMode.SelectOrClear).IsValid)
+            if (!editor.Find(textPosition, query, up, !CaseSensitive, wrapAround: true, ReadonlyTextBrowser.FindSelectMode.SelectOrClear).IsValid)
             {
-                MessageBoxes.Info("Cannot find \"" + SearchedText + "\"");
+                MessageBoxes.Info("Cannot find \"" + query + "\"");
             }
         }
         catch (Exception exception)
