@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.GUI.Backend;
 using SmarTTY.Transport;
@@ -34,7 +34,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         IsEnabled = false
     };
 
-    public readonly MainWindowController Controller;
+    public MainWindowController Controller;
 
     private ToggleButton _LastActiveNewConnectionButton;
 
