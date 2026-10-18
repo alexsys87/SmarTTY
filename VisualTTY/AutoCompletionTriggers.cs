@@ -9,7 +9,7 @@ public class AutoCompletionTriggers
 
     public bool Space { get; set; } = true;
 
-    public bool FirstCharacterInWord { get; set; } = true;
+    public bool FirstCharacterInWord { get; set; } = false;
 
     public string HistoryFileName { get; set; } = "~/.bash_history";
 }
