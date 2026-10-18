@@ -12,6 +12,7 @@ using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Threading;
 using VisualTTY;
+using VisualTTY.DeviceTerminal;
 using DataFormats = System.Windows.DataFormats;
 using DragDropEffects = System.Windows.DragDropEffects;
 using DragEventArgs = System.Windows.DragEventArgs;
@@ -43,7 +44,16 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private GridLength? _FilesWidth = new GridLength(200.0);
 
-    public MainWindow(SshSession session, SSHConnectionSettings connectionSettings, string initialCommand = null, bool echoInitialCommand = false)
+    /// <summary>Opens the window with a COM-port or raw-TCP terminal as its first session (no SSH connection).</summary>
+    public MainWindow(DeviceTerminalSettings deviceSettings)
+    {
+        InitializeWindow();
+        _InitialCommand = default(InitialCommand);
+        Controller.AddDeviceSession(deviceSettings);
+        _ResizeTimer.Tick += _ResizeTimer_Tick;
+    }
+
+    private void InitializeWindow()
     {
         ApplyTheme((Window)this, SmarTTYTheme.Dark, ref _ThemeDictionary);
         InitializeComponent();
@@ -55,13 +65,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         catch
         {
         }
-        _InitialCommand = new InitialCommand(initialCommand, echoInitialCommand);
         this.DataContext = (Controller = new MainWindowController(this));
         Controller.CloseNewConnectionPopup += () =>
         {
             NewConnectionPopup.IsOpen = false;
         };
         Controller.OnLastSessionClosed += base.Close;
+    }
+
+    public MainWindow(SshSession session, SSHConnectionSettings connectionSettings, string initialCommand = null, bool echoInitialCommand = false)
+    {
+        InitializeWindow();
+        _InitialCommand = new InitialCommand(initialCommand, echoInitialCommand);
         SessionWrapper sessionWrapper = Controller.AddSession(session, connectionSettings, createFirstPage: false);
         VirtualTerminalMode virtualTerminalMode = Controller.Settings.VirtualTerminal.DefaultMode;
         if (_InitialCommand.Command == null && virtualTerminalMode == VirtualTerminalMode.Ask)
@@ -337,14 +352,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            Controller.ActiveSession?.UploadFiles(files);
+            SessionWrapper dropSession = Controller.ActiveSession;
+            if (dropSession != null && !dropSession.IsDevice)
+            {
+                dropSession.UploadFiles(files);
+            }
         }
     }
 
     protected override void OnDragEnter(DragEventArgs e)
     {
         base.OnDragEnter(e);
-        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        if (e.Data.GetDataPresent(DataFormats.FileDrop) && Controller.ActiveSession?.IsDevice != true)
         {
             e.Effects = (DragDropEffects)1;
         }
@@ -576,7 +595,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     private void ManagePackages_Click(object sender, RoutedEventArgs e)
     {
         SessionWrapper activeSession = Controller.ActiveSession;
-        if (activeSession == null)
+        if (activeSession == null || activeSession.IsDevice)
         {
             return;
         }

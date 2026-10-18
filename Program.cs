@@ -1,5 +1,4 @@
-﻿using SmarTTY.Forms;
-using SmarTTY.GUI;
+﻿using SmarTTY.GUI;
 using System;
 using System.Linq;
 using System.Windows;
@@ -52,8 +51,14 @@ internal class Program
         }
         else if (connectionSelectionWindow.Controller.PendingRawConnectionSettings != null)
         {
-            System.Windows.Forms.Application.Run(new DeviceTerminalHostForm(connectionSelectionWindow.Controller.PendingRawConnectionSettings));
-            Application.Current.Shutdown();
+            // A COM/TCP connection chosen in the start window opens in the main window, as a tab next to
+            // any SSH sessions that are added later, instead of in a separate window of its own.
+            MainWindow rawWindow = new MainWindow(connectionSelectionWindow.Controller.PendingRawConnectionSettings);
+            rawWindow.Show();
+            rawWindow.Closed += (object closedSender, EventArgs closedArgs) =>
+            {
+                Application.Current.Shutdown();
+            };
         }
         else
         {

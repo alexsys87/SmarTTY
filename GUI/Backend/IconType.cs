@@ -9,5 +9,7 @@ public enum IconType
     New,
     Editor,
     Open,
-    AddVirtual
+    AddVirtual,
+    Serial,
+    Network
 }
