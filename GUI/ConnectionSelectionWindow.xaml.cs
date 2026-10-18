@@ -1287,6 +1287,19 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         }
     }
 
+    private void ImportSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (SettingsArchiveDialogs.Import((Window)this) != null)
+        {
+            Controller.RefreshAll();
+        }
+    }
+
+    private void ExportSettings_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsArchiveDialogs.Export((Window)this);
+    }
+
     private void NewTelnet_Click(object sender, RoutedEventArgs e)
     {
         if (Controller.CreateNewTelnetConnection((Window)this))

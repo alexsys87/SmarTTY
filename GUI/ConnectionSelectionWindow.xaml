@@ -374,6 +374,18 @@
             <AccessText Text="_Quick SSH connection..." />
           </StackPanel>
         </Button>
+        <Button HorizontalAlignment="Left" Click="ImportSettings_Click">
+          <StackPanel Orientation="Horizontal">
+            <Image Source="../Icons/import16.png" />
+            <AccessText Text="_Import settings..." />
+          </StackPanel>
+        </Button>
+        <Button HorizontalAlignment="Left" Click="ExportSettings_Click">
+          <StackPanel Orientation="Horizontal">
+            <Image Source="../Icons/export16.png" />
+            <AccessText Text="E_xport settings..." />
+          </StackPanel>
+        </Button>
       </StackPanel>
       <TextBlock VerticalAlignment="Center" Margin="0 0 5 0" Text="{Binding ProgressText}">
         <FrameworkElement.Style>

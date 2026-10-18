@@ -70,6 +70,23 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
         _Initialized = true;
     }
 
+    private void ExportSettings_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsArchiveDialogs.Export(this);
+    }
+
+    private void ImportSettings_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsArchive.ImportResult result = SettingsArchiveDialogs.Import(this);
+        if (result != null && result.SettingsImported)
+        {
+            // Apply the imported values to the running settings object; otherwise the next
+            // Save() of the old in-memory values would overwrite what was just imported.
+            GlobalSettings.Load().CopyValuesTo(_OriginalSettings);
+            this.DialogResult = true;
+        }
+    }
+
     private void OK_Click(object sender, RoutedEventArgs e)
     {
         this.DialogResult = true;

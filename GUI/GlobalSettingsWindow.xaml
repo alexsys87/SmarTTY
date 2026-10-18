@@ -447,6 +447,10 @@
         </StackPanel>
       </TabItem>
     </TabControl>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Grid.Row="1" Margin="0 5 0 5">
+      <Button Content="Import settings..." Margin="5 2 5 2" Padding="10 3 10 3" ToolTip="Import settings and saved connections from a .tar.gz archive" Click="ImportSettings_Click" />
+      <Button Content="Export settings..." Margin="5 2 5 2" Padding="10 3 10 3" ToolTip="Export settings and saved connections to a .tar.gz archive" Click="ExportSettings_Click" />
+    </StackPanel>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Grid.Row="1" Margin="0 5 0 5">
       <Button Content="_OK" Margin="5 2 5 2" Width="80" Padding="5 3 5 3" IsDefault="True" Click="OK_Click" />
       <Button Content="_Cancel" Margin="5 2 5 2" Width="80" Padding="5 3 5 3" IsCancel="True" Click="Cancel_Click" />
