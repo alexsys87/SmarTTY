@@ -10,7 +10,7 @@
     </ResourceDictionary>
   </FrameworkElement.Resources>
   <StackPanel Orientation="Vertical" Margin="10">
-    <TextBlock Text="Connect to a machine via SSH without remembering settings:" />
+    <TextBlock Name="lblHeader" Text="Connect to a machine via SSH without remembering settings:" />
     <Grid Margin="5">
       <Grid.RowDefinitions>
         <RowDefinition />
@@ -35,7 +35,7 @@
           </Style>
         </FrameworkElement.Style>
       </TextBox>
-      <TextBlock Text="Password:" Grid.Row="1" VerticalAlignment="Center" Margin="0 0 5 0" />
+      <TextBlock Name="lblPassword" Text="Password:" Grid.Row="1" VerticalAlignment="Center" Margin="0 0 5 0" />
       <PasswordBox Name="txtPassword" Grid.Column="1" Grid.Row="1" Margin="2" />
     </Grid>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

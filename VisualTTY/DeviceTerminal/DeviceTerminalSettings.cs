@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+using System;
+using System.ComponentModel;
 using System.Drawing;
 using System.IO.Ports;
 using System.Xml.Serialization;
@@ -9,6 +10,7 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 {
     [XmlInclude(typeof(Serial))]
     [XmlInclude(typeof(Tcp))]
+    [XmlInclude(typeof(Telnet))]
     public abstract class ConnectionSettings
     {
         [XmlType("com.sysprogs.terminal.connection.serial")]
@@ -70,6 +72,12 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
             public int Port { get; set; }
 
+            /// <summary>
+            /// How often an idle connection is kept alive: a raw TCP connection enables the operating system's TCP
+            /// keep-alive, a telnet connection additionally sends a harmless NOP command. 0 switches the keep-alive off.
+            /// </summary>
+            public int KeepAliveSeconds { get; set; }
+
             [XmlIgnore]
             public override string FileNameBase => Host + "_" + Port;
 
@@ -85,6 +93,115 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
                     return Port > 0;
                 }
                 return false;
+            }
+
+            /// <summary>Copy of the endpoint that keeps its kind (a telnet endpoint stays a telnet endpoint).</summary>
+            public Tcp Clone()
+            {
+                return (Tcp)MemberwiseClone();
+            }
+        }
+
+        /// <summary>
+        /// A telnet endpoint: a TCP connection that speaks the Telnet protocol (the server's option negotiation is
+        /// answered and the commands are not shown), as opposed to <see cref="Tcp"/>, which shows every byte as it is.
+        /// Telnet derives from Tcp, so everything that only needs host and port treats both alike; code that must
+        /// tell them apart checks for Telnet first.
+        /// </summary>
+        [XmlType("com.sysprogs.terminal.connection.telnet")]
+        public class Telnet : Tcp
+        {
+            /// <summary>When typed characters are shown by the terminal itself instead of waiting for the server's echo.</summary>
+            public enum LocalEchoMode
+            {
+                /// <summary>Until the server announces that it echoes (option ECHO), and not any more after that.</summary>
+                Auto,
+                Always,
+                Never
+            }
+
+            public const int DefaultPort = 23;
+
+            public const string DefaultTerminalType = "xterm";
+
+            /// <summary>Reported to the server when it asks (option TERMINAL-TYPE).</summary>
+            public string TerminalType { get; set; } = DefaultTerminalType;
+
+            public LocalEchoMode LocalEcho { get; set; } = LocalEchoMode.Auto;
+
+            /// <summary>
+            /// Offer the terminal type, the window size and suppress-go-ahead at connect, as most telnet clients do,
+            /// instead of waiting until the server asks for them.
+            /// </summary>
+            public bool ActiveNegotiation { get; set; }
+
+            /// <summary>
+            /// Saved telnet and raw TCP connections to the same host and port are different connections,
+            /// so they must not share a file.
+            /// </summary>
+            [XmlIgnore]
+            public override string FileNameBase => "telnet_" + Host + "_" + Port;
+
+            /// <summary>
+            /// Reads what a user types for a quick connection: "host", "host:port", "[ipv6]:port", a bare IPv6 address,
+            /// each with an optional "telnet://" in front. The port is <see cref="DefaultPort"/> when none is given.
+            /// </summary>
+            public static Telnet Parse(string text)
+            {
+                const string expected = "Expected: hostname or hostname:port";
+                text = (text ?? "").Trim();
+                if (text.StartsWith("telnet://", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    text = text.Substring("telnet://".Length).TrimEnd('/');
+                }
+                string host = text;
+                int port = DefaultPort;
+                if (text.StartsWith("[", System.StringComparison.Ordinal))
+                {
+                    int closing = text.IndexOf(']');
+                    if (closing == -1)
+                    {
+                        throw new System.FormatException(expected);
+                    }
+                    host = text.Substring(1, closing - 1);
+                    string rest = text.Substring(closing + 1);
+                    if (rest.StartsWith(":", System.StringComparison.Ordinal))
+                    {
+                        port = ParsePort(rest.Substring(1));
+                    }
+                    else if (rest.Length != 0)
+                    {
+                        throw new System.FormatException(expected);
+                    }
+                }
+                else
+                {
+                    int colon = text.IndexOf(':');
+                    // A single colon separates the port; several colons are an IPv6 address without a port.
+                    if (colon != -1 && colon == text.LastIndexOf(':'))
+                    {
+                        host = text.Substring(0, colon);
+                        port = ParsePort(text.Substring(colon + 1));
+                    }
+                }
+                if (host.Length == 0)
+                {
+                    throw new System.FormatException(expected);
+                }
+                return new Telnet
+                {
+                    Host = host,
+                    Port = port
+                };
+            }
+
+            private static int ParsePort(string text)
+            {
+                if (!int.TryParse(text.Trim(), out int port) || port < 1 || port > 65535)
+                {
+                    throw new System.FormatException("Invalid port number: '" + text + "' (expected 1-65535)");
+                }
+                return port;
             }
         }
 
@@ -178,6 +295,12 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
     private bool _ReconnectAutomatically;
 
+    // Automatic reconnect behavior (see ReconnectAutomatically/ReconnectImmediately/ReconnectIntervalSeconds).
+    // Explicit backing fields, not auto-property initializers, so a Clone() keeps the same defaults.
+    private bool _ReconnectImmediately;
+
+    private int _ReconnectIntervalSeconds = 2;
+
     public string BackspaceSequence;
 
     private TerminalColors _Colors = new TerminalColors
@@ -225,6 +348,56 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
         {
             _ReconnectAutomatically = value;
             OnPropertyChanged("ReconnectAutomatically");
+        }
+    }
+
+    /// <summary>
+    /// When <see cref="ReconnectAutomatically"/> is set, reconnect right away after the connection breaks
+    /// instead of waiting <see cref="ReconnectIntervalSeconds"/> seconds. Bound to the "immediately" radio
+    /// button in the Connect window.
+    /// </summary>
+    public bool ReconnectImmediately
+    {
+        get
+        {
+            return _ReconnectImmediately;
+        }
+        set
+        {
+            _ReconnectImmediately = value;
+            OnPropertyChanged("ReconnectImmediately");
+            OnPropertyChanged("ReconnectWithInterval");
+        }
+    }
+
+    /// <summary>The inverse of <see cref="ReconnectImmediately"/> (bound to the "repeat" radio button).</summary>
+    [XmlIgnore]
+    public bool ReconnectWithInterval
+    {
+        get
+        {
+            return !_ReconnectImmediately;
+        }
+        set
+        {
+            ReconnectImmediately = !value;
+        }
+    }
+
+    /// <summary>
+    /// How long to wait between automatic reconnect attempts, in seconds (1-5, default 2). Only used when
+    /// <see cref="ReconnectAutomatically"/> is set and <see cref="ReconnectImmediately"/> is off.
+    /// </summary>
+    public int ReconnectIntervalSeconds
+    {
+        get
+        {
+            return _ReconnectIntervalSeconds;
+        }
+        set
+        {
+            _ReconnectIntervalSeconds = Math.Max(1, Math.Min(value, 5));
+            OnPropertyChanged("ReconnectIntervalSeconds");
         }
     }
 

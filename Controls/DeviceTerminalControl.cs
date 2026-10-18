@@ -53,6 +53,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private ConnectionStateEnum _connectionState = ConnectionStateEnum.Connecting;
 
+    // Automatic reconnect: when the transport drops or fails and DeviceTerminalSettings.ReconnectAutomatically is
+    // set, a fresh connection is opened again, right away or on a timer (ReconnectIntervalSeconds). Only the user's
+    // own disconnect cancels it (_manualDisconnect); everything runs on the UI thread (WinForms timer).
+    private bool _manualDisconnect;
+
+    private System.Windows.Forms.Timer _autoReconnectTimer;
+
     /// <summary>Raised on the UI thread whenever the transport state or the displayed title changes.</summary>
     public event EventHandler StatusChanged;
 
@@ -62,11 +69,26 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// </summary>
     internal SerialTerminalControl FocusedTextTerminal => (!_isHexMode && _serialTerminalControl.Focused) ? _serialTerminalControl : null;
 
+    /// <summary>
+    /// The editor currently shown in the device tab: the decoded text in ASCII mode, or the HEX dump editor in
+    /// HEX mode. The shared search bar searches it to find both words and HEX byte sequences.
+    /// </summary>
+    public TextEditorControl SearchTextEditor => HexMode ? hexTerminalControl1.SearchTextEditor : _serialTerminalControl;
+
     /// <summary>Raised when the user presses Ctrl+W and the shared "Close tab on Ctrl+W" option is on.</summary>
     public event EventHandler CloseTabRequested;
 
     /// <summary>Raised when the user presses Alt+Enter (full screen on/off, as in SSH tabs).</summary>
     public event EventHandler FullScreenToggleRequested;
+
+    /// <summary>
+    /// Raised when the text terminal opens the command/directory/files completion popup. The controller turns this
+    /// into the same suggestion popup that the SSH tabs use.
+    /// </summary>
+    public event EventHandler<CompletionPopupRequest> CompletionPopupRequested;
+
+    /// <summary>Raised when the user clicks a path or an URL shown in the terminal text (a local file on this machine).</summary>
+    public event EventHandler<OpenFileEventArgs> OpenFileRequested;
 
     public long BytesSent => Interlocked.Read(ref _bytesSent);
 
@@ -146,12 +168,124 @@ public partial class DeviceTerminalControl : DpiAwareControl
         
         // Replace the designer-created TerminalEmulatorControl with our SerialTerminalControl
         ReplaceTerminalControl();
+        // A telnet server may ask for the terminal size (and wants to hear about changes); other transports ignore it.
+        _serialTerminalControl.TerminalSizeChanged += OnTerminalSizeChanged;
         
         foreach (TerminalEncodings.Choice choice in TerminalEncodings.All)
         {
             cbEncoding.Items.Add(choice);
         }
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
+    }
+
+    private void OnTerminalSizeChanged(TerminalEmulatorControl terminal, int columns, int rows)
+    {
+        _asyncTransportConnection?.SetTerminalSize(columns, rows);
+    }
+
+    // --- telnet: local echo that follows the server, and the "Telnet" commands in the context menu ---
+
+    private TelnetTransport _telnetTransport;
+
+    private ToolStripMenuItem _telnetMenu;
+
+    private void SetLocalEcho(bool echo)
+    {
+        // The same three things the "Echo typed characters" menu item changes.
+        _deviceTerminalSettings.EchoTypedCharacters = echo;
+        echoTypedCharactersToolStripMenuItem.Checked = echo;
+        _serialTerminalControl.LocalEcho = echo;
+    }
+
+    // Called for every new telnet connection (also when it is reconnected): applies the local echo mode and, in
+    // the automatic mode, keeps the echo opposite to the server's.
+    private void AttachTelnet(TelnetTransport transport, DeviceTerminalSettings.ConnectionSettings.Telnet settings)
+    {
+        _telnetTransport = transport;
+        switch (settings.LocalEcho)
+        {
+            case DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Always:
+                SetLocalEcho(true);
+                break;
+            case DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Never:
+                SetLocalEcho(false);
+                break;
+            default:
+                // Nobody echoes until the server says it does.
+                SetLocalEcho(true);
+                transport.RemoteEchoChanged += (sender, args) => OnTelnetRemoteEchoChanged(transport);
+                break;
+        }
+    }
+
+    private void OnTelnetRemoteEchoChanged(TelnetTransport transport)
+    {
+        // Raised on the reading thread.
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return;
+        }
+        try
+        {
+            BeginInvoke((Action)(() =>
+            {
+                // A reconnect creates a new transport; the news of an old one is of no interest.
+                if (!IsDisposed && ReferenceEquals(transport, _telnetTransport))
+                {
+                    SetLocalEcho(!transport.RemoteEcho);
+                }
+            }));
+        }
+        catch (InvalidOperationException)
+        {
+            // The window is closing.
+        }
+    }
+
+    private void UpdateTelnetMenu(bool telnet)
+    {
+        if (!telnet)
+        {
+            if (_telnetMenu != null)
+            {
+                _telnetMenu.Visible = false;
+            }
+            return;
+        }
+        if (_telnetMenu == null)
+        {
+            _telnetMenu = new ToolStripMenuItem("Telnet");
+            AddTelnetCommand("Send Break", TelnetStream.Break);
+            AddTelnetCommand("Send Interrupt Process (IP)", TelnetStream.InterruptProcess);
+            AddTelnetCommand("Send Are You There (AYT)", TelnetStream.AreYouThere);
+            AddTelnetCommand("Send Erase Line", TelnetStream.EraseLine);
+            AddTelnetCommand("Send NOP", TelnetStream.NOP);
+            _telnetMenu.DropDownOpening += (sender, args) =>
+            {
+                bool connected = _connectionState == ConnectionStateEnum.Connected && _telnetTransport != null;
+                foreach (ToolStripItem item in _telnetMenu.DropDownItems)
+                {
+                    item.Enabled = connected;
+                }
+            };
+            contextMenuStrip1.Items.Add(_telnetMenu);
+        }
+        _telnetMenu.Visible = true;
+    }
+
+    private void AddTelnetCommand(string text, byte command)
+    {
+        _telnetMenu.DropDownItems.Add(new ToolStripMenuItem(text, null, (sender, args) =>
+        {
+            try
+            {
+                _telnetTransport?.SendCommand(command);
+            }
+            catch (Exception)
+            {
+                // The connection is gone; the status line says so.
+            }
+        }));
     }
 
     private void ReplaceTerminalControl()
@@ -221,6 +355,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // Hook up events
         _serialTerminalControl.DataEntered += OnTerminalDataEntered;
         _serialTerminalControl.KeyDown += OnTerminalKeyDown;
+        _serialTerminalControl.CompletionPopupRequested += OnSerialCompletionPopupRequested;
+        _serialTerminalControl.OpenFileRequested += OnSerialOpenFileRequested;
 
         // Add to controls at the same position as the old control
         Controls.Add(_serialTerminalControl);
@@ -271,12 +407,26 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void DeviceTerminalControl_Disposed(object sender, EventArgs e)
     {
+        _manualDisconnect = true;
+        StopAutoReconnectTimer();
+        _autoReconnectTimer?.Dispose();
+        _autoReconnectTimer = null;
         _logWriter?.Dispose();
         _logWriter = null;
         if (_asyncTransportConnection != null)
         {
             _asyncTransportConnection.Dispose();
         }
+    }
+
+    private void OnSerialCompletionPopupRequested(object sender, CompletionPopupRequest e)
+    {
+        CompletionPopupRequested?.Invoke(this, e);
+    }
+
+    private void OnSerialOpenFileRequested(object sender, OpenFileEventArgs e)
+    {
+        OpenFileRequested?.Invoke(this, e);
     }
 
     private static string GetLineEnding(DeviceTerminalSettings.LineEndingType lineEndingType)
@@ -295,6 +445,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Serial)
         {
             return () => new SerialTransport(connectionSettings as DeviceTerminalSettings.ConnectionSettings.Serial);
+        }
+        // Telnet derives from Tcp, so it has to be recognized first.
+        if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Telnet telnet)
+        {
+            return () => new TelnetTransport(telnet);
         }
         if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Tcp)
         {
@@ -376,11 +531,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
             sendImmediatelyToolStripMenuItem.Checked = deviceTerminalSettings.HexSettings.AutoSend;
         }
         changeSettingsToolStripMenuItem.Visible = _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial;
+        UpdateTelnetMenu(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
         Connect();
     }
 
     private void Connect(bool resetTerminal = true, int value = 0)
     {
+        // Any explicit connect (reconnect button, auto-reconnect, settings change) cancels a pending auto-reconnect
+        // and is not treated as a manual disconnect anymore.
+        _manualDisconnect = false;
+        StopAutoReconnectTimer();
         if (_asyncTransportConnection != null)
         {
             _asyncTransportConnection.Dispose();
@@ -400,10 +560,17 @@ public partial class DeviceTerminalControl : DpiAwareControl
         Interlocked.Exchange(ref _bytesSent, 0L);
         Interlocked.Exchange(ref _bytesReceived, 0L);
         _connectionState = ConnectionStateEnum.Connecting;
+        _telnetTransport = null;
+        if (deviceTransport is TelnetTransport telnetTransport && _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet telnetSettings)
+        {
+            AttachTelnet(telnetTransport, telnetSettings);
+        }
         _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, value);
         _asyncTransportConnection.DataReceived += OnDataReceived;
         _asyncTransportConnection.StateChanged += OnConnectionStateChanged;
         _asyncTransportConnection.WriterIdleChanged += OnWriterIdleChanged;
+        Size terminalSize = _serialTerminalControl.TerminalSize;
+        _asyncTransportConnection.SetTerminalSize(terminalSize.Width, terminalSize.Height);
         _asyncTransportConnection.Start();
     }
 
@@ -428,6 +595,73 @@ public partial class DeviceTerminalControl : DpiAwareControl
         if (_transportFactory != null && (_connectionState == ConnectionStateEnum.Disconnected || _connectionState == ConnectionStateEnum.Failed))
         {
             Connect();
+        }
+    }
+
+    /// <summary>True while an automatic reconnect can actually open a new connection (the user has not disconnected manually in the meantime).</summary>
+    private bool CanAutoReconnect =>
+        !_manualDisconnect &&
+        _transportFactory != null &&
+        (_connectionState == ConnectionStateEnum.Disconnected || _connectionState == ConnectionStateEnum.Failed);
+
+    /// <summary>
+    /// Arranges the next automatic reconnect after the transport dropped or failed, honoring ReconnectAutomatically,
+    /// ReconnectImmediately and ReconnectIntervalSeconds from the current settings. A state change is always raised
+    /// on the UI dispatcher, so this runs on the UI thread and no extra threading is involved.
+    /// </summary>
+    private void ScheduleAutoReconnect()
+    {
+        DeviceTerminalSettings settings = _deviceTerminalSettings;
+        if (!CanAutoReconnect || settings == null || !settings.ReconnectAutomatically)
+        {
+            return;
+        }
+        StopAutoReconnectTimer();
+        if (settings.ReconnectImmediately)
+        {
+            // Open the new connection right away, once the current state change has finished being handled.
+            if (!IsDisposed && IsHandleCreated)
+            {
+                try
+                {
+                    BeginInvoke(new Action(ReconnectIfAutoStillWanted));
+                }
+                catch (InvalidOperationException)
+                {
+                    // The window is closing; drop the scheduled reconnect.
+                }
+            }
+            return;
+        }
+        if (_autoReconnectTimer == null)
+        {
+            _autoReconnectTimer = new System.Windows.Forms.Timer();
+            _autoReconnectTimer.Tick += OnAutoReconnectTimerTick;
+        }
+        _autoReconnectTimer.Interval = settings.ReconnectIntervalSeconds * 1000;
+        _autoReconnectTimer.Start();
+    }
+
+    private void StopAutoReconnectTimer()
+    {
+        _autoReconnectTimer?.Stop();
+    }
+
+    private void OnAutoReconnectTimerTick(object sender, EventArgs e)
+    {
+        ((System.Windows.Forms.Timer)sender).Stop();
+        ReconnectIfAutoStillWanted();
+    }
+
+    /// <summary>
+    /// Reopens the connection that dropped, if the user has not explicitly disconnected in the meantime.
+    /// Whether the screen content is wiped follows the ClearContentsWhenReconnecting setting.
+    /// </summary>
+    private void ReconnectIfAutoStillWanted()
+    {
+        if (CanAutoReconnect && _deviceTerminalSettings != null)
+        {
+            Connect(resetTerminal: _deviceTerminalSettings.ClearContentsWhenReconnecting);
         }
     }
 
@@ -469,7 +703,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         finally
         {
+            if (connectionStateEnum == ConnectionStateEnum.Connected || connectionStateEnum == ConnectionStateEnum.Connecting)
+            {
+                StopAutoReconnectTimer();
+            }
             RaiseStatusChanged();
+        }
+        if (connectionStateEnum == ConnectionStateEnum.Disconnected || connectionStateEnum == ConnectionStateEnum.Failed)
+        {
+            ScheduleAutoReconnect();
         }
     }
 
@@ -556,6 +798,38 @@ public partial class DeviceTerminalControl : DpiAwareControl
             text = text.Replace("\n", "\r\n");
         }
         _serialTerminalControl.OnDataReceived(text);
+    }
+
+    /// <summary>
+    /// Feeds previously recorded received data (see <see cref="SmarTTY.Forms.LogReplayForm"/>) back into this terminal exactly like
+    /// live data: hex bytes into the hex dump in HEX mode, decoded text into the text terminal otherwise. Nothing is
+    /// recorded and nothing is sent to the device.
+    /// </summary>
+    public void ReplayReceivedData(byte[] buffer, int count)
+    {
+        if (buffer == null || count <= 0 || _logWriter != null)
+        {
+            return;
+        }
+        count = Math.Min(count, buffer.Length);
+        if (_isHexMode)
+        {
+            // AppendData appends from index 0, so the caller passes a fresh slice for every step.
+            hexTerminalControl1.AppendData(buffer, count);
+            return;
+        }
+        string text = _textDecoder.Decode(buffer, 0, count);
+        if (_deviceTerminalSettings != null && _deviceTerminalSettings.TreatLFAsCRLF)
+        {
+            text = text.Replace("\n", "\r\n");
+        }
+        _serialTerminalControl.OnDataReceived(text);
+    }
+
+    /// <summary>Resets the incremental decoder so a replay can safely restart from the beginning of a log.</summary>
+    public void ResetReplayDecoder()
+    {
+        _textDecoder.Reset();
     }
 
     private void OnTerminalDataEntered(object sender, byte[] buffer, TerminalEmulatorControl.InputKind inputKind)
@@ -823,6 +1097,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
             CloseTabRequested?.Invoke(this, EventArgs.Empty);
             return;
         }
+        // Ctrl+D closes the terminal window (same as Ctrl+W). It is not gated by the "Ctrl shortcuts"
+        // option so the classic serial-terminal shortcut works out of the box, and the key is not
+        // forwarded to the device.
+        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.D)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            CloseTabRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
         if (!e.Control && e.Alt && !e.Shift && e.KeyCode == Keys.Return)
         {
             // Not a character for the device: toggle full screen like in SSH tabs.
@@ -874,6 +1158,43 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
+    }
+
+    private void btnReplay_Click(object sender, EventArgs e)
+    {
+        if (_logWriter != null)
+        {
+            MessageBox.Show("Stop recording first, then replay.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        using OpenFileDialog dialog = new OpenFileDialog
+        {
+            Title = "Play back a recorded log of received data",
+            Filter = "All files (*.*)|*.*|Text log (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin",
+            FilterIndex = 1,
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(dialog.FileName);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            return;
+        }
+        if (bytes.Length == 0)
+        {
+            MessageBox.Show("The file is empty.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        new SmarTTY.Forms.LogReplayForm(bytes, this).Show();
     }
 
     private void btnLog_Click(object sender, EventArgs e)
@@ -1026,6 +1347,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         AsyncTransportConnection asyncTransportConnection = _asyncTransportConnection;
         if (asyncTransportConnection != null && asyncTransportConnection.MatchesPort(text))
         {
+            // A deliberately closed connection must not be reopened automatically: this is the cancellation point
+            // that the auto-reconnect logic (which is also fed by OnConnectionStateChanged) must honor.
+            _manualDisconnect = true;
+            StopAutoReconnectTimer();
             _asyncTransportConnection.Dispose();
             _asyncTransportConnection = null;
             OnConnectionStateChanged(null, ConnectionStateEnum.Disconnected, null);

@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using Microsoft.Win32;
 using SmarTTY.Controls;
 using SmarTTY.Forms;
@@ -11,6 +11,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -169,22 +170,33 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                TerminalEmulatorControl terminalEmulatorControl = (_Controller.ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+                ITabContext activeTab = _Controller.ActiveSession?.ActiveTab;
+                OpenFileDialog openFileDialog = new OpenFileDialog();
+                if (openFileDialog.ShowDialog() != DialogResult.OK)
+                {
+                    return;
+                }
+                byte[] bytes;
+                using (FileStream fileStream = File.OpenRead(openFileDialog.FileName))
+                {
+                    using (MemoryStream memoryStream = new MemoryStream())
+                    {
+                        fileStream.CopyTo(memoryStream);
+                        bytes = memoryStream.ToArray();
+                    }
+                }
+                // Device terminals record raw bytes, SSH terminals record UTF-8 text.
+                if (activeTab is DeviceTabContext deviceTab)
+                {
+                    new LogReplayForm(bytes, deviceTab.Terminal).Show();
+                    return;
+                }
+                TerminalEmulatorControl terminalEmulatorControl = (activeTab as NormalTabContext)?.Terminal;
                 if (terminalEmulatorControl == null)
                 {
                     throw new Exception("No active terminal");
                 }
-                OpenFileDialog openFileDialog = new OpenFileDialog();
-                if (openFileDialog.ShowDialog() == DialogResult.OK)
-                {
-                    using (FileStream fileStream = File.OpenRead(openFileDialog.FileName))
-                    {
-                        byte[] bytes = new byte[fileStream.Length];
-                        fileStream.Read(bytes, 0, bytes.Length);
-                        new LogReplayForm(Encoding.UTF8.GetString(bytes), terminalEmulatorControl).Show();
-                        return;
-                    }
-                }
+                new LogReplayForm(Encoding.UTF8.GetString(bytes), terminalEmulatorControl).Show();
             }
             catch (Exception exception)
             {
@@ -887,6 +899,27 @@ public class MainWindowController : INotifyPropertyChanged
 
     public Visibility DebugVisibility => Visibility.Collapsed;
 
+    /// <summary>
+    /// Visibility of the "_Replay log" menu command. Replay works for SSH terminals and for device (COM / raw TCP /
+    /// telnet) terminals, so it is shown whenever the active tab is a terminal of either kind — unlike the
+    /// debug-only commands next to it.
+    /// </summary>
+    public Visibility ReplayVisibility
+    {
+        get
+        {
+            switch (ActiveSession?.ActiveTab)
+            {
+                case NormalTabContext normalTab:
+                    return normalTab.Terminal == null ? Visibility.Collapsed : Visibility.Visible;
+                case DeviceTabContext:
+                    return Visibility.Visible;
+                default:
+                    return Visibility.Collapsed;
+            }
+        }
+    }
+
     public string RemoteFileSaveHeader
     {
         get
@@ -1193,6 +1226,8 @@ public class MainWindowController : INotifyPropertyChanged
         DeviceTerminalSettings sessionSettings = CloneForSession(settings);
         string title = MakeUniqueDeviceTitle(DeviceTerminalControl.GetConnectionTitle(sessionSettings.Connection));
         SessionWrapper sessionWrapper = SessionWrapper.CreateDeviceSession(this, sessionSettings, title);
+        sessionWrapper.DeviceTab.Terminal.CompletionPopupRequested += MainWindowController_VirtualTerminalPopupRequested;
+        sessionWrapper.DeviceTab.Terminal.OpenFileRequested += DeviceTab_OpenFileRequested;
         sessionWrapper.ShowNewSessionTab = AllSessions.Count == 1;
         AllSessions.Insert(firstPseudoPage, sessionWrapper);
         HookSessionCollection();
@@ -1211,11 +1246,8 @@ public class MainWindowController : INotifyPropertyChanged
         }
         else if (source.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
         {
-            clone.Connection = new DeviceTerminalSettings.ConnectionSettings.Tcp
-            {
-                Host = tcp.Host,
-                Port = tcp.Port
-            };
+            // Clone() keeps the kind of the endpoint: a telnet connection must stay a telnet connection.
+            clone.Connection = tcp.Clone();
         }
         return clone;
     }
@@ -1310,11 +1342,23 @@ public class MainWindowController : INotifyPropertyChanged
         return terminalEmulatorControl;
     }
 
-    private void Vt_FileOpenRequested(object sender, SshTerminalControl.OpenFileEventArgs e)
+    private void Vt_FileOpenRequested(object sender, OpenFileEventArgs e)
     {
         try
         {
             MenuCommandHandlers.CreateNewEditorTab(ActiveSession, e.Path, new TextDocument.TextPosition(e.Column.GetValueOrDefault(), e.Line.GetValueOrDefault()));
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void DeviceTab_OpenFileRequested(object sender, OpenFileEventArgs e)
+    {
+        try
+        {
+            Process.Start(e.Path);
         }
         catch (Exception exception)
         {
@@ -1580,6 +1624,7 @@ public class MainWindowController : INotifyPropertyChanged
             }
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("RemoteFileSaveHeader"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SaveCommandVisibility"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReplayVisibility"));
             _VirtualTerminalPopup.IsOpen = false;
             FocusMainControlDelayed(activeTab);
         }

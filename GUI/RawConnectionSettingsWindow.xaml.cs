@@ -90,6 +90,64 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             }
         }
 
+        public bool IsTelnet => Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet;
+
+        public class TelnetLocalEchoChoice
+        {
+            public DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode Value { get; set; }
+
+            public string Text { get; set; }
+        }
+
+        public System.Collections.Generic.IReadOnlyList<TelnetLocalEchoChoice> TelnetLocalEchoChoices { get; } = new TelnetLocalEchoChoice[]
+        {
+            new TelnetLocalEchoChoice { Value = DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Auto, Text = "Automatic (until the server echoes)" },
+            new TelnetLocalEchoChoice { Value = DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Always, Text = "Always on" },
+            new TelnetLocalEchoChoice { Value = DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Never, Text = "Always off" }
+        };
+
+        // The telnet options live here while the window is open; the connection object is rebuilt from the
+        // endpoint text (EffectiveConnectionSettings), so they are copied into it every time.
+        public string TelnetTerminalType { get; set; } = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalType;
+
+        public DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode TelnetLocalEcho { get; set; }
+
+        public bool TelnetActiveNegotiation { get; set; }
+
+        private int _TelnetKeepAliveSeconds;
+
+        public int TelnetKeepAliveSeconds
+        {
+            get
+            {
+                return _TelnetKeepAliveSeconds;
+            }
+            set
+            {
+                _TelnetKeepAliveSeconds = Math.Max(0, Math.Min(value, 86400));
+            }
+        }
+
+        private int _TcpKeepAliveSeconds;
+
+        // Keep-alive of a raw TCP connection (the telnet one lives in the "Telnet options" box). It is hidden for
+        // telnet so the two keep-alive inputs never both apply to the same connection.
+        public int TcpKeepAliveSeconds
+        {
+            get
+            {
+                return _TcpKeepAliveSeconds;
+            }
+            set
+            {
+                _TcpKeepAliveSeconds = Math.Max(0, Math.Min(value, 86400));
+            }
+        }
+
+        public Visibility TcpKeepAliveSettingsVisibility => IsTelnet ? Visibility.Collapsed : Visibility.Visible;
+
+        public Visibility TelnetSettingsVisibility => IsTelnet ? Visibility.Visible : Visibility.Collapsed;
+
         public DeviceTerminalSettings.ConnectionSettings EffectiveConnectionSettings
         {
             get
@@ -105,26 +163,111 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 if (colonIdx == -1)
                 {
                     host = endpoint;
-                    port = 0;
+                    // A telnet server is expected on the telnet port unless another one is given.
+                    port = IsTelnet ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort : 0;
                 }
                 else
                 {
                     host = endpoint.Substring(0, colonIdx);
                     port = int.Parse(endpoint.Substring(colonIdx + 1));
                 }
+                if (IsTelnet)
+                {
+                    return new DeviceTerminalSettings.ConnectionSettings.Telnet
+                    {
+                        Host = host,
+                        Port = port,
+                        TerminalType = string.IsNullOrWhiteSpace(TelnetTerminalType) ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalType : TelnetTerminalType.Trim(),
+                        LocalEcho = TelnetLocalEcho,
+                        ActiveNegotiation = TelnetActiveNegotiation,
+                        KeepAliveSeconds = TelnetKeepAliveSeconds
+                    };
+                }
                 return new DeviceTerminalSettings.ConnectionSettings.Tcp
                 {
                     Host = host,
-                    Port = port
+                    Port = port,
+                    KeepAliveSeconds = TcpKeepAliveSeconds
                 };
             }
         }
+
+        public string TCPSettingsHeader => IsTelnet
+            ? "Telnet connection settings (default port " + DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort + ")"
+            : "Raw TCP connection settings";
 
         public string SerialSettingsHeader { get; }
 
         public Visibility SerialSettingsVisibility { get; }
 
         public Visibility TCPSettingsVisibility { get; }
+
+        // Auto-reconnect options, forwarded to the root settings so that DeviceTerminalControl can read them back
+        // when the connection is opened. Raised through the controller so the WPF bindings update.
+        public bool ReconnectAutomatically
+        {
+            get
+            {
+                return Settings.ReconnectAutomatically;
+            }
+            set
+            {
+                Settings.ReconnectAutomatically = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReconnectAutomatically"));
+            }
+        }
+
+        public bool ReconnectImmediately
+        {
+            get
+            {
+                return Settings.ReconnectImmediately;
+            }
+            set
+            {
+                Settings.ReconnectImmediately = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReconnectImmediately"));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReconnectWithInterval"));
+            }
+        }
+
+        public bool ReconnectWithInterval
+        {
+            get
+            {
+                return !Settings.ReconnectImmediately;
+            }
+            set
+            {
+                ReconnectImmediately = !value;
+            }
+        }
+
+        public int ReconnectIntervalSeconds
+        {
+            get
+            {
+                return Settings.ReconnectIntervalSeconds;
+            }
+            set
+            {
+                Settings.ReconnectIntervalSeconds = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReconnectIntervalSeconds"));
+            }
+        }
+
+        public bool ClearContentsWhenReconnecting
+        {
+            get
+            {
+                return Settings.ClearContentsWhenReconnecting;
+            }
+            set
+            {
+                Settings.ClearContentsWhenReconnecting = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ClearContentsWhenReconnecting"));
+            }
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -140,6 +283,17 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             }
             else if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
             {
+                if (tcp is DeviceTerminalSettings.ConnectionSettings.Telnet telnet)
+                {
+                    TelnetTerminalType = telnet.TerminalType;
+                    TelnetLocalEcho = telnet.LocalEcho;
+                    TelnetActiveNegotiation = telnet.ActiveNegotiation;
+                    TelnetKeepAliveSeconds = telnet.KeepAliveSeconds;
+                }
+                else
+                {
+                    TcpKeepAliveSeconds = tcp.KeepAliveSeconds;
+                }
                 SerialSettingsVisibility = Visibility.Collapsed;
                 TCPSettingsVisibility = Visibility.Visible;
                 if (!string.IsNullOrEmpty(tcp.Host))
@@ -277,6 +431,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         InitializeComponent();
         this.DataContext = (_Controller = new ControllerImpl(settings, showSaveCheckbox));
         _TestOnOK = testOnOK;
+        if (_Controller.IsTelnet)
+        {
+            Title = "Telnet Terminal Settings";
+        }
     }
 
     protected override void OnClosed(EventArgs e)

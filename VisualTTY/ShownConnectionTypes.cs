@@ -25,4 +25,11 @@ public struct ShownConnectionTypes
     public bool ShouldSerializeLegacyTelnet() => false;
 
     public bool Serial;
+
+    /// <summary>
+    /// Telnet connections are hidden when this is set. It is stored inverted on purpose: GUIPreferences.xml files
+    /// written before telnet existed have no such element, and for those telnet connections must be shown
+    /// (a "show" flag would read as false and hide them).
+    /// </summary>
+    public bool HideTelnet;
 }

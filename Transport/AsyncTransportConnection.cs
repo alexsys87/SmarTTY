@@ -257,6 +257,12 @@ internal class AsyncTransportConnection : IDisposable
         _writeSignal.Release();
     }
 
+    /// <summary>Tells the transport the current terminal size (used by telnet); other transports ignore it.</summary>
+    public void SetTerminalSize(int columns, int rows)
+    {
+        (_transport as ITerminalSizeAwareTransport)?.SetTerminalSize(columns, rows);
+    }
+
     public string GetDisplayName(bool includeParameters, IHostNameResolver hostNameResolver)
     {
         string name = _transport.GetDisplayName(includeParameters);

@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.IO;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
@@ -14,15 +14,6 @@ namespace SmarTTY.Controls;
 
 public class SshTerminalControl : TerminalEmulatorControl
 {
-    public class OpenFileEventArgs : EventArgs
-    {
-        public string Path;
-
-        public int? Line;
-
-        public int? Column;
-    }
-
     public class InputRegion
     {
         private readonly SshTerminalControl _terminal;

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Window x:Class="SmarTTY.GUI.RawConnectionSettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" xmlns:coll="clr-namespace:System.Collections;assembly=mscorlib" xmlns:sys="clr-namespace:System;assembly=mscorlib" xmlns:ports="clr-namespace:System.IO.Ports;assembly=System" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterScreen" SnapsToDevicePixels="True" Title="Raw Terminal Settings" FocusManager.FocusedElement="{Binding ElementName=txtHost}">
   <FrameworkElement.Resources>
     <ResourceDictionary>
@@ -23,13 +23,14 @@
     </ResourceDictionary>
   </FrameworkElement.Resources>
   <StackPanel Margin="10 0 10 10">
-    <local:SettingsGroupBox Text="Raw TCP connection settings" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
+    <local:SettingsGroupBox Text="{Binding TCPSettingsHeader}" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -48,12 +49,62 @@
             </Style>
           </FrameworkElement.Style>
         </TextBox>
+        <TextBlock Text="Keep-alive (seconds, 0 = off):" Grid.Row="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" Visibility="{Binding TcpKeepAliveSettingsVisibility}" />
+        <TextBox Grid.Column="1" Grid.Row="2" Margin="2" Width="60" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding TcpKeepAliveSettingsVisibility}" ToolTip="Asks the operating system to detect a dropped TCP connection by probing an idle connection; nothing is written to the socket, so the device protocol is not disturbed. 0 switches it off." />
         <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Grid.Row="1" Grid.ColumnSpan="2" Click="Test_Click">
           <StackPanel Orientation="Horizontal">
             <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
             <TextBlock Text="Test connection now" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
+      </Grid>
+    </local:SettingsGroupBox>
+    <local:SettingsGroupBox Text="Automatic reconnect" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <CheckBox Name="chkReconnectAutomatically" Grid.ColumnSpan="2" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding ReconnectAutomatically}" ToolTip="Open the connection again by itself when it drops or cannot be opened. Useful for unreliable links.">
+          <TextBlock Text="Automatically reconnect when the connection breaks or fails" />
+        </CheckBox>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" IsEnabled="{Binding IsChecked, ElementName=chkReconnectAutomatically}">
+          <RadioButton Margin="25 4 0 2" VerticalContentAlignment="Center" GroupName="ReconnectMode" IsChecked="{Binding ReconnectImmediately}" Content="Immediately" ToolTip="Try to reopen the connection without any delay." />
+          <RadioButton Margin="15 4 0 2" VerticalContentAlignment="Center" GroupName="ReconnectMode" IsChecked="{Binding ReconnectWithInterval}" Content="Repeat every" ToolTip="Wait between reconnect attempts." />
+          <TextBox Margin="2" Width="40" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding ReconnectIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" ToolTip="Seconds between reconnect attempts (1-5)." />
+          <TextBlock Text="seconds" VerticalAlignment="Center" Margin="2 0 0 0" />
+        </StackPanel>
+        <CheckBox Grid.Row="2" Grid.ColumnSpan="2" Margin="25 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding ClearContentsWhenReconnecting}" ToolTip="When enabled, the terminal screen is wiped before each automatic reconnect.">
+          <TextBlock Text="Clear the terminal screen when reconnecting" />
+        </CheckBox>
+      </Grid>
+    </local:SettingsGroupBox>
+    <local:SettingsGroupBox Text="Telnet options" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock Text="Terminal type:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetTerminalType, UpdateSourceTrigger=PropertyChanged}" ToolTip="Reported to the server when it asks for the terminal type (option TERMINAL-TYPE). The terminal understands xterm." />
+        <TextBlock Text="Local echo:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+        <ComboBox Grid.Column="1" Grid.Row="1" Margin="2" HorizontalAlignment="Left" MinWidth="260" ItemsSource="{Binding TelnetLocalEchoChoices}" DisplayMemberPath="Text" SelectedValuePath="Value" SelectedValue="{Binding TelnetLocalEcho}" ToolTip="Automatic: typed characters are shown by the terminal until the server announces that it echoes them (option ECHO)." />
+        <TextBlock Text="Keep-alive (seconds, 0 = off):" Grid.Row="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Grid.Row="2" Margin="2" Width="60" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" ToolTip="Send a harmless NOP command this often to keep an idle connection open." />
+        <CheckBox Grid.Row="3" Grid.ColumnSpan="2" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetActiveNegotiation}" ToolTip="Most telnet clients do this. Leave it off for servers that do not speak Telnet properly: nothing is sent until the server asks.">
+          <TextBlock Text="Offer terminal type, window size and suppress-go-ahead at connect" />
+        </CheckBox>
       </Grid>
     </local:SettingsGroupBox>
     <local:SettingsGroupBox ImageSource="../icons/com16.png" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">
