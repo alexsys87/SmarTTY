@@ -42,7 +42,13 @@ public partial class DeviceTerminalControl
 
 	private ToolStripButton toolStripButton1;
 
-	private ToolStripButton toolStripButton3;
+	private ToolStripSplitButton toolStripButton3;
+
+	private ToolStripMenuItem sendBinaryFileToolStripMenuItem;
+
+	private ToolStripMenuItem sendFileViaXMODEMToolStripMenuItem;
+
+	private ToolStripMenuItem receiveFileViaXMODEMToolStripMenuItem;
 
 	private ToolStripButton toolStripButton2;
 
@@ -110,7 +116,10 @@ public partial class DeviceTerminalControl
 		txtHexInput = new ToolStripTextBox();
 		lblSend = new ToolStripLabel();
 		toolStripButton1 = new ToolStripButton();
-		toolStripButton3 = new ToolStripButton();
+		toolStripButton3 = new ToolStripSplitButton();
+		sendBinaryFileToolStripMenuItem = new ToolStripMenuItem();
+		sendFileViaXMODEMToolStripMenuItem = new ToolStripMenuItem();
+		receiveFileViaXMODEMToolStripMenuItem = new ToolStripMenuItem();
 		toolStripButton2 = new ToolStripButton();
 		toolStripDropDownButton1 = new ToolStripDropDownButton();
 		terminalTypeToolStripMenuItem = new ToolStripMenuItem();
@@ -235,12 +244,25 @@ public partial class DeviceTerminalControl
 		toolStripButton1.Text = "Clear contents";
 		toolStripButton1.Click += toolStripButton1_Click;
 		toolStripButton3.DisplayStyle = ToolStripItemDisplayStyle.Image;
+		toolStripButton3.DropDownItems.AddRange(new ToolStripItem[3] { sendBinaryFileToolStripMenuItem, sendFileViaXMODEMToolStripMenuItem, receiveFileViaXMODEMToolStripMenuItem });
 		toolStripButton3.Image = (Image)resources.GetObject("toolStripButton3.Image");
 		toolStripButton3.ImageTransparentColor = Color.Magenta;
 		toolStripButton3.Name = "toolStripButton3";
-		toolStripButton3.Size = new Size(23, 22);
-		toolStripButton3.Text = "Send a binary file";
-		toolStripButton3.Click += toolStripButton3_Click;
+		toolStripButton3.Size = new Size(32, 22);
+		toolStripButton3.Text = "File transfer";
+		toolStripButton3.ButtonClick += toolStripButton3_Click;
+		sendBinaryFileToolStripMenuItem.Name = "sendBinaryFileToolStripMenuItem";
+		sendBinaryFileToolStripMenuItem.Size = new Size(210, 22);
+		sendBinaryFileToolStripMenuItem.Text = "Send binary file";
+		sendBinaryFileToolStripMenuItem.Click += toolStripButton3_Click;
+		sendFileViaXMODEMToolStripMenuItem.Name = "sendFileViaXMODEMToolStripMenuItem";
+		sendFileViaXMODEMToolStripMenuItem.Size = new Size(210, 22);
+		sendFileViaXMODEMToolStripMenuItem.Text = "Send file via XMODEM...";
+		sendFileViaXMODEMToolStripMenuItem.Click += sendFileViaXMODEMToolStripMenuItem_Click;
+		receiveFileViaXMODEMToolStripMenuItem.Name = "receiveFileViaXMODEMToolStripMenuItem";
+		receiveFileViaXMODEMToolStripMenuItem.Size = new Size(210, 22);
+		receiveFileViaXMODEMToolStripMenuItem.Text = "Receive file via XMODEM...";
+		receiveFileViaXMODEMToolStripMenuItem.Click += receiveFileViaXMODEMToolStripMenuItem_Click;
 		toolStripButton2.DisplayStyle = ToolStripItemDisplayStyle.Image;
 		toolStripButton2.Image = (Image)resources.GetObject("toolStripButton2.Image");
 		toolStripButton2.ImageTransparentColor = Color.Magenta;
