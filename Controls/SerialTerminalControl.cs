@@ -176,13 +176,15 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         private readonly SerialTerminalControl _terminal;
         private readonly CompletionTarget _target;
-        private readonly string _commandText;
-        private readonly int _tokenStart;
-        private readonly int _tokenEnd;
+        private string _commandText;
+        private int _tokenStart;
+        private int _tokenEnd;
         private readonly ICompletionPopup _popup;
         private readonly bool _autoApply;
         private List<CompletionItem> _items;
         private bool _isLoading;
+        // Directory whose children _items was last listed from ("" for command targets).
+        private string _itemsDirectory = "";
 
         public event EventHandler<CompletionSession.AppliedEventArgs> ItemApplied;
 
@@ -220,6 +222,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 if (_target == CompletionTarget.Command && string.IsNullOrEmpty(filterText))
                 {
                     // Built-in local commands
+                    _itemsDirectory = "";
                     itemsList.AddRange(GetBuiltInCommands());
                     // Local executables from PATH
                     itemsList.AddRange(GetLocalExecutables(filterText));
@@ -227,6 +230,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 else if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
                 {
                     // Local filesystem paths
+                    _itemsDirectory = GetPathListingDirectory(filterText);
                     itemsList.AddRange(GetLocalPaths(filterText, _target == CompletionTarget.Directory));
                 }
 
@@ -239,6 +243,123 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 _popup.DisplayException(ex);
                 _isLoading = false;
             }
+        }
+
+        // Live-sync: called by the terminal after every text edit that lands
+        // inside this session's token. Keeps the token text, the item listing
+        // and the popup filter consistent with what the user is typing.
+        // Returns true when the edit invalidated the completion token (the
+        // session must be closed, e.g. the token turned into a region of shell
+        // metacharacters or an unescaped space that listing cannot represent).
+        public bool OnTextChanged(string newFullText, int offset, int oldLength, int newLength)
+        {
+            if (_popup == null)
+            {
+                return true;
+            }
+
+            int endOffset = offset + oldLength;
+            if (offset < _tokenStart || offset > _tokenEnd || endOffset > _tokenEnd)
+            {
+                // Edit happened outside the completed token - the session is stale.
+                return true;
+            }
+
+            _tokenEnd += newLength - oldLength;
+            _commandText = newFullText;
+
+            string extracted = GetTokenText();
+            if (string.IsNullOrEmpty(extracted))
+            {
+                UpdatePopup();
+                return false;
+            }
+
+            if (extracted.IndexOfAny(CompletionMetaChars) != -1)
+            {
+                return true;
+            }
+            if (ContainsUnescapedSpace(extracted) && extracted[0] != '\'' && extracted[0] != '"')
+            {
+                return true;
+            }
+
+            // For path/directory targets the listing depends on the directory the
+            // token points into; when it changed we must re-enumerate.
+            if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
+            {
+                string directory = GetPathListingDirectory(extracted.Trim('\'', '"'));
+                if (!string.Equals(directory, _itemsDirectory, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (directory.Length == 0)
+                    {
+                        _items = new List<CompletionItem>();
+                    }
+                    else
+                    {
+                        LoadItems();
+                    }
+                }
+            }
+
+            UpdatePopup();
+            return false;
+        }
+
+        private static readonly char[] CompletionMetaChars = { '`', '$', '<', '>', '|', '&', ';' };
+
+        // Resolves the directory (with trailing separator) whose children would
+        // be listed for the given path filter - mirrors GetLocalPaths so the
+        // live-sync can detect when the listing context changed.
+        private static string GetPathListingDirectory(string filter)
+        {
+            string path = filter;
+            if (path.StartsWith("~"))
+            {
+                path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + path.Substring(1);
+            }
+
+            int lastSlash = Math.Max(path.LastIndexOf('/'), path.LastIndexOf('\\'));
+            string directory = lastSlash >= 0
+                ? path.Substring(0, lastSlash + 1)
+                : Environment.CurrentDirectory + Path.DirectorySeparatorChar;
+
+            if (!Directory.Exists(directory))
+            {
+                // Try to find parent directory
+                DirectoryInfo di = new DirectoryInfo(directory);
+                while (di != null && !di.Exists)
+                {
+                    di = di.Parent;
+                }
+                if (di != null)
+                {
+                    directory = di.FullName + Path.DirectorySeparatorChar;
+                }
+                else
+                {
+                    return "";
+                }
+            }
+            return directory;
+        }
+
+        private static bool ContainsUnescapedSpace(string text)
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] != ' ') continue;
+                int backslashes = 0;
+                for (int j = i - 1; j >= 0 && text[j] == '\\'; j--)
+                {
+                    backslashes++;
+                }
+                if (backslashes % 2 == 0)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private IEnumerable<CompletionItem> GetBuiltInCommands()
@@ -650,6 +771,84 @@ public class SerialTerminalControl : TerminalEmulatorControl
         SetCaret(GetCaretPositionFromInputIndex(_inputLine.CaretIndex));
     }
 
+    // ----------------------------------------------------------------------
+    // §3.3 ReplaceText routing. Every edit that lands inside the input area is
+    // routed through ReplaceInputLineText so an open completion (session +
+    // popup) is kept consistent with the edited text. This mirrors the
+    // ReplaceText funnel SshTerminalControl uses for its completion session.
+    // ----------------------------------------------------------------------
+
+    private void ReplaceInputLineText(int startIndex, int oldLength, string replacement)
+    {
+        if (_inputLine == null) return;
+        if (startIndex < 0 || startIndex > _inputLine.Text.Length) return;
+
+        string text = replacement ?? "";
+        int newLength = text.Length;
+
+        string newText = _inputLine.Text.Substring(0, startIndex)
+            + text
+            + _inputLine.Text.Substring(startIndex + oldLength);
+
+        _inputLine.SetText(newText);
+        _inputLine.SetCaretIndex(startIndex + newLength);
+        RewrapInput();
+        UpdateCaretFromInputLine();
+
+        SyncCompletionAfterTextChange(startIndex, oldLength, newLength);
+    }
+
+    // Keeps an open completion consistent with the last input-line text edit.
+    // Closes session + popup when the edit invalidated the current token.
+    private void SyncCompletionAfterTextChange(int offset, int oldLength, int newLength)
+    {
+        LocalCompletionSession session = _completionSession;
+        if (session == null || _inputLine == null) return;
+
+        if (session.OnTextChanged(_inputLine.Text, offset, oldLength, newLength))
+        {
+            CloseCompletion();
+        }
+    }
+
+    // Overrides the base editable-text path so replacements that land inside
+    // the (prompt + input) block go through the input line instead of bypassing
+    // it; edits outside that block keep the default behavior.
+    public override void ReplaceText(TextDocument.TextPosition start, TextDocument.TextPosition end, bool select, string text)
+    {
+        if (_inputLine != null)
+        {
+            int startIndex = GetInputIndexFromDocumentPosition(start);
+            int endIndex = GetInputIndexFromDocumentPosition(end);
+            if (startIndex >= 0 && endIndex >= startIndex)
+            {
+                ReplaceInputLineText(startIndex, endIndex - startIndex, text);
+                return;
+            }
+        }
+        base.ReplaceText(start, end, select, text);
+    }
+
+    // Maps a document position to an index into _inputLine.Text (without the
+    // prompt), or -1 when the position lies outside the input block on screen.
+    private int GetInputIndexFromDocumentPosition(TextDocument.TextPosition position)
+    {
+        if (_inputLine == null || _visibleColumns <= 0) return -1;
+
+        string fullText = _inputLine.Prompt + _inputLine.Text;
+        int lines = (fullText.Length + _visibleColumns - 1) / _visibleColumns;
+        int line = position.Line - _inputLine.StartLine;
+        if (line < 0 || line >= lines) return -1;
+        if (position.Column < 0 || position.Column >= _visibleColumns) return -1;
+
+        int fullIndex = line * _visibleColumns + position.Column;
+        if (fullIndex > fullText.Length) return -1;
+
+        int inputIndex = fullIndex - _inputLine.Prompt.Length;
+        if (inputIndex < 0 || inputIndex > _inputLine.Text.Length) return -1;
+        return inputIndex;
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         // Handle completion popup key events
@@ -870,6 +1069,13 @@ public class SerialTerminalControl : TerminalEmulatorControl
             {
                 ShowCompletions();
             }
+            else
+            {
+                // §3.3: a completed non-directory token cannot keep listing -
+                // dismiss the popup so it never shows a stale list while the
+                // user keeps typing.
+                CloseCompletion();
+            }
         }
     }
 
@@ -897,10 +1103,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
         // Handle printable characters
         if (!char.IsControl(e.KeyChar))
         {
-            _inputLine.InsertChar(e.KeyChar);
-            RewrapInput();
-            UpdateCaretFromInputLine();
-            
+            ReplaceInputLineText(_inputLine.CaretIndex, 0, e.KeyChar.ToString());
+
             // Local echo for typed characters
             if (_localEcho)
             {
@@ -922,9 +1126,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             if (_inputLine.CaretIndex > 0)
             {
-                _inputLine.RemoveCharBackward();
-                RewrapInput();
-                UpdateCaretFromInputLine();
+                ReplaceInputLineText(_inputLine.CaretIndex - 1, 1, "");
             }
             e.Handled = true;
             return;
@@ -1231,18 +1433,36 @@ public class SerialTerminalControl : TerminalEmulatorControl
             }
             if (_inputLine != null && !string.IsNullOrEmpty(text))
             {
+                int offset = _inputLine.CaretIndex;
+                var run = new System.Text.StringBuilder();
                 foreach (char ch in text)
                 {
                     if (ch == '\n')
                     {
+                        if (run.Length > 0)
+                        {
+                            ReplaceInputLineText(offset, 0, run.ToString());
+                            offset += run.Length;
+                            run.Clear();
+                        }
                         SubmitCommand();
+                        if (_inputLine == null)
+                        {
+                            // Text after a final newline falls on a fresh prompt that
+                            // has not been drawn yet; stop inserting (same as before).
+                            break;
+                        }
+                        offset = 0;
                     }
                     else
                     {
-                        _inputLine.InsertChar(ch);
+                        run.Append(ch);
                     }
                 }
-                RewrapInput();
+                if (run.Length > 0)
+                {
+                    ReplaceInputLineText(offset, 0, run.ToString());
+                }
                 UpdateCaretFromInputLine();
                 // Send pasted text to device
                 if (_localEcho)
