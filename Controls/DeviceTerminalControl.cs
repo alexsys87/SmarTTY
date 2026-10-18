@@ -36,6 +36,60 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private bool _updatingEncodingSelection;
 
+    private long _bytesSent;
+
+    private long _bytesReceived;
+
+    private ConnectionStateEnum _connectionState = ConnectionStateEnum.Connecting;
+
+    /// <summary>Raised on the UI thread whenever the transport state or the displayed title changes.</summary>
+    public event EventHandler StatusChanged;
+
+    public long BytesSent => Interlocked.Read(ref _bytesSent);
+
+    public long BytesReceived => Interlocked.Read(ref _bytesReceived);
+
+    public ConnectionStateEnum ConnectionState => _connectionState;
+
+    public DeviceTerminalSettings Settings => _deviceTerminalSettings;
+
+    /// <summary>Short name for a tab header, e.g. "COM3" or "192.168.0.5:23".</summary>
+    public string ConnectionTitle => GetConnectionTitle(_deviceTerminalSettings?.Connection);
+
+    /// <summary>Short name of a connection for a tab header; usable before the control has been given its settings.</summary>
+    public static string GetConnectionTitle(DeviceTerminalSettings.ConnectionSettings connection)
+    {
+        return connection switch
+        {
+            DeviceTerminalSettings.ConnectionSettings.Serial serial => serial.ComPortName,
+            DeviceTerminalSettings.ConnectionSettings.Tcp tcp => tcp.Host + ":" + tcp.Port,
+            _ => "Raw Terminal",
+        };
+    }
+
+    /// <summary>One-line description for the status bar, e.g. "COM3 (115200 bps): connected".</summary>
+    public string StatusText
+    {
+        get
+        {
+            string name = _transportDisplayName ?? ConnectionTitle;
+            return _connectionState switch
+            {
+                ConnectionStateEnum.Connecting => name + ": connecting...",
+                ConnectionStateEnum.Connected => name + ": connected",
+                ConnectionStateEnum.Failed => name + ": connection failed",
+                _ => name + ": disconnected",
+            };
+        }
+    }
+
+    private string _transportDisplayName;
+
+    private void RaiseStatusChanged()
+    {
+        StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public bool HexMode
     {
         get
@@ -196,7 +250,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // A half-received character from the previous connection must not be glued to the new data.
         _textDecoder.Reset();
         IDeviceTransport deviceTransport = this._transportFactory.CreateTransport();
-        lblConnection.Text = "Connected to " + deviceTransport.GetDisplayName(includeParameters: true);
+        _transportDisplayName = deviceTransport.GetDisplayName(includeParameters: true);
+        lblConnection.Text = "Connected to " + _transportDisplayName;
+        Interlocked.Exchange(ref _bytesSent, 0L);
+        Interlocked.Exchange(ref _bytesReceived, 0L);
+        _connectionState = ConnectionStateEnum.Connecting;
         _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, value);
         _asyncTransportConnection.DataReceived += OnDataReceived;
         _asyncTransportConnection.StateChanged += OnConnectionStateChanged;
@@ -208,7 +266,65 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
     }
 
+    private void SendToDevice(byte[] buffer, int count)
+    {
+        AsyncTransportConnection connection = _asyncTransportConnection;
+        if (connection == null)
+        {
+            throw new InvalidOperationException("The connection is closed. Use Reconnect first.");
+        }
+        connection.Send(buffer, count);
+        Interlocked.Add(ref _bytesSent, count);
+    }
+
+    /// <summary>Reopens the connection when it is closed or failed; an established connection is left alone.</summary>
+    public void ReconnectIfClosed()
+    {
+        if (_transportFactory != null && (_connectionState == ConnectionStateEnum.Disconnected || _connectionState == ConnectionStateEnum.Failed))
+        {
+            Connect();
+        }
+    }
+
+    /// <summary>Pastes the clipboard text into the device (same as the context menu command).</summary>
+    public void Paste()
+    {
+        pasteToolStripMenuItem_Click(this, EventArgs.Empty);
+    }
+
+    /// <summary>Copies the whole output (text or HEX dump, depending on the mode) to the clipboard.</summary>
+    public void CopyAll()
+    {
+        copyAllToolStripMenuItem_Click(this, EventArgs.Empty);
+    }
+
+    /// <summary>Moves the keyboard focus to the active output view so typed characters reach the device.</summary>
+    public void FocusTerminal()
+    {
+        if (HexMode)
+        {
+            hexTerminalControl1.Focus();
+        }
+        else
+        {
+            terminalEmulatorControl1.Focus();
+        }
+    }
+
     private void OnConnectionStateChanged(object sender, ConnectionStateEnum connectionStateEnum, string value)
+    {
+        _connectionState = connectionStateEnum;
+        try
+        {
+            ApplyConnectionState(connectionStateEnum, value);
+        }
+        finally
+        {
+            RaiseStatusChanged();
+        }
+    }
+
+    private void ApplyConnectionState(ConnectionStateEnum connectionStateEnum, string value)
     {
         if (connectionStateEnum == ConnectionStateEnum.Connecting || connectionStateEnum == ConnectionStateEnum.Failed)
         {
@@ -269,6 +385,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void OnDataReceived(object sender, byte[] buffer, int value)
     {
+        Interlocked.Add(ref _bytesReceived, value);
         if (_isHexMode)
         {
             hexTerminalControl1.AppendData(buffer, value);
@@ -286,7 +403,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         if (_asyncTransportConnection != null)
         {
-            _asyncTransportConnection.Send(buffer, buffer.Length);
+            SendToDevice(buffer, buffer.Length);
         }
         if (_deviceTerminalSettings.EchoTypedCharacters && inputKind != TerminalEmulatorControl.InputKind.MouseReport && !_isHexMode)
         {
@@ -394,7 +511,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         try
         {
             byte[] items = ((!sendAsHEXToolStripMenuItem.Checked) ? _textEncoding.GetBytes(txtHexInput.Text) : ParseHexBytes(txtHexInput.Text));
-            _asyncTransportConnection.Send(items, items.Length);
+            SendToDevice(items, items.Length);
             if (_deviceTerminalSettings.EchoTypedCharacters)
             {
                 hexTerminalControl1.AppendData(items, items.Length, isEcho: true);
@@ -512,7 +629,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         try
         {
             byte[] items = File.ReadAllBytes(_openFileDialog.FileName);
-            _asyncTransportConnection.Send(items, items.Length);
+            SendToDevice(items, items.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
             {
                 hexTerminalControl1.AppendData(items, items.Length, isEcho: true);
@@ -591,7 +708,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 return;
             }
             byte[] bytes = _textEncoding.GetBytes(text);
-            _asyncTransportConnection.Send(bytes, bytes.Length);
+            SendToDevice(bytes, bytes.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
             {
                 hexTerminalControl1.AppendData(bytes, bytes.Length, isEcho: true);
