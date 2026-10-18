@@ -441,7 +441,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
         }
 
-        public class Telnet : Raw, IConnectionSettingsWrapper, INotifyPropertyChanged
+        public class RawTcp : Raw, IConnectionSettingsWrapper, INotifyPropertyChanged
         {
             private bool _IsInactive;
 
@@ -464,7 +464,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public string Title => (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.Host + ":" + (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.Port.ToString();
 
-            public string Detail1 => "telnet";
+            public string Detail1 => "raw tcp";
 
             public string Detail2 => FormatLastUsedString(DateTime.FromFileTime(Settings.Settings.LastConnectionTime));
 
@@ -476,7 +476,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public new event PropertyChangedEventHandler PropertyChanged;
 
-            public Telnet(SavedConnectionStore mgr, RawConnectionSettings settings)
+            public RawTcp(SavedConnectionStore mgr, RawConnectionSettings settings)
                 : base(mgr, settings)
             {
             }
@@ -498,7 +498,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         {
             public int SSH { get; set; }
 
-            public int Telnet { get; set; }
+            public int RawTcp { get; set; }
 
             public int Serial { get; set; }
         }
@@ -642,16 +642,16 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
         }
 
-        public bool ShowTelnet
+        public bool ShowRawTcp
         {
             get
             {
-                return _ShownTypes.Telnet;
+                return _ShownTypes.RawTcp;
             }
             set
             {
-                _ShownTypes.Telnet = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShowTelnet"));
+                _ShownTypes.RawTcp = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShowRawTcp"));
                 UpdateFilteredItems();
             }
         }
@@ -812,9 +812,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 {
                     sSH.IsInactive = _ConnectionTester.CheckMachine(sSH.Connection) != MachineConnectionTester.State.Succeeded;
                 }
-                else if (setting is SettingsWrappers.Telnet telnet && telnet.Settings.Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
+                else if (setting is SettingsWrappers.RawTcp rawTcp && rawTcp.Settings.Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
                 {
-                    telnet.IsInactive = _ConnectionTester.CheckMachine(tcp.Host, tcp.Port) != MachineConnectionTester.State.Succeeded;
+                    rawTcp.IsInactive = _ConnectionTester.CheckMachine(tcp.Host, tcp.Port) != MachineConnectionTester.State.Succeeded;
                 }
             }
         }
@@ -870,9 +870,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 {
                     connectionCounts.Serial++;
                 }
-                else if (item is SettingsWrappers.Telnet)
+                else if (item is SettingsWrappers.RawTcp)
                 {
-                    connectionCounts.Telnet++;
+                    connectionCounts.RawTcp++;
                 }
             }
             ConnectionCounts = connectionCounts;
@@ -940,9 +940,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 return ShowSerial;
             }
-            if (item is SettingsWrappers.Telnet)
+            if (item is SettingsWrappers.RawTcp)
             {
-                return ShowTelnet;
+                return ShowRawTcp;
             }
             return true;
         }
@@ -965,7 +965,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     }
                     else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp)
                     {
-                        _StaticItems.Add(new SettingsWrappers.Telnet(_Connections, entry));
+                        _StaticItems.Add(new SettingsWrappers.RawTcp(_Connections, entry));
                     }
                 }
             }
@@ -1044,7 +1044,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             _ConnectionTester.Dispose();
         }
 
-        public bool CreateNewTelnetConnection(Window wnd)
+        public bool CreateNewRawTcpConnection(Window wnd)
         {
             RawConnectionSettingsWindow rawConnectionSettingsWindow = new RawConnectionSettingsWindow(new DeviceTerminalSettings
             {
@@ -1300,9 +1300,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         SettingsArchiveDialogs.Export((Window)this);
     }
 
-    private void NewTelnet_Click(object sender, RoutedEventArgs e)
+    private void NewRawTcp_Click(object sender, RoutedEventArgs e)
     {
-        if (Controller.CreateNewTelnetConnection((Window)this))
+        if (Controller.CreateNewRawTcpConnection((Window)this))
         {
             this.Close();
         }

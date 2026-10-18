@@ -23,7 +23,7 @@
     </ResourceDictionary>
   </FrameworkElement.Resources>
   <StackPanel Margin="10 0 10 10">
-    <local:SettingsGroupBox Text="Telnet connection settings" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
+    <local:SettingsGroupBox Text="Raw TCP connection settings" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" />

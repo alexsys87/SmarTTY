@@ -49,7 +49,7 @@ public class CommonGUIPreferences
     {
         Serial = true,
         SSH = true,
-        Telnet = true
+        RawTcp = true
     };
 
     public ConnectionSortMode SortMode = ConnectionSortMode.LastUse;

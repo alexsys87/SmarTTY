@@ -63,11 +63,11 @@
               <TextBlock Text="{Binding Path=ConnectionCounts.Serial, StringFormat=COM ({0})}" />
             </StackPanel>
           </ToggleButton>
-          <ToggleButton IsChecked="{Binding ShowTelnet}">
+          <ToggleButton IsChecked="{Binding ShowRawTcp}">
             <FrameworkElement.Style>
               <Style BasedOn="{StaticResource {x:Type ToggleButton}}" TargetType="{x:Type ToggleButton}">
                 <Style.Triggers>
-                  <DataTrigger Value="0" Binding="{Binding Path=ConnectionCounts.Telnet}">
+                  <DataTrigger Value="0" Binding="{Binding Path=ConnectionCounts.RawTcp}">
                     <Setter Property="Visibility" Value="Collapsed" />
                   </DataTrigger>
                 </Style.Triggers>
@@ -75,7 +75,7 @@
             </FrameworkElement.Style>
             <StackPanel Orientation="Horizontal">
               <Image Width="16" Height="16" Source="../icons/net16.png" />
-              <TextBlock Text="{Binding Path=ConnectionCounts.Telnet, StringFormat=Telnet ({0})}" />
+              <TextBlock Text="{Binding Path=ConnectionCounts.RawTcp, StringFormat=Raw TCP ({0})}" />
             </StackPanel>
           </ToggleButton>
         </StackPanel>
@@ -362,10 +362,10 @@
             <AccessText Text="New _SSH connection..." />
           </StackPanel>
         </Button>
-        <Button HorizontalAlignment="Left" Click="NewTelnet_Click">
+        <Button HorizontalAlignment="Left" Click="NewRawTcp_Click">
           <StackPanel Orientation="Horizontal">
             <Image Source="../Icons/term16.png" />
-            <AccessText Text="New _Telnet connection..." />
+            <AccessText Text="New _Raw TCP connection..." />
           </StackPanel>
         </Button>
         <Button HorizontalAlignment="Left" Click="QuickConnect_Click">
