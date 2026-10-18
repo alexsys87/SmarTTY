@@ -1,6 +1,7 @@
 using SmarTTY.Forms;
 using SmarTTY.Native;
 using SmarTTY.Terminal;
+using SmarTTY.TextEditing;
 using SmarTTY.Transport;
 using System;
 using System.Collections.Generic;

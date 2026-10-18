@@ -170,7 +170,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
             return;
 
         string trimmed = command.Trim();
-        if (_commandHistory.Count > 0 && _commandHistory[^1] == trimmed)
+        if (_commandHistory.Count > 0 && _commandHistory[_commandHistory.Count - 1] == trimmed)
             return; // Don't add duplicates
 
         _commandHistory.Add(trimmed);
@@ -596,7 +596,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         if (_inputLine != null)
         {
             TextDocument.TextPosition textPosition = HitTest(point, allowPastEnd: true);
-            if (textPosition.IsValid && textPosition >= _inputLine.StartPosition)
+            if (textPosition.IsValid && !(textPosition < _inputLine.StartPosition))
             {
                 SetCaret(textPosition);
                 return;
