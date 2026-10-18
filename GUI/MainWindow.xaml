@@ -73,6 +73,32 @@
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
+                <Style x:Key="TabMinimizeButton" TargetType="{x:Type Button}">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate>
+                                <Border Name="Glyph" Width="8" Height="8" Background="Transparent">
+                                    <Rectangle Name="Bar" Width="8" Height="2" VerticalAlignment="Center" Fill="#FF888888" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="UIElement.IsMouseOver" Value="True">
+                                        <Setter TargetName="Bar" Property="Rectangle.Fill" Value="#FFCC0000" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                    <Setter Property="Background" Value="{DynamicResource {x:Static styles:StyleKeys.ActiveTabBackground}}" />
+                    <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="FrameworkElement.ToolTip" Value="Collapse" />
+                    <EventSetter Event="Click" Handler="MinimizeDeviceTabWindow_Click" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsDevice}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+
         <Style x:Key="TitleText" TargetType="{x:Type TextBlock}">
           <Style.Triggers>
             <DataTrigger Binding="{Binding Title}" Value="{x:Null}">
@@ -263,6 +289,7 @@
                   <ColumnDefinition />
                   <ColumnDefinition />
                   <ColumnDefinition />
+                  <ColumnDefinition />
                 </Grid.ColumnDefinitions>
                 <Image Width="16" Height="16" Style="{StaticResource TabHeaderImage}" />
                 <Image Width="9" Height="9" Margin="0 0 5 0" VerticalAlignment="Bottom" HorizontalAlignment="Right" Source="../icons/MainWindow/err9.png">
@@ -276,6 +303,7 @@
                     </Style>
                   </FrameworkElement.Style>
                 </Image>
+                <Button Grid.Column="3" Margin="2 0 0 0" Style="{StaticResource TabMinimizeButton}" />
                 <Button Grid.Column="2" Style="{StaticResource TabCloseButton}" />
                 <TextBlock Grid.Column="1" Style="{StaticResource TitleText}" Text="{Binding Title}" />
               </Grid>

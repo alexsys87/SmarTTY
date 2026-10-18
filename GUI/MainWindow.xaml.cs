@@ -386,6 +386,23 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
     }
 
+    // Minimizes the main application window when the "collapse" button on a device (COM/raw TCP)
+    // session tab header is pressed. The button is only shown on device sessions (see TabMinimizeButton).
+    private void MinimizeDeviceTabWindow_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is FrameworkElement element)
+            {
+                Window.GetWindow(element).WindowState = WindowState.Minimized;
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     public static void ApplyTheme(Window wnd, SmarTTYTheme theme, ref ResourceDictionary themeDictionary)
     {
         ResourceDictionary resourceDictionary = new ResourceDictionary();
