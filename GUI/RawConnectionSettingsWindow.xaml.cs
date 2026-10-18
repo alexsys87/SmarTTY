@@ -128,6 +128,24 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             }
         }
 
+        private int _TcpKeepAliveSeconds;
+
+        // Keep-alive of a raw TCP connection (the telnet one lives in the "Telnet options" box). It is hidden for
+        // telnet so the two keep-alive inputs never both apply to the same connection.
+        public int TcpKeepAliveSeconds
+        {
+            get
+            {
+                return _TcpKeepAliveSeconds;
+            }
+            set
+            {
+                _TcpKeepAliveSeconds = Math.Max(0, Math.Min(value, 86400));
+            }
+        }
+
+        public Visibility TcpKeepAliveSettingsVisibility => IsTelnet ? Visibility.Collapsed : Visibility.Visible;
+
         public Visibility TelnetSettingsVisibility => IsTelnet ? Visibility.Visible : Visibility.Collapsed;
 
         public DeviceTerminalSettings.ConnectionSettings EffectiveConnectionSettings
@@ -168,7 +186,8 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 return new DeviceTerminalSettings.ConnectionSettings.Tcp
                 {
                     Host = host,
-                    Port = port
+                    Port = port,
+                    KeepAliveSeconds = TcpKeepAliveSeconds
                 };
             }
         }
@@ -182,6 +201,73 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         public Visibility SerialSettingsVisibility { get; }
 
         public Visibility TCPSettingsVisibility { get; }
+
+        // Auto-reconnect options, forwarded to the root settings so that DeviceTerminalControl can read them back
+        // when the connection is opened. Raised through the controller so the WPF bindings update.
+        public bool ReconnectAutomatically
+        {
+            get
+            {
+                return Settings.ReconnectAutomatically;
+            }
+            set
+            {
+                Settings.ReconnectAutomatically = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReconnectAutomatically"));
+            }
+        }
+
+        public bool ReconnectImmediately
+        {
+            get
+            {
+                return Settings.ReconnectImmediately;
+            }
+            set
+            {
+                Settings.ReconnectImmediately = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReconnectImmediately"));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReconnectWithInterval"));
+            }
+        }
+
+        public bool ReconnectWithInterval
+        {
+            get
+            {
+                return !Settings.ReconnectImmediately;
+            }
+            set
+            {
+                ReconnectImmediately = !value;
+            }
+        }
+
+        public int ReconnectIntervalSeconds
+        {
+            get
+            {
+                return Settings.ReconnectIntervalSeconds;
+            }
+            set
+            {
+                Settings.ReconnectIntervalSeconds = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReconnectIntervalSeconds"));
+            }
+        }
+
+        public bool ClearContentsWhenReconnecting
+        {
+            get
+            {
+                return Settings.ClearContentsWhenReconnecting;
+            }
+            set
+            {
+                Settings.ClearContentsWhenReconnecting = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ClearContentsWhenReconnecting"));
+            }
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -203,6 +289,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     TelnetLocalEcho = telnet.LocalEcho;
                     TelnetActiveNegotiation = telnet.ActiveNegotiation;
                     TelnetKeepAliveSeconds = telnet.KeepAliveSeconds;
+                }
+                else
+                {
+                    TcpKeepAliveSeconds = tcp.KeepAliveSeconds;
                 }
                 SerialSettingsVisibility = Visibility.Collapsed;
                 TCPSettingsVisibility = Visibility.Visible;

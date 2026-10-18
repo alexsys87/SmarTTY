@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+using System;
+using System.ComponentModel;
 using System.Drawing;
 using System.IO.Ports;
 using System.Xml.Serialization;
@@ -71,6 +72,12 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
             public int Port { get; set; }
 
+            /// <summary>
+            /// How often an idle connection is kept alive: a raw TCP connection enables the operating system's TCP
+            /// keep-alive, a telnet connection additionally sends a harmless NOP command. 0 switches the keep-alive off.
+            /// </summary>
+            public int KeepAliveSeconds { get; set; }
+
             [XmlIgnore]
             public override string FileNameBase => Host + "_" + Port;
 
@@ -127,9 +134,6 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
             /// instead of waiting until the server asks for them.
             /// </summary>
             public bool ActiveNegotiation { get; set; }
-
-            /// <summary>Send a harmless NOP command this often to keep an idle connection open; 0 switches it off.</summary>
-            public int KeepAliveSeconds { get; set; }
 
             /// <summary>
             /// Saved telnet and raw TCP connections to the same host and port are different connections,
@@ -291,6 +295,12 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
     private bool _ReconnectAutomatically;
 
+    // Automatic reconnect behavior (see ReconnectAutomatically/ReconnectImmediately/ReconnectIntervalSeconds).
+    // Explicit backing fields, not auto-property initializers, so a Clone() keeps the same defaults.
+    private bool _ReconnectImmediately;
+
+    private int _ReconnectIntervalSeconds = 2;
+
     public string BackspaceSequence;
 
     private TerminalColors _Colors = new TerminalColors
@@ -338,6 +348,56 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
         {
             _ReconnectAutomatically = value;
             OnPropertyChanged("ReconnectAutomatically");
+        }
+    }
+
+    /// <summary>
+    /// When <see cref="ReconnectAutomatically"/> is set, reconnect right away after the connection breaks
+    /// instead of waiting <see cref="ReconnectIntervalSeconds"/> seconds. Bound to the "immediately" radio
+    /// button in the Connect window.
+    /// </summary>
+    public bool ReconnectImmediately
+    {
+        get
+        {
+            return _ReconnectImmediately;
+        }
+        set
+        {
+            _ReconnectImmediately = value;
+            OnPropertyChanged("ReconnectImmediately");
+            OnPropertyChanged("ReconnectWithInterval");
+        }
+    }
+
+    /// <summary>The inverse of <see cref="ReconnectImmediately"/> (bound to the "repeat" radio button).</summary>
+    [XmlIgnore]
+    public bool ReconnectWithInterval
+    {
+        get
+        {
+            return !_ReconnectImmediately;
+        }
+        set
+        {
+            ReconnectImmediately = !value;
+        }
+    }
+
+    /// <summary>
+    /// How long to wait between automatic reconnect attempts, in seconds (1-5, default 2). Only used when
+    /// <see cref="ReconnectAutomatically"/> is set and <see cref="ReconnectImmediately"/> is off.
+    /// </summary>
+    public int ReconnectIntervalSeconds
+    {
+        get
+        {
+            return _ReconnectIntervalSeconds;
+        }
+        set
+        {
+            _ReconnectIntervalSeconds = Math.Max(1, Math.Min(value, 5));
+            OnPropertyChanged("ReconnectIntervalSeconds");
         }
     }
 

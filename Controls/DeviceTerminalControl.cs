@@ -53,6 +53,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private ConnectionStateEnum _connectionState = ConnectionStateEnum.Connecting;
 
+    // Automatic reconnect: when the transport drops or fails and DeviceTerminalSettings.ReconnectAutomatically is
+    // set, a fresh connection is opened again, right away or on a timer (ReconnectIntervalSeconds). Only the user's
+    // own disconnect cancels it (_manualDisconnect); everything runs on the UI thread (WinForms timer).
+    private bool _manualDisconnect;
+
+    private System.Windows.Forms.Timer _autoReconnectTimer;
+
     /// <summary>Raised on the UI thread whenever the transport state or the displayed title changes.</summary>
     public event EventHandler StatusChanged;
 
@@ -400,6 +407,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void DeviceTerminalControl_Disposed(object sender, EventArgs e)
     {
+        _manualDisconnect = true;
+        StopAutoReconnectTimer();
+        _autoReconnectTimer?.Dispose();
+        _autoReconnectTimer = null;
         _logWriter?.Dispose();
         _logWriter = null;
         if (_asyncTransportConnection != null)
@@ -526,6 +537,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void Connect(bool resetTerminal = true, int value = 0)
     {
+        // Any explicit connect (reconnect button, auto-reconnect, settings change) cancels a pending auto-reconnect
+        // and is not treated as a manual disconnect anymore.
+        _manualDisconnect = false;
+        StopAutoReconnectTimer();
         if (_asyncTransportConnection != null)
         {
             _asyncTransportConnection.Dispose();
@@ -583,6 +598,73 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
     }
 
+    /// <summary>True while an automatic reconnect can actually open a new connection (the user has not disconnected manually in the meantime).</summary>
+    private bool CanAutoReconnect =>
+        !_manualDisconnect &&
+        _transportFactory != null &&
+        (_connectionState == ConnectionStateEnum.Disconnected || _connectionState == ConnectionStateEnum.Failed);
+
+    /// <summary>
+    /// Arranges the next automatic reconnect after the transport dropped or failed, honoring ReconnectAutomatically,
+    /// ReconnectImmediately and ReconnectIntervalSeconds from the current settings. A state change is always raised
+    /// on the UI dispatcher, so this runs on the UI thread and no extra threading is involved.
+    /// </summary>
+    private void ScheduleAutoReconnect()
+    {
+        DeviceTerminalSettings settings = _deviceTerminalSettings;
+        if (!CanAutoReconnect || settings == null || !settings.ReconnectAutomatically)
+        {
+            return;
+        }
+        StopAutoReconnectTimer();
+        if (settings.ReconnectImmediately)
+        {
+            // Open the new connection right away, once the current state change has finished being handled.
+            if (!IsDisposed && IsHandleCreated)
+            {
+                try
+                {
+                    BeginInvoke(new Action(ReconnectIfAutoStillWanted));
+                }
+                catch (InvalidOperationException)
+                {
+                    // The window is closing; drop the scheduled reconnect.
+                }
+            }
+            return;
+        }
+        if (_autoReconnectTimer == null)
+        {
+            _autoReconnectTimer = new System.Windows.Forms.Timer();
+            _autoReconnectTimer.Tick += OnAutoReconnectTimerTick;
+        }
+        _autoReconnectTimer.Interval = settings.ReconnectIntervalSeconds * 1000;
+        _autoReconnectTimer.Start();
+    }
+
+    private void StopAutoReconnectTimer()
+    {
+        _autoReconnectTimer?.Stop();
+    }
+
+    private void OnAutoReconnectTimerTick(object sender, EventArgs e)
+    {
+        ((System.Windows.Forms.Timer)sender).Stop();
+        ReconnectIfAutoStillWanted();
+    }
+
+    /// <summary>
+    /// Reopens the connection that dropped, if the user has not explicitly disconnected in the meantime.
+    /// Whether the screen content is wiped follows the ClearContentsWhenReconnecting setting.
+    /// </summary>
+    private void ReconnectIfAutoStillWanted()
+    {
+        if (CanAutoReconnect && _deviceTerminalSettings != null)
+        {
+            Connect(resetTerminal: _deviceTerminalSettings.ClearContentsWhenReconnecting);
+        }
+    }
+
     /// <summary>Pastes the clipboard text into the device (same as the context menu command).</summary>
     public void Paste()
     {
@@ -621,7 +703,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         finally
         {
+            if (connectionStateEnum == ConnectionStateEnum.Connected || connectionStateEnum == ConnectionStateEnum.Connecting)
+            {
+                StopAutoReconnectTimer();
+            }
             RaiseStatusChanged();
+        }
+        if (connectionStateEnum == ConnectionStateEnum.Disconnected || connectionStateEnum == ConnectionStateEnum.Failed)
+        {
+            ScheduleAutoReconnect();
         }
     }
 
@@ -1257,6 +1347,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         AsyncTransportConnection asyncTransportConnection = _asyncTransportConnection;
         if (asyncTransportConnection != null && asyncTransportConnection.MatchesPort(text))
         {
+            // A deliberately closed connection must not be reopened automatically: this is the cancellation point
+            // that the auto-reconnect logic (which is also fed by OnConnectionStateChanged) must honor.
+            _manualDisconnect = true;
+            StopAutoReconnectTimer();
             _asyncTransportConnection.Dispose();
             _asyncTransportConnection = null;
             OnConnectionStateChanged(null, ConnectionStateEnum.Disconnected, null);
