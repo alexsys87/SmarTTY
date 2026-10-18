@@ -25,6 +25,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         public string Text => _text;
         public int CaretIndex => _caretIndex;
+        public TextDocument.TextPosition StartPosition => new TextDocument.TextPosition(StartColumn, StartLine);
 
         public InputLine(SerialTerminalControl terminal, int startLine, int startColumn, string prompt)
         {
@@ -85,7 +86,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         public void SetCaretIndex(int index)
         {
-            _caretIndex = Math.Clamp(index, 0, _text.Length);
+            _caretIndex = index < 0 ? 0 : (index > _text.Length ? _text.Length : index);
         }
     }
 
@@ -99,7 +100,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             OriginalInput = originalInput;
             Matches = history
-                .Where(cmd => cmd.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                .Where(cmd => cmd.IndexOf(searchTerm, StringComparison.OrdinalIgnoreCase) >= 0)
                 .Reverse()
                 .ToList();
             CurrentIndex = -1;
@@ -132,8 +133,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     public SerialTerminalControl()
     {
-        // Enable key mapping for proper escape sequences
-        _keyMappingEnabled = true;
     }
 
     protected override bool UsesTerminalInput => _inputLine != null;
