@@ -78,6 +78,8 @@ public partial class DeviceTerminalControl
 
 	private ToolStripComboBox cbEncoding;
 
+	private ToolStripButton btnLog;
+
 	protected override void Dispose(bool disposing)
 	{
 		if (disposing && components != null)
@@ -118,6 +120,7 @@ public partial class DeviceTerminalControl
 		cbBaudRate = new ToolStripComboBox();
 		lblEncoding = new ToolStripLabel();
 		cbEncoding = new ToolStripComboBox();
+		btnLog = new ToolStripButton();
 		contextMenuStrip1 = new ContextMenuStrip(components);
 		copyToolStripMenuItem = new ToolStripMenuItem();
 		copyAllToolStripMenuItem = new ToolStripMenuItem();
@@ -163,10 +166,10 @@ public partial class DeviceTerminalControl
 		lblConnecting.TabIndex = 0;
 		lblConnecting.Text = "Connecting...";
 		lblConnecting.TextAlign = ContentAlignment.TopCenter;
-		toolStrip1.Items.AddRange(new ToolStripItem[14]
+		toolStrip1.Items.AddRange(new ToolStripItem[15]
 		{
-			lblConnection, btnDisconnect, btnReconnect, btnSend, txtHexInput, lblSend, toolStripButton1, toolStripButton3, toolStripButton2, toolStripDropDownButton1,
-			lblBaudRate, cbBaudRate, lblEncoding, cbEncoding
+			lblConnection, btnDisconnect, btnReconnect, btnSend, txtHexInput, lblSend, toolStripButton1, toolStripButton3, toolStripButton2, btnLog,
+			toolStripDropDownButton1, lblBaudRate, cbBaudRate, lblEncoding, cbEncoding
 		});
 		toolStrip1.Location = new Point(0, 0);
 		toolStrip1.Name = "toolStrip1";
@@ -242,6 +245,12 @@ public partial class DeviceTerminalControl
 		toolStripButton2.Size = new Size(23, 22);
 		toolStripButton2.Text = "Save output to file";
 		toolStripButton2.Click += toolStripButton2_Click;
+		btnLog.DisplayStyle = ToolStripItemDisplayStyle.Text;
+		btnLog.Name = "btnLog";
+		btnLog.Size = new Size(60, 22);
+		btnLog.Text = "Start log";
+		btnLog.ToolTipText = "Continuously record received data to a file";
+		btnLog.Click += btnLog_Click;
 		toolStripDropDownButton1.DisplayStyle = ToolStripItemDisplayStyle.Image;
 		toolStripDropDownButton1.DropDownItems.AddRange(new ToolStripItem[3] { terminalTypeToolStripMenuItem, echoTypedCharactersToolStripMenuItem, changeSettingsToolStripMenuItem });
 		toolStripDropDownButton1.Image = (Image)resources.GetObject("toolStripDropDownButton1.Image");
