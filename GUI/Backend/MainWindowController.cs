@@ -170,22 +170,33 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                TerminalEmulatorControl terminalEmulatorControl = (_Controller.ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+                ITabContext activeTab = _Controller.ActiveSession?.ActiveTab;
+                OpenFileDialog openFileDialog = new OpenFileDialog();
+                if (openFileDialog.ShowDialog() != DialogResult.OK)
+                {
+                    return;
+                }
+                byte[] bytes;
+                using (FileStream fileStream = File.OpenRead(openFileDialog.FileName))
+                {
+                    using (MemoryStream memoryStream = new MemoryStream())
+                    {
+                        fileStream.CopyTo(memoryStream);
+                        bytes = memoryStream.ToArray();
+                    }
+                }
+                // Device terminals record raw bytes, SSH terminals record UTF-8 text.
+                if (activeTab is DeviceTabContext deviceTab)
+                {
+                    new LogReplayForm(bytes, deviceTab.Terminal).Show();
+                    return;
+                }
+                TerminalEmulatorControl terminalEmulatorControl = (activeTab as NormalTabContext)?.Terminal;
                 if (terminalEmulatorControl == null)
                 {
                     throw new Exception("No active terminal");
                 }
-                OpenFileDialog openFileDialog = new OpenFileDialog();
-                if (openFileDialog.ShowDialog() == DialogResult.OK)
-                {
-                    using (FileStream fileStream = File.OpenRead(openFileDialog.FileName))
-                    {
-                        byte[] bytes = new byte[fileStream.Length];
-                        fileStream.Read(bytes, 0, bytes.Length);
-                        new LogReplayForm(Encoding.UTF8.GetString(bytes), terminalEmulatorControl).Show();
-                        return;
-                    }
-                }
+                new LogReplayForm(Encoding.UTF8.GetString(bytes), terminalEmulatorControl).Show();
             }
             catch (Exception exception)
             {
@@ -887,6 +898,27 @@ public class MainWindowController : INotifyPropertyChanged
     public ConnectionSelectionWindow.ControllerImpl NewConnectionController { get; private set; }
 
     public Visibility DebugVisibility => Visibility.Collapsed;
+
+    /// <summary>
+    /// Visibility of the "_Replay log" menu command. Replay works for SSH terminals and for device (COM / raw TCP /
+    /// telnet) terminals, so it is shown whenever the active tab is a terminal of either kind — unlike the
+    /// debug-only commands next to it.
+    /// </summary>
+    public Visibility ReplayVisibility
+    {
+        get
+        {
+            switch (ActiveSession?.ActiveTab)
+            {
+                case NormalTabContext normalTab:
+                    return normalTab.Terminal == null ? Visibility.Collapsed : Visibility.Visible;
+                case DeviceTabContext:
+                    return Visibility.Visible;
+                default:
+                    return Visibility.Collapsed;
+            }
+        }
+    }
 
     public string RemoteFileSaveHeader
     {
@@ -1592,6 +1624,7 @@ public class MainWindowController : INotifyPropertyChanged
             }
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("RemoteFileSaveHeader"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SaveCommandVisibility"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReplayVisibility"));
             _VirtualTerminalPopup.IsOpen = false;
             FocusMainControlDelayed(activeTab);
         }

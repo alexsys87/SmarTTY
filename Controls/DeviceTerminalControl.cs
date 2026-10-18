@@ -710,6 +710,38 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.OnDataReceived(text);
     }
 
+    /// <summary>
+    /// Feeds previously recorded received data (see <see cref="SmarTTY.Forms.LogReplayForm"/>) back into this terminal exactly like
+    /// live data: hex bytes into the hex dump in HEX mode, decoded text into the text terminal otherwise. Nothing is
+    /// recorded and nothing is sent to the device.
+    /// </summary>
+    public void ReplayReceivedData(byte[] buffer, int count)
+    {
+        if (buffer == null || count <= 0 || _logWriter != null)
+        {
+            return;
+        }
+        count = Math.Min(count, buffer.Length);
+        if (_isHexMode)
+        {
+            // AppendData appends from index 0, so the caller passes a fresh slice for every step.
+            hexTerminalControl1.AppendData(buffer, count);
+            return;
+        }
+        string text = _textDecoder.Decode(buffer, 0, count);
+        if (_deviceTerminalSettings != null && _deviceTerminalSettings.TreatLFAsCRLF)
+        {
+            text = text.Replace("\n", "\r\n");
+        }
+        _serialTerminalControl.OnDataReceived(text);
+    }
+
+    /// <summary>Resets the incremental decoder so a replay can safely restart from the beginning of a log.</summary>
+    public void ResetReplayDecoder()
+    {
+        _textDecoder.Reset();
+    }
+
     private void OnTerminalDataEntered(object sender, byte[] buffer, TerminalEmulatorControl.InputKind inputKind)
     {
         if (_asyncTransportConnection != null)
@@ -1036,6 +1068,43 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
+    }
+
+    private void btnReplay_Click(object sender, EventArgs e)
+    {
+        if (_logWriter != null)
+        {
+            MessageBox.Show("Stop recording first, then replay.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        using OpenFileDialog dialog = new OpenFileDialog
+        {
+            Title = "Play back a recorded log of received data",
+            Filter = "All files (*.*)|*.*|Text log (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin",
+            FilterIndex = 1,
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(dialog.FileName);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            return;
+        }
+        if (bytes.Length == 0)
+        {
+            MessageBox.Show("The file is empty.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        new SmarTTY.Forms.LogReplayForm(bytes, this).Show();
     }
 
     private void btnLog_Click(object sender, EventArgs e)

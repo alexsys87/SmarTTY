@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -49,7 +49,9 @@ public partial class LogReplayForm
 		trackBar1.Name = "trackBar1";
 		trackBar1.Size = new Size(324, 45);
 		trackBar1.TabIndex = 1;
+		trackBar1.Value = 50;
 		_timer.Enabled = true;
+		_timer.Interval = 30;
 		_timer.Tick += OnTimerTick;
 		button2.Location = new Point(12, 50);
 		button2.Name = "button2";
