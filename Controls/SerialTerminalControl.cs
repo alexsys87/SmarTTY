@@ -700,7 +700,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
     }
 
-    protected override bool UsesTerminalInput => _inputLine != null;
+    // Same meaning as in SshTerminalControl: at the prompt the user edits the local input line,
+    // keys are forwarded to the device only while no input line is shown.
+    protected override bool UsesTerminalInput => _inputLine == null;
 
     public string CurrentPrompt => _currentPrompt;
 
@@ -1466,7 +1468,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     public override void Paste()
     {
-        if (!UsesTerminalInput)
+        if (UsesTerminalInput)
         {
             base.Paste();
             return;
@@ -1538,11 +1540,14 @@ public class SerialTerminalControl : TerminalEmulatorControl
         if (_inputLine == null && !string.IsNullOrEmpty(text))
         {
             // Check if the text ends with a prompt-like pattern
-            if (text.TrimEnd().EndsWith(_currentPrompt) ||
-                text.TrimEnd().EndsWith("> ") ||
-                text.TrimEnd().EndsWith("# ") ||
-                text.TrimEnd().EndsWith("$ ") ||
-                text.TrimEnd().EndsWith(">> "))
+            // Only strip line breaks: TrimEnd() also removed the trailing space of "> ", "# ", "$ ",
+            // so none of these patterns could ever match and the prompt never came back.
+            string tail = text.TrimEnd('\r', '\n');
+            if (tail.EndsWith(_currentPrompt) ||
+                tail.EndsWith("> ") ||
+                tail.EndsWith("# ") ||
+                tail.EndsWith("$ ") ||
+                tail.EndsWith(">> "))
             {
                 ShowPrompt();
             }
