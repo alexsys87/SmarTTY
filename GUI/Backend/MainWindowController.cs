@@ -11,6 +11,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -1194,6 +1195,7 @@ public class MainWindowController : INotifyPropertyChanged
         string title = MakeUniqueDeviceTitle(DeviceTerminalControl.GetConnectionTitle(sessionSettings.Connection));
         SessionWrapper sessionWrapper = SessionWrapper.CreateDeviceSession(this, sessionSettings, title);
         sessionWrapper.DeviceTab.Terminal.CompletionPopupRequested += MainWindowController_VirtualTerminalPopupRequested;
+        sessionWrapper.DeviceTab.Terminal.OpenFileRequested += DeviceTab_OpenFileRequested;
         sessionWrapper.ShowNewSessionTab = AllSessions.Count == 1;
         AllSessions.Insert(firstPseudoPage, sessionWrapper);
         HookSessionCollection();
@@ -1308,11 +1310,23 @@ public class MainWindowController : INotifyPropertyChanged
         return terminalEmulatorControl;
     }
 
-    private void Vt_FileOpenRequested(object sender, SshTerminalControl.OpenFileEventArgs e)
+    private void Vt_FileOpenRequested(object sender, OpenFileEventArgs e)
     {
         try
         {
             MenuCommandHandlers.CreateNewEditorTab(ActiveSession, e.Path, new TextDocument.TextPosition(e.Column.GetValueOrDefault(), e.Line.GetValueOrDefault()));
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void DeviceTab_OpenFileRequested(object sender, OpenFileEventArgs e)
+    {
+        try
+        {
+            Process.Start(e.Path);
         }
         catch (Exception exception)
         {
