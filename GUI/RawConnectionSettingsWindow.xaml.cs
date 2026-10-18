@@ -53,6 +53,8 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             DeviceTerminalSettings.LineEndingType.CRLF
         };
 
+        public System.Collections.Generic.IReadOnlyList<TerminalEncodings.Choice> TextEncodings => TerminalEncodings.All;
+
         public DeviceTerminalSettings.CharacterDisplayMode[] DisplayModes { get; } = new DeviceTerminalSettings.CharacterDisplayMode[2]
         {
             DeviceTerminalSettings.CharacterDisplayMode.ASCII,

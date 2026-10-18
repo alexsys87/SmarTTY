@@ -172,6 +172,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public string EnterSequence { get; set; }
 
+    /// <summary>
+    /// Encoding used to turn typed and pasted text into bytes. SSH sessions keep the UTF-8 default;
+    /// the COM/TCP terminal sets it from its settings so that input matches how received data is decoded.
+    /// </summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Encoding InputEncoding { get; set; } = Encoding.UTF8;
+
     protected virtual bool UsesTerminalInput { get; } = true;
 
     public MouseReportingMode MouseMode
@@ -1000,16 +1008,17 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             return;
         }
+        Encoding encoding = InputEncoding;
         if (Dispatcher != null)
         {
             Dispatcher.PostInput(() =>
             {
-                DataEntered(this, Encoding.UTF8.GetBytes(text), inputKind);
+                DataEntered(this, encoding.GetBytes(text), inputKind);
             });
         }
         else
         {
-            DataEntered(this, Encoding.UTF8.GetBytes(text), inputKind);
+            DataEntered(this, encoding.GetBytes(text), inputKind);
         }
     }
 
