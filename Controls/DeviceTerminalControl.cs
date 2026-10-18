@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Threading;
+using VisualTTY;
 using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Controls;
@@ -22,6 +23,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private AsyncTransportConnection _asyncTransportConnection;
 
     private DeviceTerminalSettings _deviceTerminalSettings;
+
+    // Appearance and key behavior shared with the SSH tabs (Settings window). Everything that is specific to one
+    // device (colors, line ending, encoding, baud rate, ...) stays in _deviceTerminalSettings.
+    private GlobalSettings _commonSettings;
 
     private Brush _brush;
 
@@ -44,6 +49,18 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     /// <summary>Raised on the UI thread whenever the transport state or the displayed title changes.</summary>
     public event EventHandler StatusChanged;
+
+    /// <summary>
+    /// The text terminal while it has the keyboard focus (null in HEX mode or when the focus is in the toolbar), so
+    /// window-level key handling (F10, Alt+letter) never leaks into the baud rate box or the "Send" field.
+    /// </summary>
+    internal TerminalEmulatorControl FocusedTextTerminal => (!_isHexMode && terminalEmulatorControl1.Focused) ? terminalEmulatorControl1 : null;
+
+    /// <summary>Raised when the user presses Ctrl+W and the shared "Close tab on Ctrl+W" option is on.</summary>
+    public event EventHandler CloseTabRequested;
+
+    /// <summary>Raised when the user presses Alt+Enter (full screen on/off, as in SSH tabs).</summary>
+    public event EventHandler FullScreenToggleRequested;
 
     public long BytesSent => Interlocked.Read(ref _bytesSent);
 
@@ -197,6 +214,45 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return () => new TcpTransport(connectionSettings as DeviceTerminalSettings.ConnectionSettings.Tcp);
         }
         return null;
+    }
+
+    /// <summary>
+    /// Applies the settings that SSH tabs share through the Settings window: font, ANSI palette and the key and
+    /// mouse behavior (Shift+PageUp/Down, mouse wheel, Alt+letter, Ctrl-C/V, Ctrl+W, copy on selection).
+    /// Per-device values (background/text/echo/disconnected colors, line ending, encoding, ...) are not touched,
+    /// so this can be called again at any time, e.g. after the user changes the shared settings.
+    /// </summary>
+    public void ApplyCommonSettings(GlobalSettings settings)
+    {
+        if (settings == null)
+        {
+            return;
+        }
+        _commonSettings = settings;
+        TerminalEmulatorControl terminal = terminalEmulatorControl1;
+        terminal.AppSettings = settings;
+        terminal.CopyOnSelect = settings.CopyOnSelection;
+        hexTerminalControl1.CopyOnSelect = settings.CopyOnSelection;
+        terminal.SetPalette(settings.PaletteOverride ?? ConsolePalette.PuTTY);
+        try
+        {
+            // Same rule as for SSH tabs: without a configured font the control keeps its own default.
+            if (!string.IsNullOrEmpty(settings.FontName) && settings.FontSize != 0f)
+            {
+                hexTerminalControl1.Font = new Font(settings.FontName, settings.FontSize);
+                terminal.Font = new Font(settings.FontName, settings.FontSize);
+            }
+        }
+        catch
+        {
+            // An uninstalled font must not break the terminal; the previous font stays.
+        }
+        if (terminal.IsHandleCreated)
+        {
+            terminal.UpdateLayout();
+            terminal.Redraw();
+            hexTerminalControl1.Invalidate(true);
+        }
     }
 
     public void ApplySettings(DeviceTerminalSettings deviceTerminalSettings)
@@ -677,11 +733,29 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void OnTerminalKeyDown(object sender, KeyEventArgs e)
     {
-        // Ctrl+C is sent to the device (e.g. SIGINT for a Linux console), so clipboard
-        // operations use Ctrl+Shift+C / Ctrl+Shift+V like in common Linux terminals.
+        GlobalSettings common = _commonSettings;
+        if (common != null && common.UseCtrlShortcuts && e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.W)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            CloseTabRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+        if (!e.Control && e.Alt && !e.Shift && e.KeyCode == Keys.Return)
+        {
+            // Not a character for the device: toggle full screen like in SSH tabs.
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            FullScreenToggleRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+        // By default Ctrl+C is sent to the device (e.g. SIGINT for a Linux console), so clipboard
+        // operations use Ctrl+Shift+C / Ctrl+Shift+V like in common Linux terminals. When the shared option
+        // "Ctrl-C/Ctrl-X/Ctrl-V = Copy/Cut/Paste" is on, plain Ctrl+C / Ctrl+V work on the clipboard (as in SSH tabs).
         // The HEX view never sends Ctrl+C to the device, so plain Ctrl+C copies there as well.
-        bool copy = e.Control && !e.Alt && e.KeyCode == Keys.C && (e.Shift || HexMode);
-        bool paste = e.Control && e.Shift && !e.Alt && e.KeyCode == Keys.V;
+        bool interceptClipboard = common != null && common.InterceptCtrlClipboardShortcuts;
+        bool copy = e.Control && !e.Alt && e.KeyCode == Keys.C && (e.Shift || HexMode || interceptClipboard);
+        bool paste = e.Control && !e.Alt && e.KeyCode == Keys.V && (e.Shift || interceptClipboard);
         if (copy)
         {
             CopySelection();

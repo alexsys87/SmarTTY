@@ -406,6 +406,21 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    /// <summary>Settings shared by all tabs (font, palette, key behavior), for device terminals.</summary>
+    internal GlobalSettings CommonSettings => _Controller.Settings;
+
+    /// <summary>Toggles the main window full screen mode (Alt+Enter in a device terminal).</summary>
+    internal void ToggleFullScreenFromDevice()
+    {
+        _Controller.BeginInvoke(() => _Controller.FullScreenMode = !_Controller.FullScreenMode);
+    }
+
+    /// <summary>Closes a device tab after the key handler that asked for it has returned (Ctrl+W).</summary>
+    internal void CloseDeviceTabFromKeyboard(DeviceTabContext tab)
+    {
+        _Controller.BeginInvoke(() => tab.Close());
+    }
+
     internal void OnDeviceStatusChanged()
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("TitleWithStatus"));

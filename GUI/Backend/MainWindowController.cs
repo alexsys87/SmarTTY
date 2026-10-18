@@ -422,6 +422,10 @@ public class MainWindowController : INotifyPropertyChanged
                         terminal.UpdateLayout();
                         terminal.Redraw();
                     }
+                    else if (tab is DeviceTabContext deviceTab)
+                    {
+                        deviceTab.ApplyCommonSettings();
+                    }
                     else if (tab is EditorTabContext editorTabContext)
                     {
                         _Controller.ApplyEditorSettings(editorTabContext.Editor);

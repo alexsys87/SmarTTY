@@ -55,6 +55,8 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         Settings = settings;
         Terminal = new DeviceTerminalControl();
         Terminal.StatusChanged += OnTerminalStatusChanged;
+        Terminal.CloseTabRequested += OnTerminalCloseTabRequested;
+        Terminal.FullScreenToggleRequested += OnTerminalFullScreenToggleRequested;
         WinFormsHostWrapper host = new WinFormsHostWrapper();
         ((WindowsFormsHost)host).Child = Terminal;
         Control = host;
@@ -93,7 +95,26 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             return;
         }
         _SettingsApplied = true;
+        // Shared font/palette/key behavior first: ApplySettings opens the transport, and received text must be
+        // styled with the final palette from the very first byte. Device colors are applied right after.
+        ApplyCommonSettings();
         Terminal.ApplySettings(Settings);
+    }
+
+    /// <summary>Applies the shared (SSH-wide) appearance and key behavior; per-device settings are left alone.</summary>
+    public void ApplyCommonSettings()
+    {
+        Terminal.ApplyCommonSettings(_Session.CommonSettings);
+    }
+
+    private void OnTerminalCloseTabRequested(object sender, EventArgs e)
+    {
+        _Session.CloseDeviceTabFromKeyboard(this);
+    }
+
+    private void OnTerminalFullScreenToggleRequested(object sender, EventArgs e)
+    {
+        _Session.ToggleFullScreenFromDevice();
     }
 
     private void OnTerminalStatusChanged(object sender, EventArgs e)
@@ -124,6 +145,8 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     {
         Terminal.HandleCreated -= Terminal_HandleCreated;
         Terminal.StatusChanged -= OnTerminalStatusChanged;
+        Terminal.CloseTabRequested -= OnTerminalCloseTabRequested;
+        Terminal.FullScreenToggleRequested -= OnTerminalFullScreenToggleRequested;
         Terminal.Dispose();
     }
 }
