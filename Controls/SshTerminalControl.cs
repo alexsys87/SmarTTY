@@ -324,7 +324,9 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     protected virtual bool IsCommandRunning => _inputLine == null;
 
-    protected override bool UsesTerminalInput => _inputLine != null;
+    // At the prompt (_inputLine != null) the user edits the local input line, so keys must NOT be
+    // forwarded to the remote channel; only while a command is running do they go to the terminal.
+    protected override bool UsesTerminalInput => _inputLine == null;
 
     protected virtual bool HasInputLine => _inputLine != null;
 
