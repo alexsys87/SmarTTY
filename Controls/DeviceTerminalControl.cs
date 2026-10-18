@@ -47,6 +47,72 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private int _lastLogButtonUpdate;
 
+    private long _bytesSent;
+
+    private long _bytesReceived;
+
+    private ConnectionStateEnum _connectionState = ConnectionStateEnum.Connecting;
+
+    /// <summary>Raised on the UI thread whenever the transport state or the displayed title changes.</summary>
+    public event EventHandler StatusChanged;
+
+    /// <summary>
+    /// The text terminal while it has the keyboard focus (null in HEX mode or when the focus is in the toolbar), so
+    /// window-level key handling (F10, Alt+letter) never leaks into the baud rate box or the "Send" field.
+    /// </summary>
+    internal SerialTerminalControl FocusedTextTerminal => (!_isHexMode && _serialTerminalControl.Focused) ? _serialTerminalControl : null;
+
+    /// <summary>Raised when the user presses Ctrl+W and the shared "Close tab on Ctrl+W" option is on.</summary>
+    public event EventHandler CloseTabRequested;
+
+    /// <summary>Raised when the user presses Alt+Enter (full screen on/off, as in SSH tabs).</summary>
+    public event EventHandler FullScreenToggleRequested;
+
+    public long BytesSent => Interlocked.Read(ref _bytesSent);
+
+    public long BytesReceived => Interlocked.Read(ref _bytesReceived);
+
+    public ConnectionStateEnum ConnectionState => _connectionState;
+
+    public DeviceTerminalSettings Settings => _deviceTerminalSettings;
+
+    /// <summary>Short name for a tab header, e.g. "COM3" or "192.168.0.5:23".</summary>
+    public string ConnectionTitle => GetConnectionTitle(_deviceTerminalSettings?.Connection);
+
+    /// <summary>Short name of a connection for a tab header; usable before the control has been given its settings.</summary>
+    public static string GetConnectionTitle(DeviceTerminalSettings.ConnectionSettings connection)
+    {
+        return connection switch
+        {
+            DeviceTerminalSettings.ConnectionSettings.Serial serial => serial.ComPortName,
+            DeviceTerminalSettings.ConnectionSettings.Tcp tcp => tcp.Host + ":" + tcp.Port,
+            _ => "Raw Terminal",
+        };
+    }
+
+    /// <summary>One-line description for the status bar, e.g. "COM3 (115200 bps): connected".</summary>
+    public string StatusText
+    {
+        get
+        {
+            string name = _transportDisplayName ?? ConnectionTitle;
+            return _connectionState switch
+            {
+                ConnectionStateEnum.Connecting => name + ": connecting...",
+                ConnectionStateEnum.Connected => name + ": connected",
+                ConnectionStateEnum.Failed => name + ": connection failed",
+                _ => name + ": disconnected",
+            };
+        }
+    }
+
+    private string _transportDisplayName;
+
+    private void RaiseStatusChanged()
+    {
+        StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public bool HexMode
     {
         get
