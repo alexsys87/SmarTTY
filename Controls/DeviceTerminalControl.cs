@@ -969,6 +969,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
             CloseTabRequested?.Invoke(this, EventArgs.Empty);
             return;
         }
+        // Ctrl+D closes the terminal window (same as Ctrl+W). It is not gated by the "Ctrl shortcuts"
+        // option so the classic serial-terminal shortcut works out of the box, and the key is not
+        // forwarded to the device.
+        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.D)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            CloseTabRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
         if (!e.Control && e.Alt && !e.Shift && e.KeyCode == Keys.Return)
         {
             // Not a character for the device: toggle full screen like in SSH tabs.
