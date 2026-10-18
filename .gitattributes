@@ -1,0 +1,16 @@
+# Нормализация окончаний строк: в репозитории LF, в рабочей директории CRLF
+* text=auto eol=crlf
+
+# Бинарные файлы не преобразовывать
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.zip binary
+*.dll binary
+*.exe binary
+
+# Shell-скрипты должны оставаться с LF
+*.sh text eol=lf
