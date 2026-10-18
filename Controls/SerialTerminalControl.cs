@@ -132,6 +132,38 @@ public class SerialTerminalControl : TerminalEmulatorControl
     private bool _autoDetectPrompt = true;
     private bool _localEcho = true;
 
+    /// <summary>Raised when the user clicks a path or an URL shown in the terminal text. Device terminals run on this
+    /// machine, so the path is a local file; the controller opens it with the default associated application.</summary>
+    public event EventHandler<OpenFileEventArgs> OpenFileRequested;
+
+    public void RequestOpenFile(string path, int? line = null, int? column = null)
+    {
+        OpenFileRequested?.Invoke(this, new OpenFileEventArgs
+        {
+            Path = path,
+            Line = line,
+            Column = column
+        });
+    }
+
+    private bool IsLinkExtension(string extension)
+    {
+        string autoLinkExtensions = AppSettings?.VirtualTerminal?.AutoLinkExtensions;
+        if (string.IsNullOrEmpty(autoLinkExtensions))
+        {
+            return false;
+        }
+        foreach (string item in autoLinkExtensions.Split(';'))
+        {
+            if (string.Equals(item, extension, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals("." + item, extension, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Completion infrastructure
     private enum CompletionTarget
     {
@@ -1263,6 +1295,234 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 _currentPrompt = pattern;
                 return;
             }
+        }
+    }
+
+    private ILinkTarget GetLinkAt(int line, Point point)
+    {
+        LineInfo lineInfo = ActiveBuffer?.Lines?.GetLine(line);
+        if (lineInfo?.Cells != null)
+        {
+            TextDocument.TextPosition textPosition = HitTest(point);
+            if (textPosition.Column >= 0 && textPosition.Column < lineInfo.Cells.Length)
+            {
+                return lineInfo.Cells[textPosition.Column]._link.Target;
+            }
+        }
+        return null;
+    }
+
+    protected override HoverTarget GetHoverTarget(int line, Point point)
+    {
+        ILinkTarget linkTarget = GetLinkAt(line, point);
+        if (linkTarget != null && linkTarget.IsActive)
+        {
+            return new HoverTarget
+            {
+                Cursor = Cursors.Hand,
+                ClickAction = linkTarget.Activate
+            };
+        }
+        return base.GetHoverTarget(line, point);
+    }
+
+    internal override ILinkScanner CreateLinkScanner()
+    {
+        return new LocalLinkScanner(this);
+    }
+
+    private enum LinkCandidateState
+    {
+        Word,
+        Rejected,
+        AbsolutePath,
+        Position
+    }
+
+    private class LocalLinkCandidate : ILinkTarget
+    {
+        // ':' and '\\' are valid here too: drive-letter paths (C:\...) and URLs with ports stay in one candidate.
+        internal static readonly string PathCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-/:\\";
+
+        public LinkCandidateState State;
+
+        private readonly SerialTerminalControl _terminal;
+
+        private readonly string _baseDirectory;
+
+        private readonly StringBuilder _path = new StringBuilder();
+
+        private StringBuilder _extension;
+
+        public LocalLinkCandidate(SerialTerminalControl terminal, char firstChar)
+        {
+            _terminal = terminal;
+            _baseDirectory = Environment.CurrentDirectory;
+            _path.Append(firstChar);
+            State = (firstChar == '\\' || firstChar == '/') ? LinkCandidateState.AbsolutePath : LinkCandidateState.Word;
+        }
+
+        public bool IsActive
+        {
+            get
+            {
+                if (State != LinkCandidateState.Position)
+                {
+                    return false;
+                }
+                string path = ComputeTargetPath();
+                if (path == null)
+                {
+                    return false;
+                }
+                if (IsUrl(path))
+                {
+                    return true;
+                }
+                try
+                {
+                    return File.Exists(path) || Directory.Exists(path);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
+        public void Activate()
+        {
+            string path = ComputeTargetPath();
+            if (path != null)
+            {
+                _terminal.RequestOpenFile(path);
+            }
+        }
+
+        private static bool IsUrl(string path)
+        {
+            return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string ComputeTargetPath()
+        {
+            try
+            {
+                string path = _path.ToString();
+                if (IsUrl(path))
+                {
+                    return path;
+                }
+                bool isDosDrive = path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':';
+                if (State == LinkCandidateState.AbsolutePath || isDosDrive)
+                {
+                    return Path.GetFullPath(path);
+                }
+                return Path.GetFullPath(Path.Combine(_baseDirectory, path));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public bool Accept(char ch)
+        {
+            if (State == LinkCandidateState.Rejected || State == LinkCandidateState.Position)
+            {
+                return false;
+            }
+            if (ch == '.')
+            {
+                _extension = new StringBuilder();
+            }
+            if (PathCharacters.IndexOf(ch) >= 0)
+            {
+                _path.Append(ch);
+                _extension?.Append(ch);
+                return true;
+            }
+            Complete();
+            return false;
+        }
+
+        public void Complete()
+        {
+            if (State == LinkCandidateState.Rejected || State == LinkCandidateState.Position)
+            {
+                return;
+            }
+            string path = _path.ToString();
+            bool isDosDrive = path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':';
+            if (IsUrl(path) || State == LinkCandidateState.AbsolutePath || isDosDrive)
+            {
+                State = LinkCandidateState.Position;
+            }
+            else if (_extension != null && _terminal.IsLinkExtension(_extension.ToString()))
+            {
+                State = LinkCandidateState.Position;
+            }
+            else
+            {
+                State = LinkCandidateState.Rejected;
+            }
+        }
+    }
+
+    private class LocalLinkScanner : ILinkScanner
+    {
+        private readonly SerialTerminalControl _terminal;
+
+        private LocalLinkCandidate _current;
+
+        private char _previousChar;
+
+        public LocalLinkScanner(SerialTerminalControl terminal)
+        {
+            _terminal = terminal;
+        }
+
+        private LocalLinkCandidate ReadChar(char ch)
+        {
+            char prevChar = _previousChar;
+            _previousChar = ch;
+            if (_current == null)
+            {
+                if (LocalLinkCandidate.PathCharacters.IndexOf(ch) >= 0 && prevChar != '\\')
+                {
+                    return _current = new LocalLinkCandidate(_terminal, ch);
+                }
+                return null;
+            }
+            if (!_current.Accept(ch))
+            {
+                _current = null;
+            }
+            return _current;
+        }
+
+        public LinkCell[] Scan(string lineText)
+        {
+            char[] charArray = lineText.ToArray();
+            LocalLinkCandidate[] candidateArray = charArray.Select(ReadChar).ToArray();
+            for (int i = 0; i < candidateArray.Length; i++)
+            {
+                if (candidateArray[i] != null && candidateArray[i].State == LinkCandidateState.Rejected)
+                {
+                    candidateArray[i] = null;
+                }
+            }
+            return candidateArray.Select((LocalLinkCandidate linkCandidate) => new LinkCell
+            {
+                Target = linkCandidate
+            }).ToArray();
+        }
+
+        public void Finish()
+        {
+            _current?.Complete();
         }
     }
 }

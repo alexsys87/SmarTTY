@@ -74,6 +74,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// </summary>
     public event EventHandler<CompletionPopupRequest> CompletionPopupRequested;
 
+    /// <summary>Raised when the user clicks a path or an URL shown in the terminal text (a local file on this machine).</summary>
+    public event EventHandler<OpenFileEventArgs> OpenFileRequested;
+
     public long BytesSent => Interlocked.Read(ref _bytesSent);
 
     public long BytesReceived => Interlocked.Read(ref _bytesReceived);
@@ -228,6 +231,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.DataEntered += OnTerminalDataEntered;
         _serialTerminalControl.KeyDown += OnTerminalKeyDown;
         _serialTerminalControl.CompletionPopupRequested += OnSerialCompletionPopupRequested;
+        _serialTerminalControl.OpenFileRequested += OnSerialOpenFileRequested;
 
         // Add to controls at the same position as the old control
         Controls.Add(_serialTerminalControl);
@@ -289,6 +293,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private void OnSerialCompletionPopupRequested(object sender, CompletionPopupRequest e)
     {
         CompletionPopupRequested?.Invoke(this, e);
+    }
+
+    private void OnSerialOpenFileRequested(object sender, OpenFileEventArgs e)
+    {
+        OpenFileRequested?.Invoke(this, e);
     }
 
     private static string GetLineEnding(DeviceTerminalSettings.LineEndingType lineEndingType)
