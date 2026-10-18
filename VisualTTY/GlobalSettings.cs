@@ -1,4 +1,4 @@
-﻿using SmarTTY.Controls;
+using SmarTTY.Controls;
 using SmarTTY.Utilities;
 using System;
 using System.ComponentModel;
@@ -187,6 +187,8 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public VirtualTerminalSettings VirtualTerminal { get; set; } = new VirtualTerminalSettings();
 
+    public bool CompletionTriggersMigratedV2 { get; set; }
+
     [XmlIgnore]
     public EditorSettingsWrapper EditorWrapper { get; }
 
@@ -259,6 +261,24 @@ public class GlobalSettings : INotifyPropertyChanged
         if (Editor.DarkColors == null)
         {
             Editor.DarkColors = EditorColors.DarkColors;
+        }
+        if (!CompletionTriggersMigratedV2)
+        {
+            // The "first character in a word" completion trigger used to default
+            // to true and auto-opened the completion popup on the first typed
+            // character, which made the Smart Terminal hijack typing (Space/Enter
+            // substituted the auto-selected command). Turn it off once for existing
+            // configurations; it can still be re-enabled in Settings afterwards.
+            // Guard against a missing/empty node surviving deserialization: if that
+            // happened, leaving VirtualTerminal/CompletionTriggers null would make
+            // the Smart Terminal console throw a NullReferenceException on the very
+            // first keypress (in SshTerminalControl.OnKeyPress), so typed characters
+            // would never appear and Enter would not execute the command.
+            VirtualTerminal ??= new VirtualTerminalSettings();
+            VirtualTerminal.CompletionTriggers ??= new AutoCompletionTriggers();
+            VirtualTerminal.CompletionTriggers.FirstCharacterInWord = false;
+            CompletionTriggersMigratedV2 = true;
+            Save();
         }
     }
 
