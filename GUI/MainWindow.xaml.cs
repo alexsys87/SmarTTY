@@ -344,6 +344,14 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             object hiddenSourceElement = ((sender is FrameworkElement) ? sender : null);
             (((hiddenSourceElement != null) ? ((FrameworkElement)hiddenSourceElement).DataContext : null) as TextSearcher)?.Hide();
         }
+        else if ((int)e.Key == 114)
+        {
+            // F3 searches down (forward), Shift+F3 searches up (backward), exactly like the two arrow buttons.
+            ModifierKeys f3Modifiers = (e.KeyboardDevice != null) ? e.KeyboardDevice.Modifiers : ModifierKeys.None;
+            bool searchUp = (f3Modifiers & ModifierKeys.Shift) != 0;
+            object sourceElement = ((sender is FrameworkElement) ? sender : null);
+            (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as TextSearcher)?.Search(up: searchUp);
+        }
     }
 
     protected override void OnDrop(DragEventArgs e)
@@ -635,6 +643,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
+        // Ctrl+F opens the shared search bar for any active tab. It is intercepted here, before the terminal sees
+        // the key, so Ctrl+F is never sent to the remote side (SSH shell, COM port or raw TCP connection).
+        if ((int)e.Key == 70)
+        {
+            ModifierKeys modifiers = (e.KeyboardDevice != null) ? e.KeyboardDevice.Modifiers : ModifierKeys.None;
+            if ((modifiers & ModifierKeys.Control) != 0 && (modifiers & ModifierKeys.Alt) == 0)
+            {
+                Controller.MenuCommandHandlers.Search();
+                ((RoutedEventArgs)e).Handled = true;
+                return;
+            }
+        }
         // COM/TCP tabs follow the same F10 and Alt+letter rules as SSH terminals (the shared "Action for Alt+letter" option).
         ITabContext activeTab = Controller.ActiveSession?.ActiveTab;
         if ((activeTab?.EditorControl as TerminalEmulatorControl ?? (activeTab as DeviceTabContext)?.Terminal.FocusedTextTerminal) is TerminalEmulatorControl terminalEmulatorControl)

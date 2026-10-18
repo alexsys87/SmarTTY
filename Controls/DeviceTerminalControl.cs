@@ -62,6 +62,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// </summary>
     internal SerialTerminalControl FocusedTextTerminal => (!_isHexMode && _serialTerminalControl.Focused) ? _serialTerminalControl : null;
 
+    /// <summary>
+    /// The editor currently shown in the device tab: the decoded text in ASCII mode, or the HEX dump editor in
+    /// HEX mode. The shared search bar searches it to find both words and HEX byte sequences.
+    /// </summary>
+    public TextEditorControl SearchTextEditor => HexMode ? hexTerminalControl1.SearchTextEditor : _serialTerminalControl;
+
     /// <summary>Raised when the user presses Ctrl+W and the shared "Close tab on Ctrl+W" option is on.</summary>
     public event EventHandler CloseTabRequested;
 
