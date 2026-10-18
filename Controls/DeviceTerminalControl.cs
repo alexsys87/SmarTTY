@@ -250,7 +250,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
         _commonSettings = settings;
-        TerminalEmulatorControl terminal = terminalEmulatorControl1;
+        SerialTerminalControl terminal = _serialTerminalControl;
         terminal.AppSettings = settings;
         terminal.CopyOnSelect = settings.CopyOnSelection;
         hexTerminalControl1.CopyOnSelect = settings.CopyOnSelection;
