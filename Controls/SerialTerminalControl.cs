@@ -383,6 +383,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
             foreach (string cmd in builtins)
             {
+                bool hasDoc = BuiltInCommandDocs.TryGetValue(cmd, out (string Usage, string Description) doc);
+                string usage = hasDoc ? doc.Usage : cmd;
+                string description = hasDoc ? doc.Description : $"Built-in command: {cmd}";
                 yield return new CompletionItem
                 {
                     Icon = VirtualTerminalPopupItemIcon.Command,
@@ -391,11 +394,49 @@ public class SerialTerminalControl : TerminalEmulatorControl
                     Summary = new VirtualTerminalPopupSummary.OptionInfo
                     {
                         Option = cmd,
-                        Description = new CommandCompletion.OptionDescription { Summary = $"Built-in command: {cmd}" }
+                        // Summary = argument signature, Info = short description; the completion
+                        // popup tooltip shows both, giving the user argument hints.
+                        Description = new CommandCompletion.OptionDescription { Summary = usage, Info = description }
                     }
                 };
             }
         }
+
+        /// <summary>Argument signatures and short descriptions shown as hints for the built-in commands.</summary>
+        private static readonly Dictionary<string, (string Usage, string Description)> BuiltInCommandDocs =
+            new Dictionary<string, (string Usage, string Description)>(StringComparer.Ordinal)
+            {
+                ["help"] = ("help", "Show available built-in commands"),
+                ["clear"] = ("clear", "Clear the terminal screen"),
+                ["history"] = ("history", "Show the command history"),
+                ["exit"] = ("exit", "End the session"),
+                ["quit"] = ("quit", "End the session"),
+                ["cd"] = ("cd <directory>", "Change the current directory"),
+                ["pwd"] = ("pwd", "Print the current directory"),
+                ["ls"] = ("ls [directory]", "List directory contents"),
+                ["dir"] = ("dir [directory]", "List directory contents"),
+                ["cat"] = ("cat <file>", "Print the contents of a file"),
+                ["type"] = ("type <file>", "Print the contents of a file"),
+                ["echo"] = ("echo <text>", "Print text to the terminal"),
+                ["set"] = ("set <name>=<value>", "Set a session variable"),
+                ["unset"] = ("unset <name>", "Remove a session variable"),
+                ["export"] = ("export <name>=<value>", "Export a session variable"),
+                ["env"] = ("env", "Show all session variables"),
+                ["send"] = ("send <text>", "Send text to the device"),
+                ["sendhex"] = ("sendhex <hex>", "Send hexadecimal bytes to the device"),
+                ["sendfile"] = ("sendfile <file>", "Send the contents of a file to the device"),
+                ["recv"] = ("recv <length>", "Receive a number of bytes from the device"),
+                ["recvfile"] = ("recvfile <file>", "Receive bytes from the device into a file"),
+                ["break"] = ("break", "Send a serial break condition"),
+                ["reset"] = ("reset", "Reset the device connection"),
+                ["reconnect"] = ("reconnect", "Reconnect to the device"),
+                ["disconnect"] = ("disconnect", "Disconnect from the device"),
+                ["log"] = ("log <file>", "Log terminal output to a file"),
+                ["logstart"] = ("logstart <file>", "Start logging terminal output to a file"),
+                ["logstop"] = ("logstop", "Stop logging terminal output"),
+                ["baud"] = ("baud <rate>", "Set the baud rate, e.g. 115200"),
+                ["settings"] = ("settings", "Open the terminal settings")
+            };
 
         private IEnumerable<CompletionItem> GetLocalExecutables(string filter)
         {
