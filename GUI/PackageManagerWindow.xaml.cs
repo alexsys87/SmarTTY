@@ -23,11 +23,12 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
 
         private SessionWrapper _Session;
 
-        private ILinuxPackageManagerClient[] _Clients = new ILinuxPackageManagerClient[3]
+        private ILinuxPackageManagerClient[] _Clients = new ILinuxPackageManagerClient[4]
         {
             new AptPackageManagerClient(),
             new YumPackageManagerClient(),
-            new OpkgPackageManagerClient()
+            new OpkgPackageManagerClient(),
+            new ApkPackageManagerClient()
         };
 
         private string _ProgressText;

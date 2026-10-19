@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../ApkPackageManagerClient.cs" Link="ApkPackageManagerClient.cs" />
+    <Compile Include="../../VisualTTY/ILinuxPackageManagerClient.cs" Link="ILinuxPackageManagerClient.cs" />
+    <Compile Include="../../VisualTTY/ISSHCommandRunner.cs" Link="ISSHCommandRunner.cs" />
+    <Compile Include="../../VisualTTY/LinuxPackageInfo.cs" Link="LinuxPackageInfo.cs" />
+    <Compile Include="../../VisualTTY/PackageCommitOptions.cs" Link="PackageCommitOptions.cs" />
+  </ItemGroup>
+</Project>

@@ -29,6 +29,9 @@ jobs:
       - name: Run COM/TCP command history checks
         run: dotnet run --project tests/DeviceLineInputTests -c Release
 
+      - name: Run apk package manager checks
+        run: dotnet run --project tests/ApkPackageManagerTests -c Release
+
   sshnet:
     name: SSH.NET integration tests
     runs-on: ubuntu-latest
