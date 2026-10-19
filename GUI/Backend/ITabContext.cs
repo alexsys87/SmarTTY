@@ -19,6 +19,8 @@ public interface ITabContext : IDisposable
 
     string ToolTip { get; }
 
+    bool IsNewSessionShortcut { get; }
+
     FileExplorer FileExplorer { get; }
 
     FrameworkElement VerticalScrollBar { get; }

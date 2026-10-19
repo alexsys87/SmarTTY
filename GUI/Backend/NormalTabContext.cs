@@ -54,6 +54,8 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public string ToolTip => Title;
 
+    public bool IsNewSessionShortcut => false;
+
     public FileExplorer FileExplorer { get; }
 
     public event PropertyChangedEventHandler PropertyChanged;

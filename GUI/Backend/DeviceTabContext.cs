@@ -41,6 +41,8 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public string ToolTip => Terminal.StatusText;
 
+    public bool IsNewSessionShortcut => false;
+
     public FileExplorer FileExplorer => null;
 
     public FrameworkElement VerticalScrollBar => null;

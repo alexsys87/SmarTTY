@@ -50,6 +50,8 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public string ToolTip => FilePath;
 
+    public bool IsNewSessionShortcut => false;
+
     public event PropertyChangedEventHandler PropertyChanged;
 
     public EditorTabContext(SessionWrapper sessionWrapper, RemoteFileEditor editor, string filePath)

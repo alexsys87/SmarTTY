@@ -396,17 +396,17 @@
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Border Grid.ColumnSpan="2" DataContext="{Binding Searcher}" FocusManager.FocusedElement="{Binding ElementName=txtSearch}" IsVisibleChanged="Border_IsVisibleChanged">
+                        <Border Grid.ColumnSpan="2" FocusManager.FocusedElement="{Binding ElementName=txtSearch}" IsVisibleChanged="Border_IsVisibleChanged">
                           <FrameworkElement.Style>
                             <Style TargetType="{x:Type Border}">
                               <Style.Triggers>
-                                <DataTrigger Value="false" Binding="{Binding IsVisible, FallbackValue=false}">
+                                <DataTrigger Value="false" Binding="{Binding Searcher.IsVisible, FallbackValue=false}">
                                   <Setter Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
                               </Style.Triggers>
                             </Style>
                           </FrameworkElement.Style>
-                          <Grid Margin="2" Style="{DynamicResource ToolBarGridStyle}" TextBlock.Foreground="{Binding Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}">
+                          <Grid Margin="2" DataContext="{Binding Searcher}" Style="{DynamicResource ToolBarGridStyle}" TextBlock.Foreground="{Binding Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="Auto" />
                               <ColumnDefinition Width="*" />
