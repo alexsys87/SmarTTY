@@ -1037,7 +1037,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
             var token = tokens[matchIndex.Value];
             tokenStart = token.Start;
             tokenEnd = token.End;
-            
+
             // Determine completion target based on position
             if (matchIndex == 0)
             {
@@ -1064,7 +1064,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
             var lastToken = tokens[tokens.Length - 1];
             tokenStart = lastToken.End;
             tokenEnd = lastToken.End;
-            
+
             string prevText = lastToken.Extract(text);
             if (prevText == "cd" || prevText == "ls" || prevText == "dir")
             {

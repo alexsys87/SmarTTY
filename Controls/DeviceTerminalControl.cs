@@ -42,6 +42,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private bool _updatingEncodingSelection;
 
+    // Active XMODEM byte buffer for interception during file transfers.
+    private readonly System.Collections.Concurrent.BlockingCollection<byte> _xmodemRxQueue = new System.Collections.Concurrent.BlockingCollection<byte>();
+    private bool _isXModemActive;
+
     // Continuous log of received data; null while not recording.
     private TerminalLogWriter _logWriter;
 
@@ -778,6 +782,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void OnDataReceived(object sender, byte[] buffer, int value)
     {
+        if (_isXModemActive)
+        {
+            for (int i = 0; i < value; i++)
+            {
+                _xmodemRxQueue.Add(buffer[i]);
+            }
+            return;
+        }
+
         // The log gets the raw stream before it is split into text or hex, so recording does not depend on the display mode.
         if (_logWriter != null)
         {
@@ -800,6 +813,173 @@ public partial class DeviceTerminalControl : DpiAwareControl
             text = text.Replace("\n", "\r\n");
         }
         _serialTerminalControl.OnDataReceived(text);
+    }
+
+    private byte? ReadXModemByte(int timeoutMs)
+    {
+        if (_xmodemRxQueue.TryTake(out byte b, timeoutMs))
+        {
+            return b;
+        }
+        return null;
+    }
+
+    private void sendFileViaXMODEMToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
+        {
+            MessageBox.Show("Please connect first before sending a file via XMODEM.", "XMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        using OpenFileDialog openFileDialog = new OpenFileDialog
+        {
+            Title = "Select file to send via XMODEM",
+            Filter = "All files (*.*)|*.*",
+            Multiselect = false
+        };
+
+        if (openFileDialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        using SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm("XMODEM Send");
+        transferForm.Show(this);
+
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            _isXModemActive = true;
+            while (_xmodemRxQueue.TryTake(out _)) { } // Clear queue
+
+            bool success = false;
+            try
+            {
+                using FileStream fileStream = File.OpenRead(openFileDialog.FileName);
+                success = SmarTTY.IO.XModemTransfer.SendFile(
+                    fileStream,
+                    (data, offset, length) =>
+                    {
+                        byte[] copy = new byte[length];
+                        Array.Copy(data, offset, copy, 0, length);
+                        SendToDevice(copy, length);
+                    },
+                    ReadXModemByte,
+                    transferForm.CancellationToken,
+                    (bytesTransferred, totalBytes, errorCount, status) => transferForm.UpdateProgress(bytesTransferred, totalBytes, errorCount, status)
+                );
+            }
+            catch (Exception ex)
+            {
+                transferForm.UpdateProgress(0, 0, 1, "Error: " + ex.Message);
+            }
+            finally
+            {
+                _isXModemActive = false;
+                while (_xmodemRxQueue.TryTake(out _)) { } // Clear leftovers
+            }
+
+            try
+            {
+                BeginInvoke((Action)(() =>
+                {
+                    if (!transferForm.IsDisposed)
+                    {
+                        transferForm.Close();
+                    }
+                    if (success)
+                    {
+                        MessageBox.Show("XMODEM send completed successfully.", "XMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (!transferForm.IsCancelled)
+                    {
+                        MessageBox.Show("XMODEM send failed or timed out.", "XMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }));
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        });
+    }
+
+    private void receiveFileViaXMODEMToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
+        {
+            MessageBox.Show("Please connect first before receiving a file via XMODEM.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        using SaveFileDialog saveFileDialog = new SaveFileDialog
+        {
+            Title = "Select destination file for XMODEM receive",
+            Filter = "All files (*.*)|*.*",
+            OverwritePrompt = true
+        };
+
+        if (saveFileDialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        using SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm("XMODEM Receive");
+        transferForm.Show(this);
+
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            _isXModemActive = true;
+            while (_xmodemRxQueue.TryTake(out _)) { } // Clear queue
+
+            bool success = false;
+            try
+            {
+                using FileStream fileStream = File.Create(saveFileDialog.FileName);
+                success = SmarTTY.IO.XModemTransfer.ReceiveFile(
+                    fileStream,
+                    (data, offset, length) =>
+                    {
+                        byte[] copy = new byte[length];
+                        Array.Copy(data, offset, copy, 0, length);
+                        SendToDevice(copy, length);
+                    },
+                    ReadXModemByte,
+                    transferForm.CancellationToken,
+                    (bytesTransferred, totalBytes, errorCount, status) => transferForm.UpdateProgress(bytesTransferred, totalBytes, errorCount, status)
+                );
+            }
+            catch (Exception ex)
+            {
+                transferForm.UpdateProgress(0, 0, 1, "Error: " + ex.Message);
+            }
+            finally
+            {
+                _isXModemActive = false;
+                while (_xmodemRxQueue.TryTake(out _)) { } // Clear leftovers
+            }
+
+            try
+            {
+                BeginInvoke((Action)(() =>
+                {
+                    if (!transferForm.IsDisposed)
+                    {
+                        transferForm.Close();
+                    }
+                    if (success)
+                    {
+                        MessageBox.Show("XMODEM receive completed successfully.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (!transferForm.IsCancelled)
+                    {
+                        MessageBox.Show("XMODEM receive failed or timed out.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }));
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        });
     }
 
     /// <summary>
