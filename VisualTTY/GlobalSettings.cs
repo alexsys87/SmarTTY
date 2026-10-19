@@ -22,12 +22,35 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public DeviceTerminalSettings.ColorWrapper LineNumberForeground { get; set; }
 
+        // ---- Цвета токенов подсветки синтаксиса (типы 1..7 из SyntaxHighlighting).
+        //      Тип 0 (Normal) всегда использует TextColor. ----
+        public DeviceTerminalSettings.ColorWrapper KeywordColor { get; set; }
+
+        public DeviceTerminalSettings.ColorWrapper StringColor { get; set; }
+
+        public DeviceTerminalSettings.ColorWrapper CommentColor { get; set; }
+
+        public DeviceTerminalSettings.ColorWrapper NumberColor { get; set; }
+
+        public DeviceTerminalSettings.ColorWrapper VariableColor { get; set; }
+
+        public DeviceTerminalSettings.ColorWrapper SectionColor { get; set; }
+
+        public DeviceTerminalSettings.ColorWrapper PreprocessorColor { get; set; }
+
         public static EditorColors DarkColors => new EditorColors
         {
             TextColor = Color.White,
             BackColor = Color.FromArgb(58, 46, 15),
             LineNumberBackground = Color.FromArgb(64, 64, 64),
-            LineNumberForeground = Color.LightGray
+            LineNumberForeground = Color.LightGray,
+            KeywordColor = Color.FromArgb(86, 156, 214),
+            StringColor = Color.FromArgb(214, 157, 133),
+            CommentColor = Color.FromArgb(131, 148, 105),
+            NumberColor = Color.FromArgb(181, 206, 168),
+            VariableColor = Color.FromArgb(156, 220, 254),
+            SectionColor = Color.FromArgb(78, 201, 176),
+            PreprocessorColor = Color.FromArgb(189, 99, 197)
         };
 
         public static EditorColors LightColors => new EditorColors
@@ -35,7 +58,14 @@ public class GlobalSettings : INotifyPropertyChanged
             TextColor = Color.Black,
             BackColor = Color.LightGoldenrodYellow,
             LineNumberBackground = SystemColors.ButtonFace,
-            LineNumberForeground = Color.DarkGray
+            LineNumberForeground = Color.DarkGray,
+            KeywordColor = Color.FromArgb(0, 0, 150),
+            StringColor = Color.FromArgb(163, 21, 21),
+            CommentColor = Color.FromArgb(0, 99, 49),
+            NumberColor = Color.FromArgb(135, 91, 33),
+            VariableColor = Color.FromArgb(0, 115, 165),
+            SectionColor = Color.FromArgb(0, 122, 117),
+            PreprocessorColor = Color.FromArgb(159, 23, 138)
         };
     }
 
@@ -46,6 +76,8 @@ public class GlobalSettings : INotifyPropertyChanged
         public int TabSize;
 
         public bool ShowLineNumbers;
+
+        public bool SyntaxHighlighting;
 
         public EditorColors DarkColors;
 
@@ -97,7 +129,8 @@ public class GlobalSettings : INotifyPropertyChanged
         DarkColors = EditorColors.DarkColors,
         LightColors = EditorColors.LightColors,
         TabSize = 4,
-        ShowLineNumbers = true
+        ShowLineNumbers = true,
+        SyntaxHighlighting = true
     };
 
     public int LargeBlockCutoffPoint = 1048576;

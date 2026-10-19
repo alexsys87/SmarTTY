@@ -202,6 +202,17 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         OnTextReplaced();
     }
 
+    /// <summary>
+    /// Задаёт токенизатор для подсветки синтаксиса. null — отключить подсветку.
+    /// Событие Tokenizing — событие (field-like) класса, поэтому присваивание
+    /// допустимо только внутри CodeEditorPP; внешний код обращается через этот метод.
+    /// </summary>
+    public void SetTokenizer(TokenCache.LineTokenizer tokenizer)
+    {
+        Tokenizing = tokenizer;
+        Retokenize();
+    }
+
     protected override ColorSpan[] GetLineColorSpans(int line)
     {
         if (line >= _tokenCache.LineCount)
