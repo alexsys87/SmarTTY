@@ -12,6 +12,11 @@ public partial class XModemTransferForm : DpiAwareForm
 
     public bool IsCancelled => _cts.IsCancellationRequested;
 
+    private volatile string _lastStatus = string.Empty;
+
+    /// <summary>The most recent status text reported by the transfer; explains a failure once it has ended.</summary>
+    public string LastStatus => _lastStatus;
+
     public XModemTransferForm(string title)
     {
         InitializeComponent();
@@ -20,6 +25,10 @@ public partial class XModemTransferForm : DpiAwareForm
 
     public void UpdateProgress(long bytesTransferred, long totalBytes, int errorCount, string status)
     {
+        if (!string.IsNullOrEmpty(status))
+        {
+            _lastStatus = status;
+        }
         if (IsDisposed || !IsHandleCreated) return;
 
         try
@@ -50,6 +59,17 @@ public partial class XModemTransferForm : DpiAwareForm
         catch (InvalidOperationException)
         {
         }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        // The window's close button means "stop": without it the transfer would go on invisibly and could not be cancelled.
+        // The program closes the window itself (CloseReason.None) once the transfer has ended.
+        if (e.CloseReason == CloseReason.UserClosing)
+        {
+            _cts.Cancel();
+        }
+        base.OnFormClosing(e);
     }
 
     private void btnCancel_Click(object sender, EventArgs e)
