@@ -44,7 +44,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     // Active XMODEM byte buffer for interception during file transfers.
     private readonly System.Collections.Concurrent.BlockingCollection<byte> _xmodemRxQueue = new System.Collections.Concurrent.BlockingCollection<byte>();
-    private bool _isXModemActive;
+    // Set on the UI thread before a transfer starts and cleared when it ends; while set, everything received belongs to the
+    // protocol and typing, pasting and sending from the toolbar are refused so nothing else gets into the data stream.
+    private volatile bool _isXModemActive;
 
     // Continuous log of received data; null while not recording.
     private TerminalLogWriter _logWriter;
@@ -817,6 +819,87 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.OnDataReceived(text);
     }
 
+    /// <summary>
+    /// Runs one XMODEM transfer on a worker thread with a progress window. Must be called on the UI thread: the line is
+    /// claimed here, before the first byte can arrive, and a second transfer cannot be started meanwhile.
+    /// </summary>
+    private void StartXModemTransfer(string title, string verb, Func<FileStream> fileStream, bool isSend)
+    {
+        if (_isXModemActive)
+        {
+            return;
+        }
+
+        // Not a "using": the window is modeless and outlives this method; it is closed (and disposed) when the transfer ends.
+        SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm(title);
+
+        transferForm.Show(this);
+
+        // Claim the line only after the window is up (a failing Show must not leave the terminal locked). Stale bytes
+        // (a prompt, echo) must not be mistaken for the peer's first answer.
+        while (_xmodemRxQueue.TryTake(out _)) { }
+        _isXModemActive = true;
+
+        // The callback parameter must not be called "_": a lone "_" parameter is an ordinary variable, so the
+        // "out _" discards would bind to it (an object) instead of discarding, and fail to compile (CS1503).
+        ThreadPool.QueueUserWorkItem(state =>
+        {
+            bool success = false;
+            string error = null;
+            try
+            {
+                using FileStream stream = fileStream();
+                SmarTTY.IO.XModemTransfer.SendDataHandler sendData = (data, offset, length) =>
+                {
+                    byte[] copy = new byte[length];
+                    Array.Copy(data, offset, copy, 0, length);
+                    SendToDevice(copy, length);
+                };
+                SmarTTY.IO.XModemTransfer.ProgressHandler progress = (bytesTransferred, totalBytes, errorCount, status) =>
+                    transferForm.UpdateProgress(bytesTransferred, totalBytes, errorCount, status);
+                success = isSend
+                    ? SmarTTY.IO.XModemTransfer.SendFile(stream, sendData, ReadXModemByte, transferForm.CancellationToken, progress)
+                    : SmarTTY.IO.XModemTransfer.ReceiveFile(stream, sendData, ReadXModemByte, transferForm.CancellationToken, progress);
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                transferForm.UpdateProgress(0, 0, 1, "Error: " + ex.Message);
+            }
+            finally
+            {
+                _isXModemActive = false;
+                while (_xmodemRxQueue.TryTake(out _)) { } // Clear leftovers
+            }
+
+            try
+            {
+                BeginInvoke((Action)(() =>
+                {
+                    bool cancelled = transferForm.IsCancelled;
+                    string lastStatus = transferForm.LastStatus;
+                    if (!transferForm.IsDisposed)
+                    {
+                        transferForm.Close(); // a modeless window is disposed by closing it
+                    }
+                    if (success)
+                    {
+                        MessageBox.Show("XMODEM " + verb + " completed successfully.", title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (!cancelled)
+                    {
+                        string reason = error ?? lastStatus;
+                        MessageBox.Show("XMODEM " + verb + " failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason), title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }));
+            }
+            catch (InvalidOperationException)
+            {
+                // The terminal was closed while the transfer was running: nobody is left to show the result to.
+            }
+        });
+    }
+
     private byte? ReadXModemByte(int timeoutMs)
     {
         if (_xmodemRxQueue.TryTake(out byte b, timeoutMs))
@@ -826,8 +909,23 @@ public partial class DeviceTerminalControl : DpiAwareControl
         return null;
     }
 
+    /// <summary>True (with a short explanation) while an XMODEM transfer owns the line.</summary>
+    private bool IsXModemBusy()
+    {
+        if (!_isXModemActive)
+        {
+            return false;
+        }
+        MessageBox.Show("An XMODEM transfer is in progress. Wait for it to finish or cancel it first.", "XMODEM", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        return true;
+    }
+
     private void sendFileViaXMODEMToolStripMenuItem_Click(object sender, EventArgs e)
     {
+        if (IsXModemBusy())
+        {
+            return;
+        }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
             MessageBox.Show("Please connect first before sending a file via XMODEM.", "XMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -846,69 +944,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
-        using SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm("XMODEM Send");
-        transferForm.Show(this);
-
-        // The callback parameter must not be called "_": a lone "_" parameter is an ordinary variable, so the
-        // "out _" discards below would bind to it (an object) instead of discarding, and fail to compile (CS1503).
-        ThreadPool.QueueUserWorkItem(state =>
-        {
-            _isXModemActive = true;
-            while (_xmodemRxQueue.TryTake(out _)) { } // Clear queue
-
-            bool success = false;
-            try
-            {
-                using FileStream fileStream = File.OpenRead(openFileDialog.FileName);
-                success = SmarTTY.IO.XModemTransfer.SendFile(
-                    fileStream,
-                    (data, offset, length) =>
-                    {
-                        byte[] copy = new byte[length];
-                        Array.Copy(data, offset, copy, 0, length);
-                        SendToDevice(copy, length);
-                    },
-                    ReadXModemByte,
-                    transferForm.CancellationToken,
-                    (bytesTransferred, totalBytes, errorCount, status) => transferForm.UpdateProgress(bytesTransferred, totalBytes, errorCount, status)
-                );
-            }
-            catch (Exception ex)
-            {
-                transferForm.UpdateProgress(0, 0, 1, "Error: " + ex.Message);
-            }
-            finally
-            {
-                _isXModemActive = false;
-                while (_xmodemRxQueue.TryTake(out _)) { } // Clear leftovers
-            }
-
-            try
-            {
-                BeginInvoke((Action)(() =>
-                {
-                    if (!transferForm.IsDisposed)
-                    {
-                        transferForm.Close();
-                    }
-                    if (success)
-                    {
-                        MessageBox.Show("XMODEM send completed successfully.", "XMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    else if (!transferForm.IsCancelled)
-                    {
-                        MessageBox.Show("XMODEM send failed or timed out.", "XMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
-                }));
-            }
-            catch (InvalidOperationException)
-            {
-            }
-        });
+        StartXModemTransfer("XMODEM Send", "send", fileStream: () => File.OpenRead(openFileDialog.FileName), isSend: true);
     }
 
     private void receiveFileViaXMODEMToolStripMenuItem_Click(object sender, EventArgs e)
     {
+        if (IsXModemBusy())
+        {
+            return;
+        }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
             MessageBox.Show("Please connect first before receiving a file via XMODEM.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -927,65 +971,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
-        using SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm("XMODEM Receive");
-        transferForm.Show(this);
-
-        // The callback parameter must not be called "_": a lone "_" parameter is an ordinary variable, so the
-        // "out _" discards below would bind to it (an object) instead of discarding, and fail to compile (CS1503).
-        ThreadPool.QueueUserWorkItem(state =>
-        {
-            _isXModemActive = true;
-            while (_xmodemRxQueue.TryTake(out _)) { } // Clear queue
-
-            bool success = false;
-            try
-            {
-                using FileStream fileStream = File.Create(saveFileDialog.FileName);
-                success = SmarTTY.IO.XModemTransfer.ReceiveFile(
-                    fileStream,
-                    (data, offset, length) =>
-                    {
-                        byte[] copy = new byte[length];
-                        Array.Copy(data, offset, copy, 0, length);
-                        SendToDevice(copy, length);
-                    },
-                    ReadXModemByte,
-                    transferForm.CancellationToken,
-                    (bytesTransferred, totalBytes, errorCount, status) => transferForm.UpdateProgress(bytesTransferred, totalBytes, errorCount, status)
-                );
-            }
-            catch (Exception ex)
-            {
-                transferForm.UpdateProgress(0, 0, 1, "Error: " + ex.Message);
-            }
-            finally
-            {
-                _isXModemActive = false;
-                while (_xmodemRxQueue.TryTake(out _)) { } // Clear leftovers
-            }
-
-            try
-            {
-                BeginInvoke((Action)(() =>
-                {
-                    if (!transferForm.IsDisposed)
-                    {
-                        transferForm.Close();
-                    }
-                    if (success)
-                    {
-                        MessageBox.Show("XMODEM receive completed successfully.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    else if (!transferForm.IsCancelled)
-                    {
-                        MessageBox.Show("XMODEM receive failed or timed out.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
-                }));
-            }
-            catch (InvalidOperationException)
-            {
-            }
-        });
+        StartXModemTransfer("XMODEM Receive", "receive", fileStream: () => File.Create(saveFileDialog.FileName), isSend: false);
     }
 
     /// <summary>
@@ -1022,6 +1008,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void OnTerminalDataEntered(object sender, byte[] buffer, TerminalEmulatorControl.InputKind inputKind)
     {
+        if (_isXModemActive)
+        {
+            return; // typed characters would corrupt the transfer
+        }
         if (_asyncTransportConnection != null)
         {
             SendToDevice(buffer, buffer.Length);
@@ -1104,7 +1094,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void btnSend_ButtonClick(object sender, EventArgs e)
     {
-        if (!btnSend.Enabled)
+        if (!btnSend.Enabled || IsXModemBusy())
         {
             return;
         }
@@ -1222,6 +1212,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void toolStripButton3_Click(object sender, EventArgs e)
     {
+        if (IsXModemBusy())
+        {
+            return;
+        }
         if (_openFileDialog.ShowDialog() != DialogResult.OK)
         {
             return;
@@ -1328,6 +1322,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void pasteToolStripMenuItem_Click(object sender, EventArgs e)
     {
+        if (_isXModemActive)
+        {
+            return;
+        }
         try
         {
             string text = Win32Clipboard.GetText(Handle);

@@ -1,18 +1,29 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 
 namespace SmarTTY.IO;
 
+/// <summary>
+/// XMODEM (checksum and CRC-16, 128-byte blocks) over an arbitrary byte link. The link is given as a "send bytes"
+/// callback plus a "read one byte with a timeout" callback, so the protocol logic has no dependency on the terminal.
+/// The receiver additionally understands 1K blocks (STX) from senders that use them.
+/// </summary>
 public class XModemTransfer
 {
     public const byte SOH = 0x01; // Start of Header (128-byte block)
+    public const byte STX = 0x02; // Start of Header (1024-byte block, receive only)
     public const byte EOT = 0x04; // End of Transmission
     public const byte ACK = 0x06; // Acknowledge
     public const byte NAK = 0x15; // Negative Acknowledge (Checksum mode)
-    public const byte CAN = 0x18; // Cancel
+    public const byte CAN = 0x18; // Cancel (two in a row abort the transfer)
     public const byte C   = 0x43; // 'C' (CRC16 mode)
     public const byte SUB = 0x1A; // Padding character
+
+    private const int BlockSize = 128;
+    private const int LargeBlockSize = 1024;
+    private const int MaxRetries = 10;
 
     public enum XModemMode
     {
@@ -22,6 +33,28 @@ public class XModemTransfer
 
     public delegate void ProgressHandler(long bytesTransferred, long totalBytes, int errorCount, string status);
     public delegate void SendDataHandler(byte[] data, int offset, int length);
+
+    /// <summary>The waiting times of the protocol; tests shorten them.</summary>
+    internal sealed class Timeouts
+    {
+        /// <summary>How long a sender waits for the receiver's first 'C' or NAK, ignoring everything else.</summary>
+        public int SenderHandshakeMs = 90000;
+
+        /// <summary>How long a sender waits for ACK/NAK after a block or EOT.</summary>
+        public int AckMs = 3000;
+
+        /// <summary>How long a receiver waits for the start of a block after each 'C' / NAK it sends while starting.</summary>
+        public int ReceiverHandshakeAttemptMs = 3000;
+
+        /// <summary>How long a receiver waits for the next block (or EOT) once the transfer runs.</summary>
+        public int HeaderMs = 10000;
+
+        /// <summary>The gap allowed between two bytes inside a block.</summary>
+        public int ByteMs = 1000;
+
+        /// <summary>Quiet time on the line that ends the discarding of a damaged block.</summary>
+        public int PurgeQuietMs = 300;
+    }
 
     public static ushort CalculateCrc16(byte[] data, int offset, int length)
     {
@@ -54,6 +87,145 @@ public class XModemTransfer
         return checksum;
     }
 
+    /// <summary>The byte link with cancellation: reads are done in short slices so a cancel is noticed within ~200 ms.</summary>
+    private sealed class Link
+    {
+        private const int SliceMs = 200;
+
+        private readonly SendDataHandler _send;
+        private readonly Func<int, byte?> _read;
+        private readonly CancellationToken _token;
+
+        public Link(SendDataHandler send, Func<int, byte?> read, CancellationToken token)
+        {
+            _send = send;
+            _read = read;
+            _token = token;
+        }
+
+        public bool IsCancelled => _token.IsCancellationRequested;
+
+        public void Send(params byte[] bytes)
+        {
+            _send(bytes, 0, bytes.Length);
+        }
+
+        public void Send(byte[] bytes, int length)
+        {
+            _send(bytes, 0, length);
+        }
+
+        /// <summary>Tells the peer to give up (two CAN); best effort, a broken link must not hide the real error.</summary>
+        public void SendCancel()
+        {
+            try
+            {
+                Send(CAN, CAN);
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        /// <summary>The next byte, or null when nothing arrives within <paramref name="timeoutMs"/> or the transfer is cancelled.</summary>
+        public byte? Read(int timeoutMs)
+        {
+            Stopwatch timer = Stopwatch.StartNew();
+            while (true)
+            {
+                if (_token.IsCancellationRequested)
+                {
+                    return null;
+                }
+                int left = timeoutMs - (int)timer.ElapsedMilliseconds;
+                byte? b = _read(Math.Max(0, Math.Min(SliceMs, left)));
+                if (b.HasValue)
+                {
+                    return b;
+                }
+                if (left <= SliceMs)
+                {
+                    return null;
+                }
+            }
+        }
+
+        /// <summary>Throws away whatever is on the line until it has been quiet for <paramref name="quietMs"/> (at most 5 s).</summary>
+        public void Purge(int quietMs)
+        {
+            Stopwatch timer = Stopwatch.StartNew();
+            while (timer.ElapsedMilliseconds < 5000 && Read(quietMs).HasValue)
+            {
+            }
+        }
+    }
+
+    private static void Report(ProgressHandler onProgress, long done, long total, int errors, string status)
+    {
+        onProgress?.Invoke(done, total, errors, status);
+    }
+
+    private static int ReadFully(Stream stream, byte[] buffer, int count)
+    {
+        int total = 0;
+        while (total < count)
+        {
+            int n = stream.Read(buffer, total, count - total);
+            if (n <= 0)
+            {
+                break;
+            }
+            total += n;
+        }
+        return total;
+    }
+
+    private enum Reply
+    {
+        Ack,
+        Nak,
+        Timeout,
+        Cancelled
+    }
+
+    /// <summary>Waits for the answer to a block or EOT. Other bytes (a late 'C', echo, noise) are ignored.</summary>
+    private static Reply WaitForReply(Link link, int timeoutMs)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        bool previousWasCan = false;
+        while (true)
+        {
+            int left = timeoutMs - (int)timer.ElapsedMilliseconds;
+            if (left <= 0)
+            {
+                return Reply.Timeout;
+            }
+            byte? b = link.Read(left);
+            if (!b.HasValue)
+            {
+                return Reply.Timeout;
+            }
+            if (b.Value == ACK)
+            {
+                return Reply.Ack;
+            }
+            if (b.Value == NAK)
+            {
+                return Reply.Nak;
+            }
+            if (b.Value == CAN)
+            {
+                if (previousWasCan)
+                {
+                    return Reply.Cancelled;
+                }
+                previousWasCan = true;
+                continue;
+            }
+            previousWasCan = false;
+        }
+    }
+
     public static bool SendFile(
         Stream sourceStream,
         SendDataHandler sendData,
@@ -61,138 +233,276 @@ public class XModemTransfer
         CancellationToken cancellationToken,
         ProgressHandler onProgress)
     {
-        long totalBytes = sourceStream.Length;
+        return SendFile(sourceStream, sendData, readByteWithTimeout, cancellationToken, onProgress, new Timeouts());
+    }
+
+    internal static bool SendFile(
+        Stream sourceStream,
+        SendDataHandler sendData,
+        Func<int, byte?> readByteWithTimeout,
+        CancellationToken cancellationToken,
+        ProgressHandler onProgress,
+        Timeouts timeouts)
+    {
+        if (sourceStream == null) throw new ArgumentNullException(nameof(sourceStream));
+        if (sendData == null) throw new ArgumentNullException(nameof(sendData));
+        if (readByteWithTimeout == null) throw new ArgumentNullException(nameof(readByteWithTimeout));
+
+        Link link = new Link(sendData, readByteWithTimeout, cancellationToken);
+        long totalBytes = sourceStream.CanSeek ? sourceStream.Length : 0;
         long bytesTransferred = 0;
         int errorCount = 0;
 
-        // Step 1: Wait for receiver initial handshaking byte (NAK or 'C')
+        // Step 1: wait for the receiver's initial request: 'C' (CRC-16) or NAK (checksum). Anything else is ignored,
+        // so a banner or the echo of the command that started the receiver does not spoil the handshake.
         XModemMode mode = XModemMode.Checksum;
-        bool handshakeSuccess = false;
+        bool started = false;
+        bool previousWasCan = false;
+        Stopwatch handshakeTimer = Stopwatch.StartNew();
+        Report(onProgress, 0, totalBytes, errorCount, "Waiting for the receiver...");
 
-        for (int attempt = 0; attempt < 60; attempt++)
+        while (!started && handshakeTimer.ElapsedMilliseconds < timeouts.SenderHandshakeMs)
         {
-            if (cancellationToken.IsCancellationRequested) return false;
-
-            byte? b = readByteWithTimeout(3000);
-            if (b.HasValue)
+            byte? b = link.Read(1000);
+            if (link.IsCancelled)
             {
-                if (b.Value == C)
+                link.SendCancel();
+                Report(onProgress, 0, totalBytes, errorCount, "Transfer cancelled.");
+                return false;
+            }
+            if (!b.HasValue)
+            {
+                continue;
+            }
+            if (b.Value == CAN)
+            {
+                if (previousWasCan)
                 {
-                    mode = XModemMode.Crc16;
-                    handshakeSuccess = true;
-                    break;
-                }
-                if (b.Value == NAK)
-                {
-                    mode = XModemMode.Checksum;
-                    handshakeSuccess = true;
-                    break;
-                }
-                if (b.Value == CAN)
-                {
+                    Report(onProgress, 0, totalBytes, errorCount, "Cancelled by the receiver.");
                     return false;
                 }
+                previousWasCan = true;
+                continue;
+            }
+            previousWasCan = false;
+            if (b.Value == C)
+            {
+                mode = XModemMode.Crc16;
+                started = true;
+            }
+            else if (b.Value == NAK)
+            {
+                mode = XModemMode.Checksum;
+                started = true;
             }
         }
 
-        if (!handshakeSuccess)
+        if (!started)
         {
-            onProgress?.Invoke(0, totalBytes, ++errorCount, "Handshake timeout waiting for receiver (NAK or 'C').");
+            Report(onProgress, 0, totalBytes, ++errorCount, "Handshake timeout: the receiver did not ask for data (NAK or 'C').");
             return false;
         }
 
-        byte blockNumber = 1;
-        byte[] payload = new byte[128];
+        // The receiver may have repeated its request while we were busy; those copies must not be mistaken for answers.
+        link.Purge(0);
 
-        while (bytesTransferred < totalBytes || totalBytes == 0)
+        int trailerSize = mode == XModemMode.Crc16 ? 2 : 1;
+        byte[] payload = new byte[BlockSize];
+        byte[] packet = new byte[3 + BlockSize + trailerSize];
+        int blockIndex = 1; // 1-based count for the display; only its low byte goes on the wire
+
+        while (true)
         {
-            if (cancellationToken.IsCancellationRequested)
+            int read;
+            try
             {
-                sendData(new byte[] { CAN, CAN }, 0, 2);
+                read = ReadFully(sourceStream, payload, BlockSize);
+            }
+            catch (Exception ex)
+            {
+                link.SendCancel();
+                Report(onProgress, bytesTransferred, totalBytes, ++errorCount, "Cannot read the file: " + ex.Message);
                 return false;
             }
-
-            int read = sourceStream.Read(payload, 0, 128);
-            if (read < 128)
+            if (read == 0)
             {
-                for (int i = read; i < 128; i++)
-                {
-                    payload[i] = SUB; // Pad with SUB (0x1A)
-                }
+                break; // End of the data (an empty file is just EOT)
+            }
+            for (int i = read; i < BlockSize; i++)
+            {
+                payload[i] = SUB; // Only the last block is short
             }
 
-            // Build 132 or 133 byte packet
-            int packetSize = 1 + 2 + 128 + (mode == XModemMode.Crc16 ? 2 : 1);
-            byte[] packet = new byte[packetSize];
+            byte blockByte = (byte)blockIndex;
             packet[0] = SOH;
-            packet[1] = blockNumber;
-            packet[2] = (byte)(255 - blockNumber);
-            Array.Copy(payload, 0, packet, 3, 128);
-
+            packet[1] = blockByte;
+            packet[2] = (byte)(255 - blockByte);
+            Buffer.BlockCopy(payload, 0, packet, 3, BlockSize);
             if (mode == XModemMode.Crc16)
             {
-                ushort crc = CalculateCrc16(payload, 0, 128);
-                packet[131] = (byte)(crc >> 8);
-                packet[132] = (byte)(crc & 0xFF);
+                ushort crc = CalculateCrc16(payload, 0, BlockSize);
+                packet[3 + BlockSize] = (byte)(crc >> 8);
+                packet[3 + BlockSize + 1] = (byte)(crc & 0xFF);
             }
             else
             {
-                packet[131] = CalculateChecksum(payload, 0, 128);
+                packet[3 + BlockSize] = CalculateChecksum(payload, 0, BlockSize);
             }
 
-            bool blockAcked = false;
-            int retries = 0;
-
-            while (!blockAcked && retries < 10)
+            int attempts = 0;
+            while (true)
             {
-                if (cancellationToken.IsCancellationRequested)
+                if (link.IsCancelled)
                 {
-                    sendData(new byte[] { CAN, CAN }, 0, 2);
+                    link.SendCancel();
+                    Report(onProgress, bytesTransferred, totalBytes, errorCount, "Transfer cancelled.");
                     return false;
                 }
 
-                sendData(packet, 0, packet.Length);
+                link.Send(packet, packet.Length);
+                attempts++;
+                Reply reply = WaitForReply(link, timeouts.AckMs);
 
-                byte? ackByte = readByteWithTimeout(3000);
-                if (ackByte.HasValue && ackByte.Value == ACK)
+                if (reply == Reply.Ack)
                 {
-                    blockAcked = true;
                     bytesTransferred += read;
-                    blockNumber++;
-                    onProgress?.Invoke(bytesTransferred, totalBytes, errorCount, $"Sending block {blockNumber - 1}");
+                    Report(onProgress, bytesTransferred, totalBytes, errorCount, "Sent block " + blockIndex);
+                    break;
                 }
-                else
+                if (reply == Reply.Cancelled)
                 {
-                    retries++;
-                    errorCount++;
-                    onProgress?.Invoke(bytesTransferred, totalBytes, errorCount, $"Retrying block {blockNumber} (attempt {retries})");
+                    Report(onProgress, bytesTransferred, totalBytes, errorCount, "Cancelled by the receiver.");
+                    return false;
                 }
+                if (link.IsCancelled)
+                {
+                    continue; // reported at the top of the loop
+                }
+
+                errorCount++;
+                if (attempts >= MaxRetries)
+                {
+                    link.SendCancel();
+                    Report(onProgress, bytesTransferred, totalBytes, errorCount,
+                        "Transfer failed: no valid answer to block " + blockIndex + " after " + attempts + " attempts.");
+                    return false;
+                }
+                Report(onProgress, bytesTransferred, totalBytes, errorCount, "Retrying block " + blockIndex + " (attempt " + (attempts + 1) + ")");
             }
 
-            if (!blockAcked)
+            blockIndex++;
+        }
+
+        // Send EOT; some receivers NAK the first one, so it is repeated until it is acknowledged.
+        for (int attempt = 1; attempt <= MaxRetries; attempt++)
+        {
+            if (link.IsCancelled)
             {
-                sendData(new byte[] { CAN, CAN }, 0, 2);
+                link.SendCancel();
+                Report(onProgress, bytesTransferred, totalBytes, errorCount, "Transfer cancelled.");
                 return false;
             }
 
-            if (read == 0) break; // End of empty stream
-        }
-
-        // Send EOT
-        for (int i = 0; i < 10; i++)
-        {
-            if (cancellationToken.IsCancellationRequested) return false;
-
-            sendData(new byte[] { EOT }, 0, 1);
-            byte? ack = readByteWithTimeout(3000);
-            if (ack.HasValue && ack.Value == ACK)
+            link.Send(EOT);
+            Reply reply = WaitForReply(link, timeouts.AckMs);
+            if (reply == Reply.Ack)
             {
-                onProgress?.Invoke(bytesTransferred, totalBytes, errorCount, "Transfer complete.");
+                Report(onProgress, bytesTransferred, totalBytes, errorCount, "Transfer complete.");
                 return true;
+            }
+            if (reply == Reply.Cancelled)
+            {
+                Report(onProgress, bytesTransferred, totalBytes, errorCount, "Cancelled by the receiver.");
+                return false;
+            }
+            if (!link.IsCancelled)
+            {
+                errorCount++;
             }
         }
 
+        link.SendCancel();
+        Report(onProgress, bytesTransferred, totalBytes, errorCount, "Transfer failed: the end of the file was not acknowledged.");
         return false;
+    }
+
+    /// <summary>
+    /// Waits for the start of a block: SOH, STX or EOT. Other bytes are ignored. A pair of CAN is returned as CAN;
+    /// null means nothing useful arrived in time (or the transfer was cancelled).
+    /// </summary>
+    private static byte? ReadHeader(Link link, int timeoutMs)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        bool previousWasCan = false;
+        while (true)
+        {
+            int left = timeoutMs - (int)timer.ElapsedMilliseconds;
+            if (left <= 0)
+            {
+                return null;
+            }
+            byte? b = link.Read(left);
+            if (!b.HasValue)
+            {
+                return null;
+            }
+            if (b.Value == SOH || b.Value == STX || b.Value == EOT)
+            {
+                return b;
+            }
+            if (b.Value == CAN)
+            {
+                if (previousWasCan)
+                {
+                    return CAN;
+                }
+                previousWasCan = true;
+                continue;
+            }
+            previousWasCan = false;
+        }
+    }
+
+    /// <summary>Reads the rest of a block after its start byte. False when it is incomplete or damaged.</summary>
+    private static bool TryReadBlock(Link link, int size, XModemMode mode, int byteTimeoutMs, byte[] payload, out byte blockNumber)
+    {
+        blockNumber = 0;
+        byte? number = link.Read(byteTimeoutMs);
+        byte? complement = link.Read(byteTimeoutMs);
+        if (!number.HasValue || !complement.HasValue || (byte)(number.Value + complement.Value) != 255)
+        {
+            return false;
+        }
+        for (int i = 0; i < size; i++)
+        {
+            byte? b = link.Read(byteTimeoutMs);
+            if (!b.HasValue)
+            {
+                return false;
+            }
+            payload[i] = b.Value;
+        }
+
+        if (mode == XModemMode.Crc16)
+        {
+            byte? hi = link.Read(byteTimeoutMs);
+            byte? lo = link.Read(byteTimeoutMs);
+            if (!hi.HasValue || !lo.HasValue || (ushort)((hi.Value << 8) | lo.Value) != CalculateCrc16(payload, 0, size))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            byte? sum = link.Read(byteTimeoutMs);
+            if (!sum.HasValue || sum.Value != CalculateChecksum(payload, 0, size))
+            {
+                return false;
+            }
+        }
+
+        blockNumber = number.Value;
+        return true;
     }
 
     public static bool ReceiveFile(
@@ -202,174 +512,170 @@ public class XModemTransfer
         CancellationToken cancellationToken,
         ProgressHandler onProgress)
     {
-        long bytesReceived = 0;
+        return ReceiveFile(targetStream, sendData, readByteWithTimeout, cancellationToken, onProgress, new Timeouts());
+    }
+
+    internal static bool ReceiveFile(
+        Stream targetStream,
+        SendDataHandler sendData,
+        Func<int, byte?> readByteWithTimeout,
+        CancellationToken cancellationToken,
+        ProgressHandler onProgress,
+        Timeouts timeouts)
+    {
+        if (targetStream == null) throw new ArgumentNullException(nameof(targetStream));
+        if (sendData == null) throw new ArgumentNullException(nameof(sendData));
+        if (readByteWithTimeout == null) throw new ArgumentNullException(nameof(readByteWithTimeout));
+
+        Link link = new Link(sendData, readByteWithTimeout, cancellationToken);
+        long bytesReceived = 0; // the size of the file is not known to a receiver, so progress is reported without a total
         int errorCount = 0;
+        int blocksAccepted = 0;
         byte expectedBlock = 1;
-
-        // Try CRC16 mode first by sending 'C'
         XModemMode mode = XModemMode.Crc16;
-        bool started = false;
+        byte? header = null;
 
-        for (int i = 0; i < 10; i++)
+        // Step 1: ask for the file: 'C' first (CRC-16), then NAK (checksum) for senders that do not know CRC.
+        // Text that arrives meanwhile (a banner, an echo) is skipped until the first block starts.
+        link.Purge(0);
+        Report(onProgress, 0, 0, errorCount, "Waiting for the sender...");
+        for (int phase = 0; phase < 2 && !header.HasValue; phase++)
         {
-            if (cancellationToken.IsCancellationRequested) return false;
-
-            sendData(new byte[] { C }, 0, 1);
-            byte? firstByte = readByteWithTimeout(3000);
-            if (firstByte.HasValue)
+            mode = phase == 0 ? XModemMode.Crc16 : XModemMode.Checksum;
+            byte request = phase == 0 ? C : NAK;
+            for (int attempt = 0; attempt < MaxRetries && !header.HasValue; attempt++)
             {
-                if (firstByte.Value == SOH)
+                if (link.IsCancelled)
                 {
-                    started = true;
-                    break;
+                    link.SendCancel();
+                    Report(onProgress, 0, 0, errorCount, "Transfer cancelled.");
+                    return false;
                 }
+                link.Send(request);
+                header = ReadHeader(link, timeouts.ReceiverHandshakeAttemptMs);
             }
         }
 
-        // Fallback to Checksum mode (send NAK)
-        if (!started)
+        if (link.IsCancelled)
         {
-            mode = XModemMode.Checksum;
-            for (int i = 0; i < 10; i++)
-            {
-                if (cancellationToken.IsCancellationRequested) return false;
-
-                sendData(new byte[] { NAK }, 0, 1);
-                byte? firstByte = readByteWithTimeout(3000);
-                if (firstByte.HasValue)
-                {
-                    if (firstByte.Value == SOH)
-                    {
-                        started = true;
-                        break;
-                    }
-                }
-            }
+            link.SendCancel();
+            Report(onProgress, 0, 0, errorCount, "Transfer cancelled.");
+            return false;
         }
-
-        if (!started)
+        if (!header.HasValue)
         {
-            onProgress?.Invoke(0, 0, ++errorCount, "Sender did not respond to initial handshaking.");
+            Report(onProgress, 0, 0, ++errorCount, "The sender did not respond to the initial handshake.");
             return false;
         }
 
-        // Receiving loop
-        byte? header = SOH; // First block's SOH is already received
+        // Step 2: receive blocks until EOT.
+        byte[] payload = new byte[LargeBlockSize];
+        int consecutiveErrors = 0;
 
         while (true)
         {
-            if (cancellationToken.IsCancellationRequested)
+            if (link.IsCancelled)
             {
-                sendData(new byte[] { CAN, CAN }, 0, 2);
+                link.SendCancel();
+                Report(onProgress, bytesReceived, 0, errorCount, "Transfer cancelled.");
                 return false;
             }
 
             if (!header.HasValue)
             {
-                header = readByteWithTimeout(5000);
+                header = ReadHeader(link, timeouts.HeaderMs);
+                if (link.IsCancelled)
+                {
+                    continue; // reported at the top of the loop
+                }
             }
 
             if (!header.HasValue)
             {
+                // Nothing arrived: nudge the sender (a NAK makes it repeat its last block).
                 errorCount++;
-                sendData(new byte[] { NAK }, 0, 1);
+                if (++consecutiveErrors > MaxRetries)
+                {
+                    link.SendCancel();
+                    Report(onProgress, bytesReceived, 0, errorCount, "Transfer failed: the sender stopped responding.");
+                    return false;
+                }
+                Report(onProgress, bytesReceived, 0, errorCount, "Timeout waiting for block " + (blocksAccepted + 1) + ", asking again");
+                link.Send(NAK);
                 continue;
             }
 
-            if (header.Value == EOT)
+            byte start = header.Value;
+            header = null;
+
+            if (start == EOT)
             {
-                sendData(new byte[] { ACK }, 0, 1);
-                onProgress?.Invoke(bytesReceived, bytesReceived, errorCount, "File received successfully.");
+                link.Send(ACK);
+                Report(onProgress, bytesReceived, 0, errorCount, "File received successfully.");
                 return true;
             }
-
-            if (header.Value == CAN)
+            if (start == CAN)
             {
+                Report(onProgress, bytesReceived, 0, errorCount, "Cancelled by the sender.");
                 return false;
             }
 
-            if (header.Value != SOH)
+            int size = start == STX ? LargeBlockSize : BlockSize;
+            byte blockNumber;
+            if (!TryReadBlock(link, size, mode, timeouts.ByteMs, payload, out blockNumber))
             {
-                errorCount++;
-                header = null;
-                sendData(new byte[] { NAK }, 0, 1);
-                continue;
-            }
-
-            // Read remaining 131 (or 132 for CRC) bytes of block
-            byte? blkNum = readByteWithTimeout(1000);
-            byte? invBlkNum = readByteWithTimeout(1000);
-
-            if (!blkNum.HasValue || !invBlkNum.HasValue || (byte)(blkNum.Value + invBlkNum.Value) != 255)
-            {
-                errorCount++;
-                header = null;
-                sendData(new byte[] { NAK }, 0, 1);
-                continue;
-            }
-
-            byte[] payload = new byte[128];
-            bool payloadOk = true;
-            for (int i = 0; i < 128; i++)
-            {
-                byte? b = readByteWithTimeout(1000);
-                if (!b.HasValue)
+                if (link.IsCancelled)
                 {
-                    payloadOk = false;
-                    break;
+                    continue; // reported at the top of the loop
                 }
-                payload[i] = b.Value;
-            }
-
-            if (!payloadOk)
-            {
                 errorCount++;
-                header = null;
-                sendData(new byte[] { NAK }, 0, 1);
+                if (++consecutiveErrors > MaxRetries)
+                {
+                    link.SendCancel();
+                    Report(onProgress, bytesReceived, 0, errorCount, "Transfer failed: too many damaged blocks.");
+                    return false;
+                }
+                // Drop the rest of the damaged block (and anything else in flight) before asking for it again,
+                // otherwise leftovers would be taken for the start of the next block.
+                link.Purge(timeouts.PurgeQuietMs);
+                Report(onProgress, bytesReceived, 0, errorCount, "Damaged block " + (blocksAccepted + 1) + ", asking again");
+                link.Send(NAK);
                 continue;
             }
 
-            bool validCheck = false;
-            if (mode == XModemMode.Crc16)
+            consecutiveErrors = 0;
+            if (blockNumber == expectedBlock)
             {
-                byte? crcHi = readByteWithTimeout(1000);
-                byte? crcLo = readByteWithTimeout(1000);
-                if (crcHi.HasValue && crcLo.HasValue)
+                try
                 {
-                    ushort expectedCrc = (ushort)((crcHi.Value << 8) | crcLo.Value);
-                    ushort actualCrc = CalculateCrc16(payload, 0, 128);
-                    validCheck = (expectedCrc == actualCrc);
+                    targetStream.Write(payload, 0, size);
                 }
+                catch (Exception ex)
+                {
+                    link.SendCancel();
+                    Report(onProgress, bytesReceived, 0, ++errorCount, "Cannot write the file: " + ex.Message);
+                    return false;
+                }
+                bytesReceived += size;
+                blocksAccepted++;
+                expectedBlock++;
+                link.Send(ACK);
+                Report(onProgress, bytesReceived, 0, errorCount, "Received block " + blocksAccepted);
+            }
+            else if (blocksAccepted > 0 && blockNumber == (byte)(expectedBlock - 1))
+            {
+                // The sender repeated a block whose ACK it did not see: acknowledge it again, but keep the data once.
+                link.Send(ACK);
+                Report(onProgress, bytesReceived, 0, errorCount, "Repeated block " + blocksAccepted + " acknowledged");
             }
             else
             {
-                byte? checksum = readByteWithTimeout(1000);
-                if (checksum.HasValue)
-                {
-                    byte actualChecksum = CalculateChecksum(payload, 0, 128);
-                    validCheck = (checksum.Value == actualChecksum);
-                }
+                // A gap or a jump back means data is lost; acknowledging it would silently produce a corrupt file.
+                link.SendCancel();
+                Report(onProgress, bytesReceived, 0, ++errorCount,
+                    "Transfer failed: block " + blockNumber + " arrived while block " + expectedBlock + " was expected.");
+                return false;
             }
-
-            if (!validCheck)
-            {
-                errorCount++;
-                header = null;
-                sendData(new byte[] { NAK }, 0, 1);
-                continue;
-            }
-
-            if (blkNum.Value == expectedBlock)
-            {
-                targetStream.Write(payload, 0, 128);
-                bytesReceived += 128;
-                expectedBlock++;
-            }
-
-            // ACK current block and prepare for next
-            header = null;
-            sendData(new byte[] { ACK }, 0, 1);
-            onProgress?.Invoke(bytesReceived, bytesReceived, errorCount, $"Received block {blkNum.Value}");
         }
     }
 }

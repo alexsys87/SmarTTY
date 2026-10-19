@@ -32,6 +32,15 @@ jobs:
       - name: Run apk package manager checks
         run: dotnet run --project tests/ApkPackageManagerTests -c Release
 
+      - name: Run XMODEM protocol checks
+        run: dotnet run --project tests/XModemTransferTests -c Release
+
+      - name: Run text stream decoder checks
+        run: dotnet run --project tests/TextStreamDecoderTests -c Release
+
+      - name: Run terminal log writer checks
+        run: dotnet run --project tests/TerminalLogWriterTests -c Release
+
   sshnet:
     name: SSH.NET integration tests
     runs-on: ubuntu-latest
