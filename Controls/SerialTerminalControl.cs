@@ -229,7 +229,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 if (_target == CompletionTarget.Command)
                 {
                     // The user's own commands and the saved history, matched by what is already typed.
-                    itemsList.AddRange(GetSuggestedCommandItems());
+                    itemsList.AddRange(_terminal.GetSuggestedCommandItems());
                 }
 
                 if (_target == CompletionTarget.Command && string.IsNullOrEmpty(filterText))
