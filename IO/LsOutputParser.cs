@@ -30,7 +30,7 @@ public static class LsOutputParser
 
     public static class LsParser
     {
-        private static readonly Regex _lineRegex = new Regex("^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +([0-9]+) +([0-9]{4})-([0-9]{2})-([0-9]{2}) +([0-9]{2}):([0-9]{2}):([0-9]{2})\\.[0-9]+ +([0-9+\\-]+) +([^ ].*)$");
+        private static readonly Regex _lineRegex = new Regex("^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +([0-9]+) +([0-9]{4})-([0-9]{2})-([0-9]{2}) +([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.[0-9]+)? +([0-9+\\-]+) +([^ ].*)$");
 
         public static LsEntry ParseLine(string line)
         {
