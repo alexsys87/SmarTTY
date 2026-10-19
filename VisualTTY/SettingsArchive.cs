@@ -149,7 +149,8 @@ public static class SettingsArchive
                                 result.Skipped.Add(file.Key);
                                 continue;
                             }
-                            if (!includePasswords && target.Kind == EntryKind.SshConnection)
+                            // Telnet profiles carry a saved password too (SSH profiles at the top, telnet in Connection).
+                            if (!includePasswords && (target.Kind == EntryKind.SshConnection || target.Kind == EntryKind.RawConnection))
                             {
                                 data = RemovePassword(document, data);
                             }
@@ -285,7 +286,7 @@ public static class SettingsArchive
         {
             string path = Path.Combine(DirectoryFor(item.Target.Kind, dataDirectory, localDataDirectory), item.Target.FileName);
             byte[] data = item.Data;
-            if (item.Target.Kind == EntryKind.SshConnection && File.Exists(path))
+            if ((item.Target.Kind == EntryKind.SshConnection || item.Target.Kind == EntryKind.RawConnection) && File.Exists(path))
             {
                 data = KeepExistingPassword(item.Document, data, path);
             }
@@ -449,9 +450,19 @@ public static class SettingsArchive
         return ToBytes(document);
     }
 
+    // The saved password sits directly under the root of an SSH profile and in the Connection element of a raw one.
+    private static XElement FindPassword(XDocument document)
+    {
+        if (document.Root == null)
+        {
+            return null;
+        }
+        return document.Root.Element(PasswordElementName) ?? document.Root.Descendants(PasswordElementName).FirstOrDefault();
+    }
+
     private static byte[] KeepExistingPassword(XDocument incoming, byte[] raw, string existingPath)
     {
-        XElement incomingPassword = incoming.Root.Element(PasswordElementName);
+        XElement incomingPassword = FindPassword(incoming);
         if (incomingPassword != null && !string.IsNullOrWhiteSpace(incomingPassword.Value))
         {
             return raw;
@@ -459,16 +470,27 @@ public static class SettingsArchive
         try
         {
             XDocument existing = LoadXml(ReadAllBytesShared(existingPath));
-            XElement existingPassword = existing.Root == null ? null : existing.Root.Element(PasswordElementName);
+            XElement existingPassword = FindPassword(existing);
             if (existingPassword == null || string.IsNullOrWhiteSpace(existingPassword.Value))
             {
                 return raw;
             }
-            if (incomingPassword != null)
+            // The password goes back where the profile keeps it: the parent it had in the existing file, found by
+            // name in the incoming one (the Connection element of a raw profile).
+            XElement incomingContainer = incomingPassword?.Parent;
+            if (incomingContainer == null)
             {
-                incomingPassword.Remove();
+                incomingContainer = existingPassword.Parent == existing.Root
+                    ? incoming.Root
+                    : incoming.Root.Descendants(existingPassword.Parent.Name).FirstOrDefault();
             }
-            incoming.Root.Add(new XElement(existingPassword));
+            if (incomingContainer == null)
+            {
+                // The incoming profile has no place for a password (another kind of connection): leave it alone.
+                return raw;
+            }
+            incomingPassword?.Remove();
+            incomingContainer.Add(new XElement(existingPassword));
             return ToBytes(incoming);
         }
         catch (Exception ex) when (ex is XmlException || ex is IOException || ex is UnauthorizedAccessException)

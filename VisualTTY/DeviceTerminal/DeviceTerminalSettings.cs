@@ -136,6 +136,34 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
             public bool ActiveNegotiation { get; set; }
 
             /// <summary>
+            /// Agree to LINEMODE (RFC 1184) when the server asks for it: the line is then edited here and sent when it
+            /// ends. Off by default: the server is refused and keeps sending characters one by one, which every
+            /// server supports.
+            /// </summary>
+            public bool LineMode { get; set; }
+
+            // --- automatic login: typed when the server asks, see TelnetAutoLogin ---
+
+            /// <summary>Empty: the user name is not typed (a device that asks only for a password).</summary>
+            public string AutoLoginUserName { get; set; }
+
+            /// <summary>
+            /// The password, encrypted for the current Windows user the same way as the saved SSH passwords (hence the
+            /// name: exporting settings without passwords leaves exactly this element out). Null: no password.
+            /// </summary>
+            public byte[] EncryptedSavedPassword;
+
+            /// <summary>Texts a login prompt ends with, separated by ';'. Empty: login:, username:, user name:, user:.</summary>
+            public string LoginPrompts { get; set; }
+
+            /// <summary>Texts a password prompt ends with, separated by ';'. Empty: password:, passcode:.</summary>
+            public string PasswordPrompts { get; set; }
+
+            /// <summary>True when there is something to type at a prompt.</summary>
+            [XmlIgnore]
+            public bool HasAutoLogin => !string.IsNullOrEmpty(AutoLoginUserName) || EncryptedSavedPassword != null;
+
+            /// <summary>
             /// Saved telnet and raw TCP connections to the same host and port are different connections,
             /// so they must not share a file.
             /// </summary>

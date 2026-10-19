@@ -624,6 +624,11 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         {
             return;
         }
+        ShowPackageManager(activeSession);
+    }
+
+    private void ShowPackageManager(SessionWrapper activeSession)
+    {
         try
         {
             PackageManagerWindow packageManagerWindow = new PackageManagerWindow(activeSession);
@@ -632,7 +637,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             ApplyTheme((Window)packageManagerWindow2, Controller.Settings.Theme, ref packageManagerWindow2._ThemeDictionary);
             if (packageManagerWindow2.ShowDialog() == true && packageManagerWindow2.CommandLine != null && (!(activeSession.ActiveTab.EditorControl is SshTerminalControl sshTerminalControl) || !sshTerminalControl.Submit(packageManagerWindow2.CommandLine)))
             {
-                activeSession.CreateNewTerminalPage(virtualMode: false, new InitialCommand(packageManagerWindow2.CommandLine, echoInitialCommand: true));
+                activeSession.CreateNewTerminalPage(virtualMode: false, new InitialCommand(packageManagerWindow2.CommandLine, echoInitialCommand: true, tabKeptAfterExit: () => ShowPackageManager(activeSession)));
             }
         }
         catch (Exception exception)

@@ -114,6 +114,8 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public bool TelnetActiveNegotiation { get; set; }
 
+        public bool TelnetLineMode { get; set; }
+
         private int _TelnetKeepAliveSeconds;
 
         public int TelnetKeepAliveSeconds
@@ -148,6 +150,46 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public Visibility TelnetSettingsVisibility => IsTelnet ? Visibility.Visible : Visibility.Collapsed;
 
+        // Automatic login. The password is kept here in plain text only while the window is open; it is encrypted
+        // (like the saved SSH passwords) when the settings are built.
+        public string TelnetAutoLoginUserName { get; set; }
+
+        public string TelnetLoginPrompts { get; set; }
+
+        public string TelnetPasswordPrompts { get; set; }
+
+        public string TelnetPassword { get; set; }
+
+        // Encrypting is slow (a key container) and the settings are built several times (test, OK, close): the
+        // result is reused until the password changes.
+        private string _EncryptedFor;
+
+        private byte[] _EncryptedPassword;
+
+        private byte[] EncryptTelnetPassword()
+        {
+            if (string.IsNullOrEmpty(TelnetPassword))
+            {
+                return null;
+            }
+            if (_EncryptedFor != TelnetPassword)
+            {
+                try
+                {
+                    _EncryptedPassword = VisualTTY.PasswordProtector.Encrypt(TelnetPassword, "com.sysprogs.smartty.passwords");
+                    _EncryptedFor = TelnetPassword;
+                }
+                catch (Exception)
+                {
+                    // Too long or no key container: the connection is saved without a password rather than
+                    // failing while the window closes.
+                    _EncryptedPassword = null;
+                    _EncryptedFor = TelnetPassword;
+                }
+            }
+            return _EncryptedPassword;
+        }
+
         public DeviceTerminalSettings.ConnectionSettings EffectiveConnectionSettings
         {
             get
@@ -180,7 +222,12 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                         TerminalType = string.IsNullOrWhiteSpace(TelnetTerminalType) ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalType : TelnetTerminalType.Trim(),
                         LocalEcho = TelnetLocalEcho,
                         ActiveNegotiation = TelnetActiveNegotiation,
-                        KeepAliveSeconds = TelnetKeepAliveSeconds
+                        LineMode = TelnetLineMode,
+                        KeepAliveSeconds = TelnetKeepAliveSeconds,
+                        AutoLoginUserName = string.IsNullOrWhiteSpace(TelnetAutoLoginUserName) ? null : TelnetAutoLoginUserName.Trim(),
+                        EncryptedSavedPassword = EncryptTelnetPassword(),
+                        LoginPrompts = string.IsNullOrWhiteSpace(TelnetLoginPrompts) ? null : TelnetLoginPrompts.Trim(),
+                        PasswordPrompts = string.IsNullOrWhiteSpace(TelnetPasswordPrompts) ? null : TelnetPasswordPrompts.Trim()
                     };
                 }
                 return new DeviceTerminalSettings.ConnectionSettings.Tcp
@@ -288,7 +335,24 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     TelnetTerminalType = telnet.TerminalType;
                     TelnetLocalEcho = telnet.LocalEcho;
                     TelnetActiveNegotiation = telnet.ActiveNegotiation;
+                    TelnetLineMode = telnet.LineMode;
                     TelnetKeepAliveSeconds = telnet.KeepAliveSeconds;
+                    TelnetAutoLoginUserName = telnet.AutoLoginUserName;
+                    TelnetLoginPrompts = telnet.LoginPrompts;
+                    TelnetPasswordPrompts = telnet.PasswordPrompts;
+                    if (telnet.EncryptedSavedPassword != null)
+                    {
+                        try
+                        {
+                            TelnetPassword = VisualTTY.PasswordProtector.Decrypt(telnet.EncryptedSavedPassword, "com.sysprogs.smartty.passwords");
+                            _EncryptedFor = TelnetPassword;
+                            _EncryptedPassword = telnet.EncryptedSavedPassword;
+                        }
+                        catch (Exception)
+                        {
+                            // Saved by another Windows user or on another computer: it has to be entered again.
+                        }
+                    }
                 }
                 else
                 {
@@ -434,6 +498,8 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         if (_Controller.IsTelnet)
         {
             Title = "Telnet Terminal Settings";
+            txtTelnetPassword.Password = _Controller.TelnetPassword ?? "";
+            txtTelnetPassword.PasswordChanged += (sender, args) => _Controller.TelnetPassword = txtTelnetPassword.Password;
         }
     }
 

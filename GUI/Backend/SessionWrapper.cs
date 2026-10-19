@@ -487,7 +487,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         IsInactive = false;
     }
 
-    public void AttachChannelToControl(TerminalEmulatorControl ctl, SshShellChannel chn, bool isAutoLaunchedCommand)
+    public void AttachChannelToControl(TerminalEmulatorControl ctl, SshShellChannel chn, bool isAutoLaunchedCommand, Action tabKeptAfterExit = null)
     {
         Utf8StreamDecoder reader = new Utf8StreamDecoder();
         chn.DataReceived += (object sender, byte[] data, int offset, int length, int value) =>
@@ -503,6 +503,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     if (MessageBoxes.Ask("The command has exited. Close tab?"))
                     {
                         CloseTabPageForControl(ctl);
+                    }
+                    else
+                    {
+                        tabKeptAfterExit?.Invoke();
                     }
                 });
             };

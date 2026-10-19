@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Transport/TelnetStream.cs" Link="TelnetStream.cs" />
+    <Compile Include="../../Transport/TelnetAutoLogin.cs" Link="TelnetAutoLogin.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/DeviceTerminalSettings.cs" Link="DeviceTerminalSettings.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/RawConnectionSettings.cs" Link="RawConnectionSettings.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/TerminalEncodings.cs" Link="TerminalEncodings.cs" />

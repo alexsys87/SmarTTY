@@ -762,6 +762,16 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     public IReadOnlyList<string> CommandHistory => _commandHistory.AsReadOnly();
 
+    /// <summary>
+    /// When true, the characters typed while no input line is shown (a login prompt, a program that reads single
+    /// characters) are also drawn by the terminal itself, with Enter and Backspace; for connections whose far end does
+    /// not echo (telnet without the server's echo, line mode). Typing in the input line needs no echo.
+    /// </summary>
+    public bool EchoRawInput { get; set; }
+
+    // How many typed characters of the current line Backspace may still erase on the screen.
+    private int _rawEchoLength;
+
     public bool LocalEcho
     {
         get => _localEcho;
@@ -1054,6 +1064,20 @@ public class SerialTerminalControl : TerminalEmulatorControl
             return;
         }
 
+        if (_inputLine == null && EchoRawInput && !e.Control && !e.Alt)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                ProcessOutput("\r\n");
+                _rawEchoLength = 0;
+            }
+            else if (e.KeyCode == Keys.Back && _rawEchoLength > 0)
+            {
+                ProcessOutput("\b \b");
+                _rawEchoLength--;
+            }
+        }
+
         base.OnKeyDown(e);
     }
 
@@ -1199,6 +1223,11 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         if (_inputLine == null)
         {
+            if (EchoRawInput && !char.IsControl(e.KeyChar))
+            {
+                _rawEchoLength++;
+                ProcessOutput(e.KeyChar.ToString());
+            }
             base.OnKeyPress(e);
             return;
         }

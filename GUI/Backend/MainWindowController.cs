@@ -1313,7 +1313,7 @@ public class MainWindowController : INotifyPropertyChanged
                 Channel = sshShellChannel,
                 Session = session
             };
-            session.AttachChannelToControl(terminalEmulatorControl, sshShellChannel, initialCommand.Command != null);
+            session.AttachChannelToControl(terminalEmulatorControl, sshShellChannel, initialCommand.Command != null, initialCommand.TabKeptAfterExit);
         }
         terminalEmulatorControl.CaretWhenUnfocused = false;
         terminalEmulatorControl.MouseMove += anyctl_MouseMove;

@@ -71,14 +71,38 @@ internal static class SettingsChecks
             TerminalType = "vt100",
             LocalEcho = DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Never,
             ActiveNegotiation = true,
-            KeepAliveSeconds = 45
+            KeepAliveSeconds = 45,
+            LineMode = true
         };
         RawConnectionSettings customLoaded = RoundTrip(new RawConnectionSettings { Settings = new DeviceTerminalSettings { Connection = custom } }, out string customXml);
         DeviceTerminalSettings.ConnectionSettings.Telnet back = (DeviceTerminalSettings.ConnectionSettings.Telnet)customLoaded.Settings.Connection;
         check(back.TerminalType == "vt100" && back.LocalEcho == DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Never && back.ActiveNegotiation && back.KeepAliveSeconds == 45,
             "telnet options: survive the round trip");
         DeviceTerminalSettings.ConnectionSettings.Telnet customCopy = (DeviceTerminalSettings.ConnectionSettings.Telnet)custom.Clone();
-        check(customCopy.TerminalType == "vt100" && customCopy.KeepAliveSeconds == 45 && customCopy.ActiveNegotiation, "telnet options: Clone() keeps them");
+        check(customCopy.TerminalType == "vt100" && customCopy.KeepAliveSeconds == 45 && customCopy.ActiveNegotiation && customCopy.LineMode, "telnet options: Clone() keeps them");
+        check(back.LineMode && !telnet.LineMode && !((DeviceTerminalSettings.ConnectionSettings.Telnet)loaded.Settings.Connection).LineMode,
+            "linemode setting: off by default, survives the round trip, a file saved before it existed has it off");
+
+        // auto login fields
+        check(!telnet.HasAutoLogin, "auto login: none by default");
+        DeviceTerminalSettings.ConnectionSettings.Telnet withLogin = new DeviceTerminalSettings.ConnectionSettings.Telnet
+        {
+            Host = "sw2",
+            Port = 23,
+            AutoLoginUserName = "admin",
+            EncryptedSavedPassword = new byte[] { 1, 2, 3, 250 },
+            LoginPrompts = "id>",
+            PasswordPrompts = "pin>"
+        };
+        check(withLogin.HasAutoLogin, "auto login: HasAutoLogin when a user name is set");
+        RawConnectionSettings withLoginLoaded = RoundTrip(new RawConnectionSettings { Settings = new DeviceTerminalSettings { Connection = withLogin } }, out string withLoginXml);
+        DeviceTerminalSettings.ConnectionSettings.Telnet loginBack = (DeviceTerminalSettings.ConnectionSettings.Telnet)withLoginLoaded.Settings.Connection;
+        check(loginBack.AutoLoginUserName == "admin" && loginBack.LoginPrompts == "id>" && loginBack.PasswordPrompts == "pin>"
+            && loginBack.EncryptedSavedPassword != null && loginBack.EncryptedSavedPassword.Length == 4 && loginBack.EncryptedSavedPassword[3] == 250,
+            "auto login: fields survive the round trip");
+        check(withLoginXml.Contains("<EncryptedSavedPassword>"), "auto login: the password is stored in an element named like the SSH one (the archive export strips it by that name)");
+        check(new DeviceTerminalSettings.ConnectionSettings.Telnet { Host = "h", Port = 1, EncryptedSavedPassword = new byte[] { 1 } }.HasAutoLogin, "auto login: HasAutoLogin when only a password is saved");
+        check(!((DeviceTerminalSettings.ConnectionSettings.Telnet)loaded.Settings.Connection).HasAutoLogin && !xml.Contains("EncryptedSavedPassword"), "auto login: a plain telnet profile has no login and no password element");
 
         DeviceTerminalSettings.ConnectionSettings.Tcp copy = telnet.Clone();
         check(copy is DeviceTerminalSettings.ConnectionSettings.Telnet && !ReferenceEquals(copy, telnet), "Clone() of a telnet endpoint is a separate telnet endpoint");

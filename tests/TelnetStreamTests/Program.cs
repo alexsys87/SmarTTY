@@ -102,6 +102,23 @@ internal static class Program
         return string.Join(" ", data.Select(b => b.ToString("X2")));
     }
 
+    // A connection where every command chunk is followed by one character of text ("."), so that every Read() of the
+    // stream returns after exactly one command chunk (a read of nothing but commands waits for more).
+    private static FakeConnection Marked(params byte[][] commandChunks)
+    {
+        return new FakeConnection(commandChunks.Select(chunk => Cat(chunk, Text("."))).ToArray());
+    }
+
+    // Reads one chunk of what the server sent per call.
+    private static void ReadAllChunks(TelnetStream stream, int chunks)
+    {
+        byte[] buffer = new byte[1024];
+        for (int i = 0; i < chunks; i++)
+        {
+            stream.Read(buffer, 0, buffer.Length);
+        }
+    }
+
     // Reads the stream to its end, the way the connection reader does.
     private static byte[] ReadAll(TelnetStream stream, int bufferSize = 1024)
     {
@@ -428,6 +445,238 @@ internal static class Program
             stream.SendCommand(TelnetStream.Break);
             stream.SendCommand(TelnetStream.NOP);
             CheckBytes(connection.TakeWritten(), B(IAC, 246, IAC, 243, IAC, 241), "AYT, Break and NOP are sent as IAC commands");
+        }
+
+        // --- automatic login ---
+        {
+            // the server's side of a login: prompt, our line, prompt, our line
+            FakeConnection connection = new FakeConnection(Text("Welcome\r\nSwitch login: "), Text("alice\r\nPassword: "), Text("\r\nLast login: Mon Oct 19\r\n$ "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("alice", "s3cret", null, null) });
+            byte[] buffer = new byte[256];
+            stream.Read(buffer, 0, buffer.Length);
+            CheckBytes(connection.TakeWritten(), Text("alice\r\n"), "auto login: the user name answers the login prompt");
+            stream.Read(buffer, 0, buffer.Length);
+            CheckBytes(connection.TakeWritten(), Text("s3cret\r\n"), "auto login: the password answers the password prompt");
+            stream.Read(buffer, 0, buffer.Length);
+            Check(connection.Written.Length == 0, "auto login: 'Last login:' in the banner is not a prompt, and nothing else is sent");
+        }
+        {
+            // the prompt is recognized when it arrives in pieces, with colors and trailing blanks
+            FakeConnection connection = new FakeConnection(Text("Us"), Text("er na"), Text("me"), B(0x1B), Text("[0m: "), Text("\r\n\x1B[1mPass"), Text("word: "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("bob", "pw", null, null) });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Text("bob\r\npw\r\n"), "auto login: prompts split between reads and wrapped in escape sequences");
+        }
+        {
+            // a rejected password: the server asks again, nothing is sent a second time
+            FakeConnection connection = new FakeConnection(Text("login: "), Text("Password: "), Text("\r\nLogin incorrect\r\nlogin: "), Text("Password: "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("alice", "wrong", null, null) });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Text("alice\r\nwrong\r\n"), "auto login: a rejected password is not tried again");
+        }
+        {
+            // a device with only a password prompt
+            FakeConnection connection = new FakeConnection(Text("User Access Verification\r\n\r\nPassword: "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("", "cisco", null, null) });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Text("cisco\r\n"), "auto login: an empty user name skips the login prompt");
+        }
+        {
+            // only a user name
+            FakeConnection connection = new FakeConnection(Text("login: "), Text("Password: "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("root", "", null, null) });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Text("root\r\n"), "auto login: without a password only the user name is sent");
+        }
+        {
+            // the password prompt does not get the user name and the other way round
+            FakeConnection connection = new FakeConnection(Text("Password: "), Text("login: "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("u", "p", null, null) });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Text("u\r\n"), "auto login: the order is login first; a password prompt before it is ignored");
+        }
+        {
+            // custom prompts, case does not matter
+            FakeConnection connection = new FakeConnection(Text("Enter ID> "), Text("Secret code ? "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("7", "1234", "id>; badge>", "code ?", 0) });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Text("7\r\n1234\r\n"), "auto login: configured prompts");
+        }
+        {
+            // telnet commands in the middle do not hide the prompt, and the answer is escaped like any other output
+            FakeConnection connection = new FakeConnection(Cat(Text("log"), B(IAC, 241), Text("in: ")));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("a\u00ffb", "", null, null) });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Cat(Text("a"), B(0xC3, 0xBF), Text("b\r\n")), "auto login: the answer is UTF-8");
+        }
+        {
+            // too late: after the timeout nothing is typed any more
+            long now = 0;
+            TelnetAutoLogin login = new TelnetAutoLogin("u", "p", null, null, 10, () => now);
+            Check(login.Feed(Text("login: "), 0, 7).Count == 1, "auto login: answers inside the timeout");
+            now = 11000;
+            Check(login.Feed(Text("Password: "), 0, 10).Count == 0 && login.IsFinished, "auto login: stops after the timeout");
+            Check(new TelnetAutoLogin("", "", null, null).IsFinished, "auto login: nothing to send is finished at once");
+        }
+
+        // --- LINEMODE ---
+        {
+            // not allowed (the default): the server is refused and keeps sending characters
+            FakeConnection connection = new FakeConnection(B(IAC, DO, TelnetStream.OptLineMode));
+            ReadAll(new TelnetStream(connection));
+            CheckBytes(connection.TakeWritten(), B(IAC, WONT, TelnetStream.OptLineMode), "linemode: refused unless allowed");
+        }
+        {
+            byte LM = TelnetStream.OptLineMode;
+            // allowed: WILL, MODE is acknowledged, a repeated MODE is not
+            FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 1, 1, IAC, SE), B(IAC, SB, LM, 1, 1, IAC, SE));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AllowLineMode = true });
+            byte[] scratch = new byte[64];
+            stream.Read(new byte[1], 0, 0);
+            ReadAllChunks(stream, 1);
+            CheckBytes(connection.TakeWritten(), B(IAC, WILL, LM), "linemode: DO LINEMODE is answered with WILL when allowed");
+            Check(!stream.LineEditing, "linemode: no editing before the server sets a mode");
+            ReadAllChunks(stream, 1);
+            CheckBytes(connection.TakeWritten(), B(IAC, SB, LM, 1, 1 | 4, IAC, SE), "linemode: MODE EDIT is acknowledged with the ACK bit");
+            Check(stream.LineEditing, "linemode: editing after MODE EDIT");
+            ReadAllChunks(stream, 1);
+            Check(connection.Written.Length == 0, "linemode: the same MODE again is not acknowledged again");
+            // typing: nothing goes out before the line ends
+            stream.Write(Text("l"), 0, 1);
+            stream.Write(Text("s"), 0, 1);
+            stream.Write(Text("x"), 0, 1);
+            stream.Write(B(127), 0, 1);
+            Check(connection.Written.Length == 0, "linemode: typed characters are held back");
+            stream.Write(B(13, 10), 0, 2);
+            CheckBytes(connection.TakeWritten(), Text("ls\r\n"), "linemode: Backspace/Delete edits the line, CR LF sends it once");
+            stream.Write(B(13), 0, 1);
+            stream.Write(B(10), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(13, 10), "linemode: CR then LF in separate writes is one line end");
+            stream.Write(B(10), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(13, 10), "linemode: a lone LF ends the line, too");
+            stream.Write(Text("abc"), 0, 3);
+            stream.Write(B(0x15), 0, 1);
+            stream.Write(Text("z\r"), 0, 2);
+            CheckBytes(connection.TakeWritten(), Text("z\r\n"), "linemode: Ctrl+U erases the line");
+            stream.Write(Text("one two  "), 0, 9);
+            stream.Write(B(0x17), 0, 1);
+            stream.Write(Text("x\r"), 0, 2);
+            CheckBytes(connection.TakeWritten(), Text("one x\r\n"), "linemode: Ctrl+W erases the last word");
+            stream.Write(Cat(Text("a"), B(0xC3, 0xA9)), 0, 3);
+            stream.Write(B(8), 0, 1);
+            stream.Write(Text("b\r"), 0, 2);
+            CheckBytes(connection.TakeWritten(), Text("ab\r\n"), "linemode: Backspace removes a whole UTF-8 character");
+            byte[] cursorKey = Cat(Text("a"), B(0x1B, (byte)'[', (byte)'1', (byte)';', (byte)'5', (byte)'A'), Text("b\r"));
+            stream.Write(cursorKey, 0, cursorKey.Length);
+            CheckBytes(connection.TakeWritten(), Text("ab\r\n"), "linemode: the escape sequence of a cursor key is dropped");
+            stream.Write(Cat(Text("a"), B(0x1B)), 0, 2);
+            stream.Write(Text("b\r"), 0, 2);
+            CheckBytes(connection.TakeWritten(), Cat(Text("ab\r\n")), "linemode: a lone Escape does not swallow the next character");
+            stream.Write(Cat(Text("x"), B(0xFF), Text("\r")), 0, 3);
+            CheckBytes(connection.TakeWritten(), Cat(Text("x"), B(0xFF, 0xFF), Text("\r\n")), "linemode: 0xFF in a line is doubled");
+            stream.Write(Text("abc"), 0, 3);
+            stream.Write(B(3), 0, 1);
+            Check(connection.Written.Length == 0, "linemode: without TRAPSIG Ctrl+C is only a character");
+        }
+        {
+            byte LM = TelnetStream.OptLineMode;
+            // TRAPSIG: signals are sent as commands, the line is dropped
+            FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 1, 3, IAC, SE));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AllowLineMode = true });
+            ReadAllChunks(stream, 2);
+            connection.TakeWritten();
+            stream.Write(Text("abc"), 0, 3);
+            stream.Write(B(3), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(IAC, 244), "linemode: Ctrl+C is sent as IP");
+            stream.Write(Text("\r"), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(13, 10), "linemode: the line typed before the signal is gone");
+            stream.Write(B(28), 0, 1);
+            stream.Write(B(26), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(IAC, 238, IAC, 237), "linemode: Ctrl+\\ is ABORT and Ctrl+Z is SUSP");
+        }
+        {
+            byte LM = TelnetStream.OptLineMode;
+            // TRAPSIG without EDIT: characters go on at once, the signal characters become commands
+            FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 1, 2, IAC, SE));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AllowLineMode = true });
+            ReadAllChunks(stream, 2);
+            connection.TakeWritten();
+            stream.Write(Cat(Text("a"), B(3), Text("b")), 0, 3);
+            CheckBytes(connection.TakeWritten(), Cat(Text("a"), B(IAC, 244), Text("b")), "linemode: TRAPSIG alone sends characters at once and traps the signals");
+            Check(!stream.LineEditing, "linemode: TRAPSIG alone is not line editing");
+        }
+        {
+            byte LM = TelnetStream.OptLineMode;
+            // leaving line editing sends what was typed; DONT LINEMODE does the same
+            FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 1, 1, IAC, SE), B(IAC, SB, LM, 1, 0, IAC, SE));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AllowLineMode = true });
+            ReadAllChunks(stream, 2);
+            connection.TakeWritten();
+            stream.Write(Text("abc"), 0, 3);
+            ReadAllChunks(stream, 1);
+            CheckBytes(connection.TakeWritten(), Cat(B(IAC, SB, LM, 1, 4, IAC, SE), Text("abc")), "linemode: a MODE without EDIT acknowledges and sends the pending text");
+            stream.Write(Text("d"), 0, 1);
+            CheckBytes(connection.TakeWritten(), Text("d"), "linemode: characters go out at once again");
+
+            FakeConnection connection2 = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 1, 1, IAC, SE), B(IAC, DONT, LM));
+            TelnetStream stream2 = new TelnetStream(connection2, new TelnetOptions { AllowLineMode = true });
+            ReadAllChunks(stream2, 2);
+            connection2.TakeWritten();
+            stream2.Write(Text("xy"), 0, 2);
+            ReadAllChunks(stream2, 1);
+            CheckBytes(connection2.TakeWritten(), Cat(B(IAC, WONT, LM), Text("xy")), "linemode: DONT LINEMODE is answered and sends the pending text");
+            Check(!stream2.LineEditing, "linemode: no editing after DONT LINEMODE");
+        }
+        {
+            byte LM = TelnetStream.OptLineMode;
+            // forward mask is declined
+            FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 253, 2, 0, 0, 0, IAC, SE));
+            ReadAllChunks(new TelnetStream(connection, new TelnetOptions { AllowLineMode = true }), 2);
+            CheckBytes(connection.TakeWritten(), B(IAC, WILL, LM, IAC, SB, LM, 252, 2, IAC, SE), "linemode: DO FORWARDMASK is declined");
+        }
+        {
+            byte LM = TelnetStream.OptLineMode;
+            // special characters: taken over for the functions we know, declined for the others
+            byte[] slc = B(IAC, SB, LM, 3,
+                3, 2, 0x18,      // IP -> Ctrl+X
+                10, 2, 0x08,     // EC -> Backspace
+                8, 2, 4,         // EOF: not supported here
+                5, 0, 0,         // AYT: no support on the server's side either, nothing to answer
+                IAC, SE);
+            FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 1, 3, IAC, SE), slc);
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AllowLineMode = true });
+            ReadAllChunks(stream, 3);
+            byte[] sent = connection.TakeWritten();
+            byte[] expectedTail = B(IAC, SB, LM, 3, 3, 2 | 0x80, 0x18, 10, 2 | 0x80, 0x08, 8, 0, 0, IAC, SE);
+            Check(sent.Skip(sent.Length - expectedTail.Length).SequenceEqual(expectedTail), "linemode: SLC: known functions are acknowledged, unknown ones declined (got " + Show(sent) + ")");
+            stream.Write(B(0x18), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(IAC, 244), "linemode: the server's interrupt character is trapped");
+            stream.Write(B(3), 0, 1);
+            stream.Write(Text("\r"), 0, 1);
+            CheckBytes(connection.TakeWritten(), Cat(B(3), B(13, 10)), "linemode: the default Ctrl+C is an ordinary character once the server chose another one");
+        }
+        {
+            byte LM = TelnetStream.OptLineMode;
+            // a request for our defaults gets all of them
+            FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 3, 0, 3, 0, IAC, SE));
+            ReadAllChunks(new TelnetStream(connection, new TelnetOptions { AllowLineMode = true }), 2);
+            byte[] sent = connection.TakeWritten();
+            byte[] expected = B(IAC, WILL, LM, IAC, SB, LM, 3, 3, 2, 3, 7, 2, 28, 9, 2, 26, 10, 2, 127, 11, 2, 21, 12, 2, 23, IAC, SE);
+            CheckBytes(sent, expected, "linemode: SLC: the defaults are sent on request");
+        }
+        {
+            // a long line is sent in pieces, nothing is lost
+            byte LM = TelnetStream.OptLineMode;
+            FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 1, 1, IAC, SE));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AllowLineMode = true });
+            ReadAllChunks(stream, 2);
+            connection.TakeWritten();
+            byte[] long1 = Enumerable.Repeat((byte)'a', 9000).ToArray();
+            stream.Write(long1, 0, long1.Length);
+            byte[] first = connection.TakeWritten();
+            stream.Write(Text("\r"), 0, 1);
+            byte[] rest = connection.TakeWritten();
+            Check(first.Length == 8192 && rest.Length == (9000 - 8192) + 2, "linemode: an overlong line goes out in pieces, nothing is lost");
         }
 
         // --- saved telnet connections (settings classes) ---

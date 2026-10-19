@@ -95,6 +95,12 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <TextBlock Text="Terminal type:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
         <TextBox Grid.Column="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetTerminalType, UpdateSourceTrigger=PropertyChanged}" ToolTip="Reported to the server when it asks for the terminal type (option TERMINAL-TYPE). The terminal understands xterm." />
@@ -105,6 +111,18 @@
         <CheckBox Grid.Row="3" Grid.ColumnSpan="2" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetActiveNegotiation}" ToolTip="Most telnet clients do this. Leave it off for servers that do not speak Telnet properly: nothing is sent until the server asks.">
           <TextBlock Text="Offer terminal type, window size and suppress-go-ahead at connect" />
         </CheckBox>
+        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetLineMode}" ToolTip="When the server asks for LINEMODE (RFC 1184), the line is edited here (Backspace, Ctrl+U, Ctrl+W) and sent when Enter is pressed; Ctrl+C, Ctrl+\ and Ctrl+Z become Telnet signals if the server wants that. Leave it off if unsure: the server then sends and receives single characters.">
+          <TextBlock Text="Allow line mode (LINEMODE) when the server asks" />
+        </CheckBox>
+        <TextBlock Text="Automatic login (typed when the server asks; sent once per connection, a rejected password is not retried):" Grid.Row="5" Grid.ColumnSpan="2" Margin="5 10 0 2" TextWrapping="Wrap" MaxWidth="430" HorizontalAlignment="Left" Style="{StaticResource HeaderText}" />
+        <TextBlock Text="User name:" Grid.Row="6" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Grid.Row="6" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetAutoLoginUserName, UpdateSourceTrigger=PropertyChanged}" ToolTip="Leave empty for a device that asks only for a password." />
+        <TextBlock Text="Password:" Grid.Row="7" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+        <PasswordBox Name="txtTelnetPassword" Grid.Column="1" Grid.Row="7" Margin="2" MaxLength="64" VerticalContentAlignment="Center" Padding="2 1 2 2" ToolTip="Stored encrypted for the current Windows user (like saved SSH passwords). Telnet itself sends it over the network unencrypted." />
+        <TextBlock Text="Login prompt ends with:" Grid.Row="8" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Grid.Row="8" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetLoginPrompts, UpdateSourceTrigger=PropertyChanged}" ToolTip="Texts separated by ';', case does not matter. Empty: login:;username:;user name:;user:" />
+        <TextBlock Text="Password prompt ends with:" Grid.Row="9" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Grid.Row="9" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetPasswordPrompts, UpdateSourceTrigger=PropertyChanged}" ToolTip="Texts separated by ';', case does not matter. Empty: password:;passcode:" />
       </Grid>
     </local:SettingsGroupBox>
     <local:SettingsGroupBox ImageSource="../icons/com16.png" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">

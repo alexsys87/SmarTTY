@@ -196,12 +196,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private ToolStripMenuItem _telnetMenu;
 
-    private void SetLocalEcho(bool echo)
+    // Whether the terminal shows what is typed itself (while no input line is shown; the input line shows its text
+    // anyway). Not the terminal's LocalEcho property: in SerialTerminalControl that one sends every typed character
+    // to the device at once, on top of the command that is sent when Enter is pressed.
+    private bool _telnetLocalEcho;
+
+    private void SetTelnetLocalEcho(bool echo)
     {
-        // The same three things the "Echo typed characters" menu item changes.
-        _deviceTerminalSettings.EchoTypedCharacters = echo;
+        _telnetLocalEcho = echo;
+        _serialTerminalControl.EchoRawInput = echo;
         echoTypedCharactersToolStripMenuItem.Checked = echo;
-        _serialTerminalControl.LocalEcho = echo;
     }
 
     // Called for every new telnet connection (also when it is reconnected): applies the local echo mode and, in
@@ -209,17 +213,18 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private void AttachTelnet(TelnetTransport transport, DeviceTerminalSettings.ConnectionSettings.Telnet settings)
     {
         _telnetTransport = transport;
+        _serialTerminalControl.LocalEcho = false;
         switch (settings.LocalEcho)
         {
             case DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Always:
-                SetLocalEcho(true);
+                SetTelnetLocalEcho(true);
                 break;
             case DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Never:
-                SetLocalEcho(false);
+                SetTelnetLocalEcho(false);
                 break;
             default:
                 // Nobody echoes until the server says it does.
-                SetLocalEcho(true);
+                SetTelnetLocalEcho(true);
                 transport.RemoteEchoChanged += (sender, args) => OnTelnetRemoteEchoChanged(transport);
                 break;
         }
@@ -239,7 +244,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 // A reconnect creates a new transport; the news of an old one is of no interest.
                 if (!IsDisposed && ReferenceEquals(transport, _telnetTransport))
                 {
-                    SetLocalEcho(!transport.RemoteEcho);
+                    SetTelnetLocalEcho(!transport.RemoteEcho);
                 }
             }));
         }
@@ -1536,6 +1541,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void echoTypedCharactersToolStripMenuItem_Click(object sender, EventArgs e)
     {
+        if (_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet)
+        {
+            // For telnet the item switches the echo of this session until the server's echo changes (or a reconnect).
+            SetTelnetLocalEcho(!_telnetLocalEcho);
+            return;
+        }
         DeviceTerminalSettings deviceTerminalSettings = _deviceTerminalSettings;
         bool echoTypedCharacters = (echoTypedCharactersToolStripMenuItem.Checked = !echoTypedCharactersToolStripMenuItem.Checked);
         deviceTerminalSettings.EchoTypedCharacters = echoTypedCharacters;

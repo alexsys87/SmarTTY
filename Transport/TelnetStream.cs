@@ -15,7 +15,15 @@ namespace SmarTTY.Transport;
 ///   ECHO (1) and SUPPRESS-GO-AHEAD (3) - the server echoes and the session is character-at-a-time,
 ///   BINARY (0)                         - 8-bit clean data, CR is not followed by NUL any more,
 ///   TERMINAL-TYPE (24)                 - answers with the configured terminal type,
-///   NAWS (31)                          - reports the terminal size, again whenever it changes.
+///   NAWS (31)                          - reports the terminal size, again whenever it changes,
+///   LINEMODE (34)                      - only when allowed (<see cref="TelnetOptions.AllowLineMode"/>): see below.
+///
+/// LINEMODE (RFC 1184): when the server asks for it and the MODE it sets includes EDIT, what the user types is kept
+/// in a line and sent as a whole when the line ends; Backspace / Delete, Ctrl+U and Ctrl+W edit the line, and the
+/// escape sequences of the cursor keys are dropped. With TRAPSIG the interrupt, abort and suspend characters are
+/// sent as the Telnet commands IP, ABORT and SUSP instead of as characters. The server's special characters
+/// (SLC) are taken over for these functions, the FORWARDMASK is declined. Showing the typed line is the
+/// terminal's business (local echo), the stream only sends it.
 /// By default we only answer: no option is offered on our own initiative, so a server that does not speak Telnet is
 /// not confronted with unexpected commands. With <see cref="TelnetOptions.ActiveNegotiation"/> the terminal type,
 /// the window size and SUPPRESS-GO-AHEAD are offered right after <see cref="Start"/>, as most telnet clients do.
@@ -30,6 +38,9 @@ internal sealed class TelnetStream : Stream
     internal const byte NOP = 241;
     internal const byte Break = 243;
     internal const byte InterruptProcess = 244;
+    internal const byte Eof = 236;
+    internal const byte Susp = 237;
+    internal const byte Abort = 238;
     internal const byte AreYouThere = 246;
     internal const byte EraseCharacter = 247;
     internal const byte EraseLine = 248;
@@ -46,10 +57,36 @@ internal sealed class TelnetStream : Stream
     internal const byte OptSuppressGoAhead = 3;
     internal const byte OptTerminalType = 24;
     internal const byte OptNaws = 31;
+    internal const byte OptLineMode = 34;
 
     // TERMINAL-TYPE subnegotiation (RFC 1091).
     private const byte TerminalTypeIs = 0;
     private const byte TerminalTypeSend = 1;
+
+    // LINEMODE subnegotiation (RFC 1184).
+    private const byte LmMode = 1;
+    private const byte LmForwardMask = 2;
+    private const byte LmSlc = 3;
+    private const byte ModeEdit = 1;
+    private const byte ModeTrapSig = 2;
+    private const byte ModeAck = 4;
+    private const byte ModeKnownBits = 0x1F;   // EDIT, TRAPSIG, MODE_ACK, SOFT_TAB, LIT_ECHO
+
+    // Special characters (SLC): the functions we do something with, the level bits of the flags and the ACK bit.
+    private const byte SlcIp = 3;
+    private const byte SlcAbort = 7;
+    private const byte SlcSusp = 9;
+    private const byte SlcEc = 10;
+    private const byte SlcEl = 11;
+    private const byte SlcEw = 12;
+    private const byte SlcLevelMask = 3;
+    private const byte SlcNoSupport = 0;
+    private const byte SlcVariable = 2;
+    private const byte SlcDefault = 3;
+    private const byte SlcAck = 0x80;
+
+    // A line typed in line mode that is longer than this is sent without waiting for its end.
+    private const int MaxLineLength = 8192;
 
     private const byte CR = 13;
     private const byte LF = 10;
@@ -93,6 +130,10 @@ internal sealed class TelnetStream : Stream
 
     private readonly bool _activeNegotiation;
 
+    private readonly TelnetAutoLogin _autoLogin;
+
+    private readonly bool _allowLineMode;
+
     // Guards everything below and every write to _inner.
     private readonly object _lock = new object();
 
@@ -106,6 +147,30 @@ internal sealed class TelnetStream : Stream
     private readonly OptionState[] _local = new OptionState[256];
 
     private bool _echoReported;
+
+    // LINEMODE state: the MODE the server asked for (all the bits it set) and whether one was received at all,
+    // the line typed so far, and the special characters (-1: the function is not used).
+    private byte _lineModeMask;
+
+    private bool _lineModeSeen;
+
+    private readonly MemoryStream _line = new MemoryStream();
+
+    private bool _skipLineFeed;
+
+    private int _escapeState;
+
+    private int _slcIp = 3;
+
+    private int _slcAbort = 28;
+
+    private int _slcSusp = 26;
+
+    private int _slcEc = 127;
+
+    private int _slcEl = 21;
+
+    private int _slcEw = 23;
 
     private readonly byte[] _subData = new byte[MaxSubnegotiationLength];
 
@@ -132,6 +197,8 @@ internal sealed class TelnetStream : Stream
         options = options ?? new TelnetOptions();
         _terminalType = string.IsNullOrWhiteSpace(options.TerminalType) ? DefaultTerminalType : options.TerminalType.Trim();
         _activeNegotiation = options.ActiveNegotiation;
+        _autoLogin = options.AutoLogin;
+        _allowLineMode = options.AllowLineMode;
         _columns = ClampSize(options.Columns, DefaultColumns);
         _rows = ClampSize(options.Rows, DefaultRows);
     }
@@ -204,6 +271,22 @@ internal sealed class TelnetStream : Stream
         set => throw new NotSupportedException();
     }
 
+    /// <summary>True while the server has put us in line mode with line editing (LINEMODE with EDIT).</summary>
+    public bool LineEditing
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return IsLineEditing;
+            }
+        }
+    }
+
+    private bool IsLineEditing => _local[OptLineMode] == OptionState.On && (_lineModeMask & ModeEdit) != 0;
+
+    private bool IsTrappingSignals => _local[OptLineMode] == OptionState.On && (_lineModeMask & ModeTrapSig) != 0;
+
     /// <summary>True while the server has asked for the terminal size (NAWS) and we agreed.</summary>
     public bool NawsEnabled
     {
@@ -266,9 +349,34 @@ internal sealed class TelnetStream : Stream
             }
             if (produced > 0)
             {
+                if (_autoLogin != null && !_autoLogin.IsFinished)
+                {
+                    AnswerPrompts(buffer, offset, produced);
+                }
                 return produced;
             }
             // The chunk held only commands: wait for the text that follows.
+        }
+    }
+
+    // Types the user name / password when the text just received ended with the prompt for it. Runs on the reading
+    // thread, outside the lock, and goes through Write() like the user's own typing.
+    private void AnswerPrompts(byte[] buffer, int offset, int count)
+    {
+        try
+        {
+            foreach (string line in _autoLogin.Feed(buffer, offset, count))
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(line);
+                Write(bytes, 0, bytes.Length);
+            }
+        }
+        catch (IOException)
+        {
+            // The connection is broken; the next read says so.
+        }
+        catch (ObjectDisposedException)
+        {
         }
     }
 
@@ -282,8 +390,14 @@ internal sealed class TelnetStream : Stream
         lock (_lock)
         {
             // In binary mode (both sides agreed) a CR is just a byte.
-            byte[] encoded = EncodeOutgoing(buffer, offset, count, _local[OptBinary] == OptionState.On);
-            _inner.Write(encoded, 0, encoded.Length);
+            bool binary = _local[OptBinary] == OptionState.On;
+            byte[] encoded = IsLineEditing || IsTrappingSignals
+                ? EncodeLineModeInput(buffer, offset, count, binary)
+                : EncodeOutgoing(buffer, offset, count, binary);
+            if (encoded.Length > 0)
+            {
+                _inner.Write(encoded, 0, encoded.Length);
+            }
         }
     }
 
@@ -481,9 +595,10 @@ internal sealed class TelnetStream : Stream
         return option == OptEcho || option == OptSuppressGoAhead || option == OptBinary;
     }
 
-    private static bool AcceptsFromUs(byte option)
+    private bool AcceptsFromUs(byte option)
     {
-        return option == OptSuppressGoAhead || option == OptTerminalType || option == OptNaws || option == OptBinary;
+        return option == OptSuppressGoAhead || option == OptTerminalType || option == OptNaws || option == OptBinary
+            || (option == OptLineMode && _allowLineMode);
     }
 
     private void OnWill(byte option)
@@ -554,6 +669,10 @@ internal sealed class TelnetStream : Stream
             case OptionState.On:
                 _local[option] = OptionState.Off;
                 Reply(IAC, WONT, option);
+                if (option == OptLineMode)
+                {
+                    LeaveLineMode();
+                }
                 break;
             case OptionState.Requested:
                 _local[option] = OptionState.Off;
@@ -571,7 +690,317 @@ internal sealed class TelnetStream : Stream
             _pendingReplies.Write(name, 0, name.Length);
             Reply(IAC, SE);
         }
+        else if (_subOption == OptLineMode && _local[OptLineMode] == OptionState.On && _subLength >= 1)
+        {
+            switch (_subData[0])
+            {
+                case LmMode:
+                    OnLineModeMode();
+                    break;
+                case LmSlc:
+                    OnSpecialCharacters();
+                    break;
+                case DO:
+                    // The forward mask (characters that send the line at once) is not supported: the line is only
+                    // sent when it ends, which the server has to expect from a client that declines.
+                    if (_subLength >= 2 && _subData[1] == LmForwardMask)
+                    {
+                        Reply(IAC, SB, OptLineMode, WONT, LmForwardMask, IAC, SE);
+                    }
+                    break;
+            }
+        }
         // Other subnegotiations are not used by the options we accepted.
+    }
+
+    // MODE: the server tells how the line is to be handled. A mode we did not have is acknowledged by sending it
+    // back with the ACK bit; the ACK of a mode we sent ourselves (we never do) and a repeated mode need no answer.
+    private void OnLineModeMode()
+    {
+        if (_subLength < 2)
+        {
+            return;
+        }
+        byte mask = (byte)(_subData[1] & ModeKnownBits);
+        if ((mask & ModeAck) != 0)
+        {
+            return;
+        }
+        bool changed = !_lineModeSeen || mask != _lineModeMask;
+        bool wasEditing = IsLineEditing;
+        _lineModeMask = mask;
+        _lineModeSeen = true;
+        if (changed)
+        {
+            Reply(IAC, SB, OptLineMode, LmMode, (byte)(mask | ModeAck), IAC, SE);
+        }
+        if (wasEditing && !IsLineEditing)
+        {
+            // Back to characters: what was typed so far goes out now.
+            FlushLine(_pendingReplies, newLine: false);
+        }
+    }
+
+    // SLC: the server's special characters. The ones we act on are taken over, the rest is declined, and a request
+    // for our defaults (function 0 at level DEFAULT) is answered with them.
+    private void OnSpecialCharacters()
+    {
+        MemoryStream answer = new MemoryStream();
+        for (int i = 1; i + 2 < _subLength; i += 3)
+        {
+            byte function = _subData[i];
+            byte flags = _subData[i + 1];
+            byte value = _subData[i + 2];
+            int level = flags & SlcLevelMask;
+            if ((flags & SlcAck) != 0)
+            {
+                continue;
+            }
+            if (function == 0 && level == SlcDefault)
+            {
+                AddSlc(answer, SlcIp, SlcVariable, 3);
+                AddSlc(answer, SlcAbort, SlcVariable, 28);
+                AddSlc(answer, SlcSusp, SlcVariable, 26);
+                AddSlc(answer, SlcEc, SlcVariable, 127);
+                AddSlc(answer, SlcEl, SlcVariable, 21);
+                AddSlc(answer, SlcEw, SlcVariable, 23);
+                _slcIp = 3;
+                _slcAbort = 28;
+                _slcSusp = 26;
+                _slcEc = 127;
+                _slcEl = 21;
+                _slcEw = 23;
+                continue;
+            }
+            if (function != SlcIp && function != SlcAbort && function != SlcSusp && function != SlcEc && function != SlcEl && function != SlcEw)
+            {
+                if (level != SlcNoSupport)
+                {
+                    AddSlc(answer, function, SlcNoSupport, 0);
+                }
+                continue;
+            }
+            int character = level == SlcNoSupport || value == 0 || value == IAC ? -1 : value;
+            SetSpecialCharacter(function, character);
+            AddSlc(answer, function, (byte)(flags | SlcAck), value);
+        }
+        if (answer.Length > 0)
+        {
+            Reply(IAC, SB, OptLineMode, LmSlc);
+            byte[] triplets = answer.ToArray();
+            _pendingReplies.Write(triplets, 0, triplets.Length);
+            Reply(IAC, SE);
+        }
+    }
+
+    private void SetSpecialCharacter(byte function, int character)
+    {
+        switch (function)
+        {
+            case SlcIp:
+                _slcIp = character;
+                break;
+            case SlcAbort:
+                _slcAbort = character;
+                break;
+            case SlcSusp:
+                _slcSusp = character;
+                break;
+            case SlcEc:
+                _slcEc = character;
+                break;
+            case SlcEl:
+                _slcEl = character;
+                break;
+            case SlcEw:
+                _slcEw = character;
+                break;
+        }
+    }
+
+    private static void AddSlc(MemoryStream answer, byte function, byte flags, byte value)
+    {
+        WriteEscaped(answer, function);
+        WriteEscaped(answer, flags);
+        WriteEscaped(answer, value);
+    }
+
+    // The option was switched off (the caller has already changed its state): what was typed goes out as it is.
+    private void LeaveLineMode()
+    {
+        _lineModeMask = 0;
+        _lineModeSeen = false;
+        _escapeState = 0;
+        if (_line.Length > 0)
+        {
+            FlushLine(_pendingReplies, newLine: false);
+        }
+    }
+
+    // Moves the typed line into 'output' (with the line end when it ended), ready to be sent.
+    private void FlushLine(Stream output, bool newLine)
+    {
+        byte[] text = _line.ToArray();
+        _line.SetLength(0);
+        if (text.Length > 0)
+        {
+            byte[] encoded = EncodeOutgoing(text, 0, text.Length, binary: false);
+            output.Write(encoded, 0, encoded.Length);
+        }
+        if (newLine)
+        {
+            output.WriteByte(CR);
+            output.WriteByte(LF);
+        }
+    }
+
+    // What the user typed while the server wants line mode: the line is collected and edited here and goes out when
+    // it ends. The caller holds _lock.
+    private byte[] EncodeLineModeInput(byte[] buffer, int offset, int count, bool binary)
+    {
+        bool edit = IsLineEditing;
+        bool trap = IsTrappingSignals;
+        MemoryStream output = new MemoryStream(count + 8);
+        MemoryStream passThrough = new MemoryStream();
+        for (int i = offset; i < offset + count; i++)
+        {
+            byte b = buffer[i];
+            if (edit && _escapeState != 0)
+            {
+                // The escape sequence of a cursor key means nothing in a line that is edited here: it is dropped.
+                if (_escapeState == 1)
+                {
+                    if (b == '[')
+                    {
+                        _escapeState = 2;
+                        continue;
+                    }
+                    if (b == 'O')
+                    {
+                        _escapeState = 3;
+                        continue;
+                    }
+                    // A lone Escape: this byte is an ordinary one.
+                    _escapeState = 0;
+                }
+                else if (_escapeState == 2)
+                {
+                    if (b >= 0x40 && b <= 0x7E)
+                    {
+                        _escapeState = 0;
+                    }
+                    continue;
+                }
+                else
+                {
+                    _escapeState = 0;
+                    continue;
+                }
+            }
+            if (trap && (b == _slcIp || b == _slcAbort || b == _slcSusp))
+            {
+                FlushPassThrough(passThrough, output, binary);
+                _line.SetLength(0);
+                output.WriteByte(IAC);
+                output.WriteByte(b == _slcIp ? InterruptProcess : b == _slcAbort ? Abort : Susp);
+                continue;
+            }
+            if (!edit)
+            {
+                passThrough.WriteByte(b);
+                continue;
+            }
+            if (b == 0x1B)
+            {
+                _escapeState = 1;
+                continue;
+            }
+            if (b == CR)
+            {
+                FlushLine(output, newLine: true);
+                _skipLineFeed = true;
+                continue;
+            }
+            if (b == LF)
+            {
+                if (_skipLineFeed)
+                {
+                    _skipLineFeed = false;
+                }
+                else
+                {
+                    FlushLine(output, newLine: true);
+                }
+                continue;
+            }
+            _skipLineFeed = false;
+            if (b == 8 || b == 127 || b == _slcEc)
+            {
+                EraseLastCharacter();
+            }
+            else if (b == _slcEl)
+            {
+                _line.SetLength(0);
+            }
+            else if (b == _slcEw)
+            {
+                EraseLastWord();
+            }
+            else
+            {
+                _line.WriteByte(b);
+                if (_line.Length >= MaxLineLength)
+                {
+                    FlushLine(output, newLine: false);
+                }
+            }
+        }
+        FlushPassThrough(passThrough, output, binary);
+        return output.ToArray();
+    }
+
+    private static void FlushPassThrough(MemoryStream passThrough, Stream output, bool binary)
+    {
+        if (passThrough.Length == 0)
+        {
+            return;
+        }
+        byte[] raw = passThrough.ToArray();
+        passThrough.SetLength(0);
+        byte[] encoded = EncodeOutgoing(raw, 0, raw.Length, binary);
+        output.Write(encoded, 0, encoded.Length);
+    }
+
+    // Removes the last character of the line; a character of the UTF-8 text is a lead byte and its continuation bytes.
+    private void EraseLastCharacter()
+    {
+        byte[] data = _line.GetBuffer();
+        int length = (int)_line.Length;
+        if (length == 0)
+        {
+            return;
+        }
+        length--;
+        while (length > 0 && (data[length] & 0xC0) == 0x80)
+        {
+            length--;
+        }
+        _line.SetLength(length);
+    }
+
+    private void EraseLastWord()
+    {
+        byte[] data = _line.GetBuffer();
+        int length = (int)_line.Length;
+        while (length > 0 && data[length - 1] == (byte)' ')
+        {
+            length--;
+        }
+        while (length > 0 && data[length - 1] != (byte)' ')
+        {
+            length--;
+        }
+        _line.SetLength(length);
     }
 
     private byte[] BuildWindowSizeMessage()
@@ -658,4 +1087,13 @@ internal sealed class TelnetOptions
 
     /// <summary>Offer the terminal type, the window size and SUPPRESS-GO-AHEAD right after connecting.</summary>
     public bool ActiveNegotiation { get; set; }
+
+    /// <summary>
+    /// Agree to LINEMODE when the server asks for it (by default the server is refused and keeps sending
+    /// characters one by one).
+    /// </summary>
+    public bool AllowLineMode { get; set; }
+
+    /// <summary>Types the user name and the password when the server asks for them; null for no automatic login.</summary>
+    public TelnetAutoLogin AutoLogin { get; set; }
 }

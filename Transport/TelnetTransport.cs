@@ -66,7 +66,9 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 TerminalType = _telnet.TerminalType,
                 Columns = columns,
                 Rows = rows,
-                ActiveNegotiation = _telnet.ActiveNegotiation
+                ActiveNegotiation = _telnet.ActiveNegotiation,
+                AllowLineMode = _telnet.LineMode,
+                AutoLogin = CreateAutoLogin()
             });
             stream.RemoteEchoChanged += OnStreamRemoteEchoChanged;
             stream.Start();
@@ -163,6 +165,31 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
     public void Dispose()
     {
         Close();
+    }
+
+    // The key container is the one of the saved SSH passwords.
+    private const string PasswordContainerName = "com.sysprogs.smartty.passwords";
+
+    private TelnetAutoLogin CreateAutoLogin()
+    {
+        if (!_telnet.HasAutoLogin)
+        {
+            return null;
+        }
+        string password = null;
+        if (_telnet.EncryptedSavedPassword != null)
+        {
+            try
+            {
+                password = VisualTTY.PasswordProtector.Decrypt(_telnet.EncryptedSavedPassword, PasswordContainerName);
+            }
+            catch (Exception)
+            {
+                // The saved password can not be read by this user on this computer: it has to be typed by hand
+                // (the user name, if there is one, is still sent).
+            }
+        }
+        return new TelnetAutoLogin(_telnet.AutoLoginUserName, password, _telnet.LoginPrompts, _telnet.PasswordPrompts);
     }
 
     private void OnStreamRemoteEchoChanged(object sender, EventArgs e)

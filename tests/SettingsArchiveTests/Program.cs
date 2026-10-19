@@ -359,5 +359,48 @@ internal static class Program
         string again = Path.Combine(NewDir("out"), "settings.tar.gz");
         Check(SettingsArchive.Export(again, srcData, srcLocal, false).FileCount == 6, "exporting over an existing file works");
         Check(SettingsArchive.DefaultBackupPath(@"C:\data").Contains("before-import-"), "backup path helper");
+
+        // ---- telnet profiles carry a saved password (the automatic login) inside <Connection>
+        string telnetData = NewDir("telnet-data"), telnetLocal = NewDir("telnet-local");
+        Put(telnetData, "Settings.xml", SettingsXml);
+        Put(telnetData, "SavedConnections/telnet_10.0.0.9_23.rawconnection", Telnet("10.0.0.9", "TELNETSECRET"));
+        Put(telnetData, "SavedConnections/telnet_10.0.0.8_23.rawconnection", Telnet("10.0.0.8", null));
+        string telnetArchive = Path.Combine(NewDir("out"), "telnet.tar.gz");
+        SettingsArchive.Export(telnetArchive, telnetData, telnetLocal, false);
+        var telnetEntries = ReadArchive(telnetArchive);
+        Check(telnetEntries.Count(e => e.Name.EndsWith(".rawconnection")) == 2, "telnet profiles are exported");
+        Check(telnetEntries.All(e => !Encoding.UTF8.GetString(e.Data).Contains("TELNETSECRET") && !Encoding.UTF8.GetString(e.Data).Contains("EncryptedSavedPassword")),
+            "telnet passwords are left out of an export without passwords");
+        Check(Encoding.UTF8.GetString(telnetEntries.First(e => e.Name.Contains("10.0.0.9")).Data).Contains("<AutoLoginUserName>admin</AutoLoginUserName>"),
+            "a stripped telnet profile keeps its user name and other fields");
+        string telnetArchiveWithPwd = Path.Combine(NewDir("out"), "telnet-pwd.tar.gz");
+        SettingsArchive.Export(telnetArchiveWithPwd, telnetData, telnetLocal, true);
+        Check(ReadArchive(telnetArchiveWithPwd).Any(e => Encoding.UTF8.GetString(e.Data).Contains("TELNETSECRET")), "includePasswords keeps telnet passwords");
+
+        // importing a password-less telnet profile over a local one keeps the local password, inside Connection
+        string telnetData2 = NewDir("telnet-merge-data"), telnetLocal2 = NewDir("telnet-merge-local");
+        Put(telnetData2, "SavedConnections/telnet_10.0.0.9_23.rawconnection", Telnet("10.0.0.9", "LOCALTELNETPWD"));
+        SettingsArchive.Import(telnetArchive, telnetData2, telnetLocal2, null);
+        string mergedTelnet = Read(telnetData2, "SavedConnections/telnet_10.0.0.9_23.rawconnection");
+        XDocument mergedDocument = XDocument.Parse(mergedTelnet);
+        Check(mergedTelnet.Contains("LOCALTELNETPWD") && mergedDocument.Root.Element("Settings").Element("Connection").Element("EncryptedSavedPassword") != null,
+            "the local telnet password survives importing a password-less profile and stays in Connection");
+        Check(mergedDocument.Root.Element("Settings").Element("Connection").Element("Host").Value == "10.0.0.9", "the merged telnet profile keeps the imported fields");
+        SettingsArchive.Import(telnetArchiveWithPwd, telnetData2, telnetLocal2, null);
+        string replaced = Read(telnetData2, "SavedConnections/telnet_10.0.0.9_23.rawconnection");
+        Check(replaced.Contains("TELNETSECRET") && !replaced.Contains("LOCALTELNETPWD"), "a password carried by the archive replaces the local telnet one");
+        // a raw profile without any password is not touched by the merge
+        Put(telnetData2, "SavedConnections/USB Serial Port_COM3.rawconnection", RawXml);
+        SettingsArchive.Import(archive, telnetData2, telnetLocal2, null);
+        Check(Read(telnetData2, "SavedConnections/USB Serial Port_COM3.rawconnection") == RawXml, "a raw profile without a password is imported unchanged");
+    }
+
+    private static string Telnet(string host, string password)
+    {
+        return "<?xml version=\"1.0\"?><RawConnectionSettings xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"><Settings>" +
+               "<Connection xsi:type=\"com.sysprogs.terminal.connection.telnet\"><Host>" + host + "</Host><Port>23</Port>" +
+               "<AutoLoginUserName>admin</AutoLoginUserName>" +
+               (password == null ? "" : "<EncryptedSavedPassword>" + password + "</EncryptedSavedPassword>") +
+               "</Connection></Settings></RawConnectionSettings>";
     }
 }
