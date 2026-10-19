@@ -6,14 +6,14 @@ using System.Threading;
 namespace SmarTTY.IO;
 
 /// <summary>
-/// XMODEM (checksum and CRC-16, 128-byte blocks) over an arbitrary byte link. The link is given as a "send bytes"
-/// callback plus a "read one byte with a timeout" callback, so the protocol logic has no dependency on the terminal.
-/// The receiver additionally understands 1K blocks (STX) from senders that use them.
+/// XMODEM (checksum and CRC-16, 128-byte blocks) and XMODEM-1K (CRC-16, 1024-byte blocks) over an arbitrary byte link.
+/// The link is given as a "send bytes" callback plus a "read one byte with a timeout" callback, so the protocol logic
+/// has no dependency on the terminal. The sender uses 1K blocks (STX) on request; the receiver always understands them.
 /// </summary>
 public class XModemTransfer
 {
     public const byte SOH = 0x01; // Start of Header (128-byte block)
-    public const byte STX = 0x02; // Start of Header (1024-byte block, receive only)
+    public const byte STX = 0x02; // Start of Header (1024-byte block, XMODEM-1K; needs CRC-16)
     public const byte EOT = 0x04; // End of Transmission
     public const byte ACK = 0x06; // Acknowledge
     public const byte NAK = 0x15; // Negative Acknowledge (Checksum mode)
@@ -233,7 +233,22 @@ public class XModemTransfer
         CancellationToken cancellationToken,
         ProgressHandler onProgress)
     {
-        return SendFile(sourceStream, sendData, readByteWithTimeout, cancellationToken, onProgress, new Timeouts());
+        return SendFile(sourceStream, sendData, readByteWithTimeout, cancellationToken, onProgress, false, new Timeouts());
+    }
+
+    /// <summary>
+    /// Sends a file; with <paramref name="useLargeBlocks"/> as XMODEM-1K (1024-byte STX blocks). XMODEM-1K needs CRC-16,
+    /// so when the receiver asks for the checksum variant (NAK) the file goes out in 128-byte blocks as usual.
+    /// </summary>
+    public static bool SendFile(
+        Stream sourceStream,
+        SendDataHandler sendData,
+        Func<int, byte?> readByteWithTimeout,
+        CancellationToken cancellationToken,
+        ProgressHandler onProgress,
+        bool useLargeBlocks)
+    {
+        return SendFile(sourceStream, sendData, readByteWithTimeout, cancellationToken, onProgress, useLargeBlocks, new Timeouts());
     }
 
     internal static bool SendFile(
@@ -242,6 +257,18 @@ public class XModemTransfer
         Func<int, byte?> readByteWithTimeout,
         CancellationToken cancellationToken,
         ProgressHandler onProgress,
+        Timeouts timeouts)
+    {
+        return SendFile(sourceStream, sendData, readByteWithTimeout, cancellationToken, onProgress, false, timeouts);
+    }
+
+    internal static bool SendFile(
+        Stream sourceStream,
+        SendDataHandler sendData,
+        Func<int, byte?> readByteWithTimeout,
+        CancellationToken cancellationToken,
+        ProgressHandler onProgress,
+        bool useLargeBlocks,
         Timeouts timeouts)
     {
         if (sourceStream == null) throw new ArgumentNullException(nameof(sourceStream));
@@ -306,9 +333,17 @@ public class XModemTransfer
         // The receiver may have repeated its request while we were busy; those copies must not be mistaken for answers.
         link.Purge(0);
 
+        // XMODEM-1K is defined for CRC-16 only; a receiver that asked for the checksum variant gets 128-byte blocks.
+        bool largeBlocks = useLargeBlocks && mode == XModemMode.Crc16;
+        if (useLargeBlocks && !largeBlocks)
+        {
+            Report(onProgress, 0, totalBytes, errorCount, "The receiver asked for checksum mode: 1K blocks need CRC-16, using 128-byte blocks.");
+        }
+
         int trailerSize = mode == XModemMode.Crc16 ? 2 : 1;
-        byte[] payload = new byte[BlockSize];
-        byte[] packet = new byte[3 + BlockSize + trailerSize];
+        int maxPayload = largeBlocks ? LargeBlockSize : BlockSize;
+        byte[] payload = new byte[LargeBlockSize];
+        byte[] packet = new byte[3 + LargeBlockSize + trailerSize];
         int blockIndex = 1; // 1-based count for the display; only its low byte goes on the wire
 
         while (true)
@@ -316,7 +351,7 @@ public class XModemTransfer
             int read;
             try
             {
-                read = ReadFully(sourceStream, payload, BlockSize);
+                read = ReadFully(sourceStream, payload, maxPayload);
             }
             catch (Exception ex)
             {
@@ -328,26 +363,32 @@ public class XModemTransfer
             {
                 break; // End of the data (an empty file is just EOT)
             }
-            for (int i = read; i < BlockSize; i++)
+
+            // In 1K mode a tail of up to 128 bytes goes out as an ordinary 128-byte block (SOH) instead of being padded
+            // to 1024 bytes; every other block, including a longer short one, is a full 1K block (STX).
+            // Both kinds of block share one sequence of block numbers.
+            int size = read > BlockSize ? LargeBlockSize : BlockSize;
+            for (int i = read; i < size; i++)
             {
                 payload[i] = SUB; // Only the last block is short
             }
 
             byte blockByte = (byte)blockIndex;
-            packet[0] = SOH;
+            packet[0] = size == LargeBlockSize ? STX : SOH;
             packet[1] = blockByte;
             packet[2] = (byte)(255 - blockByte);
-            Buffer.BlockCopy(payload, 0, packet, 3, BlockSize);
+            Buffer.BlockCopy(payload, 0, packet, 3, size);
             if (mode == XModemMode.Crc16)
             {
-                ushort crc = CalculateCrc16(payload, 0, BlockSize);
-                packet[3 + BlockSize] = (byte)(crc >> 8);
-                packet[3 + BlockSize + 1] = (byte)(crc & 0xFF);
+                ushort crc = CalculateCrc16(payload, 0, size);
+                packet[3 + size] = (byte)(crc >> 8);
+                packet[3 + size + 1] = (byte)(crc & 0xFF);
             }
             else
             {
-                packet[3 + BlockSize] = CalculateChecksum(payload, 0, BlockSize);
+                packet[3 + size] = CalculateChecksum(payload, 0, size);
             }
+            int packetLength = 3 + size + trailerSize;
 
             int attempts = 0;
             while (true)
@@ -359,7 +400,7 @@ public class XModemTransfer
                     return false;
                 }
 
-                link.Send(packet, packet.Length);
+                link.Send(packet, packetLength);
                 attempts++;
                 Reply reply = WaitForReply(link, timeouts.AckMs);
 
