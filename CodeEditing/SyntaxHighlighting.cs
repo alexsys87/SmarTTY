@@ -229,7 +229,7 @@ namespace SmarTTY.CodeEditing
         }
 
         /// <summary>Отмечает участок обычным цветом и обновляет «хвост» last.</summary>
-        private static void Normal(ref int last, int start, int end, ITokenSink sink)
+        private static void Normal(ref int last, int start, int end, TokenCache.ITokenSink sink)
         {
             if (start < end)
             {
@@ -279,7 +279,7 @@ namespace SmarTTY.CodeEditing
             "or", "pass", "raise", "return", "True", "try", "while", "with", "yield"
         };
 
-        private static bool TokenizePython(int startState, string text, ITokenSink sink, out int endState)
+        private static bool TokenizePython(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
             int len = text.Length;
             bool inTripleDouble = (startState & StPyTripleDouble) != 0;
@@ -298,7 +298,7 @@ namespace SmarTTY.CodeEditing
                     {
                         sink.AddToken(TypeString, 0, len);
                     }
-                    endState = startStateTerms; // остаёмся внутри тройной кавычки
+                    endState = startState; // остаёмся внутри тройной кавычки
                     return true;
                 }
                 sink.AddToken(TypeString, 0, close + 3);
@@ -430,7 +430,7 @@ namespace SmarTTY.CodeEditing
             "unset", "let"
         };
 
-        private static bool TokenizeBash(int startState, string text, ITokenSink sink, out int endState)
+        private static bool TokenizeBash(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
             int len = text.Length;
             bool inDouble = (startState & StBashDouble) != 0;
@@ -620,7 +620,7 @@ namespace SmarTTY.CodeEditing
         // Config (INI / .conf / .properties / YAML)
         // ==================================================================
 
-        private static bool TokenizeConfig(int startState, string text, ITokenSink sink, out int endState)
+        private static bool TokenizeConfig(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
             int len = text.Length;
             int i = 0;
@@ -724,7 +724,7 @@ namespace SmarTTY.CodeEditing
             "try", "catch", "finally", "throw", "struct", "enum", "namespace"
         };
 
-        private static bool TokenizeGeneric(int startState, string text, ITokenSink sink, out int endState)
+        private static bool TokenizeGeneric(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
             int len = text.Length;
             int i = 0;
