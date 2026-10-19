@@ -823,12 +823,14 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// Runs one XMODEM transfer on a worker thread with a progress window. Must be called on the UI thread: the line is
     /// claimed here, before the first byte can arrive, and a second transfer cannot be started meanwhile.
     /// </summary>
-    private void StartXModemTransfer(string title, string verb, Func<FileStream> fileStream, bool isSend)
+    private void StartXModemTransfer(string title, string verb, Func<FileStream> fileStream, bool isSend, bool useLargeBlocks = false)
     {
         if (_isXModemActive)
         {
             return;
         }
+
+        string protocolName = useLargeBlocks ? "XMODEM-1K" : "XMODEM";
 
         // Not a "using": the window is modeless and outlives this method; it is closed (and disposed) when the transfer ends.
         SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm(title);
@@ -858,7 +860,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 SmarTTY.IO.XModemTransfer.ProgressHandler progress = (bytesTransferred, totalBytes, errorCount, status) =>
                     transferForm.UpdateProgress(bytesTransferred, totalBytes, errorCount, status);
                 success = isSend
-                    ? SmarTTY.IO.XModemTransfer.SendFile(stream, sendData, ReadXModemByte, transferForm.CancellationToken, progress)
+                    ? SmarTTY.IO.XModemTransfer.SendFile(stream, sendData, ReadXModemByte, transferForm.CancellationToken, progress, useLargeBlocks)
                     : SmarTTY.IO.XModemTransfer.ReceiveFile(stream, sendData, ReadXModemByte, transferForm.CancellationToken, progress);
             }
             catch (Exception ex)
@@ -884,12 +886,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     }
                     if (success)
                     {
-                        MessageBox.Show("XMODEM " + verb + " completed successfully.", title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(protocolName + " " + verb + " completed successfully.", title, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else if (!cancelled)
                     {
                         string reason = error ?? lastStatus;
-                        MessageBox.Show("XMODEM " + verb + " failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason), title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(protocolName + " " + verb + " failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason), title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }));
             }
@@ -922,19 +924,31 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void sendFileViaXMODEMToolStripMenuItem_Click(object sender, EventArgs e)
     {
+        SendFileViaXModem(useLargeBlocks: false);
+    }
+
+    private void sendFileViaXMODEM1KToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        SendFileViaXModem(useLargeBlocks: true);
+    }
+
+    private void SendFileViaXModem(bool useLargeBlocks)
+    {
+        string protocolName = useLargeBlocks ? "XMODEM-1K" : "XMODEM";
+
         if (IsXModemBusy())
         {
             return;
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            MessageBox.Show("Please connect first before sending a file via XMODEM.", "XMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("Please connect first before sending a file via " + protocolName + ".", protocolName + " Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
         using OpenFileDialog openFileDialog = new OpenFileDialog
         {
-            Title = "Select file to send via XMODEM",
+            Title = "Select file to send via " + protocolName,
             Filter = "All files (*.*)|*.*",
             Multiselect = false
         };
@@ -944,7 +958,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
-        StartXModemTransfer("XMODEM Send", "send", fileStream: () => File.OpenRead(openFileDialog.FileName), isSend: true);
+        StartXModemTransfer(protocolName + " Send", "send", fileStream: () => File.OpenRead(openFileDialog.FileName), isSend: true, useLargeBlocks: useLargeBlocks);
     }
 
     private void receiveFileViaXMODEMToolStripMenuItem_Click(object sender, EventArgs e)

@@ -48,6 +48,8 @@ public partial class DeviceTerminalControl
 
 	private ToolStripMenuItem sendFileViaXMODEMToolStripMenuItem;
 
+	private ToolStripMenuItem sendFileViaXMODEM1KToolStripMenuItem;
+
 	private ToolStripMenuItem receiveFileViaXMODEMToolStripMenuItem;
 
 	private ToolStripButton toolStripButton2;
@@ -119,6 +121,7 @@ public partial class DeviceTerminalControl
 		toolStripButton3 = new ToolStripSplitButton();
 		sendBinaryFileToolStripMenuItem = new ToolStripMenuItem();
 		sendFileViaXMODEMToolStripMenuItem = new ToolStripMenuItem();
+		sendFileViaXMODEM1KToolStripMenuItem = new ToolStripMenuItem();
 		receiveFileViaXMODEMToolStripMenuItem = new ToolStripMenuItem();
 		toolStripButton2 = new ToolStripButton();
 		toolStripDropDownButton1 = new ToolStripDropDownButton();
@@ -244,7 +247,7 @@ public partial class DeviceTerminalControl
 		toolStripButton1.Text = "Clear contents";
 		toolStripButton1.Click += toolStripButton1_Click;
 		toolStripButton3.DisplayStyle = ToolStripItemDisplayStyle.Image;
-		toolStripButton3.DropDownItems.AddRange(new ToolStripItem[3] { sendBinaryFileToolStripMenuItem, sendFileViaXMODEMToolStripMenuItem, receiveFileViaXMODEMToolStripMenuItem });
+		toolStripButton3.DropDownItems.AddRange(new ToolStripItem[4] { sendBinaryFileToolStripMenuItem, sendFileViaXMODEMToolStripMenuItem, sendFileViaXMODEM1KToolStripMenuItem, receiveFileViaXMODEMToolStripMenuItem });
 		toolStripButton3.Image = (Image)resources.GetObject("toolStripButton3.Image");
 		toolStripButton3.ImageTransparentColor = Color.Magenta;
 		toolStripButton3.Name = "toolStripButton3";
@@ -259,6 +262,10 @@ public partial class DeviceTerminalControl
 		sendFileViaXMODEMToolStripMenuItem.Size = new Size(210, 22);
 		sendFileViaXMODEMToolStripMenuItem.Text = "Send file via XMODEM...";
 		sendFileViaXMODEMToolStripMenuItem.Click += sendFileViaXMODEMToolStripMenuItem_Click;
+		sendFileViaXMODEM1KToolStripMenuItem.Name = "sendFileViaXMODEM1KToolStripMenuItem";
+		sendFileViaXMODEM1KToolStripMenuItem.Size = new Size(210, 22);
+		sendFileViaXMODEM1KToolStripMenuItem.Text = "Send file via XMODEM-1K...";
+		sendFileViaXMODEM1KToolStripMenuItem.Click += sendFileViaXMODEM1KToolStripMenuItem_Click;
 		receiveFileViaXMODEMToolStripMenuItem.Name = "receiveFileViaXMODEMToolStripMenuItem";
 		receiveFileViaXMODEMToolStripMenuItem.Size = new Size(210, 22);
 		receiveFileViaXMODEMToolStripMenuItem.Text = "Receive file via XMODEM...";

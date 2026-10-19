@@ -101,20 +101,21 @@ internal static class Program
         if (!h.HasValue) return new Packet { Kind = "timeout" };
         if (h == EOT) return new Packet { Kind = "eot" };
         if (h == CAN) return new Packet { Kind = "can" };
-        if (h != SOH) return new Packet { Kind = "junk" };
+        if (h != SOH && h != STX) return new Packet { Kind = "junk" };
 
-        Packet p = new Packet { Kind = "block", Data = new byte[128] };
+        int size = h == STX ? 1024 : 128;
+        Packet p = new Packet { Kind = "block", Data = new byte[size] };
         p.Number = e.Read(1000) ?? 0;
         p.Complement = e.Read(1000) ?? 0;
-        for (int i = 0; i < 128; i++) p.Data[i] = e.Read(1000) ?? 0;
+        for (int i = 0; i < size; i++) p.Data[i] = e.Read(1000) ?? 0;
         if (crc)
         {
             int hi = e.Read(1000) ?? 0, lo = e.Read(1000) ?? 0;
-            p.CheckOk = (ushort)((hi << 8) | lo) == XModemTransfer.CalculateCrc16(p.Data, 0, 128);
+            p.CheckOk = (ushort)((hi << 8) | lo) == XModemTransfer.CalculateCrc16(p.Data, 0, size);
         }
         else
         {
-            p.CheckOk = (e.Read(1000) ?? 0) == XModemTransfer.CalculateChecksum(p.Data, 0, 128);
+            p.CheckOk = (e.Read(1000) ?? 0) == XModemTransfer.CalculateChecksum(p.Data, 0, size);
         }
         p.CheckOk &= (byte)(p.Number + p.Complement) == 255;
         return p;
@@ -150,6 +151,35 @@ internal static class Program
         return Chunk(data, 0, Math.Max(len, 0)).Take(len).ToArray();
     }
 
+    /// <summary>The block sizes an XMODEM-1K sender must use: 1K blocks, and a tail of up to 128 bytes as one 128-byte block.</summary>
+    private static List<int> OneKBlockSizes(int length)
+    {
+        List<int> sizes = new List<int>();
+        int left = length;
+        while (left > 0)
+        {
+            int size = left > 128 ? 1024 : 128;
+            sizes.Add(size);
+            left -= size;
+        }
+        return sizes;
+    }
+
+    /// <summary>The data as an XMODEM-1K receiver must get it: every block padded with 0x1A up to its own size.</summary>
+    private static byte[] PaddedOneK(byte[] data)
+    {
+        List<byte> result = new List<byte>();
+        int offset = 0;
+        foreach (int size in OneKBlockSizes(data.Length))
+        {
+            byte[] block = Enumerable.Repeat(SUB, size).ToArray();
+            Array.Copy(data, offset, block, 0, Math.Min(size, data.Length - offset));
+            result.AddRange(block);
+            offset += size;
+        }
+        return result.ToArray();
+    }
+
     private static byte[] RandomData(int n, int seed = 11)
     {
         byte[] d = new byte[n];
@@ -171,6 +201,7 @@ internal static class Program
         public int TimeoutMs = 3000;
         public readonly List<byte> Output = new List<byte>();
         public readonly List<byte> WireNumbers = new List<byte>();
+        public readonly List<int> BlockSizes = new List<int>(); // payload size of every packet that arrived (128 or 1024)
         public int PacketsSeen;
         public int EotSeen;
         public bool BadPacket;
@@ -196,6 +227,7 @@ internal static class Program
                 if (p.Kind != "block") { s.BadPacket = true; return; }
                 s.PacketsSeen++;
                 s.WireNumbers.Add(p.Number);
+                s.BlockSizes.Add(p.Data.Length);
                 if (!p.CheckOk) { s.BadPacket = true; e.Send(NAK); continue; }
                 if (s.DeadAfterPackets > 0 && s.PacketsSeen >= s.DeadAfterPackets)
                 {
@@ -267,6 +299,11 @@ internal static class Program
     private static bool Send(byte[] data, End u, CancellationToken token, XModemTransfer.Timeouts t, Progress p, Stream src = null)
     {
         return XModemTransfer.SendFile(src ?? new MemoryStream(data), u.Send, u.Read, token, p?.Handler, t);
+    }
+
+    private static bool SendOneK(byte[] data, End u, XModemTransfer.Timeouts t, Progress p, Stream src = null)
+    {
+        return XModemTransfer.SendFile(src ?? new MemoryStream(data), u.Send, u.Read, CancellationToken.None, p?.Handler, true, t);
     }
 
     private static int Main()
@@ -472,6 +509,137 @@ internal static class Program
                 Check(send.Wait(2500) && !send.Result, "returns false promptly");
             }
         });
+
+        // =============== sender under test: XMODEM-1K ===============
+
+        foreach (int size in new[] { 1, 127, 128, 129, 1024, 1025, 1152, 1153, 5000 })
+        {
+            int n = size;
+            Run("sender 1K: data of " + n + " bytes arrives intact in the right block sizes", () =>
+            {
+                NewLink(out End u, out End peer);
+                byte[] data = RandomData(n);
+                RxScript script = new RxScript();
+                Task rx = Receiver(peer, script);
+                Progress prog = new Progress();
+                Check(SendOneK(data, u, Fast(), prog), "send succeeded");
+                rx.Wait(5000);
+                Check(script.Output.SequenceEqual(PaddedOneK(data)), "payload identical (each block padded with 0x1A to its own size)");
+                Check(script.BlockSizes.SequenceEqual(OneKBlockSizes(n)), "block sizes " + string.Join(",", script.BlockSizes) + " instead of " + string.Join(",", OneKBlockSizes(n)));
+                Check(!script.BadPacket, "all checks valid");
+                Check(prog.Samples.Last()[0] == n, "progress ends at the real file size, not at the padded size");
+                Check(prog.LastErrors == 0, "no errors counted");
+            });
+        }
+
+        Run("sender 1K: block numbers wrap 255 -> 0 -> 1 with 1K blocks too", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(1024 * 258);
+            RxScript script = new RxScript();
+            Task rx = Receiver(peer, script);
+            Check(SendOneK(data, u, Fast(), null), "send succeeded");
+            rx.Wait(5000);
+            Check(script.WireNumbers.Count == 258, "258 blocks (" + script.WireNumbers.Count + ")");
+            Check(script.WireNumbers[254] == 255 && script.WireNumbers[255] == 0 && script.WireNumbers[256] == 1, "255, 0, 1 around the wrap");
+            Check(script.BlockSizes.All(s => s == 1024), "every block is a 1K block");
+            Check(script.Output.SequenceEqual(data), "payload identical");
+        });
+
+        Run("sender 1K: a receiver that asks with NAK (checksum) gets 128-byte blocks", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(3000);
+            RxScript script = new RxScript { Initial = new[] { NAK }, Crc = false };
+            Task rx = Receiver(peer, script);
+            Progress prog = new Progress();
+            Check(SendOneK(data, u, Fast(), prog), "send succeeded");
+            rx.Wait(5000);
+            Check(script.BlockSizes.All(s => s == 128) && script.BlockSizes.Count == (3000 + 127) / 128, "only 128-byte blocks (" + script.BlockSizes.Count + " blocks)");
+            Check(script.Output.SequenceEqual(Padded(data)) && !script.BadPacket, "data intact with checksum trailer");
+            Check(prog.Status.Any(s => s.Contains("checksum mode")), "status explains the fallback");
+        });
+
+        Run("sender 1K: NAK makes it repeat the same 1K block, then continues", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(3000);
+            RxScript script = new RxScript { NakFirstArrivalOfBlock = 2 };
+            Task rx = Receiver(peer, script);
+            Progress prog = new Progress();
+            Check(SendOneK(data, u, Fast(), prog), "send succeeded");
+            rx.Wait(5000);
+            Check(script.PacketsSeen == 4, "one block repeated (" + script.PacketsSeen + " packets)");
+            Check(script.BlockSizes.All(s => s == 1024), "the repeat is again a 1K block");
+            Check(script.WireNumbers.SequenceEqual(new byte[] { 1, 2, 2, 3 }), "the repeat has the same block number (" + string.Join(",", script.WireNumbers) + ")");
+            Check(script.Output.SequenceEqual(PaddedOneK(data)), "data intact");
+            Check(prog.LastErrors == 1, "one error counted");
+        });
+
+        Run("sender 1K: gives up after 10 unanswered attempts and tells the receiver to stop", () =>
+        {
+            NewLink(out End u, out End peer);
+            RxScript script = new RxScript { DeadAfterPackets = 1, TimeoutMs = 1500 };
+            Task rx = Receiver(peer, script);
+            Progress prog = new Progress();
+            Check(!SendOneK(RandomData(3000), u, Fast(40), prog), "send reports failure");
+            rx.Wait(5000);
+            Check(script.PacketsSeen == 10, "block 1 sent exactly 10 times (" + script.PacketsSeen + ")");
+            byte[] sent = u.Sent();
+            Check(sent.Length >= 2 && sent[sent.Length - 1] == CAN && sent[sent.Length - 2] == CAN, "CAN CAN sent at the end");
+            Check(prog.Last.Contains("block 1"), "status names the block: " + prog.Last);
+        });
+
+        Run("sender 1K: short reads from the source stream do not put padding inside the data", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(1500);
+            RxScript script = new RxScript();
+            Task rx = Receiver(peer, script);
+            Check(SendOneK(data, u, Fast(), null, new ShortReadStream(data, 10)), "send succeeded");
+            rx.Wait(5000);
+            Check(script.BlockSizes.SequenceEqual(new[] { 1024, 1024 }), "two 1K blocks (" + string.Join(",", script.BlockSizes) + ")");
+            Check(script.Output.SequenceEqual(PaddedOneK(data)), "payload intact");
+        });
+
+        Run("sender 1K: empty file is just EOT", () =>
+        {
+            NewLink(out End u, out End peer);
+            RxScript script = new RxScript();
+            Task rx = Receiver(peer, script);
+            Check(SendOneK(new byte[0], u, Fast(), null), "send succeeded");
+            rx.Wait(5000);
+            Check(script.PacketsSeen == 0 && script.EotSeen == 1, "no data block, one EOT");
+        });
+
+        Run("sender: without the 1K option only 128-byte blocks are sent, whatever the receiver asks for", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(5000);
+            RxScript script = new RxScript();
+            Task rx = Receiver(peer, script);
+            Check(Send(data, u, CancellationToken.None, Fast(), null), "send succeeded");
+            rx.Wait(5000);
+            Check(script.BlockSizes.Count == (5000 + 127) / 128 && script.BlockSizes.All(s => s == 128), "only 128-byte blocks");
+        });
+
+        foreach (int size in new[] { 1, 129, 1025, 5000, 1024 * 258 + 5 })
+        {
+            int n = size;
+            Run("sender 1K -> own receiver, " + n + " bytes", () =>
+            {
+                NewLink(out End a, out End b);
+                byte[] data = RandomData(n, 5);
+                MemoryStream target = new MemoryStream();
+                Task<bool> rx = Task.Run(() => XModemTransfer.ReceiveFile(target, a.Send, a.Read, CancellationToken.None, null, Fast(2000)));
+                bool sent = XModemTransfer.SendFile(new MemoryStream(data), b.Send, b.Read, CancellationToken.None, null, true, Fast(2000));
+                Check(rx.Wait(15000) && rx.Result && sent, "both sides succeed");
+                Check(target.ToArray().SequenceEqual(PaddedOneK(data)), "file identical (plus SUB padding of the last block)");
+                // 3 header bytes + payload + 2 CRC bytes per block, plus one EOT: this length differs from the 128-byte layout
+                int expectedWire = OneKBlockSizes(n).Sum(s => s + 5) + 1;
+                Check(b.Sent().Length == expectedWire, "1K blocks were really used (" + b.Sent().Length + " bytes on the wire, expected " + expectedWire + ")");
+            });
+        }
 
         // =============== receiver under test ===============
 
