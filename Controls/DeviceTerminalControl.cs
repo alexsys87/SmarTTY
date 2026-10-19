@@ -847,7 +847,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
         using SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm("XMODEM Send");
         transferForm.Show(this);
 
-        ThreadPool.QueueUserWorkItem(_ =>
+        // The callback parameter must not be called "_": a lone "_" parameter is an ordinary variable, so the
+        // "out _" discards below would bind to it (an object) instead of discarding, and fail to compile (CS1503).
+        ThreadPool.QueueUserWorkItem(state =>
         {
             _isXModemActive = true;
             while (_xmodemRxQueue.TryTake(out _)) { } // Clear queue
@@ -926,7 +928,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
         using SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm("XMODEM Receive");
         transferForm.Show(this);
 
-        ThreadPool.QueueUserWorkItem(_ =>
+        // The callback parameter must not be called "_": a lone "_" parameter is an ordinary variable, so the
+        // "out _" discards below would bind to it (an object) instead of discarding, and fail to compile (CS1503).
+        ThreadPool.QueueUserWorkItem(state =>
         {
             _isXModemActive = true;
             while (_xmodemRxQueue.TryTake(out _)) { } // Clear queue
