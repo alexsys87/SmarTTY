@@ -2,6 +2,7 @@
 using System.CodeDom.Compiler;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using SmarTTY.GUI.Styles;
 using Application = System.Windows.Application;
@@ -18,6 +19,9 @@ public partial class App : Application
         // defaults only act as a fallback: a theme dictionary merged into a window always takes precedence.
         Resources[StyleKeys.MainWindowText] = SystemColors.WindowTextBrush;
         Resources[StyleKeys.ActiveTabBackground] = Brushes.Transparent;
+        // WPFScrollBar references this style in its constructor, before it is attached to a window that has the
+        // theme dictionary (the reference is re-resolved on attach). The light theme does not define it at all.
+        Resources["MainWindowScrollBar"] = new Style(typeof(ScrollBar));
     }
 
     [STAThread]
