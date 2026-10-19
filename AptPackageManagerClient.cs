@@ -44,6 +44,11 @@ public class AptPackageManagerClient : ILinuxPackageManagerClient
         return 0;
     }
 
+    public string GetCommandLineForIndexUpdate()
+    {
+        return "apt-get update";
+    }
+
     public LinuxPackageInfo[] QueryAllPackages(ISSHCommandRunner runner, bool allVersions)
     {
         List<LinuxPackageInfo> packagesList = new List<LinuxPackageInfo>();

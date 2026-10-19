@@ -5,7 +5,8 @@ using SmarTTY;
 using VisualTTY;
 
 // Regression harness for the apk (Alpine Linux / OpenWrt 25.12+) package manager client: probing, parsing of
-// "apk list" output and the generated command lines. Run with: dotnet run --project tests/ApkPackageManagerTests
+// "apk list" output and the generated command lines, plus the package list refresh ("Refresh" button) for all
+// package managers. Run with: dotnet run --project tests/ApkPackageManagerTests
 internal static class Program
 {
     private static int _passed;
@@ -123,6 +124,82 @@ internal static class Program
         Check(client.GetCommandLineForPackageOperation(new[] { fresh, upgrade }, Install, noPrompt) == "apk add curl && apk add -u busybox", "new packages and upgrades are split");
         Check(client.GetCommandLineForPackageOperation(new LinuxPackageInfo[0], Install, ask) == null, "empty selection -> null");
         Check(client.GetCommandLineForPackageOperation(new[] { fresh }, LinuxPackageInfo.PackageAction.None, ask) == null, "unsupported action -> null");
+
+        // Refresh of the package lists
+        Check(client.GetCommandLineForIndexUpdate() == "apk update", "apk refresh command");
+        Check(new AptPackageManagerClient().GetCommandLineForIndexUpdate() == "apt-get update", "apt refresh command");
+        Check(new OpkgPackageManagerClient().GetCommandLineForIndexUpdate() == "opkg update", "opkg refresh command");
+        Check(new YumPackageManagerClient().GetCommandLineForIndexUpdate() == "yum -y makecache", "yum refresh command");
+
+        string wrapped = PackageIndexUpdater.BuildCommandLine("apk update", isRoot: true);
+        Check(wrapped == "{ apk update; } 2>&1; echo __SMARTTY_EXIT__=$?", "refresh as root runs the command as is, reporting the exit status on the last line");
+        Check(!wrapped.Contains("sudo"), "refresh as root does not involve sudo (OpenWrt has none)");
+        string wrappedSudo = PackageIndexUpdater.BuildCommandLine("apk update", isRoot: false);
+        Check(wrappedSudo == "{ sudo -n apk update; } 2>&1; echo __SMARTTY_EXIT__=$?", "refresh as another user goes through 'sudo -n'");
+
+        FakeRunner idRunner = new FakeRunner();
+        Check(!PackageIndexUpdater.IsRoot(idRunner), "IsRoot: unknown user (command fails) -> false");
+        idRunner.Responses["id -u"] = new[] { "0" };
+        Check(PackageIndexUpdater.IsRoot(idRunner), "IsRoot: uid 0 -> true");
+        idRunner.Responses["id -u"] = new[] { "1000" };
+        Check(!PackageIndexUpdater.IsRoot(idRunner), "IsRoot: uid 1000 -> false");
+
+        Check(PackageIndexUpdater.WrapForPrivileges("opkg install curl", true) == "opkg install curl", "install command line as root has no sudo");
+        Check(PackageIndexUpdater.WrapForPrivileges("apt-get install -y curl", false) == "sudo su -c \"apt-get install -y curl\"", "install command line as another user uses sudo su -c");
+
+        FakeRunner updateRunner = new FakeRunner();
+        updateRunner.Responses[wrapped] = new[] { "fetch https://downloads.openwrt.org/releases/25.12.0/packages/x/base/packages.adb", "OK: 120 distinct packages available", "__SMARTTY_EXIT__=0" };
+        PackageIndexUpdater.Run(updateRunner, client, isRoot: true);
+        Check(updateRunner.Commands.SequenceEqual(new[] { wrapped }), "refresh runs exactly one wrapped command");
+
+        string failure = null;
+        updateRunner.Responses[wrappedSudo] = new[] { "sudo: a password is required", "__SMARTTY_EXIT__=1" };
+        try
+        {
+            PackageIndexUpdater.Run(updateRunner, client, isRoot: false);
+        }
+        catch (Exception exception)
+        {
+            failure = exception.Message;
+        }
+        Check(failure != null && failure.Contains("exit code 1") && failure.Contains("a password is required") && failure.Contains("passwordless sudo"), "failed refresh reports the exit code, the output and a hint");
+        Check(failure != null && !failure.Contains("__SMARTTY_EXIT__"), "the exit marker is not shown to the user");
+
+        failure = null;
+        updateRunner.Responses[wrapped] = new[] { "ERROR: unable to select packages", "__SMARTTY_EXIT__=1" };
+        try
+        {
+            PackageIndexUpdater.Run(updateRunner, client, isRoot: true);
+        }
+        catch (Exception exception)
+        {
+            failure = exception.Message;
+        }
+        Check(failure != null && failure.Contains("unable to select packages") && !failure.Contains("sudo"), "failed refresh as root does not mention sudo");
+
+        failure = null;
+        updateRunner.Responses.Remove(wrapped);
+        try
+        {
+            PackageIndexUpdater.Run(updateRunner, client, isRoot: true);
+        }
+        catch (Exception exception)
+        {
+            failure = exception.Message;
+        }
+        Check(failure != null && failure.Contains("apk update"), "refresh fails clearly when the command cannot be run at all");
+
+        failure = null;
+        updateRunner.Responses[wrapped] = Enumerable.Range(1, 30).Select(i => "line " + i).Concat(new[] { "__SMARTTY_EXIT__=100" }).ToArray();
+        try
+        {
+            PackageIndexUpdater.Run(updateRunner, client, isRoot: true);
+        }
+        catch (Exception exception)
+        {
+            failure = exception.Message;
+        }
+        Check(failure != null && failure.Contains("line 30") && failure.Contains("line 23") && !failure.Contains("line 22\n"), "only the tail of a long error output is shown");
 
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed");

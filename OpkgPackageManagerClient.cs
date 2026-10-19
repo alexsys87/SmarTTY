@@ -17,6 +17,11 @@ public class OpkgPackageManagerClient : ILinuxPackageManagerClient
         return 0;
     }
 
+    public string GetCommandLineForIndexUpdate()
+    {
+        return "opkg update";
+    }
+
     public LinuxPackageInfo[] QueryAllPackages(ISSHCommandRunner runner, bool allVersions = false)
     {
         List<LinuxPackageInfo> packagesList = new List<LinuxPackageInfo>();

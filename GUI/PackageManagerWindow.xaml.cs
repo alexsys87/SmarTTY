@@ -35,6 +35,8 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
 
         private ILinuxPackageManagerClient _Client;
 
+        private bool _IsRoot;
+
         private LinuxPackageInfo[] _AllPackages;
 
         private string _Filter;
@@ -91,8 +93,12 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
             {
                 _ProgressText = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ProgressText"));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsIdle"));
             }
         }
+
+        /// <summary>False while the package manager is being detected, queried or refreshed.</summary>
+        public bool IsIdle => _ProgressText == null;
 
         public string Filter
         {
@@ -168,29 +174,8 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                     throw new Exception("Could not detect the package manager on the remote host");
                 }
                 _Client = bestClient;
-                ProgressText = "Querying package list...";
-                _AllPackages = _Client.QueryAllPackages(_Session);
-                if (_AllPackages == null)
-                {
-                    throw new Exception("Failed to query package list");
-                }
-                LinuxPackageInfo[] allPackages = _AllPackages;
-                foreach (LinuxPackageInfo linuxPackageInfo in allPackages)
-                {
-                    if (linuxPackageInfo.State == LinuxPackageInfo.PackageState.Installed)
-                    {
-                        linuxPackageInfo.IsChecked = true;
-                    }
-                    else if (linuxPackageInfo.State == LinuxPackageInfo.PackageState.Available)
-                    {
-                        linuxPackageInfo.IsChecked = false;
-                    }
-                }
-                ProgressText = null;
-                ((DispatcherObject)_Window).Dispatcher.BeginInvoke((Delegate)(Action)(() =>
-                {
-                    ApplyFilter();
-                }), new object[0]);
+                _IsRoot = PackageIndexUpdater.IsRoot(_Session);
+                LoadPackages(null);
             }
             catch (Exception exception)
             {
@@ -198,6 +183,80 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                 {
                     MessageBoxes.Exception(exception);
                     _Window.Close();
+                }), new object[0]);
+            }
+        }
+
+        /// <summary>Queries the package list and replaces the current one; <paramref name="selection"/> restores pending marks.</summary>
+        private void LoadPackages(Dictionary<string, LinuxPackageInfo> selection)
+        {
+            ProgressText = "Querying package list...";
+            LinuxPackageInfo[] allPackages = _Client.QueryAllPackages(_Session);
+            if (allPackages == null)
+            {
+                throw new Exception("Failed to query package list");
+            }
+            foreach (LinuxPackageInfo linuxPackageInfo in allPackages)
+            {
+                if (linuxPackageInfo.State == LinuxPackageInfo.PackageState.Installed)
+                {
+                    linuxPackageInfo.IsChecked = true;
+                }
+                else if (linuxPackageInfo.State == LinuxPackageInfo.PackageState.Available)
+                {
+                    linuxPackageInfo.IsChecked = false;
+                }
+                if (selection != null && selection.TryGetValue(linuxPackageInfo.ID, out LinuxPackageInfo previous) && previous.State == linuxPackageInfo.State)
+                {
+                    linuxPackageInfo.IsChecked = previous.IsChecked;
+                }
+            }
+            _AllPackages = allPackages;
+            ProgressText = null;
+            ((DispatcherObject)_Window).Dispatcher.BeginInvoke((Delegate)(Action)(() =>
+            {
+                ApplyFilter();
+                OnChecked();
+            }), new object[0]);
+        }
+
+        /// <summary>Updates the package lists from the repositories with the detected package manager and reloads the list.</summary>
+        public void Refresh()
+        {
+            if (_Client == null || !IsIdle)
+            {
+                return;
+            }
+            ProgressText = "Updating package lists...";
+            // Empty the list so that the progress text does not overlap the old rows; it is refilled after the reload.
+            FilteredPackages.Clear();
+            new Thread(RefreshThreadBody).Start();
+        }
+
+        private void RefreshThreadBody()
+        {
+            try
+            {
+                Dictionary<string, LinuxPackageInfo> selection = new Dictionary<string, LinuxPackageInfo>();
+                foreach (LinuxPackageInfo linuxPackageInfo in _AllPackages ?? new LinuxPackageInfo[0])
+                {
+                    if (linuxPackageInfo.Action != LinuxPackageInfo.PackageAction.None)
+                    {
+                        selection[linuxPackageInfo.ID] = linuxPackageInfo;
+                    }
+                }
+                ProgressText = "Updating package lists (" + _Client.GetCommandLineForIndexUpdate() + ")...";
+                PackageIndexUpdater.Run(_Session, _Client, _IsRoot);
+                LoadPackages(selection);
+            }
+            catch (Exception exception)
+            {
+                ProgressText = null;
+                ((DispatcherObject)_Window).Dispatcher.BeginInvoke((Delegate)(Action)(() =>
+                {
+                    // Bring back the previous list, the refresh did not replace it.
+                    ApplyFilter();
+                    MessageBoxes.Exception(exception);
                 }), new object[0]);
             }
         }
@@ -272,7 +331,7 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                 list.Add(_Client.GetCommandLineForPackageOperation(entries, LinuxPackageInfo.PackageAction.Remove, Options));
             }
             string text = string.Join("&&", list.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
-            return "sudo su -c \"" + text + "\"";
+            return PackageIndexUpdater.WrapForPrivileges(text, _IsRoot);
         }
     }
 
@@ -284,6 +343,11 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
     {
         InitializeComponent();
         this.DataContext = new ControllerImpl(this, session);
+    }
+
+    private void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        (this.DataContext as ControllerImpl)?.Refresh();
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)

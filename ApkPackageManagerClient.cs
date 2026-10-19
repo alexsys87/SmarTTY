@@ -31,6 +31,11 @@ public class ApkPackageManagerClient : ILinuxPackageManagerClient
         return 0;
     }
 
+    public string GetCommandLineForIndexUpdate()
+    {
+        return "apk update";
+    }
+
     public LinuxPackageInfo[] QueryAllPackages(ISSHCommandRunner runner, bool allVersions = false)
     {
         string[] lines = runner.RunCommand("apk list") ?? throw new Exception("Failed to list packages with apk");

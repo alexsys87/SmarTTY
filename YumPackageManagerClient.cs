@@ -44,6 +44,11 @@ public class YumPackageManagerClient : ILinuxPackageManagerClient
         return 0;
     }
 
+    public string GetCommandLineForIndexUpdate()
+    {
+        return "yum -y makecache";
+    }
+
     private void JoinContinuationLines(ref string[] items)
     {
         List<string> mergedLines = new List<string>();
