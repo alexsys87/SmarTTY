@@ -26,6 +26,9 @@ jobs:
       - name: Run command completion database checks
         run: dotnet run --project tests/CommandCompletionDatabaseTests -c Release
 
+      - name: Run COM/TCP command history checks
+        run: dotnet run --project tests/DeviceLineInputTests -c Release
+
   sshnet:
     name: SSH.NET integration tests
     runs-on: ubuntu-latest

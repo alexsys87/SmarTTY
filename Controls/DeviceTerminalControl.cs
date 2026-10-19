@@ -174,6 +174,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         ReplaceTerminalControl();
         // A telnet server may ask for the terminal size (and wants to hear about changes); other transports ignore it.
         _serialTerminalControl.TerminalSizeChanged += OnTerminalSizeChanged;
+        InitializeCommandLists();
         
         foreach (TerminalEncodings.Choice choice in TerminalEncodings.All)
         {
@@ -538,6 +539,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         changeSettingsToolStripMenuItem.Visible = _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial;
         UpdateTelnetMenu(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
+        ConfigureCommandLists();
         Connect();
     }
 

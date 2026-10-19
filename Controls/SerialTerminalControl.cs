@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using VisualTTY;
+using VisualTTY.DeviceTerminal;
 
 // The file uses C# 8 nullable reference type annotations (e.g. InputLine?,
 // string?) but the net48 project has no	#nullable context enabled; enable the
@@ -224,6 +225,12 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 List<CompletionItem> itemsList = new List<CompletionItem>();
                 string tokenText = GetTokenText();
                 string filterText = tokenText.Trim('\'', '"');
+
+                if (_target == CompletionTarget.Command)
+                {
+                    // The user's own commands and the saved history, matched by what is already typed.
+                    itemsList.AddRange(GetSuggestedCommandItems());
+                }
 
                 if (_target == CompletionTarget.Command && string.IsNullOrEmpty(filterText))
                 {
@@ -695,6 +702,53 @@ public class SerialTerminalControl : TerminalEmulatorControl
     private ICompletionPopup _completionPopup;
 
     public event EventHandler<CompletionPopupRequest> CompletionPopupRequested;
+
+    /// <summary>Data of <see cref="CommandSubmitted"/>.</summary>
+    public sealed class CommandSubmittedEventArgs : EventArgs
+    {
+        /// <summary>The command as it is sent (trimmed).</summary>
+        public string Command { get; }
+
+        /// <summary>The line as it was typed, with leading blanks.</summary>
+        public string RawText { get; }
+
+        /// <summary>The prompt that was shown in front of the line, e.g. "login: " or "Password: ".</summary>
+        public string Prompt { get; }
+
+        public CommandSubmittedEventArgs(string command, string rawText, string prompt)
+        {
+            Command = command;
+            RawText = rawText;
+            Prompt = prompt;
+        }
+    }
+
+    /// <summary>Raised when the user submits a command line with Enter, before it is sent to the device.</summary>
+    public event EventHandler<CommandSubmittedEventArgs> CommandSubmitted;
+
+    /// <summary>
+    /// Commands offered by Tab completion for the first word of a line, in addition to the built-in ones: the user's
+    /// command lists and the saved history of the device.
+    /// </summary>
+    public IReadOnlyList<string> CommandSuggestions { get; set; } = new string[0];
+
+    private IEnumerable<CompletionItem> GetSuggestedCommandItems()
+    {
+        foreach (string command in CommandSuggestions)
+        {
+            yield return new CompletionItem
+            {
+                Icon = VirtualTerminalPopupItemIcon.Command,
+                Text = command,
+                InsertText = command,
+                Summary = new VirtualTerminalPopupSummary.OptionInfo
+                {
+                    Option = command,
+                    Description = new CommandCompletion.OptionDescription { Summary = "Saved command" }
+                }
+            };
+        }
+    }
 
     public SerialTerminalControl()
     {
@@ -1315,8 +1369,12 @@ public class SerialTerminalControl : TerminalEmulatorControl
         string command = _inputLine.Text.Trim();
         _historySearch = null;
 
-        // Add to history
-        AddToHistory(command);
+        // What is typed at a "Password:" prompt is not kept in the history.
+        if (!LineInputText.LooksLikeSecretPrompt(_inputLine.Prompt))
+        {
+            AddToHistory(command);
+        }
+        CommandSubmitted?.Invoke(this, new CommandSubmittedEventArgs(command, _inputLine.Text, _inputLine.Prompt));
 
         // Move to next line and show command output
         ((EditableTextBrowser)this).EditableDocument.AppendLine("");
