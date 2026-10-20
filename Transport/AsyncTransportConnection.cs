@@ -15,6 +15,9 @@ internal class AsyncTransportConnection : IDisposable
         public byte[] Buffer;
 
         public int Length;
+
+        // Told on the writer thread whether the data reached the transport; null when nobody waits for it.
+        public Action<bool> Completed;
     }
 
     public delegate void DataReceivedHandler(object sender, byte[] buffer, int count);
@@ -59,6 +62,9 @@ internal class AsyncTransportConnection : IDisposable
 
     /// <summary>The reason of the last failed write, or null when the last write went through.</summary>
     public string WriteError => _writeError;
+
+    /// <summary>True once the connection has ended or was closed: nothing sent from now on reaches the device.</summary>
+    public bool HasEnded => _finished || _stopRequested;
 
     public SerialPortStream SerialStream => (_transport as SerialTransport)?.SerialStream;
 
@@ -185,6 +191,7 @@ internal class AsyncTransportConnection : IDisposable
         // The writer has nothing to write to any more: let it end instead of waiting for data until Dispose.
         _finished = true;
         _writeSignal.Release();
+        FailQueuedWrites();
         try
         {
             _transport.Close();
@@ -253,8 +260,11 @@ internal class AsyncTransportConnection : IDisposable
                 }
                 catch (Exception writeException)
                 {
+                    NotifyCompleted(pendingWrite, false);
                     ReportWriteFailure(writeException);
+                    continue;
                 }
+                NotifyCompleted(pendingWrite, true);
             }
         }
     }
@@ -267,14 +277,10 @@ internal class AsyncTransportConnection : IDisposable
     {
         if (_stopRequested || _disposed)
         {
+            FailQueuedWrites();
             return; // the connection is being closed on purpose
         }
-        int discarded;
-        lock (_writeQueue)
-        {
-            discarded = _writeQueue.Count;
-            _writeQueue.Clear();
-        }
+        int discarded = FailQueuedWrites();
         string message = exception.Message;
         if (discarded > 0)
         {
@@ -288,6 +294,34 @@ internal class AsyncTransportConnection : IDisposable
                 WriteFailed(this, message);
             }
         });
+    }
+
+    private static void NotifyCompleted(PendingWrite pendingWrite, bool written)
+    {
+        try
+        {
+            pendingWrite.Completed?.Invoke(written);
+        }
+        catch
+        {
+            // A waiter's problem must not stop the writer.
+        }
+    }
+
+    /// <summary>Throws away what is still queued and tells its waiters; returns how many writes were dropped.</summary>
+    private int FailQueuedWrites()
+    {
+        PendingWrite[] dropped;
+        lock (_writeQueue)
+        {
+            dropped = _writeQueue.ToArray();
+            _writeQueue.Clear();
+        }
+        foreach (PendingWrite pendingWrite in dropped)
+        {
+            NotifyCompleted(pendingWrite, false);
+        }
+        return dropped.Length;
     }
 
     public void Start()
@@ -309,6 +343,7 @@ internal class AsyncTransportConnection : IDisposable
     {
         _stopRequested = true;
         _writeSignal.Release();
+        FailQueuedWrites();
         try
         {
             _transport.Close();
@@ -322,9 +357,10 @@ internal class AsyncTransportConnection : IDisposable
 
     /// <summary>
     /// Queues data for the device. False when the connection has already ended (or was closed): the data is dropped
-    /// instead of piling up in a queue that nobody writes any more.
+    /// instead of piling up in a queue that nobody writes any more, and <paramref name="completed"/> is not called.
+    /// Otherwise <paramref name="completed"/> is called once, on a worker thread, with whether the data was written.
     /// </summary>
-    public bool Send(byte[] buffer, int count)
+    public bool Send(byte[] buffer, int count, Action<bool> completed = null)
     {
         if (_finished || _stopRequested)
         {
@@ -335,10 +371,16 @@ internal class AsyncTransportConnection : IDisposable
             _writeQueue.Enqueue(new PendingWrite
             {
                 Buffer = buffer,
-                Length = count
+                Length = count,
+                Completed = completed
             });
         }
         _writeSignal.Release();
+        if (_finished || _stopRequested)
+        {
+            // The connection ended between the check above and the enqueue: nobody would take this write any more.
+            FailQueuedWrites();
+        }
         return true;
     }
 

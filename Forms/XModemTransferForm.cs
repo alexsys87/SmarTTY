@@ -17,10 +17,14 @@ public partial class XModemTransferForm : DpiAwareForm
     /// <summary>The most recent status text reported by the transfer; explains a failure once it has ended.</summary>
     public string LastStatus => _lastStatus;
 
-    public XModemTransferForm(string title)
+    // Off for a plain file send, which has no retransmissions to count.
+    private readonly bool _showErrorCount;
+
+    public XModemTransferForm(string title, bool showErrorCount = true)
     {
         InitializeComponent();
         Text = title;
+        _showErrorCount = showErrorCount;
     }
 
     public void UpdateProgress(long bytesTransferred, long totalBytes, int errorCount, string status)
@@ -47,12 +51,12 @@ public partial class XModemTransferForm : DpiAwareForm
                     progressBar1.Style = ProgressBarStyle.Blocks;
                     int percent = (int)Math.Min(100, (bytesTransferred * 100) / totalBytes);
                     progressBar1.Value = percent;
-                    lblInfo.Text = $"Transferred: {FormatByteCount(bytesTransferred)} / {FormatByteCount(totalBytes)} | Errors: {errorCount}";
+                    lblInfo.Text = $"Transferred: {FormatByteCount(bytesTransferred)} / {FormatByteCount(totalBytes)}" + ErrorsText(errorCount);
                 }
                 else
                 {
                     progressBar1.Style = ProgressBarStyle.Marquee;
-                    lblInfo.Text = $"Transferred: {FormatByteCount(bytesTransferred)} | Errors: {errorCount}";
+                    lblInfo.Text = $"Transferred: {FormatByteCount(bytesTransferred)}" + ErrorsText(errorCount);
                 }
             }));
         }
@@ -77,6 +81,11 @@ public partial class XModemTransferForm : DpiAwareForm
         _cts.Cancel();
         btnCancel.Enabled = false;
         lblStatus.Text = "Cancelling...";
+    }
+
+    private string ErrorsText(int errorCount)
+    {
+        return _showErrorCount ? " | Errors: " + errorCount : string.Empty;
     }
 
     private static string FormatByteCount(long bytes)

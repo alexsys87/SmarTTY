@@ -455,6 +455,24 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         {
         }
 
+        /// <summary>
+        /// Null when the port settings can be used, otherwise why not. The baud rate is checked as typed: text the
+        /// binding could not convert never reaches the settings, which would silently keep the previous rate.
+        /// </summary>
+        public string ValidateSerialSettings(string baudRateText)
+        {
+            DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings = SerialSettings?.AdvancedSettings;
+            if (advancedSerialPortSettings == null)
+            {
+                return null;
+            }
+            if (!SerialPortRules.TryParseBaudRate(baudRateText, out _, out string error))
+            {
+                return error;
+            }
+            return SerialPortRules.ValidateFrame(advancedSerialPortSettings.DataBits, SerialPortRules.StopBitsKindFrom((int)advancedSerialPortSettings.StopBits));
+        }
+
         public string TestConnectionOrThrow()
         {
             ApplyTCPEndpoint();
@@ -590,6 +608,13 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
     private void OK_Click(object sender, RoutedEventArgs e)
     {
+        string serialProblem = _Controller.ValidateSerialSettings(cbBaudRate.Text);
+        if (serialProblem != null)
+        {
+            MessageBoxes.Error("The serial port settings cannot be used: " + serialProblem);
+            cbBaudRate.Focus();
+            return;
+        }
         if (_TestOnOK)
         {
             try

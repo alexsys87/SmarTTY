@@ -154,7 +154,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             {
                 return null;
             }
-            return $"{StringUtils.FormatSize(terminal.BytesSent)}B sent, {StringUtils.FormatSize(terminal.BytesReceived)}B received";
+            terminal.GetTransferRates(out double sendRate, out double receiveRate);
+            return $"{StringUtils.FormatSize(terminal.BytesSent)}B sent ({TransferRateMeter.FormatRate(sendRate)}), "
+                + $"{StringUtils.FormatSize(terminal.BytesReceived)}B received ({TransferRateMeter.FormatRate(receiveRate)})";
         }
     }
 

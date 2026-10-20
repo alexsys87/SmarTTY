@@ -250,6 +250,58 @@ internal static class Program
             }
         });
 
+        Run("a completion callback tells whether each write reached the device", () =>
+        {
+            using (Session s = new Session())
+            {
+                ManualResetEventSlim release = new ManualResetEventSlim();
+                ManualResetEventSlim started = new ManualResetEventSlim();
+                int calls = 0;
+                s.Transport.Stream.OnWrite = text =>
+                {
+                    int call = Interlocked.Increment(ref calls);
+                    if (call == 2)
+                    {
+                        started.Set();
+                        release.Wait(3000);
+                        throw new IOException("stalled");
+                    }
+                };
+                ConcurrentQueue<(string Name, bool Written)> results = new ConcurrentQueue<(string, bool)>();
+                Check(s.Connection.Send(Encoding.ASCII.GetBytes("one"), 3, ok => results.Enqueue(("one", ok))), "first queued");
+                Check(WaitFor(() => results.Count == 1), "first reported");
+                s.Connection.Send(Encoding.ASCII.GetBytes("two"), 3, ok => results.Enqueue(("two", ok)));
+                Check(started.Wait(3000), "second write in progress");
+                s.Connection.Send(Encoding.ASCII.GetBytes("three"), 5, ok => results.Enqueue(("three", ok)));
+                release.Set();
+                Check(WaitFor(() => results.Count == 3), "every write reported exactly once: " + results.Count);
+                var list = results.ToArray();
+                Check(list[0] == ("one", true), "the good write: written");
+                Check(list.Contains(("two", false)), "the failed write: not written");
+                Check(list.Contains(("three", false)), "the write discarded after the failure: not written");
+            }
+        });
+
+        Run("writes still queued when the connection is closed are reported as not written", () =>
+        {
+            Session s = new Session();
+            ManualResetEventSlim release = new ManualResetEventSlim();
+            ManualResetEventSlim started = new ManualResetEventSlim();
+            s.Transport.Stream.OnWrite = text =>
+            {
+                started.Set();
+                release.Wait(3000);
+            };
+            int notWritten = 0;
+            s.Connection.Send(Encoding.ASCII.GetBytes("busy"), 4);
+            Check(started.Wait(3000), "the writer is busy");
+            s.Connection.Send(Encoding.ASCII.GetBytes("queued"), 6, ok => { if (!ok) Interlocked.Increment(ref notWritten); });
+            s.Connection.Dispose();
+            Check(WaitFor(() => Volatile.Read(ref notWritten) == 1), "the queued write's waiter is released");
+            Check(s.Connection.HasEnded, "HasEnded after Dispose");
+            release.Set();
+        });
+
         Run("a closed connection refuses data", () =>
         {
             Session s = new Session();
