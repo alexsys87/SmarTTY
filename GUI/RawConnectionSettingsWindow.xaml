@@ -156,7 +156,7 @@
     </local:SettingsGroupBox>
     <local:SettingsGroupBox ImageSource="../icons/com16.png" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">
       <StackPanel Orientation="Vertical">
-        <Grid Margin="0 0 0 0" IsEnabled="{Binding IsChecked, ElementName=rbCOM}">
+        <Grid Margin="0 0 0 0">
           <FrameworkElement.Resources>
             <ResourceDictionary>
               <Style x:Key="{x:Type ListBox}" TargetType="{x:Type ListBox}" BasedOn="{StaticResource LightHorizontalListBox}">
@@ -187,7 +187,7 @@
             <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
           <TextBlock Text="Bits per second:" Style="{StaticResource HeaderText}" />
-          <ComboBox Grid.Column="1" IsEditable="True" Text="{Binding Path=SerialSettings.AdvancedSettings.BaudRate}" TextBoxBase.TextChanged="ComboBox_TextChanged">
+          <ComboBox Grid.Column="1" IsEditable="True" Text="{Binding Path=SerialSettings.AdvancedSettings.BaudRate, UpdateSourceTrigger=PropertyChanged}" TextBoxBase.TextChanged="ComboBox_TextChanged">
             <ItemsControl.ItemsSource>
               <coll:ArrayList>
                 <sys:Int32>1200</sys:Int32>
@@ -197,7 +197,13 @@
                 <sys:Int32>19200</sys:Int32>
                 <sys:Int32>38400</sys:Int32>
                 <sys:Int32>57600</sys:Int32>
+                <sys:Int32>74880</sys:Int32>
                 <sys:Int32>115200</sys:Int32>
+                <sys:Int32>230400</sys:Int32>
+                <sys:Int32>460800</sys:Int32>
+                <sys:Int32>921600</sys:Int32>
+                <sys:Int32>1000000</sys:Int32>
+                <sys:Int32>2000000</sys:Int32>
               </coll:ArrayList>
             </ItemsControl.ItemsSource>
           </ComboBox>
@@ -228,7 +234,6 @@
           <ListBox Grid.Column="1" Grid.Row="3" SelectedItem="{Binding Path=SerialSettings.AdvancedSettings.StopBits}">
             <ItemsControl.ItemsSource>
               <coll:ArrayList>
-                <ports:StopBits>None</ports:StopBits>
                 <ports:StopBits>One</ports:StopBits>
                 <ports:StopBits>OnePointFive</ports:StopBits>
                 <ports:StopBits>Two</ports:StopBits>
@@ -240,9 +245,6 @@
                   <FrameworkElement.Style>
                     <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
                       <Style.Triggers>
-                        <DataTrigger Value="None" Binding="{Binding}">
-                          <Setter Property="Text" Value="0" />
-                        </DataTrigger>
                         <DataTrigger Value="One" Binding="{Binding}">
                           <Setter Property="Text" Value="1" />
                         </DataTrigger>
@@ -264,8 +266,8 @@
             <ItemsControl.ItemsSource>
               <coll:ArrayList>
                 <ports:Handshake>None</ports:Handshake>
-                <ports:Handshake>RequestToSend</ports:Handshake>
                 <ports:Handshake>XOnXOff</ports:Handshake>
+                <ports:Handshake>RequestToSend</ports:Handshake>
                 <ports:Handshake>RequestToSendXOnXOff</ports:Handshake>
               </coll:ArrayList>
             </ItemsControl.ItemsSource>
@@ -278,14 +280,14 @@
                         <DataTrigger Value="None" Binding="{Binding}">
                           <Setter Property="Text" Value="None" />
                         </DataTrigger>
-                        <DataTrigger Value="RequestToSend" Binding="{Binding}">
+                        <DataTrigger Value="XOnXOff" Binding="{Binding}">
                           <Setter Property="Text" Value="Software (XON/XOFF)" />
+                        </DataTrigger>
+                        <DataTrigger Value="RequestToSend" Binding="{Binding}">
+                          <Setter Property="Text" Value="Hardware (RTS/CTS)" />
                         </DataTrigger>
                         <DataTrigger Value="RequestToSendXOnXOff" Binding="{Binding}">
                           <Setter Property="Text" Value="Both" />
-                        </DataTrigger>
-                        <DataTrigger Value="XOnXOff" Binding="{Binding}">
-                          <Setter Property="Text" Value="Hardware (CTS/RTS)" />
                         </DataTrigger>
                       </Style.Triggers>
                     </Style>

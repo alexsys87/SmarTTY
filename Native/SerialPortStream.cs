@@ -311,9 +311,25 @@ public class SerialPortStream : Stream, IDisposable
         SetXon = 2u
     }
 
+    private const int ErrorIoPending = 997;
+
+    private const int ErrorOperationAborted = 995;
+
+    // OVERLAPPED.Internal while the driver still owns the operation.
+    private const long StatusPending = 0x103;
+
+    // How long Close waits for a cancelled read or write to finish before closing the handle under it.
+    private const int CloseWaitMs = 2000;
+
+    private const sbyte XonCharacter = 0x11;
+
+    private const sbyte XoffCharacter = 0x13;
+
     private SafeFileHandle _handle;
 
     private readonly string _portName;
+
+    private int _closed;
 
     // The state of the output lines as this program last set them (Windows cannot read them back). A port opened without
     // explicit settings keeps the driver's behavior, which raises both lines.
@@ -390,10 +406,15 @@ public class SerialPortStream : Stream, IDisposable
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool ClearCommError(SafeFileHandle safeFileHandle, out uint errors, IntPtr comStat);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CancelIoEx(SafeHandle safeHandle, IntPtr overlapped);
+
     public SerialPortStream(string portName, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings = null)
     {
         _portName = portName;
-        _handle = CreateFile("\\\\.\\" + portName, FileAccess.ReadWrite, FileShare.None, IntPtr.Zero, FileMode.Open, (FileAttributes)1073741952, IntPtr.Zero);
+        // COM10 and above can only be opened through the device namespace; a name that already has the prefix is kept.
+        string devicePath = portName.StartsWith("\\\\.\\", StringComparison.Ordinal) ? portName : "\\\\.\\" + portName;
+        _handle = CreateFile(devicePath, FileAccess.ReadWrite, FileShare.None, IntPtr.Zero, FileMode.Open, (FileAttributes)1073741952, IntPtr.Zero);
         if (_handle.IsInvalid)
         {
             int error = Marshal.GetLastWin32Error();
@@ -576,8 +597,16 @@ public class SerialPortStream : Stream, IDisposable
         dcb.OutX = software;
         dcb.InX = software;
         dcb.TxContinueOnXoff = software;
+        if (software)
+        {
+            // Some drivers report zero for both characters; SetCommState refuses XON/XOFF with equal characters.
+            dcb.XonChar = XonCharacter;
+            dcb.XoffChar = XoffCharacter;
+        }
         dcb.OutxCtsFlow = hardware;
         dcb.OutxDsrFlow = false;
+        // Left on by another program, it would make the driver drop everything received while DSR is low.
+        dcb.DsrSensitivity = false;
         dcb.DtrControlMode = _dtr ? DtrControl.Enable : DtrControl.Disable;
         dcb.RtsControlMode = hardware ? RtsControl.Handshake : (_rts ? RtsControl.Enable : RtsControl.Disable);
         _rtsIsAutomatic = hardware;
@@ -637,31 +666,81 @@ public class SerialPortStream : Stream, IDisposable
         throw new NotSupportedException();
     }
 
+    private static void CheckBufferArguments(byte[] buffer, int offset, int count)
+    {
+        if (buffer == null)
+        {
+            throw new ArgumentNullException(nameof(buffer));
+        }
+        if (offset < 0 || count < 0 || count > buffer.Length - offset)
+        {
+            throw new ArgumentOutOfRangeException(nameof(count), "The offset and count do not describe a range of the buffer.");
+        }
+    }
+
+    private void ThrowIfClosed()
+    {
+        if (Volatile.Read(ref _closed) != 0)
+        {
+            throw new ObjectDisposedException(GetType().Name, _portName + " is closed.");
+        }
+    }
+
+    /// <summary>
+    /// Waits for an overlapped operation that the driver accepted and returns its byte count. The OVERLAPPED structure and
+    /// the data buffer belong to the driver until the operation completes; <paramref name="ownedByDriver"/> stays true when
+    /// the port was closed under an operation the driver never finished, and the caller must then not free that memory.
+    /// </summary>
+    private int CompleteOverlapped(IntPtr overlappedPtr, ManualResetEvent completionEvent, bool isWrite, out bool ownedByDriver)
+    {
+        ownedByDriver = true;
+        completionEvent.WaitOne();
+        if (Marshal.ReadIntPtr(overlappedPtr).ToInt64() == StatusPending)
+        {
+            // Woken by Close, not by the driver.
+            throw new ObjectDisposedException(GetType().Name, _portName + " is closed.");
+        }
+        ownedByDriver = false;
+        if (!GetOverlappedResult(_handle, overlappedPtr, out int bytesTransferred, wait: false))
+        {
+            int error = Marshal.GetLastWin32Error();
+            if (error == ErrorOperationAborted && Volatile.Read(ref _closed) != 0)
+            {
+                throw new ObjectDisposedException(GetType().Name, _portName + " is closed.");
+            }
+            throw isWrite ? WriteFailure(error) : ReadFailure(error);
+        }
+        return bytesTransferred;
+    }
+
     public override int Read(byte[] buffer, int offset, int count)
     {
+        CheckBufferArguments(buffer, offset, count);
+        if (count == 0)
+        {
+            return 0;
+        }
         lock (_readLock)
         {
+            ThrowIfClosed();
             NativeOverlapped nativeOverlapped = new NativeOverlapped
             {
                 EventHandle = _readEvent.SafeWaitHandle.DangerousGetHandle()
             };
             IntPtr overlappedPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
             IntPtr bufferPtr = Marshal.AllocHGlobal(count);
+            bool ownedByDriver = false;
             try
             {
                 int bytesRead;
                 do
                 {
                     Marshal.StructureToPtr((object)nativeOverlapped, overlappedPtr, false);
-                    if (!ReadFile(_handle, bufferPtr, count, out bytesRead, overlappedPtr) && Marshal.GetLastWin32Error() != 997)
+                    if (!ReadFile(_handle, bufferPtr, count, out bytesRead, overlappedPtr) && Marshal.GetLastWin32Error() != ErrorIoPending)
                     {
                         throw ReadFailure(Marshal.GetLastWin32Error());
                     }
-                    _readEvent.WaitOne();
-                    if (!GetOverlappedResult(_handle, overlappedPtr, out bytesRead, wait: false))
-                    {
-                        throw ReadFailure(Marshal.GetLastWin32Error());
-                    }
+                    bytesRead = CompleteOverlapped(overlappedPtr, _readEvent, isWrite: false, out ownedByDriver);
                 }
                 while (bytesRead == 0 && !ReturnOnEmptyRead);
                 Marshal.Copy(bufferPtr, buffer, offset, bytesRead);
@@ -669,8 +748,13 @@ public class SerialPortStream : Stream, IDisposable
             }
             finally
             {
-                Marshal.FreeHGlobal(overlappedPtr);
-                Marshal.FreeHGlobal(bufferPtr);
+                // Freeing memory the driver may still write into would corrupt the heap: leak it instead (only happens
+                // when a driver ignores the cancellation on close).
+                if (!ownedByDriver)
+                {
+                    Marshal.FreeHGlobal(overlappedPtr);
+                    Marshal.FreeHGlobal(bufferPtr);
+                }
             }
         }
     }
@@ -679,33 +763,32 @@ public class SerialPortStream : Stream, IDisposable
     {
         lock (_writeLock)
         {
+            ThrowIfClosed();
             NativeOverlapped nativeOverlapped = new NativeOverlapped
             {
                 EventHandle = _writeEvent.SafeWaitHandle.DangerousGetHandle()
             };
             IntPtr overlappedPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
             IntPtr bufferPtr = Marshal.AllocHGlobal(count);
-            int bytesWritten;
+            bool ownedByDriver = false;
             try
             {
                 Marshal.StructureToPtr((object)nativeOverlapped, overlappedPtr, false);
                 Marshal.Copy(buffer, offset, bufferPtr, count);
-                if (!WriteFile(_handle, bufferPtr, count, out bytesWritten, overlappedPtr) && Marshal.GetLastWin32Error() != 997)
+                if (!WriteFile(_handle, bufferPtr, count, out _, overlappedPtr) && Marshal.GetLastWin32Error() != ErrorIoPending)
                 {
                     throw WriteFailure(Marshal.GetLastWin32Error());
                 }
-                _writeEvent.WaitOne();
-                if (!GetOverlappedResult(_handle, overlappedPtr, out bytesWritten, wait: false))
-                {
-                    throw WriteFailure(Marshal.GetLastWin32Error());
-                }
+                return CompleteOverlapped(overlappedPtr, _writeEvent, isWrite: true, out ownedByDriver);
             }
             finally
             {
-                Marshal.FreeHGlobal(overlappedPtr);
-                Marshal.FreeHGlobal(bufferPtr);
+                if (!ownedByDriver)
+                {
+                    Marshal.FreeHGlobal(overlappedPtr);
+                    Marshal.FreeHGlobal(bufferPtr);
+                }
             }
-            return bytesWritten;
         }
     }
 
@@ -721,6 +804,7 @@ public class SerialPortStream : Stream, IDisposable
 
     public override void Write(byte[] buffer, int offset, int count)
     {
+        CheckBufferArguments(buffer, offset, count);
         int chunkWritten;
         for (int written = 0; written < count; written += chunkWritten)
         {
@@ -735,12 +819,70 @@ public class SerialPortStream : Stream, IDisposable
         }
     }
 
+    /// <summary>
+    /// Cancels the pending read and write, waits for the driver to finish them and only then closes the handle, so a
+    /// completion can never land in memory that has already been freed.
+    /// </summary>
     public override void Close()
     {
-        _handle.Close();
-        _readEvent.Set();
-        _writeEvent.Set();
+        if (Interlocked.Exchange(ref _closed, 1) == 0)
+        {
+            bool readIdle = WaitUntilIdle(_readLock);
+            bool writeIdle = WaitUntilIdle(_writeLock);
+            try
+            {
+                _handle.Close();
+                if (readIdle && writeIdle)
+                {
+                    _readEvent.Dispose();
+                    _writeEvent.Dispose();
+                }
+                else
+                {
+                    // A driver that ignored the cancellation: wake the waiting thread, which sees the operation is still
+                    // pending and leaves its memory (and these events) to the driver.
+                    _readEvent.Set();
+                    _writeEvent.Set();
+                }
+            }
+            finally
+            {
+                if (writeIdle)
+                {
+                    Monitor.Exit(_writeLock);
+                }
+                if (readIdle)
+                {
+                    Monitor.Exit(_readLock);
+                }
+            }
+        }
         base.Close();
+    }
+
+    /// <summary>Takes the lock of a read or write once its operation has ended, cancelling it meanwhile; false on timeout.</summary>
+    private bool WaitUntilIdle(object operationLock)
+    {
+        int start = Environment.TickCount;
+        while (true)
+        {
+            try
+            {
+                // Repeated: an operation that started just after the previous cancellation is cancelled as well.
+                CancelIoEx(_handle, IntPtr.Zero);
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            if (Monitor.TryEnter(operationLock, 50))
+            {
+                return true;
+            }
+            if (Environment.TickCount - start >= CloseWaitMs)
+            {
+                return false;
+            }
+        }
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]

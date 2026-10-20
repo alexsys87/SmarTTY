@@ -235,6 +235,28 @@ internal static class Program
             }
         });
 
+        Run("after the link broke, sending is refused instead of queued forever", () =>
+        {
+            using (Session s = new Session())
+            {
+                Check(s.Connection.Send(Encoding.ASCII.GetBytes("before"), 6), "an open connection takes data");
+                Check(WaitFor(() => s.Transport.Stream.WrittenCopy().Length == 1), "data written before the break");
+                s.Transport.Stream.Break(new IOException("unplugged"));
+                Check(s.Disconnected.Wait(3000), "disconnected");
+                Check(!s.Connection.Send(Encoding.ASCII.GetBytes("after"), 5), "Send says the data was not taken");
+                Thread.Sleep(200);
+                Check(s.Transport.Stream.WrittenCopy().Length == 1, "nothing was written after the break");
+                Check(s.FailuresCopy().Length == 0, "no write failure for data that was never queued");
+            }
+        });
+
+        Run("a closed connection refuses data", () =>
+        {
+            Session s = new Session();
+            s.Connection.Dispose();
+            Check(!s.Connection.Send(Encoding.ASCII.GetBytes("x"), 1), "Send after Dispose returns false");
+        });
+
         Run("closing the connection on purpose gives no reason and no write failure", () =>
         {
             Session s = new Session();

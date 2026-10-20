@@ -570,7 +570,11 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private string _Filter;
 
-        private Dictionary<SerialPortKey, RawConnectionSettings> _KnownSerialPortSettings = new Dictionary<SerialPortKey, RawConnectionSettings>();
+        // Replaced, never changed in place, so the port list thread can read it without a lock.
+        private volatile Dictionary<SerialPortKey, RawConnectionSettings> _KnownSerialPortSettings = new Dictionary<SerialPortKey, RawConnectionSettings>();
+
+        // 1 when the saved COM profiles changed since the port list thread last built its items.
+        private int _KnownSerialPortSettingsChanged;
 
         private bool _ProbeConnections;
 
@@ -757,12 +761,21 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 List<IConnectionSettingsWrapper> list = new List<IConnectionSettingsWrapper>();
                 try
                 {
-                    SetupApiDeviceSet.ComPortInfo[] items = new SetupApiDeviceSet(new Guid("4d36e978-e325-11ce-bfc1-08002be10318")).EnumerateComPorts().ToArray();
-                    if (items.SequenceEqual(second))
+                    SetupApiDeviceSet.ComPortInfo[] items;
+                    // Checked twice a second: the device list must be freed every time, not left to pile up.
+                    using (SetupApiDeviceSet deviceSet = new SetupApiDeviceSet(new Guid("4d36e978-e325-11ce-bfc1-08002be10318")))
+                    {
+                        items = deviceSet.EnumerateComPorts().ToArray();
+                    }
+                    // The list is also rebuilt when the saved COM profiles changed, or an item would keep a deleted or
+                    // outdated profile until a port is plugged in or out.
+                    bool settingsChanged = Interlocked.Exchange(ref _KnownSerialPortSettingsChanged, 0) != 0;
+                    if (items.SequenceEqual(second) && !settingsChanged)
                     {
                         continue;
                     }
                     second = items;
+                    Dictionary<SerialPortKey, RawConnectionSettings> knownSettings = _KnownSerialPortSettings;
                     SetupApiDeviceSet.ComPortInfo[] entries = items;
                     for (int portIndex = 0; portIndex < entries.Length; portIndex++)
                     {
@@ -772,7 +785,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                         {
                             serialNumber = null;
                         }
-                        _KnownSerialPortSettings.TryGetValue(new SerialPortKey(port), out var value);
+                        knownSettings.TryGetValue(new SerialPortKey(port), out var value);
                         if (value == null)
                         {
                             RawConnectionSettings rawConnectionSettings = new RawConnectionSettings();
@@ -1031,12 +1044,13 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
             if (_ShowRawConnections)
             {
-                _KnownSerialPortSettings.Clear();
+                // Built aside and swapped in whole: the port list thread reads it meanwhile.
+                Dictionary<SerialPortKey, RawConnectionSettings> knownSettings = new Dictionary<SerialPortKey, RawConnectionSettings>();
                 foreach (RawConnectionSettings entry in _Connections.RawConnections)
                 {
                     if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serConn)
                     {
-                        _KnownSerialPortSettings[new SerialPortKey(serConn)] = entry;
+                        knownSettings[new SerialPortKey(serConn)] = entry;
                     }
                     else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet)
                     {
@@ -1047,6 +1061,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                         _StaticItems.Add(new SettingsWrappers.RawTcp(_Connections, entry));
                     }
                 }
+                _KnownSerialPortSettings = knownSettings;
+                Interlocked.Exchange(ref _KnownSerialPortSettingsChanged, 1);
             }
             UpdateFilteredItems();
         }

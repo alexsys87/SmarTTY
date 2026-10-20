@@ -33,21 +33,25 @@ internal class AsyncTransportConnection : IDisposable
 
     private bool _started;
 
-    private bool _stopRequested;
+    // Read by the worker threads while the UI thread sets them.
+    private volatile bool _stopRequested;
 
-    private bool _disposed;
+    private volatile bool _disposed;
+
+    // Set once the read loop has ended: nothing written after that can reach the device.
+    private volatile bool _finished;
 
     private Thread _connectThread;
 
     private Thread _writerThread;
 
-    private ConnectionStateEnum _state;
+    private volatile ConnectionStateEnum _state;
 
     private Queue<PendingWrite> _writeQueue = new Queue<PendingWrite>();
 
     private Semaphore _writeSignal = new Semaphore(0, int.MaxValue);
 
-    private bool _writerIdle;
+    private volatile bool _writerIdle;
 
     public bool IsWriterIdle => _writerIdle;
 
@@ -128,6 +132,7 @@ internal class AsyncTransportConnection : IDisposable
         catch (Exception exception)
         {
             Exception connectEx = exception;
+            _finished = true;
             _state = ConnectionStateEnum.Failed;
             PostToUi(() =>
             {
@@ -138,13 +143,19 @@ internal class AsyncTransportConnection : IDisposable
             });
             return;
         }
-        _writerThread = new Thread(WriterLoop);
+        _writerThread = new Thread(WriterLoop)
+        {
+            // A driver that never returns from a call must not keep the program running after its window is closed.
+            IsBackground = true,
+            Name = "Device transport writer"
+        };
         _writerThread.Start();
         string disconnectReason = null;
         try
         {
             Stream stream = _transport.GetStream();
-            byte[] rawBuffer = new byte[1024];
+            // Large enough for a fast port (921600 bps is about 90 KB/s) to be drained in few reads and UI updates.
+            byte[] rawBuffer = new byte[4096];
             while (!_stopRequested)
             {
                 int count = stream.Read(rawBuffer, 0, rawBuffer.Length);
@@ -153,10 +164,7 @@ internal class AsyncTransportConnection : IDisposable
                     break;
                 }
                 byte[] buffer = new byte[count];
-                for (int i = 0; i < count; i++)
-                {
-                    buffer[i] = rawBuffer[i];
-                }
+                Buffer.BlockCopy(rawBuffer, 0, buffer, 0, count);
                 PostToUi(() =>
                 {
                     if (DataReceived != null && !_disposed)
@@ -174,6 +182,9 @@ internal class AsyncTransportConnection : IDisposable
                 disconnectReason = readException.Message;
             }
         }
+        // The writer has nothing to write to any more: let it end instead of waiting for data until Dispose.
+        _finished = true;
+        _writeSignal.Release();
         try
         {
             _transport.Close();
@@ -193,7 +204,7 @@ internal class AsyncTransportConnection : IDisposable
 
     private void WriterLoop()
     {
-        while (!_stopRequested)
+        while (!_stopRequested && !_finished)
         {
             while (true)
             {
@@ -206,7 +217,7 @@ internal class AsyncTransportConnection : IDisposable
                     }
                 });
                 _writeSignal.WaitOne();
-                if (_stopRequested)
+                if (_stopRequested || _finished)
                 {
                     break;
                 }
@@ -232,7 +243,12 @@ internal class AsyncTransportConnection : IDisposable
                 }
                 try
                 {
-                    _transport.GetStream().Write(pendingWrite.Buffer, 0, pendingWrite.Length);
+                    Stream stream = _transport.GetStream();
+                    if (stream == null)
+                    {
+                        throw new IOException("The connection is closed.");
+                    }
+                    stream.Write(pendingWrite.Buffer, 0, pendingWrite.Length);
                     _writeError = null;
                 }
                 catch (Exception writeException)
@@ -280,7 +296,11 @@ internal class AsyncTransportConnection : IDisposable
         {
             StateChanged?.Invoke(this, ConnectionStateEnum.Connecting, null);
             _started = true;
-            _connectThread = new Thread(ConnectAndReadLoop);
+            _connectThread = new Thread(ConnectAndReadLoop)
+            {
+                IsBackground = true,
+                Name = "Device transport reader"
+            };
             _connectThread.Start();
         }
     }
@@ -300,8 +320,16 @@ internal class AsyncTransportConnection : IDisposable
         _disposed = true;
     }
 
-    public void Send(byte[] buffer, int count)
+    /// <summary>
+    /// Queues data for the device. False when the connection has already ended (or was closed): the data is dropped
+    /// instead of piling up in a queue that nobody writes any more.
+    /// </summary>
+    public bool Send(byte[] buffer, int count)
     {
+        if (_finished || _stopRequested)
+        {
+            return false;
+        }
         lock (_writeQueue)
         {
             _writeQueue.Enqueue(new PendingWrite
@@ -311,6 +339,7 @@ internal class AsyncTransportConnection : IDisposable
             });
         }
         _writeSignal.Release();
+        return true;
     }
 
     /// <summary>Tells the transport the current terminal size (used by telnet); other transports ignore it.</summary>

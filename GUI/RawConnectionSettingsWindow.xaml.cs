@@ -378,11 +378,21 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             // choice back, so the mode looked like it did nothing at all.
             _EffectiveDisplayMode = ToEffectiveDisplayMode(Settings);
             SaveCheckboxVisibility = ((!showSaveCheckbox) ? Visibility.Collapsed : Visibility.Visible);
-            if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serial)
+            if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial originalSerial)
             {
+                // The port settings are edited in place through bindings: on a copy, so Cancel leaves the profile as it was
+                // (DeviceTerminalSettings.Clone shares the connection object).
+                DeviceTerminalSettings.ConnectionSettings.Serial serial = originalSerial.Clone();
+                Settings.Connection = serial;
                 SerialSettingsHeader = serial.ComPortName + " settings";
                 SerialSettingsVisibility = Visibility.Visible;
                 TCPSettingsVisibility = Visibility.Collapsed;
+                if (serial.AdvancedSettings != null && serial.AdvancedSettings.StopBits == StopBits.None)
+                {
+                    // "No stop bits" is not a real setting (the port uses one); show what is actually used.
+                    serial.AdvancedSettings.StopBits = StopBits.One;
+                }
+                UpdateMaximumSpeed();
             }
             else if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
             {

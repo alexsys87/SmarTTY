@@ -326,7 +326,7 @@ public partial class DeviceTerminalControl
 		lblBaudRate.Name = "lblBaudRate";
 		lblBaudRate.Size = new Size(60, 22);
 		lblBaudRate.Text = "Baud rate:";
-		cbBaudRate.Items.AddRange(new object[9] { "1200", "2400", "4800", "9600", "19200", "38400", "57600", "74880", "115200" });
+		cbBaudRate.Items.AddRange(new object[14] { "1200", "2400", "4800", "9600", "19200", "38400", "57600", "74880", "115200", "230400", "460800", "921600", "1000000", "2000000" });
 		cbBaudRate.Name = "cbBaudRate";
 		cbBaudRate.Size = new Size(121, 25);
 		cbBaudRate.SelectedIndexChanged += cbBaudRate_SelectedIndexChanged;

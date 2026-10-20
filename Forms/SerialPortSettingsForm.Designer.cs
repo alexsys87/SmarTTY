@@ -195,12 +195,13 @@ public partial class SerialPortSettingsForm
 		label3.Text = "Parity:";
 		cbBitsPerSecond.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 		cbBitsPerSecond.FormattingEnabled = true;
-		cbBitsPerSecond.Items.AddRange(new object[8] { "1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200" });
+		cbBitsPerSecond.Items.AddRange(new object[14] { "1200", "2400", "4800", "9600", "19200", "38400", "57600", "74880", "115200", "230400", "460800", "921600", "1000000", "2000000" });
 		cbBitsPerSecond.Location = new Point(101, 6);
 		cbBitsPerSecond.Name = "cbBitsPerSecond";
 		cbBitsPerSecond.Size = new Size(228, 21);
 		cbBitsPerSecond.TabIndex = 100;
 		cbBitsPerSecond.TextUpdate += cbStopBits_SelectedIndexChanged;
+		cbBitsPerSecond.SelectedIndexChanged += cbStopBits_SelectedIndexChanged;
 		label2.AutoSize = true;
 		label2.Location = new Point(12, 36);
 		label2.Name = "label2";

@@ -271,9 +271,16 @@ public class SetupApiDeviceSet : IDisposable
     [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern bool SetupUninstallOEMInf(string infFileName, UninstallOemInfFlags flags, IntPtr reserved);
 
+    private static readonly IntPtr InvalidHandleValue = new IntPtr(-1);
+
     public SetupApiDeviceSet(Guid guid)
     {
         _deviceInfoSet = SetupDiGetClassDevs(ref guid, null, (IntPtr)0, 2u);
+        if (_deviceInfoSet == InvalidHandleValue)
+        {
+            // Nothing to enumerate; an invalid set would make every call fail.
+            _deviceInfoSet = IntPtr.Zero;
+        }
     }
 
     [DllImport("setupapi.dll", SetLastError = true)]
@@ -303,11 +310,11 @@ public class SetupApiDeviceSet : IDisposable
     public static string GetUsbSerialNumber(string deviceId, out bool isUsbDevice)
     {
         string currentDeviceId = deviceId;
-        if (!currentDeviceId.StartsWith("USB\\"))
+        if (currentDeviceId != null && !currentDeviceId.StartsWith("USB\\"))
         {
             currentDeviceId = GetParentDeviceId(currentDeviceId);
         }
-        if (currentDeviceId.StartsWith("USB\\"))
+        if (currentDeviceId != null && currentDeviceId.StartsWith("USB\\"))
         {
             isUsbDevice = true;
         }
@@ -332,15 +339,13 @@ public class SetupApiDeviceSet : IDisposable
     {
         SpDevInfoData spDevInfoData = default;
         uint memberIndex = 0u;
-        while (true)
+        while (_deviceInfoSet != IntPtr.Zero)
         {
             spDevInfoData.Size = Marshal.SizeOf((object)spDevInfoData);
             if (!SetupDiEnumDeviceInfo(_deviceInfoSet, memberIndex, ref spDevInfoData))
             {
-                if (Marshal.GetLastWin32Error() == 259)
-                {
-                    break;
-                }
+                // ERROR_NO_MORE_ITEMS ends the list; any other error would repeat for every index and never end it.
+                break;
             }
             else
             {
@@ -390,6 +395,7 @@ public class SetupApiDeviceSet : IDisposable
         if (_deviceInfoSet != IntPtr.Zero)
         {
             SetupDiDestroyDeviceInfoList(_deviceInfoSet);
+            _deviceInfoSet = IntPtr.Zero;
         }
     }
 }
