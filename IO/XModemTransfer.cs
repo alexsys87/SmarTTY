@@ -24,6 +24,7 @@ public class XModemTransfer
     private const int BlockSize = 128;
     private const int LargeBlockSize = 1024;
     private const int MaxRetries = 10;
+    private const int LargeBlockFallbackAttempts = 3; // failed tries of the very first 1K block before dropping to 128 bytes
 
     public enum XModemMode
     {
@@ -180,6 +181,43 @@ public class XModemTransfer
         return total;
     }
 
+    /// <summary>Moves up to <paramref name="max"/> bytes from the front of the carry buffer into the payload buffer.</summary>
+    private static int TakeFromCarry(byte[] carry, ref int carryCount, byte[] payload, int max)
+    {
+        int n = Math.Min(max, carryCount);
+        Buffer.BlockCopy(carry, 0, payload, 0, n);
+        carryCount -= n;
+        Buffer.BlockCopy(carry, n, carry, 0, carryCount); // overlapping move: BlockCopy handles it
+        return n;
+    }
+
+    /// <summary>
+    /// Builds one block (SOH for 128 bytes, STX for 1024) into <paramref name="packet"/> and returns its length.
+    /// The payload is padded with SUB from <paramref name="read"/> up to <paramref name="size"/>.
+    /// </summary>
+    private static int BuildPacket(byte[] packet, byte[] payload, int read, int size, int blockIndex, XModemMode mode)
+    {
+        for (int i = read; i < size; i++)
+        {
+            payload[i] = SUB; // Only the last block is short
+        }
+
+        byte blockByte = (byte)blockIndex;
+        packet[0] = size == LargeBlockSize ? STX : SOH;
+        packet[1] = blockByte;
+        packet[2] = (byte)(255 - blockByte);
+        Buffer.BlockCopy(payload, 0, packet, 3, size);
+        if (mode == XModemMode.Crc16)
+        {
+            ushort crc = CalculateCrc16(payload, 0, size);
+            packet[3 + size] = (byte)(crc >> 8);
+            packet[3 + size + 1] = (byte)(crc & 0xFF);
+            return 3 + size + 2;
+        }
+        packet[3 + size] = CalculateChecksum(payload, 0, size);
+        return 3 + size + 1;
+    }
+
     private enum Reply
     {
         Ack,
@@ -238,7 +276,9 @@ public class XModemTransfer
 
     /// <summary>
     /// Sends a file; with <paramref name="useLargeBlocks"/> as XMODEM-1K (1024-byte STX blocks). XMODEM-1K needs CRC-16,
-    /// so when the receiver asks for the checksum variant (NAK) the file goes out in 128-byte blocks as usual.
+    /// so when the receiver asks for the checksum variant (NAK) the file goes out in 128-byte blocks as usual. A receiver
+    /// that asks for CRC but does not know 1K blocks never acknowledges the first one; after three failed tries the sender
+    /// drops to 128-byte blocks by itself.
     /// </summary>
     public static bool SendFile(
         Stream sourceStream,
@@ -344,20 +384,31 @@ public class XModemTransfer
         int maxPayload = largeBlocks ? LargeBlockSize : BlockSize;
         byte[] payload = new byte[LargeBlockSize];
         byte[] packet = new byte[3 + LargeBlockSize + trailerSize];
+        // Data already read from the file but not sent yet. It is only used after a fallback from 1K to 128-byte blocks,
+        // when the 1K block that was read has to be cut into 128-byte ones (the file may not be seekable).
+        byte[] carry = new byte[LargeBlockSize];
+        int carryCount = 0;
         int blockIndex = 1; // 1-based count for the display; only its low byte goes on the wire
 
         while (true)
         {
             int read;
-            try
+            if (carryCount > 0)
             {
-                read = ReadFully(sourceStream, payload, maxPayload);
+                read = TakeFromCarry(carry, ref carryCount, payload, maxPayload);
             }
-            catch (Exception ex)
+            else
             {
-                link.SendCancel();
-                Report(onProgress, bytesTransferred, totalBytes, ++errorCount, "Cannot read the file: " + ex.Message);
-                return false;
+                try
+                {
+                    read = ReadFully(sourceStream, payload, maxPayload);
+                }
+                catch (Exception ex)
+                {
+                    link.SendCancel();
+                    Report(onProgress, bytesTransferred, totalBytes, ++errorCount, "Cannot read the file: " + ex.Message);
+                    return false;
+                }
             }
             if (read == 0)
             {
@@ -368,27 +419,7 @@ public class XModemTransfer
             // to 1024 bytes; every other block, including a longer short one, is a full 1K block (STX).
             // Both kinds of block share one sequence of block numbers.
             int size = read > BlockSize ? LargeBlockSize : BlockSize;
-            for (int i = read; i < size; i++)
-            {
-                payload[i] = SUB; // Only the last block is short
-            }
-
-            byte blockByte = (byte)blockIndex;
-            packet[0] = size == LargeBlockSize ? STX : SOH;
-            packet[1] = blockByte;
-            packet[2] = (byte)(255 - blockByte);
-            Buffer.BlockCopy(payload, 0, packet, 3, size);
-            if (mode == XModemMode.Crc16)
-            {
-                ushort crc = CalculateCrc16(payload, 0, size);
-                packet[3 + size] = (byte)(crc >> 8);
-                packet[3 + size + 1] = (byte)(crc & 0xFF);
-            }
-            else
-            {
-                packet[3 + size] = CalculateChecksum(payload, 0, size);
-            }
-            int packetLength = 3 + size + trailerSize;
+            int packetLength = BuildPacket(packet, payload, read, size, blockIndex, mode);
 
             int attempts = 0;
             while (true)
@@ -421,6 +452,28 @@ public class XModemTransfer
                 }
 
                 errorCount++;
+
+                if (largeBlocks && size == LargeBlockSize && blockIndex == 1 && attempts >= LargeBlockFallbackAttempts)
+                {
+                    // Nothing has been acknowledged yet and the first 1K block keeps failing: the receiver most likely asks
+                    // for CRC but does not know XMODEM-1K. Continue with 128-byte blocks, starting with the data of the
+                    // block that failed. Once a 1K block has been acknowledged this never happens again, so later
+                    // trouble is treated as line errors.
+                    largeBlocks = false;
+                    maxPayload = BlockSize;
+                    Buffer.BlockCopy(payload, 0, carry, 0, read);
+                    carryCount = read;
+                    read = TakeFromCarry(carry, ref carryCount, payload, BlockSize);
+                    size = BlockSize;
+                    packetLength = BuildPacket(packet, payload, read, size, blockIndex, mode);
+                    attempts = 0;
+                    Report(onProgress, bytesTransferred, totalBytes, errorCount, "The receiver does not accept 1K blocks, switching to 128-byte blocks.");
+                    // A receiver that does not know STX may have answered every byte of the rejected block; those answers
+                    // must not be taken for replies to the 128-byte block.
+                    link.Purge(timeouts.PurgeQuietMs);
+                    continue;
+                }
+
                 if (attempts >= MaxRetries)
                 {
                     link.SendCancel();

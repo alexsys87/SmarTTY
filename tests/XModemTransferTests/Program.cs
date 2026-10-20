@@ -199,6 +199,9 @@ internal static class Program
         public int DeadAfterPackets;           // stop answering after this many packets
         public int EotNaks;                    // NAKs to answer EOT with before ACK
         public int TimeoutMs = 3000;
+        public int Reject1K;                   // a receiver that asks for CRC but does not know 1K blocks: 1 = NAK them, 2 = say nothing
+        public int Accept1KPackets;            // ... after accepting this many 1K blocks first
+        public int Rejected1K;                 // 1K blocks that were turned down
         public readonly List<byte> Output = new List<byte>();
         public readonly List<byte> WireNumbers = new List<byte>();
         public readonly List<int> BlockSizes = new List<int>(); // payload size of every packet that arrived (128 or 1024)
@@ -228,6 +231,12 @@ internal static class Program
                 s.PacketsSeen++;
                 s.WireNumbers.Add(p.Number);
                 s.BlockSizes.Add(p.Data.Length);
+                if (s.Reject1K != 0 && p.Data.Length == 1024 && s.BlockSizes.Count(x => x == 1024) - s.Rejected1K > s.Accept1KPackets)
+                {
+                    s.Rejected1K++;
+                    if (s.Reject1K == 1) e.Send(NAK);
+                    continue;
+                }
                 if (!p.CheckOk) { s.BadPacket = true; e.Send(NAK); continue; }
                 if (s.DeadAfterPackets > 0 && s.PacketsSeen >= s.DeadAfterPackets)
                 {
@@ -584,10 +593,70 @@ internal static class Program
             Progress prog = new Progress();
             Check(!SendOneK(RandomData(3000), u, Fast(40), prog), "send reports failure");
             rx.Wait(5000);
-            Check(script.PacketsSeen == 10, "block 1 sent exactly 10 times (" + script.PacketsSeen + ")");
+            // A receiver that never answers looks like one that does not know 1K: 3 tries as 1K, then 10 as 128-byte blocks.
+            Check(script.PacketsSeen == 13, "block 1 sent 3 times as 1K and 10 times as 128 bytes (" + script.PacketsSeen + ")");
+            Check(script.BlockSizes.Take(3).All(s => s == 1024) && script.BlockSizes.Skip(3).All(s => s == 128), "sizes: " + string.Join(",", script.BlockSizes));
             byte[] sent = u.Sent();
             Check(sent.Length >= 2 && sent[sent.Length - 1] == CAN && sent[sent.Length - 2] == CAN, "CAN CAN sent at the end");
             Check(prog.Last.Contains("block 1"), "status names the block: " + prog.Last);
+        });
+
+        foreach (int mode in new[] { 1, 2 })
+        {
+            int m = mode;
+            Run("sender 1K: a receiver that does not know 1K blocks (" + (m == 1 ? "answers NAK" : "stays silent") + ") gets 128-byte blocks after 3 tries", () =>
+            {
+                NewLink(out End u, out End peer);
+                byte[] data = RandomData(3000);
+                RxScript script = new RxScript { Reject1K = m };
+                Task rx = Receiver(peer, script);
+                Progress prog = new Progress();
+                Check(SendOneK(data, u, Fast(), prog), "send succeeded");
+                rx.Wait(5000);
+                Check(script.Rejected1K == 3, "the 1K block was tried 3 times (" + script.Rejected1K + ")");
+                Check(script.BlockSizes.Skip(3).All(s => s == 128) && script.BlockSizes.Count == 3 + (3000 + 127) / 128, "then only 128-byte blocks (" + script.BlockSizes.Count + " packets)");
+                Check(script.WireNumbers.Skip(3).SequenceEqual(Enumerable.Range(1, (3000 + 127) / 128).Select(x => (byte)x)), "block numbers start again at 1 for the 128-byte blocks");
+                Check(script.Output.SequenceEqual(Padded(data)) && !script.BadPacket, "no data lost, none repeated, the last block padded to 128");
+                Check(prog.LastErrors == 3, "3 errors counted (" + prog.LastErrors + ")");
+                Check(prog.Status.Any(s => s.Contains("switching to 128-byte blocks")), "status explains the fallback");
+                Check(prog.Samples.Last()[0] == 3000, "progress ends at the real file size");
+            });
+        }
+
+        Run("sender 1K: a short tail of a fallen-back file is not padded to 1K and nothing is read twice from a forward-only stream", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(1100);
+            RxScript script = new RxScript { Reject1K = 1 };
+            Task rx = Receiver(peer, script);
+            Check(SendOneK(data, u, Fast(), null, new ForwardOnlyStream(data)), "send succeeded");
+            rx.Wait(5000);
+            Check(script.Output.SequenceEqual(Padded(data)), "payload intact");
+        });
+
+        Run("sender 1K: one NAK for the first 1K block is a line error, not a reason to drop to 128 bytes", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(3000);
+            RxScript script = new RxScript { NakFirstArrivalOfBlock = 1 };
+            Task rx = Receiver(peer, script);
+            Check(SendOneK(data, u, Fast(), null), "send succeeded");
+            rx.Wait(5000);
+            Check(script.BlockSizes.SequenceEqual(new[] { 1024, 1024, 1024, 1024 }), "the repeat is a 1K block (" + string.Join(",", script.BlockSizes) + ")");
+            Check(script.Output.SequenceEqual(PaddedOneK(data)), "data intact");
+        });
+
+        Run("sender 1K: after the first 1K block was accepted, refused 1K blocks fail the transfer instead of changing the block size", () =>
+        {
+            NewLink(out End u, out End peer);
+            RxScript script = new RxScript { Reject1K = 1, Accept1KPackets = 1 };
+            Task rx = Receiver(peer, script);
+            Progress prog = new Progress();
+            Check(!SendOneK(RandomData(3000), u, Fast(), prog), "send reports failure");
+            rx.Wait(5000);
+            Check(script.Rejected1K == 10, "block 2 was tried 10 times as 1K (" + script.Rejected1K + ")");
+            Check(script.BlockSizes.All(s => s == 1024), "no 128-byte block was ever sent");
+            Check(prog.Last.Contains("block 2"), "status names the block: " + prog.Last);
         });
 
         Run("sender 1K: short reads from the source stream do not put padding inside the data", () =>
@@ -928,6 +997,15 @@ internal static class Program
         private readonly int _max;
         public ShortReadStream(byte[] data, int max) : base(data) { _max = max; }
         public override int Read(byte[] buffer, int offset, int count) { return base.Read(buffer, offset, Math.Min(count, _max)); }
+    }
+
+    /// <summary>A stream that cannot seek (a pipe, a device): data that was read once must not be needed again.</summary>
+    private sealed class ForwardOnlyStream : MemoryStream
+    {
+        public ForwardOnlyStream(byte[] data) : base(data) { }
+        public override bool CanSeek { get { return false; } }
+        public override long Seek(long offset, SeekOrigin loc) { throw new NotSupportedException(); }
+        public override long Position { get { throw new NotSupportedException(); } set { throw new NotSupportedException(); } }
     }
 
     private sealed class LyingLengthStream : MemoryStream
