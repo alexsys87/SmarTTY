@@ -43,6 +43,8 @@ public class MainWindowController : INotifyPropertyChanged
 
         private bool _LogInProgress;
 
+        private FileExplorer _FileListExplorer;
+
         public bool AutoCloseTabs
         {
             get
@@ -110,6 +112,62 @@ public class MainWindowController : INotifyPropertyChanged
             set
             {
                 _Controller.FullScreenMode = value;
+            }
+        }
+
+        public bool FileListVisible
+        {
+            get
+            {
+                return _Controller.ActiveSession?.ActiveTab?.FileExplorer?.IsVisible
+                    ?? _Controller.Settings.VirtualTerminal.ShowFileExplorer;
+            }
+            set
+            {
+                VirtualTerminalSettings virtualTerminalSettings = _Controller.Settings.VirtualTerminal;
+                if (virtualTerminalSettings.ShowFileExplorer != value)
+                {
+                    virtualTerminalSettings.ShowFileExplorer = value;
+                    _Controller.Settings.Save();
+                }
+                foreach (SessionWrapper allSession in _Controller.AllSessions)
+                {
+                    foreach (ITabContext tab in allSession.Tabs)
+                    {
+                        FileExplorer fileExplorer = tab.FileExplorer;
+                        if (fileExplorer != null && fileExplorer.IsVisible != value)
+                        {
+                            fileExplorer.IsVisible = value;
+                        }
+                    }
+                }
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("FileListVisible"));
+            }
+        }
+
+        internal void OnActiveTabChanged(ITabContext activeTab)
+        {
+            FileExplorer fileExplorer = activeTab?.FileExplorer;
+            if (_FileListExplorer != fileExplorer)
+            {
+                if (_FileListExplorer != null)
+                {
+                    _FileListExplorer.PropertyChanged -= FileListExplorer_PropertyChanged;
+                }
+                _FileListExplorer = fileExplorer;
+                if (_FileListExplorer != null)
+                {
+                    _FileListExplorer.PropertyChanged += FileListExplorer_PropertyChanged;
+                }
+            }
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("FileListVisible"));
+        }
+
+        private void FileListExplorer_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == "IsVisible")
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("FileListVisible"));
             }
         }
 
@@ -1697,6 +1755,7 @@ public class MainWindowController : INotifyPropertyChanged
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("RemoteFileSaveHeader"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SaveCommandVisibility"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReplayVisibility"));
+            MenuCommandHandlers?.OnActiveTabChanged(activeTab);
             _VirtualTerminalPopup.IsOpen = false;
             FocusMainControlDelayed(activeTab);
         }

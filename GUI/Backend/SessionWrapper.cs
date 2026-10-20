@@ -131,6 +131,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public System.Windows.Visibility SshOnlyVisibility => IsDevice ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
+    /// <summary>
+    /// Visibility of the "View -> File List" item: the file list only makes sense for SSH sessions, but the item
+    /// must stay available while an editor or a classic terminal tab of such a session is active.
+    /// </summary>
+    public System.Windows.Visibility FileListMenuVisibility => (IsDevice || IsPlaceholder) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+
     public DeviceTabContext DeviceTab => Tabs.OfType<DeviceTabContext>().FirstOrDefault();
 
     /// <summary>Non-null for a COM port: the key that must be unique among open sessions.</summary>

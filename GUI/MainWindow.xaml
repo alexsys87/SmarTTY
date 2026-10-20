@@ -163,7 +163,7 @@
             <Image Source="../icons/MainWindow/transfers.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="_File List" IsCheckable="True" IsChecked="{Binding Path=ActiveSession.ActiveTab.FileExplorer.IsVisible}" Visibility="{Binding Path=ActiveSession.ActiveTab.FileExplorer.MenuCommandVisibility, FallbackValue=Collapsed}" />
+        <MenuItem Header="_File List" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.FileListVisible}" Visibility="{Binding Path=ActiveSession.FileListMenuVisibility, FallbackValue=Collapsed}" />
         <MenuItem Header="_Close tab when shell exits" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.AutoCloseTabs}" />
         <MenuItem Header="Auto-_wrap lines" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.AutoWrapLines}" />
         <MenuItem Header="_Minimalistic mode" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.MinimalisticMode}" />
