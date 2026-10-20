@@ -761,15 +761,21 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
     }
 
-    private void SendToDevice(byte[] buffer, int count)
+    /// <summary>Queues data for the device; false when the connection has already ended and the data was dropped.</summary>
+    private bool SendToDevice(byte[] buffer, int count)
     {
         AsyncTransportConnection connection = _asyncTransportConnection;
         if (connection == null)
         {
             throw new InvalidOperationException("The connection is closed. Use Reconnect first.");
         }
-        connection.Send(buffer, count);
+        // A connection that has already ended drops the data; the toolbar says it is closed.
+        if (!connection.Send(buffer, count))
+        {
+            return false;
+        }
         Interlocked.Add(ref _bytesSent, count);
+        return true;
     }
 
     /// <summary>Reopens the connection when it is closed or failed; an established connection is left alone.</summary>
@@ -961,6 +967,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void OnDataReceived(object sender, byte[] buffer, int value)
     {
+        Interlocked.Add(ref _bytesReceived, value);
         if (_isXModemActive)
         {
             for (int i = 0; i < value; i++)
@@ -1037,7 +1044,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     }
                     byte[] copy = new byte[length];
                     Array.Copy(data, offset, copy, 0, length);
-                    SendToDevice(copy, length);
+                    if (!SendToDevice(copy, length))
+                    {
+                        throw new IOException("The connection is closed.");
+                    }
                 };
                 SmarTTY.IO.XModemTransfer.ProgressHandler progress = (bytesTransferred, totalBytes, errorCount, status) =>
                     transferForm.UpdateProgress(bytesTransferred, totalBytes, errorCount, status);
@@ -1339,8 +1349,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         if (sendAsHEXToolStripMenuItem.Checked)
         {
+            // Two digits make a byte; a space after a single digit ("A ") ends it early.
             string text = txtHexInput.Text.Trim();
-            if (text.Length >= 2 || text.EndsWith(" "))
+            if (text.Length >= 2 || (text.Length > 0 && txtHexInput.Text.EndsWith(" ")))
             {
                 btnSend_ButtonClick(null, null);
             }
@@ -1790,6 +1801,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
         int currentBaudRate = serial.AdvancedSettings?.BaudRate ?? 0;
+        if (currentBaudRate == 0 && string.IsNullOrWhiteSpace(text))
+        {
+            // The port uses the driver's settings and nothing was typed: leaving the box is not a request to change them.
+            return;
+        }
         if (!SerialPortRules.TryParseBaudRate(text, out int baudRate, out string error))
         {
             // Not a dialog: this runs from Leave and Enter, where a message box would steal the focus again.
