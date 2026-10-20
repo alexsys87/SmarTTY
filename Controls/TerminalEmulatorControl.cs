@@ -122,6 +122,8 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private Point _savedCursor;
 
+    private readonly DecCharsets _charsets = new DecCharsets();
+
     private bool _applicationKeypad;
 
     private bool _applicationCursorKeys;
@@ -295,7 +297,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 {
                     continue;
                 }
-                WriteText(output.Substring(segmentStart, charIndex - segmentStart));
+                WriteText(_charsets.Translate(output.Substring(segmentStart, charIndex - segmentStart)));
                 if (output[charIndex] != '\u001b')
                 {
                     base.ResetLinkTracking();
@@ -319,6 +321,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     case '\a':
                         Trace("<BEL>");
                         OnBell();
+                        break;
+                    case '\u000e':
+                        Trace("<SO>");
+                        _charsets.ShiftOut();
+                        break;
+                    case '\u000f':
+                        Trace("<SI>");
+                        _charsets.ShiftIn();
                         break;
                     case '\b':
                         Trace("<BACK>");
@@ -352,7 +362,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             }
             if (segmentStart < output.Length)
             {
-                WriteText(output.Substring(segmentStart, output.Length - segmentStart));
+                WriteText(_charsets.Translate(output.Substring(segmentStart, output.Length - segmentStart)));
             }
         }
         finally
@@ -477,6 +487,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 {
                     _incompleteEscape = text.Substring(position);
                     return _incompleteEscape.Length;
+                }
+                if (text[position + 1] == '(' || text[position + 1] == ')')
+                {
+                    // Character set designation: ESC ( 0 = DEC Special Graphics (line drawing) for G0, ESC ( B = ASCII.
+                    _charsets.Designate(text[position + 1], text[position + 2]);
                 }
                 escapeTrace?.SetRaw("[ESC]" + text.Substring(position, 2));
                 return 3;
@@ -1313,12 +1328,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     {
         base.BeginNewSession();
         MouseMode = MouseReportingMode.Off;
+        _charsets.Reset();
     }
 
     public override void Reset()
     {
         base.Reset();
         MouseMode = MouseReportingMode.Off;
+        _charsets.Reset();
         lock (_outputLock)
         {
             _pendingOutput = null;
