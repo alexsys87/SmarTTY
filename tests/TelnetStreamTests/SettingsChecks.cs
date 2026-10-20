@@ -171,5 +171,30 @@ internal static class SettingsChecks
         check(Rejects("[::1") && Rejects("[::1]x"), "quick telnet: a broken [ipv6] is rejected");
         check(Parse("host:65535").Port == 65535 && Parse("host:1").Port == 1, "quick telnet: the port range limits are accepted");
         check(Parse("h").IsValid(), "quick telnet: a parsed endpoint is valid");
+
+        // telnet over TLS and the data handed to the server
+        check(Parse("telnets://dev.local").Tls && Parse("telnets://dev.local").Port == 992 && Parse("telnets://dev.local").Host == "dev.local", "quick telnet: telnets:// means TLS on port 992");
+        check(Parse("TELNETS://dev.local:2992/").Port == 2992 && Parse("TELNETS://dev.local:2992/").Tls, "quick telnet: telnets:// with a port, in any case");
+        check(Parse("[::1]").Tls == false && Parse("host:23").Tls == false && Parse("telnet://host").Tls == false, "quick telnet: without telnets:// there is no TLS");
+        check(Parse("host").TerminalSpeed == DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalSpeed, "quick telnet: the terminal speed is reported by default");
+        DeviceTerminalSettings.ConnectionSettings.Telnet rich = new DeviceTerminalSettings.ConnectionSettings.Telnet
+        {
+            Host = "dev.local",
+            Port = 992,
+            Tls = true,
+            TlsAllowInvalidCertificate = true,
+            TerminalSpeed = "9600,9600",
+            XDisplayLocation = "pc:0.0",
+            EnvironmentVariables = "LANG=C\nTERM=vt100"
+        };
+        RawConnectionSettings richLoaded = RoundTrip(new RawConnectionSettings { Settings = new DeviceTerminalSettings { Connection = rich } }, out string richXml);
+        DeviceTerminalSettings.ConnectionSettings.Telnet richBack = richLoaded.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Telnet;
+        check(richBack != null && richBack.Tls && richBack.TlsAllowInvalidCertificate && richBack.TerminalSpeed == "9600,9600" && richBack.XDisplayLocation == "pc:0.0"
+            && richBack.EnvironmentVariables.Replace("\r", "") == "LANG=C\nTERM=vt100", "telnet: TLS, speed, display and variables survive the round trip");
+        DeviceTerminalSettings.ConnectionSettings.Telnet plain = new DeviceTerminalSettings.ConnectionSettings.Telnet { Host = "h", Port = 23 };
+        RawConnectionSettings plainLoaded = RoundTrip(new RawConnectionSettings { Settings = new DeviceTerminalSettings { Connection = plain } }, out string plainXml);
+        DeviceTerminalSettings.ConnectionSettings.Telnet plainBack = (DeviceTerminalSettings.ConnectionSettings.Telnet)plainLoaded.Settings.Connection;
+        check(!plainBack.Tls && plainBack.TerminalSpeed == null && plainBack.XDisplayLocation == null && plainBack.EnvironmentVariables == null,
+            "telnet: a profile saved without the new settings keeps them off (no TLS, nothing handed over)");
     }
 }

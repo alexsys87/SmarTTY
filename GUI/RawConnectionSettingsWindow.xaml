@@ -125,6 +125,35 @@
         <TextBox Grid.Column="1" Grid.Row="9" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetPasswordPrompts, UpdateSourceTrigger=PropertyChanged}" ToolTip="Texts separated by ';', case does not matter. Empty: password:;passcode:" />
       </Grid>
     </local:SettingsGroupBox>
+    <local:SettingsGroupBox Text="Telnet security (TLS)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+      <StackPanel Orientation="Vertical">
+        <CheckBox Name="chkTelnetTls" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetTls}" ToolTip="Telnet over TLS (telnets): the TLS handshake is made right after connecting and everything, including the password, travels encrypted. The port is 992 when none is given. The server must speak TLS from the first byte; the in-band STARTTLS option of Telnet is not supported.">
+          <TextBlock Text="Use TLS (telnets, default port 992)" />
+        </CheckBox>
+        <CheckBox Margin="25 4 0 2" VerticalContentAlignment="Center" IsEnabled="{Binding IsChecked, ElementName=chkTelnetTls}" IsChecked="{Binding TelnetTlsAllowInvalidCertificate}" ToolTip="For devices with a self-signed certificate. The connection stays encrypted, but nothing protects it against someone who sits between you and the server. Leave it off if unsure.">
+          <TextBlock Text="Accept any server certificate (insecure)" />
+        </CheckBox>
+      </StackPanel>
+    </local:SettingsGroupBox>
+    <local:SettingsGroupBox Text="Telnet data for the server (when it asks)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock Text="Terminal speed:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Margin="2" Width="120" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetTerminalSpeed, UpdateSourceTrigger=PropertyChanged}" ToolTip="Reported to the server when it asks (option TSPEED): 38400,38400 (transmit,receive) or one number for both. Empty: the option is refused." />
+        <TextBlock Text="X display location:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Grid.Row="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetXDisplayLocation, UpdateSourceTrigger=PropertyChanged}" ToolTip="Reported to the server when it asks (option XDISPLOC), for example mypc:0.0. The server's X programs connect to this display over the network, so use it only on a trusted network. Empty: the option is refused. It is also sent as the variable DISPLAY unless you set that variable below." />
+        <TextBlock Text="Environment variables:" Grid.Row="2" Style="{StaticResource HeaderText}" VerticalAlignment="Top" Margin="0 6 0 0" />
+        <TextBox Grid.Column="1" Grid.Row="2" Margin="2" Height="64" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="2 1 2 2" Text="{Binding TelnetEnvironmentVariables, UpdateSourceTrigger=PropertyChanged}" ToolTip="Handed to the server when it asks (option NEW-ENVIRON), one NAME=value per line; lines starting with # and invalid lines are ignored. Empty: the option is refused. Be careful with USER: some servers log that user in without asking for a password." />
+      </Grid>
+    </local:SettingsGroupBox>
     <local:SettingsGroupBox ImageSource="../icons/com16.png" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">
       <StackPanel Orientation="Vertical">
         <Grid Margin="0 0 0 0" IsEnabled="{Binding IsChecked, ElementName=rbCOM}">

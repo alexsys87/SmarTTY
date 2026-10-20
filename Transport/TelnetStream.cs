@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
@@ -16,7 +17,14 @@ namespace SmarTTY.Transport;
 ///   BINARY (0)                         - 8-bit clean data, CR is not followed by NUL any more,
 ///   TERMINAL-TYPE (24)                 - answers with the configured terminal type,
 ///   NAWS (31)                          - reports the terminal size, again whenever it changes,
-///   LINEMODE (34)                      - only when allowed (<see cref="TelnetOptions.AllowLineMode"/>): see below.
+///   LINEMODE (34)                      - only when allowed (<see cref="TelnetOptions.AllowLineMode"/>): see below,
+///   TSPEED (32)                        - the terminal speed (RFC 1079), only when one is configured,
+///   XDISPLOC (35)                      - the X display location (RFC 1096), only when one is configured,
+///   NEW-ENVIRON (39)                   - the environment variables (RFC 1572), only when some are configured,
+///   STATUS (5)                         - the state of the options is reported on request (RFC 859), and the server's
+///                                        state can be asked for (<see cref="RequestRemoteStatus"/>).
+/// The three options that hand data to the server (speed, display, environment) are never accepted unless the
+/// user configured something to hand over: a variable such as USER is acted upon by some servers.
 ///
 /// LINEMODE (RFC 1184): when the server asks for it and the MODE it sets includes EDIT, what the user types is kept
 /// in a line and sent as a whole when the line ends; Backspace / Delete, Ctrl+U and Ctrl+W edit the line, and the
@@ -58,10 +66,29 @@ internal sealed class TelnetStream : Stream
     internal const byte OptTerminalType = 24;
     internal const byte OptNaws = 31;
     internal const byte OptLineMode = 34;
+    internal const byte OptStatus = 5;
+    internal const byte OptTSpeed = 32;
+    internal const byte OptXDispLoc = 35;
+    internal const byte OptNewEnviron = 39;
 
     // TERMINAL-TYPE subnegotiation (RFC 1091).
     private const byte TerminalTypeIs = 0;
     private const byte TerminalTypeSend = 1;
+
+    // TSPEED (RFC 1079), XDISPLOC (RFC 1096) and STATUS (RFC 859) use the same two subnegotiation commands.
+    private const byte SubIs = 0;
+    private const byte SubSend = 1;
+
+    // NEW-ENVIRON subnegotiation (RFC 1572).
+    private const byte EnvIs = 0;
+    private const byte EnvSend = 1;
+    private const byte EnvVar = 0;
+    private const byte EnvValue = 1;
+    private const byte EnvEsc = 2;
+    private const byte EnvUserVar = 3;
+
+    // The variables RFC 1408 / 1572 call well known are sent as VAR, all the others as USERVAR.
+    private static readonly string[] WellKnownVariables = { "USER", "JOB", "ACCT", "PRINTER", "SYSTEMTYPE", "DISPLAY" };
 
     // LINEMODE subnegotiation (RFC 1184).
     private const byte LmMode = 1;
@@ -134,6 +161,18 @@ internal sealed class TelnetStream : Stream
 
     private readonly bool _allowLineMode;
 
+    // What is handed to the server on request; null / empty: the option is refused.
+    private readonly string _terminalSpeed;
+
+    private readonly string _xDisplayLocation;
+
+    private readonly List<KeyValuePair<string, string>> _environment;
+
+    // The server's answer to a STATUS request, and whether it arrived since the reading thread last looked.
+    private string _remoteStatus;
+
+    private bool _remoteStatusArrived;
+
     // Guards everything below and every write to _inner.
     private readonly object _lock = new object();
 
@@ -199,6 +238,9 @@ internal sealed class TelnetStream : Stream
         _activeNegotiation = options.ActiveNegotiation;
         _autoLogin = options.AutoLogin;
         _allowLineMode = options.AllowLineMode;
+        _terminalSpeed = NormalizeTerminalSpeed(options.TerminalSpeed);
+        _xDisplayLocation = NormalizeDisplayLocation(options.XDisplayLocation);
+        _environment = BuildEnvironment(options.Environment, _xDisplayLocation);
         _columns = ClampSize(options.Columns, DefaultColumns);
         _rows = ClampSize(options.Rows, DefaultRows);
     }
@@ -237,14 +279,113 @@ internal sealed class TelnetStream : Stream
             _local[OptSuppressGoAhead] = OptionState.Requested;
             _local[OptTerminalType] = OptionState.Requested;
             _local[OptNaws] = OptionState.Requested;
-            byte[] offer =
+            MemoryStream offer = new MemoryStream();
+            byte[] basic =
             {
                 IAC, DO, OptSuppressGoAhead,
                 IAC, WILL, OptSuppressGoAhead,
                 IAC, WILL, OptTerminalType,
                 IAC, WILL, OptNaws
             };
-            _inner.Write(offer, 0, offer.Length);
+            offer.Write(basic, 0, basic.Length);
+            // What the user configured to hand over is offered as well; the rest stays unmentioned.
+            OfferLocal(offer, OptTSpeed, _terminalSpeed != null);
+            OfferLocal(offer, OptXDispLoc, _xDisplayLocation != null);
+            OfferLocal(offer, OptNewEnviron, _environment.Count > 0);
+            byte[] bytes = offer.ToArray();
+            _inner.Write(bytes, 0, bytes.Length);
+        }
+    }
+
+    private void OfferLocal(MemoryStream offer, byte option, bool wanted)
+    {
+        if (!wanted)
+        {
+            return;
+        }
+        _local[option] = OptionState.Requested;
+        offer.WriteByte(IAC);
+        offer.WriteByte(WILL);
+        offer.WriteByte(option);
+    }
+
+    /// <summary>Raised on the reading thread when the server's answer to <see cref="RequestRemoteStatus"/> arrived.</summary>
+    public event EventHandler RemoteStatusReceived;
+
+    /// <summary>
+    /// What the server reported about its options (option STATUS), one entry per line; null until it answered.
+    /// </summary>
+    public string RemoteStatus
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _remoteStatus;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Asks the server to report the state of its options (STATUS SEND). False when the server did not offer STATUS
+    /// (it has not sent WILL STATUS); the answer arrives later, see <see cref="RemoteStatusReceived"/>.
+    /// </summary>
+    public bool RequestRemoteStatus()
+    {
+        lock (_lock)
+        {
+            if (_remote[OptStatus] != OptionState.On)
+            {
+                return false;
+            }
+            _inner.Write(new[] { IAC, SB, OptStatus, SubSend, IAC, SE }, 0, 6);
+            return true;
+        }
+    }
+
+    /// <summary>The options in force on our side and on the server's side, as text for the user.</summary>
+    public string DescribeOptions()
+    {
+        lock (_lock)
+        {
+            return "We do:\r\n" + DescribeOptions(_local) + "\r\n\r\nThe server does:\r\n" + DescribeOptions(_remote);
+        }
+    }
+
+    private static string DescribeOptions(OptionState[] states)
+    {
+        List<string> names = new List<string>();
+        for (int option = 0; option < states.Length; option++)
+        {
+            if (states[option] == OptionState.On)
+            {
+                names.Add("  " + OptionName((byte)option));
+            }
+        }
+        return names.Count == 0 ? "  (nothing)" : string.Join("\r\n", names.ToArray());
+    }
+
+    internal static string OptionName(byte option)
+    {
+        switch (option)
+        {
+            case OptBinary: return "BINARY";
+            case OptEcho: return "ECHO";
+            case OptStatus: return "STATUS";
+            case OptSuppressGoAhead: return "SUPPRESS-GO-AHEAD";
+            case OptTerminalType: return "TERMINAL-TYPE";
+            case OptNaws: return "NAWS";
+            case OptTSpeed: return "TSPEED";
+            case 33: return "TOGGLE-FLOW-CONTROL";
+            case OptLineMode: return "LINEMODE";
+            case OptXDispLoc: return "XDISPLOC";
+            case 37: return "AUTHENTICATION";
+            case 38: return "ENCRYPT";
+            case OptNewEnviron: return "NEW-ENVIRON";
+            case 42: return "CHARSET";
+            case 44: return "COM-PORT";
+            case 46: return "START-TLS";
+            default: return "option " + option;
         }
     }
 
@@ -334,6 +475,7 @@ internal sealed class TelnetStream : Stream
             }
             int produced;
             bool echoChanged;
+            bool statusArrived;
             lock (_lock)
             {
                 produced = Process(_readBuffer, received, buffer, offset);
@@ -341,6 +483,12 @@ internal sealed class TelnetStream : Stream
                 bool echoNow = _remote[OptEcho] == OptionState.On;
                 echoChanged = echoNow != _echoReported;
                 _echoReported = echoNow;
+                statusArrived = _remoteStatusArrived;
+                _remoteStatusArrived = false;
+            }
+            if (statusArrived)
+            {
+                RemoteStatusReceived?.Invoke(this, EventArgs.Empty);
             }
             if (echoChanged)
             {
@@ -592,13 +740,17 @@ internal sealed class TelnetStream : Stream
 
     private static bool AcceptsFromServer(byte option)
     {
-        return option == OptEcho || option == OptSuppressGoAhead || option == OptBinary;
+        return option == OptEcho || option == OptSuppressGoAhead || option == OptBinary || option == OptStatus;
     }
 
     private bool AcceptsFromUs(byte option)
     {
         return option == OptSuppressGoAhead || option == OptTerminalType || option == OptNaws || option == OptBinary
-            || (option == OptLineMode && _allowLineMode);
+            || option == OptStatus
+            || (option == OptLineMode && _allowLineMode)
+            || (option == OptTSpeed && _terminalSpeed != null)
+            || (option == OptXDispLoc && _xDisplayLocation != null)
+            || (option == OptNewEnviron && _environment.Count > 0);
     }
 
     private void OnWill(byte option)
@@ -689,6 +841,27 @@ internal sealed class TelnetStream : Stream
             byte[] name = Encoding.ASCII.GetBytes(_terminalType);
             _pendingReplies.Write(name, 0, name.Length);
             Reply(IAC, SE);
+        }
+        else if (_subOption == OptTSpeed && _local[OptTSpeed] == OptionState.On && _subLength >= 1 && _subData[0] == SubSend)
+        {
+            ReplyText(OptTSpeed, _terminalSpeed);
+        }
+        else if (_subOption == OptXDispLoc && _local[OptXDispLoc] == OptionState.On && _subLength >= 1 && _subData[0] == SubSend)
+        {
+            ReplyText(OptXDispLoc, _xDisplayLocation);
+        }
+        else if (_subOption == OptNewEnviron && _local[OptNewEnviron] == OptionState.On && _subLength >= 1 && _subData[0] == EnvSend)
+        {
+            OnEnvironmentRequest();
+        }
+        else if (_subOption == OptStatus && _local[OptStatus] == OptionState.On && _subLength >= 1 && _subData[0] == SubSend)
+        {
+            ReplyStatus();
+        }
+        else if (_subOption == OptStatus && _remote[OptStatus] == OptionState.On && _subLength >= 1 && _subData[0] == SubIs)
+        {
+            _remoteStatus = ParseStatus(_subData, 1, _subLength - 1);
+            _remoteStatusArrived = true;
         }
         else if (_subOption == OptLineMode && _local[OptLineMode] == OptionState.On && _subLength >= 1)
         {
@@ -1003,6 +1176,289 @@ internal sealed class TelnetStream : Stream
         _line.SetLength(length);
     }
 
+    // IAC SB <option> IS <text> IAC SE (TSPEED, XDISPLOC): the text is plain ASCII without any byte that needs escaping.
+    private void ReplyText(byte option, string text)
+    {
+        Reply(IAC, SB, option, SubIs);
+        byte[] bytes = Encoding.ASCII.GetBytes(text);
+        _pendingReplies.Write(bytes, 0, bytes.Length);
+        Reply(IAC, SE);
+    }
+
+    // The SEND of NEW-ENVIRON lists the variables the server wants: VAR / USERVAR followed by a name, a VAR or USERVAR
+    // without a name stands for all the variables of that kind, and an empty list for all of them. Every variable we
+    // have is answered with its value; one we do not have is answered with its name alone (it is not defined).
+    private void OnEnvironmentRequest()
+    {
+        List<KeyValuePair<byte, string>> requests = new List<KeyValuePair<byte, string>>();
+        int i = 1;
+        while (i < _subLength)
+        {
+            byte type = _subData[i++];
+            if (type != EnvVar && type != EnvUserVar)
+            {
+                continue;
+            }
+            MemoryStream name = new MemoryStream();
+            while (i < _subLength && _subData[i] != EnvVar && _subData[i] != EnvUserVar)
+            {
+                if (_subData[i] == EnvEsc && i + 1 < _subLength)
+                {
+                    i++;
+                }
+                name.WriteByte(_subData[i++]);
+            }
+            requests.Add(new KeyValuePair<byte, string>(type, name.Length == 0 ? null : Encoding.UTF8.GetString(name.ToArray())));
+        }
+        MemoryStream answer = new MemoryStream();
+        HashSet<string> added = new HashSet<string>(StringComparer.Ordinal);
+        if (requests.Count == 0)
+        {
+            foreach (KeyValuePair<string, string> variable in _environment)
+            {
+                AddVariable(answer, added, IsWellKnownVariable(variable.Key) ? EnvVar : EnvUserVar, variable.Key, variable.Value);
+            }
+        }
+        foreach (KeyValuePair<byte, string> request in requests)
+        {
+            if (request.Value == null)
+            {
+                foreach (KeyValuePair<string, string> variable in _environment)
+                {
+                    bool wellKnown = IsWellKnownVariable(variable.Key);
+                    if (wellKnown == (request.Key == EnvVar))
+                    {
+                        AddVariable(answer, added, request.Key, variable.Key, variable.Value);
+                    }
+                }
+                continue;
+            }
+            string value = null;
+            foreach (KeyValuePair<string, string> variable in _environment)
+            {
+                if (string.Equals(variable.Key, request.Value, StringComparison.Ordinal))
+                {
+                    value = variable.Value;
+                }
+            }
+            AddVariable(answer, added, request.Key, request.Value, value);
+        }
+        Reply(IAC, SB, OptNewEnviron, EnvIs);
+        byte[] bytes = answer.ToArray();
+        _pendingReplies.Write(bytes, 0, bytes.Length);
+        Reply(IAC, SE);
+    }
+
+    private static bool IsWellKnownVariable(string name)
+    {
+        return Array.IndexOf(WellKnownVariables, name) >= 0;
+    }
+
+    // value == null: the variable is not defined (its name only is sent).
+    private static void AddVariable(MemoryStream answer, HashSet<string> added, byte type, string name, string value)
+    {
+        if (!added.Add(type + ":" + name))
+        {
+            return;
+        }
+        answer.WriteByte(type);
+        WriteEnvironmentText(answer, name);
+        if (value != null)
+        {
+            answer.WriteByte(EnvValue);
+            WriteEnvironmentText(answer, value);
+        }
+    }
+
+    // A name or value may contain the bytes that mean something in the list: they are preceded by ESC (and IAC doubled).
+    private static void WriteEnvironmentText(MemoryStream answer, string text)
+    {
+        foreach (byte b in Encoding.UTF8.GetBytes(text))
+        {
+            if (b == EnvVar || b == EnvValue || b == EnvEsc || b == EnvUserVar)
+            {
+                answer.WriteByte(EnvEsc);
+            }
+            WriteEscaped(answer, b);
+        }
+    }
+
+    // STATUS IS: our side of every option that is on (WILL) and the server's side (DO). In the list, IAC and SE
+    // (a value of an option code) are doubled.
+    private void ReplyStatus()
+    {
+        MemoryStream status = new MemoryStream();
+        for (int option = 0; option < 256; option++)
+        {
+            if (_local[option] == OptionState.On)
+            {
+                status.WriteByte(WILL);
+                WriteStatusByte(status, (byte)option);
+            }
+            if (_remote[option] == OptionState.On)
+            {
+                status.WriteByte(DO);
+                WriteStatusByte(status, (byte)option);
+            }
+        }
+        Reply(IAC, SB, OptStatus, SubIs);
+        byte[] bytes = status.ToArray();
+        _pendingReplies.Write(bytes, 0, bytes.Length);
+        Reply(IAC, SE);
+    }
+
+    private static void WriteStatusByte(MemoryStream status, byte b)
+    {
+        status.WriteByte(b);
+        if (b == IAC || b == SE)
+        {
+            status.WriteByte(b);
+        }
+    }
+
+    // Reads the server's STATUS IS: WILL / WONT / DO / DONT <option> entries, and SB ... SE for an option with
+    // parameters (shown with its size only). The entries are returned one per line.
+    private static string ParseStatus(byte[] data, int start, int length)
+    {
+        List<string> entries = new List<string>();
+        int end = start + length;
+        int i = start;
+        while (i < end)
+        {
+            byte verb = data[i++];
+            if (verb == WILL || verb == WONT || verb == DO || verb == DONT)
+            {
+                if (i >= end)
+                {
+                    break;
+                }
+                byte option = data[i++];
+                if (option == SE && i < end && data[i] == SE)
+                {
+                    i++;
+                }
+                string name = verb == WILL ? "WILL " : verb == WONT ? "WONT " : verb == DO ? "DO " : "DONT ";
+                entries.Add(name + OptionName(option));
+            }
+            else if (verb == SB && i < end)
+            {
+                byte option = data[i++];
+                int size = 0;
+                while (i < end)
+                {
+                    byte b = data[i++];
+                    if (b == SE)
+                    {
+                        if (i < end && data[i] == SE)
+                        {
+                            i++;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    size++;
+                }
+                entries.Add("SB " + OptionName(option) + " (" + size + " bytes of parameters)");
+            }
+        }
+        return entries.Count == 0 ? "(no options)" : string.Join("\r\n", entries.ToArray());
+    }
+
+    /// <summary>
+    /// "9600" or "38400,9600" (transmit,receive) as sent in TSPEED; "9600" alone stands for both directions.
+    /// Null for an empty or invalid text: the option is then refused.
+    /// </summary>
+    internal static string NormalizeTerminalSpeed(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+        string[] parts = text.Trim().Split(',');
+        if (parts.Length == 1)
+        {
+            parts = new[] { parts[0], parts[0] };
+        }
+        if (parts.Length != 2)
+        {
+            return null;
+        }
+        string transmit = parts[0].Trim();
+        string receive = parts[1].Trim();
+        return IsSpeed(transmit) && IsSpeed(receive) ? transmit + "," + receive : null;
+    }
+
+    private static bool IsSpeed(string text)
+    {
+        if (text.Length < 1 || text.Length > 9)
+        {
+            return false;
+        }
+        foreach (char c in text)
+        {
+            if (c < '0' || c > '9')
+            {
+                return false;
+            }
+        }
+        return text.TrimStart('0').Length > 0;
+    }
+
+    /// <summary>The X display location (host:display[.screen]): printable ASCII only; null when empty or invalid.</summary>
+    internal static string NormalizeDisplayLocation(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+        text = text.Trim();
+        if (text.Length > 255)
+        {
+            return null;
+        }
+        foreach (char c in text)
+        {
+            if (c < 0x20 || c > 0x7E)
+            {
+                return null;
+            }
+        }
+        return text;
+    }
+
+    // The variables to hand over: valid ones only, later entries replace earlier ones with the same name, and
+    // DISPLAY comes from the X display location unless it was set explicitly.
+    private static List<KeyValuePair<string, string>> BuildEnvironment(IEnumerable<KeyValuePair<string, string>> variables, string displayLocation)
+    {
+        List<KeyValuePair<string, string>> result = new List<KeyValuePair<string, string>>();
+        if (variables != null)
+        {
+            foreach (KeyValuePair<string, string> variable in variables)
+            {
+                if (result.Count >= TelnetEnvironment.MaxVariables || !TelnetEnvironment.IsValidName(variable.Key) || !TelnetEnvironment.IsValidValue(variable.Value))
+                {
+                    continue;
+                }
+                int existing = result.FindIndex(candidate => string.Equals(candidate.Key, variable.Key, StringComparison.Ordinal));
+                if (existing >= 0)
+                {
+                    result[existing] = variable;
+                }
+                else
+                {
+                    result.Add(variable);
+                }
+            }
+        }
+        if (displayLocation != null && !result.Exists(candidate => candidate.Key == "DISPLAY"))
+        {
+            result.Add(new KeyValuePair<string, string>("DISPLAY", displayLocation));
+        }
+        return result;
+    }
+
     private byte[] BuildWindowSizeMessage()
     {
         MemoryStream message = new MemoryStream(16);
@@ -1096,4 +1552,96 @@ internal sealed class TelnetOptions
 
     /// <summary>Types the user name and the password when the server asks for them; null for no automatic login.</summary>
     public TelnetAutoLogin AutoLogin { get; set; }
+
+    /// <summary>
+    /// Reported to the server on request (option TSPEED): "9600" or "38400,9600". Empty: the option is refused.
+    /// </summary>
+    public string TerminalSpeed { get; set; }
+
+    /// <summary>
+    /// Reported to the server on request (option XDISPLOC): host:display[.screen]. Empty: the option is refused.
+    /// It also becomes the variable DISPLAY of NEW-ENVIRON unless that one is set explicitly.
+    /// </summary>
+    public string XDisplayLocation { get; set; }
+
+    /// <summary>
+    /// The variables handed to the server on request (option NEW-ENVIRON, see <see cref="TelnetEnvironment.Parse"/>).
+    /// Empty (and no X display location): the option is refused.
+    /// </summary>
+    public IEnumerable<KeyValuePair<string, string>> Environment { get; set; }
+}
+
+/// <summary>The variables of the NEW-ENVIRON option as the user writes them: one NAME=value per line.</summary>
+internal static class TelnetEnvironment
+{
+    public const int MaxVariables = 64;
+
+    public const int MaxNameLength = 64;
+
+    public const int MaxValueLength = 256;
+
+    /// <summary>
+    /// Reads "NAME=value" lines. Blank lines and lines starting with '#' are skipped, and so is every line that is
+    /// not valid (no '=', an empty or too long name, a control character); the first '=' ends the name.
+    /// </summary>
+    public static List<KeyValuePair<string, string>> Parse(string text)
+    {
+        List<KeyValuePair<string, string>> result = new List<KeyValuePair<string, string>>();
+        if (string.IsNullOrEmpty(text))
+        {
+            return result;
+        }
+        foreach (string rawLine in text.Split('\n'))
+        {
+            string line = rawLine.Trim('\r').TrimStart();
+            if (line.Length == 0 || line[0] == '#')
+            {
+                continue;
+            }
+            int equals = line.IndexOf('=');
+            if (equals <= 0)
+            {
+                continue;
+            }
+            string name = line.Substring(0, equals).Trim();
+            string value = line.Substring(equals + 1).Trim();
+            if (IsValidName(name) && IsValidValue(value))
+            {
+                result.Add(new KeyValuePair<string, string>(name, value));
+            }
+        }
+        return result;
+    }
+
+    public static bool IsValidName(string name)
+    {
+        if (string.IsNullOrEmpty(name) || name.Length > MaxNameLength)
+        {
+            return false;
+        }
+        foreach (char c in name)
+        {
+            if (c <= 0x20 || c > 0x7E || c == '=')
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static bool IsValidValue(string value)
+    {
+        if (value == null || value.Length > MaxValueLength)
+        {
+            return false;
+        }
+        foreach (char c in value)
+        {
+            if (c < 0x20 || c == 0x7F)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 }

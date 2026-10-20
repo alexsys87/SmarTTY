@@ -833,6 +833,19 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 ConnectWithSettings(new SettingsWrappers.SSH(_Connections, conn));
                 return;
             }
+            if (defaultItemName.StartsWith("/telnets:", StringComparison.InvariantCultureIgnoreCase))
+            {
+                // /telnets:host or /telnets:host:port - telnet over TLS (port 992 by default), not saved anywhere.
+                try
+                {
+                    PendingRawConnectionSettings = NewTelnetSettings(DeviceTerminalSettings.ConnectionSettings.Telnet.Parse("telnets://" + defaultItemName.Substring("/telnets:".Length)));
+                }
+                catch (FormatException exception)
+                {
+                    MessageBoxes.Exception(exception);
+                }
+                return;
+            }
             if (defaultItemName.StartsWith("/telnet:", StringComparison.InvariantCultureIgnoreCase))
             {
                 // /telnet:host or /telnet:host:port - a telnet connection that is not saved anywhere.
@@ -1122,7 +1135,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         {
             return CreateNewTcpConnection(wnd, NewTelnetSettings(new DeviceTerminalSettings.ConnectionSettings.Telnet
             {
-                Port = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort
+                Port = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort,
+                TerminalSpeed = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalSpeed
             }));
         }
 

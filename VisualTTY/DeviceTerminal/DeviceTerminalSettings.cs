@@ -134,6 +134,12 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
             public const string DefaultTerminalType = "xterm";
 
+            /// <summary>The port of telnet over TLS (telnets).</summary>
+            public const int DefaultTlsPort = 992;
+
+            /// <summary>The terminal speed (transmit,receive) that new connections report when the server asks.</summary>
+            public const string DefaultTerminalSpeed = "38400,38400";
+
             /// <summary>Reported to the server when it asks (option TERMINAL-TYPE).</summary>
             public string TerminalType { get; set; } = DefaultTerminalType;
 
@@ -151,6 +157,36 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
             /// server supports.
             /// </summary>
             public bool LineMode { get; set; }
+
+            /// <summary>
+            /// Reported to the server when it asks (option TSPEED): "9600" or "38400,9600" (transmit,receive).
+            /// Empty: the option is refused, as before it was supported.
+            /// </summary>
+            public string TerminalSpeed { get; set; }
+
+            /// <summary>
+            /// Reported to the server when it asks (option XDISPLOC): host:display[.screen], for example "pc:0.0".
+            /// Empty: the option is refused. The server's X programs connect to this display over the network.
+            /// </summary>
+            public string XDisplayLocation { get; set; }
+
+            /// <summary>
+            /// The environment variables handed to the server when it asks (option NEW-ENVIRON), one NAME=value per
+            /// line. Empty: the option is refused. Some servers act upon variables such as USER.
+            /// </summary>
+            public string EnvironmentVariables { get; set; }
+
+            /// <summary>
+            /// Telnet over TLS (telnets): the TLS handshake is made right after connecting, before any Telnet data.
+            /// The port is <see cref="DefaultTlsPort"/> when none is given.
+            /// </summary>
+            public bool Tls { get; set; }
+
+            /// <summary>
+            /// Accept any certificate of the server (self-signed, expired, for another name). The connection is still
+            /// encrypted but not protected against someone who sits in the middle. Only meaningful with <see cref="Tls"/>.
+            /// </summary>
+            public bool TlsAllowInvalidCertificate { get; set; }
 
             // --- automatic login: typed when the server asks, see TelnetAutoLogin ---
 
@@ -182,18 +218,25 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
             /// <summary>
             /// Reads what a user types for a quick connection: "host", "host:port", "[ipv6]:port", a bare IPv6 address,
-            /// each with an optional "telnet://" in front. The port is <see cref="DefaultPort"/> when none is given.
+            /// each with an optional "telnet://" in front, or "telnets://" for telnet over TLS. The port is
+            /// <see cref="DefaultPort"/> (<see cref="DefaultTlsPort"/> for telnets) when none is given.
             /// </summary>
             public static Telnet Parse(string text)
             {
                 const string expected = "Expected: hostname or hostname:port";
                 text = (text ?? "").Trim();
-                if (text.StartsWith("telnet://", System.StringComparison.OrdinalIgnoreCase))
+                bool tls = false;
+                if (text.StartsWith("telnets://", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    tls = true;
+                    text = text.Substring("telnets://".Length).TrimEnd('/');
+                }
+                else if (text.StartsWith("telnet://", System.StringComparison.OrdinalIgnoreCase))
                 {
                     text = text.Substring("telnet://".Length).TrimEnd('/');
                 }
                 string host = text;
-                int port = DefaultPort;
+                int port = tls ? DefaultTlsPort : DefaultPort;
                 if (text.StartsWith("[", System.StringComparison.Ordinal))
                 {
                     int closing = text.IndexOf(']');
@@ -229,7 +272,9 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
                 return new Telnet
                 {
                     Host = host,
-                    Port = port
+                    Port = port,
+                    Tls = tls,
+                    TerminalSpeed = DefaultTerminalSpeed
                 };
             }
 

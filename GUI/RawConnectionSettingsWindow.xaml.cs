@@ -154,6 +154,16 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public bool TelnetLineMode { get; set; }
 
+        public string TelnetTerminalSpeed { get; set; } = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalSpeed;
+
+        public string TelnetXDisplayLocation { get; set; }
+
+        public string TelnetEnvironmentVariables { get; set; }
+
+        public bool TelnetTls { get; set; }
+
+        public bool TelnetTlsAllowInvalidCertificate { get; set; }
+
         private int _TelnetKeepAliveSeconds;
 
         public int TelnetKeepAliveSeconds
@@ -244,7 +254,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 {
                     host = endpoint;
                     // A telnet server is expected on the telnet port unless another one is given.
-                    port = IsTelnet ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort : 0;
+                    port = IsTelnet ? (TelnetTls ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTlsPort : DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort) : 0;
                 }
                 else
                 {
@@ -261,6 +271,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                         LocalEcho = TelnetLocalEcho,
                         ActiveNegotiation = TelnetActiveNegotiation,
                         LineMode = TelnetLineMode,
+                        TerminalSpeed = string.IsNullOrWhiteSpace(TelnetTerminalSpeed) ? null : TelnetTerminalSpeed.Trim(),
+                        XDisplayLocation = string.IsNullOrWhiteSpace(TelnetXDisplayLocation) ? null : TelnetXDisplayLocation.Trim(),
+                        EnvironmentVariables = string.IsNullOrWhiteSpace(TelnetEnvironmentVariables) ? null : TelnetEnvironmentVariables.Trim(),
+                        Tls = TelnetTls,
+                        TlsAllowInvalidCertificate = TelnetTls && TelnetTlsAllowInvalidCertificate,
                         KeepAliveSeconds = TelnetKeepAliveSeconds,
                         AutoLoginUserName = string.IsNullOrWhiteSpace(TelnetAutoLoginUserName) ? null : TelnetAutoLoginUserName.Trim(),
                         EncryptedSavedPassword = EncryptTelnetPassword(),
@@ -278,7 +293,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         }
 
         public string TCPSettingsHeader => IsTelnet
-            ? "Telnet connection settings (default port " + DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort + ")"
+            ? "Telnet connection settings (default port " + DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort + ", with TLS " + DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTlsPort + ")"
             : "Raw TCP connection settings";
 
         public string SerialSettingsHeader { get; }
@@ -377,6 +392,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     TelnetLocalEcho = telnet.LocalEcho;
                     TelnetActiveNegotiation = telnet.ActiveNegotiation;
                     TelnetLineMode = telnet.LineMode;
+                    TelnetTerminalSpeed = telnet.TerminalSpeed;
+                    TelnetXDisplayLocation = telnet.XDisplayLocation;
+                    TelnetEnvironmentVariables = telnet.EnvironmentVariables;
+                    TelnetTls = telnet.Tls;
+                    TelnetTlsAllowInvalidCertificate = telnet.TlsAllowInvalidCertificate;
                     TelnetKeepAliveSeconds = telnet.KeepAliveSeconds;
                     TelnetAutoLoginUserName = telnet.AutoLoginUserName;
                     TelnetLoginPrompts = telnet.LoginPrompts;

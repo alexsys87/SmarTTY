@@ -202,10 +202,10 @@ internal static class Program
 
         // --- option negotiation: refused options ---
         {
-            FakeConnection connection = new FakeConnection(B(IAC, DO, 39, IAC, WILL, 5, IAC, DO, TelnetStream.OptEcho));
+            FakeConnection connection = new FakeConnection(B(IAC, DO, 39, IAC, WILL, 99, IAC, DO, TelnetStream.OptEcho));
             ReadAll(new TelnetStream(connection));
-            CheckBytes(connection.TakeWritten(), B(IAC, WONT, 39, IAC, DONT, 5, IAC, WONT, TelnetStream.OptEcho),
-                "unknown options and 'DO ECHO' are refused");
+            CheckBytes(connection.TakeWritten(), B(IAC, WONT, 39, IAC, DONT, 99, IAC, WONT, TelnetStream.OptEcho),
+                "unknown options, NEW-ENVIRON without variables and 'DO ECHO' are refused");
         }
 
         // --- no negotiation loops: a repeated request is not answered twice ---
@@ -679,8 +679,162 @@ internal static class Program
             Check(first.Length == 8192 && rest.Length == (9000 - 8192) + 2, "linemode: an overlong line goes out in pieces, nothing is lost");
         }
 
+        // --- TSPEED and XDISPLOC: answered only when something is configured ---
+        {
+            byte TS = TelnetStream.OptTSpeed;
+            FakeConnection refused = new FakeConnection(B(IAC, DO, TS, IAC, DO, TelnetStream.OptXDispLoc));
+            ReadAll(new TelnetStream(refused));
+            CheckBytes(refused.TakeWritten(), B(IAC, WONT, TS, IAC, WONT, TelnetStream.OptXDispLoc), "tspeed/xdisploc: refused while nothing is configured");
+
+            FakeConnection connection = Marked(B(IAC, DO, TS), B(IAC, SB, TS, 1, IAC, SE));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { TerminalSpeed = "38400,9600" });
+            ReadAllChunks(stream, 1);
+            CheckBytes(connection.TakeWritten(), B(IAC, WILL, TS), "tspeed: DO TSPEED is agreed to when a speed is configured");
+            ReadAllChunks(stream, 1);
+            CheckBytes(connection.TakeWritten(), Cat(B(IAC, SB, TS, 0), Text("38400,9600"), B(IAC, SE)), "tspeed: SEND is answered with the configured speed");
+
+            FakeConnection single = Marked(B(IAC, DO, TS), B(IAC, SB, TS, 1, IAC, SE));
+            TelnetStream singleStream = new TelnetStream(single, new TelnetOptions { TerminalSpeed = " 9600 " });
+            ReadAllChunks(singleStream, 2);
+            CheckBytes(single.TakeWritten(), Cat(B(IAC, WILL, TS), B(IAC, SB, TS, 0), Text("9600,9600"), B(IAC, SE)), "tspeed: one number stands for both directions");
+
+            FakeConnection invalid = new FakeConnection(B(IAC, DO, TS));
+            ReadAll(new TelnetStream(invalid, new TelnetOptions { TerminalSpeed = "fast" }));
+            CheckBytes(invalid.TakeWritten(), B(IAC, WONT, TS), "tspeed: an invalid speed is refused like none");
+
+            byte XD = TelnetStream.OptXDispLoc;
+            FakeConnection display = Marked(B(IAC, DO, XD), B(IAC, SB, XD, 1, IAC, SE));
+            TelnetStream displayStream = new TelnetStream(display, new TelnetOptions { XDisplayLocation = "pc.example:0.0" });
+            ReadAllChunks(displayStream, 2);
+            CheckBytes(display.TakeWritten(), Cat(B(IAC, WILL, XD), B(IAC, SB, XD, 0), Text("pc.example:0.0"), B(IAC, SE)), "xdisploc: the display location is reported on request");
+
+            FakeConnection notSent = Marked(B(IAC, SB, XD, 1, IAC, SE));
+            ReadAllChunks(new TelnetStream(notSent, new TelnetOptions { XDisplayLocation = "pc:0" }), 1);
+            Check(notSent.Written.Length == 0, "xdisploc: a request without the option being agreed is not answered");
+        }
+
+        // --- NEW-ENVIRON ---
+        {
+            byte NE = TelnetStream.OptNewEnviron;
+            byte[] Is(params byte[][] parts) => Cat(B(IAC, SB, NE, 0), Cat(parts), B(IAC, SE));
+            byte[] Var(string name, string value = null) => Cat(B(0), Text(name), value == null ? B() : Cat(B(1), Text(value)));
+            byte[] UserVar(string name, string value = null) => Cat(B(3), Text(name), value == null ? B() : Cat(B(1), Text(value)));
+            TelnetOptions Env(string text) => new TelnetOptions { Environment = TelnetEnvironment.Parse(text) };
+
+            FakeConnection refused = new FakeConnection(B(IAC, DO, NE));
+            ReadAll(new TelnetStream(refused));
+            CheckBytes(refused.TakeWritten(), B(IAC, WONT, NE), "new-environ: refused while there are no variables");
+
+            FakeConnection all = Marked(B(IAC, DO, NE), B(IAC, SB, NE, 1, IAC, SE));
+            TelnetStream allStream = new TelnetStream(all, Env("USER=bob\r\nLANG=C"));
+            ReadAllChunks(allStream, 1);
+            CheckBytes(all.TakeWritten(), B(IAC, WILL, NE), "new-environ: DO NEW-ENVIRON is agreed to when variables are configured");
+            ReadAllChunks(allStream, 1);
+            CheckBytes(all.TakeWritten(), Is(Var("USER", "bob"), UserVar("LANG", "C")), "new-environ: an empty SEND is answered with everything (USER as VAR, LANG as USERVAR)");
+
+            FakeConnection named2 = Marked(B(IAC, DO, NE), Cat(B(IAC, SB, NE, 1), Var("USER"), UserVar("FOO"), UserVar("LANG"), B(IAC, SE)));
+            TelnetStream named2Stream = new TelnetStream(named2, Env("USER=bob\nLANG=C"));
+            ReadAllChunks(named2Stream, 1);
+            named2.TakeWritten();
+            ReadAllChunks(named2Stream, 1);
+            CheckBytes(named2.TakeWritten(), Is(Var("USER", "bob"), UserVar("FOO"), UserVar("LANG", "C")), "new-environ: requested names get their value, an unknown one is answered by its name alone");
+
+            FakeConnection wild = Marked(B(IAC, DO, NE), Cat(B(IAC, SB, NE, 1, 0, IAC, SE)), Cat(B(IAC, SB, NE, 1, 3, IAC, SE)));
+            TelnetStream wildStream = new TelnetStream(wild, Env("USER=bob\nLANG=C\nTERM=vt"));
+            ReadAllChunks(wildStream, 1);
+            wild.TakeWritten();
+            ReadAllChunks(wildStream, 1);
+            CheckBytes(wild.TakeWritten(), Is(Var("USER", "bob")), "new-environ: a nameless VAR asks for the well-known variables only");
+            ReadAllChunks(wildStream, 1);
+            CheckBytes(wild.TakeWritten(), Is(UserVar("LANG", "C"), UserVar("TERM", "vt")), "new-environ: a nameless USERVAR asks for the user variables only");
+
+            // a name with bytes that mean something in the list is escaped in the request and in the answer
+            FakeConnection escaped = Marked(B(IAC, DO, NE), B(IAC, SB, NE, 1, 3, (byte)'A', 2, 1, (byte)'B', IAC, SE));
+            TelnetStream escapedStream = new TelnetStream(escaped, Env("X=1"));
+            ReadAllChunks(escapedStream, 1);
+            escaped.TakeWritten();
+            ReadAllChunks(escapedStream, 1);
+            CheckBytes(escaped.TakeWritten(), B(IAC, SB, NE, 0, 3, (byte)'A', 2, 1, (byte)'B', IAC, SE), "new-environ: ESC in a requested name is understood and sent back");
+
+            // the X display location becomes DISPLAY, unless DISPLAY is set explicitly
+            FakeConnection display = Marked(B(IAC, DO, NE), B(IAC, SB, NE, 1, IAC, SE));
+            TelnetStream displayStream = new TelnetStream(display, new TelnetOptions { XDisplayLocation = "pc:0.0" });
+            ReadAllChunks(displayStream, 1);
+            display.TakeWritten();
+            ReadAllChunks(displayStream, 1);
+            CheckBytes(display.TakeWritten(), Is(Var("DISPLAY", "pc:0.0")), "new-environ: the X display location is sent as DISPLAY");
+            FakeConnection explicitDisplay = Marked(B(IAC, DO, NE), B(IAC, SB, NE, 1, IAC, SE));
+            TelnetStream explicitStream = new TelnetStream(explicitDisplay, new TelnetOptions { XDisplayLocation = "pc:0.0", Environment = TelnetEnvironment.Parse("DISPLAY=other:1") });
+            ReadAllChunks(explicitStream, 1);
+            explicitDisplay.TakeWritten();
+            ReadAllChunks(explicitStream, 1);
+            CheckBytes(explicitDisplay.TakeWritten(), Is(Var("DISPLAY", "other:1")), "new-environ: an explicit DISPLAY wins over the display location");
+
+            // parsing the text of the setting
+            var parsed = TelnetEnvironment.Parse("A=1\r\n# comment\r\n\r\nbad line\r\n=x\r\n B = two \r\nC=a=b\r\nA=3\r\nD=\r\nE=tab\there");
+            Check(string.Join("|", parsed.Select(v => v.Key + "=" + v.Value)) == "A=1|B=two|C=a=b|A=3|D=",
+                "new-environ: lines are read as NAME=value, comments, blanks and invalid lines are skipped");
+            FakeConnection duplicates = Marked(B(IAC, DO, NE), B(IAC, SB, NE, 1, IAC, SE));
+            TelnetStream duplicateStream = new TelnetStream(duplicates, new TelnetOptions { Environment = parsed });
+            ReadAllChunks(duplicateStream, 1);
+            duplicates.TakeWritten();
+            ReadAllChunks(duplicateStream, 1);
+            CheckBytes(duplicates.TakeWritten(), Is(UserVar("A", "3"), UserVar("B", "two"), UserVar("C", "a=b"), UserVar("D", "")),
+                "new-environ: a later variable replaces an earlier one with the same name, an empty value is a value");
+        }
+
+        // --- STATUS ---
+        {
+            byte ST = TelnetStream.OptStatus;
+            FakeConnection connection = Marked(B(IAC, WILL, TelnetStream.OptEcho, IAC, DO, TelnetStream.OptNaws, IAC, DO, ST), B(IAC, SB, ST, 1, IAC, SE));
+            TelnetStream stream = new TelnetStream(connection);
+            ReadAllChunks(stream, 1);
+            CheckBytes(connection.TakeWritten(),
+                Cat(B(IAC, DO, TelnetStream.OptEcho, IAC, WILL, TelnetStream.OptNaws), B(IAC, SB, TelnetStream.OptNaws, 0, 80, 0, 24, IAC, SE), B(IAC, WILL, ST)),
+                "status: DO STATUS is agreed to");
+            ReadAllChunks(stream, 1);
+            CheckBytes(connection.TakeWritten(),
+                B(IAC, SB, ST, 0, DO, TelnetStream.OptEcho, WILL, ST, WILL, TelnetStream.OptNaws, IAC, SE),
+                "status: SEND is answered with the options that are on (WILL ours, DO the server's)");
+            Check(stream.DescribeOptions().Contains("NAWS") && stream.DescribeOptions().Contains("ECHO"), "status: the options in force can be listed");
+
+            // the other direction: the server offers STATUS and we ask
+            FakeConnection asking = Marked(B(IAC, WILL, ST), Cat(B(IAC, SB, ST, 0, WILL, TelnetStream.OptEcho, DO, TelnetStream.OptNaws, WILL, SE, SE, SB, 24, 1, 2, SE, IAC, SE)));
+            TelnetStream askingStream = new TelnetStream(asking);
+            int received = 0;
+            askingStream.RemoteStatusReceived += (sender, args) => received++;
+            Check(!askingStream.RequestRemoteStatus(), "status: the server's state cannot be asked for before it offered STATUS");
+            Check(asking.Written.Length == 0, "status: ...and nothing is sent then");
+            ReadAllChunks(askingStream, 1);
+            CheckBytes(asking.TakeWritten(), B(IAC, DO, ST), "status: WILL STATUS of the server is accepted");
+            Check(askingStream.RequestRemoteStatus(), "status: the server's state can be asked for after that");
+            CheckBytes(asking.TakeWritten(), B(IAC, SB, ST, 1, IAC, SE), "status: the request is STATUS SEND");
+            ReadAllChunks(askingStream, 1);
+            Check(received == 1, "status: the server's report raises the event once");
+            Check(askingStream.RemoteStatus == "WILL ECHO\r\nDO NAWS\r\nWILL option 240\r\nSB TERMINAL-TYPE (2 bytes of parameters)",
+                "status: the server's report is read (a doubled SE is one option code, SB entries are summarized)");
+        }
+
+        // --- active negotiation also offers what is configured to hand over ---
+        {
+            FakeConnection connection = new FakeConnection();
+            new TelnetStream(connection, new TelnetOptions { ActiveNegotiation = true, TerminalSpeed = "9600" }).Start();
+            CheckBytes(connection.TakeWritten(),
+                B(IAC, DO, TelnetStream.OptSuppressGoAhead, IAC, WILL, TelnetStream.OptSuppressGoAhead, IAC, WILL, TelnetStream.OptTerminalType, IAC, WILL, TelnetStream.OptNaws, IAC, WILL, TelnetStream.OptTSpeed),
+                "active negotiation: a configured terminal speed is offered");
+            FakeConnection all = new FakeConnection(B(IAC, DO, TelnetStream.OptTSpeed, IAC, DO, TelnetStream.OptNewEnviron));
+            TelnetStream stream = new TelnetStream(all, new TelnetOptions { ActiveNegotiation = true, TerminalSpeed = "9600", Environment = TelnetEnvironment.Parse("USER=u") });
+            stream.Start();
+            all.TakeWritten();
+            ReadAll(stream);
+            Check(all.Written.Length == 0, "active negotiation: the server's agreement to the extra offers is not answered again");
+        }
+
         // --- saved telnet connections (settings classes) ---
         SettingsChecks.Run(Check);
+
+        // --- telnet over TLS ---
+        TlsChecks.Run(Check);
 
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed.");

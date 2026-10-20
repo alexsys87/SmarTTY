@@ -27,7 +27,30 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
 
     private int _rows = TelnetStream.DefaultRows;
 
-    public string ConnectingMessage => "Connecting to " + _telnet.Host + ":" + _telnet.Port + " (telnet)...";
+    public string ConnectingMessage => "Connecting to " + _telnet.Host + ":" + _telnet.Port + (_telnet.Tls ? " (telnet over TLS)..." : " (telnet)...");
+
+    /// <summary>The server answered a status request (<see cref="RequestRemoteStatus"/>). Raised on the reading thread.</summary>
+    public event EventHandler RemoteStatusReceived;
+
+    /// <summary>What the server reported about its options (option STATUS); null until it answered.</summary>
+    public string RemoteStatus => _stream?.RemoteStatus;
+
+    /// <summary>Asks the server to report its options; false when it did not offer the STATUS option.</summary>
+    public bool RequestRemoteStatus()
+    {
+        TelnetStream stream = _stream;
+        if (stream == null)
+        {
+            throw new InvalidOperationException("The connection is not open.");
+        }
+        return stream.RequestRemoteStatus();
+    }
+
+    /// <summary>The options in force on both sides, as text; empty when there is no connection.</summary>
+    public string DescribeOptions()
+    {
+        return _stream?.DescribeOptions() ?? "";
+    }
 
     /// <summary>The server started or stopped echoing what is typed. Raised on the reading thread.</summary>
     public event EventHandler RemoteEchoChanged;
@@ -61,16 +84,26 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 columns = _columns;
                 rows = _rows;
             }
-            stream = new TelnetStream(client.GetStream(), new TelnetOptions
+            Stream wire = client.GetStream();
+            if (_telnet.Tls)
+            {
+                // The certificate is checked against the name the user typed, not against the resolved address.
+                wire = TelnetTls.Authenticate(wire, _telnet.Host, _telnet.TlsAllowInvalidCertificate);
+            }
+            stream = new TelnetStream(wire, new TelnetOptions
             {
                 TerminalType = _telnet.TerminalType,
                 Columns = columns,
                 Rows = rows,
                 ActiveNegotiation = _telnet.ActiveNegotiation,
                 AllowLineMode = _telnet.LineMode,
-                AutoLogin = CreateAutoLogin()
+                AutoLogin = CreateAutoLogin(),
+                TerminalSpeed = _telnet.TerminalSpeed,
+                XDisplayLocation = _telnet.XDisplayLocation,
+                Environment = TelnetEnvironment.Parse(_telnet.EnvironmentVariables)
             });
             stream.RemoteEchoChanged += OnStreamRemoteEchoChanged;
+            stream.RemoteStatusReceived += OnStreamRemoteStatusReceived;
             stream.Start();
         }
         catch
@@ -105,7 +138,7 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
     public string GetDisplayName(bool includeParameters)
     {
         string name = _telnet.Host + ":" + _telnet.Port;
-        return includeParameters ? name + " (telnet)" : name;
+        return includeParameters ? name + (_telnet.Tls ? " (telnet over TLS)" : " (telnet)") : name;
     }
 
     /// <summary>
@@ -195,6 +228,11 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
     private void OnStreamRemoteEchoChanged(object sender, EventArgs e)
     {
         RemoteEchoChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnStreamRemoteStatusReceived(object sender, EventArgs e)
+    {
+        RemoteStatusReceived?.Invoke(this, EventArgs.Empty);
     }
 
     // The caller holds _sizeLock.

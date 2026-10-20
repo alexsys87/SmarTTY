@@ -29,7 +29,7 @@ public partial class QuickConnectionWindow : Window, IComponentConnector
             txtPassword.Visibility = Visibility.Collapsed;
             if (Resources["MachineHint"] is VisualBrush hint && hint.Visual is TextBlock hintText)
             {
-                hintText.Text = "hostname[:port]";
+                hintText.Text = "hostname[:port] or telnets://hostname";
             }
         }
     }

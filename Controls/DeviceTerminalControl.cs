@@ -309,6 +309,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private void AttachTelnet(TelnetTransport transport, DeviceTerminalSettings.ConnectionSettings.Telnet settings)
     {
         _telnetTransport = transport;
+        transport.RemoteStatusReceived += (sender, args) => OnTelnetStatusReceived(transport);
         _serialTerminalControl.LocalEcho = false;
         switch (settings.LocalEcho)
         {
@@ -368,6 +369,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
             AddTelnetCommand("Send Are You There (AYT)", TelnetStream.AreYouThere);
             AddTelnetCommand("Send Erase Line", TelnetStream.EraseLine);
             AddTelnetCommand("Send NOP", TelnetStream.NOP);
+            _telnetMenu.DropDownItems.Add(new ToolStripSeparator());
+            _telnetMenu.DropDownItems.Add(new ToolStripMenuItem("Show negotiated options", null, (sender, args) => ShowTelnetOptions()));
+            _telnetMenu.DropDownItems.Add(new ToolStripMenuItem("Ask server for its option status (STATUS)", null, (sender, args) => RequestTelnetStatus()));
             _telnetMenu.DropDownOpening += (sender, args) =>
             {
                 bool connected = _connectionState == ConnectionStateEnum.Connected && _telnetTransport != null;
@@ -379,6 +383,59 @@ public partial class DeviceTerminalControl : DpiAwareControl
             contextMenuStrip1.Items.Add(_telnetMenu);
         }
         _telnetMenu.Visible = true;
+    }
+
+    private void ShowTelnetOptions()
+    {
+        TelnetTransport transport = _telnetTransport;
+        if (transport == null)
+        {
+            return;
+        }
+        MessageBox.Show(transport.DescribeOptions(), "Telnet options", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void RequestTelnetStatus()
+    {
+        TelnetTransport transport = _telnetTransport;
+        if (transport == null)
+        {
+            return;
+        }
+        try
+        {
+            if (!transport.RequestRemoteStatus())
+            {
+                MessageBox.Show("The server did not offer to report its option status (the STATUS option).", "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+        catch (Exception)
+        {
+            // The connection is gone; the status line says so.
+        }
+    }
+
+    private void OnTelnetStatusReceived(TelnetTransport transport)
+    {
+        // Raised on the reading thread.
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return;
+        }
+        try
+        {
+            BeginInvoke((Action)(() =>
+            {
+                if (!IsDisposed && ReferenceEquals(transport, _telnetTransport))
+                {
+                    MessageBox.Show("The server reports these options:\r\n\r\n" + transport.RemoteStatus, "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }));
+        }
+        catch (InvalidOperationException)
+        {
+            // The window is closing.
+        }
     }
 
     private void AddTelnetCommand(string text, byte command)
