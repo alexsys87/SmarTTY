@@ -55,13 +55,6 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public System.Collections.Generic.IReadOnlyList<TerminalEncodings.Choice> TextEncodings => TerminalEncodings.All;
 
-        public DeviceTerminalSettings.CharacterDisplayMode[] DisplayModes { get; } = new DeviceTerminalSettings.CharacterDisplayMode[3]
-        {
-            DeviceTerminalSettings.CharacterDisplayMode.ASCII,
-            DeviceTerminalSettings.CharacterDisplayMode.HEX,
-            DeviceTerminalSettings.CharacterDisplayMode.Both
-        };
-
         public string MaximumSpeed
         {
             get
