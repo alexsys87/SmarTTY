@@ -1,4 +1,5 @@
-﻿using SmarTTY.TextEditing;
+﻿using SmarTTY.Terminal;
+using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -32,6 +33,17 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
         public bool Inverse;
 
+        public bool Underline;
+
+        /// <summary>
+        /// 256-colour or 24-bit foreground set by SGR 38/90-97; 0 when <see cref="Foreground"/> applies.
+        /// Encoded as palette index + 1 (1..256) or <see cref="XtermProtocol.RgbColorFlag"/> | 0xRRGGBB.
+        /// </summary>
+        public int ExtendedForeground;
+
+        /// <summary>The same as <see cref="ExtendedForeground"/> for the background (SGR 48/100-107).</summary>
+        public int ExtendedBackground;
+
         public ForegroundOverride Override;
 
         internal LinkCell _link;
@@ -44,7 +56,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         {
             get
             {
-                if (Foreground == 0 && Background == 0 && !Bold && !Inverse && Override == null)
+                if (Foreground == 0 && Background == 0 && ExtendedForeground == 0 && ExtendedBackground == 0 && !Bold && !Inverse && !Underline && Override == null)
                 {
                     return _link.Target == null;
                 }
@@ -54,7 +66,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
         public bool StyleEquals(CellStyle cellStyle)
         {
-            if (Foreground == cellStyle.Foreground && Background == cellStyle.Background && Bold == cellStyle.Bold && Inverse == cellStyle.Inverse && object.Equals(Override, cellStyle.Override))
+            if (Foreground == cellStyle.Foreground && Background == cellStyle.Background && ExtendedForeground == cellStyle.ExtendedForeground && ExtendedBackground == cellStyle.ExtendedBackground && Bold == cellStyle.Bold && Inverse == cellStyle.Inverse && Underline == cellStyle.Underline && object.Equals(Override, cellStyle.Override))
             {
                 return object.Equals(_link, cellStyle._link);
             }
@@ -301,13 +313,19 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 LineInfo lineInfo = this._lines[textPosition.Line];
                 lineInfo.IsDimmed = false;
                 lineInfo.IsWrapped = false;
-                for (int column = textPosition.Column + count; column < lineInfo.Cells.Length; column++)
+                if (lineInfo.Cells == null || textPosition.Column >= lineInfo.Cells.Length || count <= 0)
+                {
+                    return;
+                }
+                // Shift right-to-left so that every cell is moved before it is overwritten.
+                for (int column = lineInfo.Cells.Length - 1; column >= textPosition.Column + count; column--)
                 {
                     lineInfo.Cells[column] = lineInfo.Cells[column - count];
                 }
-                for (int offset = 0; offset < count; offset++)
+                CellStyle insertedStyle = lineInfo.Cells[textPosition.Column];
+                for (int offset = 0; offset < count && textPosition.Column + offset < lineInfo.Cells.Length; offset++)
                 {
-                    lineInfo.Cells[textPosition.Column + offset] = lineInfo.Cells[textPosition.Column];
+                    lineInfo.Cells[textPosition.Column + offset] = insertedStyle;
                 }
             }
         }
@@ -569,6 +587,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     private BrushPalette _palette = new BrushPalette(ConsolePalette.PuTTY);
 
+    // Brushes of 256-colour and 24-bit colours, created on first use.
+    private readonly Dictionary<int, Brush> _extendedBrushes = new Dictionary<int, Brush>();
+
     public Brush InactiveBrush = Brushes.DarkGray;
 
     public CellStyle CurrentStyle;
@@ -635,7 +656,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
             {
                 value.X = 0;
             }
-            if (value.Y > ((ReadonlyTextBrowser)this)._visibleRows)
+            if (value.Y >= ((ReadonlyTextBrowser)this)._visibleRows)
             {
                 value.Y = ((ReadonlyTextBrowser)this)._visibleRows - 1;
             }
@@ -1022,7 +1043,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 ClearLineFrom(point.Y, point.X, CurrentStyle);
                 break;
             case EraseMode.ToStart:
-                WriteAt(new Point(0, point.Y), new string(' ', point.X + 1), CurrentStyle);
+                // At the pending-wrap position (X == columns) the line ends at the last column: erasing one more
+                // character would wrap onto the next line and blank its first cell.
+                WriteAt(new Point(0, point.Y), new string(' ', Math.Min(point.X + 1, _visibleColumns)), CurrentStyle);
                 break;
             case EraseMode.All:
                 ClearLineFrom(point.Y, 0, CurrentStyle);
@@ -1033,6 +1056,12 @@ public partial class TerminalEmulatorBase : TextEditorControl
     public void DeleteChars(int count)
     {
         TextDocument.TextPosition textPosition = ToDocumentPosition(CursorPosition);
+        int lineLength = base.EditableDocument.GetLineText(textPosition.Line).Length;
+        if (textPosition.Column >= lineLength)
+        {
+            return;
+        }
+        count = Math.Min(count, lineLength - textPosition.Column);
         base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, count, "");
         ActiveBuffer.Lines.DeleteCells(CursorPosition, count);
         Redraw();
@@ -1040,10 +1069,26 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     public void InsertChars(int count, char ch = ' ')
     {
-        TextDocument.TextPosition textPosition = ToDocumentPosition(CursorPosition);
+        TextDocument.TextPosition textPosition = EnsureCursorPosition(CursorPosition);
         base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, new string(ch, count));
         ActiveBuffer.Lines.InsertCells(CursorPosition, count);
+        TruncateToScreenWidth(textPosition.Line);
         Redraw();
+    }
+
+    // Characters pushed past the right margin by an insertion are lost, as on a real terminal; keeping them
+    // would leave text beyond the screen edge that shows up again when the line is copied or the window widened.
+    private void TruncateToScreenWidth(int documentLine)
+    {
+        if (!_autoWrap)
+        {
+            return;
+        }
+        int length = base.EditableDocument.GetLineText(documentLine).Length;
+        if (length > _visibleColumns)
+        {
+            base.EditableDocument.ReplaceInLine(documentLine, _visibleColumns, length - _visibleColumns, "");
+        }
     }
 
     internal virtual ILinkScanner CreateLinkScanner()
@@ -1096,6 +1141,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         {
             base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, text);
             ActiveBuffer.Lines.InsertCells(point, text.Length);
+            TruncateToScreenWidth(textPosition.Line);
         }
         else
         {
@@ -1129,7 +1175,8 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
         else
         {
-            ActiveBuffer.Lines.SetCells(textPosition.Line, startColumn, -1, CellStyle.Default);
+            // SetCells takes a screen row (it adds the scrollback offset itself).
+            ActiveBuffer.Lines.SetCells(line, startColumn, -1, CellStyle.Default);
         }
         this.EnsureCursorPosition(_cursor);
         if (!cellStyle.IsDefault)
@@ -1154,10 +1201,44 @@ public partial class TerminalEmulatorBase : TextEditorControl
         _palette = new BrushPalette(consolePalette);
     }
 
+    // Resolves a 256-colour or 24-bit colour (see CellStyle.ExtendedForeground); the 16 base colours keep
+    // following the user's palette.
+    private Brush GetExtendedBrush(int encodedColor)
+    {
+        int rgb;
+        if ((encodedColor & XtermProtocol.RgbColorFlag) != 0)
+        {
+            rgb = encodedColor & 0xFFFFFF;
+        }
+        else
+        {
+            int index = encodedColor - 1;
+            if (index < 8)
+            {
+                return _palette.GetBrush((byte)(index + 1), bright: false);
+            }
+            if (index < 16)
+            {
+                return _palette.GetBrush((byte)(index - 7), bright: true);
+            }
+            rgb = XtermProtocol.Xterm256ToRgb(index);
+        }
+        if (!_extendedBrushes.TryGetValue(rgb, out Brush brush))
+        {
+            if (_extendedBrushes.Count > 4096)
+            {
+                _extendedBrushes.Clear();
+            }
+            brush = new SolidBrush(Color.FromArgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF));
+            _extendedBrushes[rgb] = brush;
+        }
+        return brush;
+    }
+
     private ColorSpan CreateColorSpan(int start, int end, CellStyle cellStyle)
     {
-        Brush foregroundBrush = ((cellStyle.Foreground != 0 || !cellStyle.Bold) ? _palette.GetBrush(cellStyle.Foreground, cellStyle.Bold) : _defaultForeBrush);
-        Brush backgroundBrush = _palette.GetBrush(cellStyle.Background, bright: false);
+        Brush foregroundBrush = (cellStyle.ExtendedForeground != 0) ? GetExtendedBrush(cellStyle.ExtendedForeground) : ((cellStyle.Foreground != 0 || !cellStyle.Bold) ? _palette.GetBrush(cellStyle.Foreground, cellStyle.Bold) : _defaultForeBrush);
+        Brush backgroundBrush = (cellStyle.ExtendedBackground != 0) ? GetExtendedBrush(cellStyle.ExtendedBackground) : _palette.GetBrush(cellStyle.Background, bright: false);
         if (cellStyle.Inverse)
         {
             Brush swapBrush = foregroundBrush;
@@ -1182,7 +1263,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
             Background = backgroundBrush,
             Start = start,
             End = end,
-            Underline = (cellStyle._link.Target?.IsActive ?? false)
+            Underline = cellStyle.Underline || (cellStyle._link.Target?.IsActive ?? false)
         };
     }
 
@@ -1291,6 +1372,20 @@ public partial class TerminalEmulatorBase : TextEditorControl
         OnTextReplaced();
     }
 
+    /// <summary>
+    /// Blanks the active screen buffer and its colours, keeping the cursor where it is. Used when an application
+    /// switches to the alternate screen (modes 1047/1049), which must not show what the previous one left there.
+    /// </summary>
+    protected void ClearActiveScreen()
+    {
+        base.EditableDocument.Clear();
+        ActiveBuffer.FirstRow = 0;
+        ActiveBuffer.Lines.Clear();
+        SetSelection(select: false, new TextDocument.TextPosition(0, 0));
+        EnsureCursorPosition(_cursor);
+        OnTextReplaced();
+    }
+
     private void DeleteLines(int line, int count, bool scroll)
     {
         if (scroll)
@@ -1383,7 +1478,8 @@ public partial class TerminalEmulatorBase : TextEditorControl
             Top = top,
             Bottom = bottom
         };
-        CursorPosition = new Point(top, 0);
+        // DECSTBM moves the cursor to the home position.
+        CursorPosition = new Point(0, 0);
         this.EnsureCursorPosition(_cursor);
     }
 

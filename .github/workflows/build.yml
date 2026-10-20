@@ -44,6 +44,9 @@ jobs:
       - name: Run terminal text checks (DEC graphics, UTF-8 decoding)
         run: dotnet run --project tests/TerminalTextTests -c Release
 
+      - name: Run xterm protocol checks (modified keys, mouse, paste, SGR colours)
+        run: dotnet run --project tests/XtermProtocolTests -c Release
+
       - name: Run serial port settings and line status checks
         run: dotnet run --project tests/SerialPortRulesTests -c Release
 

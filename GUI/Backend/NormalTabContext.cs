@@ -3,6 +3,7 @@ using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
 using System.ComponentModel;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms.Integration;
@@ -102,20 +103,57 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public void OnSessionReconnected(SshSession session)
     {
-        if (Terminal.Tag is TerminalTag terminalTag)
+        // Only a classic terminal owns a shell channel. A Smart Terminal tab runs every command in a channel of its
+        // own through the session context, so it picks the new session up by itself and must not get a shell.
+        if (Terminal.Tag is TerminalTag terminalTag && terminalTag.Channel != null)
         {
-            SshShellChannel sshShellChannel = session.OpenShellChannel(null, "xterm");
-            sshShellChannel.ExtendedDataMode = ExtendedDataMode.Merge;
+            SshShellChannel previousChannel = terminalTag.Channel;
             Terminal.BeginNewSession();
-            terminalTag.Channel = sshShellChannel;
             Terminal.HideCaret = false;
-            _Session.AttachChannelToControl(Terminal, sshShellChannel, isAutoLaunchedCommand: false);
+            try
+            {
+                SshShellChannel sshShellChannel = session.OpenShellChannel(null, "xterm");
+                sshShellChannel.ExtendedDataMode = ExtendedDataMode.Merge;
+                terminalTag.Channel = sshShellChannel;
+                _Session.AttachChannelToControl(Terminal, sshShellChannel, isAutoLaunchedCommand: false);
+            }
+            catch (Exception exception)
+            {
+                // Keep the other tabs reconnecting; this one shows why it has no shell.
+                Terminal.ProcessOutput(TerminalEmulatorControl.Colorize("Failed to open a shell: " + exception.Message, 1) + "\r\n");
+            }
+            DisposeChannel(previousChannel);
         }
     }
 
     public void Dispose()
     {
+        // Closing the tab ends its remote shell; otherwise the channel would stay open until the whole session
+        // is closed and keep receiving output for a terminal that no longer exists.
+        if (Terminal.Tag is TerminalTag terminalTag)
+        {
+            DisposeChannel(terminalTag.Channel);
+        }
         Terminal.Dispose();
+    }
+
+    // Closing a channel waits for the server to confirm it, so it is done off the UI thread.
+    private static void DisposeChannel(SshShellChannel channel)
+    {
+        if (channel == null)
+        {
+            return;
+        }
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            try
+            {
+                channel.Dispose();
+            }
+            catch
+            {
+            }
+        });
     }
 
     public void Close()

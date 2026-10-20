@@ -245,6 +245,18 @@ internal static class SshIntegrationTests
         string output = ReadToEnd(channel.Output);
         channel.WaitClosed();
         Test.Check(output.Contains("shell-works"), "the shell channel runs the typed command");
+        Test.Check(!channel.ClosedByConnectionLoss, "a shell that exits is not reported as closed by a lost connection");
+        Test.Check(!channel.IsDisposed, "IsDisposed is false before Dispose");
+        channel.Dispose();
+        Test.Check(channel.IsDisposed, "IsDisposed is true after Dispose");
+
+        // A terminal tab must not take the end of the session for the shell exiting (that would close the tab).
+        SshSession closing = Connect();
+        SshShellChannel open = closing.OpenShellChannel(command: null, terminalType: "xterm");
+        closing.Dispose();
+        Test.Check(open.TryWaitClosed(), "disposing the session closes its open channels");
+        Test.Check(open.ClosedByConnectionLoss, "a channel still open when the session ends is reported as closed by the connection");
+        open.Dispose();
     }
 
     private static void ExtendedData()
@@ -356,6 +368,7 @@ internal static class SshIntegrationTests
         ReadToEnd(channel.Output);
         Test.Check(lost.WaitOne(TimeSpan.FromSeconds(30)), "ConnectionLost is raised when the connection goes away");
         Test.Check(channel.TryWaitClosed(), "open channels are closed when the connection goes away");
+        Test.Check(channel.ClosedByConnectionLoss, "a channel closed by the lost connection says so");
     }
 
     private static string ReadToEnd(Stream stream)
