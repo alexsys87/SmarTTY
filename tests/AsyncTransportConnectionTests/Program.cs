@@ -30,7 +30,6 @@ internal static class Program
     private sealed class FakeStream : Stream
     {
         private readonly BlockingCollection<byte[]> _incoming = new BlockingCollection<byte[]>();
-        private volatile bool _closed;
         public readonly List<string> Written = new List<string>();
         public Action<string> OnWrite = text => { };
         public Exception ReadFailure;
@@ -45,7 +44,6 @@ internal static class Program
 
         public void Shut()
         {
-            _closed = true;
             _incoming.Add(null);
         }
 
