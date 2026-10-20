@@ -128,7 +128,7 @@ public partial class DeviceTerminalControl
         _rtsItem.Enabled = open && !rtsAutomatic;
         _rtsItem.Text = rtsAutomatic ? "RTS (set by hardware flow control)" : "RTS (request to send)";
         _rtsItem.Checked = open ? (rtsAutomatic || stream.RtsAsserted) : (serial.AdvancedSettings?.RtsOnOpen ?? true);
-        _breakItem.Enabled = open && !_isXModemActive;
+        _breakItem.Enabled = open && !IsLineClaimed;
         if (open)
         {
             if (!_lineStatusTimer.Enabled)
@@ -176,6 +176,24 @@ public partial class DeviceTerminalControl
             _portProblemIsWrite = false;
             UpdatePortAlert();
         }
+    }
+
+    /// <summary>
+    /// Windows announced a COM port (an adapter plugged in again). When it is this tab's port and the connection dropped
+    /// on its own, it is opened right away instead of on the next reconnect timer tick.
+    /// </summary>
+    private void OnSerialPortArrived(string portName)
+    {
+        if (IsDisposed || !(_deviceTerminalSettings?.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serial)
+            || !string.Equals(serial.ComPortName, portName, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        if (!_deviceTerminalSettings.ReconnectAutomatically || !CanAutoReconnect)
+        {
+            return;
+        }
+        Connect(resetTerminal: _deviceTerminalSettings.ClearContentsWhenReconnecting, ReopenRetryMs);
     }
 
     private void OnWriteFailed(object sender, string message)
@@ -274,7 +292,7 @@ public partial class DeviceTerminalControl
     private void OnSendBreakClick(object sender, EventArgs e)
     {
         SerialPortStream stream = OpenSerialStream();
-        if (stream == null || _isXModemActive)
+        if (stream == null || IsLineClaimed)
         {
             return;
         }

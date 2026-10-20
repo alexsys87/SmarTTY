@@ -47,6 +47,9 @@ jobs:
       - name: Run serial port settings and line status checks
         run: dotnet run --project tests/SerialPortRulesTests -c Release
 
+      - name: Run COM/TCP input and transfer rate checks
+        run: dotnet run --project tests/DeviceInputTextTests -c Release
+
       - name: Run transport write failure checks
         run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
 

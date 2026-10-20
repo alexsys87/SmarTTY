@@ -57,6 +57,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private long _bytesReceived;
 
+    private static readonly System.Diagnostics.Stopwatch TrafficClock = System.Diagnostics.Stopwatch.StartNew();
+
+    private readonly TransferRateMeter _sendRate = new TransferRateMeter();
+
+    private readonly TransferRateMeter _receiveRate = new TransferRateMeter();
+
+    // How long a port that was just closed (or just plugged in) is tried again before the connection counts as failed:
+    // some USB-serial drivers release or announce a port a moment before it can be opened.
+    private const int ReopenRetryMs = 1500;
+
     private ConnectionStateEnum _connectionState = ConnectionStateEnum.Connecting;
 
     // Automatic reconnect: when the transport drops or fails and DeviceTerminalSettings.ReconnectAutomatically is
@@ -103,6 +113,17 @@ public partial class DeviceTerminalControl : DpiAwareControl
     public long BytesSent => Interlocked.Read(ref _bytesSent);
 
     public long BytesReceived => Interlocked.Read(ref _bytesReceived);
+
+    /// <summary>
+    /// Bytes per second sent and received over the last seconds. The rate is measured between calls, so it is meant to
+    /// be called regularly on the UI thread (the status bar does it a few times a second).
+    /// </summary>
+    public void GetTransferRates(out double sendRate, out double receiveRate)
+    {
+        long now = TrafficClock.ElapsedMilliseconds;
+        sendRate = _sendRate.Sample(BytesSent, now);
+        receiveRate = _receiveRate.Sample(BytesReceived, now);
+    }
 
     public ConnectionStateEnum ConnectionState => _connectionState;
 
@@ -230,6 +251,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
         InitializeSerialLineControls();
+        SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
     }
 
     // While a command runs, the keys go to the device as they are (mc, htop, vi ...) and the local input line is
@@ -574,6 +596,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void DeviceTerminalControl_Disposed(object sender, EventArgs e)
     {
+        // The watcher is static: a closed tab must not stay reachable from it.
+        SerialPortArrivalWatcher.Unsubscribe(OnSerialPortArrived);
         _manualDisconnect = true;
         StopAutoReconnectTimer();
         _autoReconnectTimer?.Dispose();
@@ -718,10 +742,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // and is not treated as a manual disconnect anymore.
         _manualDisconnect = false;
         StopAutoReconnectTimer();
+        int connectTimeoutMs = value;
         if (_asyncTransportConnection != null)
         {
+            // Closing waits for the port to be released; if the driver still holds it for a moment, the new connection
+            // retries on its own thread instead of the UI thread sleeping here.
             _asyncTransportConnection.Dispose();
-            Thread.Sleep(300);
+            connectTimeoutMs = Math.Max(connectTimeoutMs, ReopenRetryMs);
         }
         _asyncTransportConnection = null;
         if (resetTerminal)
@@ -742,7 +769,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             AttachTelnet(telnetTransport, telnetSettings);
         }
-        _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, value);
+        _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, connectTimeoutMs);
         _asyncTransportConnection.DataReceived += OnDataReceived;
         _asyncTransportConnection.StateChanged += OnConnectionStateChanged;
         _asyncTransportConnection.WriterIdleChanged += OnWriterIdleChanged;
@@ -1007,7 +1034,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// </summary>
     private void StartXModemTransfer(string title, string verb, Func<FileStream> fileStream, bool isSend, bool useLargeBlocks = false)
     {
-        if (_isXModemActive)
+        if (IsLineClaimed)
         {
             return;
         }
@@ -1103,15 +1130,23 @@ public partial class DeviceTerminalControl : DpiAwareControl
         return null;
     }
 
-    /// <summary>True (with a short explanation) while an XMODEM transfer owns the line.</summary>
-    private bool IsXModemBusy()
+    /// <summary>True while an XMODEM transfer or a file being sent owns the line: nothing else may get into the data stream.</summary>
+    private bool IsLineClaimed => _isXModemActive || _isFileSendActive;
+
+    /// <summary>True (with a short explanation) while a transfer owns the line.</summary>
+    private bool IsLineBusy()
     {
-        if (!_isXModemActive)
+        if (_isXModemActive)
         {
-            return false;
+            MessageBox.Show("An XMODEM transfer is in progress. Wait for it to finish or cancel it first.", "XMODEM", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return true;
         }
-        MessageBox.Show("An XMODEM transfer is in progress. Wait for it to finish or cancel it first.", "XMODEM", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        return true;
+        if (_isFileSendActive)
+        {
+            MessageBox.Show("A file is being sent. Wait for it to finish or cancel it first.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return true;
+        }
+        return false;
     }
 
     private void sendFileViaXMODEMToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1128,7 +1163,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         string protocolName = useLargeBlocks ? "XMODEM-1K" : "XMODEM";
 
-        if (IsXModemBusy())
+        if (IsLineBusy())
         {
             return;
         }
@@ -1157,7 +1192,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void receiveFileViaXMODEMToolStripMenuItem_Click(object sender, EventArgs e)
     {
-        if (IsXModemBusy())
+        if (IsLineBusy())
         {
             return;
         }
@@ -1218,7 +1253,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void OnTerminalDataEntered(object sender, byte[] buffer, TerminalEmulatorControl.InputKind inputKind)
     {
-        if (_isXModemActive)
+        if (IsLineClaimed)
         {
             return; // typed characters would corrupt the transfer
         }
@@ -1245,72 +1280,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
         Connect();
     }
 
-    private static int HexDigitValue(char ch)
-    {
-        if (ch >= '0' && ch <= '9')
-        {
-            return ch - 48;
-        }
-        if (ch >= 'a' && ch <= 'f')
-        {
-            return ch - 97 + 10;
-        }
-        if (ch >= 'A' && ch <= 'F')
-        {
-            return ch - 65 + 10;
-        }
-        return -1;
-    }
-
-    private static byte[] ParseHexBytes(string text)
-    {
-        List<byte> list = new List<byte>();
-        byte b = 0;
-        int itemIndex = 0;
-        char[] items = text.ToCharArray();
-        for (int arrayIndex = 0; arrayIndex < items.Length; arrayIndex++)
-        {
-            char ch = items[arrayIndex];
-            if (ch == ' ')
-            {
-                if (itemIndex > 0)
-                {
-                    list.Add(b);
-                    itemIndex = 0;
-                    b = 0;
-                }
-                continue;
-            }
-            int value = HexDigitValue(ch);
-            if (value == -1)
-            {
-                throw new ArgumentException("Invalid HEX character: " + ch);
-            }
-            if (itemIndex >= 2)
-            {
-                list.Add(b);
-                itemIndex = 0;
-                b = 0;
-            }
-            b = (byte)((b << 4) | value);
-            itemIndex++;
-        }
-        if (itemIndex > 0)
-        {
-            list.Add(b);
-        }
-        return list.ToArray();
-    }
-
     private void btnSend_ButtonClick(object sender, EventArgs e)
     {
-        if (!btnSend.Enabled || IsXModemBusy())
+        if (!btnSend.Enabled || IsLineBusy())
         {
             return;
         }
         try
         {
-            byte[] items = ((!sendAsHEXToolStripMenuItem.Checked) ? _textEncoding.GetBytes(txtHexInput.Text) : ParseHexBytes(txtHexInput.Text));
+            byte[] items = ((!sendAsHEXToolStripMenuItem.Checked) ? _textEncoding.GetBytes(txtHexInput.Text) : DeviceInputText.ParseHex(txtHexInput.Text));
             SendToDevice(items, items.Length);
             if (_deviceTerminalSettings.EchoTypedCharacters)
             {
@@ -1349,9 +1327,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         if (sendAsHEXToolStripMenuItem.Checked)
         {
-            // Two digits make a byte; a space after a single digit ("A ") ends it early.
-            string text = txtHexInput.Text.Trim();
-            if (text.Length >= 2 || (text.Length > 0 && txtHexInput.Text.EndsWith(" ")))
+            // Sent once a byte is complete: two digits ("41", "0x41"), or one digit closed by a separator ("A ").
+            if (DeviceInputText.IsHexReadyToSend(txtHexInput.Text))
             {
                 btnSend_ButtonClick(null, null);
             }
@@ -1365,7 +1342,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private void hexTerminalControl1_KeyPress(object sender, KeyPressEventArgs e)
     {
         // In character mode any printable character is accepted (Cyrillic included); it is encoded with the selected encoding on send.
-        if (sendAsHEXToolStripMenuItem.Checked ? HexDigitValue(e.KeyChar) != -1 : !char.IsControl(e.KeyChar))
+        if (!char.IsControl(e.KeyChar) && (!sendAsHEXToolStripMenuItem.Checked || DeviceInputText.IsHexInputCharacter(e.KeyChar)))
         {
             txtHexInput.Text += e.KeyChar;
             txtHexInput.SelectionStart = txtHexInput.Text.Length;
@@ -1381,7 +1358,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void txtHexInput_KeyPress(object sender, KeyPressEventArgs e)
     {
-        if (sendAsHEXToolStripMenuItem.Checked && HexDigitValue(e.KeyChar) == -1 && e.KeyChar != '\b' && e.KeyChar != ' ')
+        // Control characters stay allowed: Backspace, and Ctrl+V / Ctrl+C / Ctrl+A that the text box handles itself.
+        if (sendAsHEXToolStripMenuItem.Checked && !char.IsControl(e.KeyChar) && !DeviceInputText.IsHexInputCharacter(e.KeyChar))
         {
             e.Handled = true;
         }
@@ -1423,27 +1401,20 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void toolStripButton3_Click(object sender, EventArgs e)
     {
-        if (IsXModemBusy())
+        if (IsLineBusy())
         {
+            return;
+        }
+        if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
+        {
+            MessageBox.Show("Please connect first before sending a file.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         if (_openFileDialog.ShowDialog() != DialogResult.OK)
         {
             return;
         }
-        try
-        {
-            byte[] items = File.ReadAllBytes(_openFileDialog.FileName);
-            SendToDevice(items, items.Length);
-            if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
-            {
-                hexTerminalControl1.AppendData(items, items.Length, isEcho: true);
-            }
-        }
-        catch (Exception exception)
-        {
-            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
-        }
+        StartFileSend(_openFileDialog.FileName);
     }
 
     private void copyAllToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1535,7 +1506,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void pasteToolStripMenuItem_Click(object sender, EventArgs e)
     {
-        if (_isXModemActive)
+        if (IsLineClaimed)
         {
             return;
         }
@@ -1546,6 +1517,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
             {
                 return;
             }
+            // Each pasted line ends the way Enter ends a typed one, whatever the clipboard used (Windows CR LF, Unix LF).
+            text = DeviceInputText.ConvertLineEndings(text, GetLineEnding(_deviceTerminalSettings.LineEnding));
             byte[] bytes = _textEncoding.GetBytes(text);
             SendToDevice(bytes, bytes.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)

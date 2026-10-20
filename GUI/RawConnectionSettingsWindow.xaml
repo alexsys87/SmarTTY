@@ -70,7 +70,7 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <CheckBox Name="chkReconnectAutomatically" Grid.ColumnSpan="2" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding ReconnectAutomatically}" ToolTip="Open the connection again by itself when it drops or cannot be opened. Useful for unreliable links.">
+        <CheckBox Name="chkReconnectAutomatically" Grid.ColumnSpan="2" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding ReconnectAutomatically}" ToolTip="Open the connection again by itself when it drops or cannot be opened. Useful for unreliable links. A COM port is also opened again as soon as its USB adapter is plugged back in.">
           <TextBlock Text="Automatically reconnect when the connection breaks or fails" />
         </CheckBox>
         <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" IsEnabled="{Binding IsChecked, ElementName=chkReconnectAutomatically}">
@@ -185,9 +185,10 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
           <TextBlock Text="Bits per second:" Style="{StaticResource HeaderText}" />
-          <ComboBox Grid.Column="1" IsEditable="True" Text="{Binding Path=SerialSettings.AdvancedSettings.BaudRate, UpdateSourceTrigger=PropertyChanged}" TextBoxBase.TextChanged="ComboBox_TextChanged">
+          <ComboBox Name="cbBaudRate" Grid.Column="1" IsEditable="True" Text="{Binding Path=SerialSettings.AdvancedSettings.BaudRate, UpdateSourceTrigger=PropertyChanged}" TextBoxBase.TextChanged="ComboBox_TextChanged">
             <ItemsControl.ItemsSource>
               <coll:ArrayList>
                 <sys:Int32>1200</sys:Int32>
@@ -299,6 +300,15 @@
           <StackPanel Orientation="Horizontal" Grid.Row="5" Grid.Column="1" Margin="0 5 0 5">
             <TextBlock Text="Maximum speed:" Margin="0 0 5 0" />
             <TextBlock FontWeight="Bold" Text="{Binding MaximumSpeed}" />
+          </StackPanel>
+          <TextBlock Text="When opened:" Style="{StaticResource HeaderText}" Grid.Row="6" />
+          <StackPanel Orientation="Horizontal" Grid.Row="6" Grid.Column="1" Margin="0 2 0 5">
+            <CheckBox Margin="0 0 15 0" VerticalContentAlignment="Center" IsChecked="{Binding Path=SerialSettings.AdvancedSettings.DtrOnOpen}" ToolTip="Many boards (Arduino, ESP) reset when DTR changes: switch it off for a connection that must not restart the device. The Windows driver may still raise DTR for a moment while it opens the port.">
+              <TextBlock Text="Raise DTR" />
+            </CheckBox>
+            <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding Path=SerialSettings.AdvancedSettings.RtsOnOpen}" ToolTip="Ignored with hardware (RTS/CTS) flow control, which drives RTS itself.">
+              <TextBlock Text="Raise RTS" />
+            </CheckBox>
           </StackPanel>
         </Grid>
         <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Click="Test_Click">
