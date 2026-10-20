@@ -95,6 +95,12 @@ public class ScpDownloadStream : ScpChannelStream
                 break;
             }
         }
+        if (done == 0 && count > 0)
+        {
+            // The channel ended before all the announced bytes arrived. Reporting that as a normal end of the file
+            // would make a truncated download look complete.
+            throw new IOException("The SCP transfer was interrupted: " + _bytesTransferred + " of " + Length + " bytes were received.");
+        }
         _bytesTransferred += done;
         return done;
     }

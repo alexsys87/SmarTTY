@@ -429,11 +429,13 @@ public partial class SshConnector : Component
             {
                 if (knownHostKey == null)
                 {
-                    if (autoAcceptHostKey || ConfirmNewHostKey(sshConnectionSettings, hostKeyInfo))
+                    if (!autoAcceptHostKey && !ConfirmNewHostKey(sshConnectionSettings, hostKeyInfo))
                     {
-                        knownHostKeyStore.Update(sshConnectionSettings.HostName, hostKeyInfo);
-                        knownHostKeyStore.Save();
+                        // The user did not trust the key: never go on to send credentials to an unverified host.
+                        throw new OperationCanceledException();
                     }
+                    knownHostKeyStore.Update(sshConnectionSettings.HostName, hostKeyInfo);
+                    knownHostKeyStore.Save();
                 }
                 else
                 {
@@ -446,11 +448,13 @@ public partial class SshConnector : Component
                         {
                             mismatchReason = "Key type changed from " + knownHostKey.KeyType + " to " + hostKeyInfo.Algorithm;
                         }
-                        if (ConfirmHostKeyMismatch(sshConnectionSettings, hostKeyInfo, mismatchReason))
+                        if (!ConfirmHostKeyMismatch(sshConnectionSettings, hostKeyInfo, mismatchReason))
                         {
-                            knownHostKeyStore.Update(sshConnectionSettings.HostName, hostKeyInfo);
-                            knownHostKeyStore.Save();
+                            // A changed host key may mean a man-in-the-middle attack: do not authenticate.
+                            throw new OperationCanceledException();
                         }
+                        knownHostKeyStore.Update(sshConnectionSettings.HostName, hostKeyInfo);
+                        knownHostKeyStore.Save();
                     }
                 }
             }

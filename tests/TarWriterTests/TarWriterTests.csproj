@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Sync/TarWriter.cs" Link="TarWriter.cs" />
+    <Compile Include="../../Sync/LocalFileSystem.cs" Link="LocalFileSystem.cs" />
+    <Compile Include="../../Sync/LocalPath.cs" Link="LocalPath.cs" />
+    <Compile Include="../../Native/ReparsePoints.cs" Link="ReparsePoints.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+    <Compile Include="../../Utilities/DataExtensions.cs" Link="DataExtensions.cs" />
+    <Compile Include="../../Ssh/QuickSync/RemoteWarningRecord.cs" Link="RemoteWarningRecord.cs" />
+    <Compile Include="../../Ssh/QuickSync/FileOperationFailure.cs" Link="FileOperationFailure.cs" />
+  </ItemGroup>
+</Project>

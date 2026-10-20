@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using VisualTTY;
 
 namespace SmarTTY;
@@ -14,12 +15,12 @@ internal static class AuthorizedKeysManager
     {
         try
         {
-            List<string> pwdLines = sshSession.RunCommandChecked("pwd", requireSuccess: true);
-            if (pwdLines == null || pwdLines.Count < 1)
+            string homeDir = AuthorizedKeysFile.PickHomeDirectory(sshSession.RunCommandChecked("pwd", requireSuccess: true));
+            if (homeDir == null)
             {
                 return false;
             }
-            using (ScpDownloadStream stream = sshSession.OpenDownload(pwdLines[0] + "/.ssh/authorized_keys"))
+            using (ScpDownloadStream stream = sshSession.OpenDownload(homeDir + "/.ssh/authorized_keys"))
             {
                 using StreamReader streamReader = new StreamReader(stream);
                 while (!streamReader.EndOfStream)
@@ -29,20 +30,9 @@ internal static class AuthorizedKeysManager
                     {
                         break;
                     }
-                    string[] parts = line.Split(' ');
-                    if (parts.Length < 3)
+                    if (AuthorizedKeysFile.LineHoldsKey(line, keyBlob))
                     {
-                        continue;
-                    }
-                    try
-                    {
-                        if (PasswordProtector.BytesEqual(Convert.FromBase64String(parts[1]), keyBlob))
-                        {
-                            return true;
-                        }
-                    }
-                    catch
-                    {
+                        return true;
                     }
                 }
             }
@@ -56,24 +46,17 @@ internal static class AuthorizedKeysManager
 
     public static void RemoveAuthorizedKey(SshSession sshSession, byte[] keyBlob)
     {
-        List<string> pwdLines = sshSession.RunCommandChecked("pwd", requireSuccess: true);
-        if (pwdLines == null || pwdLines.Count < 1)
-        {
-            throw new Exception("Cannot determine user profile directory");
-        }
-        string homeDir = pwdLines.Where((string line) => line.StartsWith("/")).FirstOrDefault() ?? throw new Exception("Failed to detect home directory");
-        if (sshSession.RunCommandChecked(string.Format("test -d {0}", homeDir + "/.ssh"), requireSuccess: true) == null)
+        string homeDir = AuthorizedKeysFile.PickHomeDirectory(sshSession.RunCommandChecked("pwd", requireSuccess: true))
+            ?? throw new Exception("Failed to detect home directory");
+        if (sshSession.RunCommandChecked("test -d " + ScpChannelStream.QuotePath(homeDir + "/.ssh"), requireSuccess: true) == null)
         {
             return;
         }
-        MemoryStream memoryStream = new MemoryStream();
-        using (ScpDownloadStream stream = sshSession.OpenDownload(pwdLines[0] + "/.ssh/authorized_keys"))
+        string authKeysPath = homeDir + "/.ssh/authorized_keys";
+        List<string> lines = new List<string>();
+        using (ScpDownloadStream stream = sshSession.OpenDownload(authKeysPath))
         {
             using StreamReader streamReader = new StreamReader(stream);
-            using StreamWriter streamWriter = new StreamWriter(memoryStream)
-            {
-                NewLine = "\n"
-            };
             while (!streamReader.EndOfStream)
             {
                 string line = streamReader.ReadLine();
@@ -81,31 +64,27 @@ internal static class AuthorizedKeysManager
                 {
                     break;
                 }
-                string[] parts = line.Split(' ');
-                if (parts.Length < 3)
-                {
-                    continue;
-                }
-                try
-                {
-                    if (PasswordProtector.BytesEqual(Convert.FromBase64String(parts[1]), keyBlob))
-                    {
-                        continue;
-                    }
-                }
-                catch
-                {
-                }
-                streamWriter.WriteLine(line);
+                lines.Add(line);
             }
         }
-        string authKeysPath = homeDir + "/.ssh/authorized_keys";
-        byte[] data = memoryStream.ToArray();
-        using (ScpChannelStream scpChannelStream = sshSession.OpenUpload(authKeysPath + ".smartty", data.Length))
+        // Only the lines of this very key go away: other keys (with or without a comment), comments and blank lines stay.
+        List<string> remaining = AuthorizedKeysFile.RemoveKey(lines, keyBlob, out bool removed);
+        if (!removed)
+        {
+            return;
+        }
+        StringBuilder text = new StringBuilder();
+        foreach (string line in remaining)
+        {
+            text.Append(line).Append('\n');
+        }
+        byte[] data = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(text.ToString());
+        using (ScpChannelStream scpChannelStream = sshSession.OpenUpload(authKeysPath + ".smartty", data.Length, default(DateTime), Convert.ToInt32("600", 8)))
         {
             scpChannelStream.Write(data, 0, data.Length);
         }
-        if (sshSession.RunCommandChecked(string.Format("mv {0}.smartty {0}", authKeysPath), requireSuccess: true) != null)
+        string quotedPath = ScpChannelStream.QuotePath(authKeysPath);
+        if (sshSession.RunCommandChecked("mv " + ScpChannelStream.QuotePath(authKeysPath + ".smartty") + " " + quotedPath, requireSuccess: true) != null)
         {
             return;
         }
@@ -114,19 +93,18 @@ internal static class AuthorizedKeysManager
 
     public static void AppendAuthorizedKey(SshSession sshSession, string keyString)
     {
-        List<string> pwdLines = sshSession.RunCommandChecked("pwd", requireSuccess: true);
-        if (pwdLines == null || pwdLines.Count < 1)
-        {
-            throw new Exception("Cannot determine user profile directory");
-        }
-        string homeDir = pwdLines.Where((string line) => line.StartsWith("/")).FirstOrDefault() ?? throw new Exception("Failed to detect home directory");
-        if (sshSession.RunCommandChecked(string.Format("test -d {0} || mkdir -m 700 {0}", homeDir + "/.ssh"), requireSuccess: true) == null)
+        string homeDir = AuthorizedKeysFile.PickHomeDirectory(sshSession.RunCommandChecked("pwd", requireSuccess: true))
+            ?? throw new Exception("Failed to detect home directory");
+        string sshDir = ScpChannelStream.QuotePath(homeDir + "/.ssh");
+        if (sshSession.RunCommandChecked("test -d " + sshDir + " || mkdir -m 700 " + sshDir, requireSuccess: true) == null)
         {
             throw new Exception("Cannot access .ssh directory");
         }
         string authKeysPath = homeDir + "/.ssh/authorized_keys";
-        sshSession.RunCommandChecked("test -f " + authKeysPath, requireSuccess: true);
-        using (SshShellChannel sshShellChannel = sshSession.OpenShellChannel("cat >> " + authKeysPath))
+        string quotedAuthKeysPath = ScpChannelStream.QuotePath(authKeysPath);
+        // "sh -c" keeps this working whatever the login shell of the user is.
+        string appendCommand = "sh -c " + ScpChannelStream.QuotePath(AuthorizedKeysFile.AppendScript) + " sh " + quotedAuthKeysPath;
+        using (SshShellChannel sshShellChannel = sshSession.OpenShellChannel(appendCommand))
         {
             using (StreamWriter streamWriter = new StreamWriter(sshShellChannel.Input))
             {
@@ -134,7 +112,7 @@ internal static class AuthorizedKeysManager
             }
             sshShellChannel.SendEof();
         }
-        sshSession.RunCommandChecked("chmod 700 " + homeDir + "/.ssh", requireSuccess: true);
-        sshSession.RunCommandChecked("chmod 600 " + authKeysPath, requireSuccess: true);
+        sshSession.RunCommandChecked("chmod 700 " + sshDir, requireSuccess: true);
+        sshSession.RunCommandChecked("chmod 600 " + quotedAuthKeysPath, requireSuccess: true);
     }
 }

@@ -18,9 +18,9 @@ public class DirectoryCopier
         {
             if (preserveTimestamps)
             {
-                return $"cd \"{dir}\" && tar -xmf -";
+                return $"cd {SmarTTY.IO.RemotePathUtils.ShellQuote(dir)} && tar -xmf -";
             }
-            return $"cd \"{dir}\" && tar -xf -";
+            return $"cd {SmarTTY.IO.RemotePathUtils.ShellQuote(dir)} && tar -xf -";
         }
 
         public static string GetCreateCommand(string dir, bool followSymlinks, string filePattern = "*", string[] excludeItems = null)
@@ -31,10 +31,10 @@ public class DirectoryCopier
             {
                 foreach (string arg in excludeItems)
                 {
-                    stringBuilder.AppendFormat(" --exclude='{0}'", arg);
+                    stringBuilder.AppendFormat(" --exclude={0}", SmarTTY.IO.RemotePathUtils.ShellQuote(arg));
                 }
             }
-            return $"cd \"{dir}\" && tar{stringBuilder} -c{flagStr}f - {filePattern}";
+            return $"cd {SmarTTY.IO.RemotePathUtils.ShellQuote(dir)} && tar{stringBuilder} -c{flagStr}f - {filePattern}";
         }
 
         public static string GetCreateFromListCommand(string dir, bool followSymlinks, string listFileName, string[] excludeItems = null)
@@ -45,10 +45,10 @@ public class DirectoryCopier
             {
                 foreach (string arg in excludeItems)
                 {
-                    stringBuilder.AppendFormat(" --exclude='{0}'", arg);
+                    stringBuilder.AppendFormat(" --exclude={0}", SmarTTY.IO.RemotePathUtils.ShellQuote(arg));
                 }
             }
-            return $"cd \"{dir}\" && tar{stringBuilder} -c{flagStr}T {listFileName} -f -";
+            return $"cd {SmarTTY.IO.RemotePathUtils.ShellQuote(dir)} && tar{stringBuilder} -c{flagStr}T {SmarTTY.IO.RemotePathUtils.ShellQuote(listFileName)} -f -";
         }
     }
 
@@ -252,7 +252,7 @@ public class DirectoryCopier
                     break;
                 }
             }
-            this._session.RunCommandChecked($"rm \"{tempListFile}\"", requireSuccess: false);
+            this._session.RunCommandChecked("rm " + SmarTTY.IO.RemotePathUtils.ShellQuote(tempListFile), requireSuccess: false);
         }
         if (!string.IsNullOrEmpty(statsFilePath) && directoryStatistics != null)
         {
@@ -266,7 +266,7 @@ public class DirectoryCopier
     {
         List<string> fileList = new List<string>();
         List<string> dirList = new List<string>();
-        List<string> rawLines = this._session.RunCommandChecked("ls -1ALF \"" + remoteDir + "\"", requireSuccess: true);
+        List<string> rawLines = this._session.RunCommandChecked("ls -1ALF " + SmarTTY.IO.RemotePathUtils.ShellQuote(remoteDir), requireSuccess: true);
         if (rawLines == null)
         {
             if (Log != null)
@@ -399,7 +399,7 @@ public class DirectoryCopier
         Regex lsFullRegex = new Regex("^[^ \t]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+([0-9]+)[ \t]+");
         Regex lsShortRegex = new Regex("^[^ \t]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+([0-9]+)[ \t]+");
         Regex lsHeaderRegex = new Regex("^[a-zA-Z]+ [0-9]+$");
-        using (SshShellChannel sshShellChannel = this._session.OpenShellChannel("ls -laRFH \"" + remotePath + "\""))
+        using (SshShellChannel sshShellChannel = this._session.OpenShellChannel("ls -laRFH " + SmarTTY.IO.RemotePathUtils.ShellQuote(remotePath)))
         {
             sshShellChannel.DataReceived += outputCollector.OnDataReceived;
             sshShellChannel.ReadStderrOnRead = true;
@@ -601,7 +601,7 @@ public class DirectoryCopier
             _fileCount = 0;
             _byteCount = 0L;
         }
-        RunCommand($"mkdir -p \"{remotePath}\"");
+        RunCommand("mkdir -p " + SmarTTY.IO.RemotePathUtils.ShellQuote(remotePath));
         if (UseTar)
         {
             UploadViaTar(remotePath, localPath, filter, excludeItems);
@@ -622,7 +622,7 @@ public class DirectoryCopier
         }
         try
         {
-            this._session.RunCommandChecked("mkdir \"" + remotePath + "\"", requireSuccess: true);
+            this._session.RunCommandChecked("mkdir " + SmarTTY.IO.RemotePathUtils.ShellQuote(remotePath), requireSuccess: true);
             do
             {
                 if (findData.FileName == "." || findData.FileName == "..")
@@ -665,7 +665,7 @@ public class DirectoryCopier
 
     public void CountLocalFiles(string remotePath, ref int filesDone, ref long bytesDone, string localPath)
     {
-        if (TarOverwrite != null && this._session.RunCommandChecked("test -f '" + remotePath + "'", requireSuccess: true) != null)
+        if (TarOverwrite != null && this._session.RunCommandChecked("test -f " + SmarTTY.IO.RemotePathUtils.ShellQuote(remotePath), requireSuccess: true) != null)
         {
             bool cancel = false;
             TarOverwrite(remotePath, ref cancel);
@@ -681,7 +681,7 @@ public class DirectoryCopier
 
     private void UploadViaTar(string remotePath, string localPath, PathFilter filter, string[] excludeItems)
     {
-        RunCommand("mkdir -p \"" + remotePath + "\"");
+        RunCommand("mkdir -p " + SmarTTY.IO.RemotePathUtils.ShellQuote(remotePath));
         string extractCommand = TarCommands.GetExtractCommand(remotePath, preserveTimestamps: false);
         byte[] paddingBuffer = new byte[1024];
         OutputCollector outputCollector = new OutputCollector();
@@ -781,7 +781,7 @@ public class DirectoryCopier
     {
         string createCommand = TarCommands.GetCreateCommand(sourcePath, followSymlinks: false);
         string extractCommand = TarCommands.GetExtractCommand(destinationPath, preserveTimestamps: false);
-        string mkdirCommand = $"mkdir -p \"{destinationPath}\"";
+        string mkdirCommand = "mkdir -p " + SmarTTY.IO.RemotePathUtils.ShellQuote(destinationPath);
         long totalTransferred = 0L;
         destinationSession.RunCommandChecked(mkdirCommand, requireSuccess: false);
         bool hasError = false;

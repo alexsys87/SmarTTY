@@ -21,6 +21,10 @@ public static class AppEnvironment
 
     public static string GetCurrentDirectory(TerminalEmulatorControl terminalEmulatorControl, SshSession sshSession, ref string cachedHomeDirectory)
     {
+        if (terminalEmulatorControl == null)
+        {
+            return null;
+        }
         if (terminalEmulatorControl is SshTerminalControl sshTerminalControl)
         {
             return sshTerminalControl.CurrentDirectory;
@@ -43,7 +47,9 @@ public static class AppEnvironment
             if (lineText != null && cursorPosition.X == lineText.Length && lineText.Length > 3 && "$#>".IndexOf(lineText[cursorPosition.X - 2]) != -1)
             {
                 colonIndex = lineText.IndexOf(":");
-                if (colonIndex != -1)
+                // A colon in the last two characters (a prompt like "foo$:") leaves no room for a path: the length
+                // below would be negative.
+                if (colonIndex != -1 && lineText.Length - colonIndex - 3 >= 0)
                 {
                     string parsedPath = lineText.Substring(colonIndex + 1, lineText.Length - colonIndex - 3);
                     int spaceIndex = parsedPath.LastIndexOf(' ');

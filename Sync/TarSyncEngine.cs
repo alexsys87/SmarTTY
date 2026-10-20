@@ -80,7 +80,7 @@ internal class TarSyncEngine : CommandSyncEngine
             shellLauncher = _customization?.GetLauncher(command);
         }
         LocalFileSystem.FileStamp[] fileStamps = new LocalFileSystem.FileStamp[localPaths.Count];
-        if (_session.RunCommandChecked("mkdir -p \"" + _settings.RemotePath + "\"", requireSuccess: true) == null)
+        if (_session.RunCommandChecked("mkdir -p " + RemotePathUtils.ShellQuote(_settings.RemotePath), requireSuccess: true) == null)
         {
             throw new Exception("Failed to create " + _settings.RemotePath);
         }
@@ -154,7 +154,7 @@ internal class TarSyncEngine : CommandSyncEngine
             NewLine = "\n"
         };
         streamWriter.WriteLine("echo " + marker);
-        streamWriter.WriteLine("cd \"" + _settings.RemotePath + "\" || exit 1");
+        streamWriter.WriteLine("cd " + RemotePathUtils.ShellQuote(_settings.RemotePath) + " || exit 1");
         for (int i = 0; i < actions.Count; i++)
         {
             SyncPlan.SyncAction action = actions[i];
@@ -170,12 +170,12 @@ internal class TarSyncEngine : CommandSyncEngine
                 case SyncPlan.ActionType.EnterDirectory:
                     remoteDir = RemotePathUtils.Combine(remoteDir, action.Path);
                     relativeRemotePath = relativeRemotePath.Combine(action.Path);
-                    streamWriter.WriteLine($"cd \"{remoteDir}\" || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine($"cd {RemotePathUtils.ShellQuote(remoteDir)} || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.GoToParentDirectory:
                     remoteDir = RemotePathUtils.GetDirectoryName(remoteDir);
                     relativeRemotePath = new RelativeRemotePath(RemotePathUtils.GetDirectoryName(relativeRemotePath.Path));
-                    streamWriter.WriteLine("cd \"" + remoteDir + "\"");
+                    streamWriter.WriteLine("cd " + RemotePathUtils.ShellQuote(remoteDir));
                     break;
                 case SyncPlan.ActionType.CreateRemoteSymlink:
                     {
@@ -185,8 +185,8 @@ internal class TarSyncEngine : CommandSyncEngine
                         {
                             throw new Exception("Invalid queued symlink: " + action.Path);
                         }
-                        streamWriter.WriteLine("rm -f \"" + linkFileName + "\"");
-                        streamWriter.WriteLine($"ln -s \"{symlinkPair.Value}\" \"{linkFileName}\" || echo \"cmdfail:{i}\"");
+                        streamWriter.WriteLine("rm -f -- " + RemotePathUtils.ShellQuote(linkFileName));
+                        streamWriter.WriteLine($"ln -s -- {RemotePathUtils.ShellQuote(symlinkPair.Value)} {RemotePathUtils.ShellQuote(linkFileName)} || echo \"cmdfail:{i}\"");
                         scriptCommandCount++;
                         break;
                     }
@@ -273,7 +273,7 @@ internal class TarSyncEngine : CommandSyncEngine
                         break;
                     }
                 case SyncPlan.ActionType.DeleteTargetFile:
-                    streamWriter.WriteLine($"rm -f \"{action.Path}\" || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine($"rm -f -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
                     scriptCommandCount++;
                     break;
             }
