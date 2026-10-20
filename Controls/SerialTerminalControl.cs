@@ -758,6 +758,34 @@ public class SerialTerminalControl : TerminalEmulatorControl
     // keys are forwarded to the device only while no input line is shown.
     protected override bool UsesTerminalInput => _inputLine == null;
 
+    // Watches the escape sequences received while a command runs to tell a program that draws the whole screen
+    // (mc, htop, vi, nano ...) from a shell that is back at its prompt.
+    private readonly RemoteProgramTracker _remoteProgram = new RemoteProgramTracker();
+
+    /// <summary>True while the local input line is shown, i.e. the keys are edited here instead of being sent to the device.</summary>
+    public bool HasInputLine => _inputLine != null;
+
+    /// <summary>True while a program that draws the whole screen seems to run on the device and gets every key.</summary>
+    public bool FullScreenProgramActive => _inputLine == null && _remoteProgram.OwnsScreen;
+
+    /// <summary>
+    /// Shows the local input line again, whatever the terminal believes the device is doing. For a program that
+    /// ended without restoring the terminal (killed, crashed) or a prompt that is not recognized as one.
+    /// </summary>
+    public void ReturnToInputLine()
+    {
+        _remoteProgram.Reset();
+        if (_inputLine != null)
+        {
+            return;
+        }
+        if (ActiveBufferIndex != 0)
+        {
+            ActiveBufferIndex = 0;
+        }
+        ShowPrompt();
+    }
+
     public string CurrentPrompt => _currentPrompt;
 
     public IReadOnlyList<string> CommandHistory => _commandHistory.AsReadOnly();
@@ -990,8 +1018,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
             return;
         }
 
-        // Handle history search (Ctrl+R)
-        if (e.Control && !e.Shift && !e.Alt && e.KeyCode == Keys.R)
+        // Handle history search (Ctrl+R). Without an input line the key belongs to the program on the device
+        // (Ctrl+R is "reread directory" in mc), so it is not taken here.
+        if (e.Control && !e.Shift && !e.Alt && e.KeyCode == Keys.R && _inputLine != null)
         {
             HandleHistorySearch();
             e.Handled = true;
@@ -1419,6 +1448,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         // Reset input line
         _inputLine = null;
+        // Whatever ran before is over; the command just sent starts with a clean slate.
+        _remoteProgram.Reset();
     }
 
     private void ClearCurrentLine()
@@ -1541,6 +1572,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         base.BeginNewSession();
         _inputLine = null;
+        _remoteProgram.Reset();
         ShowPrompt();
     }
 
@@ -1548,6 +1580,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         base.Reset();
         _inputLine = null;
+        _remoteProgram.Reset();
         _historySearch = null;
         _historyIndex = _commandHistory.Count;
         ShowPrompt();
@@ -1615,29 +1648,35 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     public void OnDataReceived(string text)
     {
+        ProcessOutput(text);
+
+        if (_inputLine != null || string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        // A command is running. If it is a program that draws the whole screen (mc, htop, top, vi, nano ...), what
+        // it prints is its own output, however much of it looks like a shell prompt ("$ " in the command line of
+        // mc, "> " in a menu). Showing the input line then would take the keyboard from it (arrows would walk the
+        // history, Tab would open the completion, Enter would send a line) and would draw into its screen.
+        // ProcessOutput above has applied the escape sequences already, so the emulator knows the alternate screen.
+        _remoteProgram.Observe(text, ActiveBufferIndex != 0);
+        if (_remoteProgram.OwnsScreen)
+        {
+            return;
+        }
+
         // Auto-detect prompt from received data
-        if (_autoDetectPrompt && _inputLine == null)
+        if (_autoDetectPrompt)
         {
             DetectPrompt(text);
         }
 
-        ProcessOutput(text);
-
-        // If we're at a prompt, show new prompt
-        if (_inputLine == null && !string.IsNullOrEmpty(text))
+        // If we're at a prompt, show new prompt. Only line breaks are trimmed: the blank after "> ", "# ", "$ "
+        // is part of the pattern (TrimEnd() used to remove it, so the prompt never came back).
+        if (LineInputText.EndsLikePrompt(text, _currentPrompt))
         {
-            // Check if the text ends with a prompt-like pattern
-            // Only strip line breaks: TrimEnd() also removed the trailing space of "> ", "# ", "$ ",
-            // so none of these patterns could ever match and the prompt never came back.
-            string tail = text.TrimEnd('\r', '\n');
-            if (tail.EndsWith(_currentPrompt) ||
-                tail.EndsWith("> ") ||
-                tail.EndsWith("# ") ||
-                tail.EndsWith("$ ") ||
-                tail.EndsWith(">> "))
-            {
-                ShowPrompt();
-            }
+            ShowPrompt();
         }
     }
 

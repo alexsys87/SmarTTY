@@ -176,6 +176,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         ReplaceTerminalControl();
         // A telnet server may ask for the terminal size (and wants to hear about changes); other transports ignore it.
         _serialTerminalControl.TerminalSizeChanged += OnTerminalSizeChanged;
+        AddReturnToInputLineCommand();
         InitializeCommandLists();
         
         foreach (TerminalEncodings.Choice choice in TerminalEncodings.All)
@@ -183,6 +184,20 @@ public partial class DeviceTerminalControl : DpiAwareControl
             cbEncoding.Items.Add(choice);
         }
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
+    }
+
+    // While a command runs, the keys go to the device as they are (mc, htop, vi ...) and the local input line is
+    // hidden. The terminal brings the line back by itself when the program leaves; this command is for the cases
+    // when it cannot tell: a program that was killed without restoring the terminal, or a prompt of an unusual shape.
+    private ToolStripMenuItem _returnToInputLineMenuItem;
+
+    private void AddReturnToInputLineCommand()
+    {
+        _returnToInputLineMenuItem = new ToolStripMenuItem("Return to input line", null, (sender, args) => _serialTerminalControl.ReturnToInputLine())
+        {
+            ToolTipText = "Show the input line again if the keys keep going to a program that has already ended (mc, htop ...)"
+        };
+        contextMenuStrip1.Items.Add(_returnToInputLineMenuItem);
     }
 
     private void OnTerminalSizeChanged(TerminalEmulatorControl terminal, int columns, int rows)
@@ -1286,6 +1301,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
     {
         copyToolStripMenuItem.Enabled = HexMode ? hexTerminalControl1.HasSelection : ((ReadonlyTextBrowser)_serialTerminalControl).HasSelection;
+        _returnToInputLineMenuItem.Enabled = !HexMode && !_serialTerminalControl.HasInputLine;
     }
 
     private void OnTerminalKeyDown(object sender, KeyEventArgs e)

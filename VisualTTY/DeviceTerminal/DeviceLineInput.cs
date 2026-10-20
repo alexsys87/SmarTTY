@@ -170,6 +170,35 @@ public static class LineInputText
         return lines;
     }
 
+    private static readonly string[] PromptEndings = { "> ", "# ", "$ ", ">> " };
+
+    /// <summary>
+    /// True when received text ends the way a shell prompt does: with the current prompt or with one of the usual
+    /// endings ("&gt; ", "# ", "$ ", "&gt;&gt; "). Only line breaks are trimmed at the end: the blank after the
+    /// prompt character is part of the pattern. This says nothing about whether a program is running that merely
+    /// prints such text; see <c>RemoteProgramTracker</c>.
+    /// </summary>
+    public static bool EndsLikePrompt(string text, string currentPrompt)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+        string tail = text.TrimEnd('\r', '\n');
+        if (!string.IsNullOrEmpty(currentPrompt) && tail.EndsWith(currentPrompt, StringComparison.Ordinal))
+        {
+            return true;
+        }
+        foreach (string ending in PromptEndings)
+        {
+            if (tail.EndsWith(ending, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// <summary>
     /// True when the prompt the device printed asks for a secret ("Password:", "Enter passphrase", "PIN:" ...).
     /// What is typed at such a prompt is not stored in the saved history.
