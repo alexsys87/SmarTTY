@@ -1,4 +1,4 @@
-﻿using SmarTTY.GUI.Backend;
+using SmarTTY.GUI.Backend;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -23,9 +23,13 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
 
         private SessionWrapper _Session;
 
-        private ILinuxPackageManagerClient[] _Clients = new ILinuxPackageManagerClient[4]
+        private ILinuxPackageManagerClient[] _Clients = new ILinuxPackageManagerClient[8]
         {
             new AptPackageManagerClient(),
+            new DnfPackageManagerClient(),
+            new ZypperPackageManagerClient(),
+            new PacmanPackageManagerClient(),
+            new PortagePackageManagerClient(),
             new YumPackageManagerClient(),
             new OpkgPackageManagerClient(),
             new ApkPackageManagerClient()

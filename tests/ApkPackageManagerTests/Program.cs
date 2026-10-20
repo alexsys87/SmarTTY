@@ -201,6 +201,8 @@ internal static class Program
         }
         Check(failure != null && failure.Contains("line 30") && failure.Contains("line 23") && !failure.Contains("line 22\n"), "only the tail of a long error output is shown");
 
+        _passed += AdditionalClientsTests.Run();
+
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed");
         return 0;
