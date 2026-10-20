@@ -222,6 +222,8 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public bool CompletionTriggersMigratedV2 { get; set; }
 
+    public bool SyntaxHighlightingMigrated { get; set; }
+
     [XmlIgnore]
     public EditorSettingsWrapper EditorWrapper { get; }
 
@@ -270,6 +272,38 @@ public class GlobalSettings : INotifyPropertyChanged
         }
     }
 
+    private static void FixTokenColors(EditorColors colors, EditorColors defaults)
+    {
+        if (colors.KeywordColor.Alpha == 0)
+        {
+            colors.KeywordColor = defaults.KeywordColor;
+        }
+        if (colors.StringColor.Alpha == 0)
+        {
+            colors.StringColor = defaults.StringColor;
+        }
+        if (colors.CommentColor.Alpha == 0)
+        {
+            colors.CommentColor = defaults.CommentColor;
+        }
+        if (colors.NumberColor.Alpha == 0)
+        {
+            colors.NumberColor = defaults.NumberColor;
+        }
+        if (colors.VariableColor.Alpha == 0)
+        {
+            colors.VariableColor = defaults.VariableColor;
+        }
+        if (colors.SectionColor.Alpha == 0)
+        {
+            colors.SectionColor = defaults.SectionColor;
+        }
+        if (colors.PreprocessorColor.Alpha == 0)
+        {
+            colors.PreprocessorColor = defaults.PreprocessorColor;
+        }
+    }
+
     public static GlobalSettings Load()
     {
         GlobalSettings globalSettings = DoLoad();
@@ -294,6 +328,20 @@ public class GlobalSettings : INotifyPropertyChanged
         if (Editor.DarkColors == null)
         {
             Editor.DarkColors = EditorColors.DarkColors;
+        }
+        // Settings.xml files saved before syntax highlighting was added have no token
+        // colors: XmlSerializer leaves them as an all-zero (fully transparent) ColorWrapper,
+        // which would make keywords, strings, comments etc. invisible.
+        FixTokenColors(Editor.LightColors, EditorColors.LightColors);
+        FixTokenColors(Editor.DarkColors, EditorColors.DarkColors);
+        if (!SyntaxHighlightingMigrated)
+        {
+            // The same old files also lack the <SyntaxHighlighting> element, so XmlSerializer
+            // resets the flag to false and the editor never highlights anything. Turn it on
+            // once for existing configurations; it can be switched off in Settings afterwards.
+            Editor.SyntaxHighlighting = true;
+            SyntaxHighlightingMigrated = true;
+            Save();
         }
         if (!CompletionTriggersMigratedV2)
         {

@@ -330,6 +330,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -347,6 +348,7 @@
             <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding EditorWrapper.TabSize}" />
             <TextBlock Text="Temporary directory for uploaded files:" Grid.Row="5" />
             <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding EditorWrapper.TemporaryDirectory}" />
+            <CheckBox Content="Enable syntax highlighting" Grid.Row="6" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.SyntaxHighlighting}" />
           </Grid>
         </GroupBox>
       </TabItem>
