@@ -44,6 +44,9 @@ internal static class Program
         Check(LsOutputParser.LsParser.ParseLine("total 20").Name == null, "total line ignored");
         Check(LsOutputParser.LsParser.ParseLine("").Name == null, "empty line ignored");
 
+        Check(LsOutputParser.LsParser.BuildListCommand("/tmp/it's here", followSymlinks: false, recursive: false) == "ls -aFl --full-time '/tmp/it'\\''s here'", "a quote in the listed directory is escaped");
+        Check(LsOutputParser.LsParser.BuildListCommand("/srv", followSymlinks: true, recursive: false) == "ls -aLFl --full-time '/srv'", "follow symlinks");
+
         Console.WriteLine(_passed + " checks passed");
         return 0;
     }

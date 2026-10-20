@@ -1,5 +1,6 @@
 using SmarTTY.Ssh;
 using SmarTTY.Controls;
+using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,7 +16,8 @@ public class ShellCompletionAnalyzer : IDisposable
 
     private SshSession _sshSession;
 
-    private List<string> _history;
+    // Commands of the history file followed by the ones typed in this session (all tabs); guarded by itself.
+    private readonly List<string> _history = new List<string>();
 
     private Dictionary<string, HashSet<string>> _executablesByDir = new Dictionary<string, HashSet<string>>();
 
@@ -52,7 +54,10 @@ public class ShellCompletionAnalyzer : IDisposable
     {
         this._context = terminalSessionContext;
         _sshSession = sshSession;
-        new Thread(LoadHistoryAndPath).Start();
+        new Thread(LoadHistoryAndPath)
+        {
+            IsBackground = true
+        }.Start();
     }
 
     public void Dispose()
@@ -70,7 +75,17 @@ public class ShellCompletionAnalyzer : IDisposable
     {
         try
         {
-            _history = _sshSession.RunCommandChecked("cat " + _context.VTSettings.CompletionTriggers.HistoryFileName, requireSuccess: true);
+            List<string> lines = _sshSession.RunCommandChecked("cat " + _context.VTSettings.CompletionTriggers.HistoryFileName, requireSuccess: true);
+            if (lines != null)
+            {
+                // Time stamps of bash (HISTTIMEFORMAT) and zsh (extended history) are not commands.
+                List<string> commands = lines.Select(ShellCommandLine.ParseHistoryLine).Where((string line) => line != null).ToList();
+                lock (_history)
+                {
+                    // Commands typed while the file was being read come after it.
+                    _history.InsertRange(0, commands);
+                }
+            }
         }
         catch
         {
@@ -154,7 +169,10 @@ public class ShellCompletionAnalyzer : IDisposable
 
     public string[] GetHistory()
     {
-        return _history?.ToArray();
+        lock (_history)
+        {
+            return _history.ToArray();
+        }
     }
 
     public static string EscapeForShell(string text)
@@ -164,17 +182,26 @@ public class ShellCompletionAnalyzer : IDisposable
 
     public void AppendToHistory(string text)
     {
-        if (text == null)
+        if (string.IsNullOrWhiteSpace(text))
         {
             return;
         }
-        string item = "echo \"" + EscapeForShell(text) + "\" >> " + _context.VTSettings.CompletionTriggers.HistoryFileName;
+        lock (_history)
+        {
+            // Other Smart Terminal tabs of the session see the command as well.
+            _history.Add(text);
+        }
+        // printf rather than echo: echo may interpret backslashes or take "-n"/"-e" at the start of a command as options.
+        string item = "printf '%s\\n' " + SmarTTY.IO.RemotePathUtils.ShellQuote(text) + " >> " + _context.VTSettings.CompletionTriggers.HistoryFileName;
         lock (_historyQueue)
         {
             _historyQueue.Enqueue(item);
             if (!_historyWriterBusy)
             {
-                new Thread(ProcessHistoryQueue).Start();
+                new Thread(ProcessHistoryQueue)
+                {
+                    IsBackground = true
+                }.Start();
             }
         }
     }
@@ -188,7 +215,10 @@ public class ShellCompletionAnalyzer : IDisposable
             {
                 return;
             }
-            command = _historyQueue.Dequeue();
+            // Everything queued so far is written by one command: a channel per history line was slow, and a failed
+            // write used to leave the rest of the queue waiting for the next command.
+            command = string.Join("; ", _historyQueue.ToArray());
+            _historyQueue.Clear();
             _historyWriterBusy = true;
         }
         try
@@ -197,15 +227,24 @@ public class ShellCompletionAnalyzer : IDisposable
             _historyChannel = _sshSession.OpenShellChannel(command);
             _historyChannel.Finished += (object sender) =>
             {
-                _historyWriterBusy = false;
-                new Thread(ProcessHistoryQueue).Start();
+                lock (_historyQueue)
+                {
+                    _historyWriterBusy = false;
+                }
+                new Thread(ProcessHistoryQueue)
+                {
+                    IsBackground = true
+                }.Start();
             };
             _historyChannel.PollingEnabled = true;
         }
         catch
         {
             _historyChannel = null;
-            _historyWriterBusy = false;
+            lock (_historyQueue)
+            {
+                _historyWriterBusy = false;
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 using SmarTTY.Ssh;
 using SmarTTY.IO;
+using SmarTTY.Native;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using System;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 using VisualTTY;
 
@@ -152,30 +154,29 @@ public class SshTerminalControl : TerminalEmulatorControl
             Region.CaretIndex = -1;
         }
 
-        public void NavigateHistory(bool forward)
+        public void NavigateHistory(bool older)
         {
-            string text = this.Text;
+            string text = this.Text ?? "";
             if (_history == null)
             {
                 _history = BuildHistory();
-                _history.Remove(text ?? "");
-                _history.Insert(0, text ?? "");
+                _history.Remove(text);
+                _history.Insert(0, text);
+                _historyIndex = 0;
             }
-            else if (_historyIndex >= 0 && _historyIndex < _history.Count && !string.IsNullOrEmpty(text))
+            else if (_historyIndex >= 0 && _historyIndex < _history.Count && (_historyIndex == 0 || text != ""))
             {
+                // Edits of the line being typed (entry 0) and of recalled commands are kept while navigating.
                 _history[_historyIndex] = text;
             }
-            if (forward)
+            // Like bash, Up stops at the oldest command and Down at the line being typed: wrapping around used to
+            // replace the typed line with the oldest command when Down was pressed at the prompt.
+            int newIndex = _historyIndex + (older ? 1 : -1);
+            if (newIndex < 0 || newIndex >= _history.Count)
             {
-                if (++_historyIndex >= _history.Count)
-                {
-                    _historyIndex = 0;
-                }
+                return;
             }
-            else if (--_historyIndex < 0)
-            {
-                _historyIndex = _history.Count - 1;
-            }
+            _historyIndex = newIndex;
             try
             {
                 SetText(_history[_historyIndex]);
@@ -187,22 +188,7 @@ public class SshTerminalControl : TerminalEmulatorControl
 
         internal List<string> BuildHistory()
         {
-            string[] items = _terminal._shellCompletionAnalyzer?.GetHistory();
-            List<string> list = new List<string>();
-            HashSet<string> hashSet = new HashSet<string>();
-            if (items == null)
-            {
-                items = new string[0];
-            }
-            foreach (string item in items.Concat(_terminal._typedCommands).Reverse())
-            {
-                if (!hashSet.Contains(item))
-                {
-                    list.Add(item);
-                    hashSet.Add(item);
-                }
-            }
-            return list;
+            return _terminal.BuildHistory();
         }
     }
 
@@ -250,12 +236,41 @@ public class SshTerminalControl : TerminalEmulatorControl
 
         public void SendInput(byte[] buffer, InputKind inputKind)
         {
-            _channel.Input.Write(buffer, 0, buffer.Length);
+            try
+            {
+                _channel.Input.Write(buffer, 0, buffer.Length);
+            }
+            catch
+            {
+                // The command has just exited (or the connection is gone): the prompt is about to come back.
+            }
         }
 
         public void Resize(int columns, int rows)
         {
-            _channel.ResizePty(columns, rows);
+            try
+            {
+                _channel.ResizePty(columns, rows);
+            }
+            catch
+            {
+            }
+        }
+
+        // Closing a channel may wait for the server, so it is never done on the UI thread.
+        public void DisposeInBackground()
+        {
+            SshShellChannel channel = _channel;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    channel.Dispose();
+                }
+                catch
+                {
+                }
+            });
         }
 
         public void Dispose()
@@ -286,32 +301,29 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     private string _currentDirectory;
 
+    private string _previousDirectory;
+
     private CompletionSession _completion;
+
+    private bool _applyingCompletion;
 
     private List<string> _typedCommands = new List<string>();
 
-    private Dictionary<string, string> _environment = new Dictionary<string, string>();
+    // Variables set with "export" (a null value: "unset"), in the order they were set: a later value may refer to an
+    // earlier one. They are applied in front of every command, since each command runs in a new channel.
+    private List<KeyValuePair<string, string>> _environment = new List<KeyValuePair<string, string>>();
 
     private List<CommandRun> _runs = new List<CommandRun>();
 
     private Queue<Action> _uiQueue = new Queue<Action>();
 
-    internal readonly ShellCompletionAnalyzer _shellCompletionAnalyzer;
+    // Asked from the session every time: a reconnect replaces the analyzer (and the SSH session it uses).
+    internal ShellCompletionAnalyzer ShellAnalyzer => _context.ProvideAnalyzer();
 
     private ICompletionPopup _popup;
 
-    private string PromptPrefix
-    {
-        get
-        {
-            string text = _currentDirectory ?? "";
-            if (text.StartsWith(_homeDirectory))
-            {
-                text = "~" + text.Substring(_homeDirectory.Length);
-            }
-            return _context.TitleWithUserName + ":" + text;
-        }
-    }
+    // "/home/user2" is not under the home directory "/home/user": the prefix must end at a path boundary.
+    private string PromptPrefix => _context.TitleWithUserName + ":" + ShellCommandLine.AbbreviateHome(_currentDirectory, _homeDirectory);
 
     protected virtual bool IsCommandRunning => _inputLine == null;
 
@@ -362,7 +374,24 @@ public class SshTerminalControl : TerminalEmulatorControl
         UpdateTitle();
         TerminalSizeChanged += OnTerminalSizeChanged;
         base.DataEntered += OnDataEntered;
-        _shellCompletionAnalyzer = terminalSessionContext.ProvideAnalyzer();
+        // Starts loading the history and the list of executables in the background.
+        terminalSessionContext.ProvideAnalyzer();
+    }
+
+    // Newest first, without duplicates: the history file of the session followed by what was typed in this tab.
+    private List<string> BuildHistory()
+    {
+        string[] items = ShellAnalyzer?.GetHistory() ?? new string[0];
+        List<string> list = new List<string>();
+        HashSet<string> hashSet = new HashSet<string>();
+        foreach (string item in items.Concat(_typedCommands).Reverse())
+        {
+            if (hashSet.Add(item))
+            {
+                list.Add(item);
+            }
+        }
+        return list;
     }
 
     public void RequestOpenFile(string text, int? line, int? column)
@@ -395,40 +424,124 @@ public class SshTerminalControl : TerminalEmulatorControl
         base.Title = PromptPrefix;
     }
 
+    /// <summary>
+    /// Changes the directory of the tab to a literal path (absolute or relative to the current directory), as the file
+    /// list does. The line being typed is kept; while a command is running only the next prompt is affected.
+    /// Throws if the directory cannot be entered.
+    /// </summary>
     public void ChangeDirectory(string path)
     {
-        if (path.StartsWith("~"))
+        if (string.IsNullOrEmpty(path))
         {
-            path = _homeDirectory + path.Substring(1);
+            return;
         }
-        path = ((!path.StartsWith("\"") && !path.StartsWith("'")) ? path.Replace("\\ ", " ") : path.Trim('\'', '"'));
-        string text = RemotePathUtils.NormalizeUnix(RemotePathUtils.Combine(_currentDirectory, path));
-        string trimmedPath = text.TrimEnd('/');
+        string target = RemotePathUtils.NormalizeUnix(RemotePathUtils.Combine(_currentDirectory, path));
+        string trimmedPath = target.TrimEnd('/');
         if (trimmedPath.Length > 0)
         {
-            text = trimmedPath;
+            target = trimmedPath;
         }
-        List<string> list = _context.Session.RunCommand("cd \"" + text + "\"", out var exitCode) ?? new List<string>();
-        foreach (string item in list)
+        List<string> output = _context.Session.RunCommand("cd " + RemotePathUtils.ShellQuote(target), out int? exitCode);
+        if (exitCode != 0)
         {
-            ProcessOutput(item);
+            string message = string.Join(Environment.NewLine, (output ?? new List<string>()).Where((string line) => line.Trim() != ""));
+            throw new RemoteOperationException(message != "" ? message : $"Cannot change the directory to {target} (exit code {exitCode ?? (-1)})");
         }
-        if (exitCode == 0)
+        SetCurrentDirectory(target);
+        if (_inputLine != null)
         {
-            _currentDirectory = text;
-            DirectoryChanged?.Invoke(text);
+            RefreshPrompt();
         }
-        else if (list.Count == 0)
-        {
-            ProcessOutput(TerminalEmulatorControl.Colorize($"'cd {text}' exited with code {exitCode ?? (-1)}", 1));
-        }
-        ShowPrompt();
     }
 
-    private void ShowPrompt()
+    private void SetCurrentDirectory(string directory)
+    {
+        if (directory == _currentDirectory)
+        {
+            return;
+        }
+        _previousDirectory = _currentDirectory;
+        _currentDirectory = directory;
+        // The tab title shows the directory as well.
+        UpdateTitle();
+        DirectoryChanged?.Invoke(directory);
+    }
+
+    /// <summary>
+    /// Runs a typed "cd" command. The remote shell resolves the argument (~, $VAR, CDPATH, globs, quotes) and reports
+    /// the resulting directory, so whatever works in bash works here too. "cd -" goes back to the previous directory.
+    /// </summary>
+    private void RunChangeDirectoryCommand(string arguments)
+    {
+        arguments = (arguments ?? "").Trim();
+        string resolvedArguments = arguments;
+        if (arguments == "-")
+        {
+            if (_previousDirectory == null)
+            {
+                PrintLines(new[] { TerminalEmulatorControl.Colorize("cd: OLDPWD not set", 1) });
+                return;
+            }
+            resolvedArguments = RemotePathUtils.ShellQuote(_previousDirectory);
+        }
+        List<string> output = _context.Session.RunCommand(BuildRemoteCommand("cd " + resolvedArguments + " >/dev/null && pwd", interactive: false), out int? exitCode);
+        string newDirectory = (exitCode == 0) ? output?.LastOrDefault((string line) => line.StartsWith("/")) : null;
+        if (newDirectory == null)
+        {
+            List<string> errors = (output ?? new List<string>()).Where((string line) => line.Trim() != "").ToList();
+            if (errors.Count == 0)
+            {
+                errors.Add($"'cd {arguments}' exited with code {exitCode ?? (-1)}");
+            }
+            PrintLines(errors.Select((string line) => TerminalEmulatorControl.Colorize(line, 1)));
+            return;
+        }
+        if (arguments == "-")
+        {
+            PrintLines(new[] { newDirectory });
+        }
+        SetCurrentDirectory(newDirectory);
+    }
+
+    private void PrintLines(IEnumerable<string> lines)
+    {
+        StringBuilder output = new StringBuilder();
+        foreach (string line in lines)
+        {
+            output.Append(line).Append("\r\n");
+        }
+        if (output.Length > 0)
+        {
+            ProcessOutput(output.ToString());
+        }
+    }
+
+    // Redraws the prompt (after the directory has changed) without losing what has been typed.
+    private void RefreshPrompt()
+    {
+        InputLine inputLine = _inputLine;
+        if (inputLine == null)
+        {
+            return;
+        }
+        string text = inputLine.Text;
+        int caretIndex = inputLine.Region.CaretIndex;
+        CloseCompletion();
+        EditableTextDocument document = ((EditableTextBrowser)this).EditableDocument;
+        document.RemoveLines(inputLine.StartLine, document.LineCount - inputLine.StartLine);
+        _inputLine = null;
+        ShowPrompt(removeTrailingBlankLine: false);
+        _inputLine.SetText(text);
+        if (caretIndex >= 0 && caretIndex <= text.Length)
+        {
+            _inputLine.Region.CaretIndex = caretIndex;
+        }
+    }
+
+    private void ShowPrompt(bool removeTrailingBlankLine = true)
     {
         ActiveBufferIndex = 0;
-        if (((EditableTextBrowser)this).EditableDocument.LineCount > 0 && ((EditableTextBrowser)this).EditableDocument.GetLineText(((EditableTextBrowser)this).EditableDocument.LineCount - 1).Trim() == "")
+        if (removeTrailingBlankLine && ((EditableTextBrowser)this).EditableDocument.LineCount > 0 && ((EditableTextBrowser)this).EditableDocument.GetLineText(((EditableTextBrowser)this).EditableDocument.LineCount - 1).Trim() == "")
         {
             ((EditableTextBrowser)this).EditableDocument.RemoveLines(((EditableTextBrowser)this).EditableDocument.LineCount - 1, 1);
         }
@@ -499,7 +612,8 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     private bool InputWraps()
     {
-        if (_inputLine == null)
+        // Before the first layout there are no columns yet; rewrapping to 0 columns would never finish.
+        if (_inputLine == null || _visibleColumns <= 0)
         {
             return false;
         }
@@ -546,7 +660,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             string filter = _inputLine?.Text;
             _popup?.SetFilter(filter);
             CompletionSession completionSession = _completion;
-            if (completionSession != null && completionSession.OnTextChanged(filter, startIndex, endIndex - startIndex, (text ?? "").Replace("\n", "").Replace("\r", "").Length))
+            if (completionSession != null && !_applyingCompletion && completionSession.OnTextChanged(filter, startIndex, endIndex - startIndex, (text ?? "").Replace("\n", "").Replace("\r", "").Length))
             {
                 _completion.Dispose();
                 _completion = null;
@@ -640,7 +754,8 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             int index = _inputLine.Region.IndexOf(textPosition);
             string text = _inputLine?.Text;
-            if (text != null && index >= 0 && index < text.Length)
+            // At the end of the line (index == text.Length) Ctrl+Left must still jump to the start of the last word.
+            if (text != null && index >= 0 && index <= text.Length)
             {
                 int boundary = FindWordBoundary(index, text, caretMove == CaretMove.WordLeft);
                 movedPosition = _inputLine.Region.PositionAt(boundary);
@@ -698,9 +813,17 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             return;
         }
-        string text = inputLine.Text;
+        string text = inputLine.Text ?? "";
         int caretIndex = inputLine.Region.CaretIndex;
-        CommandCompletion commandCompletion = _shellCompletionAnalyzer.CompletionDatabase?.LookupCommand(text);
+        if (caretIndex < 0 || caretIndex > text.Length)
+        {
+            caretIndex = text.Length;
+        }
+        // The word under the caret is replaced; when the caret is between words, an empty word at the caret is
+        // completed (it used to be inserted at the start of the line for a command, e.g. after "ls | ").
+        ShellCommandLine.CompletionContext context = ShellCommandLine.Analyze(text, caretIndex);
+        // Options are looked up for the command the caret is in ("sudo apt inst", "ls | grep -"), not the first word.
+        CommandCompletion commandCompletion = ShellAnalyzer.CompletionDatabase?.LookupCommand(text.Substring(context.CommandStart));
         switch (completionTrigger)
         {
             case CompletionTrigger.Options:
@@ -716,35 +839,11 @@ public class SshTerminalControl : TerminalEmulatorControl
                 }
                 break;
         }
-        CompletionSession.Token[] items = CompletionSession.Tokenize(text);
-        int? matchIndex = Enumerable.Range(0, items.Length).Select((Func<int, int?>)((int value) => value)).FirstOrDefault((int? itemIndex) => items[itemIndex.Value].Contains(caretIndex));
-        int? previousIndex = null;
-        if (matchIndex.HasValue)
-        {
-            previousIndex = matchIndex.Value - 1;
-        }
-        else if (items.Length != 0)
-        {
-            previousIndex = items.Length - 1;
-        }
-        CompletionSession.Token token = default;
-        if (matchIndex.HasValue)
-        {
-            token = items[matchIndex.Value];
-        }
-        CompletionTarget completionTarget;
-        if (items.Length == 0 || matchIndex == 0 || (previousIndex.HasValue && items[previousIndex.Value].Text == "|"))
-        {
-            completionTarget = CompletionTarget.Command;
-        }
-        else
-        {
-            completionTarget = ((items.Length == 0 || !(items[0].Text == "cd")) ? CompletionTarget.Path : CompletionTarget.Directory);
-            if (token.Text == null)
-            {
-                token = new CompletionSession.Token(text, text.Length, text.Length);
-            }
-        }
+        CompletionTarget completionTarget = context.Target;
+        CompletionSession.Token token = new CompletionSession.Token(text, context.TokenStart, context.TokenEnd);
+        // A session whose popup was closed from outside (a click elsewhere) must not apply its late results.
+        completionSession?.Dispose();
+        _completion = null;
         CompletionPopupRequest completionPopupRequest = new CompletionPopupRequest
         {
             ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))),
@@ -765,8 +864,17 @@ public class SshTerminalControl : TerminalEmulatorControl
         InputRegion inputRegion = _inputLine?.Region;
         if (inputRegion != null)
         {
-            inputRegion.Text = item.NewText;
-            inputRegion.CaretIndex = item.CaretIndex;
+            // The session updates itself; reporting this replacement to it as typing used to end it.
+            _applyingCompletion = true;
+            try
+            {
+                inputRegion.Text = item.NewText;
+                inputRegion.CaretIndex = item.CaretIndex;
+            }
+            finally
+            {
+                _applyingCompletion = false;
+            }
         }
         if (item.Commit)
         {
@@ -779,6 +887,10 @@ public class SshTerminalControl : TerminalEmulatorControl
         bool? isAtWordStart = null;
         if (_inputLine != null)
         {
+            if (e.KeyChar >= ' ' || e.KeyChar == '\b')
+            {
+                PrepareInputForEditing();
+            }
             switch (e.KeyChar)
             {
                 case '\r':
@@ -808,6 +920,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             CompletionSession activeCompletion = _completion;
             if (activeCompletion != null && activeCompletion.IsOpen && activeCompletion.HandleChar(e.KeyChar))
             {
+                activeCompletion.Dispose();
                 _completion = null;
                 e.Handled = true;
                 switch (e.KeyChar)
@@ -877,13 +990,18 @@ public class SshTerminalControl : TerminalEmulatorControl
     {
         CompletionSession completionSession = _completion;
         ICompletionPopup completionPopup = _popup;
+        CompletionSession.AppliedEventArgs appliedBefore = completionSession?.LastApplied;
         if ((completionPopup != null && completionPopup.TryHandleKeyEvent(e)) || (completionSession != null && completionSession.HandleKey(e)))
         {
             e.Handled = true;
             e.SuppressKeyPress = true;
+            // Only an item applied by this very key counts: LastApplied stays set after Tab auto-completed a
+            // directory, and every later arrow key in the popup used to restart the completion.
             CompletionSession.AppliedEventArgs appliedEventArgs = completionSession?.LastApplied;
-            if (appliedEventArgs != null && appliedEventArgs.IsDirectory && e.KeyCode != Keys.Return)
+            if (appliedEventArgs != null && appliedEventArgs != appliedBefore && appliedEventArgs.IsDirectory && e.KeyCode != Keys.Return && _completion == completionSession && _inputLine != null)
             {
+                // A directory was chosen with Tab: list its contents right away.
+                completionSession.Dispose();
                 _completion = null;
                 ShowCompletions();
             }
@@ -895,78 +1013,195 @@ public class SshTerminalControl : TerminalEmulatorControl
             {
                 CloseCompletion();
             }
-            if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+            if (e.Control && !e.Alt)
             {
                 switch (e.KeyCode)
                 {
                     case Keys.L:
-                        if (_inputLine != null)
                         {
                             string text = _inputLine.Text;
-                            Reset();
-                            ShowPrompt();
+                            ClearScreen();
                             _inputLine?.SetText(text);
+                            SuppressKey(e);
+                            return;
                         }
-                        break;
                     case Keys.C:
-                        _inputLine?.SetText("");
+                        // With a selection Ctrl+C copies it (the base class does that). Clearing the line first used
+                        // to drop the selection, so nothing was copied and the typed command was lost.
+                        if (!HasSelection)
+                        {
+                            CloseCompletion();
+                            _inputLine.SetText("");
+                            SuppressKey(e);
+                            return;
+                        }
                         break;
                     case Keys.D:
-                        EndOfInputRequested?.Invoke(this, EventArgs.Empty);
-                        break;
-                    case Keys.R:
+                        // As in bash, Ctrl+D closes the tab only on an empty line.
+                        if (string.IsNullOrEmpty(_inputLine.Text))
                         {
-                            CompletionPopupRequest completionPopupRequest = new CompletionPopupRequest
-                            {
-                                ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))),
-                                LineHeight = LineHeight,
-                                Items = _inputLine.BuildHistory()?.Select((string historyCommand) => new CompletionItem
-                                {
-                                    Icon = VirtualTerminalPopupItemIcon.Command,
-                                    Text = historyCommand
-                                })?.ToArray(),
-                                Title = "Command history",
-                                Icon = VirtualTerminalPopupIcon.History
-                            };
-                            CompletionPopupRequested?.Invoke(this, completionPopupRequest);
-                            _popup = completionPopupRequest.Popup;
-                            if (completionPopupRequest.Popup != null)
-                            {
-                                completionPopupRequest.Popup.ItemSelected += (CompletionItem completionItem, Keys keys) =>
-                                {
-                                    _inputLine.SetText(completionItem.Text);
-                                    if (keys == Keys.Return)
-                                    {
-                                        SubmitInput();
-                                    }
-                                };
-                            }
-                            _popup?.SetFilter(_inputLine?.Text);
-                            break;
+                            RequestEndOfInput();
                         }
+                        SuppressKey(e);
+                        return;
+                    case Keys.U:
+                        DeleteInput(toStart: true);
+                        SuppressKey(e);
+                        return;
+                    case Keys.K:
+                        DeleteInput(toStart: false);
+                        SuppressKey(e);
+                        return;
+                    case Keys.R:
+                        ShowHistoryPopup();
+                        SuppressKey(e);
+                        return;
                     case Keys.Space:
                         if (CompletionTriggers().CtrlSpace)
                         {
                             ShowCompletions();
-                            e.Handled = true;
-                            e.SuppressKeyPress = true;
+                            SuppressKey(e);
                             return;
                         }
                         break;
                 }
             }
-            else
+            else if (!e.Alt && !e.Shift && (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down))
             {
-                Keys keyCode = e.KeyCode;
-                if (keyCode == Keys.Up || keyCode == Keys.Down)
-                {
-                    _inputLine.NavigateHistory(e.KeyCode == Keys.Up);
-                    e.Handled = true;
-                    e.SuppressKeyPress = true;
-                }
+                _inputLine.NavigateHistory(e.KeyCode == Keys.Up);
+                SuppressKey(e);
+                return;
+            }
+            else if (e.KeyCode == Keys.Delete && !e.Shift)
+            {
+                PrepareInputForEditing();
             }
         }
         base.OnKeyDown(e);
+    }
+
+    private static void SuppressKey(KeyEventArgs e)
+    {
+        e.Handled = true;
+        e.SuppressKeyPress = true;
+    }
+
+    /// <summary>
+    /// Typing goes to the command line even when text above it is selected (e.g. to copy it): such a selection used to
+    /// make every typed character, Backspace and Delete silently do nothing.
+    /// </summary>
+    private void PrepareInputForEditing()
+    {
+        if (_inputLine == null)
+        {
+            return;
+        }
+        if (!IsInInputArea(CaretPosition))
+        {
+            SetCaret(((EditableTextBrowser)this).EditableDocument.EndPosition);
+        }
+        if (HasSelection && !(IsInInputArea(SelectionStart) && IsInInputArea(SelectionEnd)))
+        {
+            SetSelection(select: false, CaretPosition);
+            Invalidate();
+        }
+    }
+
+    // Ctrl+U / Ctrl+K: delete from the caret to the start / end of the command line, as in readline.
+    private void DeleteInput(bool toStart)
+    {
+        InputLine inputLine = _inputLine;
+        if (inputLine == null)
+        {
+            return;
+        }
+        PrepareInputForEditing();
+        string text = inputLine.Text ?? "";
+        int caretIndex = inputLine.Region.CaretIndex;
+        if (caretIndex < 0 || caretIndex > text.Length)
+        {
+            caretIndex = text.Length;
+        }
+        CloseCompletion();
+        if (toStart)
+        {
+            inputLine.Region.Text = text.Substring(caretIndex);
+            inputLine.Region.CaretIndex = 0;
+        }
+        else
+        {
+            inputLine.Region.Text = text.Substring(0, caretIndex);
+            inputLine.Region.CaretIndex = caretIndex;
+        }
+    }
+
+    private void ShowHistoryPopup()
+    {
+        CloseCompletion();
+        CompletionPopupRequest completionPopupRequest = new CompletionPopupRequest
+        {
+            ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))),
+            LineHeight = LineHeight,
+            Items = _inputLine.BuildHistory()?.Select((string historyCommand) => new CompletionItem
+            {
+                Icon = VirtualTerminalPopupItemIcon.Command,
+                Text = historyCommand
+            })?.ToArray(),
+            Title = "Command history",
+            Icon = VirtualTerminalPopupIcon.History
+        };
+        CompletionPopupRequested?.Invoke(this, completionPopupRequest);
+        ICompletionPopup popup = completionPopupRequest.Popup;
+        _popup = popup;
+        if (popup != null)
+        {
+            popup.ItemSelected += (CompletionItem completionItem, Keys keys) =>
+            {
+                if (_popup == popup)
+                {
+                    _popup = null;
+                }
+                if (_inputLine == null)
+                {
+                    return;
+                }
+                _inputLine.SetText(completionItem.Text);
+                if (keys == Keys.Return)
+                {
+                    SubmitInput();
+                }
+            };
+            popup.SetFilter(_inputLine?.Text);
+        }
+    }
+
+    // Ctrl+L and "clear": an empty screen with the prompt at the top.
+    private void ClearScreen()
+    {
+        CloseCompletion();
+        Reset();
+        ShowPrompt();
+    }
+
+    // Closing the tab disposes this control, so it is done after the key handler has returned.
+    private void RequestEndOfInput()
+    {
+        if (EndOfInputRequested == null || IsDisposed)
+        {
+            return;
+        }
+        BeginInvoke(new Action(() =>
+        {
+            if (!IsDisposed)
+            {
+                EndOfInputRequested?.Invoke(this, EventArgs.Empty);
+            }
+            // The tab stayed open ("exit" was typed, closing was cancelled): give the prompt back.
+            if (!IsDisposed && _inputLine == null && _channel == null)
+            {
+                ShowPrompt();
+            }
+        }));
     }
 
     private void BeginExecution()
@@ -992,12 +1227,19 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     public string BuildRemoteCommand(string command, bool? interactive = null)
     {
-        string text = "cd \"" + _currentDirectory + "\" && ";
+        // Quoted as a single word: a directory name with a quote, $ or ` used to break every command.
+        string text = "cd " + RemotePathUtils.ShellQuote(_currentDirectory) + " && ";
         interactive = interactive ?? _context.VTSettings.InteractiveModeWrapper;
-        foreach (KeyValuePair<string, string> item in _environment)
+        // "export A=1 && cmd" rather than "A=1 cmd": with the latter $A in the command itself was expanded before the
+        // assignment ("echo $A" printed nothing) and the variable did not reach the other commands of a pipeline.
+        StringBuilder exports = new StringBuilder();
+        // A copy: completion threads build commands while the UI thread may change the list.
+        foreach (KeyValuePair<string, string> item in _environment.ToArray())
         {
-            command = item.Key + "=" + item.Value + " " + command;
+            exports.Append(item.Value == null ? "unset " + item.Key : "export " + item.Key + "=" + item.Value);
+            exports.Append(" && ");
         }
+        command = exports + command;
         if (interactive.Value)
         {
             command = _context.VTSettings.DefaultShell + " -i -c \"" + ShellCompletionAnalyzer.EscapeForShell(command) + "\"";
@@ -1024,7 +1266,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             command = _inputLine?.Text;
         }
-        if (string.IsNullOrEmpty(command))
+        if (string.IsNullOrWhiteSpace(command))
         {
             ShowPrompt();
             return true;
@@ -1032,48 +1274,16 @@ public class SshTerminalControl : TerminalEmulatorControl
         BeginExecution();
         try
         {
-            _typedCommands.Add(command);
-            _shellCompletionAnalyzer.AppendToHistory(command);
-            if (command.StartsWith("cd "))
+            // As with HISTCONTROL=ignorespace, a command typed with a leading space is not saved in the history file.
+            if (!command.StartsWith(" ", StringComparison.Ordinal))
             {
-                string text = command.Substring(2).Trim();
-                ChangeDirectory(text);
+                _typedCommands.Add(command);
+                ShellAnalyzer.AppendToHistory(command);
             }
-            else if (command.StartsWith("export "))
+            string trimmedCommand = command.Trim();
+            if (!TryRunBuiltin(trimmedCommand))
             {
-                string assignment = command.Substring(6).Trim();
-                int equalsIndex = assignment.IndexOf('=');
-                if (equalsIndex != -1)
-                {
-                    string key = assignment.Substring(0, equalsIndex);
-                    if (equalsIndex == assignment.Length - 1)
-                    {
-                        _environment.Remove(key);
-                    }
-                    else
-                    {
-                        _environment[key] = assignment.Substring(equalsIndex + 1);
-                    }
-                }
-                ShowPrompt();
-            }
-            else
-            {
-                SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(BuildRemoteCommand(command), "xterm", ExtendedDataMode.Merge);
-                if (sshShellChannel == null)
-                {
-                    throw new Exception("Failed to open an SSH channel");
-                }
-                CommandRun item = new CommandRun(this, command, _currentDirectory, ((EditableTextBrowser)this).EditableDocument.LineCount - 1);
-                _runs.Add(item);
-                CommandChannel commandChannel = new CommandChannel(sshShellChannel, this, item);
-                _channel = commandChannel;
-                sshShellChannel.Finished += (object sender) =>
-                {
-                    OnCommandFinished(command, commandChannel);
-                };
-                sshShellChannel.PollingEnabled = true;
-                sshShellChannel.ResizePty(TerminalSize.Width, TerminalSize.Height);
+                RunRemoteCommand(command);
             }
         }
         catch (Exception exception)
@@ -1083,6 +1293,103 @@ public class SshTerminalControl : TerminalEmulatorControl
             return true;
         }
         return true;
+    }
+
+    /// <summary>
+    /// Every command runs in a channel of its own, so commands that change the state of the shell are carried out here:
+    /// cd, export and unset are remembered for the next commands, exit closes the tab, clear clears the screen and
+    /// history lists the history. A compound command ("cd /tmp && make") is run remotely as typed.
+    /// </summary>
+    private bool TryRunBuiltin(string command)
+    {
+        List<ShellCommandLine.Token> tokens = ShellCommandLine.Tokenize(command);
+        if (tokens.Count == 0 || tokens[0].IsOperator)
+        {
+            return false;
+        }
+        string name = tokens[0].Text;
+        bool compound = ShellCommandLine.HasSeparators(tokens);
+        if (compound)
+        {
+            if (name == "cd" || name == "export" || name == "unset")
+            {
+                ProcessOutput(TerminalEmulatorControl.Colorize($"Note: '{name}' in a compound command does not affect the next commands; type it on a line of its own.", 3) + "\r\n");
+            }
+            return false;
+        }
+        switch (name)
+        {
+            case "cd":
+                RunChangeDirectoryCommand(command.Substring(tokens[0].End));
+                ShowPrompt();
+                return true;
+            case "export":
+            case "unset":
+                {
+                    if (!ShellCommandLine.TryParseVariableCommand(command, out List<KeyValuePair<string, string>> assignments))
+                    {
+                        return false;
+                    }
+                    foreach (KeyValuePair<string, string> assignment in assignments)
+                    {
+                        _environment.RemoveAll((KeyValuePair<string, string> item) => item.Key == assignment.Key);
+                        _environment.Add(assignment);
+                    }
+                    ShowPrompt();
+                    return true;
+                }
+            case "exit":
+            case "logout":
+                if (EndOfInputRequested == null)
+                {
+                    return false;
+                }
+                RequestEndOfInput();
+                return true;
+            case "clear":
+                if (tokens.Count != 1)
+                {
+                    return false;
+                }
+                ClearScreen();
+                return true;
+            case "history":
+                if (tokens.Count != 1)
+                {
+                    return false;
+                }
+                {
+                    List<string> history = BuildHistory();
+                    history.Reverse();
+                    PrintLines(history.Select((string item, int index) => $"{index + 1,5}  {item}"));
+                    ShowPrompt();
+                    return true;
+                }
+            default:
+                return false;
+        }
+    }
+
+    private void RunRemoteCommand(string command)
+    {
+        SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(BuildRemoteCommand(command), "xterm", ExtendedDataMode.Merge);
+        if (sshShellChannel == null)
+        {
+            throw new Exception("Failed to open an SSH channel");
+        }
+        CommandRun item = new CommandRun(this, command, _currentDirectory, ((EditableTextBrowser)this).EditableDocument.LineCount - 1);
+        _runs.Add(item);
+        CommandChannel commandChannel = new CommandChannel(sshShellChannel, this, item);
+        _channel = commandChannel;
+        sshShellChannel.Finished += (object sender) =>
+        {
+            // Read on the session thread: the exit status may still be on its way when the channel reports EOF.
+            bool connectionLost = sshShellChannel.ClosedByConnectionLoss;
+            int exitStatus = (connectionLost || sshShellChannel.IsDisposed) ? 0 : sshShellChannel.ExitStatus;
+            OnCommandFinished(commandChannel, connectionLost, exitStatus);
+        };
+        sshShellChannel.PollingEnabled = true;
+        sshShellChannel.ResizePty(TerminalSize.Width, TerminalSize.Height);
     }
 
     internal override ILinkScanner CreateLinkScanner()
@@ -1102,9 +1409,25 @@ public class SshTerminalControl : TerminalEmulatorControl
             queueWasEmpty = _uiQueue.Count == 0;
             _uiQueue.Enqueue(action);
         }
-        if (queueWasEmpty)
+        if (!queueWasEmpty)
         {
-            BeginInvoke(new Action(DrainUiQueue));
+            return;
+        }
+        try
+        {
+            if (!IsDisposed && IsHandleCreated)
+            {
+                BeginInvoke(new Action(DrainUiQueue));
+                return;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // The tab is being closed: late output of its command has nowhere to go.
+        }
+        lock (_uiQueue)
+        {
+            _uiQueue.Clear();
         }
     }
 
@@ -1121,6 +1444,10 @@ public class SshTerminalControl : TerminalEmulatorControl
                 }
                 action = _uiQueue.Dequeue();
             }
+            if (IsDisposed)
+            {
+                continue;
+            }
             try
             {
                 action();
@@ -1131,14 +1458,80 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
     }
 
-    private void OnCommandFinished(string text, CommandChannel commandChannel)
+    private void OnCommandFinished(CommandChannel commandChannel, bool connectionLost, int exitStatus)
     {
         PostToUi(() =>
         {
-            commandChannel?.Dispose();
+            commandChannel?.DisposeInBackground();
+            if (_channel != commandChannel)
+            {
+                return;
+            }
             ResetLinkTracking();
             _channel = null;
+            string message = null;
+            if (connectionLost)
+            {
+                message = TerminalEmulatorControl.Colorize("Connection lost.", 1);
+            }
+            else if (exitStatus > 0)
+            {
+                message = TerminalEmulatorControl.Colorize($"[exit code {exitStatus}]", 3);
+            }
+            else if (exitStatus < 0)
+            {
+                message = TerminalEmulatorControl.Colorize("[terminated by a signal]", 3);
+            }
+            if (message != null)
+            {
+                ProcessOutput((CursorPosition.X > 0 ? "\r\n" : "") + message + "\r\n");
+            }
             ShowPrompt();
         });
+    }
+
+    public override void Paste()
+    {
+        if (_inputLine == null)
+        {
+            base.Paste();
+            return;
+        }
+        try
+        {
+            // The command line is a single line: pasted lines are joined the way the shell would run them instead of
+            // being glued together without a separator.
+            string text = ShellCommandLine.JoinPastedLines(Win32Clipboard.GetText(Handle));
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+            PrepareInputForEditing();
+            InsertText(text);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            // Closing the tab stops the command that is running in it (tail -f, top, ...): its channel used to stay
+            // open until the whole session was closed.
+            CommandChannel channel = _channel;
+            _channel = null;
+            channel?.DisposeInBackground();
+            try
+            {
+                CloseCompletion();
+            }
+            catch
+            {
+            }
+        }
+        base.Dispose(disposing);
     }
 }
