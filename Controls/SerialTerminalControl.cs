@@ -787,8 +787,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
     }
 
     /// <summary>
-    /// Put "stty cols C rows R" in front of the next command when the terminal window has another size than the one
-    /// the device was told last. Only after the device has shown a Linux shell prompt, and never for a password.
+    /// Put the command that sets the terminal size (COLUMNS, LINES, stty) in front of the next command when the
+    /// terminal window has another size than the one the device was told last. Only after the device has shown a Linux shell prompt, and never for a password.
     /// </summary>
     public bool SyncRemoteSize { get; set; }
 
@@ -801,7 +801,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// <summary>True when "Send terminal size now" can run: the input line is shown and nothing is typed in it.</summary>
     public bool CanSendRemoteSize => _inputLine != null && _inputLine.Text.Length == 0 && LineInputText.BuildRemoteSizeCommand(TerminalSize.Width, TerminalSize.Height) != null;
 
-    /// <summary>Sends the stty command with the current size of the terminal as a command of its own (it is not put in the history).</summary>
+    /// <summary>Sends the command that sets the terminal size as a command of its own (it is not put in the history).</summary>
     public bool SendRemoteSizeNow()
     {
         if (!CanSendRemoteSize)
@@ -814,7 +814,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         return true;
     }
 
-    // "stty cols C rows R; " for the command about to be sent, or nothing.
+    // The terminal size command with "; " after it for the command about to be sent, or nothing.
     private string TakeRemoteSizePrefix(string command, string prompt)
     {
         if (!SyncRemoteSize || !_shellPromptSeen || command.Length == 0 || LineInputText.LooksLikeSecretPrompt(prompt))
@@ -822,13 +822,13 @@ public class SerialTerminalControl : TerminalEmulatorControl
             return string.Empty;
         }
         Size size = TerminalSize;
-        string stty = LineInputText.BuildRemoteSizeCommand(size.Width, size.Height);
-        if (stty == null || size == _announcedSize)
+        string sizeCommand = LineInputText.BuildRemoteSizeCommand(size.Width, size.Height);
+        if (sizeCommand == null || size == _announcedSize)
         {
             return string.Empty;
         }
         _announcedSize = size;
-        return stty + "; ";
+        return sizeCommand + "; ";
     }
 
     private void TrackShellPrompt(string text)

@@ -246,7 +246,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     }
 
     // A serial line and a raw TCP connection cannot carry the size of the window, so mc, htop and the like draw into
-    // the default 80x24 corner of it. For a Linux shell on the device the size can be set with stty: "Send terminal
+    // the default 80x24 corner of it. For a Linux shell on the device the size is set with COLUMNS/LINES and stty: "Send terminal
     // size now" does it once, "Keep ... in sync" puts the command in front of the next command whenever the window
     // has another size than the one the device was told last. Telnet passes the size on by itself (NAWS), so
     // these commands are not shown for it. A program that is already running cannot be told: the new size is
@@ -257,13 +257,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void AddRemoteSizeCommands()
     {
-        _syncRemoteSizeMenuItem = new ToolStripMenuItem("Keep device terminal size in sync (stty)", null, (sender, args) => ToggleSyncRemoteSize())
+        _syncRemoteSizeMenuItem = new ToolStripMenuItem("Keep device terminal size in sync", null, (sender, args) => ToggleSyncRemoteSize())
         {
-            ToolTipText = "For a Linux shell on the device: tell it the size of this window (stty cols/rows) before the next command, so mc, htop and the like fill the window. It acts only after the device has shown a shell prompt (\"# \" or \"$ \"); switch it off for a console that uses such a prompt but is not a Linux shell."
+            ToolTipText = "For a Linux shell on the device: tell it the size of this window (COLUMNS, LINES, stty) before the next command, so mc, htop and the like fill the window. It acts only after the device has shown a shell prompt (\"# \" or \"$ \"); switch it off for a console that uses such a prompt but is not a Linux shell."
         };
-        _sendRemoteSizeMenuItem = new ToolStripMenuItem("Send terminal size now (stty)", null, (sender, args) => _serialTerminalControl.SendRemoteSizeNow())
+        _sendRemoteSizeMenuItem = new ToolStripMenuItem("Send terminal size now", null, (sender, args) => _serialTerminalControl.SendRemoteSizeNow())
         {
-            ToolTipText = "Types \"stty cols N rows M\" for the shell on the device (available at the input line when nothing is typed in it)."
+            ToolTipText = "Types \"export COLUMNS=N LINES=M; stty cols N rows M\" for the shell on the device (available at the input line when nothing is typed in it)."
         };
         contextMenuStrip1.Items.Add(_syncRemoteSizeMenuItem);
         contextMenuStrip1.Items.Add(_sendRemoteSizeMenuItem);

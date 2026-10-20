@@ -388,8 +388,8 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Tell a Linux shell on the device the size of the terminal window (with an stty command in front of the
-    /// next command) so that mc, htop and the like fill the window. On by default; it acts only after the device
+    /// Tell a Linux shell on the device the size of the terminal window (with a command that sets COLUMNS, LINES
+    /// and the tty size in front of the next command) so that mc, htop and the like fill the window. On by default; it acts only after the device
     /// has shown the prompt of a Linux shell ("# " or "$ "), never at a bootloader or a "login:" prompt, because
     /// the text is typed into the device. Telnet connections do not use it (they pass the size on themselves).
     /// </summary>

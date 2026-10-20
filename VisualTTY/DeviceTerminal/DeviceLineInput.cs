@@ -214,9 +214,13 @@ public static class LineInputText
     }
 
     /// <summary>
-    /// The command that tells a Linux tty the size of the terminal window, or null when the size is not known yet.
-    /// A serial line (and a raw TCP connection) has no way to carry the size, so programs such as mc and htop
-    /// would draw into the default 80x24 corner; telnet and SSH pass the size on by themselves.
+    /// The command that tells a shell on the device the size of the terminal window, or null when the size is not
+    /// known yet. A serial line (and a raw TCP connection) has no way to carry the size, so programs such as mc and
+    /// htop would draw into the default 80x24 corner; telnet and SSH pass the size on by themselves.
+    /// Two things are set because neither is on every device: the COLUMNS and LINES variables, which ncurses (htop)
+    /// and slang (mc) use when the tty reports no size - a serial tty does not - and the size of the tty itself
+    /// with stty. The stty applet is missing from many BusyBox builds (OpenWrt), hence "2>/dev/null": no error is
+    /// shown when it is not there, the variables are enough.
     /// </summary>
     public static string BuildRemoteSizeCommand(int columns, int rows)
     {
@@ -224,7 +228,9 @@ public static class LineInputText
         {
             return null;
         }
-        return "stty cols " + Math.Min(columns, 1000) + " rows " + Math.Min(rows, 1000);
+        columns = Math.Min(columns, 1000);
+        rows = Math.Min(rows, 1000);
+        return "export COLUMNS=" + columns + " LINES=" + rows + "; stty cols " + columns + " rows " + rows + " 2>/dev/null";
     }
 
     /// <summary>
