@@ -31,17 +31,18 @@ public class Utf8StreamDecoder
 
     private int CountIncompleteTail(byte[] buffer, int offset, int count)
     {
+        int end = offset + count;
         int seqLen;
-        for (int index = offset; index < count; index += seqLen)
+        for (int index = offset; index < end; index += seqLen)
         {
             seqLen = GetSequenceLength(buffer[index]);
             if (seqLen <= 0)
             {
                 seqLen = 1;
             }
-            if (index + seqLen > count)
+            if (index + seqLen > end)
             {
-                return count - index;
+                return end - index;
             }
         }
         return 0;

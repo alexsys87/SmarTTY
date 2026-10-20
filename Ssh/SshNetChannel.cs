@@ -99,7 +99,13 @@ internal sealed class SshNetChannel : IDisposable
         }
     }
 
-    private static readonly IDictionary<TerminalModes, uint> NoTerminalModes = new Dictionary<TerminalModes, uint>();
+    // IUTF8 (RFC 8160): tell the remote tty that input is UTF-8, so a program using the kernel line discipline
+    // (cat, read, passwd, shells without their own line editor) erases a whole multi-byte character on Backspace
+    // instead of a single byte. OpenSSH sends the same flag; Dropbear and OpenSSH servers understand it.
+    private static readonly IDictionary<TerminalModes, uint> PtyTerminalModes = new Dictionary<TerminalModes, uint>
+    {
+        { TerminalModes.IUTF8, 1u }
+    };
 
     private readonly object _channel;
 
@@ -179,7 +185,7 @@ internal sealed class SshNetChannel : IDisposable
 
     public bool SendPseudoTerminalRequest(string terminalType, uint columns, uint rows)
     {
-        return (bool)Invoke(Api.SendPseudoTerminalRequest, terminalType, columns, rows, 0u, 0u, NoTerminalModes);
+        return (bool)Invoke(Api.SendPseudoTerminalRequest, terminalType, columns, rows, 0u, 0u, PtyTerminalModes);
     }
 
     public bool SendExecRequest(string command)
