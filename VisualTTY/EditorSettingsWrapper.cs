@@ -29,6 +29,18 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool SyntaxHighlighting
+    {
+        get
+        {
+            return _Settings.Editor.SyntaxHighlighting;
+        }
+        set
+        {
+            _Settings.Editor.SyntaxHighlighting = value;
+        }
+    }
+
     public GlobalSettings.EditorColors Colors
     {
         get
