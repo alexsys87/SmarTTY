@@ -17,7 +17,7 @@ public partial class XServerLaunchWindow : Window, IComponentConnector
 
         protected override string InitialCustomXServer => _Settings.CustomXServerPath;
 
-        protected override string XServerMode => _Settings.XMingMode;
+        protected override string XServerArguments => _Settings.XServerArguments;
 
         public ControllerImpl(TcpClient initialClient, IAsyncResult pendingConnection, GlobalSettings settings)
             : base(initialClient, pendingConnection)
@@ -101,11 +101,6 @@ public partial class XServerLaunchWindow : Window, IComponentConnector
     private void VCXSRV_Click(object sender, RoutedEventArgs e)
     {
         Controller.StartXServer(XServerType.Vcxsrv);
-    }
-
-    private void XMING_Click(object sender, RoutedEventArgs e)
-    {
-        Controller.StartXServer(XServerType.XMing);
     }
 
     private void Manual_Click(object sender, RoutedEventArgs e)

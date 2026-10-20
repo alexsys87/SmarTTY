@@ -8,7 +8,7 @@
     </ResourceDictionary>
   </FrameworkElement.Resources>
   <StackPanel Orientation="Vertical" Margin="5">
-    <TextBlock Text="A remote application has initiated a connection to the X server that is used to display GUI for Linux programs. SmarTTY comes with two pre-built open-source X servers that can handle this automatically." TextWrapping="Wrap" />
+    <TextBlock Text="A remote application has initiated a connection to the X server that is used to display GUI for Linux programs. SmarTTY can start vcxsrv automatically to handle this." TextWrapping="Wrap" />
     <Grid Margin="0 10 0 5">
       <FrameworkElement.Style>
         <Style TargetType="{x:Type Grid}">
@@ -49,7 +49,6 @@
         </ResourceDictionary>
       </FrameworkElement.Resources>
       <Button Content="Start vcxsrv (recommended)" Click="VCXSRV_Click" />
-      <Button Content="Start XMing (fallback)" Click="XMING_Click" />
       <Button Content="Select an X server manually" Click="Manual_Click" />
       <Button Content="Cancel" Click="Cancel_Click" />
       <CheckBox Margin="5 5 0 10" IsChecked="{Binding SaveSettings}">

@@ -51,7 +51,7 @@ public class XServerLaunchController : INotifyPropertyChanged
 
     protected virtual string InitialCustomXServer => null;
 
-    protected virtual string XServerMode => null;
+    protected virtual string XServerArguments => null;
 
     public event Action SignalCompletion;
 
@@ -103,9 +103,6 @@ public class XServerLaunchController : INotifyPropertyChanged
             string text;
             switch (xServer)
             {
-                case XServerType.XMing:
-                    text = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "XMing\\xming.exe");
-                    break;
                 case XServerType.Vcxsrv:
                     text = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "vcxsrv\\vcxsrv.exe");
                     break;
@@ -120,7 +117,7 @@ public class XServerLaunchController : INotifyPropertyChanged
                     throw new Exception("Invalid X Server type");
             }
             ProgressText = "Launching X server...";
-            process = Process.Start(text, XServerMode ?? "-multiwindow");
+            process = Process.Start(text, XServerArguments ?? "-multiwindow");
             DateTime now = DateTime.Now;
             int itemIndex = 0;
             while (true)

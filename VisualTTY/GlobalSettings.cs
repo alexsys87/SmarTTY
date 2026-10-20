@@ -5,6 +5,8 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
+using System.Xml;
+using System.Xml.Linq;
 using System.Xml.Serialization;
 using VisualTTY.DeviceTerminal;
 
@@ -111,7 +113,7 @@ public class GlobalSettings : INotifyPropertyChanged
 
     private XServerType _XServer;
 
-    public const string DefaultXMingMode = "-multiwindow";
+    public const string DefaultXServerArguments = "-multiwindow";
 
     private string _BeepFileName;
 
@@ -184,7 +186,7 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public string CustomXServerPath { get; set; }
 
-    public string XMingMode { get; set; } = "-multiwindow";
+    public string XServerArguments { get; set; } = DefaultXServerArguments;
 
     public TerminalEmulatorControl.BeepMode BeepMode { get; set; } = TerminalEmulatorControl.BeepMode.SystemBeep;
 
@@ -263,8 +265,41 @@ public class GlobalSettings : INotifyPropertyChanged
     {
         try
         {
-            using FileStream stream = File.OpenRead(Path.Combine(DataDirectory, "Settings.xml"));
-            return (GlobalSettings)new XmlSerializer(typeof(GlobalSettings)).Deserialize(stream);
+            XDocument document = XDocument.Load(Path.Combine(DataDirectory, "Settings.xml"));
+            bool migrated = false;
+            XElement root = document.Root;
+            XElement xServer = root?.Element(nameof(XServer));
+            if (xServer != null && xServer.Value == "XMing")
+            {
+                // The XMing X server option was removed. Map old settings to vcxsrv
+                // instead of letting XmlSerializer reject the whole file and reset
+                // every other setting to its default.
+                xServer.Value = nameof(XServerType.Vcxsrv);
+                migrated = true;
+            }
+            XElement legacyArguments = root?.Element("XMingMode");
+            if (legacyArguments != null)
+            {
+                if (root.Element(nameof(XServerArguments)) == null)
+                {
+                    legacyArguments.Name = nameof(XServerArguments);
+                }
+                else
+                {
+                    legacyArguments.Remove();
+                }
+                migrated = true;
+            }
+            GlobalSettings settings;
+            using (XmlReader reader = document.CreateReader())
+            {
+                settings = (GlobalSettings)new XmlSerializer(typeof(GlobalSettings)).Deserialize(reader);
+            }
+            if (migrated)
+            {
+                settings.Save();
+            }
+            return settings;
         }
         catch
         {

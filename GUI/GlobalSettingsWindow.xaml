@@ -212,7 +212,7 @@
                 </FrameworkElement.Style>
               </TextBox>
               <TextBlock Text="X server arguments:" Grid.Row="2" />
-              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding XMingMode}" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding XServerArguments}" />
             </Grid>
           </GroupBox>
           <GroupBox Header="Visual Settings">

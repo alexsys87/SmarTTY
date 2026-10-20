@@ -8,7 +8,5 @@ public enum XServerType
     Ask,
     [EnumDisplayText("vcxsrv (recommended)")]
     Vcxsrv,
-    [EnumDisplayText("XMing (legacy)")]
-    XMing,
     Custom
 }

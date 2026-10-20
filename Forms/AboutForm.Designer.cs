@@ -105,7 +105,7 @@ public partial class AboutForm
 		label5.Name = "label5";
 		label5.Size = new Size(502, 62);
 		label5.TabIndex = 2;
-		label5.Text = "Uses Oxygen icon set (see oxygen.txt)\r\nIncludes an unmodified copy of XMing X11 server (licensed under GPL)";
+		label5.Text = "Uses Oxygen icon set (see oxygen.txt)";
 		label5.TextAlign = ContentAlignment.MiddleCenter;
 		label6.Anchor = AnchorStyles.Top;
 		label6.BackColor = Color.Transparent;
