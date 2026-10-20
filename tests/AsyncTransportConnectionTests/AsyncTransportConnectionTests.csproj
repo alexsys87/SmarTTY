@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The real connection class; the Windows-only pieces it touches are replaced by Stubs.cs. -->
+    <Compile Include="../../Transport/AsyncTransportConnection.cs" Link="AsyncTransportConnection.cs" />
+    <Compile Include="../../Transport/IDeviceTransport.cs" Link="IDeviceTransport.cs" />
+    <Compile Include="../../Transport/IHostNameResolver.cs" Link="IHostNameResolver.cs" />
+    <Compile Include="../../Transport/ITerminalSizeAwareTransport.cs" Link="ITerminalSizeAwareTransport.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/ConnectionStateEnum.cs" Link="ConnectionStateEnum.cs" />
+  </ItemGroup>
+</Project>

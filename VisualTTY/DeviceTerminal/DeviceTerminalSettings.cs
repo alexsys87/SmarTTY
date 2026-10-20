@@ -28,6 +28,16 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
                 public Handshake FlowControl { get; set; }
 
+                /// <summary>
+                /// Whether DTR is raised when the port is opened. Many boards (Arduino, ESP) reset when DTR changes, so a
+                /// connection that must not restart the device switches it off. The driver may still raise DTR for a
+                /// moment while it opens the port.
+                /// </summary>
+                public bool DtrOnOpen { get; set; } = true;
+
+                /// <summary>Whether RTS is raised when the port is opened (ignored with RTS/CTS flow control).</summary>
+                public bool RtsOnOpen { get; set; } = true;
+
                 public AdvancedSerialPortSettings Clone()
                 {
                     return (AdvancedSerialPortSettings)MemberwiseClone();

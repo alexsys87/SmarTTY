@@ -417,37 +417,8 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 MaximumSpeed = "unknown";
                 return;
             }
-            int bitsPerFrame = (5 + advancedSerialPortSettings.DataBits) * 2;
-            bitsPerFrame += 2;
-            if (advancedSerialPortSettings.Parity != Parity.None)
-            {
-                bitsPerFrame += 2;
-            }
-            switch (advancedSerialPortSettings.StopBits)
-            {
-                case StopBits.One:
-                    bitsPerFrame += 2;
-                    break;
-                case StopBits.Two:
-                    bitsPerFrame += 4;
-                    break;
-                case StopBits.OnePointFive:
-                    bitsPerFrame += 3;
-                    break;
-            }
-            double bytesPerSec = (double)(advancedSerialPortSettings.BaudRate * 2) / (double)bitsPerFrame;
-            if (bytesPerSec > 1048576.0)
-            {
-                MaximumSpeed = $"{bytesPerSec / 1048576.0:f1} MB/s";
-            }
-            else if (bytesPerSec > 1024.0)
-            {
-                MaximumSpeed = $"{bytesPerSec / 1024.0:f1} KB/s";
-            }
-            else
-            {
-                MaximumSpeed = $"{bytesPerSec:f1} bytes/s";
-            }
+            MaximumSpeed = SerialPortRules.FormatSpeed(SerialPortRules.BytesPerSecond(advancedSerialPortSettings.BaudRate, advancedSerialPortSettings.DataBits,
+                advancedSerialPortSettings.Parity != Parity.None, SerialPortRules.StopBitsKindFrom((int)advancedSerialPortSettings.StopBits)));
         }
 
         public void OnSettingsChanged()

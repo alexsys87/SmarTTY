@@ -38,6 +38,10 @@ public partial class SerialPortSettingsForm
 
 	private Label label6;
 
+	private CheckBox cbDtrOnOpen;
+
+	private CheckBox cbRtsOnOpen;
+
 	protected override void Dispose(bool disposing)
 	{
 		if (disposing && components != null)
@@ -64,6 +68,8 @@ public partial class SerialPortSettingsForm
 		cbBitsPerSecond = new ComboBox();
 		label2 = new Label();
 		label1 = new Label();
+		cbDtrOnOpen = new CheckBox();
+		cbRtsOnOpen = new CheckBox();
 		panel1.SuspendLayout();
 		SuspendLayout();
 		rbDefault.AutoSize = true;
@@ -84,6 +90,8 @@ public partial class SerialPortSettingsForm
 		rbManual.UseVisualStyleBackColor = true;
 		rbManual.CheckedChanged += rbManual_CheckedChanged;
 		panel1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+		panel1.Controls.Add(cbRtsOnOpen);
+		panel1.Controls.Add(cbDtrOnOpen);
 		panel1.Controls.Add(label7);
 		panel1.Controls.Add(label6);
 		panel1.Controls.Add(cbFlowControl);
@@ -99,11 +107,29 @@ public partial class SerialPortSettingsForm
 		panel1.Enabled = false;
 		panel1.Location = new Point(31, 58);
 		panel1.Name = "panel1";
-		panel1.Size = new Size(332, 168);
+		panel1.Size = new Size(332, 238);
 		panel1.TabIndex = 1;
 		label7.AutoSize = true;
 		label7.Font = new Font("Microsoft Sans Serif", 8.25f, FontStyle.Bold, GraphicsUnit.Point, 0);
 		label7.Location = new Point(190, 145);
+		cbDtrOnOpen.AutoSize = true;
+		cbDtrOnOpen.Checked = true;
+		cbDtrOnOpen.CheckState = CheckState.Checked;
+		cbDtrOnOpen.Location = new Point(15, 170);
+		cbDtrOnOpen.Name = "cbDtrOnOpen";
+		cbDtrOnOpen.Size = new Size(190, 17);
+		cbDtrOnOpen.TabIndex = 105;
+		cbDtrOnOpen.Text = "Raise DTR when the port is opened";
+		cbDtrOnOpen.UseVisualStyleBackColor = true;
+		cbRtsOnOpen.AutoSize = true;
+		cbRtsOnOpen.Checked = true;
+		cbRtsOnOpen.CheckState = CheckState.Checked;
+		cbRtsOnOpen.Location = new Point(15, 193);
+		cbRtsOnOpen.Name = "cbRtsOnOpen";
+		cbRtsOnOpen.Size = new Size(190, 17);
+		cbRtsOnOpen.TabIndex = 106;
+		cbRtsOnOpen.Text = "Raise RTS when the port is opened";
+		cbRtsOnOpen.UseVisualStyleBackColor = true;
 		label7.Name = "label7";
 		label7.Size = new Size(58, 13);
 		label7.TabIndex = 3;
@@ -125,7 +151,7 @@ public partial class SerialPortSettingsForm
 		cbStopBits.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 		cbStopBits.DropDownStyle = ComboBoxStyle.DropDownList;
 		cbStopBits.FormattingEnabled = true;
-		cbStopBits.Items.AddRange(new object[4] { "0", "1", "2", "1.5" });
+		cbStopBits.Items.AddRange(new object[3] { "1", "1.5", "2" });
 		cbStopBits.Location = new Point(101, 87);
 		cbStopBits.Name = "cbStopBits";
 		cbStopBits.Size = new Size(228, 21);
@@ -188,11 +214,11 @@ public partial class SerialPortSettingsForm
 		label1.TabIndex = 0;
 		label1.Text = "Bits per second:";
 		AutoScaleDimensions = new SizeF(6f, 13f);
-		ClientSize = new Size(375, 269);
+		ClientSize = new Size(375, 339);
 		Controls.Add(panel1);
 		Controls.Add(rbManual);
 		Controls.Add(rbDefault);
-		MinimumSize = new Size(391, 307);
+		MinimumSize = new Size(391, 377);
 		Name = "SerialPortSettingsForm";
 		Text = "Serial port settings";
 		Controls.SetChildIndex(rbDefault, 0);
