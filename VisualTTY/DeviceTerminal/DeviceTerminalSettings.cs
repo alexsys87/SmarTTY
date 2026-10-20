@@ -283,7 +283,25 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
     public enum CharacterDisplayMode
     {
         ASCII,
-        HEX
+        HEX,
+        Both
+    }
+
+    public static class CharacterDisplayModeHelper
+    {
+        /// <summary>
+        /// Resolves a persisted mode into the mode that is actually displayed. Older settings files could enable
+        /// the text pane next to the HEX dump without having a separate "Both" mode; such files are shown as the
+        /// combined view they were displaying, while a new "HEX only" profile explicitly stores ShowTextView=false.
+        /// </summary>
+        public static CharacterDisplayMode Resolve(CharacterDisplayMode mode, HexTerminalSettings hexSettings)
+        {
+            if (mode == CharacterDisplayMode.HEX && (hexSettings == null || hexSettings.ShowTextView))
+            {
+                return CharacterDisplayMode.Both;
+            }
+            return mode;
+        }
     }
 
     public enum LineEndingType

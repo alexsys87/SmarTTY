@@ -74,6 +74,8 @@ public partial class DeviceTerminalControl
 
 	private ToolStripMenuItem cbHEX;
 
+	private ToolStripMenuItem cbBoth;
+
 	private ToolStripMenuItem echoTypedCharactersToolStripMenuItem;
 
 	private ToolStripMenuItem changeSettingsToolStripMenuItem;
@@ -128,6 +130,7 @@ public partial class DeviceTerminalControl
 		terminalTypeToolStripMenuItem = new ToolStripMenuItem();
 		cbASCII = new ToolStripMenuItem();
 		cbHEX = new ToolStripMenuItem();
+		cbBoth = new ToolStripMenuItem();
 		echoTypedCharactersToolStripMenuItem = new ToolStripMenuItem();
 		changeSettingsToolStripMenuItem = new ToolStripMenuItem();
 		lblBaudRate = new ToolStripLabel();
@@ -296,7 +299,7 @@ public partial class DeviceTerminalControl
 		toolStripDropDownButton1.Name = "toolStripDropDownButton1";
 		toolStripDropDownButton1.Size = new Size(29, 22);
 		toolStripDropDownButton1.Text = "Settings";
-		terminalTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[2] { cbASCII, cbHEX });
+		terminalTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[3] { cbASCII, cbHEX, cbBoth });
 		terminalTypeToolStripMenuItem.Name = "terminalTypeToolStripMenuItem";
 		terminalTypeToolStripMenuItem.Size = new Size(190, 22);
 		terminalTypeToolStripMenuItem.Text = "Terminal type";
@@ -308,6 +311,10 @@ public partial class DeviceTerminalControl
 		cbHEX.Size = new Size(102, 22);
 		cbHEX.Text = "HEX";
 		cbHEX.Click += cbHEX_Click;
+		cbBoth.Name = "cbBoth";
+		cbBoth.Size = new Size(102, 22);
+		cbBoth.Text = "Text + HEX";
+		cbBoth.Click += cbBoth_Click;
 		echoTypedCharactersToolStripMenuItem.Name = "echoTypedCharactersToolStripMenuItem";
 		echoTypedCharactersToolStripMenuItem.Size = new Size(190, 22);
 		echoTypedCharactersToolStripMenuItem.Text = "Echo typed characters";

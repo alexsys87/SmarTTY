@@ -54,10 +54,42 @@ internal static class SettingsChecks
             check(old.Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp && !(old.Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet),
                 "a file written before telnet existed still loads as raw TCP");
             check(((DeviceTerminalSettings.ConnectionSettings.Tcp)old.Settings.Connection).Port == 5000, "...with its port");
+            check(old.Settings.DisplayMode == DeviceTerminalSettings.CharacterDisplayMode.ASCII && old.Settings.HexSettings.ShowTextView,
+                "display mode: a file written before it existed opens as text, with the text pane ready for HEX");
         }
 
         check(telnet.FileNameBase != rawTcp.Settings.Connection.FileNameBase, "telnet and raw TCP to the same host:port do not share a file");
         check(telnet.FileNameBase == "telnet_10.0.0.7_2323", "telnet file name base");
+
+        // display mode: the connection dialog writes it and the toolbar reads it back from the profile
+        check(new DeviceTerminalSettings().DisplayMode == DeviceTerminalSettings.CharacterDisplayMode.ASCII
+            && new DeviceTerminalSettings().HexSettings != null
+            && new DeviceTerminalSettings().HexSettings.ShowTextView, "display mode: a new profile starts as text with the text pane enabled");
+        DeviceTerminalSettings bothSettings = new DeviceTerminalSettings
+        {
+            Connection = new DeviceTerminalSettings.ConnectionSettings.Tcp { Host = "10.0.0.8", Port = 5001 },
+            DisplayMode = DeviceTerminalSettings.CharacterDisplayMode.Both
+        };
+        bothSettings.HexSettings.ShowTextView = true;
+        bothSettings.HexSettings.MaximumBytesPerLine = 8;
+        RawConnectionSettings bothLoaded = RoundTrip(new RawConnectionSettings { Settings = bothSettings }, out string bothXml);
+        check(bothXml.Contains("<DisplayMode>Both</DisplayMode>"), "display mode: saved by name, not by an ordinal");
+        check(bothLoaded.Settings.DisplayMode == DeviceTerminalSettings.CharacterDisplayMode.Both, "display mode: the combined view survives the round trip");
+        check(bothLoaded.Settings.HexSettings != null && bothLoaded.Settings.HexSettings.MaximumBytesPerLine == 8,
+            "display mode: the HEX options survive the round trip");
+        DeviceTerminalSettings bothCopy = bothSettings.Clone();
+        check(bothCopy.DisplayMode == DeviceTerminalSettings.CharacterDisplayMode.Both && bothCopy.HexSettings.ShowTextView
+            && bothCopy.HexSettings.MaximumBytesPerLine == 8, "display mode: Clone() keeps the mode and the HEX options");
+        check(DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(DeviceTerminalSettings.CharacterDisplayMode.HEX, bothSettings.HexSettings)
+                == DeviceTerminalSettings.CharacterDisplayMode.Both,
+            "display mode: an old HEX profile with the text pane enabled is shown as the combined view");
+        bothSettings.HexSettings.ShowTextView = false;
+        check(DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(DeviceTerminalSettings.CharacterDisplayMode.HEX, bothSettings.HexSettings)
+                == DeviceTerminalSettings.CharacterDisplayMode.HEX,
+            "display mode: HEX without the text pane stays a HEX-only view");
+        check(DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(DeviceTerminalSettings.CharacterDisplayMode.ASCII, bothSettings.HexSettings)
+                == DeviceTerminalSettings.CharacterDisplayMode.ASCII,
+            "display mode: the mode chosen in the profile wins over the HEX options");
 
         // telnet options: defaults, round trip, files written before they existed
         check(telnet.TerminalType == "xterm" && telnet.LocalEcho == DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Auto

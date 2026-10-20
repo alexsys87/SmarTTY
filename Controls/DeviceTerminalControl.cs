@@ -31,7 +31,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private Brush _brush;
 
-    private bool _isHexMode;
+    private DeviceTerminalSettings.CharacterDisplayMode _displayMode = DeviceTerminalSettings.CharacterDisplayMode.ASCII;
 
     // Text exchanged with the device (received text, typed and pasted input, echo, "Send" box) always goes
     // through this one encoding, so what is shown and what is sent cannot disagree with each other.
@@ -69,15 +69,19 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// <summary>Raised on the UI thread whenever the transport state or the displayed title changes.</summary>
     public event EventHandler StatusChanged;
 
+    /// <summary>Raised when the user switches the display mode in the toolbar, so the profile can store it.</summary>
+    public event EventHandler DisplayModeChanged;
+
     /// <summary>
-    /// The text terminal while it has the keyboard focus (null in HEX mode or when the focus is in the toolbar), so
-    /// window-level key handling (F10, Alt+letter) never leaks into the baud rate box or the "Send" field.
+    /// The text terminal while it has the keyboard focus (null in the HEX and combined views, or when the focus is
+    /// in the toolbar), so window-level key handling (F10, Alt+letter) never leaks into the baud rate box or the
+    /// "Send" field.
     /// </summary>
-    internal SerialTerminalControl FocusedTextTerminal => (!_isHexMode && _serialTerminalControl.Focused) ? _serialTerminalControl : null;
+    internal SerialTerminalControl FocusedTextTerminal => (!HexMode && _serialTerminalControl.Focused) ? _serialTerminalControl : null;
 
     /// <summary>
     /// The editor currently shown in the device tab: the decoded text in ASCII mode, or the HEX dump editor in
-    /// HEX mode. The shared search bar searches it to find both words and HEX byte sequences.
+    /// HEX and combined modes. The shared search bar searches it to find both words and HEX byte sequences.
     /// </summary>
     public TextEditorControl SearchTextEditor => HexMode ? hexTerminalControl1.SearchTextEditor : _serialTerminalControl;
 
@@ -141,24 +145,64 @@ public partial class DeviceTerminalControl : DpiAwareControl
         StatusChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public bool HexMode
+    /// <summary>
+    /// How the received bytes are shown: the decoded text (<see cref="DeviceTerminalSettings.CharacterDisplayMode.ASCII"/>),
+    /// the HEX dump alone, or the HEX dump with the text pane next to it. The toolbar and the connection profile
+    /// both drive this one property, so switching in the toolbar is not limited to the current session.
+    /// </summary>
+    public DeviceTerminalSettings.CharacterDisplayMode DisplayMode
     {
         get
         {
-            return _isHexMode;
+            return _displayMode;
         }
         set
         {
-            _isHexMode = value;
-            hexTerminalControl1.Visible = value;
-            _serialTerminalControl.Visible = !value;
-            cbASCII.Checked = !value;
-            cbHEX.Checked = value;
-            ToolStripLabel toolStripLabel = lblSend;
-            ToolStripTextBox toolStripTextBox = txtHexInput;
-            bool isVisible = (btnSend.Visible = value);
-            bool visible = (toolStripTextBox.Visible = isVisible);
-            toolStripLabel.Visible = visible;
+            ApplyDisplayMode(value, raiseChangedEvent: true);
+        }
+    }
+
+    /// <summary>True when the HEX control is on screen, alone or together with the text pane.</summary>
+    public bool HexMode => _displayMode != DeviceTerminalSettings.CharacterDisplayMode.ASCII;
+
+    private void ApplyDisplayMode(DeviceTerminalSettings.CharacterDisplayMode mode, bool raiseChangedEvent)
+    {
+        _displayMode = mode;
+        bool hexView = mode != DeviceTerminalSettings.CharacterDisplayMode.ASCII;
+        bool showTextView = mode == DeviceTerminalSettings.CharacterDisplayMode.Both;
+        hexTerminalControl1.Visible = hexView;
+        _serialTerminalControl.Visible = !hexView;
+        cbASCII.Checked = mode == DeviceTerminalSettings.CharacterDisplayMode.ASCII;
+        cbHEX.Checked = mode == DeviceTerminalSettings.CharacterDisplayMode.HEX;
+        cbBoth.Checked = mode == DeviceTerminalSettings.CharacterDisplayMode.Both;
+        ToolStripLabel toolStripLabel = lblSend;
+        ToolStripTextBox toolStripTextBox = txtHexInput;
+        bool isVisible = (btnSend.Visible = hexView);
+        bool visible = (toolStripTextBox.Visible = isVisible);
+        toolStripLabel.Visible = visible;
+
+        if (_deviceTerminalSettings != null)
+        {
+            _deviceTerminalSettings.DisplayMode = mode;
+        }
+        DeviceTerminalSettings.HexTerminalSettings hexSettings = _deviceTerminalSettings?.HexSettings;
+        if (hexSettings == null)
+        {
+            // Only before the first ApplySettings: keep the control usable without a profile object.
+            hexSettings = new DeviceTerminalSettings.HexTerminalSettings
+            {
+                MaximumBytesPerLine = 16,
+                BreaksAroundEcho = true,
+                AutoSend = true,
+                SendAsHex = true
+            };
+        }
+        hexSettings.ShowTextView = showTextView;
+        hexTerminalControl1.HexSettings = hexSettings;
+
+        if (raiseChangedEvent)
+        {
+            DisplayModeChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -586,12 +630,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
         SetTextEncoding(deviceTerminalSettings.TextEncoding);
         SelectEncodingInToolbar(deviceTerminalSettings.TextEncoding);
         _brush = (hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo));
-        HexMode = _deviceTerminalSettings.DisplayMode != DeviceTerminalSettings.CharacterDisplayMode.ASCII;
+        // One persisted mode decides what is rendered; older profiles that enabled the text pane next to the HEX
+        // dump are resolved to the combined view instead of silently dropping one of the two panes.
+        DeviceTerminalSettings.CharacterDisplayMode displayMode = DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(
+            _deviceTerminalSettings.DisplayMode, _deviceTerminalSettings.HexSettings);
+        ApplyDisplayMode(displayMode, raiseChangedEvent: false);
         echoTypedCharactersToolStripMenuItem.Checked = _deviceTerminalSettings.EchoTypedCharacters;
         _serialTerminalControl.LocalEcho = _deviceTerminalSettings.EchoTypedCharacters;
-        if (_isHexMode)
+        if (deviceTerminalSettings.HexSettings != null)
         {
-            hexTerminalControl1.HexSettings = deviceTerminalSettings.HexSettings;
             sendAsHEXToolStripMenuItem.Checked = deviceTerminalSettings.HexSettings.SendAsHex;
             sendImmediatelyToolStripMenuItem.Checked = deviceTerminalSettings.HexSettings.AutoSend;
         }
@@ -867,7 +914,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 UpdateLogButton();
             }
         }
-        if (_isHexMode)
+        if (HexMode)
         {
             hexTerminalControl1.AppendData(buffer, value);
             return;
@@ -1061,7 +1108,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
         count = Math.Min(count, buffer.Length);
-        if (_isHexMode)
+        if (HexMode)
         {
             // AppendData appends from index 0, so the caller passes a fresh slice for every step.
             hexTerminalControl1.AppendData(buffer, count);
@@ -1589,12 +1636,17 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void cbASCII_Click(object sender, EventArgs e)
     {
-        HexMode = false;
+        DisplayMode = DeviceTerminalSettings.CharacterDisplayMode.ASCII;
     }
 
     private void cbHEX_Click(object sender, EventArgs e)
     {
-        HexMode = true;
+        DisplayMode = DeviceTerminalSettings.CharacterDisplayMode.HEX;
+    }
+
+    private void cbBoth_Click(object sender, EventArgs e)
+    {
+        DisplayMode = DeviceTerminalSettings.CharacterDisplayMode.Both;
     }
 
     private void echoTypedCharactersToolStripMenuItem_Click(object sender, EventArgs e)

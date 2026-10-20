@@ -1,7 +1,9 @@
 using SmarTTY.Controls;
 using SmarTTY.Ssh;
+using SmarTTY.Transport;
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Forms.Integration;
@@ -65,6 +67,7 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         Terminal.StatusChanged += OnTerminalStatusChanged;
         Terminal.CloseTabRequested += OnTerminalCloseTabRequested;
         Terminal.FullScreenToggleRequested += OnTerminalFullScreenToggleRequested;
+        Terminal.DisplayModeChanged += OnTerminalDisplayModeChanged;
         WinFormsHostWrapper host = new WinFormsHostWrapper();
         ((WindowsFormsHost)host).Child = Terminal;
         Control = host;
@@ -130,6 +133,49 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         _Session.OnDeviceStatusChanged();
     }
 
+    /// <summary>
+    /// Stores a mode picked in the toolbar in the saved profile itself. Auto-detected COM ports that have no saved
+    /// profile are skipped: there is nothing to update and no file must be created behind the user's back.
+    /// </summary>
+    private void OnTerminalDisplayModeChanged(object sender, EventArgs e)
+    {
+        try
+        {
+            if (Settings?.Connection == null)
+            {
+                return;
+            }
+            string key = Settings.Connection.FileNameBase;
+            if (string.IsNullOrEmpty(key))
+            {
+                return;
+            }
+            foreach (RawConnectionSettings saved in new SavedConnectionStore().RawConnections)
+            {
+                if (saved?.Settings?.Connection == null || string.IsNullOrEmpty(saved.FileName))
+                {
+                    continue;
+                }
+                if (!string.Equals(saved.Settings.Connection.FileNameBase, key, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                saved.Settings.DisplayMode = Settings.DisplayMode;
+                if (saved.Settings.HexSettings == null)
+                {
+                    saved.Settings.HexSettings = new DeviceTerminalSettings.HexTerminalSettings();
+                }
+                saved.Settings.HexSettings.ShowTextView = Settings.HexSettings?.ShowTextView
+                    ?? (Settings.DisplayMode == DeviceTerminalSettings.CharacterDisplayMode.Both);
+                saved.Save();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine("Could not save the display mode of the device profile: " + ex.Message);
+        }
+    }
+
     public void FocusMainControl()
     {
         Terminal?.FocusTerminal();
@@ -154,6 +200,7 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         Terminal.StatusChanged -= OnTerminalStatusChanged;
         Terminal.CloseTabRequested -= OnTerminalCloseTabRequested;
         Terminal.FullScreenToggleRequested -= OnTerminalFullScreenToggleRequested;
+        Terminal.DisplayModeChanged -= OnTerminalDisplayModeChanged;
         Terminal.Dispose();
     }
 

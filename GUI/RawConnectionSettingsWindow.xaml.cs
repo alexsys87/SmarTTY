@@ -55,10 +55,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public System.Collections.Generic.IReadOnlyList<TerminalEncodings.Choice> TextEncodings => TerminalEncodings.All;
 
-        public DeviceTerminalSettings.CharacterDisplayMode[] DisplayModes { get; } = new DeviceTerminalSettings.CharacterDisplayMode[2]
+        public DeviceTerminalSettings.CharacterDisplayMode[] DisplayModes { get; } = new DeviceTerminalSettings.CharacterDisplayMode[3]
         {
             DeviceTerminalSettings.CharacterDisplayMode.ASCII,
-            DeviceTerminalSettings.CharacterDisplayMode.HEX
+            DeviceTerminalSettings.CharacterDisplayMode.HEX,
+            DeviceTerminalSettings.CharacterDisplayMode.Both
         };
 
         public string MaximumSpeed
@@ -84,10 +85,54 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             }
             set
             {
+                if (_EffectiveDisplayMode == value)
+                {
+                    return;
+                }
                 _EffectiveDisplayMode = value;
+                ApplyDisplayModeToSettings(value);
+                OnSettingsChanged();
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("EffectiveDisplayMode"));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("HexModeEnabled"));
             }
+        }
+
+        /// <summary>Writes the selected mode into the settings that are returned to the caller on OK.</summary>
+        private void ApplyDisplayModeToSettings(EffectiveDisplayMode mode)
+        {
+            if (Settings.HexSettings == null)
+            {
+                Settings.HexSettings = new DeviceTerminalSettings.HexTerminalSettings();
+            }
+            switch (mode)
+            {
+                case EffectiveDisplayMode.Text:
+                    Settings.DisplayMode = DeviceTerminalSettings.CharacterDisplayMode.ASCII;
+                    Settings.HexSettings.ShowTextView = false;
+                    break;
+                case EffectiveDisplayMode.Hex:
+                    Settings.DisplayMode = DeviceTerminalSettings.CharacterDisplayMode.HEX;
+                    Settings.HexSettings.ShowTextView = false;
+                    break;
+                case EffectiveDisplayMode.Both:
+                    Settings.DisplayMode = DeviceTerminalSettings.CharacterDisplayMode.Both;
+                    Settings.HexSettings.ShowTextView = true;
+                    break;
+            }
+        }
+
+        private static EffectiveDisplayMode ToEffectiveDisplayMode(DeviceTerminalSettings settings)
+        {
+            DeviceTerminalSettings.CharacterDisplayMode mode = DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(settings.DisplayMode, settings.HexSettings);
+            if (mode == DeviceTerminalSettings.CharacterDisplayMode.Both)
+            {
+                return EffectiveDisplayMode.Both;
+            }
+            if (mode == DeviceTerminalSettings.CharacterDisplayMode.HEX)
+            {
+                return EffectiveDisplayMode.Hex;
+            }
+            return EffectiveDisplayMode.Text;
         }
 
         public bool IsTelnet => Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet;
@@ -321,6 +366,9 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         public ControllerImpl(DeviceTerminalSettings settings, bool showSaveCheckbox)
         {
             Settings = settings.Clone();
+            // Seed the list from the profile: the dialog used to always start at "Text only" and never wrote the
+            // choice back, so the mode looked like it did nothing at all.
+            _EffectiveDisplayMode = ToEffectiveDisplayMode(Settings);
             SaveCheckboxVisibility = ((!showSaveCheckbox) ? Visibility.Collapsed : Visibility.Visible);
             if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serial)
             {
