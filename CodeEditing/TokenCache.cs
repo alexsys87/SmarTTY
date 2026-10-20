@@ -568,9 +568,17 @@ public class TokenCache
             Token token = queue.Dequeue();
             if (token.Partner == null && token.LineNumber != -1 && !FindPartner(token, queue))
             {
+                // Keep going: the remaining tokens in the queue still need a partner.
                 unpairedTokenSet.Add(token);
-                break;
             }
+        }
+        if (unpairedTokenSet.Count > 0)
+        {
+            // Tokens that lost their partner in an earlier edit (e.g. a "/*" typed above them and
+            // removed again) are not revisited by the incremental repair above. Re-pair the whole
+            // document so they can find a partner again; this is a single linear pass.
+            unpairedTokenSet.Clear();
+            PairRange(unpairedTokenSet, 0, _lines.Count - 1);
         }
     }
 

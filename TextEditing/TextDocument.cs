@@ -411,6 +411,20 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
         return GetLineEndingText(_lines[lineIndex].Ending);
     }
 
+    /// <summary>
+    /// Returns the terminator that ends the line in the saved text: a line with an inherited ending
+    /// (e.g. the only line of an empty file) or a missing line uses <see cref="DefaultLineEnding"/>.
+    /// </summary>
+    public string GetEffectiveLineTerminator(int lineIndex)
+    {
+        LineEnding lineEnding = (lineIndex >= 0 && lineIndex < _lines.Count) ? _lines[lineIndex].Ending : LineEnding.Inherit;
+        if (lineEnding == LineEnding.Inherit)
+        {
+            lineEnding = DefaultLineEnding;
+        }
+        return GetLineEndingText(lineEnding);
+    }
+
     public int GetLineLengthWithTerminator(int lineIndex)
     {
         if (lineIndex >= _lines.Count || lineIndex < 0)

@@ -158,6 +158,17 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
     }
 
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        // Closing the window used to drop the unsaved changes of open remote file editors silently.
+        if (!Controller.ConfirmCloseUnsavedEditors())
+        {
+            e.Cancel = true;
+            return;
+        }
+        base.OnClosing(e);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);

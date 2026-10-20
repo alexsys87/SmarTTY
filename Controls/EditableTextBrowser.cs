@@ -74,7 +74,9 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
             {
                 if (_start != _end)
                 {
-                    _removedText = editableTextBrowser.Doc.GetRangeText(_start, _end);
+                    // Keep the real line terminators: with the default "\r\n" an undo of a multi-line
+                    // deletion would put CRLF endings into an LF file.
+                    _removedText = editableTextBrowser.Doc.GetRangeText(_start, _end, editableTextBrowser.Doc.GetEffectiveLineTerminator);
                     editableTextBrowser.DeleteRange(_start, _end);
                 }
                 TextDocument.TextPosition textPosition = ((_newText != null && _newText != "") ? (_newEnd = editableTextBrowser.Doc.InsertText(_start, _newText, this._useExistingLineEnding)) : (_newEnd = _start));
@@ -112,6 +114,12 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
                 : base(editableTextBrowser)
             {
                 this._lines = editableTextBrowser.SelectedLines;
+                if (this._lines.Count == 0)
+                {
+                    // Without a selection (Shift+Tab) the caret line is (un)indented.
+                    int caretLine = editableTextBrowser.CaretPosition.Line;
+                    this._lines = new LineRange(caretLine, caretLine);
+                }
                 _levels = levels;
             }
 
@@ -162,9 +170,11 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
                                 }
                             }
                         }
-                        if (indentWidth >= lineText.Length - 2)
+                        // lineText carries 2 sentinel characters; never remove more than the real line
+                        // (a whitespace-only line such as a single tab must still be unindented).
+                        if (indentWidth > lineText.Length - 2)
                         {
-                            indentWidth = lineText.Length - 1 - 2;
+                            indentWidth = lineText.Length - 2;
                         }
                         _removedIndents[currentLine - this._lines.First] = editableTextBrowser.Doc.ReplaceInLine(currentLine, 0, indentWidth, "");
                         editableTextBrowser.OnLineChanged(currentLine, 0, indentWidth, 0);
@@ -430,7 +440,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     public void Undo()
     {
-        if (_undoStack.Count > 0)
+        if (!_readOnly && _undoStack.Count > 0)
         {
             EditCommand editCommand = _undoStack.Pop();
             editCommand.Undo(this);
@@ -441,7 +451,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     public void Redo()
     {
-        if (_redoStack.Count > 0)
+        if (!_readOnly && _redoStack.Count > 0)
         {
             EditCommand editCommand = _redoStack.Pop();
             editCommand.Execute(this);
@@ -503,6 +513,12 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
         {
             end.Column = GetLineOrNull(end.Line).Length;
         }
+        if (start == end && string.IsNullOrEmpty(replacement))
+        {
+            // Nothing to change (e.g. Backspace at the start of the document): do not mark the
+            // file as modified and do not record an empty undo step.
+            return;
+        }
         if (replacement == "" && end.Column == 0 && end.Line == start.Line + 1 && start.Column == EditableDocument.GetLineText(start.Line).Length)
         {
             string text = GetIndentation(start.Line);
@@ -539,6 +555,10 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     public void Indent(int levels)
     {
+        if (_readOnly)
+        {
+            return;
+        }
         ExecuteCommand(new EditCommand.IndentCommand(this, levels));
     }
 
@@ -560,6 +580,10 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     public void ToggleLinePrefix(string text)
     {
+        if (_readOnly)
+        {
+            return;
+        }
         int line = CaretPosition.Line;
         if (base.HasSelection && SelectionStart.Line < line)
         {

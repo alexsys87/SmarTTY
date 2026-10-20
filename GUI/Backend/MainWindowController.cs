@@ -355,6 +355,15 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 session.CloseFirstMatchingPage((ITabContext tabContext) => tabContext.EditorControl == editor, closeSessionIfEmpty: false);
             };
+            editor.LoadCompleted += (object sender, EventArgs e) =>
+            {
+                // A file whose name tells nothing (e.g. a script without an extension) may still be
+                // recognized by its "#!" line now that the content is known.
+                if (_Controller.Settings.Editor.SyntaxHighlighting && SyntaxHighlighting.DetectLanguage(editor.RemotePath) == SyntaxHighlighting.Language.Plain)
+                {
+                    _Controller.ApplySyntaxHighlighting(editor);
+                }
+            };
             _Controller.ApplyEditorSettings(editor);
             editor.Tag = session.AddNewFileEditorOrThrow(editor, fn);
         }
@@ -1110,6 +1119,36 @@ public class MainWindowController : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Asks whether to save every editor with unsaved changes before the main window closes.
+    /// Returns false when the user cancelled or a save failed: the window must then stay open.
+    /// </summary>
+    public bool ConfirmCloseUnsavedEditors()
+    {
+        foreach (SessionWrapper session in AllSessions.ToList())
+        {
+            foreach (EditorTabContext editorTab in session.Tabs.OfType<EditorTabContext>().ToList())
+            {
+                if (!editorTab.Editor.IsModified)
+                {
+                    continue;
+                }
+                switch (MessageBoxes.YesNoCancel("Save " + editorTab.FilePath + "?"))
+                {
+                    case DialogResult.Yes:
+                        if (!editorTab.Editor.TrySave())
+                        {
+                            return false;
+                        }
+                        break;
+                    case DialogResult.Cancel:
+                        return false;
+                }
+            }
+        }
+        return true;
+    }
+
     public void ExportPreferences(CommonGUIPreferences prefs)
     {
         OpenSettingsKey();
@@ -1143,11 +1182,18 @@ public class MainWindowController : INotifyPropertyChanged
         edit.LineNumberForegroundBrush = new SolidBrush(effectiveColors.LineNumberForeground);
         edit.TabSize = Settings.Editor.TabSize;
         edit.HideMargins = !Settings.Editor.ShowLineNumbers;
+        ApplySyntaxHighlighting(edit);
+    }
 
+    private void ApplySyntaxHighlighting(RemoteFileEditor edit)
+    {
+        GlobalSettings.EditorColors effectiveColors = Settings.Editor.GetEffectiveColors(Settings.Theme);
         TokenCache.LineTokenizer tokenizer = null;
         if (Settings.Editor.SyntaxHighlighting)
         {
-            SyntaxHighlighting.Language lang = SyntaxHighlighting.DetectLanguage(edit.RemotePath);
+            // The first line is only known once the file is loaded (see the LoadCompleted handler): it lets
+            // scripts without an extension be recognized by their "#!" line.
+            SyntaxHighlighting.Language lang = SyntaxHighlighting.DetectLanguage(edit.RemotePath, edit.EditableDocument?.GetLineText(0));
             tokenizer = SyntaxHighlighting.GetTokenizer(lang);
         }
 

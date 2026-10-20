@@ -126,7 +126,8 @@ public partial class TextEditorControl : EditableTextBrowser
 
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
-        if (e.KeyChar == '\t' && ((_hasSelection && SelectionStart != CaretPosition) || (Control.ModifierKeys & Keys.Shift) == Keys.Shift))
+        // Tab indents a multi-line selection; a selection inside one line is replaced by the tab as usual.
+        if (e.KeyChar == '\t' && ((_hasSelection && SelectionStart.Line != CaretPosition.Line) || (Control.ModifierKeys & Keys.Shift) == Keys.Shift))
         {
             int value = 1;
             if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
@@ -142,6 +143,12 @@ public partial class TextEditorControl : EditableTextBrowser
                 case '\r':
                     {
                         string content = base.EditableDocument.GetLineTerminator(CaretPosition.Line, "\n");
+                        if (content.Length == 0)
+                        {
+                            // The line has an inherited ending (an empty file or a file with a single line
+                            // and no trailing newline): Enter must still insert a line break.
+                            content = TextDocument.GetLineEndingText(base.EditableDocument.DefaultLineEnding);
+                        }
                         ReplaceText(CaretPosition, SelectionStart, !_hasSelection, content + GetIndentation(CaretPosition.Line));
                         break;
                     }
@@ -214,7 +221,9 @@ public partial class TextEditorControl : EditableTextBrowser
     {
         if (IsEditable)
         {
-            if (e.KeyCode == Keys.Delete)
+            // Shift+Delete is Cut (handled below); deleting here first would lose the selection and
+            // make Cut remove the whole caret line as well.
+            if (e.KeyCode == Keys.Delete && !e.Shift)
             {
                 if (_hasSelection)
                 {
