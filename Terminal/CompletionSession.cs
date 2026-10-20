@@ -13,8 +13,10 @@ internal class CompletionSession : IDisposable
 {
     private struct ListingTarget
     {
+        // The directory to list, with "~" expanded.
         public string Directory;
 
+        // The directory part of the word as the user means it (quotes removed, "~" kept), ending with '/'.
         public string Prefix;
 
         public bool HasPrefix => Prefix != null;
@@ -101,18 +103,19 @@ internal class CompletionSession : IDisposable
 
     private List<CompletionItem> _items;
 
-    private bool IsQuoted
+    private volatile bool _disposed;
+
+    // The quote the word was opened with: a completed path keeps it; '\0' for an unquoted word.
+    private char QuoteChar
     {
         get
         {
             char ch = _token.Text?.FirstOrDefault() ?? '\0';
-            if (ch == '"' || ch == '\'' || ch == '`')
-            {
-                return true;
-            }
-            return false;
+            return (ch == '"' || ch == '\'') ? ch : '\0';
         }
     }
+
+    private bool IsQuoted => QuoteChar != '\0';
 
     public AppliedEventArgs LastApplied { get; private set; }
 
@@ -133,13 +136,36 @@ internal class CompletionSession : IDisposable
         _listing = ResolveListing(_token.Text);
         UpdatePopup(_token.Text);
         this._isLoading = true;
-        new Thread(LoadItems).Start();
+        new Thread(LoadItems)
+        {
+            IsBackground = true
+        }.Start();
     }
 
     private static string GetFilterText(string text)
     {
-        text = text ?? "";
-        return RemotePathUtils.GetFileName(text.Trim('"', '\'')) ?? "";
+        return RemotePathUtils.GetFileName(ShellCommandLine.Unquote(text ?? "")) ?? "";
+    }
+
+    // Runs an action on the UI thread unless the session (or the terminal) is gone by then.
+    private void PostToUi(Action action)
+    {
+        try
+        {
+            if (!_disposed && !_terminal.IsDisposed && _terminal.IsHandleCreated)
+            {
+                _terminal.BeginInvoke((Action)(() =>
+                {
+                    if (!_disposed)
+                    {
+                        action();
+                    }
+                }));
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
     }
 
     private void UpdatePopup(string text)
@@ -185,34 +211,27 @@ internal class CompletionSession : IDisposable
 
     private ListingTarget ResolveListing(string rawText)
     {
-        string pathText = (rawText ?? "").Trim('\'', '"');
-        if (pathText.StartsWith("~"))
-        {
-            pathText = _terminal.HomeDirectory + pathText.Substring(1);
-        }
+        // "my\ dir/" and "'my dir'/" both mean the directory "my dir": the word is unquoted before it is listed (the
+        // backslash used to be passed to ls, so escaped paths never completed).
+        string pathText = ShellCommandLine.Unquote(rawText ?? "");
         int slashIndex = pathText.LastIndexOf('/');
-        switch (slashIndex)
+        if (slashIndex == -1)
         {
-            case -1:
-                return new ListingTarget
-                {
-                    Directory = _terminal.CurrentDirectory
-                };
-            case 0:
-                if (slashIndex < pathText.Length && pathText[slashIndex] == '/')
-                {
-                    return new ListingTarget
-                    {
-                        Directory = "/",
-                        Prefix = "/"
-                    };
-                }
-                break;
+            return new ListingTarget
+            {
+                Directory = _terminal.CurrentDirectory
+            };
         }
-        string prefix = pathText.Substring(0, slashIndex);
+        string prefix = pathText.Substring(0, slashIndex + 1);
+        string directory = prefix;
+        if (directory == "~/" || directory.StartsWith("~/", StringComparison.Ordinal))
+        {
+            directory = _terminal.HomeDirectory + directory.Substring(1);
+        }
+        directory = directory.TrimEnd('/');
         return new ListingTarget
         {
-            Directory = RemotePathUtils.Combine(_terminal.CurrentDirectory, prefix),
+            Directory = (directory == "") ? "/" : RemotePathUtils.Combine(_terminal.CurrentDirectory, directory),
             Prefix = prefix
         };
     }
@@ -224,10 +243,18 @@ internal class CompletionSession : IDisposable
             List<CompletionItem> itemsList;
             while (true)
             {
-                ListingTarget listingTarget = _listing;
+                ListingTarget listingTarget;
+                lock (_lock)
+                {
+                    listingTarget = _listing;
+                }
+                if (_disposed)
+                {
+                    return;
+                }
                 if (_target == CompletionTarget.Command && !listingTarget.HasPrefix)
                 {
-                    IEnumerable<string> source = _terminal._shellCompletionAnalyzer.GetExecutables(_terminal);
+                    IEnumerable<string> source = _terminal.ShellAnalyzer.GetExecutables(_terminal);
                     itemsList = (from item in source.Select((string fullPath) => new CompletionItem
                     {
                         Icon = VirtualTerminalPopupItemIcon.Command,
@@ -290,15 +317,21 @@ internal class CompletionSession : IDisposable
                     break;
                 }
             }
-            _terminal.BeginInvoke((Action)(() =>
+            PostToUi(() =>
             {
                 OnItemsLoaded(itemsList);
-            }));
+            });
         }
         catch (Exception exception)
         {
-            _popup.DisplayException(exception);
-            _isLoading = false;
+            lock (_lock)
+            {
+                _isLoading = false;
+            }
+            PostToUi(() =>
+            {
+                _popup.DisplayException(exception);
+            });
         }
     }
 
@@ -314,7 +347,9 @@ internal class CompletionSession : IDisposable
         CompletionItem[] matches = list.Where((CompletionItem completionItem) => completionItem.Text.StartsWith(filterText)).ToArray();
         if (matches.Length == 1)
         {
+            // The only candidate is inserted and the list is not needed any more, as in bash.
             ApplyItem(matches[0], commit: false);
+            _popup.Close();
         }
         else if (matches.Length != 0)
         {
@@ -325,10 +360,12 @@ internal class CompletionSession : IDisposable
             }
             if (common.Length > 0 && common != filterText)
             {
+                // The directory part of the word stays: "src/ma" + Tab used to become "main." instead of "src/main.".
+                string prefix = (_listing.HasPrefix && !_showingOptions) ? _listing.Prefix : "";
                 ApplyItem(new CompletionItem
                 {
                     Text = common,
-                    InsertText = common
+                    InsertText = prefix + common
                 }, commit: false);
             }
         }
@@ -347,6 +384,7 @@ internal class CompletionSession : IDisposable
         return first.Substring(0, limit);
     }
 
+    // The literal path (not yet quoted for the shell) that replaces the word.
     private string BuildInsertText(ListingTarget listingTarget, LsOutputParser.LsEntry lsEntry)
     {
         string text = "";
@@ -404,47 +442,68 @@ internal class CompletionSession : IDisposable
 
     private void ApplyItem(CompletionItem completionItem, bool commit, string suffix = "")
     {
-        if (completionItem.InsertText == null)
+        if (completionItem.InsertText == null || _disposed)
         {
             return;
         }
         try
         {
-            bool isQuoted = IsQuoted;
-            string insertText = completionItem.InsertText;
-            if (!isQuoted)
-            {
-                insertText = insertText.Replace(" ", "\\ ");
-            }
-            bool isDir = insertText.EndsWith("/");
+            string literal = completionItem.InsertText;
+            bool isDir = literal.EndsWith("/");
             if (isDir)
             {
                 if (suffix == "/")
                 {
                     suffix = "";
                 }
-                else if (commit)
+                else if (commit && literal.Length > 1)
                 {
-                    insertText = insertText.TrimEnd('/');
+                    literal = literal.TrimEnd('/');
                 }
             }
-            int caretOffset = 0;
-            if (isQuoted)
+            char quote = QuoteChar;
+            string insertText;
+            int caretIndex;
+            if (quote != '\0')
             {
-                insertText = _token.Text[0] + insertText + _token.Text[0];
-                caretOffset = -1;
+                // A quoted word stays quoted; the caret stays before the closing quote so that a directory can be
+                // completed further. "~/" must stay outside the quotes to be expanded.
+                string home = "";
+                if (literal.StartsWith("~/", StringComparison.Ordinal))
+                {
+                    home = "~/";
+                    literal = literal.Substring(2);
+                }
+                insertText = home + quote + ShellCommandLine.EscapeInQuotes(literal + suffix, quote) + quote;
+                caretIndex = _token.Start + insertText.Length - 1;
             }
-            string newText = _commandText.Substring(0, _token.Start) + insertText + _commandText.Substring(_token.End) + suffix;
+            else
+            {
+                // Every character the shell would interpret is escaped, not just spaces: file names with quotes, $,
+                // &, parentheses and the like used to produce a broken command.
+                insertText = ShellCommandLine.EscapeWord(literal) + suffix;
+                caretIndex = _token.Start + insertText.Length;
+            }
+            // The typed character (suffix) goes right after the completed word, not to the end of the line.
+            string newText = _commandText.Substring(0, _token.Start) + insertText + _commandText.Substring(_token.End);
             AppliedEventArgs appliedEventArgs = new AppliedEventArgs
             {
                 NewText = newText,
-                CaretIndex = _token.Start + insertText.Length + (suffix ?? "").Length + caretOffset,
+                CaretIndex = caretIndex,
                 Commit = commit,
                 Item = completionItem,
                 IsDirectory = isDir
             };
-            this.ItemApplied?.Invoke(this, appliedEventArgs);
             LastApplied = appliedEventArgs;
+            this.ItemApplied?.Invoke(this, appliedEventArgs);
+            if (!_disposed && !commit && _popup.IsOpen)
+            {
+                // The terminal does not report its own replacement back (it used to end the session, so the list
+                // vanished after Tab completed a common prefix of a word that was not the first one).
+                _commandText = newText;
+                _token = new Token(newText, _token.Start, _token.Start + insertText.Length);
+                Retarget(_token.Text);
+            }
         }
         catch
         {
@@ -507,39 +566,52 @@ internal class CompletionSession : IDisposable
             _token.Length += lengthDiff;
             _commandText = newFullText;
             string extracted = _token.Extract(newFullText) ?? "";
-            if (extracted.IndexOfAny(new char[7] { '`', '$', '<', '>', '|', '&', ';' }) != -1)
+            if (extracted.IndexOfAny(new char[2] { '`', '$' }) != -1)
             {
                 return true;
             }
-            if (ContainsUnescapedSpace(extracted) && extracted.IndexOfAny(new char[3] { '`', '\'', '"' }) != 0)
+            // The word ended (an unquoted space) or an operator was typed: the completion is over.
+            List<ShellCommandLine.Token> words = ShellCommandLine.Tokenize(extracted);
+            if (words.Count > 1 || (words.Count == 1 && (words[0].IsOperator || words[0].Start != 0 || words[0].End != extracted.Length)) || (words.Count == 0 && extracted.Length != 0))
             {
                 return true;
             }
-            if (extracted.StartsWith("-"))
+            // Typing after "-" used to close the popup right away, so options could never be filtered.
+            if (extracted.StartsWith("-") && _commandCompletion?.Options == null)
             {
                 return true;
             }
-            ListingTarget listingTarget = ResolveListing(extracted);
-            if (!listingTarget.Equals(_listing))
-            {
-                _listing = listingTarget;
-                lock (_lock)
-                {
-                    if (!_isLoading)
-                    {
-                        _isLoading = true;
-                        new Thread(LoadItems).Start();
-                    }
-                }
-            }
-            UpdatePopup(extracted);
+            Retarget(extracted);
             return false;
         }
         return true;
     }
 
+    // Lists another directory if the word now points into one and filters the popup by the word.
+    private void Retarget(string word)
+    {
+        ListingTarget listingTarget = ResolveListing(word);
+        lock (_lock)
+        {
+            if (!listingTarget.Equals(_listing))
+            {
+                _listing = listingTarget;
+                if (!_isLoading)
+                {
+                    _isLoading = true;
+                    new Thread(LoadItems)
+                    {
+                        IsBackground = true
+                    }.Start();
+                }
+            }
+        }
+        UpdatePopup(word);
+    }
+
     public void Dispose()
     {
+        _disposed = true;
         _popup.Close();
     }
 
@@ -568,8 +640,8 @@ internal class CompletionSession : IDisposable
         {
             return false;
         }
-        ApplyItem(selectedItem, commit: false, new string(ch, 1));
         _popup.Close();
+        ApplyItem(selectedItem, commit: false, new string(ch, 1));
         return true;
     }
 }

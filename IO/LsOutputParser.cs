@@ -85,11 +85,12 @@ public static class LsOutputParser
 
         public static string BuildListCommand(string path, bool followSymlinks, bool recursive, bool useGls = false)
         {
+            // ShellQuote: a directory with a single quote in its name used to break the command.
             if (useGls)
             {
-                return string.Format("/opt/local/bin/gls -a{0}Fl{1} --full-time '{2}'", followSymlinks ? "L" : "", recursive ? "R" : "", path);
+                return string.Format("/opt/local/bin/gls -a{0}Fl{1} --full-time {2}", followSymlinks ? "L" : "", recursive ? "R" : "", RemotePathUtils.ShellQuote(path));
             }
-            return string.Format("ls -a{0}Fl{1} --full-time '{2}'", followSymlinks ? "L" : "", recursive ? "R" : "", path);
+            return string.Format("ls -a{0}Fl{1} --full-time {2}", followSymlinks ? "L" : "", recursive ? "R" : "", RemotePathUtils.ShellQuote(path));
         }
     }
 }

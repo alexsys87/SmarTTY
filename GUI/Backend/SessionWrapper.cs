@@ -487,10 +487,14 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         if (_Analyzer != null)
         {
+            ShellCompletionAnalyzer previousAnalyzer;
             lock (_Sync)
             {
+                previousAnalyzer = _Analyzer;
                 _Analyzer = new ShellCompletionAnalyzer(this, session);
             }
+            // Its history channel belongs to the lost connection.
+            previousAnalyzer.Dispose();
         }
         IsInactive = false;
     }

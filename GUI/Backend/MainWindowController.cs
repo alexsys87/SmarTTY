@@ -1422,7 +1422,8 @@ public class MainWindowController : INotifyPropertyChanged
         TerminalEmulatorControl terminalEmulatorControl;
         if (virtualMode)
         {
-            SshTerminalControl vt = new SshTerminalControl(ActiveSession, initialDirForVirtualMode)
+            // The session the tab is created for, which is not necessarily the active one yet (a new connection).
+            SshTerminalControl vt = new SshTerminalControl(session, initialDirForVirtualMode)
             {
                 Tag = new TerminalTag
                 {
@@ -1509,13 +1510,15 @@ public class MainWindowController : INotifyPropertyChanged
     {
         _VirtualTerminalPopup.Placement = PlacementMode.Custom;
         _VirtualTerminalPopup.PlacementTarget = (UIElement)_Window;
+        // The popup window is shared: the list it showed before belongs to a completion that is over now.
+        (((FrameworkElement)_VirtualTerminalPopup).DataContext as SuggestionPopupController)?.Detach();
         SuggestionPopupController suggestionPopupController = new SuggestionPopupController(this, e, _VirtualTerminalPopup);
         ((FrameworkElement)_VirtualTerminalPopup).DataContext = suggestionPopupController;
         _VirtualTerminalPopup.CustomPopupPlacementCallback = suggestionPopupController.PlacePopup;
         _VirtualTerminalPopup.IsOpen = true;
         suggestionPopupController.ItemSelected += (CompletionItem ba2, Keys isEnter) =>
         {
-            _VirtualTerminalPopup.IsOpen = false;
+            suggestionPopupController.Close();
             FocusMainControlDelayed(null);
         };
         e.Popup = suggestionPopupController;

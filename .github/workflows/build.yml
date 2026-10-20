@@ -47,6 +47,12 @@ jobs:
       - name: Run xterm protocol checks (modified keys, mouse, paste, SGR colours)
         run: dotnet run --project tests/XtermProtocolTests -c Release
 
+      - name: Run Smart Terminal command line checks (tokens, completion target, quoting, paste, export)
+        run: dotnet run --project tests/SmartTerminalCommandLineTests -c Release
+
+      - name: Run ls output parser checks
+        run: dotnet run --project tests/LsOutputParserTests -c Release
+
       - name: Run serial port settings and line status checks
         run: dotnet run --project tests/SerialPortRulesTests -c Release
 

@@ -81,6 +81,10 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
 
     private Exception _Exception;
 
+    private readonly EventHandler _PopupClosedHandler;
+
+    private const int PageSize = 10;
+
     public bool IsDarkTheme => _Controller.Settings.Theme == SmarTTYTheme.Dark;
 
     public string NoItemsHint
@@ -153,11 +157,23 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
         _Args = e;
         _VirtualTerminalPopup = popup;
         IsOpen = true;
-        popup.Closed += (object sender, EventArgs e) =>
+        _PopupClosedHandler = (object sender, EventArgs args) =>
         {
-            IsOpen = false;
+            Detach();
         };
+        popup.Closed += _PopupClosedHandler;
         UpdateFilteredItems();
+    }
+
+    /// <summary>
+    /// The popup window is shared by all completions: once it has been closed or shows another list, this controller
+    /// is closed for good. The handler is removed as well; every controller used to stay subscribed (and in memory)
+    /// for the lifetime of the window, and an earlier one kept reporting IsOpen while the popup showed a newer list.
+    /// </summary>
+    internal void Detach()
+    {
+        IsOpen = false;
+        _VirtualTerminalPopup.Closed -= _PopupClosedHandler;
     }
 
     public void OnItemMouseDown(Item item)
@@ -226,7 +242,12 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
 
     public void Close()
     {
-        _VirtualTerminalPopup.IsOpen = false;
+        // Closing an old completion must not close the list of the current one.
+        if (IsOpen && ((FrameworkElement)_VirtualTerminalPopup).DataContext == this)
+        {
+            _VirtualTerminalPopup.IsOpen = false;
+        }
+        Detach();
     }
 
     public bool TryHandleKeyEvent(KeyEventArgs e)
@@ -244,9 +265,22 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
                 }
                 return true;
             case Keys.Down:
-                if (SelectedIndex < Items.Length)
+                // The last item is Items.Length - 1: the index used to run one past it.
+                if (SelectedIndex < Items.Length - 1)
                 {
                     SelectedIndex++;
+                }
+                return true;
+            case Keys.Prior:
+                if (Items.Length > 0)
+                {
+                    SelectedIndex = Math.Max(0, SelectedIndex - PageSize);
+                }
+                return true;
+            case Keys.Next:
+                if (Items.Length > 0)
+                {
+                    SelectedIndex = Math.Min(Items.Length - 1, Math.Max(0, SelectedIndex) + PageSize);
                 }
                 return true;
             case Keys.Tab:
