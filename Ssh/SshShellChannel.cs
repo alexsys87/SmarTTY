@@ -157,6 +157,8 @@ public class SshShellChannel : IAsyncChannel, IDisposable
 
     private int _finishedRaised;
 
+    private bool _closedByConnectionLoss;
+
     private int? _exitStatus;
 
     private string _exitSignal;
@@ -273,6 +275,33 @@ public class SshShellChannel : IAsyncChannel, IDisposable
         }
     }
 
+    /// <summary>
+    /// True when the channel was still open at the moment the SSH connection went away (or the session was
+    /// disposed): the remote program did not exit, so <see cref="Finished"/> does not mean "the shell has exited".
+    /// </summary>
+    public bool ClosedByConnectionLoss
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _closedByConnectionLoss;
+            }
+        }
+    }
+
+    /// <summary>True once <see cref="Dispose"/> has been called.</summary>
+    public bool IsDisposed
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _disposed;
+            }
+        }
+    }
+
     public event DataReceivedHandler DataReceived;
 
     public event ChannelEventHandler Finished;
@@ -315,6 +344,13 @@ public class SshShellChannel : IAsyncChannel, IDisposable
 
     internal void OnConnectionClosed()
     {
+        lock (_sync)
+        {
+            if (!_closed)
+            {
+                _closedByConnectionLoss = true;
+            }
+        }
         MarkClosed();
     }
 

@@ -683,13 +683,17 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             if ((int)e.Key == 156 && (int)e.SystemKey != 120 && (int)e.SystemKey != 116)
             {
                 char ch = '\0';
+                bool shift = e.KeyboardDevice != null && (e.KeyboardDevice.Modifiers & ModifierKeys.Shift) != 0;
                 if ((int)e.SystemKey >= 44 && (int)e.SystemKey <= 69)
                 {
+                    // Alt+Shift+letter sends ESC and the capital letter (Meta-B is not Meta-b in readline).
                     int value = (int)e.SystemKey - 44;
-                    ch = (char)(97 + value);
+                    ch = (char)((shift ? 65 : 97) + value);
                 }
-                else if ((int)e.Key >= 34 && (int)e.Key <= 43)
+                else if ((int)e.SystemKey >= 34 && (int)e.SystemKey <= 43 && !shift)
                 {
+                    // Alt+digit (Key.D0..Key.D9). With Alt held the key arrives as Key.System, so the digit must be
+                    // read from SystemKey; checking Key never matched and Alt+digit was never sent.
                     int currentValue = (int)e.SystemKey - 34;
                     ch = (char)(48 + currentValue);
                 }

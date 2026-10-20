@@ -1242,7 +1242,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             text = text.Replace("\n", "\r\n");
         }
-        _serialTerminalControl.OnDataReceived(text);
+        // Queries recorded in the log (cursor position, device attributes) must not be answered to the device.
+        _serialTerminalControl.SuppressReplies = true;
+        try
+        {
+            _serialTerminalControl.OnDataReceived(text);
+        }
+        finally
+        {
+            _serialTerminalControl.SuppressReplies = false;
+        }
     }
 
     /// <summary>Resets the incremental decoder so a replay can safely restart from the beginning of a log.</summary>

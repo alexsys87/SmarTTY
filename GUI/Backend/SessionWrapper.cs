@@ -500,7 +500,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         Utf8StreamDecoder reader = new Utf8StreamDecoder();
         chn.DataReceived += (object sender, byte[] data, int offset, int length, int value) =>
         {
-            AppendText(ctl, reader.Decode(data, offset, length), data, offset, length);
+            if (IsChannelAttached(ctl, chn))
+            {
+                AppendText(ctl, reader.Decode(data, offset, length), data, offset, length);
+            }
         };
         if (isAutoLaunchedCommand)
         {
@@ -508,6 +511,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             {
                 _Controller.BeginInvoke(() =>
                 {
+                    if (!IsRemoteExit(ctl, chn))
+                    {
+                        return;
+                    }
                     if (MessageBoxes.Ask("The command has exited. Close tab?"))
                     {
                         CloseTabPageForControl(ctl);
@@ -525,12 +532,31 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             {
                 _Controller.BeginInvoke(() =>
                 {
-                    CloseTabPageForControl(ctl, autoInvoked: true);
+                    if (IsRemoteExit(ctl, chn))
+                    {
+                        CloseTabPageForControl(ctl, autoInvoked: true);
+                    }
                 });
             };
         }
         chn.PollingEnabled = true;
         chn.ResizePty(ctl.TerminalSize.Width, ctl.TerminalSize.Height);
+    }
+
+    private static bool IsChannelAttached(TerminalEmulatorControl ctl, SshShellChannel chn)
+    {
+        return !ctl.IsDisposed && (ctl.Tag as TerminalTag)?.Channel == chn;
+    }
+
+    /// <summary>
+    /// Tells a real end of the remote shell (or command) from the other reasons a channel finishes: the tab was
+    /// closed (the channel is disposed together with it), the tab got a new channel after a reconnect, or the SSH
+    /// connection went away. Only a real exit may close the tab or ask about it; a lost connection is handled by
+    /// the reconnect prompt (<see cref="SessionFixer"/>), and closing the tabs here would close the session with it.
+    /// </summary>
+    private static bool IsRemoteExit(TerminalEmulatorControl ctl, SshShellChannel chn)
+    {
+        return IsChannelAttached(ctl, chn) && !chn.IsDisposed && !chn.ClosedByConnectionLoss;
     }
 
     public EditorTabContext TryActivateEditorForFile(string fn)

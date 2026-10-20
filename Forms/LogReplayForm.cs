@@ -72,7 +72,16 @@ public partial class LogReplayForm : DpiAwareForm
         }
         else
         {
-            _terminalEmulatorControl.ProcessOutput(_logText.Substring(_position, chunkSize));
+            // The log is replayed into the live terminal: queries recorded in it must not be answered to the session.
+            _terminalEmulatorControl.SuppressReplies = true;
+            try
+            {
+                _terminalEmulatorControl.ProcessOutput(_logText.Substring(_position, chunkSize));
+            }
+            finally
+            {
+                _terminalEmulatorControl.SuppressReplies = false;
+            }
         }
         _position += chunkSize;
     }

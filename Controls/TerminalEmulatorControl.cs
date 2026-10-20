@@ -120,7 +120,20 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private string _incompleteEscape;
 
+    // An escape sequence (an OSC title, say) that has not ended after this many characters is dropped, so that a
+    // stray ESC ] in binary output cannot swallow everything that follows while waiting for its terminator.
+    private const int MaxPendingEscapeLength = 16384;
+
+    private const int BracketedPasteMode = 2004;
+
+    private const int SgrMouseMode = 1006;
+
     private Point _savedCursor;
+
+    private CellStyle _savedStyle;
+
+    // Set while Reset() runs for an ESC c received from the remote side: the output queued after it is still valid.
+    private bool _resetFromStream;
 
     private readonly DecCharsets _charsets = new DecCharsets();
 
@@ -148,7 +161,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private object _outputLock = new object();
 
-    private string _pendingOutput;
+    private StringBuilder _pendingOutput = new StringBuilder();
 
     private FileStream _logStream;
 
@@ -173,6 +186,23 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     protected virtual bool UnusedOption => false;
 
     public string EnterSequence { get; set; }
+
+    /// <summary>
+    /// What a line break of pasted text is sent as while the remote side reads the keyboard (<see cref="UsesTerminalInput"/>).
+    /// SSH terminals send CR, like the Enter key and other terminal emulators; the default LF keeps the behaviour
+    /// the COM/TCP terminal has always had.
+    /// </summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public string PasteLineBreak { get; set; } = "\n";
+
+    /// <summary>
+    /// Suppresses the answers to terminal queries (cursor position, device attributes) while output that is not
+    /// live, such as a replayed log, is processed: those answers would otherwise be typed into the live session.
+    /// </summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool SuppressReplies { get; set; }
 
     /// <summary>
     /// Encoding used to turn typed and pasted text into bytes. SSH sessions keep the UTF-8 default;
@@ -449,31 +479,29 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             case ']':
                 {
-                    int oscEnd = AnsiEscapeUtils.FindOscEnd(text, position + 1, out var belEnd);
-                    if (oscEnd == -1)
+                    int consumed = ParseControlString(text, position, out string content, escapeTrace);
+                    if (content != null)
                     {
-                        escapeTrace?.SetWarning("Invalid ST/BEL");
-                        _incompleteEscape = text.Substring(position);
-                        return _incompleteEscape.Length;
+                        ExecuteOsc(content, escapeTrace);
                     }
-                    ExecuteOsc(text.Substring(position + 2, oscEnd - position - 2).Split(';'), escapeTrace);
-                    return belEnd + 1;
+                    return consumed;
                 }
+            case 'P':
+            case 'X':
+            case '^':
+            case '_':
+                // DCS, SOS, PM and APC strings are not supported, but their contents must not be shown as text.
+                escapeTrace?.SetDescription("Ignored control string");
+                return ParseControlString(text, position, out _, escapeTrace);
             case '[':
                 {
                     int csiEnd = AnsiEscapeUtils.FindCsiEnd(text, position + 2);
                     if (csiEnd == -1)
                     {
                         escapeTrace?.SetWarning("Invalid CSI");
-                        _incompleteEscape = text.Substring(position);
-                        return _incompleteEscape.Length;
+                        return KeepIncompleteEscape(text, position, escapeTrace);
                     }
-                    int parameterStart = 0;
-                    if (text[position + 2] == '?')
-                    {
-                        parameterStart = 1;
-                    }
-                    ExecuteCsi(text[csiEnd], text.Substring(position + 2 + parameterStart, csiEnd - position - 2 - parameterStart).Split(';'), parameterStart != 0, escapeTrace);
+                    ExecuteCsiSequence(text[csiEnd], text.Substring(position + 2, csiEnd - position - 2), escapeTrace);
                     return csiEnd - position + 1;
                 }
             case ' ':
@@ -505,11 +533,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 return 2;
             case '7':
                 escapeTrace?.SetDescription("Save cursor");
-                _savedCursor = base.CursorPosition;
+                SaveCursor();
                 return 2;
             case '8':
                 escapeTrace?.SetDescription("Restore cursor");
-                base.CursorPosition = _savedCursor;
+                RestoreCursor();
                 return 2;
             case 'H':
                 escapeTrace?.SetDescription("Set tab");
@@ -517,7 +545,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 return 2;
             case 'c':
                 escapeTrace?.SetDescription("Reset");
-                Reset();
+                ResetFromStream();
                 return 2;
             case 'D':
                 escapeTrace?.SetDescription("Remove lines");
@@ -550,13 +578,108 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
+    /// <summary>
+    /// Keeps an escape sequence that has not ended yet for the next chunk of output, or drops its ESC once it has
+    /// grown beyond <see cref="MaxPendingEscapeLength"/>, so the rest is shown as text instead of being swallowed.
+    /// Returns the number of characters consumed.
+    /// </summary>
+    private int KeepIncompleteEscape(string text, int position, EscapeTrace escapeTrace)
+    {
+        if (text.Length - position > MaxPendingEscapeLength)
+        {
+            escapeTrace?.SetWarning("Unterminated escape sequence dropped");
+            return 1;
+        }
+        _incompleteEscape = text.Substring(position);
+        return _incompleteEscape.Length;
+    }
+
+    /// <summary>
+    /// Parses an OSC/DCS-style string (ESC x ... BEL or ESC x ... ESC \). As in xterm, CAN or SUB cancel the string
+    /// and an ESC that does not start the terminator aborts it and begins the next sequence.
+    /// <paramref name="content"/> receives the text between the introducer and the terminator, or null when the
+    /// string was cancelled or is not complete yet. Returns the number of characters consumed.
+    /// </summary>
+    private int ParseControlString(string text, int position, out string content, EscapeTrace escapeTrace)
+    {
+        content = null;
+        for (int index = position + 2; index < text.Length; index++)
+        {
+            char ch = text[index];
+            if (ch == '\a')
+            {
+                content = text.Substring(position + 2, index - position - 2);
+                return index - position + 1;
+            }
+            if (ch == '\u0018' || ch == '\u001a')
+            {
+                return index - position + 1;
+            }
+            if (ch == '\u001b')
+            {
+                if (index + 1 >= text.Length)
+                {
+                    break;
+                }
+                if (text[index + 1] == '\\')
+                {
+                    content = text.Substring(position + 2, index - position - 2);
+                    return index - position + 2;
+                }
+                escapeTrace?.SetWarning("Control string aborted by ESC");
+                return index - position;
+            }
+        }
+        escapeTrace?.SetWarning("Invalid ST/BEL");
+        return KeepIncompleteEscape(text, position, escapeTrace);
+    }
+
+    /// <summary>
+    /// Splits a CSI sequence into its private prefix (? > = <), parameters and intermediate bytes before running it.
+    /// Sequences with a prefix other than '?' or with intermediates are xterm extensions that mostly are not
+    /// supported; they must not be run as the standard sequence with the same final character
+    /// (vim's "CSI > 4 ; 2 m" is not an SGR reset, "CSI 2 SP q" is not a scroll-region command).
+    /// </summary>
+    private void ExecuteCsiSequence(char final, string body, EscapeTrace escapeTrace)
+    {
+        char prefix = '\0';
+        if (body.Length > 0 && body[0] >= '<' && body[0] <= '?')
+        {
+            prefix = body[0];
+            body = body.Substring(1);
+        }
+        int intermediateStart = body.Length;
+        while (intermediateStart > 0 && body[intermediateStart - 1] >= ' ' && body[intermediateStart - 1] <= '/')
+        {
+            intermediateStart--;
+        }
+        string intermediates = body.Substring(intermediateStart);
+        body = body.Substring(0, intermediateStart);
+        if (intermediates.Length != 0)
+        {
+            if (prefix == '\0' && intermediates == "!" && final == 'p')
+            {
+                escapeTrace?.SetDescription("Soft reset");
+                SoftReset();
+            }
+            return;
+        }
+        if (prefix != '\0' && prefix != '?')
+        {
+            escapeTrace?.SetDescription($"Ignored private CSI {prefix}{body}{final}");
+            return;
+        }
+        ExecuteCsi(final, body.Split(';'), prefix == '?', escapeTrace);
+    }
+
     internal bool ExecuteCsi(char ch, string[] items, bool set, EscapeTrace escapeTrace = null)
     {
         escapeTrace?.SetRaw(string.Format("Unknown CSI command: {2}{0}, DEC={1}", ch, set, string.Join(";", items)));
         int count = 0;
         int repeatCount = 1;
-        if (items.Length != 0 && int.TryParse(items[0], out count))
+        if (items.Length != 0 && int.TryParse(items[0], out count) && count > 0)
         {
+            // A count of 0 means 1, as an omitted one does.
             repeatCount = count;
         }
         switch (ch)
@@ -652,9 +775,16 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 InsertBlankLines(base.ScrollTop, repeatCount);
                 return true;
             case 'X':
-                escapeTrace?.SetDescription($"Pad {repeatCount} chars");
-                WriteText(new string(' ', repeatCount), moveCursor: false);
-                return true;
+                {
+                    // ECH erases up to the end of the line, it never wraps onto the next one.
+                    int eraseCount = Math.Min(repeatCount, _visibleColumns - base.CursorPosition.X);
+                    escapeTrace?.SetDescription($"Pad {eraseCount} chars");
+                    if (eraseCount > 0)
+                    {
+                        WriteAt(base.CursorPosition, new string(' ', eraseCount), CurrentStyle);
+                    }
+                    return true;
+                }
             case 'Z':
                 {
                     escapeTrace?.SetDescription($"Go {repeatCount} tabs back");
@@ -681,65 +811,33 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 }
                 return true;
             case 'm':
+                if (!set)
                 {
-                    string[] parameters = items;
-                    for (int parameterIndex = 0; parameterIndex < parameters.Length; parameterIndex++)
-                    {
-                        int.TryParse(parameters[parameterIndex], out var parameter);
-                        if (parameter >= 30 && parameter <= 37)
-                        {
-                            CurrentStyle.Foreground = (byte)(1 + parameter - 30);
-                            continue;
-                        }
-                        if (parameter >= 40 && parameter <= 47)
-                        {
-                            CurrentStyle.Background = (byte)(1 + parameter - 40);
-                            continue;
-                        }
-                        switch (parameter)
-                        {
-                            case 0:
-                                CurrentStyle = TerminalEmulatorBase.CellStyle.Default;
-                                continue;
-                            case 1:
-                                CurrentStyle.Bold = true;
-                                continue;
-                            case 21:
-                                CurrentStyle.Bold = false;
-                                continue;
-                            case 7:
-                                CurrentStyle.Inverse = true;
-                                continue;
-                            case 27:
-                                CurrentStyle.Inverse = false;
-                                continue;
-                            case 39:
-                                CurrentStyle.Foreground = 0;
-                                continue;
-                            case 49:
-                                CurrentStyle.Background = 0;
-                                continue;
-                            case 90:
-                            case 91:
-                            case 92:
-                            case 93:
-                            case 94:
-                            case 95:
-                            case 96:
-                            case 97:
-                                CurrentStyle.Foreground = (byte)(1 + parameter - 90);
-                                CurrentStyle.Bold = true;
-                                continue;
-                        }
-                        if (parameter >= 100 && parameter <= 107)
-                        {
-                            CurrentStyle.Background = (byte)(1 + parameter - 100);
-                            CurrentStyle.Bold = true;
-                        }
-                    }
+                    ApplySgr(XtermProtocol.ParseSgr(items));
                     escapeTrace?.SetDescription($"SGR: {CurrentStyle}");
-                    return true;
                 }
+                return true;
+            case 'n':
+                if (!set)
+                {
+                    ReportStatus(count, escapeTrace);
+                }
+                return true;
+            case 'c':
+                if (!set && count == 0)
+                {
+                    // Primary device attributes: a VT100 with advanced video option, as xterm reports by default.
+                    escapeTrace?.SetDescription("Device attributes");
+                    SendReply("\u001b[?1;2c");
+                }
+                return true;
+            case 'u':
+                if (!set)
+                {
+                    escapeTrace?.SetDescription("Restore cursor (SCORC)");
+                    RestoreCursor();
+                }
+                return true;
             case 'h':
             case 'l':
                 {
@@ -757,20 +855,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     }
                     return true;
                 }
-            case 'p':
-                if (items.Length == 1 && items[0] == "!")
-                {
-                    escapeTrace?.SetDescription("Reset");
-                    Reset();
-                }
-                else
-                {
-                    escapeTrace?.SetDescription("Unknown 'p' cmd");
-                }
-                return true;
             case 's':
                 escapeTrace?.SetDescription("Save features: " + string.Join(";", items));
-                if (set)
+                if (!set)
+                {
+                    // SCOSC: the ANSI.SYS form of "save cursor".
+                    SaveCursor();
+                }
+                else
                 {
                     string[] modeParameters = items;
                     for (int modeParameterIndex = 0; modeParameterIndex < modeParameters.Length; modeParameterIndex++)
@@ -798,20 +890,22 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 }
                 else
                 {
-                    if (items.Length < 1 || !int.TryParse(items[0], out var top))
+                    // DECSTBM: an omitted (or 0) top is the first line, an omitted bottom the last one.
+                    int rows = ((ReadonlyTextBrowser)this)._visibleRows;
+                    if (items.Length < 1 || !int.TryParse(items[0], out var top) || top < 1)
                     {
-                        top = 0;
+                        top = 1;
                     }
-                    if (items.Length < 2 || !int.TryParse(items[1], out var bottom))
+                    if (items.Length < 2 || !int.TryParse(items[1], out var bottom) || bottom < 1 || bottom > rows)
                     {
-                        bottom = 0;
+                        bottom = rows;
                     }
-                    if (top == 0 || bottom == 0 || bottom < top)
+                    if (top == 1 && bottom == rows)
                     {
                         escapeTrace?.SetDescription("Reset clip region");
                         ClearScrollRegion();
                     }
-                    else
+                    else if (top < bottom)
                     {
                         escapeTrace?.SetDescription($"Set clip region to {top}..{bottom}");
                         SetScrollRegion(top - 1, bottom - 1);
@@ -837,8 +931,45 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     HideCaret = !enabled;
                     break;
                 case 47:
-                case 1049:
                     base.ActiveBufferIndex = (enabled ? 1 : 0);
+                    break;
+                case 1047:
+                    // Alternate screen, cleared when it is left.
+                    if (!enabled && base.ActiveBufferIndex == 1)
+                    {
+                        ClearActiveScreen();
+                    }
+                    base.ActiveBufferIndex = (enabled ? 1 : 0);
+                    break;
+                case 1048:
+                    if (enabled)
+                    {
+                        SaveCursor();
+                    }
+                    else
+                    {
+                        RestoreCursor();
+                    }
+                    break;
+                case 1049:
+                    // Alternate screen, cleared when it is entered. The cursor starts where it was on the normal
+                    // screen, and the normal screen gets its own cursor back when the program leaves (each buffer
+                    // keeps its cursor, so an ESC 7 issued by the program cannot move it).
+                    if (enabled)
+                    {
+                        Point cursor = base.CursorPosition;
+                        SaveCursor();
+                        if (base.ActiveBufferIndex != 1)
+                        {
+                            base.ActiveBufferIndex = 1;
+                        }
+                        ClearActiveScreen();
+                        base.CursorPosition = cursor;
+                    }
+                    else if (base.ActiveBufferIndex != 0)
+                    {
+                        base.ActiveBufferIndex = 0;
+                    }
                     break;
                 case 9:
                 case 1000:
@@ -867,23 +998,187 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         Trace(string.Format(text, items));
     }
 
-    private bool ExecuteOsc(string[] items, EscapeTrace escapeTrace)
+    private bool ExecuteOsc(string content, EscapeTrace escapeTrace)
     {
         escapeTrace?.SetDescription("OSC");
-        if (items.Length < 2)
+        // Only the first ';' separates the command from its text: a title may contain ';' itself.
+        int separator = content.IndexOf(';');
+        if (separator == -1 || !int.TryParse(content.Substring(0, separator), out var command))
         {
             return false;
         }
-        if (!int.TryParse(items[0], out var eraseCode))
+        // 0 sets the icon name and the title, 2 the title only; 1 (the icon name alone) does not touch the title.
+        if (command == 0 || command == 2)
         {
-            return false;
-        }
-        if ((uint)eraseCode <= 2u)
-        {
-            base.Title = items[1];
+            StringBuilder title = new StringBuilder();
+            foreach (char ch in content.Substring(separator + 1))
+            {
+                if (!char.IsControl(ch))
+                {
+                    title.Append(ch);
+                }
+            }
+            base.Title = title.ToString();
             return true;
         }
         return false;
+    }
+
+    private void ApplySgr(System.Collections.Generic.List<XtermProtocol.SgrAttribute> attributes)
+    {
+        foreach (XtermProtocol.SgrAttribute attribute in attributes)
+        {
+            int code = attribute.Code;
+            if (code >= 30 && code <= 37)
+            {
+                CurrentStyle.Foreground = (byte)(1 + code - 30);
+                CurrentStyle.ExtendedForeground = 0;
+            }
+            else if (code >= 40 && code <= 47)
+            {
+                CurrentStyle.Background = (byte)(1 + code - 40);
+                CurrentStyle.ExtendedBackground = 0;
+            }
+            else if (code >= 90 && code <= 97)
+            {
+                // Bright colours are palette entries 8..15; they no longer turn bold on, which used to stick
+                // to the text written after a later normal colour.
+                CurrentStyle.Foreground = 0;
+                CurrentStyle.ExtendedForeground = EncodeExtendedColor(8 + code - 90);
+            }
+            else if (code >= 100 && code <= 107)
+            {
+                CurrentStyle.Background = 0;
+                CurrentStyle.ExtendedBackground = EncodeExtendedColor(8 + code - 100);
+            }
+            else
+            {
+                switch (code)
+                {
+                    case 0:
+                        CurrentStyle = TerminalEmulatorBase.CellStyle.Default;
+                        break;
+                    case 1:
+                        CurrentStyle.Bold = true;
+                        break;
+                    case 21:
+                    case 22:
+                        CurrentStyle.Bold = false;
+                        break;
+                    case 4:
+                        CurrentStyle.Underline = true;
+                        break;
+                    case 24:
+                        CurrentStyle.Underline = false;
+                        break;
+                    case 7:
+                        CurrentStyle.Inverse = true;
+                        break;
+                    case 27:
+                        CurrentStyle.Inverse = false;
+                        break;
+                    case 38:
+                        CurrentStyle.Foreground = 0;
+                        CurrentStyle.ExtendedForeground = EncodeExtendedColor(attribute.Color);
+                        break;
+                    case 39:
+                        CurrentStyle.Foreground = 0;
+                        CurrentStyle.ExtendedForeground = 0;
+                        break;
+                    case 48:
+                        CurrentStyle.Background = 0;
+                        CurrentStyle.ExtendedBackground = EncodeExtendedColor(attribute.Color);
+                        break;
+                    case 49:
+                        CurrentStyle.Background = 0;
+                        CurrentStyle.ExtendedBackground = 0;
+                        break;
+                }
+            }
+        }
+    }
+
+    // See CellStyle.ExtendedForeground: palette indices are stored + 1 so that 0 can mean "not set".
+    private static int EncodeExtendedColor(int color)
+    {
+        return ((color & XtermProtocol.RgbColorFlag) != 0) ? color : (color + 1);
+    }
+
+    private void ReportStatus(int request, EscapeTrace escapeTrace)
+    {
+        switch (request)
+        {
+            case 5:
+                escapeTrace?.SetDescription("Status report");
+                SendReply("\u001b[0n");
+                break;
+            case 6:
+                {
+                    // Cursor position report; at the pending-wrap position the cursor is still on the last column.
+                    escapeTrace?.SetDescription("Cursor position report");
+                    Point cursor = base.CursorPosition;
+                    int column = Math.Min(cursor.X, Math.Max(_visibleColumns - 1, 0));
+                    SendReply($"\u001b[{cursor.Y + 1};{column + 1}R");
+                    break;
+                }
+        }
+    }
+
+    private void SendReply(string reply)
+    {
+        if (!SuppressReplies)
+        {
+            SendText(reply, InputKind.KeySequence);
+        }
+    }
+
+    private void SaveCursor()
+    {
+        _savedCursor = base.CursorPosition;
+        _savedStyle = CurrentStyle;
+    }
+
+    private void RestoreCursor()
+    {
+        base.CursorPosition = _savedCursor;
+        CurrentStyle = _savedStyle;
+    }
+
+    /// <summary>DECSTR: resets the modes and attributes, but keeps the screen contents and the cursor position.</summary>
+    private void SoftReset()
+    {
+        Point cursor = base.CursorPosition;
+        ClearScrollRegion();
+        base.CursorPosition = cursor;
+        ResetModes();
+    }
+
+    private void ResetModes()
+    {
+        _applicationCursorKeys = false;
+        _applicationKeypad = false;
+        _insertMode = false;
+        HideCaret = false;
+        MouseMode = MouseReportingMode.Off;
+        Array.Clear(_privateModes, 0, _privateModes.Length);
+        Array.Clear(_savedPrivateModes, 0, _savedPrivateModes.Length);
+        CurrentStyle = TerminalEmulatorBase.CellStyle.Default;
+        _savedCursor = Point.Empty;
+        _savedStyle = TerminalEmulatorBase.CellStyle.Default;
+        _charsets.Reset();
+    }
+
+    private void ResetFromStream()
+    {
+        _resetFromStream = true;
+        try
+        {
+            Reset();
+        }
+        finally
+        {
+            _resetFromStream = false;
+        }
     }
 
     protected override void AddRef()
@@ -929,6 +1224,22 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 }
                 CopySelection();
             }
+            else if (e.Shift && !e.Control && e.KeyCode == Keys.Tab)
+            {
+                // Back-tab, used by menus, dialogs and completion lists of console programs.
+                SendText("\u001b[Z", InputKind.KeySequence);
+                e.SuppressKeyPress = true;
+                e.Handled = true;
+                return;
+            }
+            else if (e.Control && !e.Shift && e.KeyCode == Keys.Space)
+            {
+                // Ctrl+Space sends NUL (set-mark in Emacs and readline), as in xterm.
+                SendBytes(new byte[1], InputKind.KeySequence);
+                e.SuppressKeyPress = true;
+                e.Handled = true;
+                return;
+            }
             else if (AppSettings != null && AppSettings.ShiftPageXXToScroll && e.Shift && !e.Control && (e.KeyCode == Keys.Prior || e.KeyCode == Keys.Next))
             {
                 if (e.KeyCode == Keys.Prior)
@@ -961,13 +1272,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         string text = _keyMap.GetEscapeSequence(e.KeyCode, _applicationKeypad, this._applicationCursorKeys, numPad);
         if (text != null)
         {
-            text = text.Insert(0, "\u001b");
-            int modifiers = (e.Control ? 4 : 0) | (e.Alt ? 2 : 0) | (e.Shift ? 1 : 0);
-            if (modifiers != 0)
-            {
-                int modifierCode = modifiers + 1;
-                text = ((text.Length != 3 || text[0] != '\u001b' || text[1] != 'O') ? text.Insert(text.Length - 1, ";" + modifierCode) : $"\u001b[1;{modifierCode}{text[2]}");
-            }
+            // Ctrl+Left must be ESC [ 1 ; 5 D: inserting ";5" into ESC [ D used to give ESC [ ; 5 D, which shells
+            // and editors do not recognise.
+            text = XtermProtocol.ApplyKeyModifiers("\u001b" + text, e.Shift, e.Alt, e.Control);
             SendText(text, InputKind.KeySequence);
             e.SuppressKeyPress = true;
         }
@@ -1056,47 +1363,38 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
-    private static byte EncodeMouseValue(int mouseCode)
+    private bool IsPrivateModeSet(int mode)
     {
-        int encoded = mouseCode + 32;
-        if (encoded >= 255)
-        {
-            return byte.MaxValue;
-        }
-        return (byte)encoded;
+        return mode < _privateModes.Length && _privateModes[mode];
     }
 
-    private void HandleMouseButton(MouseEventArgs e, bool release)
+    // While a program has mouse reporting on, Shift+mouse still selects text locally, as in xterm.
+    private bool IsReportingMouse(MouseEventArgs e)
+    {
+        return _mouseMode != MouseReportingMode.Off && TextArea.Contains(e.Location) && (Control.ModifierKeys & Keys.Shift) == 0;
+    }
+
+    private void HandleMouseButton(MouseEventArgs e, bool pressed)
     {
         int buttonCode;
-        if (!release)
+        switch (e.Button)
         {
-            buttonCode = 3;
-        }
-        else
-        {
-            switch (e.Button)
-            {
-                default:
-                    return;
-                case MouseButtons.Left:
-                    buttonCode = 0;
-                    break;
-                case MouseButtons.Right:
-                    buttonCode = 2;
-                    break;
-                case MouseButtons.Middle:
-                    buttonCode = 1;
-                    break;
-            }
-        }
-        Point point = HitTestCell(e.Location);
-        switch (_mouseMode)
-        {
+            case MouseButtons.Left:
+                buttonCode = 0;
+                break;
+            case MouseButtons.Middle:
+                buttonCode = 1;
+                break;
+            case MouseButtons.Right:
+                buttonCode = 2;
+                break;
             default:
                 return;
+        }
+        switch (_mouseMode)
+        {
             case MouseReportingMode.X10:
-                if (!release)
+                if (!pressed)
                 {
                     return;
                 }
@@ -1107,76 +1405,80 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             case MouseReportingMode.AnyEvent:
                 buttonCode |= MouseModifierBits;
                 break;
+            default:
+                return;
         }
-        SendMouseReport(buttonCode, point.X, point.Y);
+        SendMouseReport(buttonCode, HitTestCell(e.Location), release: !pressed);
     }
 
     private void HandleMouseWheel(MouseEventArgs e)
     {
-        Point point = HitTestCell(e.Location);
         int wheelCode = 64 + ((e.Delta <= 0) ? 1 : 0);
         MouseReportingMode mouseReportingMode = _mouseMode;
         if (mouseReportingMode != MouseReportingMode.X10 && (uint)(mouseReportingMode - 1000) <= 3u)
         {
             wheelCode |= MouseModifierBits;
-            SendMouseReport(wheelCode, point.X, point.Y);
+            SendMouseReport(wheelCode, HitTestCell(e.Location), release: false);
         }
     }
 
     private void HandleMouseMove(MouseEventArgs e)
     {
-        int buttonCode = 0;
+        // Motion reports carry the held button, or 3 ("no button") for plain motion in any-event mode.
+        int buttonCode;
         switch (e.Button)
         {
             case MouseButtons.Left:
                 buttonCode = 0;
                 break;
+            case MouseButtons.Middle:
+                buttonCode = 1;
+                break;
             case MouseButtons.Right:
                 buttonCode = 2;
                 break;
-            case MouseButtons.Middle:
-                buttonCode = 1;
+            default:
+                buttonCode = 3;
                 break;
         }
         switch (_mouseMode)
         {
-            default:
-                return;
             case MouseReportingMode.ButtonEvent:
-                if (e.Button == MouseButtons.None)
+                if (buttonCode == 3)
                 {
                     return;
                 }
                 break;
             case MouseReportingMode.AnyEvent:
                 break;
+            default:
+                return;
         }
         Point point = HitTestCell(e.Location);
         if (!(point == _lastMouseCell))
         {
             _lastMouseCell = point;
-            SendMouseReport(buttonCode + 32, point.X, point.Y);
+            SendMouseReport(buttonCode | 32 | MouseModifierBits, point, release: false);
         }
     }
 
-    private void SendMouseReport(int buttonCode, int x, int y)
+    private void SendMouseReport(int buttonCode, Point cell, bool release)
     {
-        SendBytes(new byte[6]
-        {
-            27,
-            91,
-            77,
-            EncodeMouseValue(buttonCode),
-            EncodeMouseValue(x + 1),
-            EncodeMouseValue(y + 1)
-        }, InputKind.MouseReport);
+        // A click in scrolled-back text or in the partial cell at the edge is reported at the nearest screen cell.
+        int column = Math.Max(0, Math.Min(cell.X, _visibleColumns - 1));
+        int row = Math.Max(0, Math.Min(cell.Y, ((ReadonlyTextBrowser)this)._visibleRows - 1));
+        SendBytes(XtermProtocol.EncodeMouseReport(buttonCode, column, row, release, IsPrivateModeSet(SgrMouseMode)), InputKind.MouseReport);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
-        if (_mouseMode != MouseReportingMode.Off && TextArea.Contains(e.Location))
+        if (IsReportingMouse(e))
         {
-            HandleMouseButton(e, release: true);
+            if (!Focused)
+            {
+                Focus();
+            }
+            HandleMouseButton(e, pressed: true);
             return;
         }
         if (e.Button == MouseButtons.Middle)
@@ -1188,9 +1490,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     protected override void OnMouseUp(MouseEventArgs e)
     {
-        if (_mouseMode != MouseReportingMode.Off && TextArea.Contains(e.Location))
+        if (IsReportingMouse(e))
         {
-            HandleMouseButton(e, release: false);
+            HandleMouseButton(e, pressed: false);
         }
         else
         {
@@ -1200,7 +1502,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        if (_mouseMode != MouseReportingMode.Off && TextArea.Contains(e.Location))
+        if (IsReportingMouse(e))
         {
             HandleMouseMove(e);
         }
@@ -1219,12 +1521,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 base.Paste();
                 return;
             }
-            string text = Win32Clipboard.GetText(Handle);
-            if (text != null)
+            string text = XtermProtocol.PreparePaste(Win32Clipboard.GetText(Handle), PasteLineBreak, IsPrivateModeSet(BracketedPasteMode));
+            if (!string.IsNullOrEmpty(text))
             {
-                text = text.Replace("\r", "");
+                SendText(text, InputKind.Paste);
             }
-            SendText(text, InputKind.Paste);
         }
         catch (Exception exception)
         {
@@ -1234,9 +1535,16 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public void EnqueueOutput(string text)
     {
+        // A closed tab may still get the last chunks of its channel: nothing would ever flush them.
+        if (IsDisposed || string.IsNullOrEmpty(text))
+        {
+            return;
+        }
         lock (_outputLock)
         {
-            _pendingOutput += text;
+            // Appending to a StringBuilder keeps a burst of output linear: while the UI thread is busy, every new
+            // chunk used to copy all the text queued before it.
+            _pendingOutput.Append(text);
         }
         if (Interlocked.Increment(ref _pendingFlushes) >= 8)
         {
@@ -1256,11 +1564,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private void FlushOutput()
     {
-        string text;
+        string text = null;
         lock (_outputLock)
         {
-            text = _pendingOutput;
-            _pendingOutput = null;
+            if (_pendingOutput.Length != 0)
+            {
+                text = _pendingOutput.ToString();
+                _pendingOutput.Clear();
+            }
         }
         if (text != null)
         {
@@ -1276,13 +1587,13 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     protected override void OnMouseWheel(MouseEventArgs e)
     {
-        if (_mouseMode != MouseReportingMode.Off && TextArea.Contains(e.Location))
+        if (IsReportingMouse(e))
         {
             HandleMouseWheel(e);
         }
         else if ((Control.ModifierKeys & Keys.Alt) != Keys.Alt && AppSettings != null && AppSettings.EmulateDirectionKeysWithMouseWheel)
         {
-            string text = _keyMap.GetEscapeSequence((e.Delta < 0) ? Keys.Down : Keys.Up, _applicationKeypad, this._applicationCursorKeys, isNumPadKey: false);
+            string text = _keyMap?.GetEscapeSequence((e.Delta < 0) ? Keys.Down : Keys.Up, _applicationKeypad, this._applicationCursorKeys, isNumPadKey: false);
             if (text != null)
             {
                 text = text.Insert(0, "\u001b");
@@ -1333,12 +1644,24 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public override void Reset()
     {
-        base.Reset();
-        MouseMode = MouseReportingMode.Off;
-        _charsets.Reset();
-        lock (_outputLock)
+        // A full reset returns to the normal screen (a program that crashed in the alternate one leaves it there)
+        // and drops the scroll region, tab stops and modes along with the screen contents.
+        if (base.ActiveBufferIndex != 0)
         {
-            _pendingOutput = null;
+            base.ActiveBufferIndex = 0;
+        }
+        ClearScrollRegion();
+        Tabs = new TabStops();
+        base.Reset();
+        ResetModes();
+        if (!_resetFromStream)
+        {
+            // Output queued after an ESC c from the remote side still has to be shown; only a reset requested
+            // locally discards what has not been processed yet.
+            lock (_outputLock)
+            {
+                _pendingOutput.Clear();
+            }
         }
         _incompleteEscape = null;
     }

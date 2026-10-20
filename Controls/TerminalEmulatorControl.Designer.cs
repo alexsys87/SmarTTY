@@ -15,6 +15,11 @@ public partial class TerminalEmulatorControl
 		{
 			components.Dispose();
 		}
+		if (disposing)
+		{
+			// A log started with "Log all terminal output" would otherwise keep its file open.
+			OpenLogFile(null);
+		}
 		base.Dispose(disposing);
 	}
 

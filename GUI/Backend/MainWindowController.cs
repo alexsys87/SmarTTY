@@ -1452,6 +1452,9 @@ public class MainWindowController : INotifyPropertyChanged
             session.AttachChannelToControl(terminalEmulatorControl, sshShellChannel, initialCommand.Command != null, initialCommand.TabKeptAfterExit);
         }
         terminalEmulatorControl.CaretWhenUnfocused = false;
+        // Pasted line breaks reach the remote program as Enter (CR), as in other terminal emulators; a bare LF is
+        // Ctrl+J, which editors such as nano or Emacs treat as a command of its own.
+        terminalEmulatorControl.PasteLineBreak = "\r";
         terminalEmulatorControl.MouseMove += anyctl_MouseMove;
         terminalEmulatorControl.Dispatcher = _Worker;
         terminalEmulatorControl.ContextMenuStrip = _TerminalContextMenu;
