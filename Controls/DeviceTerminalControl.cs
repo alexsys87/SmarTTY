@@ -1083,7 +1083,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
-        StartXModemTransfer(protocolName + " Send", "send", fileStream: () => File.OpenRead(openFileDialog.FileName), isSend: true, useLargeBlocks: useLargeBlocks);
+        // The stream is opened later, on the worker thread, when the "using" dialog above is already disposed: take the name now.
+        string fileName = openFileDialog.FileName;
+        StartXModemTransfer(protocolName + " Send", "send", fileStream: () => File.OpenRead(fileName), isSend: true, useLargeBlocks: useLargeBlocks);
     }
 
     private void receiveFileViaXMODEMToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1110,7 +1112,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
-        StartXModemTransfer("XMODEM Receive", "receive", fileStream: () => File.Create(saveFileDialog.FileName), isSend: false);
+        // See the send handler: the dialog is disposed before the worker thread opens the file.
+        string fileName = saveFileDialog.FileName;
+        StartXModemTransfer("XMODEM Receive", "receive", fileStream: () => File.Create(fileName), isSend: false);
     }
 
     /// <summary>

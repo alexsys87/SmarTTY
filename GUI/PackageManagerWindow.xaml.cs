@@ -335,6 +335,12 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                 list.Add(_Client.GetCommandLineForPackageOperation(entries, LinuxPackageInfo.PackageAction.Remove, Options));
             }
             string text = string.Join("&&", list.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
+            if (text.Length == 0)
+            {
+                // Nothing was selected. The caller sends the command line to the terminal unless it is null: an empty
+                // text would end up there as "sudo su -c \"\"".
+                return null;
+            }
             return PackageIndexUpdater.WrapForPrivileges(text, _IsRoot);
         }
     }

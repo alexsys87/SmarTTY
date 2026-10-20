@@ -56,7 +56,7 @@ public class StatCommandBuilder
 
     public static StatFlavor DetectFlavor(CommandRunner callback, string testPath = ".")
     {
-        if (callback("stat -c \"path=%N\" \"" + testPath + "\"")?.FirstOrDefault((string line) => line.StartsWith("path=")) != null)
+        if (callback("stat -c \"path=%N\" " + SmarTTY.IO.RemotePathUtils.ShellQuote(testPath))?.FirstOrDefault((string line) => line.StartsWith("path=")) != null)
         {
             if (callback("echo | xargs -d \"\\n\" echo") != null)
             {
@@ -68,7 +68,7 @@ public class StatCommandBuilder
             }
             return StatFlavor.GnuFindNewlineSeparated;
         }
-        if (callback("stat -f \"path=%N\" \"" + testPath + "\"")?.FirstOrDefault((string line) => line.StartsWith("path=")) != null)
+        if (callback("stat -f \"path=%N\" " + SmarTTY.IO.RemotePathUtils.ShellQuote(testPath))?.FirstOrDefault((string line) => line.StartsWith("path=")) != null)
         {
             return StatFlavor.Bsd;
         }
@@ -81,17 +81,17 @@ public class StatCommandBuilder
         string findSymlinkFlag = (followSymlinks ? "-L" : "");
         if (this.Flavor == StatFlavor.Bsd)
         {
-            return "LANG=en_US cd \"" + dirPath + "\" && ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" .";
+            return "LANG=en_US cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(dirPath) + " && ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" .";
         }
         if (this.Flavor == StatFlavor.GnuFindNullSeparated)
         {
-            return "LANG=en_US cd \"" + dirPath + "\" && find . " + findSymlinkFlag + " -maxdepth 1 -print0 | xargs -0 stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
+            return "LANG=en_US cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(dirPath) + " && find . " + findSymlinkFlag + " -maxdepth 1 -print0 | xargs -0 stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
         }
         if (this.Flavor == StatFlavor.GnuFindNewlineSeparated)
         {
-            return "LANG=en_US cd \"" + dirPath + "\" && find . " + findSymlinkFlag + " -maxdepth 1 -print | xargs stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
+            return "LANG=en_US cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(dirPath) + " && find . " + findSymlinkFlag + " -maxdepth 1 -print | xargs stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
         }
-        return "LANG=en_US cd \"" + dirPath + "\" && ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\" .";
+        return "LANG=en_US cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(dirPath) + " && ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\" .";
     }
 
     public string GetStatCommand(string path, bool followSymlinks)
@@ -99,9 +99,9 @@ public class StatCommandBuilder
         string symlinkFlag = (followSymlinks ? " -L" : "");
         if (this.Flavor == StatFlavor.Bsd)
         {
-            return "stat" + symlinkFlag + " -f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" \"" + path + "\"";
+            return "stat" + symlinkFlag + " -f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" " + SmarTTY.IO.RemotePathUtils.ShellQuote(path);
         }
-        return "stat" + symlinkFlag + " -c \"StatEntryL:|%N|%Y|%d|%s|%f\" \"" + path + "\"";
+        return "stat" + symlinkFlag + " -c \"StatEntryL:|%N|%Y|%d|%s|%f\" " + SmarTTY.IO.RemotePathUtils.ShellQuote(path);
     }
 
     public StatEntry ParseEntry(string line)

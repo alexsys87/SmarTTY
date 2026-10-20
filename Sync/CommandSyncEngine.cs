@@ -98,7 +98,7 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
         public void Scan(RemoteFileSet.RemoteDirectory remoteDirectory)
         {
             Files.Add(default);
-            if (RunCommand("test -d \"" + this._rootPath + "\"") == null)
+            if (RunCommand("test -d " + RemotePathUtils.ShellQuote(this._rootPath)) == null)
             {
                 return;
             }
@@ -510,13 +510,13 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                 scpChannelStream.Write(buffer, 0, buffer.Length);
             }
             _events?.OnLog(new SyncLogMessage.RunScriptMessage(buffer));
-            return RunCommand("sh \"" + remoteTempPath + "\"", requireSuccess: false) ?? new List<string>();
+            return RunCommand("sh " + RemotePathUtils.ShellQuote(remoteTempPath), requireSuccess: false) ?? new List<string>();
         }
         finally
         {
             if (!Tuning.KeepTempScripts)
             {
-                RunCommand("rm \"" + remoteTempPath + "\"");
+                RunCommand("rm " + RemotePathUtils.ShellQuote(remoteTempPath));
             }
         }
     }

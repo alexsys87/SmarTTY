@@ -5,6 +5,29 @@ namespace SmarTTY.IO;
 
 public class RemotePathUtils
 {
+    /// <summary>
+    /// Quotes a value so that a POSIX shell reads it as one literal word. Inside double quotes the shell still expands
+    /// $name, `command` and backslash sequences, so a file called Foo$Bar would silently become another file; inside
+    /// single quotes nothing is special except the quote itself.
+    /// </summary>
+    public static string ShellQuote(string value)
+    {
+        return "'" + (value ?? "").Replace("'", "'\\''") + "'";
+    }
+
+    /// <summary>
+    /// Escapes text for use inside a double quoted word of a POSIX shell. Backslash, dollar, backtick and the double
+    /// quote are the characters that keep their meaning there; the backslash has to be escaped first.
+    /// </summary>
+    public static string EscapeForDoubleQuotes(string text)
+    {
+        if (text == null)
+        {
+            return "";
+        }
+        return text.Replace("\\", "\\\\").Replace("$", "\\$").Replace("`", "\\`").Replace("\"", "\\\"");
+    }
+
     public static string GetDirectoryName(string path)
     {
         if (path == null)
@@ -44,6 +67,11 @@ public class RemotePathUtils
     public static string GetExtension(string path)
     {
         string fileName = GetFileName(path);
+        if (fileName == null)
+        {
+            // A path ending with a separator (a directory) has no file name and no extension.
+            return "";
+        }
         int dotIndex = fileName.LastIndexOf('.');
         if (dotIndex == -1)
         {
@@ -95,10 +123,11 @@ public class RemotePathUtils
                 {
                     segments.RemoveAt(segments.Count - 1);
                 }
-                else
+                else if (leadingSlashesCount == 0)
                 {
                     segments.Add("..");
                 }
+                // else: the parent of the root directory is the root directory itself, "/.." is "/".
             }
             else
             {
@@ -140,13 +169,20 @@ public class RemotePathUtils
             {
                 segments.RemoveAt(i--);
             }
-            else if (segment == ".." && i > 0)
+            else if (segment == ".." && i > 0 && segments[i - 1].TrimStart('\\', '/') != "..")
             {
                 segments.RemoveRange(i - 1, 2);
                 i -= 2;
             }
         }
-        return string.Join("", segments.ToArray());
+        string result = string.Join("", segments.ToArray());
+        // Every segment carries its own leading separator. If the first segment of a relative path was removed, the next
+        // one must not turn the path into an absolute one.
+        if (path[0] != '\\' && path[0] != '/' && result.Length > 0 && (result[0] == '\\' || result[0] == '/'))
+        {
+            result = result.Substring(1);
+        }
+        return result;
     }
 
     public static string GetNameWithoutExtension(string path)
@@ -275,7 +311,8 @@ public class RemotePathUtils
         {
             text = Combine(text, targetSegments[j]);
         }
-        return text;
+        // Both paths are the same place: an empty string would be taken for "no path", for instance as an empty link target.
+        return text.Length == 0 ? "." : text;
     }
 
     public static string Combine(string basePath, string relativePath)

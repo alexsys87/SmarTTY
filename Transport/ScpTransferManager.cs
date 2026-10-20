@@ -90,9 +90,16 @@ public class ScpTransferManager : IDisposable
 
     public ScpTransferManager()
     {
-        _downloadThread = new Thread(DownloadThreadBody);
+        // Background threads: they only wait for work, they must not keep the process alive after the window is closed.
+        _downloadThread = new Thread(DownloadThreadBody)
+        {
+            IsBackground = true
+        };
         _downloadThread.Start();
-        _uploadThread = new Thread(UploadThreadBody);
+        _uploadThread = new Thread(UploadThreadBody)
+        {
+            IsBackground = true
+        };
         _uploadThread.Start();
     }
 
@@ -244,6 +251,7 @@ public class ScpTransferManager : IDisposable
                 }
                 _downloadQueue.RemoveFirst();
             }
+            bool localFileCreated = false;
             try
             {
                 job.State = TransferState.InProgress;
@@ -253,10 +261,17 @@ public class ScpTransferManager : IDisposable
                     scpDownloadStream = Session.OpenDownload(job.RemotePath);
                 }
                 job.PrefetchedStream = null;
+                // The file may have changed since it was queued: what is announced now is what has to arrive.
+                job.TotalBytes = scpDownloadStream.Length;
                 using (scpDownloadStream)
                 {
                     using FileStream fileStream = File.Open(job.LocalPath, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
-                    CopyStream(scpDownloadStream, fileStream, job.TotalBytes, job);
+                    localFileCreated = true;
+                    long received = CopyStream(scpDownloadStream, fileStream, job.TotalBytes, job);
+                    if (received != job.TotalBytes)
+                    {
+                        throw new IOException("The transfer ended after " + received + " of " + job.TotalBytes + " bytes.");
+                    }
                 }
                 if (scpDownloadStream.ChangeTime.Year > 1970)
                 {
@@ -270,15 +285,23 @@ public class ScpTransferManager : IDisposable
                 {
                     File.SetLastWriteTimeUtc(job.LocalPath, scpDownloadStream.ModifyTime);
                 }
+                job.State = TransferState.Completed;
                 if (job.OpenFolderWhenDone)
                 {
-                    Process.Start(Path.GetDirectoryName(job.LocalPath));
+                    try
+                    {
+                        Process.Start(Path.GetDirectoryName(job.LocalPath));
+                    }
+                    catch
+                    {
+                    }
                 }
-                job.State = TransferState.Completed;
             }
             catch
             {
-                if (job.CancelRequested)
+                // A cancelled or failed download leaves only a partial file behind (and the previous content of the
+                // file is already gone): remove it, but only if this transfer created it.
+                if (localFileCreated)
                 {
                     try
                     {
@@ -288,7 +311,7 @@ public class ScpTransferManager : IDisposable
                     {
                     }
                 }
-                job.State = TransferState.Failed;
+                job.State = job.CancelRequested ? TransferState.Cancelled : TransferState.Failed;
             }
         }
     }
@@ -319,17 +342,23 @@ public class ScpTransferManager : IDisposable
             try
             {
                 job.State = TransferState.InProgress;
+                // The size announced to the remote side must be the size of the file as it is now, not as it was queued.
+                using FileStream fileStream = File.Open(job.LocalPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                job.TotalBytes = fileStream.Length;
                 ScpChannelStream scpChannelStream = Session.OpenUpload(job.RemotePath, job.TotalBytes);
                 using (scpChannelStream)
                 {
-                    using FileStream fileStream = File.Open(job.LocalPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    CopyStream(fileStream, scpChannelStream, job.TotalBytes, job);
+                    long sent = CopyStream(fileStream, scpChannelStream, job.TotalBytes, job);
+                    if (sent != job.TotalBytes)
+                    {
+                        throw new IOException("The file ended after " + sent + " of " + job.TotalBytes + " bytes (it was changed during the transfer).");
+                    }
                 }
                 job.State = TransferState.Completed;
             }
             catch
             {
-                job.State = TransferState.Failed;
+                job.State = job.CancelRequested ? TransferState.Cancelled : TransferState.Failed;
             }
         }
     }
@@ -344,18 +373,38 @@ public class ScpTransferManager : IDisposable
 
     public void Cancel(TransferJob transferJob)
     {
+        bool removedFromDownloads;
         lock (_downloadQueue)
         {
-            if (_downloadQueue.Remove(transferJob))
+            removedFromDownloads = _downloadQueue.Remove(transferJob);
+        }
+        if (removedFromDownloads)
+        {
+            // A queued download may already hold an open channel to the remote side.
+            ScpDownloadStream prefetched = transferJob.PrefetchedStream;
+            transferJob.PrefetchedStream = null;
+            transferJob.State = TransferState.Cancelled;
+            try
+            {
+                prefetched?.Dispose();
+            }
+            catch
+            {
+            }
+            return;
+        }
+        lock (_uploadQueue)
+        {
+            if (_uploadQueue.Remove(transferJob))
             {
                 transferJob.State = TransferState.Cancelled;
                 return;
             }
-            if (transferJob.State == TransferState.Failed || transferJob.State == TransferState.Completed)
-            {
-                transferJob.State = TransferState.Cancelled;
-            }
-            transferJob.CancelRequested = true;
         }
+        if (transferJob.State == TransferState.Failed || transferJob.State == TransferState.Completed)
+        {
+            transferJob.State = TransferState.Cancelled;
+        }
+        transferJob.CancelRequested = true;
     }
 }

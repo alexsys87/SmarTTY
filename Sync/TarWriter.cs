@@ -98,6 +98,55 @@ public class TarWriter
         WriteString(buffer, offset, length, text);
     }
 
+    // The size field has room for 11 octal digits (up to 8 GiB - 1). Bigger values use the GNU/POSIX base-256 form: the
+    // high bit of the first byte is set and the rest holds the number, big endian. Written as octal they would be cut
+    // off and the archive would silently describe a file of a wrong size.
+    private static void WriteNumber(byte[] buffer, int offset, int length, long value)
+    {
+        string text = Convert.ToString(value, 8);
+        if (value >= 0 && text.Length <= length - 1)
+        {
+            WriteOctal(buffer, offset, length, value);
+            return;
+        }
+        for (int i = length - 1; i >= 1; i--)
+        {
+            buffer[offset + i] = (byte)(value & 0xFF);
+            value >>= 8;
+        }
+        buffer[offset] = 0x80;
+    }
+
+    // The mtime field holds seconds since 1970 in UTC. A time read as local time (DateTime.FromFileTime) has to be
+    // converted first or every entry is off by the time zone offset; a time before 1970 is stored as 0 because a
+    // negative number cannot be written as octal.
+    internal static long ToUnixTime(DateTime dateTime)
+    {
+        if (dateTime.Kind == DateTimeKind.Local)
+        {
+            dateTime = dateTime.ToUniversalTime();
+        }
+        long seconds = (long)(dateTime - UnixEpoch).TotalSeconds;
+        return seconds < 0 ? 0 : seconds;
+    }
+
+    // Finds the '/' at which a long entry name can be split into the ustar "prefix" (at most 155 bytes) and "name"
+    // (at most 100 bytes) fields. Returns -1 when there is no such place and the GNU long name record is needed.
+    // The limits are in bytes of UTF-8, not in characters: a name made of Cyrillic letters is twice as long as it looks.
+    internal static int FindPrefixSplit(string entryName)
+    {
+        Encoding utf8 = Encoding.UTF8;
+        for (int i = entryName.IndexOf('/'); i != -1 && i < entryName.Length - 1; i = entryName.IndexOf('/', i + 1))
+        {
+            if (utf8.GetByteCount(entryName.Substring(i + 1)) > 100)
+            {
+                continue;
+            }
+            return utf8.GetByteCount(entryName.Substring(0, i)) <= 155 ? i : -1;
+        }
+        return -1;
+    }
+
     public TarWriter(string[] items)
     {
         _executables = new ExecutableFileMatcher(items);
@@ -113,18 +162,18 @@ public class TarWriter
             entryName += "/";
         }
         string prefix = null;
-        if (entryName.Length > 100)
+        if (Encoding.UTF8.GetByteCount(entryName) > 100)
         {
-            int startIndex = entryName.Length - 100;
-            startIndex = entryName.IndexOf('/', startIndex);
-            if (startIndex != -1 && startIndex != entryName.Length - 1)
+            int splitIndex = FindPrefixSplit(entryName);
+            if (splitIndex != -1)
             {
-                prefix = entryName.Substring(0, startIndex);
-                entryName = entryName.Substring(startIndex + 1);
+                prefix = entryName.Substring(0, splitIndex);
+                entryName = entryName.Substring(splitIndex + 1);
             }
             else
             {
-                byte[] bytes = Encoding.UTF8.GetBytes(entryName);
+                // GNU long name record: the name follows as data, terminated by a NUL that is counted in the size.
+                byte[] bytes = Encoding.UTF8.GetBytes(entryName + "\0");
                 int blocks = (bytes.Length + 511) / 512;
                 longLinkHeader = new byte[512 + blocks * 512];
                 this.CreateHeader("././@LongLink", isDirectory: false, bytes.Length, dateTime, out var _, isLongLink: true).CopyTo(longLinkHeader, 0);
@@ -159,9 +208,9 @@ public class TarWriter
             WriteOctal(headerBuffer, 100, 8, mode);
             WriteOctal(headerBuffer, 108, 8, 500L);
             WriteOctal(headerBuffer, 116, 8, 544L);
-            WriteOctal(headerBuffer, 136, 12, (long)(dateTime - UnixEpoch).TotalSeconds);
+            WriteOctal(headerBuffer, 136, 12, ToUnixTime(dateTime));
         }
-        WriteOctal(headerBuffer, 124, 12, size);
+        WriteNumber(headerBuffer, 124, 12, size);
         WriteString(headerBuffer, 257, 8, "ustar\000");
         WriteString(headerBuffer, 345, 155, prefix);
         if (isLongLink)
@@ -210,6 +259,17 @@ public class TarWriter
             destinationStream.Write(buffer, 0, bytesRead);
             totalRead += bytesRead;
             bytesDone += bytesRead;
+        }
+        // The header already announced "length" bytes. If the file got shorter while it was being read, the missing
+        // part is zero-filled: otherwise every following header would be read from the wrong place.
+        long missing = length - totalRead;
+        while (missing > 0)
+        {
+            int zeroCount = (int)Math.Min(buffer.LongLength, missing);
+            Array.Clear(buffer, 0, zeroCount);
+            destinationStream.Write(buffer, 0, zeroCount);
+            missing -= zeroCount;
+            bytesDone += zeroCount;
         }
         filesDone++;
     }

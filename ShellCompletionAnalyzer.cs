@@ -96,14 +96,18 @@ public class ShellCompletionAnalyzer : IDisposable
         {
             unprocessedDirs = items.Where((string dir) => !this._executablesByDir.ContainsKey(dir)).ToArray();
         }
-        foreach (string dir in unprocessedDirs)
+        lock (this._executablesByDir)
         {
-            this._executablesByDir[dir] = new HashSet<string>();
+            // Other threads read this dictionary under the same lock.
+            foreach (string dir in unprocessedDirs)
+            {
+                this._executablesByDir[dir] = new HashSet<string>();
+            }
         }
         List<string> findOutput = new List<string>();
         if (unprocessedDirs.Length != 0)
         {
-            string findCommand = "find -L " + string.Join(" ", unprocessedDirs.Select((string dir) => "\"" + dir + "\"").ToArray()) + " -maxdepth 1 -perm -111 -type f";
+            string findCommand = "find -L " + string.Join(" ", unprocessedDirs.Select((string dir) => SmarTTY.IO.RemotePathUtils.ShellQuote(dir)).ToArray()) + " -maxdepth 1 -perm -111 -type f";
             findOutput = _sshSession.RunCommandChecked(findCommand, requireSuccess: false);
             if (findOutput == null)
             {
@@ -155,12 +159,7 @@ public class ShellCompletionAnalyzer : IDisposable
 
     public static string EscapeForShell(string text)
     {
-        if (text == null)
-        {
-            return "";
-        }
-        text = text.Replace("$", "\\$").Replace("\"", "\\\"");
-        return text;
+        return SmarTTY.IO.RemotePathUtils.EscapeForDoubleQuotes(text);
     }
 
     public void AppendToHistory(string text)

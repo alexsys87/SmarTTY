@@ -109,7 +109,7 @@ public static class StringUtils
             byteCount /= 1073741824;
             suffix = "G";
         }
-        if (byteCount > 10485760)
+        else if (byteCount > 10485760)
         {
             byteCount /= 1048576;
             suffix = "M";
@@ -399,6 +399,8 @@ public static class StringUtils
         {
             return null;
         }
+        // Blanks around the number are not part of it; without this " 12" would be cut at the first blank to nothing.
+        text = text.Trim();
         int spaceIndex = text.IndexOf(' ');
         if (spaceIndex != -1)
         {

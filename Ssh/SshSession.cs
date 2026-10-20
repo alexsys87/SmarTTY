@@ -813,14 +813,14 @@ public class SshSession : IDisposable
             {
                 return new RemotePathException(context, RemotePathProblem.NotAbsolute);
             }
-            if (RunCommandChecked("test -e \"" + path + "\"", requireSuccess: true) != null)
+            if (RunCommandChecked("test -e " + RemotePathUtils.ShellQuote(path), requireSuccess: true) != null)
             {
-                if (RunCommandChecked("test -w \"" + path + "\"", requireSuccess: true) == null)
+                if (RunCommandChecked("test -w " + RemotePathUtils.ShellQuote(path), requireSuccess: true) == null)
                 {
                     return new RemotePathException(context, RemotePathProblem.FileNotWritable);
                 }
             }
-            else if (RunCommandChecked("test -w \"" + RemotePathUtils.GetDirectoryName(path) + "\"", requireSuccess: true) == null)
+            else if (RunCommandChecked("test -w " + RemotePathUtils.ShellQuote(RemotePathUtils.GetDirectoryName(path)), requireSuccess: true) == null)
             {
                 return new RemotePathException(context, RemotePathProblem.DirectoryNotWritable);
             }

@@ -473,7 +473,7 @@ public class QuickSyncRunner
         if (sshSession.Tag == null && !disableHelper)
         {
             string text = this._helperLocator?.FindHelper(sshSession.HostName);
-            if (text != null && sshSession.RunCommandChecked("test -f \"" + text + "\"", requireSuccess: true) != null)
+            if (text != null && sshSession.RunCommandChecked("test -f " + RemotePathUtils.ShellQuote(text), requireSuccess: true) != null)
             {
                 sshSession.Tag = text;
             }
@@ -492,14 +492,14 @@ public class QuickSyncRunner
                         homeDirectory = RemotePathUtils.GetDirectoryName(sshSession.GetTempPath("test"));
                     }
                     text = homeDirectory + "/.SysprogsSync/" + helperName;
-                    if (text != null && sshSession.RunCommandChecked("test -f \"" + text + "\"", requireSuccess: true) != null)
+                    if (text != null && sshSession.RunCommandChecked("test -f " + RemotePathUtils.ShellQuote(text), requireSuccess: true) != null)
                     {
                         sshSession.Tag = text;
                     }
                     else
                     {
                         string helperDirectory = homeDirectory + "/.SysprogsSync";
-                        sshSession.RunCommandChecked("mkdir -p \"" + helperDirectory + "\"", requireSuccess: false);
+                        sshSession.RunCommandChecked("mkdir -p " + RemotePathUtils.ShellQuote(helperDirectory), requireSuccess: false);
                         text = helperDirectory + "/SysprogsSync-v1.2";
                         HelperBuilder helperBuilder = new HelperBuilder(sshSession, this._helperSourcePath, text);
                         try

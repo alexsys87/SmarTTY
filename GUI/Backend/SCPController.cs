@@ -67,7 +67,8 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
         {
             get
             {
-                if (_Context.State != ScpTransferManager.TransferState.InProgress)
+                // An empty file has nothing to divide by: 0 / 0 would be NaN, which a ProgressBar cannot take.
+                if (_Context.State != ScpTransferManager.TransferState.InProgress || _Context.TotalBytes <= 0)
                 {
                     return 0.0;
                 }

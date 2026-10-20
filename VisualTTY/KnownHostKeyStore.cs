@@ -23,14 +23,32 @@ internal class KnownHostKeyStore
         catch
         {
             _keys = new List<KnownHostKey>();
+            // A file that exists but cannot be read is not the same as no file: the next Save would overwrite it and
+            // every host key the user has accepted so far would be gone. Keep a copy.
+            try
+            {
+                if (File.Exists(FilePath))
+                {
+                    File.Copy(FilePath, FilePath + ".unreadable", overwrite: true);
+                }
+            }
+            catch
+            {
+            }
         }
+    }
+
+    // Host names are not case sensitive: "Example.com" and "example.com" are the same host.
+    private static bool SameHost(string first, string second)
+    {
+        return string.Equals(first, second, StringComparison.OrdinalIgnoreCase);
     }
 
     public KnownHostKey Find(string text)
     {
         foreach (KnownHostKey item in this._keys)
         {
-            if (item.HostName == text)
+            if (SameHost(item.HostName, text))
             {
                 return item;
             }
@@ -44,8 +62,20 @@ internal class KnownHostKeyStore
         {
             Directory.CreateDirectory(GlobalSettings.DataDirectory);
             XmlSerializer xmlSerializer = new XmlSerializer(typeof(List<KnownHostKey>));
-            using FileStream stream = File.Create(FilePath);
-            xmlSerializer.Serialize(stream, _keys);
+            // Write next to the file and swap, so that a crash in the middle does not leave a half-written store.
+            string temporaryPath = FilePath + ".tmp";
+            using (FileStream stream = File.Create(temporaryPath))
+            {
+                xmlSerializer.Serialize(stream, _keys);
+            }
+            if (File.Exists(FilePath))
+            {
+                File.Replace(temporaryPath, FilePath, null);
+            }
+            else
+            {
+                File.Move(temporaryPath, FilePath);
+            }
         }
         catch
         {
@@ -54,14 +84,7 @@ internal class KnownHostKeyStore
 
     public void Update(string text, SshSession.HostKeyInfo hostKeyInfo)
     {
-        foreach (KnownHostKey item in this._keys)
-        {
-            if (item.HostName == text)
-            {
-                this._keys.Remove(item);
-                break;
-            }
-        }
+        this._keys.RemoveAll(item => SameHost(item.HostName, text));
         this._keys.Add(new KnownHostKey
         {
             HostName = text,

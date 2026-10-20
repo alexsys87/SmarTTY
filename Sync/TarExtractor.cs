@@ -133,6 +133,57 @@ public class TarExtractor
         return buffer;
     }
 
+    /// <summary>
+    /// True for an entry name that could place a file outside of the extraction root: a rooted name or a ".." segment
+    /// (in either slash style). Such a record can only come from a broken or malicious remote side.
+    /// </summary>
+    internal static bool IsTraversalEntryName(string entryName)
+    {
+        if (string.IsNullOrEmpty(entryName))
+        {
+            return false;
+        }
+        if (entryName[0] == '/' || entryName[0] == '\\')
+        {
+            return true;
+        }
+        foreach (string segment in entryName.Split('/', '\\'))
+        {
+            if (segment == "..")
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// True for a name that exists on Linux but cannot be created on Windows as it is. A ':' would open an NTFS alternate
+    /// data stream or a drive-relative path, a segment made of dots and blanks is normalized away by Windows.
+    /// </summary>
+    internal static bool HasInvalidLocalNameCharacters(string entryName)
+    {
+        foreach (string segment in entryName.Split('/', '\\'))
+        {
+            if (segment.Length == 0 || segment == ".")
+            {
+                continue;
+            }
+            if (segment.TrimEnd('.', ' ').Length == 0)
+            {
+                return true;
+            }
+            foreach (char ch in segment)
+            {
+                if (ch < ' ' || ch == ':' || ch == '*' || ch == '?' || ch == '"' || ch == '<' || ch == '>' || ch == '|')
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private bool IsCaseCollision(string filePath)
     {
         bool contains = _caseInsensitiveNames.Contains(filePath) && !_exactNames.Contains(filePath);
@@ -173,7 +224,7 @@ public class TarExtractor
         char lastChar = entryName[entryName.Length - 1];
         bool isDirectory = lastChar == '/' || lastChar == '\\' || typeFlag == 53;
         bool isLink = typeFlag == 49 || typeFlag == 50;
-        if (headerBuffer[257] == 117 && headerBuffer[258] == 115 && headerBuffer[259] == 116 && headerBuffer[260] == 97 && headerBuffer[261] == 114 && headerBuffer[345] != 0)
+        if (headerBuffer[257] == 117 && headerBuffer[258] == 115 && headerBuffer[259] == 116 && headerBuffer[260] == 97 && headerBuffer[261] == 114 && headerBuffer[262] == 0 && headerBuffer[345] != 0)
         {
             string prefix = utf8.GetString(headerBuffer, 345, 155).TrimEnd(default(char));
             if (!prefix.EndsWith("/"))
@@ -185,7 +236,7 @@ public class TarExtractor
                 entryName = prefix + entryName;
             }
         }
-        if (entryName.StartsWith("..") || entryName.StartsWith("\\") || entryName.StartsWith("/"))
+        if (IsTraversalEntryName(entryName))
         {
             throw new Exception("Invalid file name in a TAR record");
         }
@@ -203,7 +254,14 @@ public class TarExtractor
         {
             entryName = entryName.Replace('/', '\\');
             PathRewriting?.Invoke(_rootPath, ref entryName);
-            fullPath = Path.Combine(_rootPath, entryName);
+            if (IsTraversalEntryName(entryName))
+            {
+                throw new Exception("Invalid file name in a TAR record");
+            }
+            if (!HasInvalidLocalNameCharacters(entryName))
+            {
+                fullPath = Path.Combine(_rootPath, entryName);
+            }
         }
         if (IsCaseCollision(fullPath))
         {
@@ -434,11 +492,12 @@ public class TarExtractor
         return "/" + string.Join("/", stack.ToArray());
     }
 
-    private int CountParentReferences(string path, bool isForward)
+    internal static int CountParentReferences(string path, bool isForward)
     {
         int maxParentCount = 0;
         int currentDepth = 0;
-        string[] segments = path.Split('/');
+        // A backslash is a separator on the Windows side where the link is created, so "..\\.." must count as two levels.
+        string[] segments = path.Split('/', '\\');
         foreach (string segment in segments)
         {
             if (!(segment == ""))
@@ -448,6 +507,40 @@ public class TarExtractor
             }
         }
         return maxParentCount;
+    }
+
+    /// <summary>
+    /// Converts an absolute link target that points inside the downloaded remote directory into a path relative to the
+    /// link (a symlink) or to the extraction root (a hard link). Returns null for a target outside of remoteRoot.
+    /// </summary>
+    internal static string MakeRelativeToRoot(string relativeLinkPath, string targetPath, string remoteRoot, bool isHardLink)
+    {
+        string root = remoteRoot.TrimEnd('/');
+        string rest;
+        if (targetPath.TrimEnd('/') == root)
+        {
+            rest = "";
+        }
+        else if (targetPath.StartsWith(root + "/", StringComparison.Ordinal))
+        {
+            rest = targetPath.Substring(root.Length + 1);
+        }
+        else
+        {
+            return null;
+        }
+        string result = "";
+        if (!isHardLink)
+        {
+            // The last segment is the link itself, only the directories above it have to be left.
+            int levelsUp = CountParentReferences(relativeLinkPath, isForward: false) - 1;
+            for (int i = 0; i < levelsUp; i++)
+            {
+                result += "../";
+            }
+        }
+        result += rest;
+        return result.Length == 0 ? "." : result.Replace('/', '\\');
     }
 
     public void CreateSymlinks(out List<string> unresolvedLinks, string remoteRoot = null)
@@ -463,23 +556,17 @@ public class TarExtractor
             string relativeTarget = null;
             if (item.Target[0] == '/')
             {
-                string targetPath = item.Target;
-                if (remoteRoot != null && targetPath.StartsWith(remoteRoot))
+                if (remoteRoot != null)
                 {
-                    int parentCount = CountParentReferences(item.RelativePath, isForward: false);
-                    for (int i = 0; i < parentCount; i++)
-                    {
-                        relativeTarget += "../";
-                    }
-                    relativeTarget += targetPath.Substring(remoteRoot.TrimEnd('/').Length + 1);
-                    relativeTarget = relativeTarget.Replace('/', '\\');
+                    relativeTarget = MakeRelativeToRoot(item.RelativePath, item.Target, remoteRoot, item.IsHardLink);
                 }
             }
             else
             {
                 int targetParents = CountParentReferences(item.Target, isForward: true);
                 int pathParents = CountParentReferences(item.RelativePath, isForward: false) - 1;
-                if (targetParents <= pathParents)
+                // A hard link target is relative to the archive root, so it has no business going up.
+                if (item.IsHardLink ? targetParents == 0 : targetParents <= pathParents)
                 {
                     relativeTarget = item.Target.Replace('/', '\\');
                 }

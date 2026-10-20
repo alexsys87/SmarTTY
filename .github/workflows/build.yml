@@ -47,6 +47,18 @@ jobs:
       - name: Run transport write failure checks
         run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
 
+      - name: Run TAR extractor security checks
+        run: dotnet run --project tests/TarExtractorSecurityTests -c Release
+
+      - name: Run TAR writer checks
+        run: dotnet run --project tests/TarWriterTests -c Release
+
+      - name: Run authorized_keys checks
+        run: dotnet run --project tests/AuthorizedKeysFileTests -c Release
+
+      - name: Run path, quoting and size helper checks
+        run: dotnet run --project tests/PathAndStringUtilsTests -c Release
+
   sshnet:
     name: SSH.NET integration tests
     runs-on: ubuntu-latest
