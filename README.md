@@ -405,6 +405,7 @@ Local/GUIPreferences.xml
 | Устройство не отвечает | Правильный COM/TCP-порт, параметры UART, окончания строк, режим ASCII/HEX и отсутствие другой программы, занявшей порт |
 | После перезапуска пропали настройки | Права на папку настроек, `portable.txt`, корректность XML; учитывайте отдельный путь `GUIPreferences.xml` |
 | Сборка в Visual Studio падает с `MSB3821` про «веб-метку» у `*.resx` | Файлы попали из скачанного архива и несут метку Mark-of-the-Web; снимите её в каталоге решения: `Get-ChildItem -Recurse -File \| Unblock-File`, затем Rebuild |
+| В Visual Studio 2026 появляется `MC1000` «Неизвестная ошибка сборки, "Значение не попадает в ожидаемый диапазон"» со ссылкой на `Microsoft.WinFX.targets` | Это ложное design-time предупреждение WPF, а не ошибка проекта: обычная сборка проходит. Предупреждение подавлено для IntelliSense-сборок в `SmarTTY.csproj`; если оно осталось, закройте Visual Studio, удалите `.vs`, `bin` и `obj` и откройте решение заново |
 
 Ошибка `MSB3821` означает, что MSBuild считает такие `*.resx` файлами из интернета: у них есть поток `Zone.Identifier` с зоной «Интернет», а внутри — сериализованные объекты (`mimetype`, `type`, `ResXFileRef`). Лечится снятием метки в PowerShell из каталога с решением:
 
@@ -413,6 +414,8 @@ Get-ChildItem -Recurse -File | Unblock-File
 ```
 
 Если метка осталась у каталогов, повторите вызов для них: `Get-ChildItem -Recurse -Directory | Unblock-File`. Машинная альтернатива для доверенного кода (нужны права администратора): `reg add "HKLM\SOFTWARE\Microsoft\.NETFramework\SDK" /v AllowProcessOfUntrustedResourceFiles /t REG_SZ /d true /f`. После изменений делайте Rebuild, а не Build.
+
+Предупреждение `MC1000` в `Microsoft.WinFX.targets` — известная регрессия Visual Studio 2026 (начиная с версии 18.5, [Developer Community 11078247](https://developercommunity.visualstudio.com/t/11078247)). Оно появляется только в списке ошибок IDE при design-time сборке XAML и не влияет на обычную сборку через `msbuild`. Проект использует стандартную точку входа `App.xaml` со сгенерированным `Main`; в `SmarTTY.csproj` предупреждение `MC1000` переведено в сообщения только для design-time сборок внутри Visual Studio, поэтому настоящие ошибки XAML по-прежнему обнаруживаются обычной сборкой.
 
 ## Ограничения текущей реализации
 

@@ -10,10 +10,14 @@
     <UseWindowsForms>true</UseWindowsForms>
     <LangVersion>latest</LangVersion>
     <NoWarn>$(NoWarn);CS0649;CS0169;CS0414;CS0197;CS1690;CS0108;CS0109</NoWarn>
+    <!-- Visual Studio 2026 (18.5+) design-time builds report a spurious "MC1000: Unknown build error,
+         'Value does not fall within the expected range.'" at Microsoft.WinFX.targets(211). The regular
+         build is unaffected (https://developercommunity.visualstudio.com/t/11078247). Suppress only that
+         task warning while IntelliSense compiles markup; real XAML errors still fail the build. -->
+    <MSBuildWarningsAsMessages Condition="'$(BuildingInsideVisualStudio)' == 'true' and ('$(DesignTimeBuild)' == 'true' or '$(BuildingProject)' != 'true')">$(MSBuildWarningsAsMessages);MC1000</MSBuildWarningsAsMessages>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <StartupObject>SmarTTY.Program</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>

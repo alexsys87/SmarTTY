@@ -1,25 +1,38 @@
-﻿using SmarTTY.GUI;
-using System;
+﻿using System;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
+using SmarTTY.GUI;
+using SmarTTY.GUI.Styles;
 using VisualTTY;
-using Application = System.Windows.Application;
 
 namespace SmarTTY;
 
-internal class Program
+public partial class App : Application
 {
-
-    [STAThread]
-    private static void Main(string[] args)
+    public App()
     {
+        System.Windows.Forms.Application.EnableVisualStyles();
+        // Windows load their XAML (and its DynamicResource lookups) before MainWindow.ApplyTheme merges the
+        // theme dictionary, which logged "Resource not found" warnings for the theme brushes. These application-level
+        // defaults only act as a fallback: a theme dictionary merged into a window always takes precedence.
+        Resources[StyleKeys.MainWindowText] = SystemColors.WindowTextBrush;
+        Resources[StyleKeys.ActiveTabBackground] = Brushes.Transparent;
+        // WPFScrollBar references this style in its constructor, before it is attached to a window that has the
+        // theme dictionary (the reference is re-resolved on attach). The light theme does not define it at all.
+        Resources["MainWindowScrollBar"] = new Style(typeof(ScrollBar));
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
         EnsureCommandCompletionsFile();
 
-        ConnectionSelectionWindow connectionSelectionWindow = new ConnectionSelectionWindow(showRawConnections: true, args.FirstOrDefault());
-        App app = new App();
-        ((Application)app).ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        ConnectionSelectionWindow connectionSelectionWindow = new ConnectionSelectionWindow(showRawConnections: true, e.Args.FirstOrDefault());
         connectionSelectionWindow.Closed += OnSelectionWindowClosed;
-        ((Application)app).Run((Window)connectionSelectionWindow);
+        connectionSelectionWindow.Show();
     }
 
     // Creates CommandCompletions.xml next to the exe on startup if it is missing.
