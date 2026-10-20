@@ -177,6 +177,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // A telnet server may ask for the terminal size (and wants to hear about changes); other transports ignore it.
         _serialTerminalControl.TerminalSizeChanged += OnTerminalSizeChanged;
         AddReturnToInputLineCommand();
+        AddRemoteSizeCommands();
         InitializeCommandLists();
         
         foreach (TerminalEncodings.Choice choice in TerminalEncodings.All)
@@ -198,6 +199,41 @@ public partial class DeviceTerminalControl : DpiAwareControl
             ToolTipText = "Show the input line again if the keys keep going to a program that has already ended (mc, htop ...)"
         };
         contextMenuStrip1.Items.Add(_returnToInputLineMenuItem);
+    }
+
+    // A serial line and a raw TCP connection cannot carry the size of the window, so mc, htop and the like draw into
+    // the default 80x24 corner of it. For a Linux shell on the device the size can be set with stty: "Send terminal
+    // size now" does it once, "Keep ... in sync" puts the command in front of the next command whenever the window
+    // has another size than the one the device was told last. Telnet passes the size on by itself (NAWS), so
+    // these commands are not shown for it. A program that is already running cannot be told: the new size is
+    // applied by the next command typed in the input line.
+    private ToolStripMenuItem _syncRemoteSizeMenuItem;
+
+    private ToolStripMenuItem _sendRemoteSizeMenuItem;
+
+    private void AddRemoteSizeCommands()
+    {
+        _syncRemoteSizeMenuItem = new ToolStripMenuItem("Keep device terminal size in sync (stty)", null, (sender, args) => ToggleSyncRemoteSize())
+        {
+            ToolTipText = "For a Linux shell on the device: tell it the size of this window (stty cols/rows) before the next command, so mc, htop and the like fill the window. It acts only after the device has shown a shell prompt (\"# \" or \"$ \"); switch it off for a console that uses such a prompt but is not a Linux shell."
+        };
+        _sendRemoteSizeMenuItem = new ToolStripMenuItem("Send terminal size now (stty)", null, (sender, args) => _serialTerminalControl.SendRemoteSizeNow())
+        {
+            ToolTipText = "Types \"stty cols N rows M\" for the shell on the device (available at the input line when nothing is typed in it)."
+        };
+        contextMenuStrip1.Items.Add(_syncRemoteSizeMenuItem);
+        contextMenuStrip1.Items.Add(_sendRemoteSizeMenuItem);
+    }
+
+    private void ToggleSyncRemoteSize()
+    {
+        bool sync = !_syncRemoteSizeMenuItem.Checked;
+        _syncRemoteSizeMenuItem.Checked = sync;
+        _serialTerminalControl.SyncRemoteSize = sync;
+        if (_deviceTerminalSettings != null)
+        {
+            _deviceTerminalSettings.SyncRemoteTerminalSize = sync;
+        }
     }
 
     private void OnTerminalSizeChanged(TerminalEmulatorControl terminal, int columns, int rows)
@@ -560,6 +596,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
             sendImmediatelyToolStripMenuItem.Checked = deviceTerminalSettings.HexSettings.AutoSend;
         }
         changeSettingsToolStripMenuItem.Visible = _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial;
+        bool needsStty = !(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
+        _syncRemoteSizeMenuItem.Visible = needsStty;
+        _sendRemoteSizeMenuItem.Visible = needsStty;
+        _syncRemoteSizeMenuItem.Checked = needsStty && _deviceTerminalSettings.SyncRemoteTerminalSize;
+        _serialTerminalControl.SyncRemoteSize = _syncRemoteSizeMenuItem.Checked;
         UpdateTelnetMenu(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
         ConfigureCommandLists();
         Connect();
@@ -1302,6 +1343,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         copyToolStripMenuItem.Enabled = HexMode ? hexTerminalControl1.HasSelection : ((ReadonlyTextBrowser)_serialTerminalControl).HasSelection;
         _returnToInputLineMenuItem.Enabled = !HexMode && !_serialTerminalControl.HasInputLine;
+        _sendRemoteSizeMenuItem.Enabled = !HexMode && _serialTerminalControl.CanSendRemoteSize;
     }
 
     private void OnTerminalKeyDown(object sender, KeyEventArgs e)

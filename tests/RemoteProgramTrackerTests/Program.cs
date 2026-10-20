@@ -138,6 +138,14 @@ internal static class Program
             Check(true, "robustness: null, empty, truncated and invalid input do not throw");
         }
 
+        // --- the terminal size for the shell on the device ---
+        Check(LineInputText.BuildRemoteSizeCommand(120, 40) == "stty cols 120 rows 40", "size: command text");
+        Check(LineInputText.BuildRemoteSizeCommand(0, 24) == null && LineInputText.BuildRemoteSizeCommand(80, 0) == null && LineInputText.BuildRemoteSizeCommand(-1, -1) == null, "size: unknown size gives no command");
+        Check(LineInputText.BuildRemoteSizeCommand(5000, 3000) == "stty cols 1000 rows 1000", "size: absurd values are capped");
+        Check(LineInputText.EndsLikeShellPrompt("root@OpenWrt:~# ") && LineInputText.EndsLikeShellPrompt("\r\nuser@host:~$ "), "shell prompt: root and user prompts");
+        Check(!LineInputText.EndsLikeShellPrompt("=> ") && !LineInputText.EndsLikeShellPrompt("F3 T> ") && !LineInputText.EndsLikeShellPrompt("login: ") && !LineInputText.EndsLikeShellPrompt("Password: "), "shell prompt: bootloader, Seagate, login and password prompts are not shells");
+        Check(!LineInputText.EndsLikeShellPrompt("root@OpenWrt:~#") && !LineInputText.EndsLikeShellPrompt("") && !LineInputText.EndsLikeShellPrompt(null), "shell prompt: needs the blank, empty text");
+
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed");
         return 0;

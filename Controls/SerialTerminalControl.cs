@@ -786,6 +786,63 @@ public class SerialTerminalControl : TerminalEmulatorControl
         ShowPrompt();
     }
 
+    /// <summary>
+    /// Put "stty cols C rows R" in front of the next command when the terminal window has another size than the one
+    /// the device was told last. Only after the device has shown a Linux shell prompt, and never for a password.
+    /// </summary>
+    public bool SyncRemoteSize { get; set; }
+
+    // The size the device was told last (empty: not told on this connection yet).
+    private Size _announcedSize = Size.Empty;
+
+    // The device has shown the prompt of a Linux shell ("# " or "$ ") and not another kind of prompt since.
+    private bool _shellPromptSeen;
+
+    /// <summary>True when "Send terminal size now" can run: the input line is shown and nothing is typed in it.</summary>
+    public bool CanSendRemoteSize => _inputLine != null && _inputLine.Text.Length == 0 && LineInputText.BuildRemoteSizeCommand(TerminalSize.Width, TerminalSize.Height) != null;
+
+    /// <summary>Sends the stty command with the current size of the terminal as a command of its own (it is not put in the history).</summary>
+    public bool SendRemoteSizeNow()
+    {
+        if (!CanSendRemoteSize)
+        {
+            return false;
+        }
+        Size size = TerminalSize;
+        _announcedSize = size;
+        SubmitCommand(LineInputText.BuildRemoteSizeCommand(size.Width, size.Height));
+        return true;
+    }
+
+    // "stty cols C rows R; " for the command about to be sent, or nothing.
+    private string TakeRemoteSizePrefix(string command, string prompt)
+    {
+        if (!SyncRemoteSize || !_shellPromptSeen || command.Length == 0 || LineInputText.LooksLikeSecretPrompt(prompt))
+        {
+            return string.Empty;
+        }
+        Size size = TerminalSize;
+        string stty = LineInputText.BuildRemoteSizeCommand(size.Width, size.Height);
+        if (stty == null || size == _announcedSize)
+        {
+            return string.Empty;
+        }
+        _announcedSize = size;
+        return stty + "; ";
+    }
+
+    private void TrackShellPrompt(string text)
+    {
+        if (LineInputText.EndsLikeShellPrompt(text))
+        {
+            _shellPromptSeen = true;
+        }
+        else if (LineInputText.EndsLikePrompt(text, null))
+        {
+            _shellPromptSeen = false;
+        }
+    }
+
     public string CurrentPrompt => _currentPrompt;
 
     public IReadOnlyList<string> CommandHistory => _commandHistory.AsReadOnly();
@@ -1422,17 +1479,28 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     private void SubmitCommand()
     {
+        SubmitCommand(null);
+    }
+
+    // commandOverride: a command made by the terminal itself (the terminal size), sent instead of the text of the
+    // input line; it is not recorded in the history and not reported as typed by the user.
+    private void SubmitCommand(string commandOverride)
+    {
         if (_inputLine == null) return;
 
-        string command = _inputLine.Text.Trim();
+        bool typedByUser = commandOverride == null;
+        string command = (commandOverride ?? _inputLine.Text).Trim();
         _historySearch = null;
 
-        // What is typed at a "Password:" prompt is not kept in the history.
-        if (!LineInputText.LooksLikeSecretPrompt(_inputLine.Prompt))
+        if (typedByUser)
         {
-            AddToHistory(command);
+            // What is typed at a "Password:" prompt is not kept in the history.
+            if (!LineInputText.LooksLikeSecretPrompt(_inputLine.Prompt))
+            {
+                AddToHistory(command);
+            }
+            CommandSubmitted?.Invoke(this, new CommandSubmittedEventArgs(command, _inputLine.Text, _inputLine.Prompt));
         }
-        CommandSubmitted?.Invoke(this, new CommandSubmittedEventArgs(command, _inputLine.Text, _inputLine.Prompt));
 
         // Move to next line and show command output
         ((EditableTextBrowser)this).EditableDocument.AppendLine("");
@@ -1444,7 +1512,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         // Send command to device
         string lineEnding = EnterSequence ?? "\r";
-        SendText(command + lineEnding, InputKind.Typed);
+        string sizePrefix = typedByUser ? TakeRemoteSizePrefix(command, _inputLine.Prompt) : string.Empty;
+        SendText(sizePrefix + command + lineEnding, InputKind.Typed);
 
         // Reset input line
         _inputLine = null;
@@ -1573,6 +1642,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
         base.BeginNewSession();
         _inputLine = null;
         _remoteProgram.Reset();
+        _announcedSize = Size.Empty;
+        _shellPromptSeen = false;
         ShowPrompt();
     }
 
@@ -1650,8 +1721,14 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         ProcessOutput(text);
 
-        if (_inputLine != null || string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(text))
         {
+            return;
+        }
+        if (_inputLine != null)
+        {
+            // The device keeps talking while the input line is shown: a shell prompt that arrives now still counts.
+            TrackShellPrompt(text);
             return;
         }
 
@@ -1665,6 +1742,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             return;
         }
+
+        TrackShellPrompt(text);
 
         // Auto-detect prompt from received data
         if (_autoDetectPrompt)

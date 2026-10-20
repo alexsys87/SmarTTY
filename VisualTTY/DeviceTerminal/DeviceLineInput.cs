@@ -200,6 +200,34 @@ public static class LineInputText
     }
 
     /// <summary>
+    /// True when received text ends the way the prompt of a Linux shell does ("# " or "$ "). A bootloader or a
+    /// device console ends its prompt differently ("=> ", "&gt; "), a login or password prompt with a colon.
+    /// </summary>
+    public static bool EndsLikeShellPrompt(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+        string tail = text.TrimEnd('\r', '\n');
+        return tail.EndsWith("# ", StringComparison.Ordinal) || tail.EndsWith("$ ", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The command that tells a Linux tty the size of the terminal window, or null when the size is not known yet.
+    /// A serial line (and a raw TCP connection) has no way to carry the size, so programs such as mc and htop
+    /// would draw into the default 80x24 corner; telnet and SSH pass the size on by themselves.
+    /// </summary>
+    public static string BuildRemoteSizeCommand(int columns, int rows)
+    {
+        if (columns < 1 || rows < 1)
+        {
+            return null;
+        }
+        return "stty cols " + Math.Min(columns, 1000) + " rows " + Math.Min(rows, 1000);
+    }
+
+    /// <summary>
     /// True when the prompt the device printed asks for a secret ("Password:", "Enter passphrase", "PIN:" ...).
     /// What is typed at such a prompt is not stored in the saved history.
     /// </summary>

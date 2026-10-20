@@ -323,6 +323,9 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
     private bool _ReconnectAutomatically;
 
+    // On by default; an explicit backing field, so a Clone() and a settings file without the element agree.
+    private bool _SyncRemoteTerminalSize = true;
+
     // Automatic reconnect behavior (see ReconnectAutomatically/ReconnectImmediately/ReconnectIntervalSeconds).
     // Explicit backing fields, not auto-property initializers, so a Clone() keeps the same defaults.
     private bool _ReconnectImmediately;
@@ -363,6 +366,25 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
         {
             _ClearContentsWhenReconnecting = value;
             OnPropertyChanged("ClearContentsWhenReconnecting");
+        }
+    }
+
+    /// <summary>
+    /// Tell a Linux shell on the device the size of the terminal window (with an stty command in front of the
+    /// next command) so that mc, htop and the like fill the window. On by default; it acts only after the device
+    /// has shown the prompt of a Linux shell ("# " or "$ "), never at a bootloader or a "login:" prompt, because
+    /// the text is typed into the device. Telnet connections do not use it (they pass the size on themselves).
+    /// </summary>
+    public bool SyncRemoteTerminalSize
+    {
+        get
+        {
+            return _SyncRemoteTerminalSize;
+        }
+        set
+        {
+            _SyncRemoteTerminalSize = value;
+            OnPropertyChanged("SyncRemoteTerminalSize");
         }
     }
 
