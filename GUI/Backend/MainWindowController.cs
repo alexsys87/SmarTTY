@@ -1,5 +1,6 @@
 using SmarTTY.Ssh;
 using Microsoft.Win32;
+using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using SmarTTY.Forms;
 using SmarTTY.IO;
@@ -1080,7 +1081,33 @@ public class MainWindowController : INotifyPropertyChanged
         edit.LineNumberForegroundBrush = new SolidBrush(effectiveColors.LineNumberForeground);
         edit.TabSize = Settings.Editor.TabSize;
         edit.HideMargins = !Settings.Editor.ShowLineNumbers;
-        edit.TabSize = Settings.Editor.TabSize;
+
+        TokenCache.LineTokenizer tokenizer = null;
+        if (Settings.Editor.SyntaxHighlighting)
+        {
+            SyntaxHighlighting.Language lang = SyntaxHighlighting.DetectLanguage(edit.RemotePath);
+            tokenizer = SyntaxHighlighting.GetTokenizer(lang);
+        }
+
+        edit.SetTokenizer(tokenizer);
+        if (tokenizer != null)
+        {
+            edit.TokenBrushes = new SolidBrush[]
+            {
+                new SolidBrush(effectiveColors.TextColor),
+                new SolidBrush(effectiveColors.KeywordColor),
+                new SolidBrush(effectiveColors.StringColor),
+                new SolidBrush(effectiveColors.CommentColor),
+                new SolidBrush(effectiveColors.NumberColor),
+                new SolidBrush(effectiveColors.VariableColor),
+                new SolidBrush(effectiveColors.SectionColor),
+                new SolidBrush(effectiveColors.PreprocessorColor)
+            };
+        }
+        else
+        {
+            edit.TokenBrushes = null;
+        }
     }
 
     public MainWindowController(MainWindow wnd)
