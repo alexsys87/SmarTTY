@@ -303,9 +303,7 @@ public partial class DeviceTerminalControl
             }
             catch (InvalidOperationException)
             {
-            }
-            catch (ObjectDisposedException)
-            {
+                // The terminal was closed meanwhile (this also covers ObjectDisposedException): nobody is left to tell.
             }
         });
     }
