@@ -1,5 +1,6 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.Forms;
+using SmarTTY.IO;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using System;
@@ -25,7 +26,19 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private Action<Exception> _errorHandler;
 
+    // Minimal interval between previews of a file that is still being downloaded.
+    private const int PreviewIntervalMs = 500;
+
+    // Permissions of the temporary copy uploaded on save: it may hold a file only root can read.
+    private const int TemporaryFileMode = 0x180; // 0600
+
+    // The user's answer to "Convert CRLF line endings to LF?", so that it is asked once per file.
+    private bool? _convertCrLf;
+
     public event EventHandler LoadFailed;
+
+    /// <summary>Raised on the UI thread once the whole file has been downloaded and the editor became editable.</summary>
+    public event EventHandler LoadCompleted;
 
     public RemoteFileEditor()
     {
@@ -61,11 +74,12 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         try
         {
-            string text = "";
+            StringBuilder content = new StringBuilder();
             using (ScpDownloadStream scpDownloadStream = _context.Session.OpenDownload(RemotePath))
             {
                 Utf8StreamDecoder utf8StreamDecoder = new Utf8StreamDecoder();
                 byte[] bytes = new byte[65536];
+                DateTime lastPreview = DateTime.Now;
                 while (true)
                 {
                     int value = scpDownloadStream.Read(bytes, 0, bytes.Length);
@@ -73,24 +87,32 @@ public partial class RemoteFileEditor : CodeEditorPP
                     {
                         break;
                     }
-                    text += utf8StreamDecoder.Decode(bytes, 0, value);
-                    BeginInvoke((ThreadStart)(() =>
+                    content.Append(utf8StreamDecoder.Decode(bytes, 0, value));
+                    // Show the partially downloaded text now and then. Re-parsing and re-highlighting the
+                    // whole document after every 64 KB block made opening large files quadratic.
+                    if ((DateTime.Now - lastPreview).TotalMilliseconds >= PreviewIntervalMs)
                     {
-                        try
+                        lastPreview = DateTime.Now;
+                        string preview = content.ToString();
+                        BeginInvoke((ThreadStart)(() =>
                         {
-                            EditableTextDocument editableTextDocument = new EditableTextDocument
+                            try
                             {
-                                DefaultLineEnding = TextDocument.LineEnding.Lf
-                            };
-                            editableTextDocument.SetText(text);
-                            SetDocument(editableTextDocument);
-                        }
-                        catch
-                        {
-                        }
-                    }));
+                                EditableTextDocument editableTextDocument = new EditableTextDocument
+                                {
+                                    DefaultLineEnding = TextDocument.LineEnding.Lf
+                                };
+                                editableTextDocument.SetText(preview);
+                                SetDocument(editableTextDocument);
+                            }
+                            catch
+                            {
+                            }
+                        }));
+                    }
                 }
             }
+            string text = content.ToString();
             BeginInvoke((ThreadStart)(() =>
             {
                 try
@@ -102,6 +124,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                     document.SetText(text);
                     SetDocument(document);
                     ((EditableTextBrowser)this).ReadOnly = false;
+                    LoadCompleted?.Invoke(this, EventArgs.Empty);
                     try
                     {
                         if (_initialCaret.IsValid)
@@ -158,17 +181,25 @@ public partial class RemoteFileEditor : CodeEditorPP
         try
         {
             string value = base.EditableDocument.GetText();
-            if (value.Contains("\r\n") && MessageBox.Show("Convert CRLF line endings to LF endings?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (value.Contains("\r\n"))
             {
-                base.EditableDocument.SetLineEnding(TextDocument.LineEnding.Lf);
-                value = base.EditableDocument.GetText();
+                if (!_convertCrLf.HasValue)
+                {
+                    _convertCrLf = MessageBox.Show("Convert CRLF line endings to LF endings?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+                }
+                if (_convertCrLf.Value)
+                {
+                    base.EditableDocument.SetLineEnding(TextDocument.LineEnding.Lf);
+                    value = base.EditableDocument.GetText();
+                }
             }
             byte[] bytes = Encoding.UTF8.GetBytes(value);
-            using (ScpChannelStream scpChannelStream = _context.Session.OpenUpload(text, bytes.Length))
+            using (ScpChannelStream scpChannelStream = _context.Session.OpenUpload(text, bytes.Length, mode: TemporaryFileMode))
             {
                 scpChannelStream.Write(bytes, 0, bytes.Length);
             }
-            string content = $"cat \"{text}\" > \"{RemotePath}\"";
+            // Quote both paths: a file name with ", $ or ` must neither break the command nor expand.
+            string content = "cat " + RemotePathUtils.ShellQuote(text) + " > " + RemotePathUtils.ShellQuote(RemotePath);
             if (_context.Session.RunCommandChecked(content, requireSuccess: true) != null)
             {
                 ((EditableTextBrowser)this).IsModified = false;
@@ -178,7 +209,7 @@ public partial class RemoteFileEditor : CodeEditorPP
             {
                 throw new OperationCanceledException();
             }
-            string sudoCommand = "sudo sh -c '" + content + "'";
+            string sudoCommand = "sudo sh -c " + RemotePathUtils.ShellQuote(content);
             SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(sudoCommand, "xterm");
             using (SudoConfirmationForm sudoConfirmationForm = new SudoConfirmationForm(sshShellChannel, sudoCommand))
             {
@@ -200,7 +231,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
         finally
         {
-            _context.Session.RunCommandChecked("rm \"" + text + "\"", requireSuccess: true);
+            _context.Session.RunCommandChecked("rm -f " + RemotePathUtils.ShellQuote(text), requireSuccess: true);
         }
     }
 }

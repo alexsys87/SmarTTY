@@ -1,0 +1,364 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using SmarTTY.CodeEditing;
+using SmarTTY.TextEditing;
+using L = SmarTTY.CodeEditing.SyntaxHighlighting.Language;
+
+// Regression harness for the remote file editor's text model and syntax highlighting:
+//  * line endings of new lines and of undone deletions,
+//  * language detection,
+//  * tokenizers (comments, strings, keys, variables, multi-line state),
+//  * bracket pairing through TokenCache, including after edits.
+// Run with: dotnet run --project tests/EditorTextTests
+internal static class Program
+{
+    private static int _passed;
+
+    private static void Check(bool condition, string name)
+    {
+        if (!condition)
+        {
+            throw new Exception("FAIL: " + name);
+        }
+        _passed++;
+        Console.WriteLine("PASS: " + name);
+    }
+
+    private static void Equal<T>(T actual, T expected, string name)
+    {
+        bool equal = EqualityComparer<T>.Default.Equals(actual, expected);
+        Check(equal, name + (equal ? "" : $" (expected '{Escape(expected)}', got '{Escape(actual)}')"));
+    }
+
+    private static string Escape(object value)
+    {
+        return (value?.ToString() ?? "null").Replace("\r", "\\r").Replace("\n", "\\n");
+    }
+
+    private static EditableTextDocument Document(string text)
+    {
+        EditableTextDocument document = new EditableTextDocument { DefaultLineEnding = TextDocument.LineEnding.Lf };
+        document.SetText(text);
+        return document;
+    }
+
+    // Mirrors EditableTextBrowser.DeleteRange.
+    private static void DeleteRange(EditableTextDocument document, TextDocument.TextPosition start, TextDocument.TextPosition end)
+    {
+        if (start.Line == end.Line)
+        {
+            document.ReplaceInLine(start.Line, start.Column, end.Column - start.Column, "");
+            return;
+        }
+        document.ReplaceInLine(start.Line, start.Column, -1, "");
+        document.ReplaceInLine(end.Line, 0, end.Column, "");
+        int removedLineCount = end.Line - start.Line - 1;
+        if (removedLineCount != 0)
+        {
+            document.RemoveLines(start.Line + 1, removedLineCount);
+        }
+        document.JoinWithNextLine(start.Line);
+    }
+
+    private static void LineEndingChecks()
+    {
+        EditableTextDocument empty = Document("");
+        Equal(empty.GetEffectiveLineTerminator(0), "\n", "the only line of an empty file ends like the document default");
+        string enter = empty.GetLineTerminator(0, "\n");
+        if (enter.Length == 0)
+        {
+            enter = TextDocument.GetLineEndingText(empty.DefaultLineEnding);
+        }
+        empty.InsertText(new TextDocument.TextPosition(0, 0), enter, inheritLineEnding: true);
+        Equal(empty.GetText(), "\n", "Enter in an empty file inserts a line break");
+
+        EditableTextDocument single = Document("abc");
+        Equal(single.GetEffectiveLineTerminator(0), "\n", "a single line without a newline uses the default ending");
+
+        EditableTextDocument crlf = Document("a\r\nb\r\n");
+        Equal(crlf.GetEffectiveLineTerminator(0), "\r\n", "a CRLF line keeps its ending");
+
+        // Undo of a multi-line deletion must restore LF endings in an LF file.
+        const string original = "one\ntwo\nthree\nfour\n";
+        EditableTextDocument lf = Document(original);
+        TextDocument.TextPosition start = new TextDocument.TextPosition(1, 0);
+        TextDocument.TextPosition end = new TextDocument.TextPosition(2, 2);
+        string removed = lf.GetRangeText(start, end, lf.GetEffectiveLineTerminator);
+        Equal(removed, "ne\ntwo\nth", "the removed text keeps the LF terminators");
+        DeleteRange(lf, start, end);
+        Equal(lf.GetText(), "oree\nfour\n", "the range is deleted");
+        lf.InsertText(start, removed);
+        Equal(lf.GetText(), original, "re-inserting the removed text restores the LF file exactly");
+
+        EditableTextDocument crlfUndo = Document("a\r\nb\r\nc");
+        string crlfRemoved = crlfUndo.GetRangeText(new TextDocument.TextPosition(0, 0), new TextDocument.TextPosition(0, 2), crlfUndo.GetEffectiveLineTerminator);
+        Equal(crlfRemoved, "a\r\nb\r\n", "CRLF terminators are kept as well");
+    }
+
+    private static void LanguageDetectionChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Main.PY"), L.Python, "extensions are case insensitive");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Dockerfile"), L.Script, "Dockerfile (capitalized) is recognized");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Makefile"), L.Script, "Makefile (capitalized) is recognized");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/.bashrc"), L.Bash, ".bashrc is bash");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/sshd_config"), L.Config, "sshd_config is a config file");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service"), L.Config, "systemd units are config files");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.c"), L.CLike, "C sources are C-like");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/syslog.log"), L.Plain, "logs are not highlighted");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.txt"), L.Plain, "text files are not highlighted");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/README.md"), L.Plain, "markdown is not highlighted");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/fix.patch"), L.Diff, "patches are diffs");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/index.html"), L.Markup, "HTML is markup");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/backup", "#!/bin/bash"), L.Bash, "#!/bin/bash makes a script without an extension bash");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env python3"), L.Python, "#!/usr/bin/env python3 is python");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env -S perl -w"), L.Script, "env options are skipped");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "hello"), L.Plain, "no shebang: plain");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/x.sh", "#!/usr/bin/python"), L.Bash, "the extension wins over the shebang");
+    }
+
+    private sealed class Highlighted
+    {
+        public readonly TokenCache Cache;
+        public readonly EditableTextDocument Doc;
+        public readonly TokenCache.LineTokenizer Tokenizer;
+
+        public Highlighted(L language, string text)
+        {
+            Doc = Document(text);
+            Tokenizer = SyntaxHighlighting.GetTokenizer(language);
+            Cache = new TokenCache(Doc, Tokenizer);
+        }
+
+        /// <summary>Returns the text of every token of the given type on a line.</summary>
+        public List<string> Tokens(int line, int type)
+        {
+            string text = Doc.GetLineText(line);
+            return Cache.GetLineTokens(line).Where(t => t.Type == type && t.Kind == TokenCache.Token.TokenKind.Normal)
+                .Select(t => text.Substring(t.Start, t.End - t.Start)).ToList();
+        }
+
+        /// <summary>Returns the token that starts exactly at the column.</summary>
+        public TokenCache.Token At(int line, int column)
+        {
+            return Cache.GetLineTokens(line).FirstOrDefault(t => t.Start == column);
+        }
+
+        public int TypeAt(int line, int column)
+        {
+            foreach (TokenCache.Token token in Cache.GetLineTokens(line))
+            {
+                if (token.Start <= column && column < token.End)
+                {
+                    return token.Type;
+                }
+            }
+            return SyntaxHighlighting.TypeNormal;
+        }
+    }
+
+    private static string Join(List<string> items)
+    {
+        return string.Join("|", items);
+    }
+
+    private static void ConfigChecks()
+    {
+        Highlighted unit = new Highlighted(L.Config, "[Service]\nExecStart=/usr/bin/app --verbose -- run\n---\ncolor=#fff\nkey = value # note\n; ini comment\nPort 22\nlisten 192.168.0.1:8080;\nenabled: yes\n- name: web");
+        Equal(Join(unit.Tokens(0, SyntaxHighlighting.TypeSection)), "[Service]", "[section] header");
+        Equal(Join(unit.Tokens(1, SyntaxHighlighting.TypeSection)), "", "'--' inside a value is not a section marker");
+        Equal(Join(unit.Tokens(1, SyntaxHighlighting.TypeVariable)), "ExecStart", "key before '='");
+        Equal(Join(unit.Tokens(2, SyntaxHighlighting.TypeSection)), "---", "YAML document marker");
+        Equal(Join(unit.Tokens(3, SyntaxHighlighting.TypeComment)), "", "'#fff' glued to the value is not a comment");
+        Equal(Join(unit.Tokens(4, SyntaxHighlighting.TypeComment)), "# note", "trailing '# note' is a comment");
+        Equal(Join(unit.Tokens(5, SyntaxHighlighting.TypeComment)), "; ini comment", "';' comment at the start of a line");
+        Equal(Join(unit.Tokens(6, SyntaxHighlighting.TypeVariable)), "Port", "sshd_config style keyword");
+        Equal(Join(unit.Tokens(6, SyntaxHighlighting.TypeNumber)), "22", "number value");
+        Equal(Join(unit.Tokens(7, SyntaxHighlighting.TypeNumber)), "192.168.0.1|8080", "IP address and port are numbers");
+        Equal(Join(unit.Tokens(8, SyntaxHighlighting.TypeKeyword)), "yes", "yes/no constants");
+        Equal(Join(unit.Tokens(9, SyntaxHighlighting.TypeVariable)), "name", "YAML list item key");
+    }
+
+    private static void BashChecks()
+    {
+        Highlighted sh = new Highlighted(L.Bash, "#!/bin/bash\necho $? $# ${HOME} $1\ngit config --set x\nFOO=bar; export PATH+=:/x\nls a#b ;# done\nX='multi\nline' done\necho \"a \\\" b\" # c\nif [ -f /usr/bin/test ]; then");
+        Equal(Join(sh.Tokens(0, SyntaxHighlighting.TypePreprocessor)), "#!/bin/bash", "shebang");
+        Equal(Join(sh.Tokens(1, SyntaxHighlighting.TypeVariable)), "$?|$#|${HOME}|$1", "special and braced variables");
+        Equal(Join(sh.Tokens(1, SyntaxHighlighting.TypeComment)), "", "'$#' does not start a comment");
+        Equal(Join(sh.Tokens(2, SyntaxHighlighting.TypeKeyword)), "", "'--set' is an argument, not the set builtin");
+        Equal(Join(sh.Tokens(3, SyntaxHighlighting.TypeVariable)), "FOO|PATH", "assignments (= and +=)");
+        Equal(Join(sh.Tokens(4, SyntaxHighlighting.TypeComment)), "# done", "'a#b' is a word, ';#' starts a comment");
+        Equal(Join(sh.Tokens(5, SyntaxHighlighting.TypeString)), "'multi", "an unclosed single quote...");
+        Equal(Join(sh.Tokens(6, SyntaxHighlighting.TypeString)), "line'", "...continues on the next line");
+        Equal(Join(sh.Tokens(6, SyntaxHighlighting.TypeKeyword)), "done", "and the line goes on after the quote");
+        Equal(Join(sh.Tokens(7, SyntaxHighlighting.TypeString)), "\"a \\\" b\"", "escaped quote inside a string");
+        Equal(Join(sh.Tokens(7, SyntaxHighlighting.TypeComment)), "# c", "comment after the string");
+        Equal(Join(sh.Tokens(8, SyntaxHighlighting.TypeKeyword)), "if|then", "keywords; 'test' inside a path is not one");
+    }
+
+    private static void PythonChecks()
+    {
+        Highlighted py = new Highlighted(L.Python, "@app.route('/')\ndef f(x):\n    s = \"\"\"doc\n    more \\\"\"\" still\"\"\" + 1\n    return {'a': [1, 2]}  # done");
+        Equal(Join(py.Tokens(0, SyntaxHighlighting.TypePreprocessor)), "@app.route", "decorator");
+        Equal(Join(py.Tokens(1, SyntaxHighlighting.TypeKeyword)), "def", "keyword");
+        Equal(Join(py.Tokens(2, SyntaxHighlighting.TypeString)), "\"\"\"doc", "triple-quoted string starts");
+        Equal(Join(py.Tokens(3, SyntaxHighlighting.TypeString)), "    more \\\"\"\" still\"\"\"", "an escaped quote does not close the triple-quoted string");
+        Equal(Join(py.Tokens(3, SyntaxHighlighting.TypeNumber)), "1", "code after the string");
+        Equal(Join(py.Tokens(4, SyntaxHighlighting.TypeComment)), "# done", "comment");
+
+        TokenCache.Token open = py.At(1, 5);
+        Check(open != null && open.Kind == TokenCache.Token.TokenKind.Paired && open.Partner != null && open.Partner.Start == 7, "'(' is paired with ')'");
+        TokenCache.Token brace = py.At(4, 11);
+        Check(brace != null && brace.Partner != null && py.Doc.GetLineText(4)[brace.Partner.Start] == '}', "'{' is paired with '}'");
+    }
+
+    private static void GenericChecks()
+    {
+        Highlighted c = new Highlighted(L.CLike, "#include <stdio.h>\nint main() { /* a\n b */ return 0; }\nconst char *u = \"http://x\"; // c\n#fff {");
+        Equal(Join(c.Tokens(0, SyntaxHighlighting.TypePreprocessor)), "#include", "preprocessor directive");
+        Equal(Join(c.Tokens(1, SyntaxHighlighting.TypeComment)), "/* a", "block comment starts");
+        Equal(Join(c.Tokens(2, SyntaxHighlighting.TypeComment)), " b */", "block comment continues on the next line");
+        Equal(Join(c.Tokens(2, SyntaxHighlighting.TypeKeyword)), "return", "code after the block comment");
+        Equal(Join(c.Tokens(3, SyntaxHighlighting.TypeString)), "\"http://x\"", "'//' inside a string is not a comment");
+        Equal(Join(c.Tokens(3, SyntaxHighlighting.TypeComment)), "// c", "line comment");
+        Equal(Join(c.Tokens(4, SyntaxHighlighting.TypePreprocessor)), "", "a CSS '#id' is not a directive");
+
+        TokenCache.Token brace = c.At(1, 11);
+        Check(brace != null && brace.Partner != null && brace.Partner.LineNumber == 2, "'{' is paired with '}' on the next line");
+
+        Highlighted html = new Highlighted(L.Markup, "<p class=\"x\">Don't <!-- note\n--> stop</p>");
+        Equal(Join(html.Tokens(0, SyntaxHighlighting.TypeKeyword)), "<p", "tag name");
+        Equal(Join(html.Tokens(0, SyntaxHighlighting.TypeString)), "\"x\"", "attribute value; the apostrophe in text is not a string");
+        Equal(Join(html.Tokens(1, SyntaxHighlighting.TypeComment)), "-->", "multi-line markup comment");
+        Equal(Join(html.Tokens(1, SyntaxHighlighting.TypeKeyword)), "</p", "closing tag");
+
+        Highlighted make = new Highlighted(L.Script, "FROM alpine # base\nURL=http://example.com/a#b");
+        Equal(Join(make.Tokens(0, SyntaxHighlighting.TypeKeyword)), "FROM", "Dockerfile instruction");
+        Equal(Join(make.Tokens(0, SyntaxHighlighting.TypeComment)), "# base", "'#' comment after whitespace");
+        Equal(Join(make.Tokens(1, SyntaxHighlighting.TypeComment)), "", "'#' inside a word is not a comment");
+
+        Highlighted diff = new Highlighted(L.Diff, "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n same");
+        Equal(diff.TypeAt(3, 0), SyntaxHighlighting.TypeString, "removed line");
+        Equal(diff.TypeAt(4, 0), SyntaxHighlighting.TypeComment, "added line");
+        Equal(diff.TypeAt(2, 0), SyntaxHighlighting.TypeSection, "hunk header");
+        Equal(diff.TypeAt(0, 0), SyntaxHighlighting.TypeKeyword, "file header");
+    }
+
+    private static void TokenOrderChecks()
+    {
+        // Every tokenizer must emit sorted, non-overlapping tokens inside the line, whatever the input.
+        string[] samples =
+        {
+            "", " ", "\t#", "'", "\"", "\\", "$", "${", "$(", "#!", "@", "@x", "/*", "*/", "<!--", "<", "</", "<?", "--", "---",
+            "[", "]", "[a", "a = [1, {2: (3)}]", "x = \"unterminated", "y = 'a\\'b' # c", "0x1F + 1e-5 - .5j",
+            "echo \"$HOME\" 'x' # y", "key: \"v\" # c", "#include <a.h> // x /* y", "}{)(][", "a\\", "\"\\", "'''", "\"\"\"x\"\"\""
+        };
+        foreach (L language in Enum.GetValues(typeof(L)))
+        {
+            TokenCache.LineTokenizer tokenizer = SyntaxHighlighting.GetTokenizer(language);
+            if (tokenizer == null)
+            {
+                continue;
+            }
+            foreach (int state in new[] { 0, 1, 2, 4 })
+            {
+                foreach (string sample in samples)
+                {
+                    RecordingSink sink = new RecordingSink();
+                    tokenizer(state, sample, sink, out int _);
+                    int end = 0;
+                    foreach (Tuple<int, int> token in sink.Tokens)
+                    {
+                        if (token.Item1 < end || token.Item2 < token.Item1 || token.Item2 > sample.Length)
+                        {
+                            throw new Exception($"FAIL: {language} state {state} produced a bad token [{token.Item1}, {token.Item2}) for '{sample}'");
+                        }
+                        end = token.Item2;
+                    }
+                }
+            }
+        }
+        Check(true, "all tokenizers emit ordered tokens within the line for edge-case input");
+    }
+
+    private sealed class RecordingSink : TokenCache.ITokenSink
+    {
+        public readonly List<Tuple<int, int>> Tokens = new List<Tuple<int, int>>();
+
+        public int CurrentLine => 0;
+
+        public void AddToken(int type, int start, int end)
+        {
+            Tokens.Add(Tuple.Create(start, end));
+        }
+
+        public void AddPairedToken(int type, int start, int end, int pairId, bool isOpening, TokenCache.RegionStyle regionStyle)
+        {
+            Tokens.Add(Tuple.Create(start, end));
+        }
+    }
+
+    private static void PairEditingChecks()
+    {
+        // Brackets stay paired while lines are edited, inserted and removed.
+        Highlighted c = new Highlighted(L.CLike, "void f()\n{\n    if (x) {\n        g();\n    }\n}");
+        TokenCache.Token outer = c.At(1, 0);
+        Check(outer.Partner != null && outer.Partner.LineNumber == 5, "the outer braces are paired");
+
+        // Insert a line with an extra block inside the function.
+        c.Doc.InsertText(new TextDocument.TextPosition(c.Doc.GetLineText(3).Length, 3), "\n        while (y) { h(); }", inheritLineEnding: true);
+        c.Cache.OnLinesChanged(3, 0, 1, c.Tokenizer);
+        outer = c.At(1, 0);
+        Check(outer.Partner != null && outer.Partner.LineNumber == 6, "pairs follow an inserted line");
+        TokenCache.Token loop = c.At(4, 18);
+        Check(loop != null && loop.Partner != null && loop.Partner.LineNumber == 4, "the new block is paired on its line");
+
+        // Break the inner block by deleting its closing brace, then restore it.
+        c.Doc.ReplaceInLine(5, 4, 1, "");
+        c.Cache.RetokenizeLine(5, c.Tokenizer);
+        TokenCache.Token inner = c.At(2, 11);
+        Check(inner != null && inner.Kind == TokenCache.Token.TokenKind.Paired, "the inner '{' is still a bracket token");
+        c.Doc.ReplaceInLine(5, 4, 0, "}");
+        c.Cache.RetokenizeLine(5, c.Tokenizer);
+        inner = c.At(2, 11);
+        Check(inner.Partner != null && inner.Partner.LineNumber == 5, "the inner braces are paired again after the edit is undone");
+
+        // Remove the inserted line again.
+        DeleteRange(c.Doc, new TextDocument.TextPosition(c.Doc.GetLineText(3).Length, 3), new TextDocument.TextPosition(c.Doc.GetLineText(4).Length, 4));
+        c.Cache.OnLinesChanged(3, 1, 0, c.Tokenizer);
+        outer = c.At(1, 0);
+        Check(outer.Partner != null && outer.Partner.LineNumber == 5, "pairs follow a removed line");
+
+        // A multi-line comment opened above hides the brackets below, closing it brings them back.
+        c.Doc.ReplaceInLine(2, 0, 0, "/*");
+        c.Cache.RetokenizeLine(2, c.Tokenizer);
+        Check(c.Cache.GetLineTokens(3).All(t => t.Type == SyntaxHighlighting.TypeComment), "lines below an unclosed /* are comments");
+        c.Doc.ReplaceInLine(2, 0, 2, "");
+        c.Cache.RetokenizeLine(2, c.Tokenizer);
+        outer = c.At(1, 0);
+        Check(c.Cache.GetLineTokens(3).Any(t => t.Kind == TokenCache.Token.TokenKind.Paired) && outer.Partner != null && outer.Partner.LineNumber == 5, "removing the /* restores code and pairs");
+    }
+
+    private static int Main()
+    {
+        try
+        {
+            LineEndingChecks();
+            LanguageDetectionChecks();
+            ConfigChecks();
+            BashChecks();
+            PythonChecks();
+            GenericChecks();
+            TokenOrderChecks();
+            PairEditingChecks();
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine(exception.Message);
+            Console.WriteLine(exception.StackTrace);
+            return 1;
+        }
+        Console.WriteLine($"All {_passed} checks passed.");
+        return 0;
+    }
+}
