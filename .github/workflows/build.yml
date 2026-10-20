@@ -41,6 +41,12 @@ jobs:
       - name: Run terminal log writer checks
         run: dotnet run --project tests/TerminalLogWriterTests -c Release
 
+      - name: Run serial port settings and line status checks
+        run: dotnet run --project tests/SerialPortRulesTests -c Release
+
+      - name: Run transport write failure checks
+        run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
+
   sshnet:
     name: SSH.NET integration tests
     runs-on: ubuntu-latest

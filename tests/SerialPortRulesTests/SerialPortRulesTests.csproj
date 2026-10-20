@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../VisualTTY/DeviceTerminal/SerialPortRules.cs" Link="SerialPortRules.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/SerialLineStatus.cs" Link="SerialLineStatus.cs" />
+  </ItemGroup>
+</Project>

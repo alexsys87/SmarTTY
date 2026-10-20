@@ -21,6 +21,8 @@ internal class AsyncTransportConnection : IDisposable
 
     public delegate void StateChangedHandler(object sender, ConnectionStateEnum connectionStateEnum, string message);
 
+    public delegate void WriteFailedHandler(object sender, string message);
+
     private readonly IDeviceTransport _transport;
 
     private readonly Dispatcher _dispatcher;
@@ -49,9 +51,17 @@ internal class AsyncTransportConnection : IDisposable
 
     public bool IsWriterIdle => _writerIdle;
 
+    private volatile string _writeError;
+
+    /// <summary>The reason of the last failed write, or null when the last write went through.</summary>
+    public string WriteError => _writeError;
+
     public SerialPortStream SerialStream => (_transport as SerialTransport)?.SerialStream;
 
     public event EventHandler WriterIdleChanged;
+
+    /// <summary>Raised on the UI thread when data could not be written to the device (the data is lost).</summary>
+    public event WriteFailedHandler WriteFailed;
 
     public event DataReceivedHandler DataReceived;
 
@@ -130,6 +140,7 @@ internal class AsyncTransportConnection : IDisposable
         }
         _writerThread = new Thread(WriterLoop);
         _writerThread.Start();
+        string disconnectReason = null;
         try
         {
             Stream stream = _transport.GetStream();
@@ -155,8 +166,13 @@ internal class AsyncTransportConnection : IDisposable
                 });
             }
         }
-        catch
+        catch (Exception readException)
         {
+            // Closing the connection on purpose also ends the read with an error; only an unexpected one is a reason to show.
+            if (!_stopRequested && !_disposed)
+            {
+                disconnectReason = readException.Message;
+            }
         }
         try
         {
@@ -170,7 +186,7 @@ internal class AsyncTransportConnection : IDisposable
         {
             if (StateChanged != null && !_disposed)
             {
-                StateChanged(this, _state, null);
+                StateChanged(this, _state, disconnectReason);
             }
         });
     }
@@ -202,20 +218,60 @@ internal class AsyncTransportConnection : IDisposable
                         WriterIdleChanged(this, EventArgs.Empty);
                     }
                 });
-                try
+                PendingWrite pendingWrite = null;
+                lock (_writeQueue)
                 {
-                    PendingWrite pendingWrite;
-                    lock (_writeQueue)
+                    if (_writeQueue.Count > 0)
                     {
                         pendingWrite = _writeQueue.Dequeue();
                     }
-                    _transport.GetStream().Write(pendingWrite.Buffer, 0, pendingWrite.Length);
                 }
-                catch
+                if (pendingWrite == null)
                 {
+                    continue; // its data was thrown away after a failed write
+                }
+                try
+                {
+                    _transport.GetStream().Write(pendingWrite.Buffer, 0, pendingWrite.Length);
+                    _writeError = null;
+                }
+                catch (Exception writeException)
+                {
+                    ReportWriteFailure(writeException);
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// A write failed: remember why, tell the UI, and throw away what is still queued. That data was typed or sent for a
+    /// moment that has passed, and writing it later (after a stalled port wakes up) would send stale input to the device.
+    /// </summary>
+    private void ReportWriteFailure(Exception exception)
+    {
+        if (_stopRequested || _disposed)
+        {
+            return; // the connection is being closed on purpose
+        }
+        int discarded;
+        lock (_writeQueue)
+        {
+            discarded = _writeQueue.Count;
+            _writeQueue.Clear();
+        }
+        string message = exception.Message;
+        if (discarded > 0)
+        {
+            message += " " + discarded + " queued write" + (discarded == 1 ? " was" : "s were") + " discarded.";
+        }
+        _writeError = message;
+        PostToUi(() =>
+        {
+            if (WriteFailed != null && !_disposed)
+            {
+                WriteFailed(this, message);
+            }
+        });
     }
 
     public void Start()

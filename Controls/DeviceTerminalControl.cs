@@ -229,6 +229,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             cbEncoding.Items.Add(choice);
         }
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
+        InitializeSerialLineControls();
     }
 
     // While a command runs, the keys go to the device as they are (mc, htop, vi ...) and the local input line is
@@ -648,6 +649,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _sendRemoteSizeMenuItem.Visible = needsStty;
         _syncRemoteSizeMenuItem.Checked = needsStty && _deviceTerminalSettings.SyncRemoteTerminalSize;
         _serialTerminalControl.SyncRemoteSize = _syncRemoteSizeMenuItem.Checked;
+        UpdateSerialLineUi();
         UpdateTelnetMenu(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
         ConfigureCommandLists();
         Connect();
@@ -687,6 +689,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _asyncTransportConnection.DataReceived += OnDataReceived;
         _asyncTransportConnection.StateChanged += OnConnectionStateChanged;
         _asyncTransportConnection.WriterIdleChanged += OnWriterIdleChanged;
+        _asyncTransportConnection.WriteFailed += OnWriteFailed;
+        // Notices belong to the previous connection.
+        _portProblem = null;
+        _portProblemIsWrite = false;
+        _lineErrors.Reset();
+        UpdatePortAlert();
         Size terminalSize = _serialTerminalControl.TerminalSize;
         _asyncTransportConnection.SetTerminalSize(terminalSize.Width, terminalSize.Height);
         _asyncTransportConnection.Start();
@@ -814,6 +822,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         try
         {
             ApplyConnectionState(connectionStateEnum, value);
+            UpdateSerialLineUi();
             if (connectionStateEnum == ConnectionStateEnum.Connected)
             {
                 _serialTerminalControl.BeginNewSession();
@@ -862,7 +871,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     Color backColor = (hexTerminalControl1.BackColor = _deviceTerminalSettings.Colors.Disconnected);
                     terminal.BackColor = backColor;
                     ToolStripLabel toolStripLabel = lblConnection;
-                    string text = (lblConnecting.Text = "Connection closed");
+                    // A reason is given when the connection broke (an unplugged adapter, a reset) instead of being closed.
+                    string text = (lblConnecting.Text = string.IsNullOrEmpty(value) ? "Connection closed" : "Connection closed: " + value);
                     toolStripLabel.Text = text;
                     break;
                 }
@@ -961,6 +971,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 using FileStream stream = fileStream();
                 SmarTTY.IO.XModemTransfer.SendDataHandler sendData = (data, offset, length) =>
                 {
+                    // Writes are queued, so a failure of an earlier one is only known now: end the transfer with its reason
+                    // instead of letting it wait for answers that cannot come.
+                    string writeError = _asyncTransportConnection?.WriteError;
+                    if (writeError != null)
+                    {
+                        throw new IOException(writeError);
+                    }
                     byte[] copy = new byte[length];
                     Array.Copy(data, offset, copy, 0, length);
                     SendToDevice(copy, length);
@@ -1687,8 +1704,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         using SerialPortSettingsForm serialPortSettingsForm = new SerialPortSettingsForm(serial.AdvancedSettings, serial.ComPortName);
         if (serialPortSettingsForm.ShowModal() == DialogResult.OK)
         {
-            serial.AdvancedSettings = serialPortSettingsForm.AdvancedSettings;
-            Connect(resetTerminal: false, 1000);
+            TryApplySerialSettings(serial, serialPortSettingsForm.AdvancedSettings);
+            cbBaudRate.Text = (serial.AdvancedSettings?.BaudRate)?.ToString() ?? cbBaudRate.Text;
         }
     }
 
@@ -1707,17 +1724,31 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void ApplyBaudRate(string text)
     {
-        if (int.TryParse(text, out var baudRate) && _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serial)
+        if (!(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serial))
         {
-            if (serial.AdvancedSettings == null)
+            return;
+        }
+        int currentBaudRate = serial.AdvancedSettings?.BaudRate ?? 0;
+        if (!SerialPortRules.TryParseBaudRate(text, out int baudRate, out string error))
+        {
+            // Not a dialog: this runs from Leave and Enter, where a message box would steal the focus again.
+            ShowPortProblem("Baud rate: " + error);
+            if (currentBaudRate > 0)
             {
-                serial.AdvancedSettings = new DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings();
+                cbBaudRate.Text = currentBaudRate.ToString();
             }
-            if (serial.AdvancedSettings.BaudRate != baudRate)
-            {
-                serial.AdvancedSettings.BaudRate = baudRate;
-                Connect(resetTerminal: false, 1000);
-            }
+            return;
+        }
+        if (baudRate == currentBaudRate)
+        {
+            return;
+        }
+        DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings candidate =
+            serial.AdvancedSettings?.Clone() ?? new DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings();
+        candidate.BaudRate = baudRate;
+        if (!TryApplySerialSettings(serial, candidate) && currentBaudRate > 0)
+        {
+            cbBaudRate.Text = currentBaudRate.ToString();
         }
     }
 

@@ -313,6 +313,16 @@ public class SerialPortStream : Stream, IDisposable
 
     private SafeFileHandle _handle;
 
+    private readonly string _portName;
+
+    // The state of the output lines as this program last set them (Windows cannot read them back). A port opened without
+    // explicit settings keeps the driver's behavior, which raises both lines.
+    private volatile bool _dtr = true;
+
+    private volatile bool _rts = true;
+
+    private volatile bool _rtsIsAutomatic;
+
     private object _readLock = new object();
 
     private object _writeLock = new object();
@@ -368,30 +378,123 @@ public class SerialPortStream : Stream, IDisposable
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool SetCommTimeouts(SafeHandle safeHandle, ref CommTimeouts commTimeouts);
 
-    [DllImport("kernel32.dll")]
+    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetCommState(SafeFileHandle safeFileHandle, ref Dcb dcb);
 
-    [DllImport("kernel32.dll")]
+    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool SetCommState(SafeFileHandle safeFileHandle, ref Dcb dcb);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetCommModemStatus(SafeFileHandle safeFileHandle, out uint modemStatus);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool ClearCommError(SafeFileHandle safeFileHandle, out uint errors, IntPtr comStat);
 
     public SerialPortStream(string portName, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings = null)
     {
+        _portName = portName;
         _handle = CreateFile("\\\\.\\" + portName, FileAccess.ReadWrite, FileShare.None, IntPtr.Zero, FileMode.Open, (FileAttributes)1073741952, IntPtr.Zero);
         if (_handle.IsInvalid)
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot open " + portName);
+            int error = Marshal.GetLastWin32Error();
+            throw new Win32Exception(error, "Cannot open " + portName + ": " + new Win32Exception(error).Message);
         }
-        if (advancedSerialPortSettings != null)
+        try
         {
-            ApplyAdvancedSettings(advancedSerialPortSettings);
+            if (advancedSerialPortSettings != null)
+            {
+                _dtr = advancedSerialPortSettings.DtrOnOpen;
+                _rts = advancedSerialPortSettings.RtsOnOpen;
+                ApplyAdvancedSettings(advancedSerialPortSettings);
+            }
+            ApplyTimeouts();
         }
-        CommTimeouts commTimeouts = new CommTimeouts
+        catch
         {
-            ReadIntervalTimeout = 1u
-        };
-        if (!SetCommTimeouts(_handle, ref commTimeouts))
+            // The port is opened exclusively: a handle left open by a failed setup would lock it until the finalizer runs
+            // and every retry would then fail with "access denied".
+            _handle.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Applies new line settings to the open port without closing it. The DTR and RTS lines keep their state, so a change
+    /// of the baud rate does not restart a board that resets on DTR.
+    /// </summary>
+    public void Reconfigure(DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings)
+    {
+        if (advancedSerialPortSettings == null)
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot set timeouts on " + portName);
+            throw new ArgumentNullException(nameof(advancedSerialPortSettings));
+        }
+        ApplyAdvancedSettings(advancedSerialPortSettings);
+        ApplyTimeouts();
+    }
+
+    /// <summary>Whether DTR is raised, as last set by this program.</summary>
+    public bool DtrAsserted => _dtr;
+
+    /// <summary>Whether RTS is raised, as last set by this program. Meaningless while <see cref="RtsIsAutomatic"/>.</summary>
+    public bool RtsAsserted => _rts;
+
+    /// <summary>True while RTS/CTS flow control owns the RTS line, so it cannot be set by hand.</summary>
+    public bool RtsIsAutomatic => _rtsIsAutomatic;
+
+    public void SetDtr(bool asserted)
+    {
+        EscapeFunction(asserted ? CommFunction.SetDtr : CommFunction.ClearDtr);
+        _dtr = asserted;
+    }
+
+    public void SetRts(bool asserted)
+    {
+        if (_rtsIsAutomatic)
+        {
+            throw new InvalidOperationException("RTS is controlled by hardware flow control; choose another flow control setting to set it by hand.");
+        }
+        EscapeFunction(asserted ? CommFunction.SetRts : CommFunction.ClearRts);
+        _rts = asserted;
+    }
+
+    /// <summary>Holds the transmit line in the break state for the given time (blocks the calling thread).</summary>
+    public void SendBreak(int durationMs)
+    {
+        EscapeFunction(CommFunction.SetBreak);
+        try
+        {
+            Thread.Sleep(Math.Max(10, Math.Min(durationMs, 5000)));
+        }
+        finally
+        {
+            EscapeFunction(CommFunction.ClearBreak);
+        }
+    }
+
+    /// <summary>
+    /// Reads the input modem lines and collects (and clears) the driver's pending line errors. False when the port is
+    /// closed or the driver refuses, which is not worth reporting from a periodic check.
+    /// </summary>
+    public bool TryReadLineStatus(out SerialModemLines lines, out uint errorFlags)
+    {
+        lines = default(SerialModemLines);
+        errorFlags = 0;
+        try
+        {
+            if (_handle == null || _handle.IsClosed || !GetCommModemStatus(_handle, out uint modemStatus))
+            {
+                return false;
+            }
+            lines = SerialModemLines.FromFlags(modemStatus);
+            if (!ClearCommError(_handle, out errorFlags, IntPtr.Zero))
+            {
+                errorFlags = 0;
+            }
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
         }
     }
 
@@ -411,69 +514,112 @@ public class SerialPortStream : Stream, IDisposable
         }
     }
 
+    private static SerialStopBitsKind StopBitsKindOf(DcbStopBits stopBits)
+    {
+        switch (stopBits)
+        {
+            case DcbStopBits.Two:
+                return SerialStopBitsKind.Two;
+            case DcbStopBits.OnePointFive:
+                return SerialStopBitsKind.OnePointFive;
+            default:
+                return SerialStopBitsKind.One;
+        }
+    }
+
     private void ApplyAdvancedSettings(DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings)
     {
+        SerialStopBitsKind stopBits = SerialPortRules.StopBitsKindFrom((int)advancedSerialPortSettings.StopBits);
+        string problem = SerialPortRules.ValidateFrame(advancedSerialPortSettings.DataBits, stopBits);
+        if (problem == null && (advancedSerialPortSettings.BaudRate < SerialPortRules.MinBaudRate || advancedSerialPortSettings.BaudRate > SerialPortRules.MaxBaudRate))
+        {
+            problem = "The baud rate must be between " + SerialPortRules.MinBaudRate + " and " + SerialPortRules.MaxBaudRate + ".";
+        }
+        if (problem != null)
+        {
+            throw new ArgumentException("Invalid serial port settings for " + _portName + ": " + problem);
+        }
+
         Dcb dcb = new Dcb
         {
             DcbLength = (uint)Marshal.SizeOf(typeof(Dcb))
         };
         if (!GetCommState(_handle, ref dcb))
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot query comm state for serial port");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot query the settings of " + _portName + ": " + new Win32Exception(Marshal.GetLastWin32Error()).Message);
         }
         dcb.BaudRate = (uint)advancedSerialPortSettings.BaudRate;
         dcb.ByteSize = (byte)advancedSerialPortSettings.DataBits;
         dcb.Parity = (DcbParity)advancedSerialPortSettings.Parity;
-        switch (advancedSerialPortSettings.StopBits)
+        switch (stopBits)
         {
+            case SerialStopBitsKind.Two:
+                dcb.StopBits = DcbStopBits.Two;
+                break;
+            case SerialStopBitsKind.OnePointFive:
+                dcb.StopBits = DcbStopBits.OnePointFive;
+                break;
             default:
                 dcb.StopBits = DcbStopBits.One;
                 break;
-            case StopBits.Two:
-                dcb.StopBits = DcbStopBits.Two;
-                break;
-            case StopBits.OnePointFive:
-                dcb.StopBits = DcbStopBits.OnePointFive;
-                break;
         }
-        switch (advancedSerialPortSettings.FlowControl)
-        {
-            case Handshake.None:
-                dcb.TxContinueOnXoff = false;
-                dcb.OutX = false;
-                dcb.RtsControlMode = RtsControl.Enable;
-                dcb.DtrControlMode = DtrControl.Enable;
-                dcb.OutxCtsFlow = false;
-                dcb.OutxDsrFlow = false;
-                break;
-            case Handshake.XOnXOff:
-                dcb.TxContinueOnXoff = true;
-                dcb.OutX = true;
-                dcb.RtsControlMode = RtsControl.Enable;
-                dcb.DtrControlMode = DtrControl.Enable;
-                dcb.OutxCtsFlow = false;
-                dcb.OutxDsrFlow = false;
-                break;
-            case Handshake.RequestToSend:
-                dcb.TxContinueOnXoff = false;
-                dcb.OutX = false;
-                dcb.RtsControlMode = RtsControl.Handshake;
-                dcb.DtrControlMode = DtrControl.Enable;
-                dcb.OutxCtsFlow = true;
-                dcb.OutxDsrFlow = false;
-                break;
-            case Handshake.RequestToSendXOnXOff:
-                dcb.TxContinueOnXoff = true;
-                dcb.OutX = true;
-                dcb.RtsControlMode = RtsControl.Handshake;
-                dcb.DtrControlMode = DtrControl.Enable;
-                dcb.OutxCtsFlow = true;
-                dcb.OutxDsrFlow = false;
-                break;
-        }
+
+        Handshake flow = advancedSerialPortSettings.FlowControl;
+        bool software = flow == Handshake.XOnXOff || flow == Handshake.RequestToSendXOnXOff;
+        bool hardware = flow == Handshake.RequestToSend || flow == Handshake.RequestToSendXOnXOff;
+        dcb.Binary = true;
+        // A line error must not abort reading: it is counted by the status check instead of dropping the connection.
+        dcb.AbortOnError = false;
+        dcb.ErrorCharEnabled = false;
+        dcb.NullDiscard = false;
+        dcb.ParityCheck = advancedSerialPortSettings.Parity != Parity.None;
+        dcb.OutX = software;
+        dcb.InX = software;
+        dcb.TxContinueOnXoff = software;
+        dcb.OutxCtsFlow = hardware;
+        dcb.OutxDsrFlow = false;
+        dcb.DtrControlMode = _dtr ? DtrControl.Enable : DtrControl.Disable;
+        dcb.RtsControlMode = hardware ? RtsControl.Handshake : (_rts ? RtsControl.Enable : RtsControl.Disable);
+        _rtsIsAutomatic = hardware;
+
         if (!SetCommState(_handle, ref dcb))
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot query comm state for serial port");
+            int error = Marshal.GetLastWin32Error();
+            string frame = SerialPortRules.FrameName(advancedSerialPortSettings.DataBits, (int)advancedSerialPortSettings.Parity, stopBits);
+            throw new Win32Exception(error, "Cannot apply the settings to " + _portName + " (" + advancedSerialPortSettings.BaudRate + " baud, " + frame + "): "
+                + new Win32Exception(error).Message + ". The adapter or driver may not support them.");
+        }
+    }
+
+    /// <summary>
+    /// Reads return as soon as bytes arrive; a write fails after the time its bytes need on the wire plus a stall allowance,
+    /// instead of blocking forever on a port that stopped accepting data.
+    /// </summary>
+    private void ApplyTimeouts()
+    {
+        Dcb dcb = new Dcb
+        {
+            DcbLength = (uint)Marshal.SizeOf(typeof(Dcb))
+        };
+        int writeTimeoutMs;
+        if (GetCommState(_handle, ref dcb) && dcb.BaudRate > 0)
+        {
+            writeTimeoutMs = SerialPortRules.WriteTimeoutMs((int)dcb.BaudRate, dcb.ByteSize, dcb.Parity != DcbParity.None, StopBitsKindOf(dcb.StopBits),
+                SerialPortRules.WriteChunkBytes, SerialPortRules.WriteStallTimeoutMs);
+        }
+        else
+        {
+            writeTimeoutMs = SerialPortRules.WriteTimeoutMs(0, 8, false, SerialStopBitsKind.One, SerialPortRules.WriteChunkBytes, SerialPortRules.WriteStallTimeoutMs);
+        }
+        CommTimeouts commTimeouts = new CommTimeouts
+        {
+            ReadIntervalTimeout = 1u,
+            WriteTotalTimeoutConstant = (uint)writeTimeoutMs
+        };
+        if (!SetCommTimeouts(_handle, ref commTimeouts))
+        {
+            int error = Marshal.GetLastWin32Error();
+            throw new Win32Exception(error, "Cannot set the timeouts of " + _portName + ": " + new Win32Exception(error).Message);
         }
     }
 
@@ -509,12 +655,12 @@ public class SerialPortStream : Stream, IDisposable
                     Marshal.StructureToPtr((object)nativeOverlapped, overlappedPtr, false);
                     if (!ReadFile(_handle, bufferPtr, count, out bytesRead, overlappedPtr) && Marshal.GetLastWin32Error() != 997)
                     {
-                        throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot read from serial port");
+                        throw ReadFailure(Marshal.GetLastWin32Error());
                     }
                     _readEvent.WaitOne();
                     if (!GetOverlappedResult(_handle, overlappedPtr, out bytesRead, wait: false))
                     {
-                        throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot read from serial port");
+                        throw ReadFailure(Marshal.GetLastWin32Error());
                     }
                 }
                 while (bytesRead == 0 && !ReturnOnEmptyRead);
@@ -546,12 +692,12 @@ public class SerialPortStream : Stream, IDisposable
                 Marshal.Copy(buffer, offset, bufferPtr, count);
                 if (!WriteFile(_handle, bufferPtr, count, out bytesWritten, overlappedPtr) && Marshal.GetLastWin32Error() != 997)
                 {
-                    throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot read from serial port");
+                    throw WriteFailure(Marshal.GetLastWin32Error());
                 }
                 _writeEvent.WaitOne();
                 if (!GetOverlappedResult(_handle, overlappedPtr, out bytesWritten, wait: false))
                 {
-                    throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot read from serial port");
+                    throw WriteFailure(Marshal.GetLastWin32Error());
                 }
             }
             finally
@@ -563,15 +709,28 @@ public class SerialPortStream : Stream, IDisposable
         }
     }
 
+    private Win32Exception ReadFailure(int error)
+    {
+        return new Win32Exception(error, "Cannot read from " + _portName + ": " + new Win32Exception(error).Message + " (the adapter may have been unplugged)");
+    }
+
+    private Win32Exception WriteFailure(int error)
+    {
+        return new Win32Exception(error, "Cannot write to " + _portName + ": " + new Win32Exception(error).Message + " (the adapter may have been unplugged)");
+    }
+
     public override void Write(byte[] buffer, int offset, int count)
     {
         int chunkWritten;
         for (int written = 0; written < count; written += chunkWritten)
         {
-            chunkWritten = WriteChunk(buffer, offset + written, count - written);
+            // Small chunks: each has its own write timeout, so a stalled port is noticed within seconds and a long
+            // transfer is not cut off by the time a big buffer legitimately needs.
+            chunkWritten = WriteChunk(buffer, offset + written, Math.Min(SerialPortRules.WriteChunkBytes, count - written));
             if (chunkWritten <= 0)
             {
-                throw new Exception("Unexpected byte count written to serial port: " + chunkWritten);
+                throw new IOException("Cannot write to " + _portName + ": the device did not accept any data for " + SerialPortRules.WriteStallTimeoutMs / 1000
+                    + " s. Check the cable, whether the device is powered, and the flow control setting (a device that holds CTS low or sent XOFF blocks the port).");
             }
         }
     }
@@ -584,7 +743,7 @@ public class SerialPortStream : Stream, IDisposable
         base.Close();
     }
 
-    [DllImport("kernel32.dll")]
+    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool EscapeCommFunction(SafeFileHandle safeFileHandle, CommFunction commFunction);
 
     public void EscapeFunction(CommFunction commFunction)

@@ -36,7 +36,7 @@ public partial class SerialPortSettingsForm : OKCancelFormBase
         cbBitsPerSecond.Text = advancedSerialPortSettings.BaudRate.ToString();
         try
         {
-            cbDataBits.SelectedIndex = advancedSerialPortSettings.DataBits - 5;
+            cbDataBits.SelectedIndex = advancedSerialPortSettings.DataBits - SerialPortRules.MinDataBits;
         }
         catch
         {
@@ -50,7 +50,8 @@ public partial class SerialPortSettingsForm : OKCancelFormBase
         }
         try
         {
-            cbStopBits.SelectedIndex = (int)advancedSerialPortSettings.StopBits;
+            // The list is 1, 1.5, 2 in the order of SerialStopBitsKind.
+            cbStopBits.SelectedIndex = (int)SerialPortRules.StopBitsKindFrom((int)advancedSerialPortSettings.StopBits);
         }
         catch
         {
@@ -62,6 +63,8 @@ public partial class SerialPortSettingsForm : OKCancelFormBase
         catch
         {
         }
+        cbDtrOnOpen.Checked = advancedSerialPortSettings.DtrOnOpen;
+        cbRtsOnOpen.Checked = advancedSerialPortSettings.RtsOnOpen;
     }
 
     private void rbManual_CheckedChanged(object sender, EventArgs e)
@@ -71,59 +74,56 @@ public partial class SerialPortSettingsForm : OKCancelFormBase
 
     protected override void btnOK_Click(object sender, EventArgs e)
     {
-        if (!int.TryParse(cbBitsPerSecond.Text, out var baudRate))
+        if (rbDefault.Checked)
         {
-            MessageBox.Show("Invalid baud rate. Should be an integer!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            // "Use default settings": leave the port as the driver has it configured.
+            _advancedSettings = null;
+            base.btnOK_Click(sender, e);
+            return;
+        }
+        if (!SerialPortRules.TryParseBaudRate(cbBitsPerSecond.Text, out int baudRate, out string error))
+        {
+            MessageBox.Show(error, "Serial port settings", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            cbBitsPerSecond.Focus();
+            return;
+        }
+        if (cbDataBits.SelectedIndex < 0 || cbParity.SelectedIndex < 0 || cbStopBits.SelectedIndex < 0 || cbFlowControl.SelectedIndex < 0)
+        {
+            MessageBox.Show("Choose the data bits, parity, stop bits and flow control.", "Serial port settings", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        int dataBits = SerialPortRules.MinDataBits + cbDataBits.SelectedIndex;
+        SerialStopBitsKind stopBits = (SerialStopBitsKind)cbStopBits.SelectedIndex;
+        string frameProblem = SerialPortRules.ValidateFrame(dataBits, stopBits);
+        if (frameProblem != null)
+        {
+            MessageBox.Show(frameProblem, "Serial port settings", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            cbStopBits.Focus();
             return;
         }
         _advancedSettings = new DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings
         {
             BaudRate = baudRate,
-            DataBits = 5 + cbDataBits.SelectedIndex,
+            DataBits = dataBits,
             Parity = (Parity)cbParity.SelectedIndex,
-            StopBits = (StopBits)cbStopBits.SelectedIndex,
-            FlowControl = (Handshake)cbFlowControl.SelectedIndex
+            StopBits = (StopBits)SerialPortRules.FrameworkStopBitsFrom(stopBits),
+            FlowControl = (Handshake)cbFlowControl.SelectedIndex,
+            DtrOnOpen = cbDtrOnOpen.Checked,
+            RtsOnOpen = cbRtsOnOpen.Checked
         };
         base.btnOK_Click(sender, e);
     }
 
     private void cbStopBits_SelectedIndexChanged(object sender, EventArgs e)
     {
-        int bitsPerFrame = (5 + cbDataBits.SelectedIndex) * 2;
-        bitsPerFrame += 2;
-        if (cbParity.SelectedIndex != 0)
-        {
-            bitsPerFrame += 2;
-        }
-        switch (cbStopBits.SelectedIndex)
-        {
-        case 1:
-            bitsPerFrame += 2;
-            break;
-        case 2:
-            bitsPerFrame += 4;
-            break;
-        case 3:
-            bitsPerFrame += 3;
-            break;
-        }
-        if (!int.TryParse(cbBitsPerSecond.Text, out var baudRate))
+        if (!int.TryParse(cbBitsPerSecond.Text, out int baudRate) || baudRate <= 0
+            || cbDataBits.SelectedIndex < 0 || cbParity.SelectedIndex < 0 || cbStopBits.SelectedIndex < 0)
         {
             label7.Text = "unknown";
             return;
         }
-        double bytesPerSec = (double)(baudRate * 2) / (double)bitsPerFrame;
-        if (bytesPerSec > 1048576.0)
-        {
-            label7.Text = $"{bytesPerSec / 1048576.0:f1} MB/s";
-        }
-        else if (bytesPerSec > 1024.0)
-        {
-            label7.Text = $"{bytesPerSec / 1024.0:f1} KB/s";
-        }
-        else
-        {
-            label7.Text = $"{bytesPerSec:f1} bytes/s";
-        }
+        double bytesPerSecond = SerialPortRules.BytesPerSecond(baudRate, SerialPortRules.MinDataBits + cbDataBits.SelectedIndex,
+            cbParity.SelectedIndex != 0, (SerialStopBitsKind)cbStopBits.SelectedIndex);
+        label7.Text = SerialPortRules.FormatSpeed(bytesPerSecond);
     }
 }
