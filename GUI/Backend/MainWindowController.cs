@@ -743,6 +743,10 @@ public class MainWindowController : INotifyPropertyChanged
 
     private readonly MainWindow _Window;
 
+    // How close to an edge of the terminal the mouse must be for that edge to count as "near". The same margin
+    // is used for the auto-hidden scrollbars and for revealing the menu and the tab headers in minimalistic mode.
+    private const int EdgeMargin = 30;
+
     public readonly Dispatcher Dispatcher;
 
     private ContextMenuStrip _TerminalContextMenu;
@@ -1255,6 +1259,7 @@ public class MainWindowController : INotifyPropertyChanged
         SessionWrapper sessionWrapper = SessionWrapper.CreateDeviceSession(this, sessionSettings, title);
         sessionWrapper.DeviceTab.Terminal.CompletionPopupRequested += MainWindowController_VirtualTerminalPopupRequested;
         sessionWrapper.DeviceTab.Terminal.OpenFileRequested += DeviceTab_OpenFileRequested;
+        SubscribeMinimalisticModeMouseTracking(sessionWrapper.DeviceTab.Terminal);
         sessionWrapper.ShowNewSessionTab = AllSessions.Count == 1;
         AllSessions.Insert(firstPseudoPage, sessionWrapper);
         HookSessionCollection();
@@ -1518,7 +1523,7 @@ public class MainWindowController : INotifyPropertyChanged
 
     private void anyctl_MouseMove(object sender, MouseEventArgs e)
     {
-        ScreenEdgeUtils.EdgeFlags edgeFlags = ScreenEdgeUtils.GetNearEdges(sender as Control, e.Location, 30);
+        ScreenEdgeUtils.EdgeFlags edgeFlags = ScreenEdgeUtils.GetNearEdges(sender as Control, e.Location, EdgeMargin);
         if (sender is TerminalEmulatorControl terminalEmulatorControl)
         {
             switch (Settings.VerticalScrollbarMode)
@@ -1546,6 +1551,17 @@ public class MainWindowController : INotifyPropertyChanged
                     break;
             }
         }
+        UpdateMinimalisticModeVisibility(edgeFlags);
+    }
+
+    /// <summary>
+    /// Hides the menu and the tab headers while the mouse is away from the window edges, and brings them back
+    /// when it is near the edge they are docked to. The same rules drive SSH and device (COM/TCP) terminals;
+    /// only the source of the mouse events is different, because a WinForms control hosted in a
+    /// WindowsFormsHost does not pass its MouseMove events up to the WPF window.
+    /// </summary>
+    private void UpdateMinimalisticModeVisibility(ScreenEdgeUtils.EdgeFlags edgeFlags)
+    {
         if (MinimalisticMode)
         {
             MainMenuVisibility = BoolToVisibility((edgeFlags & ScreenEdgeUtils.EdgeFlags.Top) != 0);
@@ -1557,6 +1573,35 @@ public class MainWindowController : INotifyPropertyChanged
             MainMenuVisibility = BoolToVisibility(v: true);
             HideTabHeaders = false;
             HideHeadersAnyway = false;
+        }
+    }
+
+    /// <summary>
+    /// Subscribes <see cref="UpdateMinimalisticModeVisibility"/> to the mouse events of a device (COM/TCP)
+    /// terminal. The terminal itself and every child that can appear under the pointer are handled, because a
+    /// child control does not pass its MouseMove events to its parent. Coordinates are converted to the
+    /// terminal's client area, so a control that does not fill the window (a label of the "connecting" panel,
+    /// for example) cannot make a window edge look nearer than it is.
+    /// </summary>
+    private void SubscribeMinimalisticModeMouseTracking(Control terminal)
+    {
+        SubscribeMinimalisticModeMouseTracking(terminal, terminal);
+    }
+
+    private void SubscribeMinimalisticModeMouseTracking(Control control, Control terminal)
+    {
+        control.MouseMove += (sender, e) =>
+        {
+            if (!(sender is Control source) || terminal.IsDisposed || source.IsDisposed)
+            {
+                return;
+            }
+            Point location = terminal.PointToClient(source.PointToScreen(e.Location));
+            UpdateMinimalisticModeVisibility(ScreenEdgeUtils.GetNearEdges(terminal, location, EdgeMargin));
+        };
+        foreach (Control child in control.Controls)
+        {
+            SubscribeMinimalisticModeMouseTracking(child, terminal);
         }
     }
 
