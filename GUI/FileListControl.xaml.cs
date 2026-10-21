@@ -1,4 +1,5 @@
-﻿using SmarTTY.GUI.Backend;
+﻿using SmarTTY.Forms;
+using SmarTTY.GUI.Backend;
 using System;
 using System.Collections;
 using System.Linq;
@@ -117,6 +118,11 @@ public partial class FileListControl : UserControl, IComponentConnector
 
     private void ListView_KeyDown(object sender, KeyEventArgs e)
     {
+        if (HandleFileOperationKey(e))
+        {
+            e.Handled = true;
+            return;
+        }
         Key key = e.Key;
         if ((int)key != 2)
         {
@@ -191,6 +197,140 @@ public partial class FileListControl : UserControl, IComponentConnector
         }
         catch
         {
+        }
+    }
+
+    private FileExplorer Explorer => this.DataContext as FileExplorer;
+
+    // The selected files and folders, without "..".
+    private FileExplorer.ItemWrapper[] SelectedEntries()
+    {
+        return ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>().Where((FileExplorer.ItemWrapper item) => item.Name != "..").ToArray();
+    }
+
+    // Delete, F2, Ctrl+C/X/V and Ctrl+Shift+N in the list, as in Explorer.
+    private bool HandleFileOperationKey(KeyEventArgs e)
+    {
+        ModifierKeys modifiers = Keyboard.Modifiers;
+        if (modifiers == ModifierKeys.None && e.Key == Key.Delete)
+        {
+            DeleteSelection();
+            return true;
+        }
+        if (modifiers == ModifierKeys.None && e.Key == Key.F2)
+        {
+            RenameSelection();
+            return true;
+        }
+        if (modifiers == ModifierKeys.Control)
+        {
+            switch (e.Key)
+            {
+                case Key.C:
+                    Explorer?.CopyToClipboard(SelectedEntries(), cut: false);
+                    return true;
+                case Key.X:
+                    Explorer?.CopyToClipboard(SelectedEntries(), cut: true);
+                    return true;
+                case Key.V:
+                    Explorer?.Paste();
+                    return true;
+            }
+        }
+        if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.N)
+        {
+            CreateEntry(folder: true);
+            return true;
+        }
+        return false;
+    }
+
+    private void XferMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        FileExplorer.ItemWrapper[] selected = SelectedEntries();
+        FileExplorer explorer = Explorer;
+        cmdCut.IsEnabled = selected.Length > 0;
+        cmdCopy.IsEnabled = selected.Length > 0;
+        cmdDelete.IsEnabled = selected.Length > 0;
+        cmdRename.IsEnabled = selected.Length == 1;
+        cmdPaste.IsEnabled = explorer != null && explorer.CanPaste;
+        cmdNewFolder.IsEnabled = explorer != null;
+        cmdNewFile.IsEnabled = explorer != null;
+    }
+
+    private void Cut_Click(object sender, RoutedEventArgs e)
+    {
+        Explorer?.CopyToClipboard(SelectedEntries(), cut: true);
+    }
+
+    private void Copy_Click(object sender, RoutedEventArgs e)
+    {
+        Explorer?.CopyToClipboard(SelectedEntries(), cut: false);
+    }
+
+    private void Paste_Click(object sender, RoutedEventArgs e)
+    {
+        Explorer?.Paste();
+    }
+
+    private void Rename_Click(object sender, RoutedEventArgs e)
+    {
+        RenameSelection();
+    }
+
+    private void Delete_Click(object sender, RoutedEventArgs e)
+    {
+        DeleteSelection();
+    }
+
+    private void NewFolder_Click(object sender, RoutedEventArgs e)
+    {
+        CreateEntry(folder: true);
+    }
+
+    private void NewFile_Click(object sender, RoutedEventArgs e)
+    {
+        CreateEntry(folder: false);
+    }
+
+    private void DeleteSelection()
+    {
+        try
+        {
+            Explorer?.Delete(SelectedEntries());
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void RenameSelection()
+    {
+        FileExplorer explorer = Explorer;
+        FileExplorer.ItemWrapper[] selected = SelectedEntries();
+        if (explorer == null || selected.Length != 1)
+        {
+            return;
+        }
+        string newName = RemoteNameDialog.Ask("Rename", "New name for '" + selected[0].Name + "':", selected[0].Name, selectStemOnly: !selected[0].Entry.IsDirectory);
+        if (newName != null)
+        {
+            explorer.Rename(selected[0], newName);
+        }
+    }
+
+    private void CreateEntry(bool folder)
+    {
+        FileExplorer explorer = Explorer;
+        if (explorer == null)
+        {
+            return;
+        }
+        string name = RemoteNameDialog.Ask(folder ? "New folder" : "New empty file", (folder ? "Name of the new folder in " : "Name of the new file in ") + explorer.WorkingDirectory + ":", explorer.SuggestNewName(folder ? "New folder" : "new file.txt", folder), selectStemOnly: !folder);
+        if (name != null)
+        {
+            explorer.CreateEntry(name, folder);
         }
     }
 

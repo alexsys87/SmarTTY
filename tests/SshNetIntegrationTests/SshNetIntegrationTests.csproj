@@ -30,6 +30,7 @@
     <!-- The production SSH layer is linked directly, as in tests/CommandCompletionDatabaseTests. -->
     <Compile Include="../../Ssh/*.cs" LinkBase="Ssh" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="IO/RemotePathUtils.cs" />
+    <Compile Include="../../IO/RemoteFileOperations.cs" Link="IO/RemoteFileOperations.cs" />
     <Compile Include="../../IProjectAwareException.cs" Link="IProjectAwareException.cs" />
   </ItemGroup>
 

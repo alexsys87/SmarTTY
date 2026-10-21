@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
+using SmarTTY.IO;
 
 namespace SmarTTY.Ssh.Tests;
 
@@ -78,6 +80,38 @@ internal static class DropbearTests
         Test.Equal(0, failures, "a PTY command started together with a helper command always starts (" + iterations + " tries)");
         Test.Equal(iterations.ToString(), session.RunCommandChecked("wc -c < smartty-dropbear-race", requireSuccess: true)?.Find((string line) => line.Trim() != "")?.Trim(), "every helper command ran");
         session.RunCommand("rm -f smartty-dropbear-race", out _);
+        FileOperations(session);
+    }
+
+    // The commands of the file list's Copy/Cut/Paste/Rename/Delete/New, run by BusyBox ash and its applets.
+    private static void FileOperations(SshSession session)
+    {
+        Test.Section("Dropbear: file list operations in BusyBox ash");
+        string home = session.RunCommandChecked("pwd", requireSuccess: true)?.Find((string line) => line.StartsWith("/"));
+        string root = RemoteFileOperations.Join(home, "smartty file ops");
+        session.RunCommand("rm -rf " + RemotePathUtils.ShellQuote(root), out _);
+        Test.Equal(0, Run(session, RemoteFileOperations.CreateDirectoryCommand(root)), "create a folder");
+        string file = RemoteFileOperations.Join(root, "it's a $file.txt");
+        Test.Equal(0, Run(session, RemoteFileOperations.CreateFileCommand(file)), "create an empty file");
+        Test.Check(Run(session, RemoteFileOperations.CreateFileCommand(file)) != 0, "creating an existing file fails");
+        string folder = RemoteFileOperations.Join(root, "sub dir");
+        Test.Equal(0, Run(session, RemoteFileOperations.CreateDirectoryCommand(folder)), "create a subfolder");
+        Test.Equal(0, Run(session, RemoteFileOperations.CopyCommand(file, RemoteFileOperations.Join(folder, "copy.txt"), replace: false)), "copy a file into the subfolder");
+        string folderCopy = RemoteFileOperations.Join(root, RemoteFileOperations.MakeCopyName("sub dir", true, new HashSet<string> { "sub dir" }));
+        Test.Equal(0, Run(session, RemoteFileOperations.CopyCommand(folder, folderCopy, replace: false)), "copy a folder next to itself");
+        Test.Equal(0, Run(session, "test -f " + RemotePathUtils.ShellQuote(RemoteFileOperations.Join(folderCopy, "copy.txt"))), "the folder copy has its file");
+        Test.Check(Run(session, RemoteFileOperations.CopyCommand(folder, folderCopy, replace: false)) != 0, "copying onto an existing folder fails instead of nesting it");
+        Test.Equal(0, Run(session, RemoteFileOperations.MoveCommand(file, RemoteFileOperations.Join(folderCopy, "moved.txt"), replace: false)), "move a file");
+        Test.Check(Run(session, "test -e " + RemotePathUtils.ShellQuote(file)) != 0, "the moved file left its folder");
+        Test.Equal(0, Run(session, RemoteFileOperations.DeleteCommand(new[] { folder, folderCopy })), "delete two folders");
+        Test.Equal(0, Run(session, "test -z \"$(ls -A " + RemotePathUtils.ShellQuote(root) + ")\""), "the folder is empty afterwards");
+        session.RunCommand("rm -rf " + RemotePathUtils.ShellQuote(root), out _);
+    }
+
+    private static int Run(SshSession session, string command)
+    {
+        session.RunCommand(command, out int? exitCode);
+        return exitCode ?? -1;
     }
 
     private static string Value(string name, string fallback)
