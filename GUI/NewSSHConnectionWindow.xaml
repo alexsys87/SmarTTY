@@ -1,12 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Window x:Class="SmarTTY.GUI.NewSSHConnectionWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" Style="{DynamicResource SecondaryWindowStyle}" SizeToContent="Height" Width="600" FocusManager.FocusedElement="{Binding ElementName=txtHostName}" Title="{Binding Path=Customization.Caption}">
-  <FrameworkElement.Resources>
-    <ResourceDictionary>
-      <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="styles.xaml" />
-      </ResourceDictionary.MergedDictionaries>
-    </ResourceDictionary>
-  </FrameworkElement.Resources>
   <StackPanel>
     <StackPanel Margin="10" Grid.IsSharedSizeScope="True">
       <FrameworkElement.Resources>
@@ -197,7 +190,7 @@
       <TextBlock VerticalAlignment="Center" Margin="5 0 0 0" Text="{Binding ProgressText}" />
       <ProgressBar IsIndeterminate="True" Grid.Column="1" Margin="5">
         <FrameworkElement.Style>
-          <Style TargetType="{x:Type ProgressBar}">
+          <Style TargetType="{x:Type ProgressBar}" BasedOn="{StaticResource {x:Type ProgressBar}}">
             <Style.Triggers>
               <DataTrigger Binding="{Binding ProgressText}" Value="{x:Null}">
                 <Setter Property="Visibility" Value="Collapsed" />
@@ -209,7 +202,7 @@
       <Button Width="60" Grid.Column="2" Margin="5" IsDefault="True" Click="OK_Click">
         <AccessText Text="{Binding Path=Customization.ConnectButtonText}" />
         <FrameworkElement.Style>
-          <Style TargetType="{x:Type Button}">
+          <Style TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="IsEnabled" Value="False" />
             <Style.Triggers>
               <DataTrigger Binding="{Binding ProgressText}" Value="{x:Null}">

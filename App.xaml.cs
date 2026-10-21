@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Windows;
-using System.Windows.Controls.Primitives;
-using System.Windows.Media;
 using SmarTTY.GUI;
 using SmarTTY.GUI.Styles;
 using VisualTTY;
@@ -14,19 +12,13 @@ public partial class App : Application
     public App()
     {
         System.Windows.Forms.Application.EnableVisualStyles();
-        // Windows load their XAML (and its DynamicResource lookups) before MainWindow.ApplyTheme merges the
-        // theme dictionary, which logged "Resource not found" warnings for the theme brushes. These application-level
-        // defaults only act as a fallback: a theme dictionary merged into a window always takes precedence.
-        Resources[StyleKeys.MainWindowText] = SystemColors.WindowTextBrush;
-        Resources[StyleKeys.ActiveTabBackground] = Brushes.Transparent;
-        // WPFScrollBar references this style in its constructor, before it is attached to a window that has the
-        // theme dictionary (the reference is re-resolved on attach). The light theme does not define it at all.
-        Resources["MainWindowScrollBar"] = new Style(typeof(ScrollBar));
     }
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        // The theme lives in Application.Resources, so it has to be there before the first window loads its XAML.
+        ThemeManager.Apply(GlobalSettings.Load()?.Theme ?? SmarTTYTheme.Dark);
 
         EnsureCommandCompletionsFile();
 

@@ -14,7 +14,6 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
 {
     private PasswordBox txtPassword;
 
-    internal ResourceDictionary _ThemeDictionary;
 
     public NewConnectionController Controller { get; }
 

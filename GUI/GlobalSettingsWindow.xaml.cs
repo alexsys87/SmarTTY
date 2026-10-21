@@ -24,7 +24,6 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
 
     private GlobalSettings _ClonedSettings;
 
-    internal ResourceDictionary _ThemeDictionary;
 
     private bool _Initialized;
 

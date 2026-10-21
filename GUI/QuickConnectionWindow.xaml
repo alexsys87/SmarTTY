@@ -1,14 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.QuickConnectionWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" WindowStartupLocation="CenterOwner" SizeToContent="WidthAndHeight" SnapsToDevicePixels="True" Title="Quick SSH Connection" FocusManager.FocusedElement="{Binding ElementName=txtMachine}">
-  <FrameworkElement.Resources>
-    <ResourceDictionary>
-      <VisualBrush x:Key="MachineHint" Stretch="None" AlignmentX="Left">
-        <VisualBrush.Visual>
-          <TextBlock FontStyle="Italic" Opacity="0.5" Text="username@hostname" Margin="2 1 0 0" Padding="5,0,1000,0" VerticalAlignment="Center" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" />
-        </VisualBrush.Visual>
-      </VisualBrush>
-    </ResourceDictionary>
-  </FrameworkElement.Resources>
+<Window x:Class="SmarTTY.GUI.QuickConnectionWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" WindowStartupLocation="CenterOwner" SizeToContent="WidthAndHeight" SnapsToDevicePixels="True" Title="Quick SSH Connection" Style="{DynamicResource SecondaryWindowStyle}" FocusManager.FocusedElement="{Binding ElementName=txtMachine}">
   <StackPanel Orientation="Vertical" Margin="10">
     <TextBlock Name="lblHeader" Text="Connect to a machine via SSH without remembering settings:" />
     <Grid Margin="5">
@@ -21,20 +12,7 @@
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
       <TextBlock Text="Machine:" VerticalAlignment="Center" Margin="0 0 5 0" />
-      <TextBox Name="txtMachine" Grid.Column="1" Margin="2">
-        <FrameworkElement.Style>
-          <Style TargetType="{x:Type TextBox}">
-            <Style.Triggers>
-              <MultiTrigger>
-                <MultiTrigger.Conditions>
-                  <Condition Property="Text" Value="" />
-                </MultiTrigger.Conditions>
-                <Setter Property="Background" Value="{StaticResource MachineHint}" />
-              </MultiTrigger>
-            </Style.Triggers>
-          </Style>
-        </FrameworkElement.Style>
-      </TextBox>
+      <TextBox Name="txtMachine" Grid.Column="1" Margin="2" MinWidth="220" Tag="username@hostname" />
       <TextBlock Name="lblPassword" Text="Password:" Grid.Row="1" VerticalAlignment="Center" Margin="0 0 5 0" />
       <PasswordBox Name="txtPassword" Grid.Column="1" Grid.Row="1" Margin="2" />
     </Grid>

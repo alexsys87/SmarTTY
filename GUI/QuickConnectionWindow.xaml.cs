@@ -1,14 +1,10 @@
 ﻿using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Markup;
-using System.Windows.Media;
 
 namespace SmarTTY.GUI;
 
 public partial class QuickConnectionWindow : Window, IComponentConnector
 {
-    internal ResourceDictionary ThemeDictionary;
-
     public QuickConnectionWindow()
         : this(telnet: false)
     {
@@ -27,10 +23,8 @@ public partial class QuickConnectionWindow : Window, IComponentConnector
             lblHeader.Text = "Connect to a machine via telnet without remembering settings:";
             lblPassword.Visibility = Visibility.Collapsed;
             txtPassword.Visibility = Visibility.Collapsed;
-            if (Resources["MachineHint"] is VisualBrush hint && hint.Visual is TextBlock hintText)
-            {
-                hintText.Text = "hostname[:port] or telnets://hostname";
-            }
+            // The hint shown while the box is empty (see the TextBox style).
+            txtMachine.Tag = "hostname[:port] or telnets://hostname";
         }
     }
 

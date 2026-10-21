@@ -345,7 +345,6 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
         }
     }
 
-    internal ResourceDictionary _ThemeDictionary;
 
     public string CommandLine { get; private set; }
 

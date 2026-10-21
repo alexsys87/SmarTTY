@@ -1,12 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" xmlns:styles="clr-namespace:SmarTTY.GUI.Styles" Width="800" Height="600" ResizeMode="CanResizeWithGrip" SnapsToDevicePixels="True" AllowDrop="True" Title="{Binding Path=ActiveSession.TitleWithStatus, StringFormat=SmarTTY - {0}}">
-  <FrameworkElement.Resources>
-    <ResourceDictionary>
-      <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="styles.xaml" />
-      </ResourceDictionary.MergedDictionaries>
-    </ResourceDictionary>
-  </FrameworkElement.Resources>
+<Window x:Class="SmarTTY.GUI.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" Width="800" Height="600" ResizeMode="CanResizeWithGrip" SnapsToDevicePixels="True" AllowDrop="True" Title="{Binding Path=ActiveSession.TitleWithStatus, StringFormat=SmarTTY - {0}}">
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -63,7 +56,7 @@
               </ControlTemplate>
             </Setter.Value>
           </Setter>
-          <Setter Property="Background" Value="{DynamicResource {x:Static styles:StyleKeys.ActiveTabBackground}}" />
+          <Setter Property="Background" Value="Transparent" />
           <Setter Property="BorderThickness" Value="0" />
           <Setter Property="FrameworkElement.ToolTip" Value="Close" />
                     <EventSetter Event="Click" Handler="CloseTabButton_Click" />
@@ -78,17 +71,17 @@
                         <Setter.Value>
                             <ControlTemplate>
                                 <Border Name="Glyph" Width="8" Height="8" Background="Transparent">
-                                    <Rectangle Name="Bar" Width="8" Height="2" VerticalAlignment="Center" Fill="#FF888888" />
+                                    <Rectangle Name="Bar" Width="8" Height="2" VerticalAlignment="Center" Fill="{DynamicResource Theme.TextSecondary}" />
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="UIElement.IsMouseOver" Value="True">
-                                        <Setter TargetName="Bar" Property="Rectangle.Fill" Value="#FFCC0000" />
+                                        <Setter TargetName="Bar" Property="Rectangle.Fill" Value="{DynamicResource Theme.Error}" />
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
                         </Setter.Value>
                     </Setter>
-                    <Setter Property="Background" Value="{DynamicResource {x:Static styles:StyleKeys.ActiveTabBackground}}" />
+                    <Setter Property="Background" Value="Transparent" />
                     <Setter Property="BorderThickness" Value="0" />
                     <Setter Property="FrameworkElement.ToolTip" Value="Collapse" />
                     <EventSetter Event="Click" Handler="MinimizeDeviceTabWindow_Click" />
@@ -555,8 +548,8 @@
         </Grid>
       </ContentControl>
     </Grid>
-    <Popup Name="NewConnectionPopup" Placement="Relative" StaysOpen="False" Closed="NewConnectionPopup_Closed">
-      <Border BorderThickness="1" Padding="0">
+    <Popup Name="NewConnectionPopup" Placement="Relative" StaysOpen="False" AllowsTransparency="True" Closed="NewConnectionPopup_Closed">
+      <Border Style="{DynamicResource PopupBorder}">
         <Grid DataContext="{Binding NewConnectionController}">
           <Grid.RowDefinitions>
             <RowDefinition />

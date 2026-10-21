@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.RawConnectionSettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" xmlns:coll="clr-namespace:System.Collections;assembly=mscorlib" xmlns:sys="clr-namespace:System;assembly=mscorlib" xmlns:ports="clr-namespace:System.IO.Ports;assembly=System" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterScreen" SnapsToDevicePixels="True" Title="Raw Terminal Settings" FocusManager.FocusedElement="{Binding ElementName=txtHost}">
+<Window x:Class="SmarTTY.GUI.RawConnectionSettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" xmlns:coll="clr-namespace:System.Collections;assembly=mscorlib" xmlns:sys="clr-namespace:System;assembly=mscorlib" xmlns:ports="clr-namespace:System.IO.Ports;assembly=System" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterScreen" SnapsToDevicePixels="True" Style="{DynamicResource SecondaryWindowStyle}" Title="Raw Terminal Settings" FocusManager.FocusedElement="{Binding ElementName=txtHost}">
   <FrameworkElement.Resources>
     <ResourceDictionary>
-      <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="styles.xaml" />
-      </ResourceDictionary.MergedDictionaries>
-      <VisualBrush x:Key="TcpHint" Stretch="None" AlignmentX="Left">
-        <VisualBrush.Visual>
-          <TextBlock FontStyle="Italic" Opacity="0.5" Text="&lt;hostname or IP address&gt;:&lt;port&gt;" Margin="2 1 0 0" Padding="5,0,1000,0" VerticalAlignment="Center" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" />
-        </VisualBrush.Visual>
-      </VisualBrush>
       <local:ColorWrapperConverter x:Key="ColorWrapperConverter" />
       <Style x:Key="LargeSelectableLabel" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource {x:Type TextBlock}}">
         <Setter Property="Margin" Value="5 0 5 0" />
@@ -35,20 +27,7 @@
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <TextBlock Text="Connect to: " VerticalAlignment="Center" />
-        <TextBox Name="txtHost" Grid.Column="2" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TCPEndpoint, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsChecked, ElementName=rbTCP}">
-          <FrameworkElement.Style>
-            <Style TargetType="{x:Type TextBox}">
-              <Style.Triggers>
-                <MultiTrigger>
-                  <MultiTrigger.Conditions>
-                    <Condition Property="Text" Value="" />
-                  </MultiTrigger.Conditions>
-                  <Setter Property="Background" Value="{StaticResource TcpHint}" />
-                </MultiTrigger>
-              </Style.Triggers>
-            </Style>
-          </FrameworkElement.Style>
-        </TextBox>
+        <TextBox Name="txtHost" Grid.Column="2" Margin="2" VerticalContentAlignment="Center" Text="{Binding TCPEndpoint, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsChecked, ElementName=rbTCP}" Tag="&lt;hostname or IP address&gt;:&lt;port&gt;" />
         <TextBlock Text="Keep-alive (seconds, 0 = off):" Grid.Row="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" Visibility="{Binding TcpKeepAliveSettingsVisibility}" />
         <TextBox Grid.Column="1" Grid.Row="2" Margin="2" Width="60" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding TcpKeepAliveSettingsVisibility}" ToolTip="Asks the operating system to detect a dropped TCP connection by probing an idle connection; nothing is written to the socket, so the device protocol is not disturbed. 0 switches it off." />
         <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Grid.Row="1" Grid.ColumnSpan="2" Click="Test_Click">
@@ -345,13 +324,13 @@
           </ResourceDictionary>
         </FrameworkElement.Resources>
         <TextBlock Text="Background color:" />
-        <Border Width="40" Grid.Column="1" BorderBrush="#FF000000" BorderThickness="1" HorizontalAlignment="Left" Background="{Binding Path=Colors.Background, Converter={StaticResource ColorWrapperConverter}}" />
+        <Border Width="40" Grid.Column="1" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Background="{Binding Path=Colors.Background, Converter={StaticResource ColorWrapperConverter}}" />
         <TextBlock Text="Received text color:" Grid.Column="3" />
-        <Border Width="40" Grid.Column="4" BorderBrush="#FF000000" BorderThickness="1" HorizontalAlignment="Left" Background="{Binding Path=Colors.Text, Converter={StaticResource ColorWrapperConverter}}" />
+        <Border Width="40" Grid.Column="4" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Background="{Binding Path=Colors.Text, Converter={StaticResource ColorWrapperConverter}}" />
         <TextBlock Text="Background color (disconnected):" Grid.Column="0" Grid.Row="1" />
-        <Border Width="40" Grid.Column="1" BorderBrush="#FF000000" BorderThickness="1" HorizontalAlignment="Left" Grid.Row="1" Background="{Binding Path=Colors.Disconnected, Converter={StaticResource ColorWrapperConverter}}" />
+        <Border Width="40" Grid.Column="1" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Grid.Row="1" Background="{Binding Path=Colors.Disconnected, Converter={StaticResource ColorWrapperConverter}}" />
         <TextBlock Text="Echoed characters color:" Grid.Column="3" Grid.Row="1" />
-        <Border Width="40" Grid.Column="4" BorderBrush="#FF000000" BorderThickness="1" HorizontalAlignment="Left" Grid.Row="1" Background="{Binding Path=Colors.Echo, Converter={StaticResource ColorWrapperConverter}}" />
+        <Border Width="40" Grid.Column="4" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Grid.Row="1" Background="{Binding Path=Colors.Echo, Converter={StaticResource ColorWrapperConverter}}" />
       </Grid>
     </local:SettingsGroupBox>
     <local:SettingsGroupBox Text="Terminal settings" ImageSource="..\Icons\term16.png">

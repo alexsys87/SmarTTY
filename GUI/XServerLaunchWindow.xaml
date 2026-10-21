@@ -1,12 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Window x:Class="SmarTTY.GUI.XServerLaunchWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" Style="{DynamicResource SecondaryWindowStyle}" Title="X Server Required" Width="400" SizeToContent="Height" WindowStartupLocation="CenterOwner">
-  <FrameworkElement.Resources>
-    <ResourceDictionary>
-      <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="styles.xaml" />
-      </ResourceDictionary.MergedDictionaries>
-    </ResourceDictionary>
-  </FrameworkElement.Resources>
   <StackPanel Orientation="Vertical" Margin="5">
     <TextBlock Text="A remote application has initiated a connection to the X server that is used to display GUI for Linux programs. SmarTTY can start vcxsrv automatically to handle this." TextWrapping="Wrap" />
     <Grid Margin="0 10 0 5">
