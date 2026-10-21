@@ -1,12 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.GlobalSettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" xmlns:coll="clr-namespace:System.Collections;assembly=mscorlib" xmlns:sys="clr-namespace:System;assembly=mscorlib" Title="SmarTTY Settings" SizeToContent="Height" Width="800" WindowStartupLocation="CenterOwner">
-  <FrameworkElement.Resources>
-    <ResourceDictionary>
-      <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="styles.xaml" />
-      </ResourceDictionary.MergedDictionaries>
-    </ResourceDictionary>
-  </FrameworkElement.Resources>
+<Window x:Class="SmarTTY.GUI.GlobalSettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" xmlns:coll="clr-namespace:System.Collections;assembly=mscorlib" xmlns:sys="clr-namespace:System;assembly=mscorlib" Title="SmarTTY Settings" SizeToContent="Height" Width="800" WindowStartupLocation="CenterOwner" Style="{DynamicResource SecondaryWindowStyle}">
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="*" />
@@ -20,7 +13,7 @@
             <Setter Property="Margin" Value="{StaticResource GridLabelPadding}" />
             <Setter Property="VerticalAlignment" Value="Center" />
           </Style>
-          <Style x:Key="{x:Type TextBox}" TargetType="{x:Type TextBox}">
+          <Style x:Key="{x:Type TextBox}" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="VerticalAlignment" Value="Center" />
           </Style>
           <coll:ArrayList x:Key="TrueFalse">
@@ -81,7 +74,7 @@
           <Style x:Key="ColorEditor" TargetType="{x:Type Border}">
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Margin" Value="0 2 0 2" />
-            <Setter Property="BorderBrush" Value="#FF000000" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Theme.BorderStrong}" />
             <EventSetter Event="MouseDown" Handler="Border_MouseDown" />
           </Style>
         </ResourceDictionary>
@@ -238,7 +231,7 @@
               <ListBox Grid.Column="1" Grid.Row="2" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=TabHeaderOrientation, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding TabHeaderOrientation}" />
               <TextBlock Text="Session header position:" Grid.Row="3" />
               <ListBox Grid.Column="1" Grid.Row="3" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=SessionHeaderOrientation, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding SessionHeaderOrientation}" />
-              <TextBlock Text="Main window theme:" Grid.Row="4" />
+              <TextBlock Text="Application theme:" Grid.Row="4" />
               <ListBox Grid.Column="1" Grid.Row="4" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=Theme, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding Theme}" />
             </Grid>
           </GroupBox>

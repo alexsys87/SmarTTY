@@ -38,8 +38,6 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private ToggleButton _LastActiveNewConnectionButton;
 
-    internal ResourceDictionary _ThemeDictionary;
-
     private GridLength? _SCPHeight = new GridLength(200.0);
 
     private GridLength? _FilesWidth = new GridLength(200.0);
@@ -55,7 +53,6 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private void InitializeWindow()
     {
-        ApplyTheme((Window)this, SmarTTYTheme.Dark, ref _ThemeDictionary);
         InitializeComponent();
         CommonGUIPreferences commonGUIPreferences = GuiPreferencesStore.Current;
         try
@@ -81,7 +78,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         VirtualTerminalMode virtualTerminalMode = Controller.Settings.VirtualTerminal.DefaultMode;
         if (_InitialCommand.Command == null && virtualTerminalMode == VirtualTerminalMode.Ask)
         {
-            VirtualTerminalIntroWindow virtualTerminalIntroWindow = new VirtualTerminalIntroWindow(Controller.Settings);
+            VirtualTerminalIntroWindow virtualTerminalIntroWindow = new VirtualTerminalIntroWindow();
             bool? dialogResult = virtualTerminalIntroWindow.ShowDialog();
             if (dialogResult.HasValue)
             {
@@ -422,26 +419,6 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
     }
 
-    public static void ApplyTheme(Window wnd, SmarTTYTheme theme, ref ResourceDictionary themeDictionary)
-    {
-        ResourceDictionary resourceDictionary = new ResourceDictionary();
-        switch (theme)
-        {
-            case SmarTTYTheme.Dark:
-                resourceDictionary.Source = new Uri("pack://application:,,,/GUI/Styles/Dark/Style.xaml");
-                break;
-            case SmarTTYTheme.Light:
-                resourceDictionary.Source = new Uri("pack://application:,,,/GUI/Styles/Light/Style.xaml");
-                break;
-        }
-        if (themeDictionary != null)
-        {
-            ((FrameworkElement)wnd).Resources.MergedDictionaries.Remove(themeDictionary);
-        }
-        themeDictionary = resourceDictionary;
-        ((FrameworkElement)wnd).Resources.MergedDictionaries.Add(resourceDictionary);
-    }
-
     private void SCPVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         object newValue = e.NewValue;
@@ -645,7 +622,6 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             PackageManagerWindow packageManagerWindow = new PackageManagerWindow(activeSession);
             packageManagerWindow.Owner = (Window)this;
             PackageManagerWindow packageManagerWindow2 = packageManagerWindow;
-            ApplyTheme((Window)packageManagerWindow2, Controller.Settings.Theme, ref packageManagerWindow2._ThemeDictionary);
             if (packageManagerWindow2.ShowDialog() == true && packageManagerWindow2.CommandLine != null && (!(activeSession.ActiveTab.EditorControl is SshTerminalControl sshTerminalControl) || !sshTerminalControl.Submit(packageManagerWindow2.CommandLine)))
             {
                 activeSession.CreateNewTerminalPage(virtualMode: false, new InitialCommand(packageManagerWindow2.CommandLine, echoInitialCommand: true, tabKeptAfterExit: () => ShowPackageManager(activeSession)));
@@ -705,10 +681,5 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             }
         }
         base.OnPreviewKeyDown(e);
-    }
-
-    internal static void ApplyTheme(VirtualTerminalIntroWindow virtualTerminalIntroWindow, SmarTTYTheme theme, ref object themeDictionary)
-    {
-        throw new NotImplementedException();
     }
 }

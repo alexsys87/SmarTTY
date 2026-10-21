@@ -33,8 +33,6 @@ public partial class XServerLaunchWindow : Window, IComponentConnector
         }
     }
 
-    private ResourceDictionary _ThemeDictionary;
-
     private bool _Loaded;
 
     public ControllerImpl Controller { get; }
@@ -92,7 +90,6 @@ public partial class XServerLaunchWindow : Window, IComponentConnector
             XServerLaunchWindow xServerLaunchWindow = new XServerLaunchWindow(controllerImpl);
             xServerLaunchWindow.Owner = parent;
             XServerLaunchWindow xServerLaunchWindow2 = xServerLaunchWindow;
-            MainWindow.ApplyTheme((Window)xServerLaunchWindow2, settings.Theme, ref xServerLaunchWindow2._ThemeDictionary);
             xServerLaunchWindow2.ShowDialog();
             return controllerImpl.SuccessfulSocket;
         }), new object[0]);

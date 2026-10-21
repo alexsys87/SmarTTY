@@ -3,6 +3,7 @@ using Microsoft.Win32;
 using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using SmarTTY.Forms;
+using SmarTTY.GUI.Styles;
 using SmarTTY.IO;
 using SmarTTY.Properties;
 using SmarTTY.Terminal;
@@ -1221,12 +1222,16 @@ public class MainWindowController : INotifyPropertyChanged
     public MainWindowController(MainWindow wnd)
     {
         _Window = wnd;
+        Border popupBorder = new Border
+        {
+            Child = (UIElement)new VirtualTerminalPopup(this)
+        };
+        // The popup is not part of the window, so the theme frame (background, text colour) is set explicitly.
+        popupBorder.SetResourceReference(FrameworkElement.StyleProperty, "PopupBorder");
         _VirtualTerminalPopup = new Popup
         {
-            Child = (UIElement)new Border
-            {
-                Child = (UIElement)new VirtualTerminalPopup(this)
-            },
+            Child = (UIElement)popupBorder,
+            AllowsTransparency = true,
             StaysOpen = true,
             Focusable = false
         };
@@ -1281,7 +1286,7 @@ public class MainWindowController : INotifyPropertyChanged
     {
         TabHeaderLocation = HeaderOrientationToDock(Settings.TabHeaderOrientation);
         SessionHeaderLocation = HeaderOrientationToDock(Settings.SessionHeaderOrientation);
-        MainWindow.ApplyTheme((Window)_Window, Settings.Theme, ref _Window._ThemeDictionary);
+        ThemeManager.Apply(Settings.Theme);
     }
 
     private void CloseActivePage()

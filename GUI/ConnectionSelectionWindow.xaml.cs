@@ -1,5 +1,6 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.Forms;
+using SmarTTY.GUI.Styles;
 using SmarTTY.Native;
 using SmarTTY.Transport;
 using SmarTTY.Utilities;
@@ -260,7 +261,6 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 NewSSHConnectionWindow newSSHConnectionWindow = new NewSSHConnectionWindow(Connection, customization);
                 newSSHConnectionWindow.Owner = wnd;
                 newSSHConnectionWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                MainWindow.ApplyTheme((Window)newSSHConnectionWindow, (wnd as ConnectionSelectionWindow)?._Theme ?? SmarTTYTheme.Dark, ref newSSHConnectionWindow._ThemeDictionary);
                 if (newSSHConnectionWindow.ShowDialog() == true && newSSHConnectionWindow.Controller.CreatedSession != null)
                 {
                     _Manager?.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
@@ -1119,7 +1119,6 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             NewSSHConnectionWindow newSSHConnectionWindow = new NewSSHConnectionWindow(null, customization);
             newSSHConnectionWindow.Owner = wnd;
             newSSHConnectionWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            MainWindow.ApplyTheme((Window)newSSHConnectionWindow, (wnd as ConnectionSelectionWindow)?._Theme ?? SmarTTYTheme.Dark, ref newSSHConnectionWindow._ThemeDictionary);
             if (newSSHConnectionWindow.ShowDialog() == true && newSSHConnectionWindow.Controller.CreatedSession != null)
             {
                 if (newSSHConnectionWindow.Controller.SaveSettings)
@@ -1254,10 +1253,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
     public ConnectionSelectionWindow(bool showRawConnections, string defaultItemNameOrCmdLine)
     {
-        ResourceDictionary themeDictionary = null;
         InitializeComponent();
         _Theme = GlobalSettings.Load()?.Theme ?? SmarTTYTheme.Dark;
-        MainWindow.ApplyTheme((Window)this, _Theme, ref themeDictionary);
+        ThemeManager.Apply(_Theme);
         this.DataContext = (Controller = new ControllerImpl(this.Dispatcher, showRawConnections, defaultItemNameOrCmdLine, GuiPreferencesStore.Current));
         Controller.SessionCreated += Controller_SessionCreated;
         if (Controller.PendingRawConnectionSettings != null)
