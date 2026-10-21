@@ -29,7 +29,7 @@ jobs:
       - name: Run COM/TCP command history checks
         run: dotnet run --project tests/DeviceLineInputTests -c Release
 
-      - name: Run apk package manager checks
+      - name: Run package manager checks (apk, apt, dnf, yum, zypper, pacman, portage, opkg)
         run: dotnet run --project tests/ApkPackageManagerTests -c Release
 
       - name: Run XMODEM protocol checks

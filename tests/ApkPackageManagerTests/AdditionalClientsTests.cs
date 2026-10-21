@@ -59,21 +59,21 @@ internal static class AdditionalClientsTests
         Check(client.Probe(probeRunner) == 0, "dnf: a foreign binary named dnf is not accepted");
 
         FakeRunner listRunner = new FakeRunner();
-        listRunner.Responses["dnf -q list --installed"] = new[]
+        listRunner.Responses["LC_ALL=C dnf -q list --installed"] = new[]
         {
             "Installed Packages",
             "bash.x86_64                    5.2.26-4.fc40                    @System",
             "curl.x86_64                    8.9.1-2.fc40                     @System",
             "kernel.x86_64                  6.12.4-200.fc41                  @System"
         };
-        listRunner.Responses["dnf -q list --available"] = new[]
+        listRunner.Responses["LC_ALL=C dnf -q list --available"] = new[]
         {
             "Available Packages",
             "bash.x86_64                    5.2.32-1.fc40                    updates",
             "htop.x86_64                    3.3.0-5.fc40                     fedora",
             "nano.x86_64                    8.1-3.fc40                       fedora"
         };
-        listRunner.Responses["dnf -q list --upgrades"] = new[] { "bash.x86_64                    5.2.32-1.fc40                    updates" };
+        listRunner.Responses["LC_ALL=C dnf -q list --upgrades"] = new[] { "bash.x86_64                    5.2.32-1.fc40                    updates" };
         LinuxPackageInfo[] packages = client.QueryAllPackages(listRunner);
         Check(packages.Length == 5, "dnf: header rows skipped, installed and available merged (" + packages.Length + ")");
         Check(packages.Select(package => package.ID).SequenceEqual(new[] { "bash.x86_64", "curl.x86_64", "htop.x86_64", "kernel.x86_64", "nano.x86_64" }), "dnf: sorted by name");
@@ -85,8 +85,8 @@ internal static class AdditionalClientsTests
         Check(Find(packages, "htop.x86_64").State == LinuxPackageInfo.PackageState.Available && Find(packages, "htop.x86_64").Version == "3.3.0-5.fc40", "dnf: available package");
 
         FakeRunner noUpgradeInfoRunner = new FakeRunner();
-        noUpgradeInfoRunner.Responses["dnf -q list --installed"] = new[] { "curl.x86_64                    8.9.1-2.fc40                    @System" };
-        noUpgradeInfoRunner.Responses["dnf -q list --available"] = new[] { "htop.x86_64                    3.3.0-5.fc40                     fedora" };
+        noUpgradeInfoRunner.Responses["LC_ALL=C dnf -q list --installed"] = new[] { "curl.x86_64                    8.9.1-2.fc40                    @System" };
+        noUpgradeInfoRunner.Responses["LC_ALL=C dnf -q list --available"] = new[] { "htop.x86_64                    3.3.0-5.fc40                     fedora" };
         LinuxPackageInfo[] noUpgradeInfo = client.QueryAllPackages(noUpgradeInfoRunner);
         Check(noUpgradeInfo.Length == 2 && noUpgradeInfo.All(package => package.State != LinuxPackageInfo.PackageState.Upgradeable), "dnf: a failed 'list --upgrades' does not break the listing");
 
@@ -133,21 +133,21 @@ internal static class AdditionalClientsTests
         Check(client.Probe(probeRunner) == 0, "zypper: a foreign binary named zypper is not accepted");
 
         FakeRunner listRunner = new FakeRunner();
-        listRunner.Responses["zypper packages --installed-only"] = new[]
+        listRunner.Responses["LC_ALL=C zypper --non-interactive packages --installed-only"] = new[]
         {
             " S | Repository | Name | Version",
             "---+------------+------+--------",
             " i | @System    | bash | 5.2.26-1.1",
             " i | @System    | curl | 8.9.1-1.1"
         };
-        listRunner.Responses["zypper packages --not-installed-only"] = new[]
+        listRunner.Responses["LC_ALL=C zypper --non-interactive packages --not-installed-only"] = new[]
         {
             " S | Repository | Name | Version",
             "---+------------+------+--------",
             "   | Main       | curl | 8.9.1-1.1",
             "   | Main       | htop | 3.3.0-1.1"
         };
-        listRunner.Responses["zypper list-updates"] = new[]
+        listRunner.Responses["LC_ALL=C zypper --non-interactive list-updates"] = new[]
         {
             " S | Repository | Name | Current Version | Available Version",
             "---+------------+------+-----------------+-------------------",
@@ -354,11 +354,11 @@ internal static class AdditionalClientsTests
         PackageCommitOptions ask = new PackageCommitOptions { NoPrompt = false };
         PackageCommitOptions noPrompt = new PackageCommitOptions { NoPrompt = true };
         Check(client.GetCommandLineForPackageOperation(new[] { fresh, freshToo }, LinuxPackageInfo.PackageAction.Install, noPrompt) == "emerge --ask=n app-misc/hello app-editors/vim", "portage: install without confirmation");
-        Check(client.GetCommandLineForPackageOperation(new[] { fresh }, LinuxPackageInfo.PackageAction.Install, ask) == "emerge app-misc/hello", "portage: install asks by default");
-        Check(client.GetCommandLineForPackageOperation(new[] { fresh }, LinuxPackageInfo.PackageAction.Install, null) == "emerge app-misc/hello", "portage: install without options asks by default");
+        Check(client.GetCommandLineForPackageOperation(new[] { fresh }, LinuxPackageInfo.PackageAction.Install, ask) == "emerge --ask app-misc/hello", "portage: install asks by default");
+        Check(client.GetCommandLineForPackageOperation(new[] { fresh }, LinuxPackageInfo.PackageAction.Install, null) == "emerge --ask app-misc/hello", "portage: install without options asks by default");
         Check(client.GetCommandLineForPackageOperation(new[] { upgradeable }, LinuxPackageInfo.PackageAction.Install, noPrompt) == "emerge --ask=n dev-libs/glib", "portage: upgrade keeps the category");
         Check(client.GetCommandLineForPackageOperation(new[] { installed }, LinuxPackageInfo.PackageAction.Remove, noPrompt) == "emerge --ask=n --unmerge app-admin/sudo", "portage: remove without confirmation");
-        Check(client.GetCommandLineForPackageOperation(new[] { installed }, LinuxPackageInfo.PackageAction.Remove, ask) == "emerge --unmerge app-admin/sudo", "portage: remove asks by default");
+        Check(client.GetCommandLineForPackageOperation(new[] { installed }, LinuxPackageInfo.PackageAction.Remove, ask) == "emerge --ask --unmerge app-admin/sudo", "portage: remove asks by default");
         Check(client.GetCommandLineForPackageOperation(new[] { fresh }, LinuxPackageInfo.PackageAction.None, noPrompt) == null, "portage: unsupported action -> null");
         Check(client.GetCommandLineForPackageOperation(new LinuxPackageInfo[0], LinuxPackageInfo.PackageAction.Install, noPrompt) == null, "portage: empty selection -> null");
         Check(client.GetCommandLineForIndexUpdate() == "emerge --sync", "portage: refresh command");
