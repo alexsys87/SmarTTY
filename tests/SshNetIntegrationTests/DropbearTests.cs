@@ -46,7 +46,9 @@ internal static class DropbearTests
         };
         using SshSession session = new SshSession(parameters);
         Test.Check(session.Authenticate(user, password), "password authentication against Dropbear");
-        Test.Equal("BusyBox", (session.RunCommandChecked("ash --help 2>&1 | head -n 1", requireSuccess: false)?.Find((string line) => line.StartsWith("BusyBox")) ?? "").Split(' ')[0], "the login shell is BusyBox ash");
+        // The executable of the shell that runs the command (the command substitution keeps it alive meanwhile).
+        string shellExecutable = session.RunCommandChecked("echo $(readlink /proc/$$/exe)", requireSuccess: true)?.Find((string line) => line.Trim() != "")?.Trim() ?? "";
+        Test.Check(shellExecutable.EndsWith("/busybox"), "the login shell is BusyBox ash (" + shellExecutable + ")");
         // The helper exits at slightly different moments, so that some of its exits would fall into the PTY setup.
         const int iterations = 40;
         int failures = 0;
