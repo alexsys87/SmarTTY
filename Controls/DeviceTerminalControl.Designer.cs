@@ -103,340 +103,477 @@ public partial class DeviceTerminalControl
 
 	private void InitializeComponent()
 	{
-		components = new Container();
-		ComponentResourceManager resources = new ComponentResourceManager(typeof(DeviceTerminalControl));
-		HighlightStyle highlightStyle = new HighlightStyle();
-		pnlConnectionInProgress = new Panel();
-		linkLabel1 = new LinkLabel();
-		progressBar1 = new ProgressBar();
-		lblConnecting = new Label();
-		toolStrip1 = new ToolStrip();
-		lblConnection = new ToolStripLabel();
-		btnDisconnect = new ToolStripButton();
-		btnReconnect = new ToolStripButton();
-		btnSend = new ToolStripSplitButton();
-		sendAsHEXToolStripMenuItem = new ToolStripMenuItem();
-		sendImmediatelyToolStripMenuItem = new ToolStripMenuItem();
-		txtHexInput = new ToolStripTextBox();
-		lblSend = new ToolStripLabel();
-		toolStripButton1 = new ToolStripButton();
-		toolStripButton3 = new ToolStripSplitButton();
-		sendBinaryFileToolStripMenuItem = new ToolStripMenuItem();
-		sendFileViaXMODEMToolStripMenuItem = new ToolStripMenuItem();
-		sendFileViaXMODEM1KToolStripMenuItem = new ToolStripMenuItem();
-		receiveFileViaXMODEMToolStripMenuItem = new ToolStripMenuItem();
-		toolStripButton2 = new ToolStripButton();
-		toolStripDropDownButton1 = new ToolStripDropDownButton();
-		terminalTypeToolStripMenuItem = new ToolStripMenuItem();
-		cbASCII = new ToolStripMenuItem();
-		cbHEX = new ToolStripMenuItem();
-		cbBoth = new ToolStripMenuItem();
-		echoTypedCharactersToolStripMenuItem = new ToolStripMenuItem();
-		changeSettingsToolStripMenuItem = new ToolStripMenuItem();
-		lblBaudRate = new ToolStripLabel();
-		cbBaudRate = new ToolStripComboBox();
-		lblEncoding = new ToolStripLabel();
-		cbEncoding = new ToolStripComboBox();
-		btnLog = new ToolStripButton();
-		btnReplay = new ToolStripButton();
-		contextMenuStrip1 = new ContextMenuStrip(components);
-		copyToolStripMenuItem = new ToolStripMenuItem();
-		copyAllToolStripMenuItem = new ToolStripMenuItem();
-		pasteToolStripMenuItem = new ToolStripMenuItem();
-		_openFileDialog = new OpenFileDialog();
-		_saveFileDialog = new SaveFileDialog();
-		hexTerminalControl1 = new HexTerminalControl();
-		terminalEmulatorControl1 = new TerminalEmulatorControl();
-		pnlConnectionInProgress.SuspendLayout();
-		toolStrip1.SuspendLayout();
-		contextMenuStrip1.SuspendLayout();
-		SuspendLayout();
-		pnlConnectionInProgress.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-		pnlConnectionInProgress.Controls.Add(linkLabel1);
-		pnlConnectionInProgress.Controls.Add(progressBar1);
-		pnlConnectionInProgress.Controls.Add(lblConnecting);
-		pnlConnectionInProgress.Location = new Point(0, 0);
-		pnlConnectionInProgress.Name = "pnlConnectionInProgress";
-		pnlConnectionInProgress.Size = new Size(634, 236);
-		pnlConnectionInProgress.TabIndex = 1;
-		pnlConnectionInProgress.Visible = false;
-		linkLabel1.Anchor = AnchorStyles.None;
-		linkLabel1.AutoSize = true;
-		linkLabel1.Font = new Font("Microsoft Sans Serif", 14.25f, FontStyle.Regular, GraphicsUnit.Point, 0);
-		linkLabel1.Location = new Point(266, 123);
-		linkLabel1.Name = "linkLabel1";
-		linkLabel1.Size = new Size(88, 24);
-		linkLabel1.TabIndex = 2;
-		((Label)linkLabel1).TabStop = true;
-		linkLabel1.Text = "Try again";
-		linkLabel1.LinkClicked += linkLabel1_LinkClicked;
-		progressBar1.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-		progressBar1.Location = new Point(65, 123);
-		progressBar1.Name = "progressBar1";
-		progressBar1.Size = new Size(505, 23);
-		progressBar1.Style = ProgressBarStyle.Marquee;
-		progressBar1.TabIndex = 1;
-		lblConnecting.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-		lblConnecting.Font = new Font("Microsoft Sans Serif", 14.25f, FontStyle.Regular, GraphicsUnit.Point, 0);
-		lblConnecting.Location = new Point(3, 90);
-		lblConnecting.Name = "lblConnecting";
-		lblConnecting.Size = new Size(628, 30);
-		lblConnecting.TabIndex = 0;
-		lblConnecting.Text = "Connecting...";
-		lblConnecting.TextAlign = ContentAlignment.TopCenter;
-		toolStrip1.Items.AddRange(new ToolStripItem[16]
-		{
-			lblConnection, btnDisconnect, btnReconnect, btnSend, txtHexInput, lblSend, toolStripButton1, toolStripButton3, toolStripButton2, btnLog,
-			btnReplay, toolStripDropDownButton1, lblBaudRate, cbBaudRate, lblEncoding, cbEncoding
-		});
-		toolStrip1.Location = new Point(0, 0);
-		toolStrip1.Name = "toolStrip1";
-		toolStrip1.Size = new Size(634, 25);
-		toolStrip1.TabIndex = 3;
-		toolStrip1.Text = "Paste binary file";
-		lblConnection.Name = "lblConnection";
-		lblConnection.Size = new Size(65, 22);
-		lblConnection.Text = "Connected";
-		btnDisconnect.DisplayStyle = ToolStripItemDisplayStyle.Image;
-		btnDisconnect.Image = (Image)resources.GetObject("btnDisconnect.Image");
-		btnDisconnect.ImageTransparentColor = Color.Magenta;
-		btnDisconnect.Name = "btnDisconnect";
-		btnDisconnect.Size = new Size(23, 22);
-		btnDisconnect.Text = "Disconnect";
-		btnDisconnect.Click += btnDisconnect_Click;
-		btnReconnect.DisplayStyle = ToolStripItemDisplayStyle.Image;
-		btnReconnect.Image = (Image)resources.GetObject("btnReconnect.Image");
-		btnReconnect.ImageTransparentColor = Color.Magenta;
-		btnReconnect.Name = "btnReconnect";
-		btnReconnect.Size = new Size(23, 22);
-		btnReconnect.Text = "Reconnect";
-		btnReconnect.Click += btnReconnect_Click;
-		btnSend.Alignment = ToolStripItemAlignment.Right;
-		btnSend.DisplayStyle = ToolStripItemDisplayStyle.Image;
-		btnSend.DropDownItems.AddRange(new ToolStripItem[2] { sendAsHEXToolStripMenuItem, sendImmediatelyToolStripMenuItem });
-		btnSend.Image = (Image)resources.GetObject("btnSend.Image");
-		btnSend.ImageTransparentColor = Color.Magenta;
-		btnSend.Name = "btnSend";
-		btnSend.Size = new Size(32, 22);
-		btnSend.Text = "Send";
-		btnSend.ButtonClick += btnSend_ButtonClick;
-		sendAsHEXToolStripMenuItem.Checked = true;
-		sendAsHEXToolStripMenuItem.CheckState = CheckState.Checked;
-		sendAsHEXToolStripMenuItem.Name = "sendAsHEXToolStripMenuItem";
-		sendAsHEXToolStripMenuItem.Size = new Size(163, 22);
-		sendAsHEXToolStripMenuItem.Text = "Send as HEX";
-		sendAsHEXToolStripMenuItem.Click += sendAsHEXToolStripMenuItem_Click;
-		sendImmediatelyToolStripMenuItem.Checked = true;
-		sendImmediatelyToolStripMenuItem.CheckState = CheckState.Checked;
-		sendImmediatelyToolStripMenuItem.Name = "sendImmediatelyToolStripMenuItem";
-		sendImmediatelyToolStripMenuItem.Size = new Size(163, 22);
-		sendImmediatelyToolStripMenuItem.Text = "Send as you type";
-		sendImmediatelyToolStripMenuItem.Click += sendImmediatelyToolStripMenuItem_Click;
-		txtHexInput.Alignment = ToolStripItemAlignment.Right;
-		txtHexInput.Name = "txtHexInput";
-		txtHexInput.Size = new Size(100, 25);
-		txtHexInput.KeyDown += txtHexInput_KeyDown;
-		txtHexInput.KeyPress += txtHexInput_KeyPress;
-		txtHexInput.TextChanged += txtHexInput_TextChanged;
-		lblSend.Alignment = ToolStripItemAlignment.Right;
-		lblSend.Name = "lblSend";
-		lblSend.Size = new Size(72, 22);
-		lblSend.Text = "Send values:";
-		toolStripButton1.DisplayStyle = ToolStripItemDisplayStyle.Image;
-		toolStripButton1.Image = (Image)resources.GetObject("toolStripButton1.Image");
-		toolStripButton1.ImageTransparentColor = Color.Magenta;
-		toolStripButton1.Name = "toolStripButton1";
-		toolStripButton1.Size = new Size(23, 22);
-		toolStripButton1.Text = "Clear contents";
-		toolStripButton1.Click += toolStripButton1_Click;
-		toolStripButton3.DisplayStyle = ToolStripItemDisplayStyle.Image;
-		toolStripButton3.DropDownItems.AddRange(new ToolStripItem[4] { sendBinaryFileToolStripMenuItem, sendFileViaXMODEMToolStripMenuItem, sendFileViaXMODEM1KToolStripMenuItem, receiveFileViaXMODEMToolStripMenuItem });
-		toolStripButton3.Image = (Image)resources.GetObject("toolStripButton3.Image");
-		toolStripButton3.ImageTransparentColor = Color.Magenta;
-		toolStripButton3.Name = "toolStripButton3";
-		toolStripButton3.Size = new Size(32, 22);
-		toolStripButton3.Text = "File transfer";
-		toolStripButton3.ButtonClick += toolStripButton3_Click;
-		sendBinaryFileToolStripMenuItem.Name = "sendBinaryFileToolStripMenuItem";
-		sendBinaryFileToolStripMenuItem.Size = new Size(210, 22);
-		sendBinaryFileToolStripMenuItem.Text = "Send binary file";
-		sendBinaryFileToolStripMenuItem.Click += toolStripButton3_Click;
-		sendFileViaXMODEMToolStripMenuItem.Name = "sendFileViaXMODEMToolStripMenuItem";
-		sendFileViaXMODEMToolStripMenuItem.Size = new Size(210, 22);
-		sendFileViaXMODEMToolStripMenuItem.Text = "Send file via XMODEM...";
-		sendFileViaXMODEMToolStripMenuItem.Click += sendFileViaXMODEMToolStripMenuItem_Click;
-		sendFileViaXMODEM1KToolStripMenuItem.Name = "sendFileViaXMODEM1KToolStripMenuItem";
-		sendFileViaXMODEM1KToolStripMenuItem.Size = new Size(210, 22);
-		sendFileViaXMODEM1KToolStripMenuItem.Text = "Send file via XMODEM-1K...";
-		sendFileViaXMODEM1KToolStripMenuItem.Click += sendFileViaXMODEM1KToolStripMenuItem_Click;
-		receiveFileViaXMODEMToolStripMenuItem.Name = "receiveFileViaXMODEMToolStripMenuItem";
-		receiveFileViaXMODEMToolStripMenuItem.Size = new Size(210, 22);
-		receiveFileViaXMODEMToolStripMenuItem.Text = "Receive file via XMODEM...";
-		receiveFileViaXMODEMToolStripMenuItem.Click += receiveFileViaXMODEMToolStripMenuItem_Click;
-		toolStripButton2.DisplayStyle = ToolStripItemDisplayStyle.Image;
-		toolStripButton2.Image = (Image)resources.GetObject("toolStripButton2.Image");
-		toolStripButton2.ImageTransparentColor = Color.Magenta;
-		toolStripButton2.Name = "toolStripButton2";
-		toolStripButton2.Size = new Size(23, 22);
-		toolStripButton2.Text = "Save output to file";
-		toolStripButton2.Click += toolStripButton2_Click;
-		btnLog.DisplayStyle = ToolStripItemDisplayStyle.Text;
-		btnLog.Name = "btnLog";
-		btnLog.Size = new Size(60, 22);
-		btnLog.Text = "Start log";
-		btnLog.ToolTipText = "Continuously record received data to a file";
-		btnLog.Click += btnLog_Click;
-		btnReplay.DisplayStyle = ToolStripItemDisplayStyle.Text;
-		btnReplay.Name = "btnReplay";
-		btnReplay.Size = new Size(60, 22);
-		btnReplay.Text = "Replay";
-		btnReplay.ToolTipText = "Play a recorded log of received data back into this terminal";
-		btnReplay.Click += btnReplay_Click;
-		toolStripDropDownButton1.DisplayStyle = ToolStripItemDisplayStyle.Image;
-		toolStripDropDownButton1.DropDownItems.AddRange(new ToolStripItem[3] { terminalTypeToolStripMenuItem, echoTypedCharactersToolStripMenuItem, changeSettingsToolStripMenuItem });
-		toolStripDropDownButton1.Image = (Image)resources.GetObject("toolStripDropDownButton1.Image");
-		toolStripDropDownButton1.ImageTransparentColor = Color.Magenta;
-		toolStripDropDownButton1.Name = "toolStripDropDownButton1";
-		toolStripDropDownButton1.Size = new Size(29, 22);
-		toolStripDropDownButton1.Text = "Settings";
-		terminalTypeToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[3] { cbASCII, cbHEX, cbBoth });
-		terminalTypeToolStripMenuItem.Name = "terminalTypeToolStripMenuItem";
-		terminalTypeToolStripMenuItem.Size = new Size(190, 22);
-		terminalTypeToolStripMenuItem.Text = "Terminal type";
-		cbASCII.Name = "cbASCII";
-		cbASCII.Size = new Size(102, 22);
-		cbASCII.Text = "ASCII";
-		cbASCII.Click += cbASCII_Click;
-		cbHEX.Name = "cbHEX";
-		cbHEX.Size = new Size(102, 22);
-		cbHEX.Text = "HEX";
-		cbHEX.Click += cbHEX_Click;
-		cbBoth.Name = "cbBoth";
-		cbBoth.Size = new Size(102, 22);
-		cbBoth.Text = "Text + HEX";
-		cbBoth.Click += cbBoth_Click;
-		echoTypedCharactersToolStripMenuItem.Name = "echoTypedCharactersToolStripMenuItem";
-		echoTypedCharactersToolStripMenuItem.Size = new Size(190, 22);
-		echoTypedCharactersToolStripMenuItem.Text = "Echo typed characters";
-		echoTypedCharactersToolStripMenuItem.Click += echoTypedCharactersToolStripMenuItem_Click;
-		changeSettingsToolStripMenuItem.Name = "changeSettingsToolStripMenuItem";
-		changeSettingsToolStripMenuItem.Size = new Size(190, 22);
-		changeSettingsToolStripMenuItem.Text = "Connection settings...";
-		changeSettingsToolStripMenuItem.Click += changeSettingsToolStripMenuItem_Click;
-		lblBaudRate.Name = "lblBaudRate";
-		lblBaudRate.Size = new Size(60, 22);
-		lblBaudRate.Text = "Baud rate:";
-		cbBaudRate.Items.AddRange(new object[14] { "1200", "2400", "4800", "9600", "19200", "38400", "57600", "74880", "115200", "230400", "460800", "921600", "1000000", "2000000" });
-		cbBaudRate.Name = "cbBaudRate";
-		cbBaudRate.Size = new Size(121, 25);
-		cbBaudRate.SelectedIndexChanged += cbBaudRate_SelectedIndexChanged;
-		cbBaudRate.Leave += cbBaudRate_Leave;
-		cbBaudRate.KeyDown += cbBaudRate_KeyDown;
-		lblEncoding.Name = "lblEncoding";
-		lblEncoding.Size = new Size(58, 22);
-		lblEncoding.Text = "Encoding:";
-		cbEncoding.DropDownStyle = ComboBoxStyle.DropDownList;
-		cbEncoding.Name = "cbEncoding";
-		cbEncoding.Size = new Size(170, 25);
-		cbEncoding.ToolTipText = "Text encoding used to decode received data and to encode typed and pasted text";
-		cbEncoding.SelectedIndexChanged += cbEncoding_SelectedIndexChanged;
-		contextMenuStrip1.Items.AddRange(new ToolStripItem[3] { copyToolStripMenuItem, copyAllToolStripMenuItem, pasteToolStripMenuItem });
-		contextMenuStrip1.Name = "contextMenuStrip1";
-		contextMenuStrip1.Size = new Size(200, 70);
-		contextMenuStrip1.Opening += contextMenuStrip1_Opening;
-		copyToolStripMenuItem.Image = SmarTTY.Properties.Resources.CopyHS;
-		copyToolStripMenuItem.Name = "copyToolStripMenuItem";
-		copyToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+C";
-		copyToolStripMenuItem.Size = new Size(199, 22);
-		copyToolStripMenuItem.Text = "Copy";
-		copyToolStripMenuItem.Click += copyToolStripMenuItem_Click;
-		copyAllToolStripMenuItem.Image = (Image)resources.GetObject("copyAllToolStripMenuItem.Image");
-		copyAllToolStripMenuItem.Name = "copyAllToolStripMenuItem";
-		copyAllToolStripMenuItem.Size = new Size(199, 22);
-		copyAllToolStripMenuItem.Text = "Copy all";
-		copyAllToolStripMenuItem.Click += copyAllToolStripMenuItem_Click;
-		pasteToolStripMenuItem.Image = (Image)resources.GetObject("pasteToolStripMenuItem.Image");
-		pasteToolStripMenuItem.Name = "pasteToolStripMenuItem";
-		pasteToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+V";
-		pasteToolStripMenuItem.Size = new Size(199, 22);
-		pasteToolStripMenuItem.Text = "Paste";
-		pasteToolStripMenuItem.Click += pasteToolStripMenuItem_Click;
-		_openFileDialog.Filter = "All files|*.*";
-		_openFileDialog.Title = "Send a binary file";
-		_saveFileDialog.Filter = "All files|*.*";
-		_saveFileDialog.Title = "Save output to a file";
-		hexTerminalControl1.ContextMenuStrip = contextMenuStrip1;
-		hexTerminalControl1.Dock = DockStyle.Fill;
-		hexTerminalControl1.HideCaret = false;
-		hexTerminalControl1.Location = new Point(0, 0);
-		hexTerminalControl1.Name = "hexTerminalControl1";
-		hexTerminalControl1.Size = new Size(634, 236);
-		hexTerminalControl1.TabIndex = 4;
-		hexTerminalControl1.KeyPress += hexTerminalControl1_KeyPress;
-		hexTerminalControl1.KeyDown += OnTerminalKeyDown;
-		terminalEmulatorControl1.ActiveBufferIndex = 0;
-		terminalEmulatorControl1.AutoScroll = true;
-		terminalEmulatorControl1.AutoWrap = true;
-		terminalEmulatorControl1.BackColor = Color.Black;
-		terminalEmulatorControl1.BellMode = TerminalEmulatorControl.BeepMode.None;
-		terminalEmulatorControl1.BellSoundFile = null;
-		terminalEmulatorControl1.NoLeftPadding = false;
-		terminalEmulatorControl1.NormalTextColor = Color.White;
-		terminalEmulatorControl1.CaptureDialogKeys = false;
-		((ReadonlyTextBrowser)terminalEmulatorControl1).CaretBounds = new Rectangle(0, 0, 0, 0);
-		((ReadonlyTextBrowser)terminalEmulatorControl1).TerminalMode = true;
-		terminalEmulatorControl1.ContextMenuStrip = contextMenuStrip1;
-		terminalEmulatorControl1.TabWidth = 8;
-		terminalEmulatorControl1.Dock = DockStyle.Fill;
-		terminalEmulatorControl1.LayoutSuspended = false;
-		terminalEmulatorControl1.Font = new Font("Courier New", 12f, FontStyle.Regular, GraphicsUnit.Point, 204);
-		terminalEmulatorControl1.ForeColor = Color.LightGray;
-		terminalEmulatorControl1.NavigationLocked = true;
-		terminalEmulatorControl1.NoHorizontalScroll = false;
-		terminalEmulatorControl1.HideCaret = false;
-		terminalEmulatorControl1.HideMargins = true;
-		terminalEmulatorControl1.HorizontalScrollBarVisible = false;
-		terminalEmulatorControl1.ForwardAltF4 = false;
-		terminalEmulatorControl1.MaxChunkLength = 0;
-		terminalEmulatorControl1.ShowLineNumbers = true;
-		terminalEmulatorControl1.TopLine = 0;
-		terminalEmulatorControl1.Location = new Point(0, 0);
-		terminalEmulatorControl1.SelectionStyle = highlightStyle;
-		terminalEmulatorControl1.Margin = new Padding(5, 4, 5, 4);
-		terminalEmulatorControl1.UnusedValue = 0;
-		terminalEmulatorControl1.MouseMode = TerminalEmulatorControl.MouseReportingMode.Off;
-		terminalEmulatorControl1.Name = "terminalEmulatorControl1";
-		terminalEmulatorControl1.EnterSequence = null;
-		((ReadonlyTextBrowser)terminalEmulatorControl1).OverwriteMode = false;
-		((EditableTextBrowser)terminalEmulatorControl1).ReadOnly = true;
-		terminalEmulatorControl1.CaretWhenUnfocused = false;
-		terminalEmulatorControl1.ShowUnrecognizedAsHex = false;
-		terminalEmulatorControl1.SingleLine = false;
-		terminalEmulatorControl1.Size = new Size(634, 236);
-		((ReadonlySmartScrollBrowser)terminalEmulatorControl1).SmartAutoScroll = false;
-		terminalEmulatorControl1.TabIndex = 0;
-		((ReadonlyTextBrowser)terminalEmulatorControl1).TabSize = 4;
-		terminalEmulatorControl1.ScrollbackLimit = int.MaxValue;
-		terminalEmulatorControl1.Title = null;
-		((ReadonlyTextBrowser)terminalEmulatorControl1).GroupBinaryDigits = false;
-		terminalEmulatorControl1.IsModified = false;
-		terminalEmulatorControl1.VerticalScrollBarVisible = true;
-		terminalEmulatorControl1.Dispatcher = null;
-		terminalEmulatorControl1.DataEntered += OnTerminalDataEntered;
-		terminalEmulatorControl1.KeyDown += OnTerminalKeyDown;
-		Controls.Add(toolStrip1);
-		Controls.Add(hexTerminalControl1);
-		Controls.Add(terminalEmulatorControl1);
-		Controls.Add(pnlConnectionInProgress);
-		Name = "DeviceTerminalControl";
-		Size = new Size(634, 236);
-		pnlConnectionInProgress.ResumeLayout(performLayout: false);
-		pnlConnectionInProgress.PerformLayout();
-		toolStrip1.ResumeLayout(performLayout: false);
-		toolStrip1.PerformLayout();
-		contextMenuStrip1.ResumeLayout(performLayout: false);
-		ResumeLayout(performLayout: false);
-		PerformLayout();
+            this.components = new System.ComponentModel.Container();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(DeviceTerminalControl));
+            SmarTTY.TextEditing.HighlightStyle highlightStyle1 = new SmarTTY.TextEditing.HighlightStyle();
+            this.pnlConnectionInProgress = new System.Windows.Forms.Panel();
+            this.linkLabel1 = new System.Windows.Forms.LinkLabel();
+            this.progressBar1 = new System.Windows.Forms.ProgressBar();
+            this.lblConnecting = new System.Windows.Forms.Label();
+            this.toolStrip1 = new System.Windows.Forms.ToolStrip();
+            this.lblConnection = new System.Windows.Forms.ToolStripLabel();
+            this.btnDisconnect = new System.Windows.Forms.ToolStripButton();
+            this.btnReconnect = new System.Windows.Forms.ToolStripButton();
+            this.btnSend = new System.Windows.Forms.ToolStripSplitButton();
+            this.sendAsHEXToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.sendImmediatelyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.txtHexInput = new System.Windows.Forms.ToolStripTextBox();
+            this.lblSend = new System.Windows.Forms.ToolStripLabel();
+            this.toolStripButton1 = new System.Windows.Forms.ToolStripButton();
+            this.toolStripButton3 = new System.Windows.Forms.ToolStripSplitButton();
+            this.sendBinaryFileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.sendFileViaXMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.sendFileViaXMODEM1KToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.receiveFileViaXMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripButton2 = new System.Windows.Forms.ToolStripButton();
+            this.btnLog = new System.Windows.Forms.ToolStripButton();
+            this.btnReplay = new System.Windows.Forms.ToolStripButton();
+            this.toolStripDropDownButton1 = new System.Windows.Forms.ToolStripDropDownButton();
+            this.terminalTypeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.cbASCII = new System.Windows.Forms.ToolStripMenuItem();
+            this.cbHEX = new System.Windows.Forms.ToolStripMenuItem();
+            this.cbBoth = new System.Windows.Forms.ToolStripMenuItem();
+            this.echoTypedCharactersToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.changeSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.lblBaudRate = new System.Windows.Forms.ToolStripLabel();
+            this.cbBaudRate = new System.Windows.Forms.ToolStripComboBox();
+            this.lblEncoding = new System.Windows.Forms.ToolStripLabel();
+            this.cbEncoding = new System.Windows.Forms.ToolStripComboBox();
+            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.copyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.copyAllToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.pasteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this._openFileDialog = new System.Windows.Forms.OpenFileDialog();
+            this._saveFileDialog = new System.Windows.Forms.SaveFileDialog();
+            this.hexTerminalControl1 = new SmarTTY.Controls.HexTerminalControl();
+            this.terminalEmulatorControl1 = new SmarTTY.Controls.TerminalEmulatorControl();
+            this.pnlConnectionInProgress.SuspendLayout();
+            this.toolStrip1.SuspendLayout();
+            this.contextMenuStrip1.SuspendLayout();
+            this.SuspendLayout();
+            // 
+            // pnlConnectionInProgress
+            // 
+            this.pnlConnectionInProgress.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.pnlConnectionInProgress.Controls.Add(this.linkLabel1);
+            this.pnlConnectionInProgress.Controls.Add(this.progressBar1);
+            this.pnlConnectionInProgress.Controls.Add(this.lblConnecting);
+            this.pnlConnectionInProgress.Location = new System.Drawing.Point(0, 0);
+            this.pnlConnectionInProgress.Name = "pnlConnectionInProgress";
+            this.pnlConnectionInProgress.Size = new System.Drawing.Size(634, 236);
+            this.pnlConnectionInProgress.TabIndex = 1;
+            this.pnlConnectionInProgress.Visible = false;
+            // 
+            // linkLabel1
+            // 
+            this.linkLabel1.Anchor = System.Windows.Forms.AnchorStyles.None;
+            this.linkLabel1.AutoSize = true;
+            this.linkLabel1.Font = new System.Drawing.Font("Microsoft Sans Serif", 14.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.linkLabel1.Location = new System.Drawing.Point(266, 123);
+            this.linkLabel1.Name = "linkLabel1";
+            this.linkLabel1.Size = new System.Drawing.Size(88, 24);
+            this.linkLabel1.TabIndex = 2;
+            this.linkLabel1.TabStop = true;
+            this.linkLabel1.Text = "Try again";
+            // 
+            // progressBar1
+            // 
+            this.progressBar1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.progressBar1.Location = new System.Drawing.Point(65, 123);
+            this.progressBar1.Name = "progressBar1";
+            this.progressBar1.Size = new System.Drawing.Size(505, 23);
+            this.progressBar1.Style = System.Windows.Forms.ProgressBarStyle.Marquee;
+            this.progressBar1.TabIndex = 1;
+            // 
+            // lblConnecting
+            // 
+            this.lblConnecting.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblConnecting.Font = new System.Drawing.Font("Microsoft Sans Serif", 14.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblConnecting.Location = new System.Drawing.Point(3, 90);
+            this.lblConnecting.Name = "lblConnecting";
+            this.lblConnecting.Size = new System.Drawing.Size(628, 30);
+            this.lblConnecting.TabIndex = 0;
+            this.lblConnecting.Text = "Connecting...";
+            this.lblConnecting.TextAlign = System.Drawing.ContentAlignment.TopCenter;
+            // 
+            // toolStrip1
+            // 
+            this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.lblConnection,
+            this.btnDisconnect,
+            this.btnReconnect,
+            this.btnSend,
+            this.txtHexInput,
+            this.lblSend,
+            this.toolStripButton1,
+            this.toolStripButton3,
+            this.toolStripButton2,
+            this.btnLog,
+            this.btnReplay,
+            this.toolStripDropDownButton1,
+            this.lblBaudRate,
+            this.cbBaudRate,
+            this.lblEncoding,
+            this.cbEncoding});
+            this.toolStrip1.Location = new System.Drawing.Point(0, 0);
+            this.toolStrip1.Name = "toolStrip1";
+            this.toolStrip1.Size = new System.Drawing.Size(634, 27);
+            this.toolStrip1.TabIndex = 3;
+            this.toolStrip1.Text = "Paste binary file";
+            // 
+            // lblConnection
+            // 
+            this.lblConnection.Name = "lblConnection";
+            this.lblConnection.Size = new System.Drawing.Size(65, 24);
+            this.lblConnection.Text = "Connected";
+            // 
+            // btnDisconnect
+            // 
+            this.btnDisconnect.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.btnDisconnect.Image = ((System.Drawing.Image)(resources.GetObject("btnDisconnect.Image")));
+            this.btnDisconnect.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnDisconnect.Name = "btnDisconnect";
+            this.btnDisconnect.Size = new System.Drawing.Size(23, 24);
+            this.btnDisconnect.Text = "Disconnect";
+            // 
+            // btnReconnect
+            // 
+            this.btnReconnect.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.btnReconnect.Image = ((System.Drawing.Image)(resources.GetObject("btnReconnect.Image")));
+            this.btnReconnect.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnReconnect.Name = "btnReconnect";
+            this.btnReconnect.Size = new System.Drawing.Size(23, 24);
+            this.btnReconnect.Text = "Reconnect";
+            // 
+            // btnSend
+            // 
+            this.btnSend.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+            this.btnSend.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.btnSend.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.sendAsHEXToolStripMenuItem,
+            this.sendImmediatelyToolStripMenuItem});
+            this.btnSend.Image = ((System.Drawing.Image)(resources.GetObject("btnSend.Image")));
+            this.btnSend.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnSend.Name = "btnSend";
+            this.btnSend.Size = new System.Drawing.Size(32, 24);
+            this.btnSend.Text = "Send";
+            // 
+            // sendAsHEXToolStripMenuItem
+            // 
+            this.sendAsHEXToolStripMenuItem.Checked = true;
+            this.sendAsHEXToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.sendAsHEXToolStripMenuItem.Name = "sendAsHEXToolStripMenuItem";
+            this.sendAsHEXToolStripMenuItem.Size = new System.Drawing.Size(163, 22);
+            this.sendAsHEXToolStripMenuItem.Text = "Send as HEX";
+            // 
+            // sendImmediatelyToolStripMenuItem
+            // 
+            this.sendImmediatelyToolStripMenuItem.Checked = true;
+            this.sendImmediatelyToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.sendImmediatelyToolStripMenuItem.Name = "sendImmediatelyToolStripMenuItem";
+            this.sendImmediatelyToolStripMenuItem.Size = new System.Drawing.Size(163, 22);
+            this.sendImmediatelyToolStripMenuItem.Text = "Send as you type";
+            // 
+            // txtHexInput
+            // 
+            this.txtHexInput.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+            this.txtHexInput.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.txtHexInput.Name = "txtHexInput";
+            this.txtHexInput.Size = new System.Drawing.Size(100, 27);
+            // 
+            // lblSend
+            // 
+            this.lblSend.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+            this.lblSend.Name = "lblSend";
+            this.lblSend.Size = new System.Drawing.Size(72, 24);
+            this.lblSend.Text = "Send values:";
+            // 
+            // toolStripButton1
+            // 
+            this.toolStripButton1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.toolStripButton1.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton1.Image")));
+            this.toolStripButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.toolStripButton1.Name = "toolStripButton1";
+            this.toolStripButton1.Size = new System.Drawing.Size(23, 24);
+            this.toolStripButton1.Text = "Clear contents";
+            // 
+            // toolStripButton3
+            // 
+            this.toolStripButton3.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.toolStripButton3.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.sendBinaryFileToolStripMenuItem,
+            this.sendFileViaXMODEMToolStripMenuItem,
+            this.sendFileViaXMODEM1KToolStripMenuItem,
+            this.receiveFileViaXMODEMToolStripMenuItem});
+            this.toolStripButton3.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton3.Image")));
+            this.toolStripButton3.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.toolStripButton3.Name = "toolStripButton3";
+            this.toolStripButton3.Size = new System.Drawing.Size(32, 24);
+            this.toolStripButton3.Text = "File transfer";
+            // 
+            // sendBinaryFileToolStripMenuItem
+            // 
+            this.sendBinaryFileToolStripMenuItem.Name = "sendBinaryFileToolStripMenuItem";
+            this.sendBinaryFileToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.sendBinaryFileToolStripMenuItem.Text = "Send binary file";
+            // 
+            // sendFileViaXMODEMToolStripMenuItem
+            // 
+            this.sendFileViaXMODEMToolStripMenuItem.Name = "sendFileViaXMODEMToolStripMenuItem";
+            this.sendFileViaXMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.sendFileViaXMODEMToolStripMenuItem.Text = "Send file via XMODEM...";
+            // 
+            // sendFileViaXMODEM1KToolStripMenuItem
+            // 
+            this.sendFileViaXMODEM1KToolStripMenuItem.Name = "sendFileViaXMODEM1KToolStripMenuItem";
+            this.sendFileViaXMODEM1KToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.sendFileViaXMODEM1KToolStripMenuItem.Text = "Send file via XMODEM-1K...";
+            // 
+            // receiveFileViaXMODEMToolStripMenuItem
+            // 
+            this.receiveFileViaXMODEMToolStripMenuItem.Name = "receiveFileViaXMODEMToolStripMenuItem";
+            this.receiveFileViaXMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.receiveFileViaXMODEMToolStripMenuItem.Text = "Receive file via XMODEM...";
+            // 
+            // toolStripButton2
+            // 
+            this.toolStripButton2.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.toolStripButton2.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton2.Image")));
+            this.toolStripButton2.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.toolStripButton2.Name = "toolStripButton2";
+            this.toolStripButton2.Size = new System.Drawing.Size(23, 24);
+            this.toolStripButton2.Text = "Save output to file";
+            // 
+            // btnLog
+            // 
+            this.btnLog.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.btnLog.Name = "btnLog";
+            this.btnLog.Size = new System.Drawing.Size(55, 24);
+            this.btnLog.Text = "Start log";
+            this.btnLog.ToolTipText = "Continuously record received data to a file";
+            // 
+            // btnReplay
+            // 
+            this.btnReplay.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.btnReplay.Name = "btnReplay";
+            this.btnReplay.Size = new System.Drawing.Size(46, 24);
+            this.btnReplay.Text = "Replay";
+            this.btnReplay.ToolTipText = "Play a recorded log of received data back into this terminal";
+            // 
+            // toolStripDropDownButton1
+            // 
+            this.toolStripDropDownButton1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            this.toolStripDropDownButton1.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.terminalTypeToolStripMenuItem,
+            this.echoTypedCharactersToolStripMenuItem,
+            this.changeSettingsToolStripMenuItem});
+            this.toolStripDropDownButton1.Image = ((System.Drawing.Image)(resources.GetObject("toolStripDropDownButton1.Image")));
+            this.toolStripDropDownButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.toolStripDropDownButton1.Name = "toolStripDropDownButton1";
+            this.toolStripDropDownButton1.Size = new System.Drawing.Size(29, 24);
+            this.toolStripDropDownButton1.Text = "Settings";
+            // 
+            // terminalTypeToolStripMenuItem
+            // 
+            this.terminalTypeToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.cbASCII,
+            this.cbHEX,
+            this.cbBoth});
+            this.terminalTypeToolStripMenuItem.Name = "terminalTypeToolStripMenuItem";
+            this.terminalTypeToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
+            this.terminalTypeToolStripMenuItem.Text = "Terminal type";
+            // 
+            // cbASCII
+            // 
+            this.cbASCII.Name = "cbASCII";
+            this.cbASCII.Size = new System.Drawing.Size(131, 22);
+            this.cbASCII.Text = "ASCII";
+            // 
+            // cbHEX
+            // 
+            this.cbHEX.Name = "cbHEX";
+            this.cbHEX.Size = new System.Drawing.Size(131, 22);
+            this.cbHEX.Text = "HEX";
+            // 
+            // cbBoth
+            // 
+            this.cbBoth.Name = "cbBoth";
+            this.cbBoth.Size = new System.Drawing.Size(131, 22);
+            this.cbBoth.Text = "Text + HEX";
+            // 
+            // echoTypedCharactersToolStripMenuItem
+            // 
+            this.echoTypedCharactersToolStripMenuItem.Name = "echoTypedCharactersToolStripMenuItem";
+            this.echoTypedCharactersToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
+            this.echoTypedCharactersToolStripMenuItem.Text = "Echo typed characters";
+            // 
+            // changeSettingsToolStripMenuItem
+            // 
+            this.changeSettingsToolStripMenuItem.Name = "changeSettingsToolStripMenuItem";
+            this.changeSettingsToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
+            this.changeSettingsToolStripMenuItem.Text = "Connection settings...";
+            // 
+            // lblBaudRate
+            // 
+            this.lblBaudRate.Name = "lblBaudRate";
+            this.lblBaudRate.Size = new System.Drawing.Size(60, 24);
+            this.lblBaudRate.Text = "Baud rate:";
+            // 
+            // cbBaudRate
+            // 
+            this.cbBaudRate.Items.AddRange(new object[] {
+            "1200",
+            "2400",
+            "4800",
+            "9600",
+            "19200",
+            "38400",
+            "57600",
+            "74880",
+            "115200",
+            "230400",
+            "460800",
+            "921600",
+            "1000000",
+            "2000000"});
+            this.cbBaudRate.Name = "cbBaudRate";
+            this.cbBaudRate.Size = new System.Drawing.Size(121, 23);
+            // 
+            // lblEncoding
+            // 
+            this.lblEncoding.Name = "lblEncoding";
+            this.lblEncoding.Size = new System.Drawing.Size(60, 15);
+            this.lblEncoding.Text = "Encoding:";
+            // 
+            // cbEncoding
+            // 
+            this.cbEncoding.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cbEncoding.Name = "cbEncoding";
+            this.cbEncoding.Size = new System.Drawing.Size(170, 23);
+            this.cbEncoding.ToolTipText = "Text encoding used to decode received data and to encode typed and pasted text";
+            // 
+            // contextMenuStrip1
+            // 
+            this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.copyToolStripMenuItem,
+            this.copyAllToolStripMenuItem,
+            this.pasteToolStripMenuItem});
+            this.contextMenuStrip1.Name = "contextMenuStrip1";
+            this.contextMenuStrip1.Size = new System.Drawing.Size(177, 70);
+            // 
+            // copyToolStripMenuItem
+            // 
+            this.copyToolStripMenuItem.Image = ((System.Drawing.Image)(resources.GetObject("copyToolStripMenuItem.Image")));
+            this.copyToolStripMenuItem.Name = "copyToolStripMenuItem";
+            this.copyToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+C";
+            this.copyToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
+            this.copyToolStripMenuItem.Text = "Copy";
+            // 
+            // copyAllToolStripMenuItem
+            // 
+            this.copyAllToolStripMenuItem.Image = ((System.Drawing.Image)(resources.GetObject("copyAllToolStripMenuItem.Image")));
+            this.copyAllToolStripMenuItem.Name = "copyAllToolStripMenuItem";
+            this.copyAllToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
+            this.copyAllToolStripMenuItem.Text = "Copy all";
+            // 
+            // pasteToolStripMenuItem
+            // 
+            this.pasteToolStripMenuItem.Image = ((System.Drawing.Image)(resources.GetObject("pasteToolStripMenuItem.Image")));
+            this.pasteToolStripMenuItem.Name = "pasteToolStripMenuItem";
+            this.pasteToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+V";
+            this.pasteToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
+            this.pasteToolStripMenuItem.Text = "Paste";
+            // 
+            // _openFileDialog
+            // 
+            this._openFileDialog.Filter = "All files|*.*";
+            this._openFileDialog.Title = "Send a binary file";
+            // 
+            // _saveFileDialog
+            // 
+            this._saveFileDialog.Filter = "All files|*.*";
+            this._saveFileDialog.Title = "Save output to a file";
+            // 
+            // hexTerminalControl1
+            // 
+            this.hexTerminalControl1.ContextMenuStrip = this.contextMenuStrip1;
+            this.hexTerminalControl1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.hexTerminalControl1.HideCaret = false;
+            this.hexTerminalControl1.Location = new System.Drawing.Point(0, 0);
+            this.hexTerminalControl1.Name = "hexTerminalControl1";
+            this.hexTerminalControl1.Size = new System.Drawing.Size(634, 236);
+            this.hexTerminalControl1.TabIndex = 4;
+            this.hexTerminalControl1.TextScrollBarVisible = true;
+            // 
+            // terminalEmulatorControl1
+            // 
+            this.terminalEmulatorControl1.ActiveBufferIndex = 0;
+            this.terminalEmulatorControl1.AutoScroll = true;
+            this.terminalEmulatorControl1.AutoWrap = true;
+            this.terminalEmulatorControl1.BackColor = System.Drawing.Color.Black;
+            this.terminalEmulatorControl1.BellMode = SmarTTY.Controls.TerminalEmulatorControl.BeepMode.None;
+            this.terminalEmulatorControl1.BellSoundFile = null;
+            this.terminalEmulatorControl1.CaptureDialogKeys = false;
+            this.terminalEmulatorControl1.CaretBounds = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.terminalEmulatorControl1.CaretWhenUnfocused = false;
+            this.terminalEmulatorControl1.ContextMenuStrip = this.contextMenuStrip1;
+            this.terminalEmulatorControl1.Dispatcher = null;
+            this.terminalEmulatorControl1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.terminalEmulatorControl1.EnterSequence = null;
+            this.terminalEmulatorControl1.Font = new System.Drawing.Font("Courier New", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
+            this.terminalEmulatorControl1.ForeColor = System.Drawing.Color.LightGray;
+            this.terminalEmulatorControl1.ForwardAltF4 = false;
+            this.terminalEmulatorControl1.GroupBinaryDigits = false;
+            this.terminalEmulatorControl1.HideCaret = false;
+            this.terminalEmulatorControl1.HideMargins = true;
+            this.terminalEmulatorControl1.HorizontalScrollBarVisible = false;
+            this.terminalEmulatorControl1.IsModified = false;
+            this.terminalEmulatorControl1.LayoutSuspended = false;
+            this.terminalEmulatorControl1.Location = new System.Drawing.Point(0, 0);
+            this.terminalEmulatorControl1.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
+            this.terminalEmulatorControl1.MaxChunkLength = 0;
+            this.terminalEmulatorControl1.MouseMode = SmarTTY.Controls.TerminalEmulatorControl.MouseReportingMode.Off;
+            this.terminalEmulatorControl1.Name = "terminalEmulatorControl1";
+            this.terminalEmulatorControl1.NavigationLocked = true;
+            this.terminalEmulatorControl1.NoHorizontalScroll = false;
+            this.terminalEmulatorControl1.NoLeftPadding = false;
+            this.terminalEmulatorControl1.NormalTextColor = System.Drawing.Color.White;
+            this.terminalEmulatorControl1.OverwriteMode = false;
+            this.terminalEmulatorControl1.ReadOnly = true;
+            this.terminalEmulatorControl1.ScrollbackLimit = 2147483647;
+            this.terminalEmulatorControl1.SelectionStyle = highlightStyle1;
+            this.terminalEmulatorControl1.ShowLineNumbers = true;
+            this.terminalEmulatorControl1.ShowUnrecognizedAsHex = false;
+            this.terminalEmulatorControl1.SingleLine = false;
+            this.terminalEmulatorControl1.Size = new System.Drawing.Size(634, 236);
+            this.terminalEmulatorControl1.SmartAutoScroll = false;
+            this.terminalEmulatorControl1.TabIndex = 0;
+            this.terminalEmulatorControl1.TabSize = 4;
+            this.terminalEmulatorControl1.TabWidth = 8;
+            this.terminalEmulatorControl1.TerminalMode = true;
+            this.terminalEmulatorControl1.Title = null;
+            this.terminalEmulatorControl1.TopLine = 0;
+            this.terminalEmulatorControl1.UnusedValue = 0;
+            this.terminalEmulatorControl1.VerticalScrollBarVisible = true;
+            // 
+            // DeviceTerminalControl
+            // 
+            this.Controls.Add(this.toolStrip1);
+            this.Controls.Add(this.hexTerminalControl1);
+            this.Controls.Add(this.terminalEmulatorControl1);
+            this.Controls.Add(this.pnlConnectionInProgress);
+            this.Name = "DeviceTerminalControl";
+            this.Size = new System.Drawing.Size(634, 236);
+            this.pnlConnectionInProgress.ResumeLayout(false);
+            this.pnlConnectionInProgress.PerformLayout();
+            this.toolStrip1.ResumeLayout(false);
+            this.toolStrip1.PerformLayout();
+            this.contextMenuStrip1.ResumeLayout(false);
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
 	}
 
 }

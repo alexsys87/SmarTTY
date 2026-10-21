@@ -43,15 +43,15 @@ internal class Resources
         }
     }
 
-    internal static Bitmap add16 => (Bitmap)ResourceManager.GetObject("add16", resourceCulture);
+    public static Bitmap add16 => (Bitmap)ResourceManager.GetObject("add16", resourceCulture);
 
-    internal static Bitmap CopyHS => (Bitmap)ResourceManager.GetObject("CopyHS", resourceCulture);
+    public static Bitmap CopyHS => (Bitmap)ResourceManager.GetObject("CopyHS", resourceCulture);
 
-    internal static Bitmap delete16 => (Bitmap)ResourceManager.GetObject("delete16", resourceCulture);
+    public static Bitmap delete16 => (Bitmap)ResourceManager.GetObject("delete16", resourceCulture);
 
-    internal static Bitmap new16 => (Bitmap)ResourceManager.GetObject("new16", resourceCulture);
+    public static Bitmap new16 => (Bitmap)ResourceManager.GetObject("new16", resourceCulture);
 
-    internal static Bitmap PasteHS => (Bitmap)ResourceManager.GetObject("PasteHS", resourceCulture);
+    public static Bitmap PasteHS => (Bitmap)ResourceManager.GetObject("PasteHS", resourceCulture);
 
     internal Resources()
     {
