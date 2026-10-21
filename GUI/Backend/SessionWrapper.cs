@@ -651,32 +651,55 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    /// <summary>
+    /// Replaces a leading "~" ("~" or "~/dir") with the home directory: SCP takes the path literally, so a "~" in it
+    /// would name a directory called "~".
+    /// </summary>
     public void ExpandHomeDirIfNeeded(ref string dir)
     {
-        if (!(dir == "~"))
+        if (dir == null || !(dir == "~" || dir.StartsWith("~/")))
         {
             return;
         }
         try
         {
-            using SshShellChannel sshShellChannel = Session.OpenShellChannel("pwd");
-            using StreamReader streamReader = new StreamReader(sshShellChannel.Output);
-            dir = streamReader.ReadLine();
+            string home;
+            using (SshShellChannel sshShellChannel = Session.OpenShellChannel("pwd"))
+            using (StreamReader streamReader = new StreamReader(sshShellChannel.Output))
+            {
+                home = streamReader.ReadLine();
+            }
+            if (!string.IsNullOrEmpty(home))
+            {
+                dir = home.TrimEnd('/') + dir.Substring(1);
+                if (dir.Length == 0)
+                {
+                    dir = "/";
+                }
+            }
         }
         catch
         {
         }
     }
 
-    public void DoUploadFile(string file, string remoteDir)
+    public void DoUploadFile(string file, string remoteDir, bool checkOverwrite = true)
     {
-        LastDownloadDir = RemotePathUtils.GetDirectoryName(file);
+        // This directory is the remote one offered next time a remote file is picked, so it must not be the local one.
+        LastDownloadDir = remoteDir;
         string fileName = Path.GetFileName(file);
         string text = remoteDir.TrimEnd('/') + "/" + fileName;
-        ScpTransferManager.TransferJob transferJob = TransferManager.EnqueueUpload(file, text);
-        if (transferJob != null)
+        try
         {
-            SCPController.AddTransfer(transferJob);
+            ScpTransferManager.TransferJob transferJob = TransferManager.EnqueueUpload(file, text, null, checkOverwrite);
+            if (transferJob != null)
+            {
+                SCPController.AddTransfer(transferJob);
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot upload " + file + ": " + exception.Message);
         }
     }
 
@@ -697,34 +720,140 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    /// <summary>
+    /// Uploads dropped files and folders into the current directory of <paramref name="targetTab"/> (or of the active
+    /// tab), falling back to the default upload directory. Files go to the transfer queue after a single overwrite
+    /// question for all of them; each folder opens the directory upload window, ready to start.
+    /// </summary>
     public void UploadFiles(string[] files, ITabContext targetTab = null)
     {
-        if (IsDevice)
+        if (IsDevice || files == null)
         {
             return;
         }
-        // SCP uploads regular files only; a dropped folder would just fail in the transfer queue.
         string[] regularFiles = files.Where(File.Exists).ToArray();
-        if (regularFiles.Length < files.Length)
-        {
-            System.Windows.MessageBox.Show("Folders cannot be uploaded by dragging them into the window and were skipped. Use SCP -> Upload a directory instead.", "SmarTTY", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
-        }
-        if (regularFiles.Length == 0)
+        string[] folders = files.Where(Directory.Exists).ToArray();
+        if (regularFiles.Length == 0 && folders.Length == 0)
         {
             return;
         }
-        string dir = _Controller.Settings.DefaultUploadDirectory;
-        ExpandHomeDirIfNeeded(ref dir);
-        _Controller.Settings.DefaultUploadDirectory = dir;
-        string text = TryExtractCurrentDir(targetTab);
-        if (text == null)
+        string remoteDir = TryExtractCurrentDir(targetTab);
+        if (remoteDir == null)
         {
-            text = _Controller.Settings.DefaultUploadDirectory;
+            string dir = _Controller.Settings.DefaultUploadDirectory;
+            ExpandHomeDirIfNeeded(ref dir);
+            _Controller.Settings.DefaultUploadDirectory = dir;
+            remoteDir = dir;
         }
-        foreach (string file in regularFiles)
+        if (string.IsNullOrEmpty(remoteDir))
         {
-            DoUploadFile(file, text);
+            MessageBoxes.Error("Cannot determine the remote directory to upload to. Set the default upload directory in the SCP upload window.");
+            return;
         }
+        if (regularFiles.Length != 0)
+        {
+            UploadFilesToDirectory(regularFiles, remoteDir);
+        }
+        foreach (string folder in folders)
+        {
+            // A dropped drive root (D:\) has no name of its own: its contents go straight into the directory.
+            string folderName = Path.GetFileName(folder.TrimEnd('\\', '/'));
+            ShowDirectoryUploadForm(folder, string.IsNullOrEmpty(folderName) ? remoteDir : remoteDir.TrimEnd('/') + "/" + folderName);
+        }
+    }
+
+    /// <summary>
+    /// Queues several uploads into one remote directory, asking once about all the files that already exist there.
+    /// </summary>
+    public void UploadFilesToDirectory(IList<string> files, string remoteDir)
+    {
+        string[] remotePaths = files.Select((string file) => remoteDir.TrimEnd('/') + "/" + Path.GetFileName(file)).ToArray();
+        RemotePathKind[] kinds;
+        try
+        {
+            // The target directory is checked in the same round trip as the files.
+            kinds = Session.GetRemotePathKinds(remotePaths.Concat(new[] { remoteDir }).ToList());
+            switch (kinds[files.Count])
+            {
+                case RemotePathKind.File:
+                    MessageBoxes.Error("Cannot upload files to " + remoteDir + ": it is a file, not a directory.");
+                    return;
+                case RemotePathKind.Missing:
+                    if (!MessageBoxes.Ask(remoteDir + " does not exist on the server. Create it?"))
+                    {
+                        return;
+                    }
+                    if (Session.RunCommandChecked("mkdir -p " + RemotePathUtils.ShellQuote(remoteDir), requireSuccess: true) == null)
+                    {
+                        MessageBoxes.Error("Cannot create " + remoteDir + ".");
+                        return;
+                    }
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot upload files: " + exception.Message);
+            return;
+        }
+        List<string> directories = Enumerable.Range(0, files.Count).Where((int i) => kinds[i] == RemotePathKind.Directory).Select((int i) => remotePaths[i]).ToList();
+        if (directories.Count != 0)
+        {
+            MessageBoxes.Error("These files cannot be uploaded because a directory with the same name exists on the server:\n\n" + FormatFileList(directories));
+        }
+        List<int> existing = Enumerable.Range(0, files.Count).Where((int i) => kinds[i] == RemotePathKind.File).ToList();
+        bool overwrite = true;
+        if (existing.Count == 1 && files.Count == 1)
+        {
+            if (!MessageBoxes.AskWarn(remotePaths[0] + " already exists. Overwrite it?"))
+            {
+                return;
+            }
+        }
+        else if (existing.Count != 0)
+        {
+            string question = "These files already exist in " + remoteDir + ":\n\n" + FormatFileList(existing.Select((int i) => Path.GetFileName(files[i])).ToList())
+                + "\n\nYes: overwrite them. No: skip them and upload the rest. Cancel: upload nothing.";
+            switch (MessageBoxes.YesNoCancel(question))
+            {
+                case System.Windows.Forms.DialogResult.Yes:
+                    break;
+                case System.Windows.Forms.DialogResult.No:
+                    overwrite = false;
+                    break;
+                default:
+                    return;
+            }
+        }
+        for (int i = 0; i < files.Count; i++)
+        {
+            if (kinds[i] == RemotePathKind.Directory || (kinds[i] == RemotePathKind.File && !overwrite))
+            {
+                continue;
+            }
+            // Unknown (the check could not run) is left to the transfer itself, which reports what goes wrong.
+            DoUploadFile(files[i], remoteDir, checkOverwrite: false);
+        }
+    }
+
+    private static string FormatFileList(IList<string> names)
+    {
+        const int MaxShown = 15;
+        string list = string.Join("\n", names.Take(MaxShown));
+        return (names.Count > MaxShown) ? list + $"\n... and {names.Count - MaxShown} more" : list;
+    }
+
+    /// <summary>
+    /// Opens the directory upload window for <paramref name="localDir"/>; the transfer starts when the user confirms it there.
+    /// </summary>
+    public void ShowDirectoryUploadForm(string localDir, string remoteDir)
+    {
+        DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm(Session, isUpload: true)
+        {
+            LocalDirectory = localDir,
+            RemoteDirectory = remoteDir
+        };
+        directoryTransferForm.Show();
     }
 
     public string TryExtractCurrentDir(ITabContext activeTab = null)
@@ -815,18 +944,33 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    public void DoDownloadFile(string file, string localDir, bool openWhenDone)
+    public void DoDownloadFile(string file, string localDir, bool openWhenDone, bool confirmOverwrite = true)
     {
         LastDownloadDir = RemotePathUtils.GetDirectoryName(file);
-        string fileName = Path.GetFileName(file);
+        // The remote name may contain characters that Windows does not allow in file names (':', '?', '*', ...).
+        string fileName = RemotePathUtils.GetFileName(file);
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+        {
+            fileName = fileName.Replace(invalid, '_');
+        }
         string text = Path.Combine(localDir, fileName);
-        if (!File.Exists(text) || MessageBoxes.AskWarn(text + " already exists. Overwrite it?"))
+        if (Directory.Exists(text))
+        {
+            MessageBoxes.Error("Cannot download " + file + ": " + text + " is a directory.");
+            return;
+        }
+        if (confirmOverwrite && File.Exists(text) && !MessageBoxes.AskWarn(text + " already exists. Overwrite it?"))
+        {
+            return;
+        }
+        try
         {
             ScpTransferManager.TransferJob transferJob = TransferManager.EnqueueDownload(file, text, null, openWhenDone);
-            if (transferJob != null)
-            {
-                SCPController.AddTransfer(transferJob);
-            }
+            SCPController.AddTransfer(transferJob);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot download a file: " + exception.Message);
         }
     }
 

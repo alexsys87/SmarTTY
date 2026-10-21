@@ -365,13 +365,24 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     protected override void OnDrop(DragEventArgs e)
     {
         base.OnDrop(e);
-        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        if (e.Data.GetDataPresent(DataFormats.FileDrop) && e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length != 0)
         {
-            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
             SessionWrapper dropSession = Controller.ActiveSession;
             if (dropSession != null && !dropSession.IsDevice)
             {
-                dropSession.UploadFiles(files);
+                // As for drops on the terminal: let the drop finish first, so that Explorer is not kept waiting while the
+                // remote directory is determined and the overwrite question is shown.
+                Dispatcher.BeginInvoke((Action)(() =>
+                {
+                    try
+                    {
+                        dropSession.UploadFiles(files);
+                    }
+                    catch (Exception exception)
+                    {
+                        MessageBoxes.Exception(exception);
+                    }
+                }));
             }
         }
     }
@@ -504,6 +515,11 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     {
         object sourceElement = ((sender is FrameworkElement) ? sender : null);
         (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as SCPController)?.RemoveCompleted();
+    }
+
+    private void RetryFailed_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.ActiveSession?.SCPController?.RetryFailed();
     }
 
     private void RunForSelecterXfers(Action<SCPController.TransferObject> action, bool onlyFirst = false)

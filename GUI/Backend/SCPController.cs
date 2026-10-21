@@ -1,6 +1,7 @@
 ﻿using SmarTTY.IO;
 using SmarTTY.Transport;
 using SmarTTY.Utilities;
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -53,7 +54,45 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
 
         public string Size => StringUtils.FormatSize(_Context.TotalBytes);
 
-        public string TransferRate => StringUtils.FormatSize(_Context.BytesPerSecond) + "B/s";
+        public string TransferRate => (_Context.State == ScpTransferManager.TransferState.InProgress && !_Controller.IsPaused) ? StringUtils.FormatSize(_Context.BytesPerSecond) + "B/s" : "";
+
+        /// <summary>
+        /// The state in words: progress and time left while running, the reason when failed.
+        /// </summary>
+        public string StatusText
+        {
+            get
+            {
+                switch (_Context.State)
+                {
+                    case ScpTransferManager.TransferState.Queued:
+                        return "Queued";
+                    case ScpTransferManager.TransferState.InProgress:
+                        {
+                            if (_Controller.IsPaused)
+                            {
+                                return "Paused";
+                            }
+                            long total = _Context.TotalBytes;
+                            string text = (total > 0) ? $"{_Context.TransferredBytes * 100 / total}%" : "In progress";
+                            TimeSpan? remaining = _Context.Remaining;
+                            if (remaining.HasValue)
+                            {
+                                text += ", " + FormatDuration(remaining.Value) + " left";
+                            }
+                            return text;
+                        }
+                    case ScpTransferManager.TransferState.Completed:
+                        return "Completed";
+                    case ScpTransferManager.TransferState.Cancelled:
+                        return "Cancelled";
+                    default:
+                        return string.IsNullOrEmpty(_Context.ErrorMessage) ? "Failed" : "Failed: " + _Context.ErrorMessage;
+                }
+            }
+        }
+
+        public string ToolTip => (_Context.IsDownload ? "Download " + _Context.RemotePath + " to " + _Context.LocalPath : "Upload " + _Context.LocalPath + " to " + _Context.RemotePath) + "\n" + StatusText;
 
         public ImagePair Images => _Context.State switch
         {
@@ -120,6 +159,8 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CancelVisibility"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ProgressVisibility"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Images"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("StatusText"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ToolTip"));
             stats.TotalTransfers++;
             if (Status == ScpTransferManager.TransferState.InProgress || Status == ScpTransferManager.TransferState.Queued)
             {
@@ -151,31 +192,72 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             {
                 _Controller._Session.TransferManager.Cancel(_Context);
                 _Context.State = ScpTransferManager.TransferState.Cancelled;
+                // The overwrite question was answered when the transfer was first queued.
                 if (_Context.IsDownload)
                 {
-                    _Controller._Session.DoDownloadFile(_Context.RemotePath, Path.GetDirectoryName(_Context.LocalPath), _Context.OpenFolderWhenDone);
+                    _Controller._Session.DoDownloadFile(_Context.RemotePath, Path.GetDirectoryName(_Context.LocalPath), _Context.OpenFolderWhenDone, confirmOverwrite: false);
                 }
                 else
                 {
-                    _Controller._Session.DoUploadFile(_Context.LocalPath, RemotePathUtils.GetDirectoryName(_Context.RemotePath));
+                    _Controller._Session.DoUploadFile(_Context.LocalPath, RemotePathUtils.GetDirectoryName(_Context.RemotePath), checkOverwrite: false);
                 }
             }
         }
 
         internal void OpenLocal()
         {
-            if (_Context?.LocalPath != null)
+            string localPath = _Context?.LocalPath;
+            if (localPath == null)
             {
-                Process.Start(_Context?.LocalPath);
+                return;
+            }
+            if (!File.Exists(localPath))
+            {
+                MessageBoxes.Error(localPath + " does not exist" + ((_Context.IsDownload && _Context.State != ScpTransferManager.TransferState.Completed) ? " yet: the download has not completed." : "."));
+                return;
+            }
+            try
+            {
+                Process.Start(localPath);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Error("Cannot open " + localPath + ": " + exception.Message);
             }
         }
 
         internal void OpenFolder()
         {
-            if (_Context?.LocalPath != null)
+            string localPath = _Context?.LocalPath;
+            if (localPath == null)
             {
-                Process.Start(Path.GetDirectoryName(_Context?.LocalPath));
+                return;
             }
+            try
+            {
+                if (File.Exists(localPath))
+                {
+                    // Opens the folder with the file selected.
+                    Process.Start("explorer.exe", "/select,\"" + localPath + "\"");
+                }
+                else
+                {
+                    Process.Start(Path.GetDirectoryName(localPath));
+                }
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Error("Cannot open the folder of " + localPath + ": " + exception.Message);
+            }
+        }
+
+        private static string FormatDuration(TimeSpan duration)
+        {
+            if (duration.TotalHours >= 1.0)
+            {
+                return $"{(int)duration.TotalHours}:{duration.Minutes:00}:{duration.Seconds:00}";
+            }
+            return $"{duration.Minutes}:{duration.Seconds:00}";
         }
 
         internal void CopyLocalPath()
@@ -282,6 +364,17 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             {
                 ActiveTransfers.Remove(transferObject);
             }
+        }
+    }
+
+    /// <summary>
+    /// Queues all failed transfers again.
+    /// </summary>
+    public void RetryFailed()
+    {
+        foreach (TransferObject transferObject in ActiveTransfers.ToArray())
+        {
+            transferObject.Retry();
         }
     }
 }

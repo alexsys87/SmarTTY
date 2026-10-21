@@ -33,6 +33,7 @@
     <Compile Include="../../IO/RemoteFileOperations.cs" Link="IO/RemoteFileOperations.cs" />
     <Compile Include="../../IProjectAwareException.cs" Link="IProjectAwareException.cs" />
     <Compile Include="../../Terminal/ByteColumns.cs" Link="Terminal/ByteColumns.cs" />
+    <Compile Include="../../Transport/ScpTransferManager.cs" Link="Transport/ScpTransferManager.cs" />
   </ItemGroup>
 
 </Project>

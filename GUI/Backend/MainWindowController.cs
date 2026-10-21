@@ -461,12 +461,12 @@ public class MainWindowController : INotifyPropertyChanged
                 scpUploadForm.RemoteDirectory = _Controller.Settings.DefaultUploadDirectory;
                 if (scpUploadForm.ShowModal() == DialogResult.OK)
                 {
-                    _Controller.Settings.DefaultUploadDirectory = scpUploadForm.RemoteDirectory;
+                    _Controller.Settings.DefaultUploadDirectory = scpUploadForm.RemoteDirectory.Trim();
                     string dir = _Controller.Settings.DefaultUploadDirectory;
                     activeSession.ExpandHomeDirIfNeeded(ref dir);
                     _Controller.Settings.DefaultUploadDirectory = dir;
                     _Controller.Settings.Save();
-                    activeSession.DoUploadFile(scpUploadForm.LocalFile, _Controller.Settings.DefaultUploadDirectory);
+                    activeSession.UploadFilesToDirectory(scpUploadForm.LocalFiles, _Controller.Settings.DefaultUploadDirectory);
                 }
             }
             catch (Exception exception)
