@@ -18,14 +18,23 @@ public partial class FileListControl : UserControl, IComponentConnector
     public enum FileEvent
     {
         Open,
-        Download
+        Download,
+        Upload
     }
 
     public class FileEventArgs : EventArgs
     {
         public FileEvent Event;
 
+        /// <summary>
+        /// The remote file; for <see cref="FileEvent.Upload"/> the remote directory to upload into.
+        /// </summary>
         public string FullPath;
+
+        /// <summary>
+        /// The local files and folders to upload (<see cref="FileEvent.Upload"/> only).
+        /// </summary>
+        public string[] LocalFiles;
     }
 
     private int _SelDepth;
@@ -38,6 +47,48 @@ public partial class FileListControl : UserControl, IComponentConnector
     {
         InitializeComponent();
         ResizeFilter();
+    }
+
+    /// <summary>
+    /// The remote directory a drop at the current mouse position goes to: the folder under the mouse, or the
+    /// directory the panel shows.
+    /// </summary>
+    private string GetDropDirectory(DragEventArgs e)
+    {
+        DependencyObject element = e.OriginalSource as DependencyObject;
+        while (element != null && !(element is ListViewItem))
+        {
+            element = (element is System.Windows.Media.Visual || element is System.Windows.Media.Media3D.Visual3D) ? System.Windows.Media.VisualTreeHelper.GetParent(element) : LogicalTreeHelper.GetParent(element);
+        }
+        if (element is ListViewItem listViewItem && listViewItem.DataContext is FileExplorer.ItemWrapper item && item.Entry.IsDirectory && item.Name != "..")
+        {
+            return item.FullPath;
+        }
+        return (this.DataContext as FileExplorer)?.WorkingDirectory;
+    }
+
+    private void TransferList_DragOver(object sender, DragEventArgs e)
+    {
+        bool canDrop = e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop) && GetDropDirectory(e) != null;
+        e.Effects = canDrop ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void TransferList_Drop(object sender, DragEventArgs e)
+    {
+        // Handled here, so that the main window does not upload the same files to the terminal's directory as well.
+        e.Handled = true;
+        string directory = GetDropDirectory(e);
+        if (directory == null || !(e.Data?.GetData(DataFormats.FileDrop) is string[] files) || files.Length == 0)
+        {
+            return;
+        }
+        FileActionRequested?.Invoke(this, new FileEventArgs
+        {
+            Event = FileEvent.Upload,
+            FullPath = directory,
+            LocalFiles = files
+        });
     }
 
     private void OpenFile_Click(object sender, RoutedEventArgs e)

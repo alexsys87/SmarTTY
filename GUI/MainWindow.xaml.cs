@@ -522,6 +522,63 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         Controller.ActiveSession?.SCPController?.RetryFailed();
     }
 
+    private void RetryAll_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.ActiveSession?.SCPController?.RetryFailed(evenIfCompleted: true);
+    }
+
+    private void RemoveAll_Click(object sender, RoutedEventArgs e)
+    {
+        SCPController controller = Controller.ActiveSession?.SCPController;
+        if (controller == null || controller.ActiveTransfers.Count == 0)
+        {
+            return;
+        }
+        bool unfinished = controller.ActiveTransfers.Any((SCPController.TransferObject transferObject) => transferObject.Status == FileTransferManager.TransferState.InProgress || transferObject.Status == FileTransferManager.TransferState.Queued);
+        if (unfinished && !MessageBoxes.AskWarn("Some transfers are not finished yet. Cancel them and clear the list?"))
+        {
+            return;
+        }
+        controller.RemoveAll();
+    }
+
+    private void SelectedXfers_RetryAgain(object sender, RoutedEventArgs e)
+    {
+        RunForSelecterXfers((SCPController.TransferObject xf) =>
+        {
+            xf.Retry(evenIfCompleted: true);
+        });
+    }
+
+    private void SelectedXfers_CopyRemotePath(object sender, RoutedEventArgs e)
+    {
+        RunForSelecterXfers((SCPController.TransferObject xf) =>
+        {
+            xf.CopyRemotePath();
+        }, onlyFirst: true);
+    }
+
+    private void SelectedXfers_DeleteUploaded(object sender, RoutedEventArgs e)
+    {
+        SCPController.TransferObject[] uploads = ((ListBox)TransferList).SelectedItems.OfType<SCPController.TransferObject>().Where((SCPController.TransferObject xf) => !xf.IsDownload && xf.Status == FileTransferManager.TransferState.Completed).ToArray();
+        if (uploads.Length == 0)
+        {
+            return;
+        }
+        string question = (uploads.Length == 1) ? "Delete " + uploads[0].RemoteFile + " on the server?" : "Delete these " + uploads.Length + " files on the server?\n\n" + string.Join("\n", uploads.Take(15).Select((SCPController.TransferObject xf) => xf.RemoteFile)) + ((uploads.Length > 15) ? "\n..." : "");
+        if (!MessageBoxes.AskWarn(question + "\n\nThis cannot be undone."))
+        {
+            return;
+        }
+        foreach (SCPController.TransferObject upload in uploads)
+        {
+            if (!upload.DeleteUploadedFile(ask: false))
+            {
+                break;
+            }
+        }
+    }
+
     private void RunForSelecterXfers(Action<SCPController.TransferObject> action, bool onlyFirst = false)
     {
         SCPController.TransferObject[] items = ((ListBox)TransferList).SelectedItems.OfType<SCPController.TransferObject>().ToArray();
@@ -584,8 +641,12 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             return;
         }
         xferMenu.Visibility = Visibility.Visible;
-        cmdCancel.Visibility = ((items.FirstOrDefault((SCPController.TransferObject transferObject) => transferObject.Status == ScpTransferManager.TransferState.InProgress || transferObject.Status == ScpTransferManager.TransferState.Queued) == null) ? Visibility.Collapsed : Visibility.Visible);
-        cmdRetry.Visibility = ((items.FirstOrDefault((SCPController.TransferObject transferObject) => transferObject.Status == ScpTransferManager.TransferState.Failed) == null) ? Visibility.Collapsed : Visibility.Visible);
+        cmdCancel.Visibility = ((items.FirstOrDefault((SCPController.TransferObject transferObject) => transferObject.Status == FileTransferManager.TransferState.InProgress || transferObject.Status == FileTransferManager.TransferState.Queued) == null) ? Visibility.Collapsed : Visibility.Visible);
+        cmdRetry.Visibility = ((items.FirstOrDefault((SCPController.TransferObject transferObject) => transferObject.Status == FileTransferManager.TransferState.Failed) == null) ? Visibility.Collapsed : Visibility.Visible);
+        cmdRetryAgain.Visibility = items.Any((SCPController.TransferObject transferObject) => transferObject.Status == FileTransferManager.TransferState.Completed) ? Visibility.Visible : Visibility.Collapsed;
+        Visibility deleteVisibility = items.Any((SCPController.TransferObject transferObject) => !transferObject.IsDownload && transferObject.Status == FileTransferManager.TransferState.Completed) ? Visibility.Visible : Visibility.Collapsed;
+        cmdDeleteUploaded.Visibility = deleteVisibility;
+        sepDeleteUploaded.Visibility = deleteVisibility;
     }
 
     public void UpdateContextMenu()
@@ -605,6 +666,25 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                 case FileListControl.FileEvent.Download:
                     Controller.MenuCommandHandlers.QuickDownload(e.FullPath);
                     break;
+                case FileListControl.FileEvent.Upload:
+                    {
+                        SessionWrapper dropSession = Controller.ActiveSession;
+                        string[] files = e.LocalFiles;
+                        string remoteDir = e.FullPath;
+                        // Like other drops: let the drop finish first, so that Explorer is not kept waiting.
+                        Dispatcher.BeginInvoke((Action)(() =>
+                        {
+                            try
+                            {
+                                dropSession?.UploadFiles(files, remoteDir: remoteDir);
+                            }
+                            catch (Exception exception)
+                            {
+                                MessageBoxes.Exception(exception);
+                            }
+                        }));
+                        break;
+                    }
             }
         }
         catch (Exception exception)

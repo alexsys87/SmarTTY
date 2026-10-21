@@ -25,6 +25,7 @@ internal sealed class SshNetChannel : IDisposable
         public static readonly MethodInfo SendPseudoTerminalRequest;
         public static readonly MethodInfo SendExecRequest;
         public static readonly MethodInfo SendShellRequest;
+        public static readonly MethodInfo SendSubsystemRequest;
         public static readonly MethodInfo SendWindowChangeRequest;
         public static readonly MethodInfo SendData;
         public static readonly MethodInfo SendEof;
@@ -46,6 +47,7 @@ internal sealed class SshNetChannel : IDisposable
                 SendPseudoTerminalRequest = GetMethod(channelSessionType, "SendPseudoTerminalRequest", typeof(string), typeof(uint), typeof(uint), typeof(uint), typeof(uint), typeof(IDictionary<TerminalModes, uint>));
                 SendExecRequest = GetMethod(channelSessionType, "SendExecRequest", typeof(string));
                 SendShellRequest = GetMethod(channelSessionType, "SendShellRequest");
+                SendSubsystemRequest = GetMethod(channelSessionType, "SendSubsystemRequest", typeof(string));
                 SendWindowChangeRequest = GetMethod(channelSessionType, "SendWindowChangeRequest", typeof(uint), typeof(uint), typeof(uint), typeof(uint));
                 SendData = GetMethod(channelType, "SendData", typeof(byte[]), typeof(int), typeof(int));
                 SendEof = GetMethod(channelType, "SendEof");
@@ -196,6 +198,11 @@ internal sealed class SshNetChannel : IDisposable
     public bool SendShellRequest()
     {
         return (bool)Invoke(Api.SendShellRequest);
+    }
+
+    public bool SendSubsystemRequest(string subsystem)
+    {
+        return (bool)Invoke(Api.SendSubsystemRequest, subsystem);
     }
 
     public void SendWindowChangeRequest(uint columns, uint rows)

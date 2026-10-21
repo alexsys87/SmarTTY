@@ -45,6 +45,7 @@ internal static class SshNetContractTests
         RequireMethod(channelSessionType, "SendPseudoTerminalRequest", typeof(string), typeof(uint), typeof(uint), typeof(uint), typeof(uint), typeof(IDictionary<TerminalModes, uint>));
         RequireMethod(channelSessionType, "SendExecRequest", typeof(string));
         RequireMethod(channelSessionType, "SendShellRequest");
+        RequireMethod(channelSessionType, "SendSubsystemRequest", typeof(string));
         RequireMethod(channelSessionType, "SendWindowChangeRequest", typeof(uint), typeof(uint), typeof(uint), typeof(uint));
         RequireMethod(channelType, "SendData", typeof(byte[]), typeof(int), typeof(int));
         RequireMethod(channelType, "SendEof");

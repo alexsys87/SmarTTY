@@ -33,7 +33,11 @@
     <Compile Include="../../IO/RemoteFileOperations.cs" Link="IO/RemoteFileOperations.cs" />
     <Compile Include="../../IProjectAwareException.cs" Link="IProjectAwareException.cs" />
     <Compile Include="../../Terminal/ByteColumns.cs" Link="Terminal/ByteColumns.cs" />
-    <Compile Include="../../Transport/ScpTransferManager.cs" Link="Transport/ScpTransferManager.cs" />
+    <Compile Include="../../Transport/FileTransferManager.cs" Link="Transport/FileTransferManager.cs" />
+    <Compile Include="../../Transport/RemoteFileTools.cs" Link="Transport/RemoteFileTools.cs" />
+    <Compile Include="../../Transport/RateLimiter.cs" Link="Transport/RateLimiter.cs" />
+    <Compile Include="../../Transport/TransferQueueStore.cs" Link="Transport/TransferQueueStore.cs" />
+    <Compile Include="../../Utilities/EnumDisplayText.cs" Link="Utilities/EnumDisplayText.cs" />
   </ItemGroup>
 
 </Project>
