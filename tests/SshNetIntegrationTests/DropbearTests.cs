@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Threading;
 using SmarTTY.IO;
+using SmarTTY.Terminal;
 
 namespace SmarTTY.Ssh.Tests;
 
@@ -81,6 +84,65 @@ internal static class DropbearTests
         Test.Equal(iterations.ToString(), session.RunCommandChecked("wc -c < smartty-dropbear-race", requireSuccess: true)?.Find((string line) => line.Trim() != "")?.Trim(), "every helper command ran");
         session.RunCommand("rm -f smartty-dropbear-race", out _);
         FileOperations(session);
+        ByteOrientedLineEditing(session);
+    }
+
+    // BusyBox ash without Unicode support edits its command line in UTF-8 bytes (OpenWrt): one Backspace removes one
+    // byte, half of a Cyrillic letter. SmarTTY detects such a shell and sends Backspace/Left once per byte.
+    private static void ByteOrientedLineEditing(SshSession session)
+    {
+        Test.Section("Dropbear: BusyBox ash edits the command line in UTF-8 bytes");
+        Test.Check(ByteColumns.ParseProbe(session.RunCommand(ByteColumns.ProbeCommand, out _)), "the probe detects the byte-oriented shell");
+
+        int backspaces = ByteColumns.BackwardKeyCount("$ echo при", 10, 0);
+        Test.Equal(2, backspaces, "a Backspace after a Cyrillic letter is sent twice");
+        string fixedLine = TypeInShell(session, "echo AAпри" + new string('\u007f', backspaces) + "BB\r");
+        Test.Check(fixedLine.Contains("AAпрBB"), "two DELs remove the whole letter (got '" + fixedLine.Trim() + "')");
+        string brokenLine = TypeInShell(session, "echo AAпри\u007fBB\r");
+        Test.Check(!brokenLine.Contains("AAпрBB"), "a single DEL leaves half of the letter: the shell really counts bytes");
+
+        // Left over 'т' and 'е', Backspace over 'в', then a letter typed in the middle of the word.
+        string inserted = TypeInShell(session, "echo AAпривет" + "\u001b[D\u001b[D\u001b[D\u001b[D" + "\u007f\u007f" + "Ж" + "\r");
+        Test.Check(inserted.Contains("AAприЖет"), "keys repeated per byte edit the middle of a Cyrillic word (got '" + inserted.Trim() + "')");
+    }
+
+    // Types keys into an interactive BusyBox ash (with a PTY, as a terminal tab) and returns what the shell printed.
+    private static string TypeInShell(SshSession session, string keys)
+    {
+        using SshShellChannel channel = session.OpenShellChannel(null, "xterm", ExtendedDataMode.Merge);
+        MemoryStream received = new MemoryStream();
+        Thread reader = new Thread(() =>
+        {
+            byte[] buffer = new byte[4096];
+            int read;
+            while ((read = channel.Output.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                lock (received)
+                {
+                    received.Write(buffer, 0, read);
+                }
+            }
+        });
+        reader.Start();
+        // Wait for the prompt, so that the keys reach the line editor rather than the tty's own line discipline.
+        for (int attempt = 0; attempt < 50; attempt++)
+        {
+            lock (received)
+            {
+                if (received.Length > 0)
+                {
+                    break;
+                }
+            }
+            Thread.Sleep(100);
+        }
+        byte[] input = Encoding.UTF8.GetBytes(keys + "exit\r");
+        channel.Input.Write(input, 0, input.Length);
+        reader.Join(TimeSpan.FromSeconds(10));
+        lock (received)
+        {
+            return Encoding.UTF8.GetString(received.ToArray());
+        }
     }
 
     // The commands of the file list's Copy/Cut/Paste/Rename/Delete/New, run by BusyBox ash and its applets.

@@ -160,6 +160,8 @@
                   </ResourceDictionary>
                 </FrameworkElement.Resources>
               </ListBox>
+              <TextBlock Text="Shells that count UTF-8 bytes:" Grid.Row="7" ToolTip="Backspace, Delete and the arrows are repeated once per byte of a non-Latin letter, and the shell&apos;s cursor moves are counted in bytes. Needed for BusyBox ash without UTF-8 support (OpenWrt)." />
+              <ListBox Grid.Row="7" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=ByteOrientedLineEditing, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ByteOrientedLineEditing}" />
             </Grid>
           </GroupBox>
         </StackPanel>

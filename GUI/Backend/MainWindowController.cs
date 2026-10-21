@@ -500,6 +500,7 @@ public class MainWindowController : INotifyPropertyChanged
                     {
                         terminal.Font = font;
                         _Controller.ApplyTerminalSettings(terminal);
+                        allSession.ApplyByteOrientedLineEditing(terminal);
                         terminal.UpdateLayout();
                         terminal.Redraw();
                     }
@@ -1456,6 +1457,7 @@ public class MainWindowController : INotifyPropertyChanged
                 Session = session
             };
             session.AttachChannelToControl(terminalEmulatorControl, sshShellChannel, initialCommand.Command != null, initialCommand.TabKeptAfterExit);
+            session.ApplyByteOrientedLineEditing(terminalEmulatorControl);
         }
         terminalEmulatorControl.CaretWhenUnfocused = false;
         // Pasted line breaks reach the remote program as Enter (CR), as in other terminal emulators; a bare LF is

@@ -135,6 +135,19 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     // Set while Reset() runs for an ESC c received from the remote side: the output queued after it is still valid.
     private bool _resetFromStream;
 
+    private bool _byteOrientedLineEditing;
+
+    // Byte mode (see ByteOrientedLineEditing): the remote cursor is this many bytes into the character at the cursor.
+    private int _byteOffset;
+
+    // Byte mode: a cell shown as U+FFFD that holds the first bytes of a letter the remote editor printed one byte at
+    // a time (document line, column and the bytes received so far); the next bytes complete it in place.
+    private int _partialLine = -1;
+
+    private int _partialColumn = -1;
+
+    private System.Collections.Generic.List<byte> _partialBytes;
+
     private readonly DecCharsets _charsets = new DecCharsets();
 
     private bool _applicationKeypad;
@@ -186,6 +199,31 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     protected virtual bool UnusedOption => false;
 
     public string EnterSequence { get; set; }
+
+    /// <summary>
+    /// The remote line editor counts UTF-8 bytes rather than characters (BusyBox ash without Unicode support, as on
+    /// OpenWrt). It then moves its cursor one column per byte, so a Backspace after a Cyrillic letter (two bytes) used
+    /// to erase the letter from the screen but only half of it from the command line, and every further Backspace
+    /// erased one more letter from the screen than from the line. In this mode, on the normal screen, the terminal
+    /// converts the editor's cursor moves from bytes into screen cells and repeats Backspace, Delete, Left and Right
+    /// once per byte of the letter they cross (see <see cref="ByteColumns"/>).
+    /// </summary>
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool ByteOrientedLineEditing
+    {
+        get
+        {
+            return _byteOrientedLineEditing;
+        }
+        set
+        {
+            _byteOrientedLineEditing = value;
+            ResetByteState();
+        }
+    }
+
+    private bool ByteColumnsActive => _byteOrientedLineEditing && base.ActiveBufferIndex == 0;
 
     /// <summary>
     /// What a line break of pasted text is sent as while the remote side reads the keyboard (<see cref="UsesTerminalInput"/>).
@@ -327,7 +365,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 {
                     continue;
                 }
-                WriteText(_charsets.Translate(output.Substring(segmentStart, charIndex - segmentStart)));
+                WriteOutputText(output.Substring(segmentStart, charIndex - segmentStart));
                 if (output[charIndex] != '\u001b')
                 {
                     base.ResetLinkTracking();
@@ -338,14 +376,17 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 {
                     case '\r':
                         Trace("<CR>");
+                        _byteOffset = 0;
                         MoveCursorBy(-base.CursorPosition.X, 0);
                         break;
                     case '\n':
                         Trace("<LF>");
+                        _byteOffset = 0;
                         MoveCursorBy(0, 1, scroll: true);
                         break;
                     case '\t':
                         Trace("<TAB>");
+                        _byteOffset = 0;
                         MoveCursorBy(Tabs.NextDistance(base.CursorPosition.X, _tabWidth), 0);
                         break;
                     case '\a':
@@ -362,6 +403,10 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                         break;
                     case '\b':
                         Trace("<BACK>");
+                        if (ByteColumnsActive && MoveBackBytes(1) == 0)
+                        {
+                            break;
+                        }
                         if (base.CursorPosition.X == 0)
                         {
                             MoveCursorBy(_visibleColumns - 1, -1);
@@ -392,7 +437,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             }
             if (segmentStart < output.Length)
             {
-                WriteText(_charsets.Translate(output.Substring(segmentStart, output.Length - segmentStart)));
+                WriteOutputText(output.Substring(segmentStart, output.Length - segmentStart));
             }
         }
         finally
@@ -474,6 +519,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             _incompleteEscape = text.Substring(position);
             return 1;
+        }
+        if (text[position + 1] != '[' && text[position + 1] != ']')
+        {
+            // ESC 7/8, ESC D/E/M, ESC c and the like place the cursor on a cell boundary.
+            _byteOffset = 0;
         }
         switch (text[position + 1])
         {
@@ -674,6 +724,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     internal bool ExecuteCsi(char ch, string[] items, bool set, EscapeTrace escapeTrace = null)
     {
+        if ("CDJKmXP@hlnc".IndexOf(ch) == -1)
+        {
+            // Every other command that moves the cursor puts it on a cell boundary (byte mode).
+            _byteOffset = 0;
+        }
         escapeTrace?.SetRaw(string.Format("Unknown CSI command: {2}{0}, DEC={1}", ch, set, string.Join(";", items)));
         int count = 0;
         int repeatCount = 1;
@@ -697,12 +752,26 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 MoveCursorBy(0, repeatCount);
                 return true;
             case 'C':
-                escapeTrace?.SetDescription($"Go left {repeatCount}");
-                MoveCursorBy(repeatCount, 0);
+                escapeTrace?.SetDescription($"Go right {repeatCount}");
+                if (ByteColumnsActive)
+                {
+                    MoveForwardBytes(repeatCount);
+                }
+                else
+                {
+                    MoveCursorBy(repeatCount, 0);
+                }
                 return true;
             case 'D':
-                escapeTrace?.SetDescription($"Go right {repeatCount}");
-                MoveCursorBy(-repeatCount, 0);
+                escapeTrace?.SetDescription($"Go left {repeatCount}");
+                if (ByteColumnsActive)
+                {
+                    MoveBackBytes(repeatCount);
+                }
+                else
+                {
+                    MoveCursorBy(-repeatCount, 0);
+                }
                 return true;
             case 'E':
                 escapeTrace?.SetDescription($"Go to start of relative line {repeatCount}");
@@ -1132,6 +1201,176 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
+    private void ResetByteState()
+    {
+        _byteOffset = 0;
+        _partialLine = -1;
+        _partialColumn = -1;
+        _partialBytes = null;
+    }
+
+    // Writes a text segment of the output. In byte mode stray bytes arrive escaped (U+DC80..U+DCFF, see
+    // Utf8StreamDecoder.EscapeInvalidBytes) and are joined with the bytes before them; otherwise they become U+FFFD.
+    private void WriteOutputText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+        if (!ByteColumnsActive)
+        {
+            // Escaped bytes still in the queue when byte mode was turned off, or on the alternate screen.
+            StringBuilder replaced = null;
+            for (int index = 0; index < text.Length; index++)
+            {
+                if (Utf8StreamDecoder.IsEscapedByte(text[index]))
+                {
+                    replaced = replaced ?? new StringBuilder(text);
+                    replaced[index] = '\uFFFD';
+                }
+            }
+            WriteText(_charsets.Translate(replaced?.ToString() ?? text));
+            return;
+        }
+        int runStart = 0;
+        for (int index = 0; index < text.Length; index++)
+        {
+            if (Utf8StreamDecoder.IsEscapedByte(text[index]))
+            {
+                WriteByteModeRun(text.Substring(runStart, index - runStart));
+                WriteEscapedByte((byte)(text[index] - Utf8StreamDecoder.EscapedByteBase));
+                runStart = index + 1;
+            }
+        }
+        WriteByteModeRun(text.Substring(runStart));
+    }
+
+    private void WriteByteModeRun(string text)
+    {
+        if (text.Length == 0)
+        {
+            return;
+        }
+        SplitHalfCrossedCell();
+        Point cursor = base.CursorPosition;
+        if (_partialColumn >= cursor.X && _partialColumn < cursor.X + text.Length && _partialLine == ToDocumentPosition(cursor).Line)
+        {
+            ResetByteState();
+        }
+        WriteText(_charsets.Translate(text));
+        _byteOffset = 0;
+    }
+
+    private void WriteEscapedByte(byte value)
+    {
+        SplitHalfCrossedCell();
+        Point cursor = base.CursorPosition;
+        int line = ToDocumentPosition(cursor).Line;
+        if (_partialLine == line && _partialColumn == cursor.X - 1 && CellAt(cursor.Y, _partialColumn) == '\uFFFD' && ByteColumns.CanContinue(_partialBytes, value))
+        {
+            // The next byte of a letter echoed one byte at a time: it completes the letter in its own cell.
+            string completed = ByteColumns.TryComplete(_partialBytes, value);
+            if (completed != null)
+            {
+                WriteAt(new Point(_partialColumn, cursor.Y), completed, CurrentStyle);
+                ResetByteState();
+            }
+            return;
+        }
+        WriteText("\uFFFD");
+        _byteOffset = 0;
+        if (ByteColumns.SequenceLength(value) > 0)
+        {
+            _partialLine = line;
+            _partialColumn = cursor.X;
+            _partialBytes = new System.Collections.Generic.List<byte> { value };
+        }
+        else
+        {
+            _partialLine = -1;
+            _partialColumn = -1;
+            _partialBytes = null;
+        }
+    }
+
+    // The remote editor prints after the first bytes of a letter it stepped into: those bytes keep the cell (shown
+    // as U+FFFD, completed in place if the rest arrives later) and the text continues in the next cell.
+    private void SplitHalfCrossedCell()
+    {
+        if (_byteOffset <= 0)
+        {
+            return;
+        }
+        Point cursor = base.CursorPosition;
+        byte[] prefix = ByteColumns.CellPrefix(GetLineText(cursor.Y), cursor.X, _byteOffset);
+        int line = ToDocumentPosition(cursor).Line;
+        _byteOffset = 0;
+        WriteText("\uFFFD");
+        if (prefix.Length > 0 && ByteColumns.SequenceLength(prefix[0]) > 0)
+        {
+            _partialLine = line;
+            _partialColumn = cursor.X;
+            _partialBytes = new System.Collections.Generic.List<byte>(prefix);
+        }
+    }
+
+    private char CellAt(int row, int column)
+    {
+        string line = GetLineText(row);
+        return (line != null && column >= 0 && column < line.Length) ? line[column] : ' ';
+    }
+
+    // Moves the cursor back by a number of bytes of the remote editor; returns the bytes left at the line start.
+    private int MoveBackBytes(int bytes)
+    {
+        Point cursor = base.CursorPosition;
+        int column = Math.Min(cursor.X, _visibleColumns);
+        int offset = _byteOffset;
+        int remaining = ByteColumns.MoveBack(GetLineText(cursor.Y), ref column, ref offset, bytes);
+        base.CursorPosition = new Point(column, cursor.Y);
+        _byteOffset = offset;
+        return remaining;
+    }
+
+    private void MoveForwardBytes(int bytes)
+    {
+        Point cursor = base.CursorPosition;
+        int column = cursor.X;
+        int offset = _byteOffset;
+        ByteColumns.MoveForward(GetLineText(cursor.Y), ref column, ref offset, bytes, Math.Max(_visibleColumns - 1, 0));
+        base.CursorPosition = new Point(column, cursor.Y);
+        _byteOffset = offset;
+    }
+
+    // How many times a key that crosses one character must be sent (byte mode); 1 otherwise.
+    private int KeyRepeatCount(bool backward)
+    {
+        if (!ByteColumnsActive)
+        {
+            return 1;
+        }
+        // Count on the screen as the remote side has drawn it so far.
+        FlushOutput();
+        Point cursor = base.CursorPosition;
+        string line = GetLineText(cursor.Y);
+        int column = Math.Min(cursor.X, _visibleColumns);
+        return backward ? ByteColumns.BackwardKeyCount(line, column, _byteOffset) : ByteColumns.ForwardKeyCount(line, column, _byteOffset);
+    }
+
+    private static string Repeat(string text, int count)
+    {
+        if (count <= 1)
+        {
+            return text;
+        }
+        StringBuilder result = new StringBuilder(text.Length * count);
+        for (int index = 0; index < count; index++)
+        {
+            result.Append(text);
+        }
+        return result.ToString();
+    }
+
     private void SaveCursor()
     {
         _savedCursor = base.CursorPosition;
@@ -1155,6 +1394,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private void ResetModes()
     {
+        ResetByteState();
         _applicationCursorKeys = false;
         _applicationKeypad = false;
         _insertMode = false;
@@ -1275,6 +1515,17 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             // Ctrl+Left must be ESC [ 1 ; 5 D: inserting ";5" into ESC [ D used to give ESC [ ; 5 D, which shells
             // and editors do not recognise.
             text = XtermProtocol.ApplyKeyModifiers("\u001b" + text, e.Shift, e.Alt, e.Control);
+            if (!e.Shift && !e.Alt && !e.Control)
+            {
+                if (e.KeyCode == Keys.Left)
+                {
+                    text = Repeat(text, KeyRepeatCount(backward: true));
+                }
+                else if (e.KeyCode == Keys.Right || e.KeyCode == Keys.Delete)
+                {
+                    text = Repeat(text, KeyRepeatCount(backward: false));
+                }
+            }
             SendText(text, InputKind.KeySequence);
             e.SuppressKeyPress = true;
         }
@@ -1312,7 +1563,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
         else if (e.KeyChar == '\b' && !string.IsNullOrEmpty(BackspaceSequence))
         {
-            SendText(BackspaceSequence, InputKind.Typed);
+            SendText(Repeat(BackspaceSequence, KeyRepeatCount(backward: true)), InputKind.Typed);
         }
         else if (e.KeyChar == '\r' && EnterSequence != null)
         {

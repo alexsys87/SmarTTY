@@ -245,6 +245,7 @@ internal static class SshIntegrationTests
         string output = ReadToEnd(channel.Output);
         channel.WaitClosed();
         Test.Check(output.Contains("shell-works"), "the shell channel runs the typed command");
+        Test.Check(!SmarTTY.Terminal.ByteColumns.ParseProbe(session.RunCommand(SmarTTY.Terminal.ByteColumns.ProbeCommand, out _)), "a bash login shell is not taken for a shell that counts UTF-8 bytes");
         Test.Check(!channel.ClosedByConnectionLoss, "a shell that exits is not reported as closed by a lost connection");
         Test.Check(!channel.IsDisposed, "IsDisposed is false before Dispose");
         channel.Dispose();
