@@ -16,6 +16,10 @@
           <Style x:Key="{x:Type TextBox}" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="VerticalAlignment" Value="Center" />
           </Style>
+          <!-- Each yes/no list overrides these two texts in its own resources; the defaults only keep the template
+               resolvable outside such a list (the XAML designer). -->
+          <sys:String x:Key="TrueText">Yes</sys:String>
+          <sys:String x:Key="FalseText">No</sys:String>
           <coll:ArrayList x:Key="TrueFalse">
             <sys:Boolean>true</sys:Boolean>
             <sys:Boolean>false</sys:Boolean>

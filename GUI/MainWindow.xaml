@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" Width="800" Height="600" ResizeMode="CanResizeWithGrip" SnapsToDevicePixels="True" AllowDrop="True" Title="{Binding Path=ActiveSession.TitleWithStatus, StringFormat=SmarTTY - {0}}">
+<Window x:Class="SmarTTY.GUI.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" Width="800" Height="600" ResizeMode="CanResizeWithGrip" SnapsToDevicePixels="True" AllowDrop="True" Style="{DynamicResource SecondaryWindowStyle}" Title="{Binding Path=ActiveSession.TitleWithStatus, StringFormat=SmarTTY - {0}}">
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -334,7 +334,7 @@
                     </Style.Triggers>
                   </Style>
                 </FrameworkElement.Style>
-                <TabControl Panel.ZIndex="0" Style="{DynamicResource MainWindowInnerTabControl}" TabStripPlacement="{Binding Path=DataContext.TabHeaderLocation, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding ActiveTabIndex}">
+                <TabControl Panel.ZIndex="0" Style="{DynamicResource MainWindowInnerTabControl}" TabStripPlacement="{Binding Path=DataContext.TabHeaderLocation, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding ActiveTabIndex}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
                       <Grid ToolTip="{Binding ToolTip}">
@@ -399,7 +399,7 @@
                               </Style.Triggers>
                             </Style>
                           </FrameworkElement.Style>
-                          <Grid Margin="2" DataContext="{Binding Searcher}" Style="{DynamicResource ToolBarGridStyle}" TextBlock.Foreground="{Binding Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}">
+                          <Grid Margin="2" DataContext="{Binding Searcher}" Style="{DynamicResource ToolBarGridStyle}" TextBlock.Foreground="{Binding Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="Auto" />
                               <ColumnDefinition Width="*" />
@@ -410,7 +410,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Find: " VerticalAlignment="Center" />
                             <TextBox Name="txtSearch" Grid.Column="1" VerticalContentAlignment="Center" VerticalAlignment="Center" Text="{Binding SearchedText, UpdateSourceTrigger=PropertyChanged}" KeyDown="txtSearch_KeyDown" />
-                            <ToggleButton Grid.Column="2" ToolTip="Case-sensitive search" IsChecked="{Binding CaseSensitive}" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}">
+                            <ToggleButton Grid.Column="2" ToolTip="Case-sensitive search" IsChecked="{Binding CaseSensitive}" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}">
                               <TextBlock Text="Aa" />
                             </ToggleButton>
                             <Button Grid.Column="3" Click="SearchUp_Click">
@@ -432,7 +432,7 @@
                   </TabControl.ContentTemplate>
                 </TabControl>
               </ContentControl>
-              <local:ConnectionClosedPopup VerticalAlignment="Center" HorizontalAlignment="Center" Panel.ZIndex="1" DataContext="{Binding Fixer}" TextBlock.Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:MainWindow}}}">
+              <local:ConnectionClosedPopup VerticalAlignment="Center" HorizontalAlignment="Center" Panel.ZIndex="1" DataContext="{Binding Fixer}" TextBlock.Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}">
                 <FrameworkElement.Style>
                   <Style TargetType="{x:Type local:ConnectionClosedPopup}">
                     <Style.Triggers>

@@ -22,8 +22,6 @@
     <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
   </Style>
 
-  <Style TargetType="{x:Type gui:MainWindow}" BasedOn="{StaticResource SecondaryWindowStyle}" />
-
   <!-- ============================================================ Popups -->
 
   <!-- The frame of a popup or a drop-down: the popup needs AllowsTransparency="True" for the rounded corners and the
