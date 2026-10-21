@@ -12,6 +12,10 @@ public class ZypperPackageManagerClient : ILinuxPackageManagerClient
 {
     // Both "zypper packages" and "zypper list-updates" print a table with '|' separated cells,
     // e.g. "i | @System | curl | 8.9.1-1.1" and "v | Update | curl | 8.9.1-1.1 | 8.10.1-1.1".
+    // LC_ALL=C keeps the table headers in English (a translated "Name" header would be taken for a package), and
+    // "--non-interactive" keeps zypper from waiting forever for an answer (e.g. to trust a new repository key),
+    // as there is nobody to answer it on the other end of the command channel.
+    private const string QueryPrefix = "LC_ALL=C zypper --non-interactive ";
 
     public int Probe(ISSHCommandRunner runner)
     {
@@ -30,17 +34,17 @@ public class ZypperPackageManagerClient : ILinuxPackageManagerClient
 
     public LinuxPackageInfo[] QueryAllPackages(ISSHCommandRunner runner, bool allVersions = false)
     {
-        string[] installedLines = runner.RunCommand("zypper packages --installed-only");
-        string[] availableLines = runner.RunCommand("zypper packages --not-installed-only");
-        if (installedLines == null || availableLines == null)
+        string[] installedLines = runner.RunCommand(QueryPrefix + "packages --installed-only");
+        if (installedLines == null)
         {
             throw new Exception("Failed to list packages with zypper");
         }
         Dictionary<string, LinuxPackageInfo> packages = new Dictionary<string, LinuxPackageInfo>(StringComparer.Ordinal);
         AddPackages(packages, installedLines, LinuxPackageInfo.PackageState.Installed);
-        AddPackages(packages, availableLines, LinuxPackageInfo.PackageState.Available);
+        // The repositories may be unreachable: the installed packages are still listed then.
+        AddPackages(packages, runner.RunCommand(QueryPrefix + "packages --not-installed-only"), LinuxPackageInfo.PackageState.Available);
         // "zypper list-updates" is a bonus only: when it fails, the packages are still listed, just without updates.
-        string[] updateLines = runner.RunCommand("zypper list-updates");
+        string[] updateLines = runner.RunCommand(QueryPrefix + "list-updates");
         if (updateLines != null)
         {
             foreach (string line in updateLines)

@@ -1,7 +1,6 @@
 using SmarTTY.GUI.Backend;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -9,13 +8,12 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Markup;
 using System.Windows.Threading;
 using VisualTTY;
 
 namespace SmarTTY.GUI;
 
-public partial class PackageManagerWindow : Window, IComponentConnector, IStyleConnector
+public partial class PackageManagerWindow : Window
 {
     public class ControllerImpl : INotifyPropertyChanged
     {
@@ -43,40 +41,52 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
 
         private LinuxPackageInfo[] _AllPackages;
 
+        private IList<LinuxPackageInfo> _FilteredPackages = new LinuxPackageInfo[0];
+
         private string _Filter;
 
         private PackageTypeFilter _TypeFilter;
+
+        private volatile bool _Closed;
 
         public string InstallText
         {
             get
             {
-                int itemIndex = 0;
-                int removedPackageCount = 0;
-                if (_AllPackages != null)
+                int installCount = 0;
+                int upgradeCount = 0;
+                int removeCount = 0;
+                foreach (LinuxPackageInfo linuxPackageInfo in _AllPackages ?? new LinuxPackageInfo[0])
                 {
-                    LinuxPackageInfo[] allPackages = _AllPackages;
-                    for (int allPackageIndex = 0; allPackageIndex < allPackages.Length; allPackageIndex++)
+                    switch (linuxPackageInfo.Action)
                     {
-                        switch (allPackages[allPackageIndex].Action)
-                        {
-                            case LinuxPackageInfo.PackageAction.Install:
-                                itemIndex++;
-                                break;
-                            case LinuxPackageInfo.PackageAction.Remove:
-                                removedPackageCount++;
-                                break;
-                        }
+                        case LinuxPackageInfo.PackageAction.Install:
+                            if (linuxPackageInfo.State == LinuxPackageInfo.PackageState.Upgradeable)
+                            {
+                                upgradeCount++;
+                            }
+                            else
+                            {
+                                installCount++;
+                            }
+                            break;
+                        case LinuxPackageInfo.PackageAction.Remove:
+                            removeCount++;
+                            break;
                     }
                 }
                 List<string> list = new List<string>();
-                if (itemIndex > 0)
+                if (installCount > 0)
                 {
-                    list.Add($"install {itemIndex} package" + ((itemIndex == 1) ? "" : "s"));
+                    list.Add(FormatCount("install", installCount));
                 }
-                if (removedPackageCount > 0)
+                if (upgradeCount > 0)
                 {
-                    list.Add($"remove {removedPackageCount} package" + ((removedPackageCount == 1) ? "" : "s"));
+                    list.Add(FormatCount("upgrade", upgradeCount));
+                }
+                if (removeCount > 0)
+                {
+                    list.Add(FormatCount("remove", removeCount));
                 }
                 string text = string.Join(", ", list.ToArray());
                 if (text.Length == 0)
@@ -86,6 +96,29 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                 return char.ToUpper(text[0]) + text.Substring(1);
             }
         }
+
+        /// <summary>How many packages the list shows and how many there are, e.g. "120 of 3512 packages, 4 updates".</summary>
+        public string StatusText
+        {
+            get
+            {
+                if (_AllPackages == null)
+                {
+                    return null;
+                }
+                string total = _AllPackages.Length + " package" + ((_AllPackages.Length == 1) ? "" : "s");
+                string text = (_FilteredPackages.Count == _AllPackages.Length) ? total : (_FilteredPackages.Count + " of " + total);
+                int updateCount = _AllPackages.Count((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.State == LinuxPackageInfo.PackageState.Upgradeable);
+                if (updateCount > 0)
+                {
+                    text += ", " + updateCount + " update" + ((updateCount == 1) ? "" : "s");
+                }
+                return text;
+            }
+        }
+
+        /// <summary>True when some of the available updates are not selected yet.</summary>
+        public bool CanSelectUpdates => IsIdle && _AllPackages != null && _AllPackages.Any((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.State == LinuxPackageInfo.PackageState.Upgradeable && linuxPackageInfo.IsChecked != true);
 
         public string ProgressText
         {
@@ -98,6 +131,7 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                 _ProgressText = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ProgressText"));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsIdle"));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CanSelectUpdates"));
             }
         }
 
@@ -118,7 +152,24 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
             }
         }
 
-        public ObservableCollection<LinuxPackageInfo> FilteredPackages { get; } = new ObservableCollection<LinuxPackageInfo>();
+        /// <summary>
+        /// The packages that pass the filters. The list is replaced as a whole on every change: filling an
+        /// ObservableCollection item by item raises an event per package, which is slow with the tens of
+        /// thousands of packages that apt lists.
+        /// </summary>
+        public IList<LinuxPackageInfo> FilteredPackages
+        {
+            get
+            {
+                return _FilteredPackages;
+            }
+            private set
+            {
+                _FilteredPackages = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("FilteredPackages"));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("StatusText"));
+            }
+        }
 
         public PackageTypeFilter TypeFilter
         {
@@ -141,6 +192,13 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
         public void OnChecked()
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("InstallText"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CanSelectUpdates"));
+        }
+
+        /// <summary>Called when the window is closed: the background queries stop reporting to it.</summary>
+        public void OnClosed()
+        {
+            _Closed = true;
         }
 
         public ControllerImpl(PackageManagerWindow packageManagerWindow, SessionWrapper session)
@@ -148,7 +206,34 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
             _Window = packageManagerWindow;
             _Session = session;
             ProgressText = "Detecting package manager...";
-            new Thread(ParseThreadBody).Start();
+            StartBackgroundThread(ParseThreadBody);
+        }
+
+        private static void StartBackgroundThread(ThreadStart body)
+        {
+            // A background thread does not keep SmarTTY running if it is closed while a slow command is still running.
+            new Thread(body)
+            {
+                IsBackground = true,
+                Name = "Package manager"
+            }.Start();
+        }
+
+        /// <summary>Runs <paramref name="action"/> on the UI thread unless the window has been closed in the meantime.</summary>
+        private void RunOnUIThread(Action action)
+        {
+            ((DispatcherObject)_Window).Dispatcher.BeginInvoke((Delegate)(Action)(() =>
+            {
+                if (!_Closed)
+                {
+                    action();
+                }
+            }), new object[0]);
+        }
+
+        private static string FormatCount(string verb, int count)
+        {
+            return verb + " " + count + " package" + ((count == 1) ? "" : "s");
         }
 
         private void ParseThreadBody()
@@ -159,6 +244,10 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                 int bestScore = 0;
                 foreach (ILinuxPackageManagerClient client in _Clients)
                 {
+                    if (_Closed)
+                    {
+                        return;
+                    }
                     int score = -1;
                     try
                     {
@@ -183,11 +272,11 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
             }
             catch (Exception exception)
             {
-                ((DispatcherObject)_Window).Dispatcher.BeginInvoke((Delegate)(Action)(() =>
+                RunOnUIThread(() =>
                 {
                     MessageBoxes.Exception(exception);
                     _Window.Close();
-                }), new object[0]);
+                });
             }
         }
 
@@ -215,13 +304,14 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
                     linuxPackageInfo.IsChecked = previous.IsChecked;
                 }
             }
-            _AllPackages = allPackages;
-            ProgressText = null;
-            ((DispatcherObject)_Window).Dispatcher.BeginInvoke((Delegate)(Action)(() =>
+            RunOnUIThread(() =>
             {
+                // The list is replaced on the UI thread, which is the one that reads it.
+                _AllPackages = allPackages;
+                ProgressText = null;
                 ApplyFilter();
                 OnChecked();
-            }), new object[0]);
+            });
         }
 
         /// <summary>Updates the package lists from the repositories with the detected package manager and reloads the list.</summary>
@@ -231,98 +321,135 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
             {
                 return;
             }
-            ProgressText = "Updating package lists...";
+            Dictionary<string, LinuxPackageInfo> selection = new Dictionary<string, LinuxPackageInfo>();
+            foreach (LinuxPackageInfo linuxPackageInfo in _AllPackages ?? new LinuxPackageInfo[0])
+            {
+                if (linuxPackageInfo.Action != LinuxPackageInfo.PackageAction.None)
+                {
+                    selection[linuxPackageInfo.ID] = linuxPackageInfo;
+                }
+            }
+            ProgressText = "Updating package lists (" + _Client.GetCommandLineForIndexUpdate() + ")...";
             // Empty the list so that the progress text does not overlap the old rows; it is refilled after the reload.
-            FilteredPackages.Clear();
-            new Thread(RefreshThreadBody).Start();
+            FilteredPackages = new LinuxPackageInfo[0];
+            StartBackgroundThread(() => RefreshThreadBody(selection));
         }
 
-        private void RefreshThreadBody()
+        private void RefreshThreadBody(Dictionary<string, LinuxPackageInfo> selection)
         {
             try
             {
-                Dictionary<string, LinuxPackageInfo> selection = new Dictionary<string, LinuxPackageInfo>();
-                foreach (LinuxPackageInfo linuxPackageInfo in _AllPackages ?? new LinuxPackageInfo[0])
-                {
-                    if (linuxPackageInfo.Action != LinuxPackageInfo.PackageAction.None)
-                    {
-                        selection[linuxPackageInfo.ID] = linuxPackageInfo;
-                    }
-                }
-                ProgressText = "Updating package lists (" + _Client.GetCommandLineForIndexUpdate() + ")...";
                 PackageIndexUpdater.Run(_Session, _Client, _IsRoot);
                 LoadPackages(selection);
             }
             catch (Exception exception)
             {
-                ProgressText = null;
-                ((DispatcherObject)_Window).Dispatcher.BeginInvoke((Delegate)(Action)(() =>
+                RunOnUIThread(() =>
                 {
+                    ProgressText = null;
                     // Bring back the previous list, the refresh did not replace it.
                     ApplyFilter();
                     MessageBoxes.Exception(exception);
-                }), new object[0]);
+                });
             }
+        }
+
+        /// <summary>Marks every available update for installation.</summary>
+        public void SelectAllUpdates()
+        {
+            if (_AllPackages == null || !IsIdle)
+            {
+                return;
+            }
+            foreach (LinuxPackageInfo linuxPackageInfo in _AllPackages)
+            {
+                if (linuxPackageInfo.State == LinuxPackageInfo.PackageState.Upgradeable)
+                {
+                    linuxPackageInfo.IsChecked = true;
+                }
+            }
+            OnChecked();
         }
 
         private void ApplyFilter()
         {
-            FilteredPackages.Clear();
             string filter = _Filter;
             Regex regex = null;
             if (filter != null && filter.IndexOfAny(new char[4] { '$', '*', '^', '.' }) != -1)
             {
                 try
                 {
-                    regex = new Regex(filter, RegexOptions.IgnoreCase);
+                    // The timeout keeps a pathological pattern from freezing the window on a long list.
+                    regex = new Regex(filter, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(200));
                 }
                 catch
                 {
                 }
             }
+            List<LinuxPackageInfo> filteredPackages = new List<LinuxPackageInfo>();
             LinuxPackageInfo[] linuxPackageInfos = _AllPackages ?? new LinuxPackageInfo[0];
             foreach (LinuxPackageInfo linuxPackageInfo in linuxPackageInfos)
             {
                 string name = linuxPackageInfo.Name;
-                if (name == null)
+                if (name == null || !MatchesTypeFilter(linuxPackageInfo))
                 {
                     continue;
                 }
-                switch (_TypeFilter)
-                {
-                    case PackageTypeFilter.Installed:
-                        if (linuxPackageInfo.State != LinuxPackageInfo.PackageState.Installed)
-                        {
-                            continue;
-                        }
-                        break;
-                    case PackageTypeFilter.Updates:
-                        if (linuxPackageInfo.State != LinuxPackageInfo.PackageState.Upgradeable)
-                        {
-                            continue;
-                        }
-                        break;
-                }
-                if (!string.IsNullOrEmpty(_Filter))
+                if (!string.IsNullOrEmpty(filter))
                 {
                     if (regex != null)
                     {
-                        if (!regex.IsMatch(name))
+                        try
                         {
-                            continue;
+                            if (!regex.IsMatch(name))
+                            {
+                                continue;
+                            }
+                        }
+                        catch (RegexMatchTimeoutException)
+                        {
+                            // Fall back to the plain text search for the rest of the list.
+                            regex = null;
+                            if (name.IndexOf(filter, StringComparison.InvariantCultureIgnoreCase) == -1)
+                            {
+                                continue;
+                            }
                         }
                     }
-                    else if (name.IndexOf(_Filter, StringComparison.InvariantCultureIgnoreCase) == -1)
+                    else if (name.IndexOf(filter, StringComparison.InvariantCultureIgnoreCase) == -1)
                     {
                         continue;
                     }
                 }
-                FilteredPackages.Add(linuxPackageInfo);
+                filteredPackages.Add(linuxPackageInfo);
+            }
+            FilteredPackages = filteredPackages;
+        }
+
+        private bool MatchesTypeFilter(LinuxPackageInfo linuxPackageInfo)
+        {
+            switch (_TypeFilter)
+            {
+                case PackageTypeFilter.Installed:
+                    // A package with an update is installed too.
+                    return linuxPackageInfo.State != LinuxPackageInfo.PackageState.Available;
+                case PackageTypeFilter.NotInstalled:
+                    return linuxPackageInfo.State == LinuxPackageInfo.PackageState.Available;
+                case PackageTypeFilter.Updates:
+                    return linuxPackageInfo.State == LinuxPackageInfo.PackageState.Upgradeable;
+                case PackageTypeFilter.Pending:
+                    return linuxPackageInfo.Action != LinuxPackageInfo.PackageAction.None;
+                default:
+                    return true;
             }
         }
 
         public string BuildCommandLine()
         {
+            if (_AllPackages == null || _Client == null)
+            {
+                return null;
+            }
             List<string> list = new List<string>();
             LinuxPackageInfo[] items = _AllPackages.Where((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.Action == LinuxPackageInfo.PackageAction.Install).ToArray();
             LinuxPackageInfo[] entries = _AllPackages.Where((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.Action == LinuxPackageInfo.PackageAction.Remove).ToArray();
@@ -334,7 +461,7 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
             {
                 list.Add(_Client.GetCommandLineForPackageOperation(entries, LinuxPackageInfo.PackageAction.Remove, Options));
             }
-            string text = string.Join("&&", list.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
+            string text = string.Join(" && ", list.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
             if (text.Length == 0)
             {
                 // Nothing was selected. The caller sends the command line to the terminal unless it is null: an empty
@@ -354,9 +481,20 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
         this.DataContext = new ControllerImpl(this, session);
     }
 
+    protected override void OnClosed(EventArgs e)
+    {
+        (this.DataContext as ControllerImpl)?.OnClosed();
+        base.OnClosed(e);
+    }
+
     private void Refresh_Click(object sender, RoutedEventArgs e)
     {
         (this.DataContext as ControllerImpl)?.Refresh();
+    }
+
+    private void SelectAllUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        (this.DataContext as ControllerImpl)?.SelectAllUpdates();
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
@@ -367,6 +505,11 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
     private void OK_Click(object sender, RoutedEventArgs e)
     {
         CommandLine = (this.DataContext as ControllerImpl)?.BuildCommandLine();
+        if (CommandLine == null)
+        {
+            // Enter in the filter box reaches the default button even when nothing is selected: keep the window open.
+            return;
+        }
         this.DialogResult = true;
     }
 
@@ -377,14 +520,16 @@ public partial class PackageManagerWindow : Window, IComponentConnector, IStyleC
 
     private void ListView_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if ((int)e.Key != 18)
+        if (e.Key != Key.Space || !(sender is ListView listView))
         {
             return;
         }
-        foreach (LinuxPackageInfo item in ((ListBox)((sender is ListView) ? sender : null)).SelectedItems.OfType<LinuxPackageInfo>())
+        foreach (LinuxPackageInfo item in listView.SelectedItems.OfType<LinuxPackageInfo>())
         {
             item.ToggleSelection();
         }
+        // The rows that are scrolled out of view have no check box to report the change, so update the summary here.
+        (this.DataContext as ControllerImpl)?.OnChecked();
         ((RoutedEventArgs)e).Handled = true;
     }
 }

@@ -35,9 +35,8 @@ public class DnfPackageManagerClient : ILinuxPackageManagerClient
 
     public LinuxPackageInfo[] QueryAllPackages(ISSHCommandRunner runner, bool allVersions = false)
     {
-        string[] installedLines = runner.RunCommand("dnf -q list --installed");
-        string[] availableLines = runner.RunCommand("dnf -q list --available");
-        if (installedLines == null || availableLines == null)
+        string[] installedLines = runner.RunCommand("LC_ALL=C dnf -q list --installed");
+        if (installedLines == null)
         {
             throw new Exception("Failed to list packages with dnf");
         }
@@ -51,7 +50,8 @@ public class DnfPackageManagerClient : ILinuxPackageManagerClient
                 State = LinuxPackageInfo.PackageState.Installed
             };
         }
-        foreach (KeyValuePair<string, string> available in ParseListLines(availableLines))
+        // "dnf list --available" fails when no repository can be reached: the installed packages are still listed then.
+        foreach (KeyValuePair<string, string> available in ParseListLines(runner.RunCommand("LC_ALL=C dnf -q list --available")))
         {
             if (!packages.ContainsKey(available.Key))
             {
@@ -64,7 +64,7 @@ public class DnfPackageManagerClient : ILinuxPackageManagerClient
             }
         }
         // The list of upgrades is a bonus only: if the command fails, the packages are still listed, just without updates.
-        foreach (KeyValuePair<string, string> upgrade in ParseListLines(runner.RunCommand("dnf -q list --upgrades")))
+        foreach (KeyValuePair<string, string> upgrade in ParseListLines(runner.RunCommand("LC_ALL=C dnf -q list --upgrades")))
         {
             if (packages.TryGetValue(upgrade.Key, out LinuxPackageInfo packageInfo) && packageInfo.State == LinuxPackageInfo.PackageState.Installed)
             {
@@ -112,7 +112,8 @@ public class DnfPackageManagerClient : ILinuxPackageManagerClient
         {
             return result;
         }
-        foreach (string line in lines)
+        // dnf wraps a row whose package name does not fit into its column, like yum does.
+        foreach (string line in YumPackageManagerClient.JoinContinuationLines(lines))
         {
             if (string.IsNullOrWhiteSpace(line))
             {

@@ -87,8 +87,9 @@ public class PortagePackageManagerClient : ILinuxPackageManagerClient
         {
             return null;
         }
-        // Portage asks the questions of the merge plan by default: "--ask=n" takes the default answer instead.
-        string optionsFlag = ((options != null && options.NoPrompt) ? "--ask=n " : "");
+        // emerge merges right away unless "--ask" is given, so the confirmation has to be asked for explicitly;
+        // "--ask=n" overrides an "--ask" from EMERGE_DEFAULT_OPTS when no confirmation is wanted.
+        string optionsFlag = ((options != null && options.NoPrompt) ? "--ask=n " : "--ask ");
         string actionFlag;
         switch (action)
         {

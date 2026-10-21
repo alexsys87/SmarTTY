@@ -8,6 +8,10 @@ public enum PackageTypeFilter
     All,
     [EnumDisplayText("Installed packages")]
     Installed,
+    [EnumDisplayText("Not installed")]
+    NotInstalled,
     [EnumDisplayText("Updates")]
-    Updates
+    Updates,
+    [EnumDisplayText("Pending changes")]
+    Pending
 }
