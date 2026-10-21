@@ -107,6 +107,15 @@ jobs:
           SMARTTY_DROPBEAR_TEST_REQUIRED: 1
         run: dotnet run --project tests/SshNetIntegrationTests -c Release
 
+      - name: Install Mono and a virtual display for the Smart Terminal checks
+        run: sudo apt-get install -y mono-runtime libmono-system-windows-forms4.0-cil libmono-system-drawing4.0-cil libmono-system-xml-linq4.0-cil libmono-microsoft-csharp4.0-cil libgdiplus xvfb
+
+      - name: Build the Smart Terminal checks
+        run: dotnet build tests/SmartTerminalIntegrationTests -c Release
+
+      - name: Run the Smart Terminal checks (the real control under Mono, on OpenSSH and Dropbear)
+        run: xvfb-run -a mono tests/SmartTerminalIntegrationTests/bin/Release/net48/SmartTerminalIntegrationTests.exe
+
   build:
     name: Build SmarTTY (Release)
     runs-on: windows-latest

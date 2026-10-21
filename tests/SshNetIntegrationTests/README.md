@@ -29,6 +29,16 @@ channel (Dropbear silently drops the PTY channel's request when such a helper ex
 Smart Terminal commands on OpenWRT). `DropbearTests` run PTY commands together with helper commands against
 a Dropbear server with a BusyBox ash login shell; they need the server from `setup-dropbear.sh`.
 
+`tests/SmartTerminalIntegrationTests` uses the same two servers to run the real Smart Terminal control (a
+WinForms program built for .NET Framework 4.8) under Mono with a virtual display: commands, `cd`, `export`, exit
+codes, the Ctrl+R history search and Tab completion of variables, hosts, aliases and functions. After the servers are
+up:
+
+```sh
+dotnet build tests/SmartTerminalIntegrationTests -c Release
+xvfb-run -a mono tests/SmartTerminalIntegrationTests/bin/Release/net48/SmartTerminalIntegrationTests.exe
+```
+
 ## Running
 
 The suite needs the .NET 8 SDK and an OpenSSH server. `setup-sshd.sh` provisions a throwaway

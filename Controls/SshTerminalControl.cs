@@ -307,6 +307,11 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     private bool _applyingCompletion;
 
+    // Ctrl+R: the bash-like incremental history search in progress, and the line typed before it started.
+    private HistorySearch _historySearch;
+
+    private string _searchOriginalText;
+
     private List<string> _typedCommands = new List<string>();
 
     // Variables set with "export" (a null value: "unset"), in the order they were set: a later value may refer to an
@@ -338,6 +343,9 @@ public class SshTerminalControl : TerminalEmulatorControl
     public SshSession Session => _context.Session;
 
     public bool HasEnvironment => _environment.Count > 0;
+
+    /// <summary>Variables exported in this tab (for completing $NAME).</summary>
+    public IEnumerable<string> EnvironmentNames => _environment.ToArray().Where((KeyValuePair<string, string> item) => item.Value != null).Select((KeyValuePair<string, string> item) => item.Key);
 
     public string HomeDirectory => _homeDirectory;
 
@@ -524,21 +532,134 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             return;
         }
-        string text = inputLine.Text;
-        int caretIndex = inputLine.Region.CaretIndex;
+        if (_historySearch != null)
+        {
+            EndHistorySearch(accept: true);
+            inputLine = _inputLine;
+        }
+        ReplacePromptLine(null, inputLine.Text, inputLine.Region.CaretIndex);
+    }
+
+    /// <summary>
+    /// Replaces the prompt line (with a custom prompt, or the normal one when <paramref name="prompt"/> is null) and
+    /// puts <paramref name="text"/> on it.
+    /// </summary>
+    private void ReplacePromptLine(string prompt, string text, int caretIndex)
+    {
+        InputLine inputLine = _inputLine;
+        if (inputLine == null)
+        {
+            return;
+        }
+        text = text ?? "";
         CloseCompletion();
         EditableTextDocument document = ((EditableTextBrowser)this).EditableDocument;
         document.RemoveLines(inputLine.StartLine, document.LineCount - inputLine.StartLine);
         _inputLine = null;
-        ShowPrompt(removeTrailingBlankLine: false);
+        ShowPrompt(removeTrailingBlankLine: false, customPrompt: prompt);
         _inputLine.SetText(text);
-        if (caretIndex >= 0 && caretIndex <= text.Length)
-        {
-            _inputLine.Region.CaretIndex = caretIndex;
-        }
+        _inputLine.Region.CaretIndex = (caretIndex >= 0 && caretIndex <= text.Length) ? caretIndex : text.Length;
     }
 
-    private void ShowPrompt(bool removeTrailingBlankLine = true)
+    private void StartHistorySearch()
+    {
+        if (_inputLine == null)
+        {
+            return;
+        }
+        _searchOriginalText = _inputLine.Text ?? "";
+        _historySearch = new HistorySearch(BuildHistory());
+        ShowHistorySearchLine();
+    }
+
+    // "(reverse-i-search)`query': match", as bash shows it.
+    private void ShowHistorySearchLine()
+    {
+        HistorySearch search = _historySearch;
+        if (search == null)
+        {
+            return;
+        }
+        string text = search.Match ?? _searchOriginalText;
+        ReplacePromptLine(search.Prompt, text, search.MatchPosition >= 0 ? search.MatchPosition : text.Length);
+    }
+
+    /// <summary>Leaves the history search with the found command (or with the line typed before it when cancelled).</summary>
+    private void EndHistorySearch(bool accept)
+    {
+        HistorySearch search = _historySearch;
+        if (search == null)
+        {
+            return;
+        }
+        _historySearch = null;
+        string text = (accept ? search.Match : null) ?? _searchOriginalText;
+        int caretIndex = (accept && search.Match != null && search.MatchPosition >= 0) ? search.MatchPosition : text.Length;
+        ReplacePromptLine(null, text, caretIndex);
+    }
+
+    // Keys while the history search is active. Returns true for a key it has handled completely.
+    private bool HandleHistorySearchKey(KeyEventArgs e)
+    {
+        HistorySearch search = _historySearch;
+        switch (e.KeyCode)
+        {
+            case Keys.R when e.Control && !e.Alt:
+                search.Older();
+                ShowHistorySearchLine();
+                return true;
+            case Keys.S when e.Control && !e.Alt:
+                search.Newer();
+                ShowHistorySearchLine();
+                return true;
+            case Keys.G when e.Control && !e.Alt:
+            case Keys.Escape:
+                EndHistorySearch(accept: false);
+                return true;
+            case Keys.C when e.Control && !e.Alt:
+                _searchOriginalText = "";
+                EndHistorySearch(accept: false);
+                return true;
+            case Keys.Back:
+                search.RemoveLast();
+                ShowHistorySearchLine();
+                return true;
+            case Keys.Return:
+                EndHistorySearch(accept: true);
+                SubmitInput();
+                return true;
+        }
+        return false;
+    }
+
+    private static bool IsModifierKey(Keys keyCode)
+    {
+        return keyCode == Keys.ShiftKey || keyCode == Keys.ControlKey || keyCode == Keys.Menu || keyCode == Keys.LWin || keyCode == Keys.RWin || keyCode == Keys.Capital;
+    }
+
+    // Keys that leave the history search keeping the found command for editing, and then act as usual (as in bash).
+    private static bool IsEditingKey(KeyEventArgs e)
+    {
+        switch (e.KeyCode)
+        {
+            case Keys.Left:
+            case Keys.Right:
+            case Keys.Up:
+            case Keys.Down:
+            case Keys.Home:
+            case Keys.End:
+            case Keys.Tab:
+            case Keys.Delete:
+            case Keys.Prior:
+            case Keys.Next:
+            case Keys.Insert:
+                return true;
+        }
+        // Other Ctrl shortcuts as well, but not Ctrl+Alt (AltGr), which types characters on many layouts.
+        return e.Control && !e.Alt;
+    }
+
+    private void ShowPrompt(bool removeTrailingBlankLine = true, string customPrompt = null)
     {
         ActiveBufferIndex = 0;
         if (removeTrailingBlankLine && ((EditableTextBrowser)this).EditableDocument.LineCount > 0 && ((EditableTextBrowser)this).EditableDocument.GetLineText(((EditableTextBrowser)this).EditableDocument.LineCount - 1).Trim() == "")
@@ -550,7 +671,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             ch = '#';
         }
-        _inputLine = new InputLine(this, ((EditableTextBrowser)this).EditableDocument.LineCount, $"{PromptPrefix}{ch} ");
+        _inputLine = new InputLine(this, ((EditableTextBrowser)this).EditableDocument.LineCount, customPrompt ?? $"{PromptPrefix}{ch} ");
         ((EditableTextBrowser)this).EditableDocument.AppendLine(_inputLine.Prompt);
         RewrapInput();
         OnTextReplaced();
@@ -854,7 +975,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         CompletionPopupRequested?.Invoke(this, completionPopupRequest);
         if (completionPopupRequest.Popup != null)
         {
-            _completion = new CompletionSession(this, text, completionTarget, token, completionPopupRequest.Popup, completionTrigger == CompletionTrigger.Tab, commandCompletion);
+            _completion = new CompletionSession(this, text, completionTarget, token, completionPopupRequest.Popup, completionTrigger == CompletionTrigger.Tab, commandCompletion, context.InsertPrefix, context.InsertSuffix);
             _completion.ItemApplied += OnCompletionApplied;
         }
     }
@@ -884,6 +1005,17 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
+        if (_historySearch != null && _inputLine != null)
+        {
+            // Typed characters extend the search query instead of the command line.
+            if (e.KeyChar >= ' ')
+            {
+                _historySearch.Append(e.KeyChar);
+                ShowHistorySearchLine();
+            }
+            e.Handled = true;
+            return;
+        }
         bool? isAtWordStart = null;
         if (_inputLine != null)
         {
@@ -906,6 +1038,11 @@ public class SshTerminalControl : TerminalEmulatorControl
                         if (completionSession == null || !completionSession.IsOpen)
                         {
                             ShowCompletions(CompletionTrigger.Tab);
+                        }
+                        else
+                        {
+                            // The list is open (e.g. after a space) but Tab did not pick an item from it.
+                            completionSession.ApplyOnTab();
                         }
                         e.Handled = true;
                         return;
@@ -988,6 +1125,25 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        if (_historySearch != null && _inputLine != null)
+        {
+            if (IsModifierKey(e.KeyCode))
+            {
+                base.OnKeyDown(e);
+                return;
+            }
+            if (HandleHistorySearchKey(e))
+            {
+                SuppressKey(e);
+                return;
+            }
+            if (!IsEditingKey(e))
+            {
+                // A character key: OnKeyPress adds it to the query.
+                return;
+            }
+            EndHistorySearch(accept: true);
+        }
         CompletionSession completionSession = _completion;
         ICompletionPopup completionPopup = _popup;
         CompletionSession.AppliedEventArgs appliedBefore = completionSession?.LastApplied;
@@ -1053,7 +1209,15 @@ public class SshTerminalControl : TerminalEmulatorControl
                         SuppressKey(e);
                         return;
                     case Keys.R:
-                        ShowHistoryPopup();
+                        // Ctrl+R searches the history as bash does; Ctrl+Shift+R shows it as a list.
+                        if (e.Shift)
+                        {
+                            ShowHistoryPopup();
+                        }
+                        else
+                        {
+                            StartHistorySearch();
+                        }
                         SuppressKey(e);
                         return;
                     case Keys.Space:
@@ -1178,6 +1342,7 @@ public class SshTerminalControl : TerminalEmulatorControl
     // Ctrl+L and "clear": an empty screen with the prompt at the top.
     private void ClearScreen()
     {
+        _historySearch = null;
         CloseCompletion();
         Reset();
         ShowPrompt();
@@ -1206,6 +1371,7 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     private void BeginExecution()
     {
+        _historySearch = null;
         _inputLine = null;
         ((EditableTextBrowser)this).EditableDocument.AppendLine("");
         NavigationLocked = true;
@@ -1474,6 +1640,10 @@ public class SshTerminalControl : TerminalEmulatorControl
             {
                 message = TerminalEmulatorControl.Colorize("Connection lost.", 1);
             }
+            else if (!(_context.VTSettings?.ShowExitCodes ?? true))
+            {
+                // Turned off in Smart Terminal Settings.
+            }
             else if (exitStatus > 0)
             {
                 message = TerminalEmulatorControl.Colorize($"[exit code {exitStatus}]", 3);
@@ -1504,6 +1674,12 @@ public class SshTerminalControl : TerminalEmulatorControl
             string text = ShellCommandLine.JoinPastedLines(Win32Clipboard.GetText(Handle));
             if (string.IsNullOrEmpty(text))
             {
+                return;
+            }
+            if (_historySearch != null)
+            {
+                _historySearch.Append(text);
+                ShowHistorySearchLine();
                 return;
             }
             PrepareInputForEditing();

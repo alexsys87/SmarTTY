@@ -89,7 +89,7 @@ internal class CompletionSession : IDisposable
 
     private string _commandText;
 
-    private readonly bool _autoApply;
+    private bool _autoApply;
 
     private readonly CommandCompletion _commandCompletion;
 
@@ -104,6 +104,13 @@ internal class CompletionSession : IDisposable
     private List<CompletionItem> _items;
 
     private volatile bool _disposed;
+
+    // For variables and hosts: the text kept in front of the completed name ("$", "${", "user@") and after it ("}").
+    private readonly string _insertPrefix;
+
+    private readonly string _insertSuffix;
+
+    private bool CompletesName => _target == CompletionTarget.Variable || _target == CompletionTarget.Host;
 
     // The quote the word was opened with: a completed path keeps it; '\0' for an unquoted word.
     private char QuoteChar
@@ -123,10 +130,12 @@ internal class CompletionSession : IDisposable
 
     public event EventHandler<AppliedEventArgs> ItemApplied;
 
-    public CompletionSession(SshTerminalControl sshTerminalControl, string commandText, CompletionTarget completionTarget, Token token, ICompletionPopup completionPopup, bool autoApply, CommandCompletion commandCompletion)
+    public CompletionSession(SshTerminalControl sshTerminalControl, string commandText, CompletionTarget completionTarget, Token token, ICompletionPopup completionPopup, bool autoApply, CommandCompletion commandCompletion, string insertPrefix = null, string insertSuffix = null)
     {
         _terminal = sshTerminalControl;
         _target = completionTarget;
+        _insertPrefix = insertPrefix ?? "";
+        _insertSuffix = insertSuffix ?? "";
         _token = token;
         _commandText = commandText;
         _popup = completionPopup;
@@ -142,8 +151,28 @@ internal class CompletionSession : IDisposable
         }.Start();
     }
 
-    private static string GetFilterText(string text)
+    private string GetFilterText(string text)
     {
+        if (CompletesName)
+        {
+            // "$HO" / "${HO}" / "root@ro": the popup is filtered by the name after the prefix.
+            string name = text ?? "";
+            if (_target == CompletionTarget.Host)
+            {
+                // "user@" may be typed after the list has opened, so it is taken from the word each time.
+                name = ShellCommandLine.Unquote(name);
+                return name.Substring(name.LastIndexOf('@') + 1);
+            }
+            if (name.StartsWith(_insertPrefix, StringComparison.Ordinal))
+            {
+                name = name.Substring(_insertPrefix.Length);
+            }
+            if (_insertSuffix.Length > 0 && name.EndsWith(_insertSuffix, StringComparison.Ordinal))
+            {
+                name = name.Substring(0, name.Length - _insertSuffix.Length);
+            }
+            return name;
+        }
         return RemotePathUtils.GetFileName(ShellCommandLine.Unquote(text ?? "")) ?? "";
     }
 
@@ -177,7 +206,7 @@ internal class CompletionSession : IDisposable
         }
         else
         {
-            isOption = text.StartsWith("-");
+            isOption = text.StartsWith("-") && !CompletesName;
             _popup.SetFilter(GetFilterText(text));
         }
         if (isOption == _showingOptions && text != null)
@@ -252,7 +281,15 @@ internal class CompletionSession : IDisposable
                 {
                     return;
                 }
-                if (_target == CompletionTarget.Command && !listingTarget.HasPrefix)
+                if (_target == CompletionTarget.Variable)
+                {
+                    itemsList = LoadVariables();
+                }
+                else if (_target == CompletionTarget.Host)
+                {
+                    itemsList = LoadHosts(withColon: false);
+                }
+                else if (_target == CompletionTarget.Command && !listingTarget.HasPrefix)
                 {
                     IEnumerable<string> source = _terminal.ShellAnalyzer.GetExecutables(_terminal);
                     itemsList = (from item in source.Select((string fullPath) => new CompletionItem
@@ -273,6 +310,7 @@ internal class CompletionSession : IDisposable
                               })
                             orderby item.Text
                             select item).ToList();
+                    AddShellDefinitions(itemsList);
                 }
                 else
                 {
@@ -306,6 +344,11 @@ internal class CompletionSession : IDisposable
                         InsertText = BuildInsertText(listingTarget, lsEntry)
                     }).ToList();
                     itemsList.Sort(CompareItems);
+                    if (_target == CompletionTarget.HostOrPath && !listingTarget.HasPrefix)
+                    {
+                        // scp/rsync: the word may also be the "host:" of a remote path.
+                        itemsList.AddRange(LoadHosts(withColon: true));
+                    }
                 }
                 lock (_lock)
                 {
@@ -335,14 +378,109 @@ internal class CompletionSession : IDisposable
         }
     }
 
+    // Aliases and functions of the interactive shell (.bashrc) are commands as well; they replace a command of the
+    // same name in the list, since the shell runs them instead.
+    private void AddShellDefinitions(List<CompletionItem> items)
+    {
+        CompletionSources.ShellDefinitions definitions = _terminal.ShellAnalyzer.GetShellDefinitions(_terminal);
+        if (definitions == null)
+        {
+            return;
+        }
+        HashSet<string> names = new HashSet<string>(StringComparer.Ordinal);
+        List<CompletionItem> added = new List<CompletionItem>();
+        foreach (KeyValuePair<string, string> alias in definitions.Aliases)
+        {
+            if (names.Add(alias.Key))
+            {
+                added.Add(new CompletionItem
+                {
+                    Icon = VirtualTerminalPopupItemIcon.Command,
+                    Text = alias.Key,
+                    InsertText = alias.Key,
+                    Description = "alias: " + alias.Value
+                });
+            }
+        }
+        foreach (string function in definitions.Functions)
+        {
+            if (names.Add(function))
+            {
+                added.Add(new CompletionItem
+                {
+                    Icon = VirtualTerminalPopupItemIcon.Command,
+                    Text = function,
+                    InsertText = function,
+                    Description = "function"
+                });
+            }
+        }
+        items.RemoveAll((CompletionItem item) => names.Contains(item.Text));
+        items.AddRange(added);
+        items.Sort((CompletionItem first, CompletionItem second) => StringComparer.Ordinal.Compare(first.Text, second.Text));
+    }
+
+    private List<CompletionItem> LoadVariables()
+    {
+        SortedSet<string> names = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (string name in _terminal.ShellAnalyzer.GetShellDefinitions(_terminal)?.Variables ?? new List<string>())
+        {
+            names.Add(name);
+        }
+        // Variables set with "export" in this tab.
+        foreach (string name in _terminal.EnvironmentNames)
+        {
+            names.Add(name);
+        }
+        return names.Select((string name) => new CompletionItem
+        {
+            Icon = VirtualTerminalPopupItemIcon.Variable,
+            Text = name,
+            InsertText = name
+        }).ToList();
+    }
+
+    private List<CompletionItem> LoadHosts(bool withColon)
+    {
+        return _terminal.ShellAnalyzer.GetHosts().Select((CompletionSources.HostEntry host) => new CompletionItem
+        {
+            Icon = VirtualTerminalPopupItemIcon.Host,
+            Text = withColon ? host.Name + ":" : host.Name,
+            InsertText = withColon ? host.Name + ":" : host.Name,
+            Description = host.Source
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Tab while the list is open but nothing in it is selected (or it is still loading): complete the unique match or
+    /// the common prefix, as Tab does in bash, now or as soon as the list has been loaded.
+    /// </summary>
+    public void ApplyOnTab()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+        _autoApply = true;
+        List<CompletionItem> items = _items;
+        if (items != null && !_isLoading)
+        {
+            AutoApply(items);
+        }
+    }
+
     private void OnItemsLoaded(List<CompletionItem> list)
     {
         _items = list;
         UpdatePopup(null);
-        if (!_autoApply)
+        if (_autoApply)
         {
-            return;
+            AutoApply(list);
         }
+    }
+
+    private void AutoApply(List<CompletionItem> list)
+    {
         string filterText = GetFilterText(_token.Text);
         CompletionItem[] matches = list.Where((CompletionItem completionItem) => completionItem.Text.StartsWith(filterText)).ToArray();
         if (matches.Length == 1)
@@ -361,7 +499,7 @@ internal class CompletionSession : IDisposable
             if (common.Length > 0 && common != filterText)
             {
                 // The directory part of the word stays: "src/ma" + Tab used to become "main." instead of "src/main.".
-                string prefix = (_listing.HasPrefix && !_showingOptions) ? _listing.Prefix : "";
+                string prefix = (_listing.HasPrefix && !_showingOptions && !CompletesName) ? _listing.Prefix : "";
                 ApplyItem(new CompletionItem
                 {
                     Text = common,
@@ -449,6 +587,11 @@ internal class CompletionSession : IDisposable
         try
         {
             string literal = completionItem.InsertText;
+            if (CompletesName && !_showingOptions)
+            {
+                ApplyName(completionItem, literal, commit, suffix);
+                return;
+            }
             bool isDir = literal.EndsWith("/");
             if (isDir)
             {
@@ -510,6 +653,33 @@ internal class CompletionSession : IDisposable
         }
     }
 
+    // "$" + name (no quoting: it is a reference, not a literal) or "user@" + host.
+    private void ApplyName(CompletionItem completionItem, string name, bool commit, string suffix)
+    {
+        string word = ShellCommandLine.Unquote(_token.Text ?? "");
+        string insertText = _target == CompletionTarget.Variable
+            ? _insertPrefix + name + _insertSuffix
+            : ShellCommandLine.EscapeWord(word.Substring(0, word.LastIndexOf('@') + 1) + name);
+        insertText += (suffix == "/" && _target == CompletionTarget.Variable) ? "/" : suffix;
+        string newText = _commandText.Substring(0, _token.Start) + insertText + _commandText.Substring(_token.End);
+        AppliedEventArgs appliedEventArgs = new AppliedEventArgs
+        {
+            NewText = newText,
+            CaretIndex = _token.Start + insertText.Length,
+            Commit = commit,
+            Item = completionItem,
+            IsDirectory = false
+        };
+        LastApplied = appliedEventArgs;
+        ItemApplied?.Invoke(this, appliedEventArgs);
+        if (!_disposed && !commit && _popup.IsOpen)
+        {
+            _commandText = newText;
+            _token = new Token(newText, _token.Start, _token.Start + insertText.Length);
+            UpdatePopup(_token.Text);
+        }
+    }
+
     public static Token[] Tokenize(string text)
     {
         List<Token> list = new List<Token>();
@@ -566,6 +736,20 @@ internal class CompletionSession : IDisposable
             _token.Length += lengthDiff;
             _commandText = newFullText;
             string extracted = _token.Extract(newFullText) ?? "";
+            // The word as typed so far: the filter of a later Tab and the quote of the word are taken from it.
+            _token.Text = extracted;
+            if (_target == CompletionTarget.Variable)
+            {
+                // Still "$NAME" or "${NAME": keep filtering; anything else ends the completion.
+                string name = GetFilterText(extracted);
+                bool stillVariable = extracted.StartsWith(_insertPrefix, StringComparison.Ordinal) && name.All((char ch) => ch < 128 && (char.IsLetterOrDigit(ch) || ch == '_'));
+                if (!stillVariable)
+                {
+                    return true;
+                }
+                UpdatePopup(extracted);
+                return false;
+            }
             if (extracted.IndexOfAny(new char[2] { '`', '$' }) != -1)
             {
                 return true;
@@ -590,6 +774,11 @@ internal class CompletionSession : IDisposable
     // Lists another directory if the word now points into one and filters the popup by the word.
     private void Retarget(string word)
     {
+        if (CompletesName)
+        {
+            UpdatePopup(word);
+            return;
+        }
         ListingTarget listingTarget = ResolveListing(word);
         lock (_lock)
         {

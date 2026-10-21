@@ -161,6 +161,56 @@ public class ShellCompletionAnalyzer : IDisposable
         }
     }
 
+    private readonly object _definitionsLock = new object();
+
+    private CompletionSources.ShellDefinitions _shellDefinitions;
+
+    private List<CompletionSources.HostEntry> _hosts;
+
+    /// <summary>
+    /// Aliases, functions and variables of the shell the commands run in, loaded once per session. With the interactive
+    /// wrapper (Smart Terminal Settings) that is the interactive shell, which reads .bashrc; without it only the
+    /// environment is known, since aliases and functions of .bashrc are not available to the commands then.
+    /// </summary>
+    internal CompletionSources.ShellDefinitions GetShellDefinitions(SshTerminalControl sshTerminalControl)
+    {
+        lock (_definitionsLock)
+        {
+            if (_shellDefinitions != null)
+            {
+                return _shellDefinitions;
+            }
+            List<string> output;
+            if (_context.VTSettings.InteractiveModeWrapper)
+            {
+                string command = sshTerminalControl.BuildRemoteCommand(CompletionSources.BuildShellDefinitionsScript(), interactive: true);
+                // A .bashrc that waits for input must not keep the helper command (and with it the PTY gate) busy.
+                string quoted = SmarTTY.IO.RemotePathUtils.ShellQuote(command);
+                output = _sshSession.RunCommandChecked("if command -v timeout >/dev/null 2>&1; then timeout 10 sh -c " + quoted + "; else sh -c " + quoted + "; fi </dev/null", requireSuccess: false);
+            }
+            else
+            {
+                output = _sshSession.RunCommandChecked(sshTerminalControl.BuildRemoteCommand("env", interactive: false), requireSuccess: false);
+                output?.Insert(0, CompletionSources.VariablesMarker);
+            }
+            _shellDefinitions = CompletionSources.ParseShellDefinitions(output);
+            return _shellDefinitions;
+        }
+    }
+
+    /// <summary>Host names from ~/.ssh/config, ~/.ssh/known_hosts and /etc/hosts of the server, loaded once per session.</summary>
+    internal List<CompletionSources.HostEntry> GetHosts()
+    {
+        lock (_definitionsLock)
+        {
+            if (_hosts == null)
+            {
+                _hosts = CompletionSources.ParseHostFiles(_sshSession.RunCommandChecked(CompletionSources.BuildHostFilesCommand(), requireSuccess: false));
+            }
+            return _hosts;
+        }
+    }
+
     public string[] GetHistory()
     {
         lock (_history)

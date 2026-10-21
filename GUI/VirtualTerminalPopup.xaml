@@ -120,6 +120,12 @@
                     <DataTrigger Value="Flag" Binding="{Binding Icon}">
                       <Setter Property="Source" Value="../icons/gear16.png" />
                     </DataTrigger>
+                    <DataTrigger Value="Variable" Binding="{Binding Icon}">
+                      <Setter Property="Source" Value="../icons/event16.png" />
+                    </DataTrigger>
+                    <DataTrigger Value="Host" Binding="{Binding Icon}">
+                      <Setter Property="Source" Value="../icons/net16.png" />
+                    </DataTrigger>
                   </Style.Triggers>
                 </Style>
               </FrameworkElement.Style>

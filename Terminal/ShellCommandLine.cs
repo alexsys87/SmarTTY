@@ -46,6 +46,15 @@ internal static class ShellCommandLine
         public int CommandStart;
 
         public string CommandName;
+
+        /// <summary>
+        /// For <see cref="CompletionTarget.Variable"/> and <see cref="CompletionTarget.Host"/>: the text kept in front of
+        /// the completed name ("$", "${", "root@"); the popup is filtered by what follows it.
+        /// </summary>
+        public string InsertPrefix;
+
+        /// <summary>For "${NAME}": the closing brace added after the completed name.</summary>
+        public string InsertSuffix;
     }
 
     private const string OperatorChars = "|&;<>()";
@@ -59,6 +68,15 @@ internal static class ShellCommandLine
     };
 
     private static readonly HashSet<string> DirectoryCommands = new HashSet<string> { "cd", "pushd", "rmdir" };
+
+    // Commands whose arguments are host names (with an optional user@).
+    private static readonly HashSet<string> HostCommands = new HashSet<string>
+    {
+        "ssh", "sftp", "slogin", "mosh", "ssh-copy-id", "ping", "ping6", "telnet", "traceroute", "tracepath", "mtr", "host", "nslookup", "dig", "nc", "ftp"
+    };
+
+    // Commands whose arguments are local paths or host:path.
+    private static readonly HashSet<string> HostOrPathCommands = new HashSet<string> { "scp", "rsync" };
 
     public static bool IsOperatorChar(char ch)
     {
@@ -273,6 +291,17 @@ internal static class ShellCommandLine
             CommandStart = (commandIndex >= 0 && !expectCommand) ? tokens[commandIndex].Start : tokenStart,
             CommandName = (commandIndex >= 0 && !expectCommand) ? tokens[commandIndex].Text : null
         };
+        if (TryGetVariableContext(text, tokenStart, caretIndex, out int variableStart, out int variableEnd, out bool braced))
+        {
+            // "$HO" or "${HO" anywhere in a word (not in single quotes): a variable name.
+            context.Target = CompletionTarget.Variable;
+            context.TokenStart = variableStart;
+            context.TokenEnd = variableEnd;
+            context.InsertPrefix = braced ? "${" : "$";
+            context.InsertSuffix = braced ? "}" : "";
+            return context;
+        }
+        string word = text.Substring(tokenStart, tokenEnd - tokenStart);
         if (afterRedirection)
         {
             context.Target = CompletionTarget.Path;
@@ -285,11 +314,116 @@ internal static class ShellCommandLine
         {
             context.Target = CompletionTarget.Directory;
         }
+        else if (!word.StartsWith("-", StringComparison.Ordinal) && HostCommands.Contains(context.CommandName))
+        {
+            context.Target = CompletionTarget.Host;
+            context.InsertPrefix = HostUserPrefix(word);
+        }
+        else if (!word.StartsWith("-", StringComparison.Ordinal) && HostOrPathCommands.Contains(context.CommandName) && word.IndexOf(':') == -1)
+        {
+            // "user@ho" can only be a host; a word with '/' only a path; anything else may be either.
+            if (word.IndexOf('@') != -1 && word.IndexOf('/') == -1)
+            {
+                context.Target = CompletionTarget.Host;
+                context.InsertPrefix = HostUserPrefix(word);
+            }
+            else
+            {
+                context.Target = word.IndexOf('/') == -1 && !word.StartsWith(".", StringComparison.Ordinal) && !word.StartsWith("~", StringComparison.Ordinal) ? CompletionTarget.HostOrPath : CompletionTarget.Path;
+            }
+        }
         else
         {
             context.Target = CompletionTarget.Path;
         }
         return context;
+    }
+
+    // "root@" of "root@ho"; "" for a word without a user.
+    private static string HostUserPrefix(string word)
+    {
+        int at = word.LastIndexOf('@');
+        return at == -1 ? "" : word.Substring(0, at + 1);
+    }
+
+    /// <summary>
+    /// Finds a variable reference that ends at the caret ("$HO", "${HO"), outside single quotes and not escaped.
+    /// <paramref name="end"/> also covers the rest of the name after the caret (and the closing brace).
+    /// </summary>
+    private static bool TryGetVariableContext(string text, int wordStart, int caretIndex, out int start, out int end, out bool braced)
+    {
+        start = end = -1;
+        braced = false;
+        int nameStart = caretIndex;
+        while (nameStart > wordStart && IsNameChar(text[nameStart - 1]))
+        {
+            nameStart--;
+        }
+        if (nameStart > wordStart && text[nameStart - 1] == '{' && nameStart - 2 >= wordStart && text[nameStart - 2] == '$')
+        {
+            braced = true;
+            start = nameStart - 2;
+        }
+        else if (nameStart > wordStart && text[nameStart - 1] == '$')
+        {
+            start = nameStart - 1;
+        }
+        else
+        {
+            return false;
+        }
+        if (nameStart < caretIndex && char.IsDigit(text[nameStart]))
+        {
+            // $1, $2: positional parameters, not names.
+            return false;
+        }
+        // Quoting state of the word up to the '$': a backslash or single quotes make it literal.
+        bool inSingle = false;
+        bool inDouble = false;
+        bool escaped = false;
+        for (int i = wordStart; i < start; i++)
+        {
+            char ch = text[i];
+            if (escaped)
+            {
+                escaped = false;
+            }
+            else if (inSingle)
+            {
+                inSingle = ch != '\'';
+            }
+            else if (ch == '\\')
+            {
+                escaped = true;
+            }
+            else if (ch == '"')
+            {
+                inDouble = !inDouble;
+            }
+            else if (ch == '\'' && !inDouble)
+            {
+                inSingle = true;
+            }
+        }
+        if (inSingle || escaped)
+        {
+            return false;
+        }
+        end = caretIndex;
+        while (end < text.Length && IsNameChar(text[end]))
+        {
+            end++;
+        }
+        if (braced && end < text.Length && text[end] == '}')
+        {
+            end++;
+        }
+        return true;
+    }
+
+    private static bool IsNameChar(char ch)
+    {
+        return ch < 128 && (char.IsLetterOrDigit(ch) || ch == '_');
     }
 
     /// <summary>

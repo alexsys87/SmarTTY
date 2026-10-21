@@ -7,7 +7,9 @@ using SmarTTY.Terminal;
 //  * tokenizing with quotes, backslashes and operators,
 //  * telling a command name from a path or a cd argument (completion target),
 //  * quoting completed paths and reading back what was typed,
-//  * joining pasted lines, export/unset parsing, history file lines, "~" in the prompt.
+//  * joining pasted lines, export/unset parsing, history file lines, "~" in the prompt,
+//  * the bash-like history search (Ctrl+R), $variables and host names,
+//  * parsing aliases, functions, variables and host files for completion.
 // Run with: dotnet run --project tests/SmartTerminalCommandLineTests
 internal static class Program
 {
@@ -151,10 +153,129 @@ internal static class Program
         Equal(ShellCommandLine.ParseHistoryLine("   "), null, "a blank line");
     }
 
+    private static void Context(string text, int caret, CompletionTarget target, int start, int end, string prefix, string name)
+    {
+        ShellCommandLine.CompletionContext context = ShellCommandLine.Analyze(text, caret);
+        bool ok = context.Target == target && context.TokenStart == start && context.TokenEnd == end && (context.InsertPrefix ?? "") == prefix;
+        Check(ok, name + (ok ? "" : $" (got {context.Target} {context.TokenStart}..{context.TokenEnd} prefix '{context.InsertPrefix}')"));
+    }
+
+    private static void VariableAndHostChecks()
+    {
+        Context("echo $HO", 8, CompletionTarget.Variable, 5, 8, "$", "a $NAME prefix is a variable");
+        Context("echo ${HO", 9, CompletionTarget.Variable, 5, 9, "${", "a ${NAME prefix is a braced variable");
+        Context("echo ${HO}x", 9, CompletionTarget.Variable, 5, 10, "${", "the closing brace is part of the replaced text");
+        Context("echo $", 6, CompletionTarget.Variable, 5, 6, "$", "a lone $ starts a variable");
+        Context("ls $HOME/bi", 11, CompletionTarget.Path, 3, 11, "", "after the variable name comes a path");
+        Context("echo \"$HO\"", 9, CompletionTarget.Variable, 6, 9, "$", "a variable inside double quotes");
+        Context("echo '$HO'", 9, CompletionTarget.Path, 5, 10, "", "not inside single quotes");
+        Context("echo \\$HO", 9, CompletionTarget.Path, 5, 9, "", "not after a backslash");
+        Context("echo $1", 7, CompletionTarget.Path, 5, 7, "", "positional parameters are not completed");
+        Context("cd $PW", 6, CompletionTarget.Variable, 3, 6, "$", "a variable as a cd argument");
+        Context("ssh rou", 7, CompletionTarget.Host, 4, 7, "", "ssh: a host");
+        Context("ssh root@rou", 12, CompletionTarget.Host, 4, 12, "root@", "ssh: a host after user@");
+        Context("ssh -p 22 rou", 13, CompletionTarget.Host, 10, 13, "", "ssh: a host after options");
+        Context("ssh -", 5, CompletionTarget.Path, 4, 5, "", "ssh: an option is not a host");
+        Context("ping 8.8", 8, CompletionTarget.Host, 5, 8, "", "ping: a host");
+        Context("scp fi", 6, CompletionTarget.HostOrPath, 4, 6, "", "scp: a file or a host");
+        Context("scp ./fi", 8, CompletionTarget.Path, 4, 8, "", "scp: ./ is a local path");
+        Context("scp file root@rou", 17, CompletionTarget.Host, 9, 17, "root@", "scp: user@ is a host");
+        Context("scp file router:/tm", 19, CompletionTarget.Path, 9, 19, "", "scp: host:path is not completed as a host");
+        Context("sudo ssh rou", 12, CompletionTarget.Host, 9, 12, "", "sudo ssh: a host");
+    }
+
+    private static void HistorySearchChecks()
+    {
+        List<string> history = new List<string> { "git push", "make test", "git status", "ls -l", "git commit -m x" };
+        HistorySearch search = new HistorySearch(history);
+        Equal(search.Prompt, "(reverse-i-search)`': ", "the empty search prompt");
+        Equal(search.Match, null, "no match before typing");
+        search.Append('g');
+        search.Append('i');
+        search.Append('t');
+        Equal(search.Match, "git push", "the newest match first");
+        Equal(search.MatchPosition, 0, "the caret goes to the match");
+        search.Older();
+        Equal(search.Match, "git status", "Ctrl+R: the next older match");
+        search.Older();
+        Equal(search.Match, "git commit -m x", "Ctrl+R again");
+        search.Older();
+        Check(search.Failed && search.Match == "git commit -m x", "no older match: failed, the last match stays");
+        Equal(search.Prompt, "(failed reverse-i-search)`git': ", "the failed prompt");
+        search.Newer();
+        Check(!search.Failed && search.Match == "git status", "Ctrl+S: back to a newer match");
+        search.Append(" s");
+        Equal(search.Match, "git status", "the current match still matches the longer query");
+        Equal(search.MatchPosition, 0, "the position of the longer query");
+        search.Append("x");
+        Check(search.Failed && search.Match == "git status", "a query without a match fails and keeps the match");
+        search.RemoveLast();
+        Check(!search.Failed && search.Match == "git status", "Backspace searches again from the newest command");
+        HistorySearch middle = new HistorySearch(history);
+        middle.Append("test");
+        Equal(middle.MatchPosition, 5, "a match in the middle of a command");
+        HistorySearch none = new HistorySearch(new List<string>());
+        none.Append('x');
+        Check(none.Failed && none.Match == null, "an empty history");
+    }
+
+    private static void CompletionSourceChecks()
+    {
+        CompletionSources.ShellDefinitions definitions = CompletionSources.ParseShellDefinitions(new[]
+        {
+            "bash: cannot set terminal process group (-1): Inappropriate ioctl for device",
+            "bash: no job control in this shell",
+            "alias ll='ls -alF'",
+            "alias gs='git status'\r",
+            "l='ls -CF'",
+            "alias q=\"it's\"",
+            CompletionSources.FunctionsMarker,
+            "mkcd",
+            "declare -f __git_ps1",
+            "not a name (x)",
+            CompletionSources.VariablesMarker,
+            "HOME",
+            "PATH=/usr/bin:/bin",
+            "MULTI=line one",
+            "line two without equals sign",
+            "1BAD",
+            "EDITOR"
+        });
+        Equal(string.Join(",", definitions.Aliases.ConvertAll((KeyValuePair<string, string> alias) => alias.Key + "=" + alias.Value)), "ll=ls -alF,gs=git status,l=ls -CF,q=it's", "aliases of bash and dash, shell noise skipped");
+        Equal(string.Join(",", definitions.Functions), "mkcd,__git_ps1", "functions");
+        Equal(string.Join(",", definitions.Variables), "EDITOR,HOME,MULTI,PATH", "variables (names only, sorted)");
+
+        List<CompletionSources.HostEntry> hosts = CompletionSources.ParseHostFiles(new[]
+        {
+            CompletionSources.FileMarker + "/home/u/.ssh/config",
+            "Host router nas",
+            "  HostName 192.168.1.1",
+            "Host *.example.com !bad",
+            "host=build",
+            "Match host x",
+            CompletionSources.FileMarker + "/home/u/.ssh/known_hosts",
+            "github.com,140.82.121.4 ssh-ed25519 AAAA",
+            "[gitlab.local]:2222 ssh-rsa AAAA",
+            "|1|hash=|salt= ssh-rsa AAAA",
+            "@cert-authority *.corp ssh-rsa AAAA",
+            "# comment",
+            "Router ssh-rsa AAAA",
+            CompletionSources.FileMarker + "/etc/hosts",
+            "127.0.0.1 localhost",
+            "192.168.1.10   printer printer.lan  # office",
+            "# 10.0.0.1 commented"
+        });
+        Equal(string.Join(",", hosts.ConvertAll((CompletionSources.HostEntry host) => host.Name)), "router,nas,build,github.com,140.82.121.4,gitlab.local,localhost,printer,printer.lan", "hosts of ssh config, known_hosts and /etc/hosts without patterns, hashes and duplicates");
+        Equal(hosts[0].Source, "ssh config", "the source of a host");
+    }
+
     private static int Main()
     {
         try
         {
+            VariableAndHostChecks();
+            HistorySearchChecks();
+            CompletionSourceChecks();
             TokenizeChecks();
             AnalyzeChecks();
             QuotingChecks();

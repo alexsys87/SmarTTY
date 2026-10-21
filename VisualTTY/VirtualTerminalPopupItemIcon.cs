@@ -7,5 +7,7 @@ public enum VirtualTerminalPopupItemIcon
     Command,
     Directory,
     File,
-    Flag
+    Flag,
+    Variable,
+    Host
 }
