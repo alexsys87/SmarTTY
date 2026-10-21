@@ -12,6 +12,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
 
@@ -110,6 +111,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     private List<ITabContext> _PagesInLastUsedOrder = new List<ITabContext>();
 
     private ShellCompletionAnalyzer _Analyzer;
+
+    // Whether the login shell edits its command line in UTF-8 bytes (BusyBox without Unicode support, as on OpenWrt):
+    // null until the probe started by the first classic terminal tab has answered.
+    private bool? _ByteOrientedShell;
+
+    private bool _ByteOrientedShellProbeStarted;
 
     private object _Sync = new object();
 
@@ -506,6 +513,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             if (IsChannelAttached(ctl, chn))
             {
+                // In byte mode the terminal needs to see which stray byte arrived (see Utf8StreamDecoder).
+                reader.EscapeInvalidBytes = ctl.ByteOrientedLineEditing;
                 AppendText(ctl, reader.Decode(data, offset, length), data, offset, length);
             }
         };
@@ -545,6 +554,59 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         chn.PollingEnabled = true;
         chn.ResizePty(ctl.TerminalSize.Width, ctl.TerminalSize.Height);
+    }
+
+    /// <summary>
+    /// Applies the "byte-oriented line editing" setting to a classic terminal tab of this session. In the automatic
+    /// mode the login shell is probed once per session (in the background, the tab works meanwhile) and every
+    /// classic terminal tab of the session follows the answer.
+    /// </summary>
+    public void ApplyByteOrientedLineEditing(TerminalEmulatorControl ctl)
+    {
+        if (!(ctl.Tag is TerminalTag terminalTag) || terminalTag.Channel == null || ctl.IsDisposed)
+        {
+            return;
+        }
+        switch (_Controller.Settings.ByteOrientedLineEditing)
+        {
+            case GlobalSettings.ByteOrientedLineEditingMode.Always:
+                ctl.ByteOrientedLineEditing = true;
+                return;
+            case GlobalSettings.ByteOrientedLineEditingMode.Never:
+                ctl.ByteOrientedLineEditing = false;
+                return;
+        }
+        if (_ByteOrientedShell.HasValue)
+        {
+            ctl.ByteOrientedLineEditing = _ByteOrientedShell.Value;
+            return;
+        }
+        ctl.ByteOrientedLineEditing = false;
+        SshSession session = Session;
+        if (_ByteOrientedShellProbeStarted || session == null)
+        {
+            return;
+        }
+        _ByteOrientedShellProbeStarted = true;
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            bool byteOriented = false;
+            try
+            {
+                byteOriented = ByteColumns.ParseProbe(session.RunCommand(ByteColumns.ProbeCommand, out _));
+            }
+            catch
+            {
+            }
+            _Controller.BeginInvoke(() =>
+            {
+                _ByteOrientedShell = byteOriented;
+                foreach (NormalTabContext tab in Tabs.OfType<NormalTabContext>())
+                {
+                    ApplyByteOrientedLineEditing(tab.Terminal);
+                }
+            });
+        });
     }
 
     private static bool IsChannelAttached(TerminalEmulatorControl ctl, SshShellChannel chn)

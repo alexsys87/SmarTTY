@@ -105,6 +105,20 @@ public class GlobalSettings : INotifyPropertyChanged
         Auto
     }
 
+    /// <summary>
+    /// Whether SSH terminals compensate for a shell that edits its command line in UTF-8 bytes rather than
+    /// characters (see TerminalEmulatorControl.ByteOrientedLineEditing).
+    /// </summary>
+    public enum ByteOrientedLineEditingMode
+    {
+        [EnumDisplayText("Detect (BusyBox without UTF-8, e.g. OpenWrt)")]
+        Auto,
+        [EnumDisplayText("Always")]
+        Always,
+        [EnumDisplayText("Never")]
+        Never
+    }
+
     private string _DefaultDownloadDirectory;
 
     public bool AutoCloseTabs = true;
@@ -167,6 +181,8 @@ public class GlobalSettings : INotifyPropertyChanged
     public bool SendAltPlusLetterToSession { get; set; } = true;
 
     public bool CopyOnSelection { get; set; } = true;
+
+    public ByteOrientedLineEditingMode ByteOrientedLineEditing { get; set; }
 
     public XServerType XServer
     {

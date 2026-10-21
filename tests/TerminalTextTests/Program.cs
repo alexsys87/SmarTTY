@@ -4,13 +4,14 @@ using SmarTTY.Terminal;
 
 // Regression harness for how the SSH terminal turns remote bytes into text:
 //  * DEC Special Graphics (ESC ( 0 line drawing used by mc & co. without a UTF-8 locale),
-//  * UTF-8 stream decoding with characters split between reads and a non-zero buffer offset.
+//  * UTF-8 stream decoding with characters split between reads and a non-zero buffer offset,
+//  * byte-oriented line editing (BusyBox ash without Unicode support), see ByteColumnChecks.cs.
 // Run with: dotnet run --project tests/TerminalTextTests
 internal static class Program
 {
     private static int _passed;
 
-    private static void Check(bool condition, string name)
+    internal static void Check(bool condition, string name)
     {
         if (!condition)
         {
@@ -20,7 +21,7 @@ internal static class Program
         Console.WriteLine("PASS: " + name);
     }
 
-    private static void Equal(string actual, string expected, string name)
+    internal static void Equal(string actual, string expected, string name)
     {
         Check(actual == expected, name + (actual == expected ? "" : $" (expected '{expected}', got '{actual}')"));
     }
@@ -158,6 +159,7 @@ internal static class Program
         DecGraphicsChecks();
         ShiftChecks();
         Utf8DecoderChecks();
+        ByteColumnChecks.Run();
         Console.WriteLine($"All {_passed} checks passed.");
         return 0;
     }
