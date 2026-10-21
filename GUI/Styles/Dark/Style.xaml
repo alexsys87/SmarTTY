@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:gui="clr-namespace:SmarTTY.GUI" xmlns:styles="clr-namespace:SmarTTY.GUI.Styles" xmlns:local="clr-namespace:SmarTTY.GUI.Styles.Dark">
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:gui="clr-namespace:SmarTTY.GUI" xmlns:styles="clr-namespace:SmarTTY.GUI.Styles">
   <ResourceDictionary.MergedDictionaries>
     <ResourceDictionary Source="Colors.xaml" />
     <ResourceDictionary Source="TabControl.xaml" />
@@ -213,7 +213,7 @@
                   <ResourceDictionary>
                     <Style x:Key="{x:Type MenuItem}" TargetType="{x:Type MenuItem}" BasedOn="{StaticResource MainWindowMenuItem}" />
                     <Style x:Key="{x:Type Border}" TargetType="{x:Type Border}">
-                      <Setter Property="gui:AttachedProperties.MenuPopupBackgroundOverride" Value="{StaticResource HighlightColor}" />
+                      <!--<Setter Property="gui:AttachedProperties.MenuPopupBackgroundOverride" Value="{StaticResource HighlightColor}" />-->
                     </Style>
                   </ResourceDictionary>
                 </Style.Resources>

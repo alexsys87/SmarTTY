@@ -225,6 +225,8 @@ public partial class DeviceTerminalControl
             // 
             // lblConnection
             // 
+            this.lblConnection.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.lblConnection.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
             this.lblConnection.Name = "lblConnection";
             this.lblConnection.Size = new System.Drawing.Size(65, 24);
             this.lblConnection.Text = "Connected";
@@ -286,6 +288,7 @@ public partial class DeviceTerminalControl
             // lblSend
             // 
             this.lblSend.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+            this.lblSend.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
             this.lblSend.Name = "lblSend";
             this.lblSend.Size = new System.Drawing.Size(72, 24);
             this.lblSend.Text = "Send values:";
@@ -417,6 +420,7 @@ public partial class DeviceTerminalControl
             // 
             // lblBaudRate
             // 
+            this.lblBaudRate.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
             this.lblBaudRate.Name = "lblBaudRate";
             this.lblBaudRate.Size = new System.Drawing.Size(60, 24);
             this.lblBaudRate.Text = "Baud rate:";
