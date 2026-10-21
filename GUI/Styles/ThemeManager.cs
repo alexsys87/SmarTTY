@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Media;
 using VisualTTY;
 
 namespace SmarTTY.GUI.Styles;
@@ -21,6 +22,23 @@ public static class ThemeManager
     private static ResourceDictionary _Palette;
 
     public static SmarTTYTheme? Current { get; private set; }
+
+    /// <summary>Raised after a new palette is in place; WinForms controls repaint themselves with <see cref="GetColor"/>.</summary>
+    public static event EventHandler ThemeChanged;
+
+    /// <summary>
+    /// A palette colour (a "Theme.*" key) for WinForms controls, which cannot use the WPF resources directly.
+    /// Returns <paramref name="fallback"/> before a theme is applied.
+    /// </summary>
+    public static System.Drawing.Color GetColor(string key, System.Drawing.Color fallback)
+    {
+        if (Application.Current?.TryFindResource(key) is SolidColorBrush brush)
+        {
+            Color color = brush.Color;
+            return System.Drawing.Color.FromArgb(color.A, color.R, color.G, color.B);
+        }
+        return fallback;
+    }
 
     public static void Apply(SmarTTYTheme theme)
     {
@@ -46,6 +64,7 @@ public static class ThemeManager
             mergedDictionaries.Add(_Controls);
         }
         Current = theme;
+        ThemeChanged?.Invoke(null, EventArgs.Empty);
     }
 
     private static Uri PaletteUri(SmarTTYTheme theme)
