@@ -79,6 +79,12 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         }
         _Session = sessionWrapper;
         Terminal = term;
+        // The terminal is a WinForms control hosted in WPF: files dropped on it never reach the WPF window's own
+        // drop handler, so the control has to accept them itself.
+        term.AllowDrop = true;
+        term.DragEnter += Terminal_DragOver;
+        term.DragOver += Terminal_DragOver;
+        term.DragDrop += Terminal_DragDrop;
         WinFormsHostWrapper winFormsHostWrapper = new WinFormsHostWrapper();
         ((WindowsFormsHost)winFormsHostWrapper).Child = term;
         Control = (FrameworkElement)winFormsHostWrapper;
@@ -94,6 +100,33 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     public void FocusMainControl()
     {
         Terminal?.Focus();
+    }
+
+    private void Terminal_DragOver(object sender, System.Windows.Forms.DragEventArgs e)
+    {
+        bool acceptFiles = !_Session.IsDevice && e.Data != null && e.Data.GetDataPresent(System.Windows.Forms.DataFormats.FileDrop);
+        e.Effect = acceptFiles ? System.Windows.Forms.DragDropEffects.Copy : System.Windows.Forms.DragDropEffects.None;
+    }
+
+    private void Terminal_DragDrop(object sender, System.Windows.Forms.DragEventArgs e)
+    {
+        if (_Session.IsDevice || e.Data == null || !(e.Data.GetData(System.Windows.Forms.DataFormats.FileDrop) is string[] files) || files.Length == 0)
+        {
+            return;
+        }
+        // Start the upload after the drop has finished, so that Explorer is not kept waiting while the remote
+        // directory is being determined.
+        Terminal.BeginInvoke((Action)(() =>
+        {
+            try
+            {
+                _Session.UploadFiles(files, this);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }));
     }
 
     public void OnSessionInactiveChanged(bool isInactive)

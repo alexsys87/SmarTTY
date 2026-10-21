@@ -697,21 +697,31 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    public void UploadFiles(string[] files)
+    public void UploadFiles(string[] files, ITabContext targetTab = null)
     {
         if (IsDevice)
+        {
+            return;
+        }
+        // SCP uploads regular files only; a dropped folder would just fail in the transfer queue.
+        string[] regularFiles = files.Where(File.Exists).ToArray();
+        if (regularFiles.Length < files.Length)
+        {
+            System.Windows.MessageBox.Show("Folders cannot be uploaded by dragging them into the window and were skipped. Use SCP -> Upload a directory instead.", "SmarTTY", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+        }
+        if (regularFiles.Length == 0)
         {
             return;
         }
         string dir = _Controller.Settings.DefaultUploadDirectory;
         ExpandHomeDirIfNeeded(ref dir);
         _Controller.Settings.DefaultUploadDirectory = dir;
-        string text = TryExtractCurrentDir();
+        string text = TryExtractCurrentDir(targetTab);
         if (text == null)
         {
             text = _Controller.Settings.DefaultUploadDirectory;
         }
-        foreach (string file in files)
+        foreach (string file in regularFiles)
         {
             DoUploadFile(file, text);
         }

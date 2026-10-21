@@ -27,7 +27,7 @@
       </ListBox>
       <Separator />
       <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="5" />
-      <TextBox Name="txtFilter" MinWidth="200" ToolTip="Part of the package name, or a regular expression if it contains $, *, ^ or ." VerticalAlignment="Center" Style="{DynamicResource ThemedTextBox}" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" />
+      <TextBox Name="txtFilter" MinWidth="180" ToolTip="Part of the package name, or a regular expression if it contains $, *, ^ or ." VerticalAlignment="Center" Style="{DynamicResource ThemedTextBox}" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" />
     </ToolBar>
     <ListView Name="ItemList" Grid.Row="1" VirtualizingStackPanel.IsVirtualizing="True" ItemsSource="{Binding FilteredPackages}" PreviewKeyDown="ListView_PreviewKeyDown">
       <ItemsControl.ItemsPanel>
