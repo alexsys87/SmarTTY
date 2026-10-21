@@ -245,6 +245,9 @@ public class SshSession : IDisposable
 
     private readonly HashSet<SshShellChannel> _channels = new HashSet<SshShellChannel>();
 
+    // Keeps helper commands without a PTY from overlapping with setting up a PTY channel (Dropbear on OpenWRT).
+    internal readonly PtySetupGate PtyGate = new PtySetupGate(TimeSpan.FromSeconds(5));
+
     private bool _connectionClosed;
 
     private readonly Thread _eventThread;
@@ -730,6 +733,11 @@ public class SshSession : IDisposable
     /// </summary>
     public List<string> RunCommand(string command, out int? exitStatus, string terminalType = null)
     {
+        bool plainHelper = terminalType == null;
+        if (plainHelper)
+        {
+            PtyGate.BeginPlainHelper();
+        }
         try
         {
             using SshShellChannel channel = OpenShellChannel(command, terminalType, ExtendedDataMode.Merge);
@@ -750,6 +758,13 @@ public class SshSession : IDisposable
         {
             exitStatus = null;
             return null;
+        }
+        finally
+        {
+            if (plainHelper)
+            {
+                PtyGate.EndPlainHelper();
+            }
         }
     }
 

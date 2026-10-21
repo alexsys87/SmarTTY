@@ -25,6 +25,7 @@ internal static class Program
 
         SshNetContractTests.ReportVersion();
         SshNetContractTests.Run();
+        PtySetupGateTests.Run();
 
         if (TestEnvironment.IntegrationEnabled())
         {
@@ -38,6 +39,11 @@ internal static class Program
             Test.Section("Live server checks");
             Console.WriteLine("SKIP: no test server is configured, only the SSH.NET API contract was checked.");
             Console.WriteLine("      Run tests/SshNetIntegrationTests/setup-sshd.sh first to exercise a real server.");
+        }
+
+        if (DropbearTests.Enabled())
+        {
+            DropbearTests.Run();
         }
 
         return Test.Report("SshNetIntegrationTests");

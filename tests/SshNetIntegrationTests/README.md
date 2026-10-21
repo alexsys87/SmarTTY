@@ -23,6 +23,12 @@ authentication (including passphrase handling), exec channels with and without a
 separate stderr stream, exit statuses and signals, shell channels, PTY resize, EOF, polling
 delivery, the extended data modes, the SCP upload/download exchange and connection loss.
 
+Two more groups cover Dropbear, the SSH server of OpenWRT. `PtySetupGateTests` always run: they check
+`Ssh/PtySetupGate.cs`, which keeps helper commands without a PTY from overlapping with setting up a PTY
+channel (Dropbear silently drops the PTY channel's request when such a helper exits meanwhile, which hung
+Smart Terminal commands on OpenWRT). `DropbearTests` run PTY commands together with helper commands against
+a Dropbear server with a BusyBox ash login shell; they need the server from `setup-dropbear.sh`.
+
 ## Running
 
 The suite needs the .NET 8 SDK and an OpenSSH server. `setup-sshd.sh` provisions a throwaway
@@ -33,6 +39,10 @@ directory, and `sshd` on a loopback port. It needs root, directly or through `su
 set -a; eval "$(tests/SshNetIntegrationTests/setup-sshd.sh)"; set +a
 dotnet run --project tests/SshNetIntegrationTests
 ```
+
+For the Dropbear checks also install `dropbear-bin` and `busybox` and run
+`set -a; eval "$(tests/SshNetIntegrationTests/setup-dropbear.sh)"; set +a` (CI sets
+`SMARTTY_DROPBEAR_TEST_REQUIRED=1` so that a missing server fails instead of skipping these checks).
 
 The script prints the connection details as `NAME=value` lines; the test reads them from the
 environment. Without them the live-server checks are skipped with a notice and only the API
