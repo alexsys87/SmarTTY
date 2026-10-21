@@ -53,6 +53,9 @@ jobs:
       - name: Run ls output parser checks
         run: dotnet run --project tests/LsOutputParserTests -c Release
 
+      - name: Run file list operation checks (copy, move, delete, new; /bin/sh and BusyBox)
+        run: dotnet run --project tests/RemoteFileOperationsTests -c Release
+
       - name: Run serial port settings and line status checks
         run: dotnet run --project tests/SerialPortRulesTests -c Release
 

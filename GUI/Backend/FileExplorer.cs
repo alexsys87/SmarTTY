@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace SmarTTY.GUI.Backend;
 
@@ -27,10 +28,6 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     {
         public readonly SshSession Session;
 
-        private List<byte> _AllData = new List<byte>();
-
-        private SshShellChannel _Channel;
-
         private string _Directory;
 
         private FileExplorer _Explorer;
@@ -42,18 +39,42 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             _Explorer = explorer;
         }
 
+        // The listing runs as a helper command (RunCommand) rather than a channel of its own: helper commands do not
+        // overlap with setting up a PTY channel, which Dropbear on OpenWRT does not survive (see Ssh/PtySetupGate.cs).
         public void Start()
         {
             string text = LsOutputParser.LsParser.BuildListCommand(_Directory, followSymlinks: true, recursive: false);
-            SshShellChannel sshShellChannel = (_Channel = Session.OpenShellChannel(text));
-            sshShellChannel.DataReceived += Channel_ChannelDataReceived;
-            sshShellChannel.Finished += Channel_ChannelClosed;
-            sshShellChannel.PollingEnabled = true;
-        }
-
-        private void Channel_ChannelDataReceived(object sender, byte[] data, int offset, int length, int streamID)
-        {
-            _AllData.AddRange(data.Skip(offset).Take(length));
+            new Thread(() =>
+            {
+                try
+                {
+                    List<string> lines = Session.RunCommand(text, out _);
+                    if (lines == null)
+                    {
+                        throw new Exception("Failed to list " + _Directory);
+                    }
+                    List<LsOutputParser.LsEntry> list = (from entry in lines.Select(LsOutputParser.LsParser.ParseLine)
+                                                         where entry.Name != null && entry.Name != "." && (_Directory != "/" || entry.Name != "..")
+                                                         select entry).ToList();
+                    list.Sort(FileEntryComparer);
+                    _Explorer.ProcessListResult(new ListResult
+                    {
+                        Result = list.ToArray(),
+                        Directory = _Directory
+                    });
+                }
+                catch (Exception exception)
+                {
+                    _Explorer.ProcessListResult(new ListResult
+                    {
+                        Exception = exception,
+                        Directory = _Directory
+                    });
+                }
+            })
+            {
+                IsBackground = true
+            }.Start();
         }
 
         private static int FileEntryComparer(LsOutputParser.LsEntry x, LsOutputParser.LsEntry y)
@@ -87,45 +108,22 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             return StringComparer.InvariantCulture.Compare(x.Name, y.Name);
         }
 
-        private void Channel_ChannelClosed(object sender)
-        {
-            new Thread(() =>
-            {
-                try
-                {
-                    _Channel.Dispose();
-                }
-                catch
-                {
-                }
-                try
-                {
-                    List<LsOutputParser.LsEntry> list = (from entry in Encoding.UTF8.GetString(_AllData.ToArray()).Split('\n').Select(LsOutputParser.LsParser.ParseLine)
-                                                         where entry.Name != null && entry.Name != "." && (_Directory != "/" || entry.Name != "..")
-                                                         select entry).ToList();
-                    list.Sort(FileEntryComparer);
-                    _Explorer.ProcessListResult(new ListResult
-                    {
-                        Result = list.ToArray(),
-                        Directory = _Directory
-                    });
-                }
-                catch (Exception exception)
-                {
-                    _Explorer.ProcessListResult(new ListResult
-                    {
-                        Exception = exception,
-                        Directory = _Directory
-                    });
-                }
-            }).Start();
-        }
-
         public void Dispose()
         {
-            _Channel.Dispose();
         }
     }
+
+    // Files and folders copied or cut in a file list; shared by the file lists of all tabs of a session.
+    private class RemoteClipboard
+    {
+        public SshSession Session;
+
+        public ItemWrapper[] Items;
+
+        public bool Cut;
+    }
+
+    private static RemoteClipboard _Clipboard;
 
     public enum ItemIcon
     {
@@ -198,6 +196,11 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     private ListResult _LastListResult;
 
     public string Title => "File List";
+
+    public string WorkingDirectory => _WorkingDirectory;
+
+    /// <summary>True if files copied or cut in this session can be pasted here.</summary>
+    public bool CanPaste => _Clipboard != null && _Clipboard.Session == _Control.Session;
 
     public ItemWrapper[] FilteredItems
     {
@@ -346,6 +349,224 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     {
         _WorkingDirectory = dir;
         ProvideFileList();
+    }
+
+    // Names in the current directory as last listed (for name clashes and copy names).
+    private HashSet<string> CurrentNames()
+    {
+        ListResult listResult = _LastListResult;
+        HashSet<string> names = new HashSet<string>(StringComparer.Ordinal);
+        if (listResult?.Result != null && listResult.Directory == _WorkingDirectory)
+        {
+            foreach (LsOutputParser.LsEntry entry in listResult.Result)
+            {
+                names.Add(entry.Name);
+            }
+        }
+        return names;
+    }
+
+    public void CopyToClipboard(IEnumerable<ItemWrapper> items, bool cut)
+    {
+        ItemWrapper[] selected = items.Where((ItemWrapper item) => item.Name != "..").ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+        _Clipboard = new RemoteClipboard
+        {
+            Session = _Control.Session,
+            Items = selected,
+            Cut = cut
+        };
+    }
+
+    /// <summary>
+    /// Pastes the copied or cut files and folders into the current directory. A copy into the folder it came from
+    /// gets a "(copy)" name; for other name clashes the user decides whether to replace the existing entry.
+    /// </summary>
+    public void Paste()
+    {
+        RemoteClipboard clipboard = _Clipboard;
+        if (clipboard == null)
+        {
+            return;
+        }
+        if (clipboard.Session != _Control.Session)
+        {
+            MessageBoxes.Info("The files were copied in another SSH session. Copy them again in this session's file list.");
+            return;
+        }
+        string targetDirectory = _WorkingDirectory;
+        HashSet<string> names = CurrentNames();
+        List<string> commands = new List<string>();
+        foreach (ItemWrapper item in clipboard.Items)
+        {
+            string sourceDirectory = RemotePathUtils.GetDirectoryName(item.FullPath);
+            bool sameDirectory = RemoteFileOperations.IsSameOrInside(sourceDirectory, targetDirectory) && RemoteFileOperations.IsSameOrInside(targetDirectory, sourceDirectory);
+            if (item.Entry.IsDirectory && RemoteFileOperations.IsSameOrInside(targetDirectory, item.FullPath))
+            {
+                MessageBoxes.Error("'" + item.Name + "' cannot be " + (clipboard.Cut ? "moved" : "copied") + " into itself.");
+                return;
+            }
+            if (sameDirectory && clipboard.Cut)
+            {
+                continue;
+            }
+            string name = item.Name;
+            bool replace = false;
+            if (sameDirectory)
+            {
+                name = RemoteFileOperations.MakeCopyName(item.Name, item.Entry.IsDirectory, names);
+            }
+            else if (names.Contains(name))
+            {
+                System.Windows.Forms.DialogResult answer = MessageBoxes.YesNoCancel("'" + name + "' already exists in " + targetDirectory + ".\n\nReplace it" + (item.Entry.IsDirectory ? " (the existing folder and everything in it is deleted)" : "") + "?\n\nYes: replace, No: skip this item, Cancel: stop.");
+                if (answer == System.Windows.Forms.DialogResult.Cancel)
+                {
+                    return;
+                }
+                if (answer == System.Windows.Forms.DialogResult.No)
+                {
+                    continue;
+                }
+                replace = true;
+            }
+            names.Add(name);
+            string destination = RemoteFileOperations.Join(targetDirectory, name);
+            commands.Add(clipboard.Cut ? RemoteFileOperations.MoveCommand(item.FullPath, destination, replace) : RemoteFileOperations.CopyCommand(item.FullPath, destination, replace));
+        }
+        if (commands.Count == 0)
+        {
+            return;
+        }
+        RunOperations((clipboard.Cut ? "Moving " : "Copying ") + Describe(commands.Count) + "...", commands, () =>
+        {
+            // Cut files are pasted once; copied ones can be pasted again.
+            if (clipboard.Cut && _Clipboard == clipboard)
+            {
+                _Clipboard = null;
+            }
+        });
+    }
+
+    public void Delete(IEnumerable<ItemWrapper> items)
+    {
+        ItemWrapper[] selected = items.Where((ItemWrapper item) => item.Name != "..").ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+        string list = string.Join("\n", selected.Take(10).Select((ItemWrapper item) => item.Name + (item.Entry.IsDirectory ? "/" : "")));
+        if (selected.Length > 10)
+        {
+            list += "\n... and " + (selected.Length - 10) + " more";
+        }
+        bool hasFolders = selected.Any((ItemWrapper item) => item.Entry.IsDirectory);
+        if (!MessageBoxes.AskWarn("Delete " + Describe(selected.Length) + " from " + _WorkingDirectory + "?\n\n" + list + "\n\n" + (hasFolders ? "Folders are deleted with everything in them. " : "") + "This cannot be undone."))
+        {
+            return;
+        }
+        RunOperations("Deleting " + Describe(selected.Length) + "...", new List<string> { RemoteFileOperations.DeleteCommand(selected.Select((ItemWrapper item) => item.FullPath)) }, null);
+    }
+
+    public void Rename(ItemWrapper item, string newName)
+    {
+        if (item == null || item.Name == ".." || newName == item.Name)
+        {
+            return;
+        }
+        string error = RemoteFileOperations.ValidateName(newName);
+        if (error != null)
+        {
+            MessageBoxes.Error(error);
+            return;
+        }
+        string destination = RemoteFileOperations.Join(RemotePathUtils.GetDirectoryName(item.FullPath), newName);
+        RunOperations("Renaming...", new List<string> { RemoteFileOperations.MoveCommand(item.FullPath, destination, replace: false) }, null);
+    }
+
+    public void CreateEntry(string name, bool folder)
+    {
+        string error = RemoteFileOperations.ValidateName(name);
+        if (error != null)
+        {
+            MessageBoxes.Error(error);
+            return;
+        }
+        string path = RemoteFileOperations.Join(_WorkingDirectory, name);
+        RunOperations(folder ? "Creating the folder..." : "Creating the file...", new List<string> { folder ? RemoteFileOperations.CreateDirectoryCommand(path) : RemoteFileOperations.CreateFileCommand(path) }, null);
+    }
+
+    /// <summary>A name for a new file or folder that does not exist yet in the current directory.</summary>
+    public string SuggestNewName(string baseName, bool folder)
+    {
+        HashSet<string> names = CurrentNames();
+        if (!names.Contains(baseName))
+        {
+            return baseName;
+        }
+        string stem = baseName;
+        string extension = "";
+        int dot = baseName.LastIndexOf('.');
+        if (!folder && dot > 0)
+        {
+            stem = baseName.Substring(0, dot);
+            extension = baseName.Substring(dot);
+        }
+        for (int number = 2; ; number++)
+        {
+            string candidate = stem + " (" + number + ")" + extension;
+            if (!names.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    private static string Describe(int count)
+    {
+        return count == 1 ? "1 item" : count + " items";
+    }
+
+    /// <summary>
+    /// Runs the commands one after another on a background thread (as helper commands of the session), then refreshes
+    /// the list and reports the commands that failed.
+    /// </summary>
+    private void RunOperations(string progressText, List<string> commands, Action onSuccess)
+    {
+        SshSession session = _Control.Session;
+        Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
+        ProgressText = progressText;
+        new Thread(() =>
+        {
+            List<string> errors = new List<string>();
+            foreach (string command in commands)
+            {
+                List<string> output = session.RunCommand(command, out int? exitCode);
+                if (exitCode != 0)
+                {
+                    string message = string.Join("\n", (output ?? new List<string>()).Where((string line) => line.Trim() != ""));
+                    errors.Add(message != "" ? message : (exitCode.HasValue ? "The command failed with exit code " + exitCode : "The connection is not available"));
+                }
+            }
+            dispatcher.BeginInvoke((Action)(() =>
+            {
+                ProgressText = null;
+                Refresh();
+                if (errors.Count != 0)
+                {
+                    MessageBoxes.Error(string.Join("\n", errors.Take(10)) + (errors.Count > 10 ? "\n..." : ""));
+                }
+                else
+                {
+                    onSuccess?.Invoke();
+                }
+            }));
+        })
+        {
+            IsBackground = true
+        }.Start();
     }
 
     internal void Show()
