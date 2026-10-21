@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Media;
 using VisualTTY;
@@ -48,6 +49,9 @@ public static class ThemeManager
             return;
         }
         var mergedDictionaries = application.Resources.MergedDictionaries;
+        // App.xaml already holds a palette and the styles: take them over instead of adding second copies.
+        _Palette ??= FindDictionary(mergedDictionaries, "/Colors.xaml");
+        _Controls ??= FindDictionary(mergedDictionaries, "/Controls.xaml");
         ResourceDictionary palette = new ResourceDictionary { Source = PaletteUri(theme) };
         if (_Palette != null)
         {
@@ -65,6 +69,18 @@ public static class ThemeManager
         }
         Current = theme;
         ThemeChanged?.Invoke(null, EventArgs.Empty);
+    }
+
+    private static ResourceDictionary FindDictionary(Collection<ResourceDictionary> dictionaries, string fileName)
+    {
+        foreach (ResourceDictionary dictionary in dictionaries)
+        {
+            if (dictionary.Source != null && dictionary.Source.OriginalString.EndsWith(fileName, StringComparison.OrdinalIgnoreCase))
+            {
+                return dictionary;
+            }
+        }
+        return null;
     }
 
     private static Uri PaletteUri(SmarTTYTheme theme)

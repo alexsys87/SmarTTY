@@ -1,4 +1,15 @@
 ﻿<Application x:Class="SmarTTY.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             ShutdownMode="OnExplicitShutdown" />
+             ShutdownMode="OnExplicitShutdown">
+  <!-- The dark palette and the control styles are declared here so that the XAML designer resolves the theme
+       resources; at startup ThemeManager swaps in the palette of the theme chosen in the settings. -->
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="GUI/Styles/Dark/Colors.xaml" />
+        <ResourceDictionary Source="GUI/Styles/Controls.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>
