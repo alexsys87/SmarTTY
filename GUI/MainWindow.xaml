@@ -465,8 +465,9 @@
           <ListView Name="TransferList" Grid.Row="1" ItemsSource="{Binding ActiveTransfers}" KeyDown="ListView_KeyDown" SelectionChanged="TransferList_SelectionChanged">
             <FrameworkElement.ContextMenu>
               <ContextMenu Name="xferMenu" Visibility="Collapsed">
-                <MenuItem Name="cmdCancel" Header="_Cancel download(s)" Click="SelectedXfers_Cancel" />
-                <MenuItem Name="cmdRetry" Header="_Retry download(s)" Click="SelectedXfers_Retry" />
+                <MenuItem Name="cmdCancel" Header="_Cancel transfer(s)" Click="SelectedXfers_Cancel" />
+                <MenuItem Name="cmdRetry" Header="_Retry transfer(s)" Click="SelectedXfers_Retry" />
+                <MenuItem Header="Retry all _failed" Click="RetryFailed_Click" />
                 <MenuItem Header="Open local file" Click="SelectedXfers_OpenLocal" />
                 <MenuItem Header="Open containing folder" Click="SelectedXfers_OpenFolder" />
                 <MenuItem Header="Copy local file path" Click="SelectedXfers_CopyLocalPath" />
@@ -478,7 +479,7 @@
                   <GridViewColumn Header="Local file">
                     <GridViewColumn.CellTemplate>
                       <DataTemplate>
-                        <Grid>
+                        <Grid ToolTip="{Binding ToolTip}">
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -525,6 +526,13 @@
                   <GridViewColumn Header="Remote file" DisplayMemberBinding="{Binding RemoteFile}" />
                   <GridViewColumn Header="Size" DisplayMemberBinding="{Binding Size}" />
                   <GridViewColumn Header="Transfer rate" DisplayMemberBinding="{Binding TransferRate}" />
+                  <GridViewColumn Header="Status" Width="180">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding StatusText}" ToolTip="{Binding ToolTip}" TextTrimming="CharacterEllipsis" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
                   <GridViewColumn Header="Progress" Width="100" x:Name="WidthColumn">
                     <GridViewColumn.CellTemplate>
                       <DataTemplate>

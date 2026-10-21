@@ -50,18 +50,28 @@ public class ScpChannelStream : Stream
     }
 
     /// <summary>
+    /// The mode announced for a new file when the caller does not ask for one; the remote umask still applies to it.
+    /// </summary>
+    internal const int DefaultFileMode = 0x1A4; // 0644
+
+    /// <summary>
     /// Starts uploading a file of <paramref name="length"/> bytes; the caller then writes exactly that many bytes and closes the stream.
     /// </summary>
-    internal static ScpChannelStream OpenUpload(SshSession session, string path, long length, DateTime modifyTime, int mode)
+    /// <param name="mode">
+    /// The permissions to set. When null, an existing file keeps its permissions and a new one gets 0644 minus the remote umask
+    /// (with "scp -p" the remote side would reset an existing file to the announced mode, e.g. drop the execute bits of a script).
+    /// </param>
+    internal static ScpChannelStream OpenUpload(SshSession session, string path, long length, DateTime modifyTime, int? mode)
     {
-        SshShellChannel channel = session.OpenShellChannel("scp -p -t " + QuotePath(path));
+        // The modification time ("T" line) is applied by the remote scp with or without -p.
+        SshShellChannel channel = session.OpenShellChannel((mode.HasValue ? "scp -p -t " : "scp -t ") + QuotePath(path));
         try
         {
             ReadAck(channel);
             long time = (long)(modifyTime.ToUniversalTime() - SshSession.UnixEpoch).TotalSeconds;
             SendLine(channel, $"T{time} 0 {time} 0");
             ReadAck(channel);
-            SendLine(channel, "C" + Convert.ToString(mode & 0xFFF, 8).PadLeft(4, '0') + " " + length + " " + GetFileName(path));
+            SendLine(channel, "C" + Convert.ToString((mode ?? DefaultFileMode) & 0xFFF, 8).PadLeft(4, '0') + " " + length + " " + GetFileName(path));
             ReadAck(channel);
             return new ScpChannelStream(channel, canRead: false, length);
         }

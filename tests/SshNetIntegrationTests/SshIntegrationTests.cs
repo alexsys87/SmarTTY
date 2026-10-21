@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using SmarTTY.IO;
 
 namespace SmarTTY.Ssh.Tests;
 
@@ -354,7 +355,34 @@ internal static class SshIntegrationTests
 
         Test.Throws<RemoteOperationException>(() => session.OpenDownload(_environment.RemoteHome), "downloading a directory is reported", ex => Test.Check(ex.Message.Contains("regular file") || ex.Message.Contains("directory"), "the directory message is readable (actual: " + ex.Message + ")"));
         Test.Throws<RemotePathException>(() => session.OpenUpload(_environment.RemoteHome + "/missing/nope.bin", 1), "an upload to a missing directory is diagnosed", ex => Test.Equal(RemotePathProblem.DirectoryNotWritable, ex.Problem, "the diagnosis points at the unwritable directory"));
+        Test.Equal(RemotePathKind.File, session.GetRemotePathKind(remote), "an uploaded file is reported as a file");
+        Test.Equal(RemotePathKind.Directory, session.GetRemotePathKind(_environment.RemoteHome), "the home directory is reported as a directory");
+        Test.Equal(RemotePathKind.Missing, session.GetRemotePathKind(_environment.RemoteHome + "/missing/nope.bin"), "a missing path is reported as missing");
+
+        // Uploading over an existing file without asking for a mode must not reset its permissions (an executable
+        // script edited locally and uploaded again has to stay executable).
+        Test.Check(session.RunCommand("chmod 755 " + remote, out _) != null, "the uploaded file is made executable");
+        using (ScpChannelStream upload = session.OpenUpload(remote, 3))
+        {
+            upload.Write(payload, 0, 3);
+        }
+        stat = session.RunCommand("stat -c '%a %s' " + remote, out _);
+        Test.Check(stat != null && stat.Count == 1 && stat[0] == "755 3", "a new upload without a mode keeps the existing permissions and truncates the file (actual: " + string.Join(" ", stat ?? new List<string>()) + ")");
         Test.Check(session.RunCommand("rm -f " + remote, out _) != null, "the uploaded file is cleaned up");
+
+        // A file name with spaces, quotes and non-ASCII characters, and an empty file.
+        string odd = _environment.RemoteFile("smartty it's \"odd\" файл.txt");
+        using (ScpChannelStream upload = session.OpenUpload(odd, 0))
+        {
+        }
+        stat = session.RunCommand("stat -c '%a %s' " + RemotePathUtils.ShellQuote(odd), out _);
+        Test.Check(stat != null && stat.Count == 1 && stat[0] == "644 0", "an empty file with an unusual name is created with the default mode (actual: " + string.Join(" ", stat ?? new List<string>()) + ")");
+        using (ScpDownloadStream download = session.OpenDownload(odd))
+        {
+            Test.Equal(0L, download.Length, "an empty file is downloaded as empty");
+            Test.Equal(0, download.Read(new byte[16], 0, 16), "reading an empty download returns no data");
+        }
+        Test.Check(session.RunCommand("rm -f " + RemotePathUtils.ShellQuote(odd), out _) != null, "the file with the unusual name is cleaned up");
     }
 
     private static void ConnectionLoss()

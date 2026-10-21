@@ -33,6 +33,7 @@ internal static class Program
             Console.WriteLine();
             Console.WriteLine("Using the test server at " + environment.Host + ":" + environment.Port + " as " + environment.User);
             SshIntegrationTests.Run(environment);
+            ScpTransferManagerTests.Run(environment);
         }
         else
         {

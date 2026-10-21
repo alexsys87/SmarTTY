@@ -790,7 +790,7 @@ public class SshSession : IDisposable
         }
         try
         {
-            return ScpChannelStream.OpenUpload(this, path, length, modifyTime, mode ?? Convert.ToInt32("644", 8));
+            return ScpChannelStream.OpenUpload(this, path, length, modifyTime, mode);
         }
         catch (Exception exception) when (!(exception is RemotePathException))
         {
@@ -809,6 +809,55 @@ public class SshSession : IDisposable
         {
             throw new RemoteOperationException(exception.Message + " while trying to download " + path);
         }
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="path"/> exists on the remote side and whether it is a directory.
+    /// Returns <see cref="RemotePathKind.Unknown"/> if the check itself could not be run.
+    /// </summary>
+    public RemotePathKind GetRemotePathKind(string path)
+    {
+        return GetRemotePathKinds(new[] { path })[0];
+    }
+
+    /// <summary>
+    /// <see cref="GetRemotePathKind"/> for several paths, with one remote command per batch instead of one per path.
+    /// </summary>
+    public RemotePathKind[] GetRemotePathKinds(IList<string> paths)
+    {
+        const int BatchSize = 32;
+        RemotePathKind[] kinds = new RemotePathKind[paths.Count];
+        for (int start = 0; start < paths.Count; start += BatchSize)
+        {
+            int count = Math.Min(BatchSize, paths.Count - start);
+            // "test" and ";" also work in fish and csh login shells, unlike "if ...; then ...; fi" or a loop.
+            StringBuilder command = new StringBuilder();
+            for (int i = 0; i < count; i++)
+            {
+                string quoted = RemotePathUtils.ShellQuote(paths[start + i]);
+                command.Append("test -d ").Append(quoted).Append(" && echo d").Append(i).Append("; ");
+                command.Append("test -e ").Append(quoted).Append(" && echo e").Append(i).Append("; ");
+            }
+            command.Append("echo .");
+            List<string> output = RunCommand(command.ToString(), out _);
+            bool ran = output != null && output.Contains(".");
+            for (int i = 0; i < count; i++)
+            {
+                if (!ran)
+                {
+                    kinds[start + i] = RemotePathKind.Unknown;
+                }
+                else if (output.Contains("d" + i))
+                {
+                    kinds[start + i] = RemotePathKind.Directory;
+                }
+                else
+                {
+                    kinds[start + i] = output.Contains("e" + i) ? RemotePathKind.File : RemotePathKind.Missing;
+                }
+            }
+        }
+        return kinds;
     }
 
     private Exception DiagnoseUploadError(string path)
