@@ -8,5 +8,7 @@
   <ItemGroup>
     <Compile Include="../../Terminal/CompletionTarget.cs" Link="CompletionTarget.cs" />
     <Compile Include="../../Terminal/ShellCommandLine.cs" Link="ShellCommandLine.cs" />
+    <Compile Include="../../Terminal/HistorySearch.cs" Link="HistorySearch.cs" />
+    <Compile Include="../../Terminal/CompletionSources.cs" Link="CompletionSources.cs" />
   </ItemGroup>
 </Project>

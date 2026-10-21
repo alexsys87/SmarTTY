@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Runs the real Smart Terminal control (Controls/SshTerminalControl.cs) against the test SSH servers of
+    tests/SshNetIntegrationTests (OpenSSH and Dropbear with BusyBox ash). It is a .NET Framework 4.8 WinForms program,
+    so on Linux it is built with the .NET SDK and run by Mono under a virtual X display:
+
+      dotnet build tests/SmartTerminalIntegrationTests -c Release
+      xvfb-run -a mono tests/SmartTerminalIntegrationTests/bin/Release/net48/SmartTerminalIntegrationTests.exe
+
+    The WPF part of the application (GUI/) is not compiled in.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <NoWarn>$(NoWarn);CS0649;CS0169;CS0414;CS0197;CS1690;CS0108;CS0109;CS0618</NoWarn>
+    <RootNamespace>SmarTTY</RootNamespace>
+    <SmarTTYProjectFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../SmarTTY.csproj'))</SmarTTYProjectFile>
+    <SmarTTYProjectText>$([System.IO.File]::ReadAllText('$(SmarTTYProjectFile)'))</SmarTTYProjectText>
+    <SmarTTY_SshNetVersion>$([System.Text.RegularExpressions.Regex]::Match('$(SmarTTYProjectText)', 'Include="SSH\.NET"\s+Version="([^"]+)"').Groups[1].Value)</SmarTTY_SshNetVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- Used by the COM/TCP controls; plain code, unlike the rest of GUI/. -->
+    <Compile Include="../../GUI/Styles/ThemeManager.cs" />
+    <Compile Include="../../**/*.cs" Exclude="../../GUI/**;../../App.xaml.cs;../../tests/**;../../obj/**;../../bin/**;../../Properties/AssemblyInfo.cs" />
+    <PackageReference Include="SSH.NET" Version="$(SmarTTY_SshNetVersion)" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsFormsIntegration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Security" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+</Project>
