@@ -1761,6 +1761,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     private void DetectPrompt(string text)
     {
+        // What the shell sends after its prompt without printing anything (BusyBox ash asks for the cursor position
+        // with ESC[6n) does not belong to the prompt.
+        text = LineInputText.TrimTrailingControlSequences(text);
         // Common prompt patterns
         string[] promptPatterns = { "> ", "# ", "$ ", ">> ", "] ", "-> " };
 

@@ -184,7 +184,7 @@ public static class LineInputText
         {
             return false;
         }
-        string tail = text.TrimEnd('\r', '\n');
+        string tail = TrimTrailingControlSequences(text).TrimEnd('\r', '\n');
         if (!string.IsNullOrEmpty(currentPrompt) && tail.EndsWith(currentPrompt, StringComparison.Ordinal))
         {
             return true;
@@ -200,6 +200,95 @@ public static class LineInputText
     }
 
     /// <summary>
+    /// Cuts the escape sequences, BEL characters and line breaks that follow the last character the device printed, so
+    /// the text ends the way the last line looks on the screen. A shell often sends something invisible right after its prompt: BusyBox ash
+    /// (OpenWrt) asks for the cursor position with <c>ESC[6n</c> after every prompt once the terminal answers that
+    /// query, other shells reset colours (<c>ESC[0m</c>) or set the window title. An escape sequence that is not complete
+    /// yet (its end comes with the next chunk) is cut as well.
+    /// </summary>
+    public static string TrimTrailingControlSequences(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+        if (text.IndexOf('\u001b') < 0 && text.IndexOf('\a') < 0)
+        {
+            return text.TrimEnd('\r', '\n');
+        }
+        // The end of the last printed character (not part of an escape sequence, not a BEL or a line break).
+        int keep = 0;
+        int i = 0;
+        while (i < text.Length)
+        {
+            char ch = text[i];
+            if (ch == '\u001b')
+            {
+                i = SkipEscapeSequence(text, i);
+                continue;
+            }
+            i++;
+            if (ch != '\a' && ch != '\r' && ch != '\n')
+            {
+                keep = i;
+            }
+        }
+        return keep == text.Length ? text : text.Substring(0, keep);
+    }
+
+    // Returns the index after the escape sequence that starts at text[esc] (the text length when it is unfinished).
+    private static int SkipEscapeSequence(string text, int esc)
+    {
+        int length = text.Length;
+        if (esc + 1 >= length)
+        {
+            return length;
+        }
+        char kind = text[esc + 1];
+        if (kind == '[')
+        {
+            // CSI: parameter and intermediate bytes, then one final byte.
+            int j = esc + 2;
+            while (j < length && text[j] >= ' ' && text[j] <= '?')
+            {
+                j++;
+            }
+            if (j >= length)
+            {
+                return length;
+            }
+            return text[j] >= '@' && text[j] <= '~' ? j + 1 : j;
+        }
+        if (kind == ']' || kind == 'P' || kind == 'X' || kind == '^' || kind == '_')
+        {
+            // OSC, DCS, SOS, PM, APC: a string ended by BEL or ESC \.
+            for (int j = esc + 2; j < length; j++)
+            {
+                if (text[j] == '\a')
+                {
+                    return j + 1;
+                }
+                if (text[j] == '\u001b' && j + 1 < length && text[j + 1] == '\\')
+                {
+                    return j + 2;
+                }
+            }
+            return length;
+        }
+        if (kind >= ' ' && kind <= '/')
+        {
+            // Intermediate bytes, then the final byte: ESC ( B selects a character set.
+            int j = esc + 1;
+            while (j < length && text[j] >= ' ' && text[j] <= '/')
+            {
+                j++;
+            }
+            return Math.Min(j + 1, length);
+        }
+        return esc + 2;
+    }
+
+    /// <summary>
     /// True when received text ends the way the prompt of a Linux shell does ("# " or "$ "). A bootloader or a
     /// device console ends its prompt differently ("=> ", "&gt; "), a login or password prompt with a colon.
     /// </summary>
@@ -209,7 +298,7 @@ public static class LineInputText
         {
             return false;
         }
-        string tail = text.TrimEnd('\r', '\n');
+        string tail = TrimTrailingControlSequences(text).TrimEnd('\r', '\n');
         return tail.EndsWith("# ", StringComparison.Ordinal) || tail.EndsWith("$ ", StringComparison.Ordinal);
     }
 

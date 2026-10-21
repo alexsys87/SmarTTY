@@ -69,6 +69,24 @@ internal static class Program
         Check(LineInputText.LooksLikeSecretPrompt("PIN: "), "secret prompt: PIN");
         Check(!LineInputText.LooksLikeSecretPrompt("login: ") && !LineInputText.LooksLikeSecretPrompt("> ") && !LineInputText.LooksLikeSecretPrompt("=> ") && !LineInputText.LooksLikeSecretPrompt(null) && !LineInputText.LooksLikeSecretPrompt(""), "secret prompt: ordinary prompts are fine");
 
+        // --- prompts followed by escape sequences that print nothing ---
+        // Captured from BusyBox ash (OpenWrt): once the terminal answers ESC[6n, ash asks again after every prompt.
+        string ashPrompt = "hi\r\nroot@OpenWrt:~# \u001b[6n";
+        Check(LineInputText.EndsLikePrompt(ashPrompt, "> "), "prompt: BusyBox ash prompt followed by a cursor position query");
+        Check(LineInputText.EndsLikeShellPrompt(ashPrompt), "shell prompt: BusyBox ash prompt followed by a cursor position query");
+        Check(LineInputText.EndsLikeShellPrompt("user@host:~$ \u001b[0m"), "shell prompt: colour reset after the prompt");
+        Check(LineInputText.EndsLikeShellPrompt("\u001b]0;root@host: ~\u0007root@host:~# "), "shell prompt: window title before the prompt");
+        Check(LineInputText.EndsLikeShellPrompt("root@host:~# \u001b]0;title\u001b\\"), "shell prompt: window title (ESC \\ terminated) after the prompt");
+        Check(LineInputText.EndsLikeShellPrompt("root@host:~# \u001b(B\u001b[m"), "shell prompt: charset and SGR after the prompt");
+        Check(LineInputText.EndsLikeShellPrompt("root@host:~# \u001b[6n\r\n"), "shell prompt: a line break after the query");
+        Check(LineInputText.EndsLikePrompt("root@OpenWrt:~# \u001b[", "> "), "prompt: an unfinished escape sequence at the end is cut");
+        Check(!LineInputText.EndsLikeShellPrompt("\u001b[6n") && !LineInputText.EndsLikePrompt("\u001b[6n", "> "), "prompt: a query alone is not a prompt");
+        Check(!LineInputText.EndsLikeShellPrompt("# \u001b[6nmore text"), "prompt: text after the query still counts");
+        Check(!LineInputText.EndsLikeShellPrompt("x\u001b[31m#\u001b[0m"), "prompt: the blank after # is still required");
+        Check(LineInputText.TrimTrailingControlSequences("plain") == "plain" && LineInputText.TrimTrailingControlSequences("line\r\n") == "line" && LineInputText.TrimTrailingControlSequences(null) == null, "trim: plain text, trailing line breaks, null");
+        Check(LineInputText.TrimTrailingControlSequences("a\u001b[1mb\u001b[0m") == "a\u001b[1mb", "trim: only what follows the last printed character is cut");
+        Check(LineInputText.TrimTrailingControlSequences("a\u0007") == "a", "trim: a trailing BEL is cut");
+
         // --- keys ---
         Check(DeviceLineInputStorage.MakeSerialKey("com3") == DeviceLineInputStorage.MakeSerialKey(" COM3 "), "key: serial port name is case and space insensitive");
         Check(DeviceLineInputStorage.MakeSerialKey("COM3") == DeviceLineInputStorage.MakeSerialKey(@"\\.\COM3"), "key: device path prefix is the same port");
