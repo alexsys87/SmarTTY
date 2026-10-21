@@ -252,6 +252,32 @@ public partial class DeviceTerminalControl : DpiAwareControl
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
         InitializeSerialLineControls();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
+        // The toolbar takes its background from the window (the WPF host passes the theme on), so the text colour of
+        // its labels and buttons follows that background.
+        toolStrip1.BackColorChanged += (sender, e) => UpdateToolbarTextColor();
+        UpdateToolbarTextColor();
+    }
+
+    /// <summary>White on a dark toolbar (the dark theme), the usual text colour on a light one.</summary>
+    private Color ToolbarTextColor => toolStrip1.BackColor.GetBrightness() < 0.5f ? Color.White : SystemColors.ControlText;
+
+    private void UpdateToolbarTextColor()
+    {
+        Color text = ToolbarTextColor;
+        foreach (ToolStripItem item in toolStrip1.Items)
+        {
+            // The input boxes keep their own colours; the port alert is a red link; "Stop log" is red while recording.
+            if (item is ToolStripControlHost || item == _lblPortAlert || (item == btnLog && _logWriter != null))
+            {
+                continue;
+            }
+            item.ForeColor = text;
+            if (item is ToolStripDropDownItem dropDownItem)
+            {
+                // The menus of the toolbar buttons are drawn on the system menu background, whatever the toolbar is.
+                dropDownItem.DropDown.ForeColor = SystemColors.MenuText;
+            }
+        }
     }
 
     // While a command runs, the keys go to the device as they are (mc, htop, vi ...) and the local input line is
@@ -1636,7 +1662,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             writer.Dispose();
         }
         btnLog.Text = "Start log";
-        btnLog.ForeColor = toolStrip1.ForeColor;
+        btnLog.ForeColor = ToolbarTextColor;
         btnLog.ToolTipText = "Continuously record received data to a file";
     }
 
