@@ -89,15 +89,19 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Install OpenSSH server
-        run: sudo apt-get update && sudo apt-get install -y openssh-server
+      - name: Install OpenSSH server, Dropbear and BusyBox
+        run: sudo apt-get update && sudo apt-get install -y openssh-server dropbear-bin busybox
 
       - name: Provision the test SSH server
         run: tests/SshNetIntegrationTests/setup-sshd.sh >> "$GITHUB_ENV"
 
+      - name: Provision the Dropbear server with a BusyBox ash shell (as on OpenWRT)
+        run: tests/SshNetIntegrationTests/setup-dropbear.sh >> "$GITHUB_ENV"
+
       - name: Run SSH.NET integration tests
         env:
           SMARTTY_SSH_TEST_REQUIRED: 1
+          SMARTTY_DROPBEAR_TEST_REQUIRED: 1
         run: dotnet run --project tests/SshNetIntegrationTests -c Release
 
   build:

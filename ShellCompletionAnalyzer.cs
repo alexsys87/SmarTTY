@@ -23,7 +23,7 @@ public class ShellCompletionAnalyzer : IDisposable
 
     private Queue<string> _historyQueue = new Queue<string>();
 
-    private SshShellChannel _historyChannel;
+    private volatile bool _disposed;
 
     private bool _historyWriterBusy;
 
@@ -62,13 +62,7 @@ public class ShellCompletionAnalyzer : IDisposable
 
     public void Dispose()
     {
-        try
-        {
-            _historyChannel?.Dispose();
-        }
-        catch
-        {
-        }
+        _disposed = true;
     }
 
     private void LoadHistoryAndPath()
@@ -198,6 +192,7 @@ public class ShellCompletionAnalyzer : IDisposable
             _historyQueue.Enqueue(item);
             if (!_historyWriterBusy)
             {
+                _historyWriterBusy = true;
                 new Thread(ProcessHistoryQueue)
                 {
                     IsBackground = true
@@ -208,43 +203,25 @@ public class ShellCompletionAnalyzer : IDisposable
 
     private void ProcessHistoryQueue()
     {
-        string command = null;
-        lock (_historyQueue)
+        while (true)
         {
-            if (_historyWriterBusy || _historyQueue.Count == 0)
-            {
-                return;
-            }
-            // Everything queued so far is written by one command: a channel per history line was slow, and a failed
-            // write used to leave the rest of the queue waiting for the next command.
-            command = string.Join("; ", _historyQueue.ToArray());
-            _historyQueue.Clear();
-            _historyWriterBusy = true;
-        }
-        try
-        {
-            _historyChannel?.Dispose();
-            _historyChannel = _sshSession.OpenShellChannel(command);
-            _historyChannel.Finished += (object sender) =>
-            {
-                lock (_historyQueue)
-                {
-                    _historyWriterBusy = false;
-                }
-                new Thread(ProcessHistoryQueue)
-                {
-                    IsBackground = true
-                }.Start();
-            };
-            _historyChannel.PollingEnabled = true;
-        }
-        catch
-        {
-            _historyChannel = null;
+            string command;
             lock (_historyQueue)
             {
-                _historyWriterBusy = false;
+                if (_historyQueue.Count == 0 || _disposed)
+                {
+                    _historyWriterBusy = false;
+                    return;
+                }
+                // Everything queued so far is written by one command: a channel per history line was slow.
+                command = string.Join("; ", _historyQueue.ToArray());
+                _historyQueue.Clear();
+                _historyWriterBusy = true;
             }
+            // RunCommand rather than a channel left running in the background: a helper command must not overlap
+            // with the PTY channel of the command being started (see Ssh/PtySetupGate.cs), otherwise dropbear on
+            // OpenWRT dropped that command's exec request and the Smart Terminal tab hung.
+            _sshSession.RunCommand(command, out _);
         }
     }
 

@@ -323,12 +323,27 @@ public class SshShellChannel : IAsyncChannel, IDisposable
         try
         {
             _session.RegisterChannel(this);
-            _channel.Open();
-            if (terminalType != null && !_channel.SendPseudoTerminalRequest(terminalType, 80, 25))
+            bool started;
+            if (terminalType != null)
             {
-                throw new PtyRequestFailedException();
+                _session.PtyGate.BeginPtySetup();
             }
-            bool started = (command != null) ? _channel.SendExecRequest(command) : _channel.SendShellRequest();
+            try
+            {
+                _channel.Open();
+                if (terminalType != null && !_channel.SendPseudoTerminalRequest(terminalType, 80, 25))
+                {
+                    throw new PtyRequestFailedException();
+                }
+                started = (command != null) ? _channel.SendExecRequest(command) : _channel.SendShellRequest();
+            }
+            finally
+            {
+                if (terminalType != null)
+                {
+                    _session.PtyGate.EndPtySetup();
+                }
+            }
             if (!started)
             {
                 throw new RemoteOperationException((command != null) ? ("The server refused to run '" + command + "'") : "The server refused to start a shell");
