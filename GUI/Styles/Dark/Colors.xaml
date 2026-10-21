@@ -44,7 +44,7 @@
   <!-- Text -->
   <SolidColorBrush x:Key="Theme.Text" Color="#ECEEF1" />
   <SolidColorBrush x:Key="Theme.TextSecondary" Color="#B5BAC1" />
-  <SolidColorBrush x:Key="Theme.TextDisabled" Color="#7A7F87" />
+  <SolidColorBrush x:Key="Theme.TextDisabled" Color="#8F949C" />
   <SolidColorBrush x:Key="Theme.Link" Color="#6CB4FF" />
   <SolidColorBrush x:Key="Theme.LinkHover" Color="#A8D3FF" />
   <SolidColorBrush x:Key="Theme.Error" Color="#FF7B72" />
@@ -61,7 +61,7 @@
   <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#ECEEF1" />
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#2B2D30" />
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#ECEEF1" />
-  <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#7A7F87" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#8F949C" />
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#264F86" />
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF" />
   <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#3A3D43" />

@@ -1,4 +1,5 @@
 using SmarTTY.Forms;
+using SmarTTY.GUI.Styles;
 using SmarTTY.Native;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
@@ -252,30 +253,84 @@ public partial class DeviceTerminalControl : DpiAwareControl
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
         InitializeSerialLineControls();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
-        // The toolbar takes its background from the window (the WPF host passes the theme on), so the text colour of
-        // its labels and buttons follows that background.
-        toolStrip1.BackColorChanged += (sender, e) => UpdateToolbarTextColor();
-        UpdateToolbarTextColor();
-    }
-
-    /// <summary>White on a dark toolbar (the dark theme), the usual text colour on a light one.</summary>
-    private Color ToolbarTextColor => toolStrip1.BackColor.GetBrightness() < 0.5f ? Color.White : SystemColors.ControlText;
-
-    private void UpdateToolbarTextColor()
-    {
-        Color text = ToolbarTextColor;
+        ThemeManager.ThemeChanged += OnThemeChanged;
+        ApplyToolbarTheme();
+        // Some menus get their items later (the Telnet menu, for instance): they are themed again when they open.
+        contextMenuStrip1.Opening += (sender, e) => ApplyMenuTheme(contextMenuStrip1);
         foreach (ToolStripItem item in toolStrip1.Items)
         {
-            // The input boxes keep their own colours; the port alert is a red link; "Stop log" is red while recording.
-            if (item is ToolStripControlHost || item == _lblPortAlert || (item == btnLog && _logWriter != null))
-            {
-                continue;
-            }
-            item.ForeColor = text;
             if (item is ToolStripDropDownItem dropDownItem)
             {
-                // The menus of the toolbar buttons are drawn on the system menu background, whatever the toolbar is.
-                dropDownItem.DropDown.ForeColor = SystemColors.MenuText;
+                dropDownItem.DropDownOpening += (sender, e) => ApplyMenuTheme(dropDownItem.DropDown);
+            }
+        }
+    }
+
+    private ToolbarPalette _toolbarPalette;
+
+    private ToolStripRenderer _toolbarRenderer;
+
+    private void OnThemeChanged(object sender, EventArgs e)
+    {
+        ApplyToolbarTheme();
+    }
+
+    /// <summary>
+    /// Paints the tool bar, its menus and the terminal context menu in the colours of the application theme.
+    /// </summary>
+    private void ApplyToolbarTheme()
+    {
+        _toolbarPalette = ToolbarPalette.FromCurrentTheme();
+        _toolbarRenderer = new ThemedToolStripRenderer(_toolbarPalette);
+        toolStrip1.Renderer = _toolbarRenderer;
+        toolStrip1.BackColor = _toolbarPalette.Background;
+        toolStrip1.ForeColor = _toolbarPalette.Text;
+        foreach (ToolStripItem item in toolStrip1.Items)
+        {
+            switch (item)
+            {
+                case ToolStripComboBox comboBox:
+                    comboBox.ComboBox.FlatStyle = FlatStyle.Flat;
+                    comboBox.BackColor = _toolbarPalette.Input;
+                    comboBox.ForeColor = _toolbarPalette.Text;
+                    break;
+                case ToolStripTextBox textBox:
+                    textBox.BackColor = _toolbarPalette.Input;
+                    textBox.ForeColor = _toolbarPalette.Text;
+                    break;
+                case ToolStripDropDownItem dropDownItem:
+                    dropDownItem.ForeColor = _toolbarPalette.Text;
+                    ApplyMenuTheme(dropDownItem.DropDown);
+                    break;
+                default:
+                    item.ForeColor = _toolbarPalette.Text;
+                    break;
+            }
+        }
+        // The port alert is a link and "Stop log" is shown while recording: both use the error colour.
+        if (_lblPortAlert != null)
+        {
+            _lblPortAlert.LinkColor = _lblPortAlert.ActiveLinkColor = _lblPortAlert.VisitedLinkColor = _toolbarPalette.Error;
+        }
+        if (_logWriter != null)
+        {
+            btnLog.ForeColor = _toolbarPalette.Error;
+        }
+        ApplyMenuTheme(contextMenuStrip1);
+        toolStrip1.Invalidate();
+    }
+
+    private void ApplyMenuTheme(ToolStripDropDown menu)
+    {
+        menu.Renderer = _toolbarRenderer;
+        menu.BackColor = _toolbarPalette.Popup;
+        menu.ForeColor = _toolbarPalette.Text;
+        foreach (ToolStripItem item in menu.Items)
+        {
+            item.ForeColor = _toolbarPalette.Text;
+            if (item is ToolStripDropDownItem { HasDropDownItems: true } subMenu)
+            {
+                ApplyMenuTheme(subMenu.DropDown);
             }
         }
     }
@@ -622,8 +677,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void DeviceTerminalControl_Disposed(object sender, EventArgs e)
     {
-        // The watcher is static: a closed tab must not stay reachable from it.
+        // The watcher and the theme event are static: a closed tab must not stay reachable from them.
         SerialPortArrivalWatcher.Unsubscribe(OnSerialPortArrived);
+        ThemeManager.ThemeChanged -= OnThemeChanged;
         _manualDisconnect = true;
         StopAutoReconnectTimer();
         _autoReconnectTimer?.Dispose();
@@ -1662,7 +1718,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             writer.Dispose();
         }
         btnLog.Text = "Start log";
-        btnLog.ForeColor = ToolbarTextColor;
+        btnLog.ForeColor = _toolbarPalette.Text;
         btnLog.ToolTipText = "Continuously record received data to a file";
     }
 
@@ -1680,7 +1736,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             _ => "text (UTF-8)",
         };
         btnLog.Text = "Stop log (" + FormatByteCount(writer.BytesWritten) + ")";
-        btnLog.ForeColor = Color.Firebrick;
+        btnLog.ForeColor = _toolbarPalette.Error;
         btnLog.ToolTipText = "Recording to " + writer.FilePath + " as " + format + ". Click to stop.";
     }
 
