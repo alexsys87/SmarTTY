@@ -22,6 +22,9 @@ namespace SmarTTY.Controls;
 
 public class SerialTerminalControl : TerminalEmulatorControl
 {
+    // The line being edited locally. Its prompt is either the device's own prompt, already on the screen (the input
+    // continues that line: StartColumn is the end of the prompt), or a local prompt drawn on a line of its own
+    // (StartColumn 0) when no device prompt is there to continue.
     private class InputLine
     {
         public readonly int StartLine;
@@ -783,7 +786,10 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             ActiveBufferIndex = 0;
         }
-        ShowPrompt();
+        if (!ContinueDevicePrompt())
+        {
+            ShowPrompt();
+        }
     }
 
     /// <summary>
@@ -897,6 +903,86 @@ public class SerialTerminalControl : TerminalEmulatorControl
         _historyIndex = _commandHistory.Count;
     }
 
+    /// <summary>
+    /// The device has just printed its prompt: the input line continues that very line after the device's cursor,
+    /// instead of a second, local prompt on a line of its own ("root@OpenWrt:/# " followed by "# "). False when the
+    /// cursor is not at the end of a prompt (something follows it, or the text before it does not end like one).
+    /// </summary>
+    private bool ContinueDevicePrompt()
+    {
+        if (ActiveBufferIndex != 0 || _visibleColumns <= 0)
+        {
+            return false;
+        }
+        EditableTextDocument document = ((EditableTextBrowser)this).EditableDocument;
+        TextDocument.TextPosition cursor = ToDocumentPosition(CursorPosition);
+        if (cursor.Line < 0 || cursor.Line >= document.LineCount || cursor.Column <= 0 || cursor.Column >= _visibleColumns)
+        {
+            return false;
+        }
+        // A prompt is the last thing on the screen.
+        string lineText = document.GetLineText(cursor.Line);
+        if (lineText.Length > cursor.Column && !string.IsNullOrWhiteSpace(lineText.Substring(cursor.Column)))
+        {
+            return false;
+        }
+        for (int line = cursor.Line + 1; line < document.LineCount; line++)
+        {
+            if (!string.IsNullOrWhiteSpace(document.GetLineText(line)))
+            {
+                return false;
+            }
+        }
+        // The blank after "# " is part of the prompt even where the line does not keep trailing blanks.
+        string prompt = lineText.Length >= cursor.Column ? lineText.Substring(0, cursor.Column) : lineText.PadRight(cursor.Column);
+        if (!LineInputText.EndsLikePrompt(prompt, _currentPrompt))
+        {
+            return false;
+        }
+        if (cursor.Line + 1 < document.LineCount)
+        {
+            document.RemoveLines(cursor.Line + 1, document.LineCount - cursor.Line - 1);
+        }
+        _inputLine = new InputLine(this, cursor.Line, prompt.Length, prompt);
+        RewrapInput();
+        OnTextReplaced();
+        UpdateCaretFromInputLine();
+        NavigationLocked = false;
+        _historyIndex = _commandHistory.Count;
+        _historySearch = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Replaces what follows the device's prompt on the screen (the typed text, wrapped over as many lines as it
+    /// needs) with <paramref name="text"/>. The prompt itself is not rewritten, so it keeps the device's colours.
+    /// </summary>
+    private void ReplaceAfterDevicePrompt(string text)
+    {
+        EditableTextDocument document = ((EditableTextBrowser)this).EditableDocument;
+        int line = _inputLine.StartLine;
+        if (line >= document.LineCount)
+        {
+            return;
+        }
+        if (document.LineCount > line + 1)
+        {
+            document.RemoveLines(line + 1, document.LineCount - line - 1);
+        }
+        int start = _inputLine.StartColumn;
+        string lineText = document.GetLineText(line);
+        if (lineText.Length < start)
+        {
+            text = new string(' ', start - lineText.Length) + text;
+            start = lineText.Length;
+        }
+        if (lineText.Length == start && text.Length == 0)
+        {
+            return;
+        }
+        ReplaceTextCore(new TextDocument.TextPosition(start, line), new TextDocument.TextPosition(lineText.Length, line), select: false, text);
+    }
+
     private void ShowPrompt()
     {
         // Remove empty last line if exists
@@ -940,11 +1026,19 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 wrapped.Append("\n");
         }
 
-        ReplaceTextCore(
-            new TextDocument.TextPosition(0, _inputLine.StartLine),
-            new TextDocument.TextPosition(0, ((EditableTextBrowser)this).EditableDocument.LineCount),
-            select: false,
-            wrapped.ToString());
+        if (_inputLine.StartColumn > 0 && _inputLine.StartColumn < maxWidth)
+        {
+            // The prompt is the device's: it stays as the device drew it, only the text after it is redrawn.
+            ReplaceAfterDevicePrompt(wrapped.ToString().Substring(_inputLine.StartColumn));
+        }
+        else
+        {
+            ReplaceTextCore(
+                new TextDocument.TextPosition(0, _inputLine.StartLine),
+                new TextDocument.TextPosition(0, ((EditableTextBrowser)this).EditableDocument.LineCount),
+                select: false,
+                wrapped.ToString());
+        }
 
         OnTextReplaced();
 
@@ -1361,44 +1455,23 @@ public class SerialTerminalControl : TerminalEmulatorControl
         base.OnKeyPress(e);
     }
 
+    // Ctrl+R: the input line shows the newest command that contains what was typed, the next press the one before.
+    // Nothing is printed through the emulator: that would be written at the device's cursor, into the input line.
     private void HandleHistorySearch()
     {
         if (_inputLine == null) return;
 
-        string currentText = _inputLine.Text;
-
         if (_historySearch == null)
         {
-            // Start new search
+            string currentText = _inputLine.Text;
             _historySearch = new HistorySearchSession(_commandHistory, currentText, currentText);
-            string? match = _historySearch.GetNextMatch();
-            if (match != null)
-            {
-                _inputLine.SetText(match);
-                RewrapInput();
-                UpdateCaretFromInputLine();
-                ProcessOutput($"(reverse-i-search)`{currentText}': {match}");
-            }
-            else
-            {
-                ProcessOutput($"(reverse-i-search)`{currentText}': {currentText}");
-            }
         }
-        else
+        string? match = _historySearch.GetNextMatch();
+        if (match != null)
         {
-            // Continue search with same term
-            string? match = _historySearch.GetNextMatch();
-            if (match != null)
-            {
-                _inputLine.SetText(match);
-                RewrapInput();
-                UpdateCaretFromInputLine();
-                ProcessOutput($"(reverse-i-search)`{_historySearch.OriginalInput}': {match}");
-            }
-            else
-            {
-                ProcessOutput($"(reverse-i-search)`{_historySearch.OriginalInput}': {_historySearch.OriginalInput}");
-            }
+            _inputLine.SetText(match);
+            RewrapInput();
+            UpdateCaretFromInputLine();
         }
     }
 
@@ -1410,7 +1483,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
             RewrapInput();
             UpdateCaretFromInputLine();
             _historySearch = null;
-            ProcessOutput($"{_currentPrompt}{_historySearch.OriginalInput}");
         }
     }
 
@@ -1472,9 +1544,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         if (_inputLine == null) return;
         
-        // Send the full line (prompt + text) to device
-        string fullLine = _inputLine.Prompt + _inputLine.Text;
-        SendText(fullLine, InputKind.Typed);
+        // Only what was typed: the prompt is the device's own text (or a local marker), not input.
+        SendText(_inputLine.Text, InputKind.Typed);
     }
 
     private void SubmitCommand()
@@ -1502,13 +1573,32 @@ public class SerialTerminalControl : TerminalEmulatorControl
             CommandSubmitted?.Invoke(this, new CommandSubmittedEventArgs(command, _inputLine.Text, _inputLine.Prompt));
         }
 
-        // Move to next line and show command output
-        ((EditableTextBrowser)this).EditableDocument.AppendLine("");
-        NavigationLocked = true;
-        ActiveBuffer.FirstRow = ((EditableTextBrowser)this).EditableDocument.LineCount - 1;
-        base.CursorPosition = new Point(0, 0);
-        UpdateCaret();
-        UpdateLayout();
+        if (ContinuesDevicePrompt)
+        {
+            // The device echoes the command right after its prompt, where its cursor still is, as in any terminal:
+            // the locally typed copy is taken away so the command is not shown twice (and an empty Enter does not
+            // leave a stray line).
+            ReplaceAfterDevicePrompt(string.Empty);
+            OnTextReplaced();
+            int row = _inputLine.StartLine - ActiveBuffer.FirstRow;
+            if (row >= 0)
+            {
+                base.CursorPosition = new Point(_inputLine.StartColumn, row);
+            }
+            NavigationLocked = true;
+            UpdateCaret();
+            UpdateLayout();
+        }
+        else
+        {
+            // Move to next line and show command output
+            ((EditableTextBrowser)this).EditableDocument.AppendLine("");
+            NavigationLocked = true;
+            ActiveBuffer.FirstRow = ((EditableTextBrowser)this).EditableDocument.LineCount - 1;
+            base.CursorPosition = new Point(0, 0);
+            UpdateCaret();
+            UpdateLayout();
+        }
 
         // Send command to device
         string lineEnding = EnterSequence ?? "\r";
@@ -1521,11 +1611,25 @@ public class SerialTerminalControl : TerminalEmulatorControl
         _remoteProgram.Reset();
     }
 
+    // True when the input line continues the device's own prompt and the device echoes what it receives (telnet
+    // without the server's echo shows typed text itself): the device then draws the command line, like any terminal.
+    private bool ContinuesDevicePrompt => _inputLine != null && _inputLine.StartColumn > 0 && !EchoRawInput;
+
     private void ClearCurrentLine()
     {
         if (_inputLine == null) return;
 
         _historySearch = null;
+        if (ContinuesDevicePrompt)
+        {
+            // The shell answers Ctrl+C itself with "^C" and a new prompt, which the input line then continues.
+            ReplaceAfterDevicePrompt(string.Empty);
+            OnTextReplaced();
+            _inputLine = null;
+            NavigationLocked = true;
+            SendBytes(new byte[] { 3 }, InputKind.KeySequence);
+            return;
+        }
         _inputLine.SetText("");
         RewrapInput();
         UpdateCaretFromInputLine();
@@ -1541,17 +1645,10 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         if (_inputLine == null) return;
 
-        string currentText = _inputLine.Text;
         _historySearch = null;
-
-        Reset();
-        _inputLine = new InputLine(this, 0, 0, _currentPrompt);
-        _inputLine.SetText(currentText);
-        ((EditableTextBrowser)this).EditableDocument.AppendLine(_currentPrompt + currentText);
-        RewrapInput();
-        UpdateCaretFromInputLine();
-        // Send clear screen escape sequence to device
-        SendText("\u001b[2J\u001b[H", InputKind.KeySequence);
+        // Only the screen here is cleared: the line is edited locally, the device has nothing to redraw (an escape
+        // sequence sent to it would land in its own line editor as keys).
+        ClearScreen();
         // Re-send the current line
         if (_localEcho)
         {
@@ -1637,6 +1734,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
         base.AdjustSelectionEnd(ref textPosition);
     }
 
+    // No input line until the device shows its prompt: the input line then continues it. Until then keys go to the
+    // device as they are (a local "> " drawn at once would only stand in front of the device's own prompt).
     public override void BeginNewSession()
     {
         base.BeginNewSession();
@@ -1644,9 +1743,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
         _remoteProgram.Reset();
         _announcedSize = Size.Empty;
         _shellPromptSeen = false;
-        ShowPrompt();
     }
 
+    // Also run for ESC c from the device, which prints its prompt again by itself.
     public override void Reset()
     {
         base.Reset();
@@ -1654,7 +1753,38 @@ public class SerialTerminalControl : TerminalEmulatorControl
         _remoteProgram.Reset();
         _historySearch = null;
         _historyIndex = _commandHistory.Count;
-        ShowPrompt();
+    }
+
+    /// <summary>
+    /// Clears the screen for the person (the Clear button, Ctrl+L): when a command was being typed, its prompt and
+    /// text are drawn again at the top, so typing goes on.
+    /// </summary>
+    public void ClearScreen()
+    {
+        InputLine previous = _inputLine;
+        Reset();
+        if (previous == null)
+        {
+            return;
+        }
+        if (previous.StartColumn > 0)
+        {
+            ProcessOutput(previous.Prompt);
+            if (!ContinueDevicePrompt())
+            {
+                ShowPrompt();
+            }
+        }
+        else
+        {
+            ShowPrompt();
+        }
+        if (_inputLine != null && previous.Text.Length > 0)
+        {
+            _inputLine.SetText(previous.Text);
+            RewrapInput();
+            UpdateCaretFromInputLine();
+        }
     }
 
     public override void Paste()
@@ -1719,6 +1849,14 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     public void OnDataReceived(string text)
     {
+        if (ContinuesDevicePrompt && !string.IsNullOrEmpty(text) && LineInputText.TrimTrailingControlSequences(text).Length > 0)
+        {
+            // The device prints something while a command is being typed after its prompt (a kernel message, a
+            // late line of output): it would be written over the typed text.
+            PrintAboveInputLine(text);
+            return;
+        }
+
         ProcessOutput(text);
 
         if (string.IsNullOrEmpty(text))
@@ -1755,7 +1893,47 @@ public class SerialTerminalControl : TerminalEmulatorControl
         // is part of the pattern (TrimEnd() used to remove it, so the prompt never came back).
         if (LineInputText.EndsLikePrompt(text, _currentPrompt))
         {
-            ShowPrompt();
+            if (!ContinueDevicePrompt())
+            {
+                ShowPrompt();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Shows text that the device printed while a command was being typed after its prompt: the typed text is taken
+    /// off the screen, the device's text is printed, and then the input line comes back - after the device's new
+    /// prompt when the text ends with one, otherwise after a copy of the old prompt on the next line - with what was
+    /// typed so far and the caret where it was.
+    /// </summary>
+    private void PrintAboveInputLine(string text)
+    {
+        InputLine previous = _inputLine;
+        ReplaceAfterDevicePrompt(string.Empty);
+        OnTextReplaced();
+        _inputLine = null;
+        ProcessOutput(text);
+        TrackShellPrompt(text);
+        bool continued = LineInputText.EndsLikePrompt(text, _currentPrompt) && ContinueDevicePrompt();
+        if (!continued)
+        {
+            if (CursorPosition.X != 0)
+            {
+                ProcessOutput("\r\n");
+            }
+            ProcessOutput(previous.Prompt);
+            if (!ContinueDevicePrompt())
+            {
+                ShowPrompt();
+            }
+        }
+        if (_inputLine != null && previous.Text.Length > 0)
+        {
+            _inputLine.SetText(previous.Text);
+            _inputLine.SetCaretIndex(previous.CaretIndex);
+            int caret = previous.CaretIndex;
+            RewrapInput(caret);
+            UpdateCaretFromInputLine();
         }
     }
 
