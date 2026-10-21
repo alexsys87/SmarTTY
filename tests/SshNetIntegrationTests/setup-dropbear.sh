@@ -56,7 +56,9 @@ as_root chown root "$host_key"
 # -E logs to stderr, -P keeps the pid file next to the key; dropbear forks into the background by itself.
 # Its stdout must not stay connected to ours: a caller reading this script's output through $(...) would wait
 # for the daemon to exit.
-as_root "$dropbear_binary" -r "$host_key" -p "127.0.0.1:$port" -P "$directory/dropbear.pid" -E </dev/null >/dev/null 2>"$directory/dropbear.log"
+# Dropbear hands its own environment to the sessions. OpenWRT has no locale, so its BusyBox ash edits the command
+# line in UTF-8 bytes; a LANG=C.UTF-8 inherited from the CI runner (sudo keeps LANG and LC_*) would turn that off.
+as_root env -u LANG -u LANGUAGE -u LC_ALL -u LC_CTYPE "$dropbear_binary" -r "$host_key" -p "127.0.0.1:$port" -P "$directory/dropbear.pid" -E </dev/null >/dev/null 2>"$directory/dropbear.log"
 
 started=false
 for _ in $(seq 1 100); do
