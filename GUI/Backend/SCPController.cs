@@ -46,7 +46,7 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
     {
         private readonly SCPController _Controller;
 
-        private ScpTransferManager.TransferJob _Context;
+        private FileTransferManager.TransferJob _Context;
 
         public string LocalFile => _Context.LocalPath;
 
@@ -54,7 +54,7 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
 
         public string Size => StringUtils.FormatSize(_Context.TotalBytes);
 
-        public string TransferRate => (_Context.State == ScpTransferManager.TransferState.InProgress && !_Controller.IsPaused) ? StringUtils.FormatSize(_Context.BytesPerSecond) + "B/s" : "";
+        public string TransferRate => (_Context.State == FileTransferManager.TransferState.InProgress && !_Controller.IsPaused) ? StringUtils.FormatSize(_Context.BytesPerSecond) + "B/s" : "";
 
         /// <summary>
         /// The state in words: progress and time left while running, the reason when failed.
@@ -65,10 +65,15 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             {
                 switch (_Context.State)
                 {
-                    case ScpTransferManager.TransferState.Queued:
+                    case FileTransferManager.TransferState.Queued:
                         return "Queued";
-                    case ScpTransferManager.TransferState.InProgress:
+                    case FileTransferManager.TransferState.InProgress:
                         {
+                            string phase = _Context.Phase;
+                            if (phase != null)
+                            {
+                                return phase + "...";
+                            }
                             if (_Controller.IsPaused)
                             {
                                 return "Paused";
@@ -80,11 +85,15 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
                             {
                                 text += ", " + FormatDuration(remaining.Value) + " left";
                             }
+                            if (_Context.ResumedFrom > 0)
+                            {
+                                text += " (resumed)";
+                            }
                             return text;
                         }
-                    case ScpTransferManager.TransferState.Completed:
-                        return "Completed";
-                    case ScpTransferManager.TransferState.Cancelled:
+                    case FileTransferManager.TransferState.Completed:
+                        return (_Context.Checksum != null) ? "Completed, " + _Context.Checksum : "Completed";
+                    case FileTransferManager.TransferState.Cancelled:
                         return "Cancelled";
                     default:
                         return string.IsNullOrEmpty(_Context.ErrorMessage) ? "Failed" : "Failed: " + _Context.ErrorMessage;
@@ -92,13 +101,18 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             }
         }
 
-        public string ToolTip => (_Context.IsDownload ? "Download " + _Context.RemotePath + " to " + _Context.LocalPath : "Upload " + _Context.LocalPath + " to " + _Context.RemotePath) + "\n" + StatusText;
+        public string ToolTip => (_Context.IsDownload ? "Download " + _Context.RemotePath + " to " + _Context.LocalPath : "Upload " + _Context.LocalPath + " to " + _Context.RemotePath)
+            + ((_Context.Protocol != null) ? " (" + _Context.Protocol + ")" : "") + "\n" + StatusText;
+
+        public bool IsDownload => _Context.IsDownload;
+
+        internal FileTransferManager.TransferJob Job => _Context;
 
         public ImagePair Images => _Context.State switch
         {
-            ScpTransferManager.TransferState.InProgress => new ImagePair((!_Context.IsDownload) ? MainImageType.Up : MainImageType.Down, _Controller._Session.TransferManager.IsPaused ? OverlayImageType.Pause : OverlayImageType.None),
-            ScpTransferManager.TransferState.Queued => new ImagePair((!_Context.IsDownload) ? MainImageType.Up : MainImageType.Down, OverlayImageType.Clock),
-            ScpTransferManager.TransferState.Completed => new ImagePair(MainImageType.Done),
+            FileTransferManager.TransferState.InProgress => new ImagePair((!_Context.IsDownload) ? MainImageType.Up : MainImageType.Down, _Controller._Session.TransferManager.IsPaused ? OverlayImageType.Pause : OverlayImageType.None),
+            FileTransferManager.TransferState.Queued => new ImagePair((!_Context.IsDownload) ? MainImageType.Up : MainImageType.Down, OverlayImageType.Clock),
+            FileTransferManager.TransferState.Completed => new ImagePair(MainImageType.Done),
             _ => new ImagePair(MainImageType.Error),
         };
 
@@ -107,7 +121,7 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             get
             {
                 // An empty file has nothing to divide by: 0 / 0 would be NaN, which a ProgressBar cannot take.
-                if (_Context.State != ScpTransferManager.TransferState.InProgress || _Context.TotalBytes <= 0)
+                if (_Context.State != FileTransferManager.TransferState.InProgress || _Context.TotalBytes <= 0)
                 {
                     return 0.0;
                 }
@@ -119,7 +133,7 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
         {
             get
             {
-                if (_Context.State != ScpTransferManager.TransferState.InProgress && _Context.State != ScpTransferManager.TransferState.Queued)
+                if (_Context.State != FileTransferManager.TransferState.InProgress && _Context.State != FileTransferManager.TransferState.Queued)
                 {
                     return Visibility.Hidden;
                 }
@@ -131,7 +145,7 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
         {
             get
             {
-                if (_Context.State == ScpTransferManager.TransferState.InProgress)
+                if (_Context.State == FileTransferManager.TransferState.InProgress)
                 {
                     return Visibility.Visible;
                 }
@@ -139,11 +153,11 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             }
         }
 
-        public ScpTransferManager.TransferState Status => _Context.State;
+        public FileTransferManager.TransferState Status => _Context.State;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public TransferObject(SCPController controller, ScpTransferManager.TransferJob ctx)
+        public TransferObject(SCPController controller, FileTransferManager.TransferJob ctx)
         {
             _Controller = controller;
             _Context = ctx;
@@ -162,13 +176,13 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("StatusText"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ToolTip"));
             stats.TotalTransfers++;
-            if (Status == ScpTransferManager.TransferState.InProgress || Status == ScpTransferManager.TransferState.Queued)
+            if (Status == FileTransferManager.TransferState.InProgress || Status == FileTransferManager.TransferState.Queued)
             {
                 stats.TotalActiveOrQueuedTransfers++;
             }
             stats.TotalSize += _Context.TotalBytes;
             stats.TotalDone += _Context.TransferredBytes;
-            if (_Context.State == ScpTransferManager.TransferState.Cancelled)
+            if (_Context.State == FileTransferManager.TransferState.Cancelled)
             {
                 _Controller.ActiveTransfers.Remove(this);
             }
@@ -184,24 +198,66 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
         {
             _Controller._Session.TransferManager.Cancel(_Context);
             SendUpdateEvents();
+            _Controller._Session.SaveTransferQueue();
         }
 
-        internal void Retry()
+        /// <summary>
+        /// Queues the transfer again: a failed one continues where it stopped if possible; with
+        /// <paramref name="evenIfCompleted"/> a completed one is transferred once more. The overwrite question was
+        /// answered when the transfer was first queued.
+        /// </summary>
+        internal void Retry(bool evenIfCompleted = false)
         {
-            if (_Context.State == ScpTransferManager.TransferState.Failed)
+            FileTransferManager manager = _Controller._Session.TransferManager;
+            if (manager == null)
             {
-                _Controller._Session.TransferManager.Cancel(_Context);
-                _Context.State = ScpTransferManager.TransferState.Cancelled;
-                // The overwrite question was answered when the transfer was first queued.
-                if (_Context.IsDownload)
-                {
-                    _Controller._Session.DoDownloadFile(_Context.RemotePath, Path.GetDirectoryName(_Context.LocalPath), _Context.OpenFolderWhenDone, confirmOverwrite: false);
-                }
-                else
-                {
-                    _Controller._Session.DoUploadFile(_Context.LocalPath, RemotePathUtils.GetDirectoryName(_Context.RemotePath), checkOverwrite: false);
-                }
+                return;
             }
+            FileTransferManager.TransferState state = _Context.State;
+            if (state == FileTransferManager.TransferState.Failed || (evenIfCompleted && state == FileTransferManager.TransferState.Completed))
+            {
+                manager.Requeue(_Context);
+                _Controller._Session.SaveTransferQueue();
+                SendUpdateEvents();
+            }
+        }
+
+        internal void CopyRemotePath()
+        {
+            try
+            {
+                Clipboard.SetText(_Context.RemotePath);
+            }
+            catch
+            {
+            }
+        }
+
+        /// <summary>
+        /// Deletes the file an upload created on the server (after asking) and removes the entry.
+        /// </summary>
+        internal bool DeleteUploadedFile(bool ask = true)
+        {
+            if (_Context.IsDownload || _Context.State != FileTransferManager.TransferState.Completed)
+            {
+                return false;
+            }
+            if (ask && !MessageBoxes.AskWarn("Delete " + _Context.RemotePath + " on the server?\n\nThis cannot be undone."))
+            {
+                return false;
+            }
+            try
+            {
+                _Controller._Session.TransferManager.DeleteRemoteFile(_Context);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Error("Cannot delete " + _Context.RemotePath + ": " + exception.Message);
+                return false;
+            }
+            _Controller.ActiveTransfers.Remove(this);
+            _Controller._Session.RefreshFileExplorers(RemotePathUtils.GetDirectoryName(_Context.RemotePath));
+            return true;
         }
 
         internal void OpenLocal()
@@ -213,7 +269,7 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             }
             if (!File.Exists(localPath))
             {
-                MessageBoxes.Error(localPath + " does not exist" + ((_Context.IsDownload && _Context.State != ScpTransferManager.TransferState.Completed) ? " yet: the download has not completed." : "."));
+                MessageBoxes.Error(localPath + " does not exist" + ((_Context.IsDownload && _Context.State != FileTransferManager.TransferState.Completed) ? " yet: the download has not completed." : "."));
                 return;
             }
             try
@@ -287,7 +343,12 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
 
     private bool _IsVisible;
 
-    public string Title => "SCP Transfers";
+    public string Title => "File Transfers: " + (_Session?.TransferManager?.EffectiveProtocolName ?? "SCP");
+
+    /// <summary>
+    /// The jobs listed in the panel, e.g. for saving the queue.
+    /// </summary>
+    public FileTransferManager.TransferJob[] Jobs => ActiveTransfers.Select((TransferObject transferObject) => transferObject.Job).ToArray();
 
     public ObservableCollection<TransferObject> ActiveTransfers { get; } = new ObservableCollection<TransferObject>();
 
@@ -333,14 +394,20 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
         IsVisible = true;
     }
 
-    public void AddTransfer(ScpTransferManager.TransferJob ctx)
+    public void AddTransfer(FileTransferManager.TransferJob ctx, bool save = true)
     {
         ActiveTransfers.Add(new TransferObject(this, ctx));
         Show();
+        if (save)
+        {
+            _Session.SaveTransferQueue();
+        }
     }
 
     public SCPStatistics SendUpdateEventsAndGetStatistics()
     {
+        // The protocol in the title changes when SFTP turns out to be unavailable.
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Title"));
         SCPStatistics stats = default;
         TransferObject[] items = ActiveTransfers.ToArray();
         for (int arrayIndex = 0; arrayIndex < items.Length; arrayIndex++)
@@ -360,7 +427,7 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
         TransferObject[] items = ActiveTransfers.ToArray();
         foreach (TransferObject transferObject in items)
         {
-            if (transferObject.Status == ScpTransferManager.TransferState.Completed)
+            if (transferObject.Status == FileTransferManager.TransferState.Completed)
             {
                 ActiveTransfers.Remove(transferObject);
             }
@@ -368,13 +435,27 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
     }
 
     /// <summary>
-    /// Queues all failed transfers again.
+    /// Queues all failed transfers again; with <paramref name="evenIfCompleted"/> also the completed ones.
     /// </summary>
-    public void RetryFailed()
+    public void RetryFailed(bool evenIfCompleted = false)
     {
         foreach (TransferObject transferObject in ActiveTransfers.ToArray())
         {
-            transferObject.Retry();
+            transferObject.Retry(evenIfCompleted);
         }
+    }
+
+    /// <summary>
+    /// Cancels every queued and running transfer and empties the list.
+    /// </summary>
+    public void RemoveAll()
+    {
+        FileTransferManager manager = _Session?.TransferManager;
+        foreach (TransferObject transferObject in ActiveTransfers.ToArray())
+        {
+            manager?.Cancel(transferObject.Job);
+        }
+        ActiveTransfers.Clear();
+        _Session?.SaveTransferQueue();
     }
 }

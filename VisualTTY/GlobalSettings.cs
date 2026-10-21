@@ -168,6 +168,26 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public bool OpenLocalDirAfterDownload { get; set; }
 
+    /// <summary>
+    /// SCP by default; SFTP is used where the server provides it and SCP otherwise.
+    /// </summary>
+    public SmarTTY.Transport.FileTransferProtocol TransferProtocol { get; set; }
+
+    public int MaxParallelTransfers { get; set; } = 2;
+
+    /// <summary>
+    /// The limit for all transfers of a session together, in KB/s; 0 means unlimited.
+    /// </summary>
+    public int TransferSpeedLimitKBps { get; set; }
+
+    public bool VerifyTransfers { get; set; } = true;
+
+    public bool ResumeTransfers { get; set; } = true;
+
+    public bool AtomicUploads { get; set; } = true;
+
+    public bool SaveTransferQueue { get; set; } = true;
+
     public bool ShowCtrlInsertWarnings { get; set; } = true;
 
     public bool UseCtrlShortcuts { get; set; }

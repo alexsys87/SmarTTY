@@ -91,6 +91,14 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -106,6 +114,24 @@
               <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding DefaultUploadDirectory}" />
               <CheckBox Grid.Row="2" Grid.ColumnSpan="3" VerticalContentAlignment="Center" Margin="5 0 0 0" IsChecked="{Binding OpenLocalDirAfterDownload}">
                 <TextBlock Text="Open local directory when done downloading" />
+              </CheckBox>
+              <TextBlock Text="Transfer protocol:" Grid.Row="3" ToolTip="SFTP is used only where the server provides it: on OpenWrt it needs the openssh-sftp-server package, otherwise SCP is used." />
+              <ListBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=TransferProtocol, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding TransferProtocol}" />
+              <TextBlock Text="Transfers at the same time (1-8):" Grid.Row="4" />
+              <TextBox Grid.Row="4" Grid.Column="1" Width="60" HorizontalAlignment="Left" Text="{Binding MaxParallelTransfers}" />
+              <TextBlock Text="Speed limit, KB/s (0 = no limit):" Grid.Row="5" ToolTip="For all transfers of a session together" />
+              <TextBox Grid.Row="5" Grid.Column="1" Width="60" HorizontalAlignment="Left" Text="{Binding TransferSpeedLimitKBps}" />
+              <CheckBox Grid.Row="6" Grid.ColumnSpan="3" VerticalContentAlignment="Center" Margin="5 0 0 0" IsChecked="{Binding VerifyTransfers}">
+                <TextBlock Text="Verify transferred files with a checksum (sha256sum or md5sum on the server)" />
+              </CheckBox>
+              <CheckBox Grid.Row="7" Grid.ColumnSpan="3" VerticalContentAlignment="Center" Margin="5 0 0 0" IsChecked="{Binding ResumeTransfers}">
+                <TextBlock Text="Resume interrupted transfers from where they stopped" />
+              </CheckBox>
+              <CheckBox Grid.Row="8" Grid.ColumnSpan="3" VerticalContentAlignment="Center" Margin="5 0 0 0" IsChecked="{Binding AtomicUploads}">
+                <TextBlock Text="Upload to a temporary file and replace the target only when complete" />
+              </CheckBox>
+              <CheckBox Grid.Row="9" Grid.ColumnSpan="3" VerticalContentAlignment="Center" Margin="5 0 0 0" IsChecked="{Binding SaveTransferQueue}">
+                <TextBlock Text="Keep unfinished transfers and continue them on the next connection to the server" />
               </CheckBox>
             </Grid>
           </GroupBox>

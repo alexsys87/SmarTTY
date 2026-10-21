@@ -729,6 +729,15 @@ public class SshSession : IDisposable
     }
 
     /// <summary>
+    /// Opens a channel running the server's <paramref name="subsystem"/> (e.g. "sftp").
+    /// </summary>
+    public SshShellChannel OpenSubsystemChannel(string subsystem)
+    {
+        EnsureAuthenticated();
+        return new SshShellChannel(this, SshNetChannel.Create(_client), null, null, ExtendedDataMode.Ignore, subsystem);
+    }
+
+    /// <summary>
     /// Runs a command and returns its output (stdout and stderr merged), or null if it could not be run.
     /// </summary>
     public List<string> RunCommand(string command, out int? exitStatus, string terminalType = null)
