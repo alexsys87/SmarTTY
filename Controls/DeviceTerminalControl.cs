@@ -1463,7 +1463,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     public void ClearOutput()
     {
-        _serialTerminalControl.Reset();
+        // Keeps a command that is being typed (and its prompt) at the top of the cleared screen.
+        _serialTerminalControl.ClearScreen();
         hexTerminalControl1.Clear();
     }
 
