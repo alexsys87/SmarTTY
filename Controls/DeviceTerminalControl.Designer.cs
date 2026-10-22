@@ -52,6 +52,21 @@ public partial class DeviceTerminalControl
 
 	private ToolStripMenuItem receiveFileViaXMODEMToolStripMenuItem;
 
+	private ToolStripMenuItem sendFilesViaYMODEMToolStripMenuItem;
+
+	private ToolStripMenuItem receiveFilesViaYMODEMToolStripMenuItem;
+
+	private ToolStripMenuItem sendFilesViaZModemToolStripMenuItem;
+
+	private ToolStripMenuItem receiveFilesViaZModemToolStripMenuItem;
+
+	private ToolStripMenuItem autoReceiveZModemToolStripMenuItem;
+
+	private ToolStripMenuItem escapeZModemControlToolStripMenuItem;
+	private ToolStripMenuItem sendFilesViaKermitToolStripMenuItem;
+
+	private ToolStripMenuItem receiveFilesViaKermitToolStripMenuItem;
+
 	private ToolStripButton toolStripButton2;
 
 	private OpenFileDialog _openFileDialog;
@@ -125,6 +140,14 @@ public partial class DeviceTerminalControl
             this.sendFileViaXMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.sendFileViaXMODEM1KToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.receiveFileViaXMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.sendFilesViaYMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.receiveFilesViaYMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.sendFilesViaZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.receiveFilesViaZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.autoReceiveZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.escapeZModemControlToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.sendFilesViaKermitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.receiveFilesViaKermitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripButton2 = new System.Windows.Forms.ToolStripButton();
             this.btnLog = new System.Windows.Forms.ToolStripButton();
             this.btnReplay = new System.Windows.Forms.ToolStripButton();
@@ -309,7 +332,15 @@ public partial class DeviceTerminalControl
             this.sendBinaryFileToolStripMenuItem,
             this.sendFileViaXMODEMToolStripMenuItem,
             this.sendFileViaXMODEM1KToolStripMenuItem,
-            this.receiveFileViaXMODEMToolStripMenuItem});
+            this.receiveFileViaXMODEMToolStripMenuItem,
+            this.sendFilesViaYMODEMToolStripMenuItem,
+            this.receiveFilesViaYMODEMToolStripMenuItem,
+            this.sendFilesViaZModemToolStripMenuItem,
+            this.receiveFilesViaZModemToolStripMenuItem,
+            this.autoReceiveZModemToolStripMenuItem,
+            this.escapeZModemControlToolStripMenuItem,
+            this.sendFilesViaKermitToolStripMenuItem,
+            this.receiveFilesViaKermitToolStripMenuItem});
             this.toolStripButton3.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton3.Image")));
             this.toolStripButton3.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton3.Name = "toolStripButton3";
@@ -339,6 +370,57 @@ public partial class DeviceTerminalControl
             this.receiveFileViaXMODEMToolStripMenuItem.Name = "receiveFileViaXMODEMToolStripMenuItem";
             this.receiveFileViaXMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
             this.receiveFileViaXMODEMToolStripMenuItem.Text = "Receive file via XMODEM...";
+            // 
+            // sendFilesViaYMODEMToolStripMenuItem
+            // 
+            this.sendFilesViaYMODEMToolStripMenuItem.Name = "sendFilesViaYMODEMToolStripMenuItem";
+            this.sendFilesViaYMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.sendFilesViaYMODEMToolStripMenuItem.Text = "Send file(s) via YMODEM...";
+            // 
+            // receiveFilesViaYMODEMToolStripMenuItem
+            // 
+            this.receiveFilesViaYMODEMToolStripMenuItem.Name = "receiveFilesViaYMODEMToolStripMenuItem";
+            this.receiveFilesViaYMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.receiveFilesViaYMODEMToolStripMenuItem.Text = "Receive file(s) via YMODEM...";
+            // 
+            // sendFilesViaZModemToolStripMenuItem
+            // 
+            this.sendFilesViaZModemToolStripMenuItem.Name = "sendFilesViaZModemToolStripMenuItem";
+            this.sendFilesViaZModemToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.sendFilesViaZModemToolStripMenuItem.Text = "Send files via ZMODEM...";
+            // 
+            // receiveFilesViaZModemToolStripMenuItem
+            // 
+            this.receiveFilesViaZModemToolStripMenuItem.Name = "receiveFilesViaZModemToolStripMenuItem";
+            this.receiveFilesViaZModemToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.receiveFilesViaZModemToolStripMenuItem.Text = "Receive files via ZMODEM...";
+            // 
+            // autoReceiveZModemToolStripMenuItem
+            // 
+            this.autoReceiveZModemToolStripMenuItem.Checked = true;
+            this.autoReceiveZModemToolStripMenuItem.CheckOnClick = true;
+            this.autoReceiveZModemToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.autoReceiveZModemToolStripMenuItem.Name = "autoReceiveZModemToolStripMenuItem";
+            this.autoReceiveZModemToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.autoReceiveZModemToolStripMenuItem.Text = "Start ZMODEM receive automatically";
+            // 
+            // escapeZModemControlToolStripMenuItem
+            // 
+            this.escapeZModemControlToolStripMenuItem.CheckOnClick = true;
+            this.escapeZModemControlToolStripMenuItem.Name = "escapeZModemControlToolStripMenuItem";
+            this.escapeZModemControlToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.escapeZModemControlToolStripMenuItem.Text = "ZMODEM: escape control characters";
+            // sendFilesViaKermitToolStripMenuItem
+            // 
+            this.sendFilesViaKermitToolStripMenuItem.Name = "sendFilesViaKermitToolStripMenuItem";
+            this.sendFilesViaKermitToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.sendFilesViaKermitToolStripMenuItem.Text = "Send files via Kermit...";
+            // 
+            // receiveFilesViaKermitToolStripMenuItem
+            // 
+            this.receiveFilesViaKermitToolStripMenuItem.Name = "receiveFilesViaKermitToolStripMenuItem";
+            this.receiveFilesViaKermitToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.receiveFilesViaKermitToolStripMenuItem.Text = "Receive files via Kermit...";
             // 
             // toolStripButton2
             // 

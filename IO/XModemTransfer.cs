@@ -21,9 +21,9 @@ public class XModemTransfer
     public const byte C   = 0x43; // 'C' (CRC16 mode)
     public const byte SUB = 0x1A; // Padding character
 
-    private const int BlockSize = 128;
-    private const int LargeBlockSize = 1024;
-    private const int MaxRetries = 10;
+    internal const int BlockSize = 128;
+    internal const int LargeBlockSize = 1024;
+    internal const int MaxRetries = 10;
     private const int LargeBlockFallbackAttempts = 3; // failed tries of the very first 1K block before dropping to 128 bytes
 
     public enum XModemMode
@@ -55,6 +55,14 @@ public class XModemTransfer
 
         /// <summary>Quiet time on the line that ends the discarding of a damaged block.</summary>
         public int PurgeQuietMs = 300;
+
+        /// <summary>YMODEM sender: how long to wait for the receiver's 'C' after a file header or a file's EOT was acknowledged
+        /// (a bootloader may erase or flash first, so this is long).</summary>
+        public int NextRequestMs = 60000;
+
+        /// <summary>YMODEM sender: how long to wait for the 'C' that asks for the end-of-batch block after the last file.
+        /// A receiver that restarts into the new program right after the file never sends it.</summary>
+        public int BatchEndRequestMs = 10000;
     }
 
     public static ushort CalculateCrc16(byte[] data, int offset, int length)
@@ -89,7 +97,7 @@ public class XModemTransfer
     }
 
     /// <summary>The byte link with cancellation: reads are done in short slices so a cancel is noticed within ~200 ms.</summary>
-    private sealed class Link
+    internal sealed class Link
     {
         private const int SliceMs = 200;
 
@@ -161,12 +169,12 @@ public class XModemTransfer
         }
     }
 
-    private static void Report(ProgressHandler onProgress, long done, long total, int errors, string status)
+    internal static void Report(ProgressHandler onProgress, long done, long total, int errors, string status)
     {
         onProgress?.Invoke(done, total, errors, status);
     }
 
-    private static int ReadFully(Stream stream, byte[] buffer, int count)
+    internal static int ReadFully(Stream stream, byte[] buffer, int count)
     {
         int total = 0;
         while (total < count)
@@ -195,7 +203,7 @@ public class XModemTransfer
     /// Builds one block (SOH for 128 bytes, STX for 1024) into <paramref name="packet"/> and returns its length.
     /// The payload is padded with SUB from <paramref name="read"/> up to <paramref name="size"/>.
     /// </summary>
-    private static int BuildPacket(byte[] packet, byte[] payload, int read, int size, int blockIndex, XModemMode mode)
+    internal static int BuildPacket(byte[] packet, byte[] payload, int read, int size, int blockIndex, XModemMode mode)
     {
         for (int i = read; i < size; i++)
         {
@@ -218,7 +226,7 @@ public class XModemTransfer
         return 3 + size + 1;
     }
 
-    private enum Reply
+    internal enum Reply
     {
         Ack,
         Nak,
@@ -227,7 +235,7 @@ public class XModemTransfer
     }
 
     /// <summary>Waits for the answer to a block or EOT. Other bytes (a late 'C', echo, noise) are ignored.</summary>
-    private static Reply WaitForReply(Link link, int timeoutMs)
+    internal static Reply WaitForReply(Link link, int timeoutMs)
     {
         Stopwatch timer = Stopwatch.StartNew();
         bool previousWasCan = false;
@@ -524,7 +532,7 @@ public class XModemTransfer
     /// Waits for the start of a block: SOH, STX or EOT. Other bytes are ignored. A pair of CAN is returned as CAN;
     /// null means nothing useful arrived in time (or the transfer was cancelled).
     /// </summary>
-    private static byte? ReadHeader(Link link, int timeoutMs)
+    internal static byte? ReadHeader(Link link, int timeoutMs)
     {
         Stopwatch timer = Stopwatch.StartNew();
         bool previousWasCan = false;
@@ -558,7 +566,7 @@ public class XModemTransfer
     }
 
     /// <summary>Reads the rest of a block after its start byte. False when it is incomplete or damaged.</summary>
-    private static bool TryReadBlock(Link link, int size, XModemMode mode, int byteTimeoutMs, byte[] payload, out byte blockNumber)
+    internal static bool TryReadBlock(Link link, int size, XModemMode mode, int byteTimeoutMs, byte[] payload, out byte blockNumber)
     {
         blockNumber = 0;
         byte? number = link.Read(byteTimeoutMs);

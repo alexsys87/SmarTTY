@@ -311,6 +311,14 @@ public class SshShellChannel : IAsyncChannel, IDisposable
     /// requesting a PTY of type <paramref name="terminalType"/> if it is not null.
     /// </summary>
     internal SshShellChannel(SshSession session, SshNetChannel channel, string command, string terminalType, ExtendedDataMode extendedDataMode)
+        : this(session, channel, command, terminalType, extendedDataMode, subsystem: null)
+    {
+    }
+
+    /// <summary>
+    /// Opens a session channel for the <paramref name="subsystem"/> (e.g. "sftp") when it is not null, otherwise as above.
+    /// </summary>
+    internal SshShellChannel(SshSession session, SshNetChannel channel, string command, string terminalType, ExtendedDataMode extendedDataMode, string subsystem)
     {
         _session = session;
         _channel = channel;
@@ -335,7 +343,14 @@ public class SshShellChannel : IAsyncChannel, IDisposable
                 {
                     throw new PtyRequestFailedException();
                 }
-                started = (command != null) ? _channel.SendExecRequest(command) : _channel.SendShellRequest();
+                if (subsystem != null)
+                {
+                    started = _channel.SendSubsystemRequest(subsystem);
+                }
+                else
+                {
+                    started = (command != null) ? _channel.SendExecRequest(command) : _channel.SendShellRequest();
+                }
             }
             finally
             {
@@ -346,7 +361,7 @@ public class SshShellChannel : IAsyncChannel, IDisposable
             }
             if (!started)
             {
-                throw new RemoteOperationException((command != null) ? ("The server refused to run '" + command + "'") : "The server refused to start a shell");
+                throw new RemoteOperationException((subsystem != null) ? ("The server does not provide the " + subsystem + " subsystem") : (command != null) ? ("The server refused to run '" + command + "'") : "The server refused to start a shell");
             }
         }
         catch

@@ -2,6 +2,7 @@
 using SmarTTY.Controls;
 using SmarTTY.Forms;
 using SmarTTY.IO;
+using SmarTTY.LocalRepo;
 using SmarTTY.Terminal;
 using SmarTTY.Transport;
 using SmarTTY.Utilities;
@@ -204,7 +205,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public SshSession Session { get; private set; }
 
-    public ScpTransferManager TransferManager { get; private set; }
+    /// <summary>The local OpenWrt repository served to this session's device (Tools > Local OpenWrt repository server).</summary>
+    public LocalRepoHost LocalRepo { get; } = new LocalRepoHost();
+
+    public FileTransferManager TransferManager { get; private set; }
 
     public bool HideHeaders => _Controller.HideTabHeaders;
 
@@ -473,21 +477,47 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             return;
         }
+        bool firstConnection = Session == null;
         Session?.Dispose();
         Session = session;
+        if (!firstConnection && LocalRepo.IsRunning)
+        {
+            // The reverse tunnel belonged to the old connection: restore it (and the feeds) on the new one, off the UI thread.
+            ThreadPool.QueueUserWorkItem((object state) => LocalRepo.Reattach((SshSession)state), session);
+        }
         TransferManager?.Dispose();
-        TransferManager = new ScpTransferManager
+        TransferManager = new FileTransferManager
         {
             Session = session,
             ConfirmOverwrite = MessageBoxes.AskWarn
         };
+        ApplyTransferSettings();
+        TransferManager.JobFinished += OnTransferFinished;
         session.ConnectionLost += (object sender, EventArgs e) =>
         {
             _Controller.BeginInvoke(() =>
             {
+                // The transfers that were under way continue after reconnecting, from where they stopped.
+                _TransfersToResume = SCPController.Jobs.Where((FileTransferManager.TransferJob job) => job.State == FileTransferManager.TransferState.Queued || job.State == FileTransferManager.TransferState.InProgress).ToList();
                 Fixer = new SessionFixer(this);
             });
         };
+        if (firstConnection)
+        {
+            RestoreTransferQueue();
+        }
+        else if (_TransfersToResume != null)
+        {
+            List<FileTransferManager.TransferJob> resume = _TransfersToResume;
+            _TransfersToResume = null;
+            _Controller.BeginInvoke(() =>
+            {
+                foreach (FileTransferManager.TransferJob job in resume)
+                {
+                    TransferManager.Requeue(job);
+                }
+            });
+        }
         foreach (ITabContext tab in Tabs)
         {
             tab.OnSessionReconnected(session);
@@ -651,32 +681,163 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    /// <summary>
+    /// Replaces a leading "~" ("~" or "~/dir") with the home directory: SCP takes the path literally, so a "~" in it
+    /// would name a directory called "~".
+    /// </summary>
     public void ExpandHomeDirIfNeeded(ref string dir)
     {
-        if (!(dir == "~"))
+        if (dir == null || !(dir == "~" || dir.StartsWith("~/")))
         {
             return;
         }
         try
         {
-            using SshShellChannel sshShellChannel = Session.OpenShellChannel("pwd");
-            using StreamReader streamReader = new StreamReader(sshShellChannel.Output);
-            dir = streamReader.ReadLine();
+            string home;
+            using (SshShellChannel sshShellChannel = Session.OpenShellChannel("pwd"))
+            using (StreamReader streamReader = new StreamReader(sshShellChannel.Output))
+            {
+                home = streamReader.ReadLine();
+            }
+            if (!string.IsNullOrEmpty(home))
+            {
+                dir = home.TrimEnd('/') + dir.Substring(1);
+                if (dir.Length == 0)
+                {
+                    dir = "/";
+                }
+            }
         }
         catch
         {
         }
     }
 
-    public void DoUploadFile(string file, string remoteDir)
+    #region File transfer queue
+
+    private List<FileTransferManager.TransferJob> _TransfersToResume;
+
+    private string TransferQueueFile => (Session == null) ? null : TransferQueueStore.GetFilePath(Path.Combine(GlobalSettings.DataDirectory, "TransferQueues"), Session.UserName, Session.HostName, Session.Port);
+
+    /// <summary>
+    /// Applies the file transfer settings (protocol, parallel transfers, speed limit, checks) to the queue.
+    /// </summary>
+    public void ApplyTransferSettings()
     {
-        LastDownloadDir = RemotePathUtils.GetDirectoryName(file);
+        FileTransferManager manager = TransferManager;
+        if (manager == null)
+        {
+            return;
+        }
+        GlobalSettings settings = _Controller.Settings;
+        manager.Protocol = settings.TransferProtocol;
+        manager.MaxParallelTransfers = settings.MaxParallelTransfers;
+        manager.SpeedLimitBytesPerSecond = Math.Max(0, settings.TransferSpeedLimitKBps) * 1024L;
+        manager.VerifyChecksums = settings.VerifyTransfers;
+        manager.ResumeInterrupted = settings.ResumeTransfers;
+        manager.AtomicUploads = settings.AtomicUploads;
+    }
+
+    /// <summary>
+    /// Saves the unfinished transfers, so that they come back the next time SmarTTY connects to this server.
+    /// </summary>
+    public void SaveTransferQueue()
+    {
+        string file = TransferQueueFile;
+        if (IsDevice || file == null)
+        {
+            return;
+        }
+        try
+        {
+            // With the option off, an old saved queue is removed so that it does not come back later.
+            TransferQueueStore.Save(file, _Controller.Settings.SaveTransferQueue ? SCPController.Jobs : new FileTransferManager.TransferJob[0]);
+        }
+        catch
+        {
+        }
+    }
+
+    private void RestoreTransferQueue()
+    {
+        string file = TransferQueueFile;
+        if (file == null || !_Controller.Settings.SaveTransferQueue)
+        {
+            return;
+        }
+        List<FileTransferManager.TransferJob> jobs = TransferQueueStore.Load(file);
+        if (jobs.Count == 0)
+        {
+            return;
+        }
+        _Controller.BeginInvoke(() =>
+        {
+            HashSet<Guid> listed = new HashSet<Guid>(SCPController.Jobs.Select((FileTransferManager.TransferJob job) => job.Id));
+            foreach (FileTransferManager.TransferJob job in jobs.Where((FileTransferManager.TransferJob job) => !listed.Contains(job.Id)))
+            {
+                SCPController.AddTransfer(job, save: false);
+                if (job.State == FileTransferManager.TransferState.Queued)
+                {
+                    TransferManager.Requeue(job);
+                }
+            }
+        });
+    }
+
+    // Runs on a transfer thread.
+    private void OnTransferFinished(FileTransferManager.TransferJob job)
+    {
+        _Controller.BeginInvoke(() =>
+        {
+            SaveTransferQueue();
+            if (!job.IsDownload && job.State == FileTransferManager.TransferState.Completed)
+            {
+                RefreshFileExplorers(RemotePathUtils.GetDirectoryName(job.RemotePath));
+            }
+        });
+    }
+
+    /// <summary>
+    /// Reloads the Smart Terminal file panels of this session that show <paramref name="remoteDir"/>, so that new or
+    /// deleted files appear at once.
+    /// </summary>
+    public void RefreshFileExplorers(string remoteDir)
+    {
+        if (string.IsNullOrEmpty(remoteDir))
+        {
+            return;
+        }
+        string wanted = remoteDir.TrimEnd('/');
+        foreach (ITabContext tab in Tabs.ToList())
+        {
+            FileExplorer explorer = tab.FileExplorer;
+            string shown = explorer?.WorkingDirectory?.TrimEnd('/');
+            if (explorer != null && shown != null && shown == wanted)
+            {
+                explorer.Refresh();
+            }
+        }
+    }
+
+    #endregion
+
+    public void DoUploadFile(string file, string remoteDir, bool checkOverwrite = true)
+    {
+        // This directory is the remote one offered next time a remote file is picked, so it must not be the local one.
+        LastDownloadDir = remoteDir;
         string fileName = Path.GetFileName(file);
         string text = remoteDir.TrimEnd('/') + "/" + fileName;
-        ScpTransferManager.TransferJob transferJob = TransferManager.EnqueueUpload(file, text);
-        if (transferJob != null)
+        try
         {
-            SCPController.AddTransfer(transferJob);
+            FileTransferManager.TransferJob transferJob = TransferManager.EnqueueUpload(file, text, null, checkOverwrite);
+            if (transferJob != null)
+            {
+                SCPController.AddTransfer(transferJob);
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot upload " + file + ": " + exception.Message);
         }
     }
 
@@ -697,24 +858,147 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    public void UploadFiles(string[] files)
+    /// <summary>
+    /// Uploads dropped files and folders into <paramref name="remoteDir"/> if given (a drop on the file panel), else into
+    /// the current directory of <paramref name="targetTab"/> (or of the active tab), falling back to the default upload
+    /// directory. Files go to the transfer queue after a single overwrite
+    /// question for all of them; each folder opens the directory upload window, ready to start.
+    /// </summary>
+    public void UploadFiles(string[] files, ITabContext targetTab = null, string remoteDir = null)
     {
-        if (IsDevice)
+        if (IsDevice || files == null)
         {
             return;
         }
-        string dir = _Controller.Settings.DefaultUploadDirectory;
-        ExpandHomeDirIfNeeded(ref dir);
-        _Controller.Settings.DefaultUploadDirectory = dir;
-        string text = TryExtractCurrentDir();
-        if (text == null)
+        string[] regularFiles = files.Where(File.Exists).ToArray();
+        string[] folders = files.Where(Directory.Exists).ToArray();
+        if (regularFiles.Length == 0 && folders.Length == 0)
         {
-            text = _Controller.Settings.DefaultUploadDirectory;
+            return;
         }
-        foreach (string file in files)
+        remoteDir ??= TryExtractCurrentDir(targetTab);
+        if (remoteDir == null)
         {
-            DoUploadFile(file, text);
+            string dir = _Controller.Settings.DefaultUploadDirectory;
+            ExpandHomeDirIfNeeded(ref dir);
+            _Controller.Settings.DefaultUploadDirectory = dir;
+            remoteDir = dir;
         }
+        if (string.IsNullOrEmpty(remoteDir))
+        {
+            MessageBoxes.Error("Cannot determine the remote directory to upload to. Set the default upload directory in the SCP upload window.");
+            return;
+        }
+        if (regularFiles.Length != 0)
+        {
+            UploadFilesToDirectory(regularFiles, remoteDir);
+        }
+        foreach (string folder in folders)
+        {
+            // A dropped drive root (D:\) has no name of its own: its contents go straight into the directory.
+            string folderName = Path.GetFileName(folder.TrimEnd('\\', '/'));
+            ShowDirectoryUploadForm(folder, string.IsNullOrEmpty(folderName) ? remoteDir : remoteDir.TrimEnd('/') + "/" + folderName);
+        }
+    }
+
+    /// <summary>
+    /// Queues several uploads into one remote directory, asking once about all the files that already exist there.
+    /// </summary>
+    public void UploadFilesToDirectory(IList<string> files, string remoteDir)
+    {
+        string[] remotePaths = files.Select((string file) => remoteDir.TrimEnd('/') + "/" + Path.GetFileName(file)).ToArray();
+        RemotePathKind[] kinds;
+        try
+        {
+            // The target directory is checked in the same round trip as the files.
+            kinds = Session.GetRemotePathKinds(remotePaths.Concat(new[] { remoteDir }).ToList());
+            switch (kinds[files.Count])
+            {
+                case RemotePathKind.File:
+                    MessageBoxes.Error("Cannot upload files to " + remoteDir + ": it is a file, not a directory.");
+                    return;
+                case RemotePathKind.Missing:
+                    if (!MessageBoxes.Ask(remoteDir + " does not exist on the server. Create it?"))
+                    {
+                        return;
+                    }
+                    if (Session.RunCommandChecked("mkdir -p " + RemotePathUtils.ShellQuote(remoteDir), requireSuccess: true) == null)
+                    {
+                        MessageBoxes.Error("Cannot create " + remoteDir + ".");
+                        return;
+                    }
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot upload files: " + exception.Message);
+            return;
+        }
+        List<string> directories = Enumerable.Range(0, files.Count).Where((int i) => kinds[i] == RemotePathKind.Directory).Select((int i) => remotePaths[i]).ToList();
+        if (directories.Count != 0)
+        {
+            MessageBoxes.Error("These files cannot be uploaded because a directory with the same name exists on the server:\n\n" + FormatFileList(directories));
+        }
+        List<int> existing = Enumerable.Range(0, files.Count).Where((int i) => kinds[i] == RemotePathKind.File).ToList();
+        bool overwrite = true;
+        if (existing.Count == 1 && files.Count == 1)
+        {
+            if (!MessageBoxes.AskWarn(remotePaths[0] + " already exists. Overwrite it?"))
+            {
+                return;
+            }
+        }
+        else if (existing.Count != 0)
+        {
+            string question = "These files already exist in " + remoteDir + ":\n\n" + FormatFileList(existing.Select((int i) => Path.GetFileName(files[i])).ToList())
+                + "\n\nYes: overwrite them. No: skip them and upload the rest. Cancel: upload nothing.";
+            switch (MessageBoxes.YesNoCancel(question))
+            {
+                case System.Windows.Forms.DialogResult.Yes:
+                    break;
+                case System.Windows.Forms.DialogResult.No:
+                    overwrite = false;
+                    break;
+                default:
+                    return;
+            }
+        }
+        for (int i = 0; i < files.Count; i++)
+        {
+            if (kinds[i] == RemotePathKind.Directory || (kinds[i] == RemotePathKind.File && !overwrite))
+            {
+                continue;
+            }
+            // Unknown (the check could not run) is left to the transfer itself, which reports what goes wrong.
+            DoUploadFile(files[i], remoteDir, checkOverwrite: false);
+        }
+    }
+
+    private static string FormatFileList(IList<string> names)
+    {
+        const int MaxShown = 15;
+        string list = string.Join("\n", names.Take(MaxShown));
+        return (names.Count > MaxShown) ? list + $"\n... and {names.Count - MaxShown} more" : list;
+    }
+
+    /// <summary>
+    /// Opens the directory upload window for <paramref name="localDir"/>; the transfer starts when the user confirms it there.
+    /// </summary>
+    public void ShowDirectoryUploadForm(string localDir, string remoteDir)
+    {
+        DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm(Session, isUpload: true)
+        {
+            LocalDirectory = localDir,
+            RemoteDirectory = remoteDir
+        };
+        // The new folder shows up in the file panels once the upload window is closed.
+        directoryTransferForm.FormClosed += (object sender, System.Windows.Forms.FormClosedEventArgs e) =>
+        {
+            RefreshFileExplorers(RemotePathUtils.GetDirectoryName(remoteDir.TrimEnd('/')));
+            RefreshFileExplorers(remoteDir);
+        };
+        directoryTransferForm.Show();
     }
 
     public string TryExtractCurrentDir(ITabContext activeTab = null)
@@ -805,18 +1089,33 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    public void DoDownloadFile(string file, string localDir, bool openWhenDone)
+    public void DoDownloadFile(string file, string localDir, bool openWhenDone, bool confirmOverwrite = true)
     {
         LastDownloadDir = RemotePathUtils.GetDirectoryName(file);
-        string fileName = Path.GetFileName(file);
-        string text = Path.Combine(localDir, fileName);
-        if (!File.Exists(text) || MessageBoxes.AskWarn(text + " already exists. Overwrite it?"))
+        // The remote name may contain characters that Windows does not allow in file names (':', '?', '*', ...).
+        string fileName = RemotePathUtils.GetFileName(file);
+        foreach (char invalid in Path.GetInvalidFileNameChars())
         {
-            ScpTransferManager.TransferJob transferJob = TransferManager.EnqueueDownload(file, text, null, openWhenDone);
-            if (transferJob != null)
-            {
-                SCPController.AddTransfer(transferJob);
-            }
+            fileName = fileName.Replace(invalid, '_');
+        }
+        string text = Path.Combine(localDir, fileName);
+        if (Directory.Exists(text))
+        {
+            MessageBoxes.Error("Cannot download " + file + ": " + text + " is a directory.");
+            return;
+        }
+        if (confirmOverwrite && File.Exists(text) && !MessageBoxes.AskWarn(text + " already exists. Overwrite it?"))
+        {
+            return;
+        }
+        try
+        {
+            FileTransferManager.TransferJob transferJob = TransferManager.EnqueueDownload(file, text, null, openWhenDone);
+            SCPController.AddTransfer(transferJob);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot download a file: " + exception.Message);
         }
     }
 
@@ -853,8 +1152,18 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public void Dispose()
     {
-        Session?.Dispose();
+        // Saved before the queue is stopped, so that the transfers still waiting come back as waiting, not as failed.
+        SaveTransferQueue();
         TransferManager?.Dispose();
+        try
+        {
+            // Takes the feeds out of the opkg configuration of the device while the connection is still open.
+            LocalRepo.Stop(Session);
+        }
+        catch
+        {
+        }
+        Session?.Dispose();
         foreach (DeviceTabContext deviceTab in Tabs.OfType<DeviceTabContext>().ToList())
         {
             deviceTab.Dispose();

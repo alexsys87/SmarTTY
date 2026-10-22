@@ -47,7 +47,26 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private class Context : IDisposable
         {
-            public readonly TcpClient Client = new TcpClient();
+            // A dual-stack socket: the parameterless TcpClient of .NET Framework is IPv4 only and could never reach a
+            // host that is given by (or resolves only to) an IPv6 address.
+            public readonly TcpClient Client = CreateClient();
+
+            private static TcpClient CreateClient()
+            {
+                if (Socket.OSSupportsIPv6)
+                {
+                    try
+                    {
+                        TcpClient client = new TcpClient(AddressFamily.InterNetworkV6);
+                        client.Client.DualMode = true;
+                        return client;
+                    }
+                    catch (SocketException)
+                    {
+                    }
+                }
+                return new TcpClient();
+            }
 
             public State State;
 
@@ -304,7 +323,11 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             public void SetIcon(string icon)
             {
                 Connection.Icon = icon;
-                Connection.Save();
+                // A connection opened from the command line or a job has no settings file to update.
+                if (Connection.FileName != null)
+                {
+                    Connection.Save();
+                }
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Image"));
             }
         }
@@ -343,8 +366,14 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             public void SetIcon(string icon)
             {
                 Settings.Icon = icon;
-                Settings.Save();
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Image"));
+                // The store gives the settings a file name: a COM port that was never connected has none yet.
+                _Manager.SaveRawConnection(Settings);
+                OnPropertyChanged("Image");
+            }
+
+            protected void OnPropertyChanged(string propertyName)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
             }
         }
 
@@ -454,7 +483,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 set
                 {
                     _IsInactive = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsInactive"));
+                    OnPropertyChanged("IsInactive");
                 }
             }
 
@@ -462,7 +491,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public SubtypeImage TypeImage => SubtypeImage.Terminal;
 
-            public string Title => (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.Host + ":" + (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.Port.ToString();
+            public string Title => (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.ToString() ?? "";
 
             public virtual string Detail1 => "raw tcp";
 
@@ -473,8 +502,6 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             public int BaudRate { get; set; }
 
             public long LastUseTime => Settings.Settings.LastConnectionTime;
-
-            public new event PropertyChangedEventHandler PropertyChanged;
 
             public RawTcp(SavedConnectionStore mgr, RawConnectionSettings settings)
                 : base(mgr, settings)
@@ -728,7 +755,12 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 if (_CachedIcons == null)
                 {
                     List<BitmapImage> list = new List<BitmapImage>();
-                    string[] embeddedIcons = new string[] { "computer.png", "computer-laptop.png", "SerialPort.png" };
+                    string[] embeddedIcons = new string[]
+                    {
+                        "computer.png", "computer-laptop.png", "server.png", "vds.png", "cloud.png", "router.png",
+                        "switch.png", "access-point.png", "firewall.png", "nas.png", "database.png", "container.png",
+                        "terminal.png", "single-board.png", "chip.png", "SerialPort.png", "ip-camera.png", "phone.png"
+                    };
                     foreach (string iconName in embeddedIcons)
                     {
                         try
@@ -788,11 +820,18 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                         knownSettings.TryGetValue(new SerialPortKey(port), out var value);
                         if (value == null)
                         {
+                            // Profiles saved without the device description are keyed by the port number alone.
+                            knownSettings.TryGetValue(new SerialPortKey { Number = port.PortNumber }, out value);
+                        }
+                        if (value == null)
+                        {
                             RawConnectionSettings rawConnectionSettings = new RawConnectionSettings();
                             DeviceTerminalSettings deviceTerminalSettings = new DeviceTerminalSettings();
                             DeviceTerminalSettings.ConnectionSettings.Serial serial = new DeviceTerminalSettings.ConnectionSettings.Serial();
                             int portNumber = port.PortNumber;
                             serial.ComPortName = "COM" + portNumber;
+                            // Saved with the profile (an icon, for instance), it lets the next scan find the profile again.
+                            serial.DeviceDescription = port.Description;
                             deviceTerminalSettings.Connection = serial;
                             rawConnectionSettings.Settings = deviceTerminalSettings;
                             value = rawConnectionSettings;
@@ -1249,6 +1288,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
     private ToggleButton _ActiveIconPicker;
 
+    // Set while the icon list marks the current icon of the connection: that is not a choice of the user.
+    private bool _SelectingCurrentIcon;
+
     private SmarTTYTheme _Theme;
 
     public ConnectionSelectionWindow(bool showRawConnections, string defaultItemNameOrCmdLine)
@@ -1473,8 +1515,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         iconPopup.PlacementTarget = (UIElement)_ActiveIconPicker;
         iconPopup.VerticalOffset = ((FrameworkElement)_ActiveIconPicker).ActualHeight;
         iconPopup.IsOpen = true;
+        _SelectingCurrentIcon = true;
         try
         {
+            ((Selector)lstIcons).SelectedItem = null;
             Uri imageUri = (((FrameworkElement)_ActiveIconPicker).DataContext as IConnectionSettingsWrapper)?.Image;
             if (imageUri != null)
             {
@@ -1498,6 +1542,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         }
         catch
         {
+        }
+        finally
+        {
+            _SelectingCurrentIcon = false;
         }
     }
 
@@ -1533,6 +1581,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
     private void lstIcons_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_SelectingCurrentIcon)
+        {
+            return;
+        }
         ToggleButton activeIconPicker = _ActiveIconPicker;
         if (((activeIconPicker != null) ? ((FrameworkElement)activeIconPicker).DataContext : null) is IConnectionSettingsWrapper connectionSettingsWrapper)
         {

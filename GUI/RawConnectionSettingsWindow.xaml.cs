@@ -3,6 +3,7 @@ using System;
 using System.ComponentModel;
 using System.IO.Ports;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -160,9 +161,82 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public string TelnetEnvironmentVariables { get; set; }
 
-        public bool TelnetTls { get; set; }
+        private bool _TelnetTls;
+
+        public bool TelnetTls
+        {
+            get
+            {
+                return _TelnetTls;
+            }
+            set
+            {
+                _TelnetTls = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("TelnetTls"));
+                OnTelnetTlsChanged();
+            }
+        }
 
         public bool TelnetTlsAllowInvalidCertificate { get; set; }
+
+        public class TelnetStartTlsChoice
+        {
+            public DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode Value { get; set; }
+
+            public string Text { get; set; }
+        }
+
+        public System.Collections.Generic.IReadOnlyList<TelnetStartTlsChoice> TelnetStartTlsChoices { get; } = new TelnetStartTlsChoice[]
+        {
+            new TelnetStartTlsChoice { Value = DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Off, Text = "Off (refused)" },
+            new TelnetStartTlsChoice { Value = DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.WhenOffered, Text = "When the server offers it" },
+            new TelnetStartTlsChoice { Value = DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Required, Text = "Required (no clear-text session)" }
+        };
+
+        private DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode _TelnetStartTls;
+
+        public DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode TelnetStartTls
+        {
+            get
+            {
+                return _TelnetStartTls;
+            }
+            set
+            {
+                _TelnetStartTls = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("TelnetStartTls"));
+                OnTelnetTlsChanged();
+            }
+        }
+
+        // STARTTLS is the way to TLS on a plain connection; with telnets the session is encrypted from the start.
+        public bool TelnetStartTlsEnabled => !TelnetTls;
+
+        // The certificate options matter only when TLS is used one way or the other.
+        public bool TelnetTlsInUse => TelnetTls || TelnetStartTls != DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Off;
+
+        private void OnTelnetTlsChanged()
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("TelnetStartTlsEnabled"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("TelnetTlsInUse"));
+        }
+
+        private string _TelnetTlsClientCertificate;
+
+        public string TelnetTlsClientCertificate
+        {
+            get
+            {
+                return _TelnetTlsClientCertificate;
+            }
+            set
+            {
+                _TelnetTlsClientCertificate = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("TelnetTlsClientCertificate"));
+            }
+        }
+
+        public bool TelnetSendAutomaticValues { get; set; } = true;
 
         private int _TelnetKeepAliveSeconds;
 
@@ -246,21 +320,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 {
                     return SerialSettings;
                 }
-                string endpoint = TCPEndpoint ?? "";
-                int colonIdx = endpoint.IndexOf(':');
-                string host;
-                int port;
-                if (colonIdx == -1)
-                {
-                    host = endpoint;
-                    // A telnet server is expected on the telnet port unless another one is given.
-                    port = IsTelnet ? (TelnetTls ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTlsPort : DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort) : 0;
-                }
-                else
-                {
-                    host = endpoint.Substring(0, colonIdx);
-                    port = int.Parse(endpoint.Substring(colonIdx + 1));
-                }
+                SplitEndpoint(TCPEndpoint, out string host, out int? givenPort);
+                // A telnet server is expected on the telnet port unless another one is given; a port that is not a
+                // number is 0, which makes the connection invalid instead of throwing while the window closes.
+                int port = givenPort ?? (IsTelnet ? (TelnetTls ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTlsPort : DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort) : 0);
                 if (IsTelnet)
                 {
                     return new DeviceTerminalSettings.ConnectionSettings.Telnet
@@ -275,7 +338,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                         XDisplayLocation = string.IsNullOrWhiteSpace(TelnetXDisplayLocation) ? null : TelnetXDisplayLocation.Trim(),
                         EnvironmentVariables = string.IsNullOrWhiteSpace(TelnetEnvironmentVariables) ? null : TelnetEnvironmentVariables.Trim(),
                         Tls = TelnetTls,
-                        TlsAllowInvalidCertificate = TelnetTls && TelnetTlsAllowInvalidCertificate,
+                        StartTls = TelnetTls ? DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Off : TelnetStartTls,
+                        TlsAllowInvalidCertificate = TelnetTlsInUse && TelnetTlsAllowInvalidCertificate,
+                        TlsClientCertificate = TelnetTlsInUse && !string.IsNullOrWhiteSpace(TelnetTlsClientCertificate) ? TelnetTlsClientCertificate.Trim() : null,
+                        SendAutomaticValues = TelnetSendAutomaticValues,
                         KeepAliveSeconds = TelnetKeepAliveSeconds,
                         AutoLoginUserName = string.IsNullOrWhiteSpace(TelnetAutoLoginUserName) ? null : TelnetAutoLoginUserName.Trim(),
                         EncryptedSavedPassword = EncryptTelnetPassword(),
@@ -290,6 +356,85 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     KeepAliveSeconds = TcpKeepAliveSeconds
                 };
             }
+        }
+
+        /// <summary>
+        /// Reads "host", "host:port", "[ipv6]:port" or a bare IPv6 address (several colons, no port), with an optional
+        /// telnet:// or telnets:// in front (the latter switches TLS on for a telnet connection). The port is null when
+        /// none is given and 0 when it is not a valid number.
+        /// </summary>
+        private void SplitEndpoint(string endpoint, out string host, out int? port)
+        {
+            endpoint = (endpoint ?? "").Trim();
+            if (endpoint.StartsWith("telnets://", StringComparison.OrdinalIgnoreCase))
+            {
+                endpoint = endpoint.Substring("telnets://".Length).TrimEnd('/');
+                if (IsTelnet && !TelnetTls)
+                {
+                    TelnetTls = true;
+                }
+            }
+            else if (endpoint.StartsWith("telnet://", StringComparison.OrdinalIgnoreCase))
+            {
+                endpoint = endpoint.Substring("telnet://".Length).TrimEnd('/');
+            }
+            else if (endpoint.StartsWith("tcp://", StringComparison.OrdinalIgnoreCase))
+            {
+                endpoint = endpoint.Substring("tcp://".Length).TrimEnd('/');
+            }
+            else if (endpoint.StartsWith("raw://", StringComparison.OrdinalIgnoreCase))
+            {
+                endpoint = endpoint.Substring("raw://".Length).TrimEnd('/');
+            }
+            port = null;
+            if (endpoint.StartsWith("[", StringComparison.Ordinal) && endpoint.IndexOf(']') > 0)
+            {
+                int closing = endpoint.IndexOf(']');
+                host = endpoint.Substring(1, closing - 1);
+                string rest = endpoint.Substring(closing + 1);
+                if (rest.StartsWith(":", StringComparison.Ordinal))
+                {
+                    port = ParsePort(rest.Substring(1));
+                }
+                else if (rest.Length != 0)
+                {
+                    // "[::1]23" or "[::1]x": not a port, so the endpoint is rejected instead of the text being ignored.
+                    port = 0;
+                }
+                return;
+            }
+            int colon = endpoint.IndexOf(':');
+            if (colon != -1 && colon == endpoint.LastIndexOf(':'))
+            {
+                host = endpoint.Substring(0, colon);
+                port = ParsePort(endpoint.Substring(colon + 1));
+                return;
+            }
+            host = endpoint;
+        }
+
+        private static int ParsePort(string text)
+        {
+            return int.TryParse(text.Trim(), out int port) && port > 0 && port <= 65535 ? port : 0;
+        }
+
+        /// <summary>Null when the endpoint can be used, otherwise why not.</summary>
+        public string ValidateEndpoint()
+        {
+            if (!(Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp))
+            {
+                return null;
+            }
+            SplitEndpoint(TCPEndpoint, out string host, out int? port);
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                return "Enter the host name or IP address to connect to.";
+            }
+            if (port == 0 || (port == null && !IsTelnet))
+            {
+                return "Enter a port number from 1 to 65535 after the host name (host:port).";
+            }
+            return null;
         }
 
         public string TCPSettingsHeader => IsTelnet
@@ -406,7 +551,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     TelnetXDisplayLocation = telnet.XDisplayLocation;
                     TelnetEnvironmentVariables = telnet.EnvironmentVariables;
                     TelnetTls = telnet.Tls;
+                    TelnetStartTls = telnet.StartTls;
                     TelnetTlsAllowInvalidCertificate = telnet.TlsAllowInvalidCertificate;
+                    TelnetTlsClientCertificate = telnet.TlsClientCertificate;
+                    TelnetSendAutomaticValues = telnet.SendAutomaticValues;
                     TelnetKeepAliveSeconds = telnet.KeepAliveSeconds;
                     TelnetAutoLoginUserName = telnet.AutoLoginUserName;
                     TelnetLoginPrompts = telnet.LoginPrompts;
@@ -433,7 +581,8 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 TCPSettingsVisibility = Visibility.Visible;
                 if (!string.IsNullOrEmpty(tcp.Host))
                 {
-                    TCPEndpoint = tcp.Host + ":" + tcp.Port;
+                    // An IPv6 address goes in brackets, so it is not cut at one of its colons when read back.
+                    TCPEndpoint = (tcp.Host.Contains(":") ? "[" + tcp.Host + "]" : tcp.Host) + ":" + tcp.Port;
                 }
             }
         }
@@ -473,10 +622,15 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             return SerialPortRules.ValidateFrame(advancedSerialPortSettings.DataBits, SerialPortRules.StopBitsKindFrom((int)advancedSerialPortSettings.StopBits));
         }
 
-        public string TestConnectionOrThrow()
+        /// <summary>
+        /// Takes the settings as they are now (on the UI thread) and tests them on a worker thread, so the window keeps
+        /// painting while a host that does not answer is waited for.
+        /// </summary>
+        public Task<string> TestConnectionAsync()
         {
             ApplyTCPEndpoint();
-            return DeviceTerminalControl.TestConnection(EffectiveConnectionSettings);
+            DeviceTerminalSettings.ConnectionSettings connection = EffectiveConnectionSettings;
+            return Task.Run(() => DeviceTerminalControl.TestConnection(connection));
         }
 
         public void EditColor(Border border)
@@ -563,10 +717,43 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         }
     }
 
+    private bool _Closed;
+
+    private bool _Testing;
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        // The result of a test that is still running would have nowhere to go.
+        if (_Testing)
+        {
+            e.Cancel = true;
+        }
+        base.OnClosing(e);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
+        _Closed = true;
         base.OnClosed(e);
         _Controller.ApplyTCPEndpoint();
+    }
+
+    /// <summary>Runs the connection test with the window locked and a wait cursor; rethrows the failure.</summary>
+    private async Task<string> RunConnectionTestAsync()
+    {
+        _Testing = true;
+        IsEnabled = false;
+        Cursor = System.Windows.Input.Cursors.Wait;
+        try
+        {
+            return await _Controller.TestConnectionAsync();
+        }
+        finally
+        {
+            _Testing = false;
+            IsEnabled = true;
+            Cursor = null;
+        }
     }
 
     private void ListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -574,11 +761,22 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         _Controller.UpdateMaximumSpeed();
     }
 
-    private void Test_Click(object sender, RoutedEventArgs e)
+    private async void Test_Click(object sender, RoutedEventArgs e)
     {
+        if (_Testing)
+        {
+            return;
+        }
+        string endpointProblem = _Controller.ValidateEndpoint();
+        if (endpointProblem != null)
+        {
+            MessageBoxes.Error(endpointProblem);
+            txtHost.Focus();
+            return;
+        }
         try
         {
-            string text = _Controller.TestConnectionOrThrow();
+            string text = await RunConnectionTestAsync();
             MessageBoxes.Info("Connection test to " + text + " succeeded. Your settings appear to be valid.");
         }
         catch (Exception exception)
@@ -606,8 +804,75 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         _Controller.UpdateMaximumSpeed();
     }
 
-    private void OK_Click(object sender, RoutedEventArgs e)
+    private void SelectClientCertificate_Click(object sender, RoutedEventArgs e)
     {
+        try
+        {
+            System.Security.Cryptography.X509Certificates.X509Store store = new System.Security.Cryptography.X509Certificates.X509Store(
+                System.Security.Cryptography.X509Certificates.StoreName.My, System.Security.Cryptography.X509Certificates.StoreLocation.CurrentUser);
+            try
+            {
+                store.Open(System.Security.Cryptography.X509Certificates.OpenFlags.ReadOnly);
+                System.Security.Cryptography.X509Certificates.X509Certificate2Collection usable = new System.Security.Cryptography.X509Certificates.X509Certificate2Collection();
+                foreach (System.Security.Cryptography.X509Certificates.X509Certificate2 certificate in store.Certificates)
+                {
+                    // Only a certificate with its private key can prove anything to the server.
+                    if (certificate.HasPrivateKey)
+                    {
+                        usable.Add(certificate);
+                    }
+                }
+                if (usable.Count == 0)
+                {
+                    MessageBoxes.Info("Your personal certificate store has no certificate with a private key. Import one first (open the .pfx / .p12 file with a double click).");
+                    return;
+                }
+                System.Security.Cryptography.X509Certificates.X509Certificate2Collection chosen = System.Security.Cryptography.X509Certificates.X509Certificate2UI.SelectFromCollection(
+                    usable, "Client certificate", "Choose the certificate presented to the telnet server.",
+                    System.Security.Cryptography.X509Certificates.X509SelectionFlag.SingleSelection, new System.Windows.Interop.WindowInteropHelper(this).Handle);
+                if (chosen.Count > 0)
+                {
+                    _Controller.TelnetTlsClientCertificate = chosen[0].Thumbprint;
+                }
+            }
+            finally
+            {
+                store.Close();
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void BrowseClientCertificate_Click(object sender, RoutedEventArgs e)
+    {
+        Microsoft.Win32.OpenFileDialog dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Client certificate (a file without a password)",
+            Filter = "Certificates with a private key (*.pfx;*.p12)|*.pfx;*.p12|All files (*.*)|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            _Controller.TelnetTlsClientCertificate = dialog.FileName;
+        }
+    }
+
+    private async void OK_Click(object sender, RoutedEventArgs e)
+    {
+        if (_Testing)
+        {
+            return;
+        }
+        string endpointProblem = _Controller.ValidateEndpoint();
+        if (endpointProblem != null)
+        {
+            MessageBoxes.Error(endpointProblem);
+            txtHost.Focus();
+            return;
+        }
         string serialProblem = _Controller.ValidateSerialSettings(cbBaudRate.Text);
         if (serialProblem != null)
         {
@@ -619,15 +884,18 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         {
             try
             {
-                _Controller.TestConnectionOrThrow();
-                this.DialogResult = true;
-                return;
+                await RunConnectionTestAsync();
             }
             catch (Exception exception)
             {
                 MessageBoxes.Exception(exception);
                 return;
             }
+            if (!_Closed)
+            {
+                this.DialogResult = true;
+            }
+            return;
         }
         this.DialogResult = true;
     }

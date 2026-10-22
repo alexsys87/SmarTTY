@@ -1,0 +1,57 @@
+using SmarTTY.Utilities;
+using System;
+using System.Collections.Generic;
+using System.IO;
+
+namespace SmarTTY.LocalRepo;
+
+/// <summary>
+/// The folders served by Tools > Local OpenWrt repository server and the TCP port. They are kept per computer in
+/// %LOCALAPPDATA%\SmarTTY\LocalRepo.xml (next to GUIPreferences.xml), because they point into the local build tree.
+/// </summary>
+public class LocalRepoSettings
+{
+    public const int DefaultPort = 8765;
+
+    public List<string> Folders = new List<string>();
+
+    public int Port = DefaultPort;
+
+    private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SmarTTY\\LocalRepo.xml");
+
+    public static LocalRepoSettings Load()
+    {
+        try
+        {
+            if (File.Exists(FilePath))
+            {
+                LocalRepoSettings settings = XmlStorage.LoadFromFile<LocalRepoSettings>(FilePath, new Type[0]);
+                if (settings.Folders == null)
+                {
+                    settings.Folders = new List<string>();
+                }
+                if (settings.Port < 1 || settings.Port > 65535)
+                {
+                    settings.Port = DefaultPort;
+                }
+                return settings;
+            }
+        }
+        catch
+        {
+        }
+        return new LocalRepoSettings();
+    }
+
+    public void Save()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
+            XmlStorage.SaveToFile(this, FilePath);
+        }
+        catch
+        {
+        }
+    }
+}

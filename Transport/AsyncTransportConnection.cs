@@ -56,6 +56,34 @@ internal class AsyncTransportConnection : IDisposable
 
     private volatile bool _writerIdle;
 
+    // Received data that waits for the UI thread. The reader appends to it and posts one delivery at a time, so a fast
+    // link (a raw TCP stream can bring megabytes per second) costs one dispatcher operation per UI turn instead of one
+    // per read, and keyboard and mouse input are still handled in between.
+    private readonly object _receiveLock = new object();
+
+    private byte[] _received = new byte[ReadBufferSize];
+
+    private int _receivedCount;
+
+    private bool _deliveryPosted;
+
+    // Runs on the UI thread once everything received has been delivered (the end of the connection is told last).
+    private ThreadStart _afterDelivery;
+
+    // Bytes per read of a network connection: large enough for a fast link to be drained in few reads.
+    private const int ReadBufferSize = 64 * 1024;
+
+    // Bytes per read of a serial port. Its read returns only when the buffer is full or the line pauses, so a large
+    // buffer would hold back a continuous stream: 4 KB is about 45 ms at 921600 bps.
+    private const int SerialReadBufferSize = 4096;
+
+    // When the UI is this far behind, the reader stops reading: the far end is then slowed down by the flow control of
+    // the link (TCP window, RTS/CTS) instead of the backlog growing without bound and the window freezing.
+    internal const int MaxPendingReceiveBytes = 4 * 1024 * 1024;
+
+    // The most one UI update gets, so drawing a backlog never holds the window for long; the rest follows at once.
+    internal const int MaxDeliveryBytes = 256 * 1024;
+
     public bool IsWriterIdle => _writerIdle;
 
     private volatile string _writeError;
@@ -108,7 +136,7 @@ internal class AsyncTransportConnection : IDisposable
                     StateChanged(this, _state, _transport.ConnectingMessage);
                 }
             });
-            DateTime now = DateTime.Now;
+            System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
             while (true)
             {
                 try
@@ -117,7 +145,7 @@ internal class AsyncTransportConnection : IDisposable
                 }
                 catch
                 {
-                    if ((DateTime.Now - now).TotalMilliseconds >= (double)_connectTimeoutMs || _disposed)
+                    if (elapsed.ElapsedMilliseconds >= _connectTimeoutMs || _stopRequested || _disposed)
                     {
                         throw;
                     }
@@ -160,8 +188,7 @@ internal class AsyncTransportConnection : IDisposable
         try
         {
             Stream stream = _transport.GetStream();
-            // Large enough for a fast port (921600 bps is about 90 KB/s) to be drained in few reads and UI updates.
-            byte[] rawBuffer = new byte[4096];
+            byte[] rawBuffer = new byte[_transport is SerialTransport ? SerialReadBufferSize : ReadBufferSize];
             while (!_stopRequested)
             {
                 int count = stream.Read(rawBuffer, 0, rawBuffer.Length);
@@ -169,15 +196,7 @@ internal class AsyncTransportConnection : IDisposable
                 {
                     break;
                 }
-                byte[] buffer = new byte[count];
-                Buffer.BlockCopy(rawBuffer, 0, buffer, 0, count);
-                PostToUi(() =>
-                {
-                    if (DataReceived != null && !_disposed)
-                    {
-                        DataReceived(this, buffer, count);
-                    }
-                });
+                QueueReceived(rawBuffer, count);
             }
         }
         catch (Exception readException)
@@ -200,7 +219,8 @@ internal class AsyncTransportConnection : IDisposable
         {
         }
         _state = ConnectionStateEnum.Disconnected;
-        PostToUi(() =>
+        // After the last received data: the UI must not see the end before the data that came before it.
+        PostAfterReceived(() =>
         {
             if (StateChanged != null && !_disposed)
             {
@@ -209,64 +229,169 @@ internal class AsyncTransportConnection : IDisposable
         });
     }
 
+    /// <summary>Posts <paramref name="callback"/> to the UI thread behind all received data that is still on its way.</summary>
+    private void PostAfterReceived(ThreadStart callback)
+    {
+        lock (_receiveLock)
+        {
+            if (_deliveryPosted)
+            {
+                _afterDelivery += callback;
+                return;
+            }
+        }
+        PostToUi(callback);
+    }
+
+    /// <summary>Adds received bytes to what waits for the UI thread and makes sure one delivery is on its way.</summary>
+    private void QueueReceived(byte[] data, int count)
+    {
+        bool post;
+        lock (_receiveLock)
+        {
+            while (_deliveryPosted && _receivedCount >= MaxPendingReceiveBytes && !_stopRequested && !_disposed)
+            {
+                // Woken by the delivery; the timeout only guards against a dispatcher that has shut down.
+                Monitor.Wait(_receiveLock, 100);
+            }
+            if (_receivedCount + count > _received.Length)
+            {
+                byte[] larger = new byte[Math.Max(_received.Length * 2, _receivedCount + count)];
+                Buffer.BlockCopy(_received, 0, larger, 0, _receivedCount);
+                _received = larger;
+            }
+            Buffer.BlockCopy(data, 0, _received, _receivedCount, count);
+            _receivedCount += count;
+            post = !_deliveryPosted;
+            _deliveryPosted = true;
+        }
+        if (post)
+        {
+            PostToUi(DeliverReceived);
+        }
+    }
+
+    /// <summary>
+    /// Runs on the UI thread: hands what was received so far to <see cref="DataReceived"/>, at most
+    /// <see cref="MaxDeliveryBytes"/> at a time; a larger backlog is delivered by the next posted call.
+    /// </summary>
+    private void DeliverReceived()
+    {
+        byte[] buffer;
+        int count;
+        bool more;
+        ThreadStart after = null;
+        lock (_receiveLock)
+        {
+            count = Math.Min(_receivedCount, MaxDeliveryBytes);
+            buffer = new byte[count];
+            Buffer.BlockCopy(_received, 0, buffer, 0, count);
+            _receivedCount -= count;
+            more = _receivedCount > 0;
+            if (more)
+            {
+                Buffer.BlockCopy(_received, count, _received, 0, _receivedCount);
+            }
+            else if (_received.Length > ReadBufferSize * 4)
+            {
+                // A burst is over: do not keep its large buffer for the rest of the session.
+                _received = new byte[ReadBufferSize];
+            }
+            if (!more)
+            {
+                after = _afterDelivery;
+                _afterDelivery = null;
+            }
+            // The next delivery is posted below (the flag stays set) or by the reader when new data comes.
+            _deliveryPosted = more;
+            Monitor.PulseAll(_receiveLock);
+        }
+        try
+        {
+            if (count > 0 && DataReceived != null && !_disposed)
+            {
+                DataReceived(this, buffer, count);
+            }
+        }
+        finally
+        {
+            if (more)
+            {
+                PostToUi(DeliverReceived);
+            }
+            else
+            {
+                after?.Invoke();
+            }
+        }
+    }
+
     private void WriterLoop()
     {
         while (!_stopRequested && !_finished)
         {
-            while (true)
+            bool queueEmpty;
+            lock (_writeQueue)
             {
-                _writerIdle = true;
-                PostToUi(() =>
-                {
-                    if (WriterIdleChanged != null && !_disposed)
-                    {
-                        WriterIdleChanged(this, EventArgs.Empty);
-                    }
-                });
-                _writeSignal.WaitOne();
-                if (_stopRequested || _finished)
-                {
-                    break;
-                }
-                _writerIdle = false;
-                PostToUi(() =>
-                {
-                    if (WriterIdleChanged != null && !_disposed)
-                    {
-                        WriterIdleChanged(this, EventArgs.Empty);
-                    }
-                });
-                PendingWrite pendingWrite = null;
-                lock (_writeQueue)
-                {
-                    if (_writeQueue.Count > 0)
-                    {
-                        pendingWrite = _writeQueue.Dequeue();
-                    }
-                }
-                if (pendingWrite == null)
-                {
-                    continue; // its data was thrown away after a failed write
-                }
-                try
-                {
-                    Stream stream = _transport.GetStream();
-                    if (stream == null)
-                    {
-                        throw new IOException("The connection is closed.");
-                    }
-                    stream.Write(pendingWrite.Buffer, 0, pendingWrite.Length);
-                    _writeError = null;
-                }
-                catch (Exception writeException)
-                {
-                    NotifyCompleted(pendingWrite, false);
-                    ReportWriteFailure(writeException);
-                    continue;
-                }
-                NotifyCompleted(pendingWrite, true);
+                queueEmpty = _writeQueue.Count == 0;
             }
+            if (queueEmpty)
+            {
+                SetWriterIdle(true);
+            }
+            _writeSignal.WaitOne();
+            if (_stopRequested || _finished)
+            {
+                break;
+            }
+            PendingWrite pendingWrite = null;
+            lock (_writeQueue)
+            {
+                if (_writeQueue.Count > 0)
+                {
+                    pendingWrite = _writeQueue.Dequeue();
+                }
+            }
+            if (pendingWrite == null)
+            {
+                continue; // its data was thrown away after a failed write
+            }
+            SetWriterIdle(false);
+            try
+            {
+                Stream stream = _transport.GetStream();
+                if (stream == null)
+                {
+                    throw new IOException("The connection is closed.");
+                }
+                stream.Write(pendingWrite.Buffer, 0, pendingWrite.Length);
+                _writeError = null;
+            }
+            catch (Exception writeException)
+            {
+                NotifyCompleted(pendingWrite, false);
+                ReportWriteFailure(writeException);
+                continue;
+            }
+            NotifyCompleted(pendingWrite, true);
         }
+    }
+
+    /// <summary>Tells the UI when the writer starts or stops being idle; nothing is posted while the state stays the same.</summary>
+    private void SetWriterIdle(bool idle)
+    {
+        if (_writerIdle == idle)
+        {
+            return;
+        }
+        _writerIdle = idle;
+        PostToUi(() =>
+        {
+            if (WriterIdleChanged != null && !_disposed)
+            {
+                WriterIdleChanged(this, EventArgs.Empty);
+            }
+        });
     }
 
     /// <summary>
@@ -343,6 +468,11 @@ internal class AsyncTransportConnection : IDisposable
     {
         _stopRequested = true;
         _writeSignal.Release();
+        lock (_receiveLock)
+        {
+            // A reader that waits for the UI to catch up must not keep waiting.
+            Monitor.PulseAll(_receiveLock);
+        }
         FailQueuedWrites();
         try
         {

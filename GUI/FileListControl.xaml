@@ -31,7 +31,7 @@
           </Style.Triggers>
         </Style>
       </FrameworkElement.Style>
-      <ListView Name="TransferList" ItemsSource="{Binding FilteredItems}" SelectionMode="Extended" KeyDown="ListView_KeyDown" MouseDoubleClick="TransferList_MouseDoubleClick" SelectionChanged="TransferList_SelectionChanged">
+      <ListView Name="TransferList" ItemsSource="{Binding FilteredItems}" SelectionMode="Extended" AllowDrop="True" DragEnter="TransferList_DragOver" DragOver="TransferList_DragOver" Drop="TransferList_Drop" KeyDown="ListView_KeyDown" MouseDoubleClick="TransferList_MouseDoubleClick" SelectionChanged="TransferList_SelectionChanged">
         <FrameworkElement.ContextMenu>
           <ContextMenu Name="xferMenu" Opened="XferMenu_Opened">
             <MenuItem Name="cmdEdit" Header="Edit..." Click="OpenFile_Click" />

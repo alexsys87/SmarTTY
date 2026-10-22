@@ -84,7 +84,50 @@ internal static class DropbearTests
         Test.Equal(iterations.ToString(), session.RunCommandChecked("wc -c < smartty-dropbear-race", requireSuccess: true)?.Find((string line) => line.Trim() != "")?.Trim(), "every helper command ran");
         session.RunCommand("rm -f smartty-dropbear-race", out _);
         FileOperations(session);
+        FileTransfersWithoutSftp(session);
         ByteOrientedLineEditing(session);
+    }
+
+    // OpenWrt's Dropbear has SFTP only if openssh-sftp-server is installed (it runs /usr/lib/sftp-server): with SFTP
+    // selected, transfers use it when it is there and SCP otherwise. The fallback itself is checked against OpenSSH.
+    private static void FileTransfersWithoutSftp(SshSession session)
+    {
+        Test.Section("Dropbear: file transfers with SFTP selected");
+        bool hasSftp;
+        try
+        {
+            SftpChannel.Open(session).Dispose();
+            hasSftp = true;
+        }
+        catch (RemoteOperationException exception)
+        {
+            hasSftp = false;
+            Test.Check(exception.Message.Contains("SFTP"), "without sftp-server, opening SFTP fails with a readable error (" + exception.Message + ")");
+        }
+        Console.WriteLine("     Dropbear " + (hasSftp ? "has" : "has no") + " SFTP here.");
+        string home = session.RunCommandChecked("pwd", requireSuccess: true)?.Find((string line) => line.StartsWith("/"));
+        string remote = RemoteFileOperations.Join(home, "smartty transfer.txt");
+        string local = Path.Combine(Path.GetTempPath(), "smartty-dropbear-" + Guid.NewGuid().ToString("N") + ".txt");
+        File.WriteAllText(local, "uploaded to dropbear\n");
+        try
+        {
+            using SmarTTY.Transport.FileTransferManager manager = new SmarTTY.Transport.FileTransferManager { Session = session, Protocol = SmarTTY.Transport.FileTransferProtocol.Sftp };
+            SmarTTY.Transport.FileTransferManager.TransferJob upload = manager.EnqueueUpload(local, remote, checkOverwrite: false);
+            Test.WaitUntil(() => upload.State == SmarTTY.Transport.FileTransferManager.TransferState.Completed || upload.State == SmarTTY.Transport.FileTransferManager.TransferState.Failed, TimeSpan.FromSeconds(30), "the upload finishes");
+            Test.Equal(SmarTTY.Transport.FileTransferManager.TransferState.Completed, upload.State, "the upload completes (" + upload.ErrorMessage + ")");
+            Test.Equal(hasSftp ? "SFTP" : "SCP", upload.Protocol, "it used SFTP if available, SCP otherwise");
+            Test.Equal(hasSftp ? "SFTP" : "SCP (no SFTP on the server)", manager.EffectiveProtocolName, "the queue shows the protocol in use");
+            Test.Check(upload.Checksum != null && upload.Checksum.EndsWith("verified"), "the upload is verified with the BusyBox tools (" + upload.Checksum + ")");
+            File.Delete(local);
+            SmarTTY.Transport.FileTransferManager.TransferJob download = manager.EnqueueDownload(remote, local);
+            Test.WaitUntil(() => download.State == SmarTTY.Transport.FileTransferManager.TransferState.Completed || download.State == SmarTTY.Transport.FileTransferManager.TransferState.Failed, TimeSpan.FromSeconds(30), "the download finishes");
+            Test.Equal("uploaded to dropbear\n", File.Exists(local) ? File.ReadAllText(local) : null, "the file comes back unchanged (" + download.ErrorMessage + ")");
+        }
+        finally
+        {
+            File.Delete(local);
+            session.RunCommand("rm -f " + RemotePathUtils.ShellQuote(remote), out _);
+        }
     }
 
     // BusyBox ash without Unicode support edits its command line in UTF-8 bytes (OpenWrt): one Backspace removes one

@@ -91,16 +91,22 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
             [XmlIgnore]
             public override string FileNameBase => Host + "_" + Port;
 
+            /// <summary>"host:port", with an IPv6 address in brackets so the port can be told from it.</summary>
+            public static string FormatEndpoint(string host, int port)
+            {
+                return (host != null && host.Contains(":") && !host.StartsWith("[", StringComparison.Ordinal) ? "[" + host + "]" : host) + ":" + port;
+            }
+
             public override string ToString()
             {
-                return Host + ":" + Port;
+                return FormatEndpoint(Host, Port);
             }
 
             public override bool IsValid()
             {
-                if (!string.IsNullOrEmpty(Host))
+                if (!string.IsNullOrWhiteSpace(Host))
                 {
-                    return Port > 0;
+                    return Port > 0 && Port <= 65535;
                 }
                 return false;
             }
@@ -184,9 +190,114 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
             /// <summary>
             /// Accept any certificate of the server (self-signed, expired, for another name). The connection is still
-            /// encrypted but not protected against someone who sits in the middle. Only meaningful with <see cref="Tls"/>.
+            /// encrypted but not protected against someone who sits in the middle. Only meaningful with TLS
+            /// (<see cref="Tls"/> or <see cref="StartTls"/>).
             /// </summary>
             public bool TlsAllowInvalidCertificate { get; set; }
+
+            /// <summary>TLS negotiated inside a plain telnet session (Telnet option START_TLS, 46).</summary>
+            public enum StartTlsMode
+            {
+                /// <summary>The option is refused (and with <see cref="Tls"/> it is not needed).</summary>
+                Off,
+
+                /// <summary>Agreed to when the server asks for it; a server that does not ask is used without TLS.</summary>
+                WhenOffered,
+
+                /// <summary>
+                /// Offered at once, and nothing typed is sent before the handshake; the connection ends when the server
+                /// refuses or sends text first, so a password never travels in clear text.
+                /// </summary>
+                Required
+            }
+
+            /// <summary>STARTTLS on a plain connection; ignored with <see cref="Tls"/>, which is TLS from the first byte.</summary>
+            public StartTlsMode StartTls { get; set; }
+
+            /// <summary>
+            /// The certificate presented when the TLS server asks for one: the thumbprint of a certificate in the personal
+            /// store of Windows (with its private key), or the path of a .pfx / .p12 file without a password. Empty: none.
+            /// </summary>
+            public string TlsClientCertificate { get; set; }
+
+            /// <summary>
+            /// Hand the server sensible values that were not configured: the terminal speed
+            /// <see cref="DefaultTerminalSpeed"/>, the X display of this computer (its DISPLAY variable, when set) and
+            /// the user name of the automatic login as USER. NEW-ENVIRON is then also agreed to when there is nothing to
+            /// send (the server learns that the variables it asks for are not defined). Off: only what is configured is
+            /// handed over, and an option with nothing configured is refused.
+            /// </summary>
+            public bool SendAutomaticValues { get; set; } = true;
+
+            /// <summary>True when the session is encrypted or may become encrypted.</summary>
+            [XmlIgnore]
+            public bool UsesTls => Tls || StartTls != StartTlsMode.Off;
+
+            /// <summary>What is reported for TSPEED: the configured speed, else the default one with automatic values.</summary>
+            public string EffectiveTerminalSpeed()
+            {
+                if (!string.IsNullOrWhiteSpace(TerminalSpeed))
+                {
+                    return TerminalSpeed.Trim();
+                }
+                return SendAutomaticValues ? DefaultTerminalSpeed : null;
+            }
+
+            /// <summary>
+            /// What is reported for XDISPLOC: the configured location, else (with automatic values) the X display of this
+            /// computer, <paramref name="localDisplay"/> (its DISPLAY variable), when that names a host. A display
+            /// without a host (":0") is of no use to a program on the server.
+            /// </summary>
+            public string EffectiveXDisplayLocation(string localDisplay)
+            {
+                if (!string.IsNullOrWhiteSpace(XDisplayLocation))
+                {
+                    return XDisplayLocation.Trim();
+                }
+                if (!SendAutomaticValues || string.IsNullOrWhiteSpace(localDisplay))
+                {
+                    return null;
+                }
+                localDisplay = localDisplay.Trim();
+                int colon = localDisplay.LastIndexOf(':');
+                return colon > 0 ? localDisplay : null;
+            }
+
+            /// <summary>
+            /// The NEW-ENVIRON variables (one NAME=value per line): with automatic values the user name of the automatic
+            /// login comes first as USER, so a USER line of the user replaces it. A name that could be taken for an option
+            /// of the server's login program (it starts with '-') or that contains blanks is never sent automatically.
+            /// </summary>
+            public string EffectiveEnvironmentVariables()
+            {
+                string configured = EnvironmentVariables ?? "";
+                if (!SendAutomaticValues || !IsSafeUserName(AutoLoginUserName))
+                {
+                    return configured;
+                }
+                return "USER=" + AutoLoginUserName.Trim() + "\n" + configured;
+            }
+
+            private static bool IsSafeUserName(string name)
+            {
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    return false;
+                }
+                name = name.Trim();
+                if (name.Length > 64 || name[0] == '-')
+                {
+                    return false;
+                }
+                foreach (char c in name)
+                {
+                    if (c <= 0x20 || c == 0x7F || c == '=')
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
 
             // --- automatic login: typed when the server asks, see TelnetAutoLogin ---
 

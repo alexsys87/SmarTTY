@@ -195,6 +195,11 @@
             <Image Source="../icons/MainWindow/archive16.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="Local OpenWrt _repository server..." Click="LocalRepo_Click" ToolTip="Serve OpenWrt packages built on this computer to the device and install them with the package manager" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/archive16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="_Public key authentication" Click="PublicKey_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/pubkey.png" />
@@ -461,15 +466,27 @@
             <Button ToolTip="Remove completed" Style="{DynamicResource DynamicButton}" Click="RemoveCompleted_Click">
               <Image Width="16" Height="16" Source="../icons/transfers/removecomp.png" />
             </Button>
+            <Button ToolTip="Remove all (cancels the transfers that are not finished)" Style="{DynamicResource DynamicButton}" Click="RemoveAll_Click">
+              <Image Width="16" Height="16" Source="../icons/transfers/removeall.png" />
+            </Button>
+            <Button ToolTip="Retry all (also transfers the completed ones again)" Style="{DynamicResource DynamicButton}" Click="RetryAll_Click">
+              <Image Width="16" Height="16" Source="../icons/transfers/retryall.png" />
+            </Button>
           </ToolBar>
           <ListView Name="TransferList" Grid.Row="1" ItemsSource="{Binding ActiveTransfers}" KeyDown="ListView_KeyDown" SelectionChanged="TransferList_SelectionChanged">
             <FrameworkElement.ContextMenu>
               <ContextMenu Name="xferMenu" Visibility="Collapsed">
-                <MenuItem Name="cmdCancel" Header="_Cancel download(s)" Click="SelectedXfers_Cancel" />
-                <MenuItem Name="cmdRetry" Header="_Retry download(s)" Click="SelectedXfers_Retry" />
+                <MenuItem Name="cmdCancel" Header="_Cancel transfer(s)" Click="SelectedXfers_Cancel" />
+                <MenuItem Name="cmdRetry" Header="_Retry transfer(s)" Click="SelectedXfers_Retry" />
+                <MenuItem Name="cmdRetryAgain" Header="Retry _again (also if completed)" Click="SelectedXfers_RetryAgain" />
+                <MenuItem Header="Retry all _failed" Click="RetryFailed_Click" />
+                <Separator />
                 <MenuItem Header="Open local file" Click="SelectedXfers_OpenLocal" />
                 <MenuItem Header="Open containing folder" Click="SelectedXfers_OpenFolder" />
                 <MenuItem Header="Copy local file path" Click="SelectedXfers_CopyLocalPath" />
+                <MenuItem Header="Copy remote _path" Click="SelectedXfers_CopyRemotePath" />
+                <Separator Name="sepDeleteUploaded" />
+                <MenuItem Name="cmdDeleteUploaded" Header="_Delete uploaded file(s) from the server..." Click="SelectedXfers_DeleteUploaded" />
               </ContextMenu>
             </FrameworkElement.ContextMenu>
             <ListView.View>
@@ -478,7 +495,7 @@
                   <GridViewColumn Header="Local file">
                     <GridViewColumn.CellTemplate>
                       <DataTemplate>
-                        <Grid>
+                        <Grid ToolTip="{Binding ToolTip}">
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -525,6 +542,13 @@
                   <GridViewColumn Header="Remote file" DisplayMemberBinding="{Binding RemoteFile}" />
                   <GridViewColumn Header="Size" DisplayMemberBinding="{Binding Size}" />
                   <GridViewColumn Header="Transfer rate" DisplayMemberBinding="{Binding TransferRate}" />
+                  <GridViewColumn Header="Status" Width="180">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding StatusText}" ToolTip="{Binding ToolTip}" TextTrimming="CharacterEllipsis" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
                   <GridViewColumn Header="Progress" Width="100" x:Name="WidthColumn">
                     <GridViewColumn.CellTemplate>
                       <DataTemplate>

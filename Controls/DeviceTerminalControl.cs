@@ -43,7 +43,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private bool _updatingEncodingSelection;
 
-    // Active XMODEM byte buffer for interception during file transfers.
+    // Active XMODEM/YMODEM/ZMODEM/Kermit byte buffer for interception during file transfers.
     private readonly System.Collections.Concurrent.BlockingCollection<byte> _xmodemRxQueue = new System.Collections.Concurrent.BlockingCollection<byte>();
     // Set on the UI thread before a transfer starts and cleared when it ends; while set, everything received belongs to the
     // protocol and typing, pasting and sending from the toolbar are refused so nothing else gets into the data stream.
@@ -139,7 +139,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         return connection switch
         {
             DeviceTerminalSettings.ConnectionSettings.Serial serial => serial.ComPortName,
-            DeviceTerminalSettings.ConnectionSettings.Tcp tcp => tcp.Host + ":" + tcp.Port,
+            DeviceTerminalSettings.ConnectionSettings.Tcp tcp => tcp.ToString(),
             _ => "Raw Terminal",
         };
     }
@@ -252,6 +252,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
         InitializeSerialLineControls();
+        InitializeZModemMenu();
+        InitializeYModemMenu();
+        InitializeKermitMenu();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
         ThemeManager.ThemeChanged += OnThemeChanged;
         ApplyToolbarTheme();
@@ -849,6 +852,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _telnetTransport = null;
         if (deviceTransport is TelnetTransport telnetTransport && _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet telnetSettings)
         {
+            // The server may propose a character set (option CHARSET): the terminal's own one is accepted.
+            telnetTransport.Charset = _textEncoding?.WebName;
             AttachTelnet(telnetTransport, telnetSettings);
         }
         _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, connectTimeoutMs);
@@ -1063,12 +1068,28 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
     }
 
+    // A test of a network connection gives up after this long instead of the operating system's connect timeout.
+    private const int TestConnectTimeoutMs = 10000;
+
+    /// <summary>
+    /// Opens the connection once and closes it again; throws with the reason when it cannot be made. It blocks, so the
+    /// caller runs it on a worker thread.
+    /// </summary>
     public static string TestConnection(DeviceTerminalSettings.ConnectionSettings connectionSettings)
     {
         using IDeviceTransport deviceTransport = new CallbackTransportFactory(CreateTransportCallback(connectionSettings) ?? throw new Exception("Connection type not specified")).CreateTransport();
         if (deviceTransport == null)
         {
             throw new Exception("Unspecified error");
+        }
+        switch (deviceTransport)
+        {
+            case TcpTransport tcpTransport:
+                tcpTransport.ConnectTimeoutMs = TestConnectTimeoutMs;
+                break;
+            case TelnetTransport telnetTransport:
+                telnetTransport.ConnectTimeoutMs = TestConnectTimeoutMs;
+                break;
         }
         deviceTransport.Open(null);
         return deviceTransport.GetDisplayName(includeParameters: true);
@@ -1086,10 +1107,41 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
+        // A ZMODEM sender announces itself with a recognizable header: take over the line from that point on, the
+        // text before it is shown as usual.
+        if (_autoStartZModem && !IsLineClaimed)
+        {
+            int zmodemStart = FindZModemRequest(buffer, value);
+            if (zmodemStart >= 0)
+            {
+                if (zmodemStart > 0)
+                {
+                    DisplayReceivedData(buffer, zmodemStart);
+                }
+                if (BeginAutoZModemReceive(buffer, zmodemStart, value))
+                {
+                    return;
+                }
+                DisplayReceivedData(buffer, value - zmodemStart, zmodemStart);
+                return;
+            }
+        }
+        DisplayReceivedData(buffer, value);
+    }
+
+    /// <summary>Shows received bytes (<paramref name="count"/> of them, starting at <paramref name="offset"/>) in the active view and records them in the log.</summary>
+    private void DisplayReceivedData(byte[] buffer, int count, int offset = 0)
+    {
+        if (offset != 0)
+        {
+            byte[] slice = new byte[count];
+            Buffer.BlockCopy(buffer, offset, slice, 0, count);
+            buffer = slice;
+        }
         // The log gets the raw stream before it is split into text or hex, so recording does not depend on the display mode.
         if (_logWriter != null)
         {
-            _logWriter.Write(buffer, 0, value);
+            _logWriter.Write(buffer, 0, count);
             int now = Environment.TickCount;
             if (now - _lastLogButtonUpdate > 500)
             {
@@ -1099,10 +1151,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         if (HexMode)
         {
-            hexTerminalControl1.AppendData(buffer, value);
+            hexTerminalControl1.AppendData(buffer, count);
             return;
         }
-        string text = _textDecoder.Decode(buffer, 0, value);
+        string text = _textDecoder.Decode(buffer, 0, count);
         if (_deviceTerminalSettings != null && _deviceTerminalSettings.TreatLFAsCRLF)
         {
             text = text.Replace("\n", "\r\n");
@@ -1116,12 +1168,34 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// </summary>
     private void StartXModemTransfer(string title, string verb, Func<FileStream> fileStream, bool isSend, bool useLargeBlocks = false)
     {
+        string protocolName = useLargeBlocks ? "XMODEM-1K" : "XMODEM";
+        StartLineTransfer(title, protocolName, verb, (sendData, progress, token) =>
+        {
+            using FileStream stream = fileStream();
+            return isSend
+                ? SmarTTY.IO.XModemTransfer.SendFile(stream, sendData, ReadXModemByte, token, progress, useLargeBlocks)
+                : SmarTTY.IO.XModemTransfer.ReceiveFile(stream, sendData, ReadXModemByte, token, progress);
+        });
+    }
+
+    /// <summary>The protocol part of a transfer. Runs on a worker thread and returns whether the transfer succeeded.</summary>
+    private delegate bool LineTransferRun(
+        SmarTTY.IO.XModemTransfer.SendDataHandler sendData,
+        SmarTTY.IO.XModemTransfer.ProgressHandler progress,
+        CancellationToken token);
+
+    /// <summary>
+    /// Runs one file transfer protocol (XMODEM, YMODEM, Kermit) on a worker thread with a progress window;
+    /// <paramref name="run"/> is the protocol itself and gets the line (callbacks for sending bytes and reporting
+    /// progress, the cancel token). <paramref name="successNote"/> (optional) is called on the UI thread after a
+    /// successful transfer and may return an extra paragraph for the final message. Must be called on the UI thread.
+    /// </summary>
+    private void StartLineTransfer(string title, string protocolName, string verb, LineTransferRun run, Func<string> successNote = null)
+    {
         if (IsLineClaimed)
         {
             return;
         }
-
-        string protocolName = useLargeBlocks ? "XMODEM-1K" : "XMODEM";
 
         // Not a "using": the window is modeless and outlives this method; it is closed (and disposed) when the transfer ends.
         SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm(title);
@@ -1141,7 +1215,6 @@ public partial class DeviceTerminalControl : DpiAwareControl
             string error = null;
             try
             {
-                using FileStream stream = fileStream();
                 SmarTTY.IO.XModemTransfer.SendDataHandler sendData = (data, offset, length) =>
                 {
                     // Writes are queued, so a failure of an earlier one is only known now: end the transfer with its reason
@@ -1160,9 +1233,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 };
                 SmarTTY.IO.XModemTransfer.ProgressHandler progress = (bytesTransferred, totalBytes, errorCount, status) =>
                     transferForm.UpdateProgress(bytesTransferred, totalBytes, errorCount, status);
-                success = isSend
-                    ? SmarTTY.IO.XModemTransfer.SendFile(stream, sendData, ReadXModemByte, transferForm.CancellationToken, progress, useLargeBlocks)
-                    : SmarTTY.IO.XModemTransfer.ReceiveFile(stream, sendData, ReadXModemByte, transferForm.CancellationToken, progress);
+                success = run(sendData, progress, transferForm.CancellationToken);
             }
             catch (Exception ex)
             {
@@ -1187,7 +1258,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     }
                     if (success)
                     {
-                        MessageBox.Show(protocolName + " " + verb + " completed successfully.", title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        string note = successNote?.Invoke();
+                        MessageBox.Show(protocolName + " " + verb + " completed successfully." + (string.IsNullOrEmpty(note) ? string.Empty : "\r\n\r\n" + note),
+                            title, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else if (!cancelled)
                     {
@@ -1212,7 +1285,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         return null;
     }
 
-    /// <summary>True while an XMODEM transfer or a file being sent owns the line: nothing else may get into the data stream.</summary>
+    /// <summary>True while an XMODEM or ZMODEM transfer or a file being sent owns the line: nothing else may get into the data stream.</summary>
     private bool IsLineClaimed => _isXModemActive || _isFileSendActive;
 
     /// <summary>True (with a short explanation) while a transfer owns the line.</summary>
@@ -1220,7 +1293,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         if (_isXModemActive)
         {
-            MessageBox.Show("An XMODEM transfer is in progress. Wait for it to finish or cancel it first.", "XMODEM", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM or Kermit) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return true;
         }
         if (_isFileSendActive)
@@ -1463,7 +1536,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     public void ClearOutput()
     {
-        _serialTerminalControl.Reset();
+        // Keeps a command that is being typed (and its prompt) at the top of the cleared screen.
+        _serialTerminalControl.ClearScreen();
         hexTerminalControl1.Clear();
     }
 

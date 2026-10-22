@@ -35,6 +35,15 @@ jobs:
       - name: Run XMODEM protocol checks
         run: dotnet run --project tests/XModemTransferTests -c Release
 
+      - name: Run YMODEM protocol checks
+        run: dotnet run --project tests/YModemTransferTests -c Release
+
+      - name: Run ZMODEM protocol checks
+        run: dotnet run --project tests/ZModemTransferTests -c Release
+
+      - name: Run Kermit protocol checks
+        run: dotnet run --project tests/KermitTransferTests -c Release
+
       - name: Run text stream decoder checks
         run: dotnet run --project tests/TextStreamDecoderTests -c Release
 
@@ -65,6 +74,12 @@ jobs:
       - name: Run transport write failure checks
         run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
 
+      - name: Run raw TCP transport checks (IPv4/IPv6, keep-alive, connect abort, data flood back-pressure)
+        run: dotnet run --project tests/TcpTransportTests -c Release
+
+      - name: Run Telnet protocol checks (options, LINEMODE, STATUS, CHARSET, TLS and STARTTLS, output queue)
+        run: dotnet run --project tests/TelnetStreamTests -c Release
+
       - name: Run TAR extractor security checks
         run: dotnet run --project tests/TarExtractorSecurityTests -c Release
 
@@ -79,6 +94,9 @@ jobs:
 
       - name: Run editor text model and syntax highlighting checks
         run: dotnet run --project tests/EditorTextTests -c Release
+
+      - name: Run local OpenWrt repository checks (opkg index, HTTP server, feed scripts, tunnel host)
+        run: dotnet run --project tests/LocalRepoTests -c Release
 
   sshnet:
     name: SSH.NET integration tests

@@ -461,12 +461,12 @@ public class MainWindowController : INotifyPropertyChanged
                 scpUploadForm.RemoteDirectory = _Controller.Settings.DefaultUploadDirectory;
                 if (scpUploadForm.ShowModal() == DialogResult.OK)
                 {
-                    _Controller.Settings.DefaultUploadDirectory = scpUploadForm.RemoteDirectory;
+                    _Controller.Settings.DefaultUploadDirectory = scpUploadForm.RemoteDirectory.Trim();
                     string dir = _Controller.Settings.DefaultUploadDirectory;
                     activeSession.ExpandHomeDirIfNeeded(ref dir);
                     _Controller.Settings.DefaultUploadDirectory = dir;
                     _Controller.Settings.Save();
-                    activeSession.DoUploadFile(scpUploadForm.LocalFile, _Controller.Settings.DefaultUploadDirectory);
+                    activeSession.UploadFilesToDirectory(scpUploadForm.LocalFiles, _Controller.Settings.DefaultUploadDirectory);
                 }
             }
             catch (Exception exception)
@@ -484,6 +484,11 @@ public class MainWindowController : INotifyPropertyChanged
                 return;
             }
             _Controller.Settings.Save();
+            foreach (SessionWrapper session in _Controller.AllSessions)
+            {
+                session.ApplyTransferSettings();
+                session.SaveTransferQueue();
+            }
             Font font = null;
             try
             {
@@ -740,6 +745,12 @@ public class MainWindowController : INotifyPropertyChanged
             };
         }
 
+        private static string TransferStatusPrefix(SessionWrapper session)
+        {
+            // "SCP" or "SFTP"; the panel title tells why SCP is used when SFTP was selected.
+            return (session.TransferManager?.EffectiveProtocolName ?? "SCP").Split(' ')[0] + ": ";
+        }
+
         public void RefreshAndSendKeepalives()
         {
             try
@@ -767,7 +778,7 @@ public class MainWindowController : INotifyPropertyChanged
                 SCPController.SCPStatistics valueOrDefault = (_Controller.ActiveSession?.SCPController?.SendUpdateEventsAndGetStatistics()).GetValueOrDefault();
                 if (valueOrDefault.TotalActiveOrQueuedTransfers == 0)
                 {
-                    Status1 = "SCP: No transfers";
+                    Status1 = TransferStatusPrefix(activeSession) + "No transfers";
                     ProgressVisibility = Visibility.Collapsed;
                 }
                 else
@@ -775,11 +786,11 @@ public class MainWindowController : INotifyPropertyChanged
                     ProgressVisibility = Visibility.Visible;
                     if (activeSession.TransferManager.IsPaused)
                     {
-                        Status1 = string.Format("SCP: paused ({1}/{2})", valueOrDefault.TotalTransfers, StringUtils.FormatSize(valueOrDefault.TotalDone), StringUtils.FormatSize(valueOrDefault.TotalSize));
+                        Status1 = TransferStatusPrefix(activeSession) + string.Format("paused ({1}/{2})", valueOrDefault.TotalTransfers, StringUtils.FormatSize(valueOrDefault.TotalDone), StringUtils.FormatSize(valueOrDefault.TotalSize));
                     }
                     else
                     {
-                        Status1 = $"SCP: {valueOrDefault.TotalTransfers} transfers ({StringUtils.FormatSize(valueOrDefault.TotalDone)}/{StringUtils.FormatSize(valueOrDefault.TotalSize)})";
+                        Status1 = TransferStatusPrefix(activeSession) + $"{valueOrDefault.TotalTransfers} transfers ({StringUtils.FormatSize(valueOrDefault.TotalDone)}/{StringUtils.FormatSize(valueOrDefault.TotalSize)})";
                         if (valueOrDefault.TotalSize == 0L)
                         {
                             valueOrDefault.TotalSize = 1L;

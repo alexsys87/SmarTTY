@@ -729,6 +729,15 @@ public class SshSession : IDisposable
     }
 
     /// <summary>
+    /// Opens a channel running the server's <paramref name="subsystem"/> (e.g. "sftp").
+    /// </summary>
+    public SshShellChannel OpenSubsystemChannel(string subsystem)
+    {
+        EnsureAuthenticated();
+        return new SshShellChannel(this, SshNetChannel.Create(_client), null, null, ExtendedDataMode.Ignore, subsystem);
+    }
+
+    /// <summary>
     /// Runs a command and returns its output (stdout and stderr merged), or null if it could not be run.
     /// </summary>
     public List<string> RunCommand(string command, out int? exitStatus, string terminalType = null)
@@ -790,7 +799,7 @@ public class SshSession : IDisposable
         }
         try
         {
-            return ScpChannelStream.OpenUpload(this, path, length, modifyTime, mode ?? Convert.ToInt32("644", 8));
+            return ScpChannelStream.OpenUpload(this, path, length, modifyTime, mode);
         }
         catch (Exception exception) when (!(exception is RemotePathException))
         {
@@ -809,6 +818,55 @@ public class SshSession : IDisposable
         {
             throw new RemoteOperationException(exception.Message + " while trying to download " + path);
         }
+    }
+
+    /// <summary>
+    /// Tells whether <paramref name="path"/> exists on the remote side and whether it is a directory.
+    /// Returns <see cref="RemotePathKind.Unknown"/> if the check itself could not be run.
+    /// </summary>
+    public RemotePathKind GetRemotePathKind(string path)
+    {
+        return GetRemotePathKinds(new[] { path })[0];
+    }
+
+    /// <summary>
+    /// <see cref="GetRemotePathKind"/> for several paths, with one remote command per batch instead of one per path.
+    /// </summary>
+    public RemotePathKind[] GetRemotePathKinds(IList<string> paths)
+    {
+        const int BatchSize = 32;
+        RemotePathKind[] kinds = new RemotePathKind[paths.Count];
+        for (int start = 0; start < paths.Count; start += BatchSize)
+        {
+            int count = Math.Min(BatchSize, paths.Count - start);
+            // "test" and ";" also work in fish and csh login shells, unlike "if ...; then ...; fi" or a loop.
+            StringBuilder command = new StringBuilder();
+            for (int i = 0; i < count; i++)
+            {
+                string quoted = RemotePathUtils.ShellQuote(paths[start + i]);
+                command.Append("test -d ").Append(quoted).Append(" && echo d").Append(i).Append("; ");
+                command.Append("test -e ").Append(quoted).Append(" && echo e").Append(i).Append("; ");
+            }
+            command.Append("echo .");
+            List<string> output = RunCommand(command.ToString(), out _);
+            bool ran = output != null && output.Contains(".");
+            for (int i = 0; i < count; i++)
+            {
+                if (!ran)
+                {
+                    kinds[start + i] = RemotePathKind.Unknown;
+                }
+                else if (output.Contains("d" + i))
+                {
+                    kinds[start + i] = RemotePathKind.Directory;
+                }
+                else
+                {
+                    kinds[start + i] = output.Contains("e" + i) ? RemotePathKind.File : RemotePathKind.Missing;
+                }
+            }
+        }
+        return kinds;
     }
 
     private Exception DiagnoseUploadError(string path)
@@ -844,6 +902,82 @@ public class SshSession : IDisposable
         {
         }
         return null;
+    }
+
+    #endregion
+
+    #region Reverse port forwarding
+
+    private readonly object _forwardLock = new object();
+
+    private ForwardedPortRemote _remoteForward;
+
+    /// <summary>
+    /// Asks the SSH server to listen on <paramref name="boundPort"/> of its own loopback interface and to tunnel every connection
+    /// to <paramref name="host"/>:<paramref name="hostPort"/> as seen from this computer (the equivalent of "ssh -R").
+    /// There is one such tunnel per session; starting another replaces it. Throws if the server refuses the request.
+    /// </summary>
+    public void StartRemoteForward(uint boundPort, string host, uint hostPort)
+    {
+        EnsureAuthenticated();
+        StopRemoteForward();
+        ForwardedPortRemote port = new ForwardedPortRemote("127.0.0.1", boundPort, host, hostPort);
+        _client.AddForwardedPort(port);
+        try
+        {
+            port.Start();
+        }
+        catch
+        {
+            try
+            {
+                _client.RemoveForwardedPort(port);
+            }
+            catch
+            {
+            }
+            port.Dispose();
+            throw;
+        }
+        lock (_forwardLock)
+        {
+            _remoteForward = port;
+        }
+    }
+
+    public void StopRemoteForward()
+    {
+        ForwardedPortRemote port;
+        lock (_forwardLock)
+        {
+            port = _remoteForward;
+            _remoteForward = null;
+        }
+        if (port == null)
+        {
+            return;
+        }
+        try
+        {
+            port.Stop();
+        }
+        catch
+        {
+        }
+        try
+        {
+            _client.RemoveForwardedPort(port);
+        }
+        catch
+        {
+        }
+        try
+        {
+            port.Dispose();
+        }
+        catch
+        {
+        }
     }
 
     #endregion

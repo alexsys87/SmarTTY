@@ -24,6 +24,8 @@
     <!-- Standalone regression harnesses are not part of the Windows application. -->
     <Compile Remove="tests\**\*.cs" />
     <Reference Include="System.Core" />
+    <!-- X509Certificate2UI: the certificate picker of the telnet client certificate. -->
+    <Reference Include="System.Security" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
