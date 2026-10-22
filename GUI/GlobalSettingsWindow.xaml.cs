@@ -66,7 +66,47 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
                 ((Selector)lbCutoffUnit).SelectedIndex = 0;
             }
         }
+        txtVcxsrvStatus.Text = VcxsrvSetup.DescribeInstallation(VcxsrvSetup.FindExecutable());
         _Initialized = true;
+    }
+
+    private readonly System.Threading.CancellationTokenSource _VcxsrvSetupCancellation = new System.Threading.CancellationTokenSource();
+
+    private void InstallVcxsrv_Click(object sender, RoutedEventArgs e)
+    {
+        btnInstallVcxsrv.IsEnabled = false;
+        System.Threading.CancellationToken cancellation = _VcxsrvSetupCancellation.Token;
+        System.Threading.ThreadPool.QueueUserWorkItem(delegate
+        {
+            string status;
+            try
+            {
+                string executable = VcxsrvSetup.DownloadAndInstall((string step) => Dispatcher.BeginInvoke((Action)(() => txtVcxsrvStatus.Text = step)), cancellation);
+                status = VcxsrvSetup.DescribeInstallation(executable);
+            }
+            catch (OperationCanceledException exception)
+            {
+                status = cancellation.IsCancellationRequested ? null : exception.Message + " " + VcxsrvSetup.DescribeInstallation(VcxsrvSetup.FindExecutable());
+            }
+            catch (Exception exception)
+            {
+                status = exception.Message + " You can download VcXsrv manually from " + VcxsrvSetup.ReleasesPage + ".";
+            }
+            if (status != null)
+            {
+                Dispatcher.BeginInvoke((Action)(() =>
+                {
+                    txtVcxsrvStatus.Text = status;
+                    btnInstallVcxsrv.IsEnabled = true;
+                }));
+            }
+        });
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _VcxsrvSetupCancellation.Cancel();
+        base.OnClosed(e);
     }
 
     private void ExportSettings_Click(object sender, RoutedEventArgs e)

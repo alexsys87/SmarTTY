@@ -372,11 +372,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     {
         SCPController = new SCPController(this);
         _Controller = controllerImpl;
+        // Before attaching the session: the connection settings decide whether it forwards X11.
+        Settings = connectionSettings;
         if (session != null)
         {
             AttachNewSession(session);
         }
-        Settings = connectionSettings;
         Tabs.CollectionChanged += Tabs_CollectionChanged;
         _NewTabShortcuts = new PseudoTabContext[3]
         {
@@ -501,6 +502,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         bool firstConnection = Session == null;
         Session?.Dispose();
         Session = session;
+        EnableX11Forwarding(session);
         if (!firstConnection && LocalRepo.IsRunning)
         {
             // The reverse tunnel belonged to the old connection: restore it (and the feeds) on the new one, off the UI thread.
@@ -773,6 +775,100 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     #region File transfer queue
 
     private List<FileTransferManager.TransferJob> _TransfersToResume;
+
+    // The refusal of X11 forwarding is explained once per session, not after every reconnection.
+    private int _X11RefusalReported;
+
+    /// <summary>
+    /// Requests X11 forwarding on the terminal channels of a connection whose settings ask for it. Remote programs then
+    /// reach the local X server, which is started (or installed) on their first connection, see XServerLaunchWindow.
+    /// </summary>
+    private void EnableX11Forwarding(SshSession session)
+    {
+        if (Settings == null || !Settings.EnableX11Forwarding)
+        {
+            return;
+        }
+        try
+        {
+            X11Forwarding x11 = session.EnableX11Forwarding(() => _Controller.CreateX11Connection()?.Client);
+            x11.Refused += (object sender, EventArgs e) => OnX11Refused(session);
+        }
+        catch (Exception exception)
+        {
+            _Controller.BeginInvoke(() => MessageBoxes.Error("X11 forwarding could not be enabled: " + exception.Message));
+        }
+    }
+
+    // Runs on a worker thread: the remote check tells the user what the server lacks.
+    private void OnX11Refused(SshSession session)
+    {
+        if (Interlocked.Exchange(ref _X11RefusalReported, 1) != 0)
+        {
+            return;
+        }
+        X11RemoteStatus status = X11RemoteStatus.Check(session);
+        string text = status.DescribeRefusal(session.HostName) + "\r\n\r\nTerminal tabs work as usual. X11 forwarding can be turned off in the connection settings.";
+        _Controller.BeginInvoke(() => MessageBoxes.Warning(text));
+    }
+
+    /// <summary>
+    /// A report of X11 forwarding for this session: the connection setting, the server's answer, the remote host's X11
+    /// support and the local X server. Runs commands on the server, so it is called off the UI thread.
+    /// </summary>
+    internal string DescribeX11Forwarding()
+    {
+        SshSession session = Session;
+        System.Text.StringBuilder text = new System.Text.StringBuilder();
+        X11Forwarding x11 = session?.X11;
+        if (Settings == null || !Settings.EnableX11Forwarding)
+        {
+            text.AppendLine("X11 forwarding is off for this connection. Turn on \"Forward X11\" in the connection settings and reconnect.");
+        }
+        else if (x11 == null)
+        {
+            text.AppendLine("X11 forwarding is on in the connection settings but is not active for this connection; reconnect to enable it.");
+        }
+        else if (x11.IsRefused)
+        {
+            text.AppendLine("X11 forwarding: the server refused it.");
+        }
+        else if (x11.IsAccepted)
+        {
+            text.AppendLine("X11 forwarding: active. Programs started in terminal tabs get DISPLAY; " + x11.ConnectionCount + " X11 connection(s) so far, " + x11.ActiveConnectionCount + " open.");
+        }
+        else
+        {
+            text.AppendLine("X11 forwarding: not requested yet; it is requested when a terminal tab or a Smart Terminal command starts.");
+        }
+        text.AppendLine();
+        text.AppendLine("Remote host " + session?.HostName + ":");
+        X11RemoteStatus status = (session != null) ? X11RemoteStatus.Check(session) : new X11RemoteStatus();
+        text.AppendLine(status.Describe());
+        if (x11 != null && x11.IsRefused)
+        {
+            text.AppendLine();
+            text.AppendLine(status.DescribeRefusal(session.HostName));
+        }
+        text.AppendLine();
+        text.AppendLine("This computer:");
+        text.AppendLine(VcxsrvSetup.DescribeInstallation(VcxsrvSetup.FindExecutable()));
+        text.Append("X server on localhost:6000 (display :0): ").Append(IsLocalXServerRunning() ? "running" : "not running (it is started when a remote program connects)");
+        return text.ToString();
+    }
+
+    private static bool IsLocalXServerRunning()
+    {
+        try
+        {
+            using System.Net.Sockets.TcpClient client = new System.Net.Sockets.TcpClient();
+            return client.ConnectAsync("localhost", 6000).Wait(TimeSpan.FromMilliseconds(500)) && client.Connected;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     private string TransferQueueFile => (Session == null) ? null : TransferQueueStore.GetFilePath(Path.Combine(GlobalSettings.DataDirectory, "TransferQueues"), Session.UserName, Session.HostName, Session.Port);
 

@@ -13,6 +13,9 @@
 set -euo pipefail
 
 port="${SMARTTY_SSH_TEST_PORT:-2222}"
+# A second port of the same server with X11 forwarding disabled, for the refusal checks of X11ForwardingTests
+# (2223 is the default port of the Dropbear server from setup-dropbear.sh).
+no_x11_port="${SMARTTY_SSH_TEST_NO_X11_PORT:-2224}"
 user="${SMARTTY_SSH_TEST_USER:-smartty-test}"
 password="${SMARTTY_SSH_TEST_PASSWORD:-smartty-test-password}"
 key_passphrase="${SMARTTY_SSH_TEST_KEY_PASSPHRASE:-smartty-key-passphrase}"
@@ -58,6 +61,7 @@ as_root install -m 600 -o "$user" -g "$user" "$directory/authorized_keys" "$home
 
 cat > "$directory/sshd_config" <<CONF
 Port $port
+Port $no_x11_port
 ListenAddress 127.0.0.1
 HostKey $host_key
 PidFile $directory/sshd.pid
@@ -68,10 +72,14 @@ UsePAM yes
 PermitRootLogin no
 AllowUsers $user
 AllowTcpForwarding no
-X11Forwarding no
+# X11 forwarding also needs xauth on the server; without it sshd refuses x11-req and the X11 checks are skipped.
+X11Forwarding yes
+X11UseLocalhost yes
 StrictModes no
 LogLevel VERBOSE
 Subsystem sftp internal-sftp
+Match LocalPort $no_x11_port
+    X11Forwarding no
 CONF
 
 # sshd needs its privilege separation directory even for a config test; it can be missing on a fresh runner.
@@ -101,6 +109,7 @@ sshd_pid="$(cat "$directory/sshd.pid" 2>/dev/null || true)"
 cat <<ENV
 SMARTTY_SSH_TEST_HOST=127.0.0.1
 SMARTTY_SSH_TEST_PORT=$port
+SMARTTY_SSH_TEST_NO_X11_PORT=$no_x11_port
 SMARTTY_SSH_TEST_USER=$user
 SMARTTY_SSH_TEST_PASSWORD=$password
 SMARTTY_SSH_TEST_KEY=$client_key

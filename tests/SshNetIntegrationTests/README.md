@@ -1,4 +1,4 @@
-# SSH.NET integration tests
+﻿# SSH.NET integration tests
 
 These checks run the production SSH layer (`Ssh/`) against a real OpenSSH server. They exist
 because `SmarTTY.csproj` depends on `SSH.NET`, and a large part of that library's API is
@@ -22,6 +22,13 @@ connect and key exchange, the host key callback, password, keyboard-interactive 
 authentication (including passphrase handling), exec channels with and without a PTY, the
 separate stderr stream, exit statuses and signals, shell channels, PTY resize, EOF, polling
 delivery, the extended data modes, the SCP upload/download exchange and connection loss.
+
+X11 forwarding (`Ssh/X11Forwarding.cs`) has a group of its own. The parsing of the X11 connection setup with
+the fake cookie always runs. The live part needs `xauth` and `python3` on the server (CI installs them): a remote
+Python client connects to the forwarded display through the real OpenSSH server, and its connection is relayed to an
+in-process fake X server, with more data in both directions than either side's channel window. A wrong cookie must
+be rejected, and a second port of the same server (`SMARTTY_SSH_TEST_NO_X11_PORT`, X11 forwarding disabled with
+`Match LocalPort`) checks the refusal and the remote X11 check.
 
 Two more groups cover Dropbear, the SSH server of OpenWRT. `PtySetupGateTests` always run: they check
 `Ssh/PtySetupGate.cs`, which keeps helper commands without a PTY from overlapping with setting up a PTY

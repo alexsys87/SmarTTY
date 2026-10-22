@@ -272,6 +272,12 @@ public class SshSession : IDisposable
 
     public bool KeepAliveEnabled => _client.KeepAliveInterval > TimeSpan.Zero;
 
+    /// <summary>Software version of the server from its identification string (e.g. "OpenSSH_9.6p1").</summary>
+    public string ServerVersion => _client.ConnectionInfo?.ServerVersion;
+
+    /// <summary>X11 forwarding of this connection; null unless <see cref="EnableX11Forwarding"/> was called.</summary>
+    public X11Forwarding X11 { get; private set; }
+
     public SessionStats Statistics => new SessionStats
     {
         BytesReceived = Interlocked.Read(ref _bytesReceived),
@@ -528,6 +534,21 @@ public class SshSession : IDisposable
     public void ConfigureKeepAlive(int intervalSeconds)
     {
         _client.KeepAliveInterval = (intervalSeconds > 0) ? TimeSpan.FromSeconds(intervalSeconds) : Timeout.InfiniteTimeSpan;
+    }
+
+    /// <summary>
+    /// Requests X11 forwarding on every PTY channel opened from now on (terminal tabs and Smart Terminal commands).
+    /// <paramref name="connectToXServer"/> returns a socket connected to the local X server, or null if there is none.
+    /// </summary>
+    public X11Forwarding EnableX11Forwarding(Func<System.Net.Sockets.Socket> connectToXServer)
+    {
+        EnsureAuthenticated();
+        if (X11 == null)
+        {
+            Session session = SshNetChannel.GetSession(_client) ?? throw new InvalidOperationException("The SSH session is not connected");
+            X11 = new X11Forwarding(this, session, connectToXServer);
+        }
+        return X11;
     }
 
     #region Authentication
@@ -998,6 +1019,7 @@ public class SshSession : IDisposable
             return;
         }
         _authGate.Stop();
+        X11?.Dispose();
         try
         {
             _client.Dispose();

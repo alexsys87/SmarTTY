@@ -1,5 +1,6 @@
 ﻿using Renci.SshNet;
 using Renci.SshNet.Common;
+using Renci.SshNet.Messages;
 using Renci.SshNet.Messages.Connection;
 using System;
 using System.Collections.Generic;
@@ -27,10 +28,13 @@ internal sealed class SshNetChannel : IDisposable
         public static readonly MethodInfo SendShellRequest;
         public static readonly MethodInfo SendSubsystemRequest;
         public static readonly MethodInfo SendWindowChangeRequest;
+        public static readonly MethodInfo SendX11ForwardingRequest;
         public static readonly MethodInfo SendData;
         public static readonly MethodInfo SendEof;
         public static readonly PropertyInfo DataEventData;
         public static readonly PropertyInfo RequestEventInfo;
+        public static readonly MethodInfo SessionSendMessage;
+        public static readonly PropertyInfo SessionNextChannelNumber;
         public static readonly Exception LoadError;
 
         static Api()
@@ -49,10 +53,15 @@ internal sealed class SshNetChannel : IDisposable
                 SendShellRequest = GetMethod(channelSessionType, "SendShellRequest");
                 SendSubsystemRequest = GetMethod(channelSessionType, "SendSubsystemRequest", typeof(string));
                 SendWindowChangeRequest = GetMethod(channelSessionType, "SendWindowChangeRequest", typeof(uint), typeof(uint), typeof(uint), typeof(uint));
+                SendX11ForwardingRequest = GetMethod(channelSessionType, "SendX11ForwardingRequest", typeof(bool), typeof(string), typeof(byte[]), typeof(uint));
                 SendData = GetMethod(channelType, "SendData", typeof(byte[]), typeof(int), typeof(int));
                 SendEof = GetMethod(channelType, "SendEof");
                 DataEventData = GetType(assembly, "Renci.SshNet.Common.ChannelDataEventArgs").GetProperty("Data") ?? throw Missing("ChannelDataEventArgs.Data");
                 RequestEventInfo = GetType(assembly, "Renci.SshNet.Common.ChannelRequestEventArgs").GetProperty("Info") ?? throw Missing("ChannelRequestEventArgs.Info");
+                // Channels that the server opens (X11, see X11Forwarding.cs) are implemented here, on top of the public
+                // channel message events of Session; only sending a message and taking a channel number are internal.
+                SessionSendMessage = typeof(Session).GetMethod("SendMessage", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Message) }, null) ?? throw Missing("Session.SendMessage");
+                SessionNextChannelNumber = typeof(Session).GetProperty("NextChannelNumber", BindingFlags.Instance | BindingFlags.NonPublic) ?? throw Missing("Session.NextChannelNumber");
             }
             catch (Exception exception)
             {
@@ -154,6 +163,32 @@ internal sealed class SshNetChannel : IDisposable
     }
 
     /// <summary>
+    /// Sends a message of a channel implemented by SmarTTY itself (it has no SSH.NET channel object).
+    /// Must not be called on SSH.NET's receive thread: during a key re-exchange the call waits for the
+    /// exchange to finish, which only that thread can complete.
+    /// </summary>
+    public static void SendSessionMessage(Session session, Message message)
+    {
+        if (Api.LoadError != null)
+        {
+            throw Api.LoadError;
+        }
+        InvokeOn(session, Api.SessionSendMessage, message);
+    }
+
+    /// <summary>
+    /// Takes a local channel number from the same counter as SSH.NET's own channels, so the numbers never collide.
+    /// </summary>
+    public static uint AllocateChannelNumber(Session session)
+    {
+        if (Api.LoadError != null)
+        {
+            throw Api.LoadError;
+        }
+        return (uint)Api.SessionNextChannelNumber.GetValue(session);
+    }
+
+    /// <summary>
     /// Subscribes to the channel events. The handlers run on SSH.NET's receive thread; the data segments
     /// are only valid during the call.
     /// </summary>
@@ -211,6 +246,15 @@ internal sealed class SshNetChannel : IDisposable
     public bool SendSubsystemRequest(string subsystem)
     {
         return (bool)Invoke(Api.SendSubsystemRequest, subsystem);
+    }
+
+    /// <summary>
+    /// Sends "x11-req" (RFC 4254, 6.3.1); <paramref name="cookie"/> is the hexadecimal cookie text. Must precede
+    /// the shell or exec request. Returns false if the server refuses X11 forwarding.
+    /// </summary>
+    public bool SendX11ForwardingRequest(bool singleConnection, string protocol, string cookie, uint screenNumber)
+    {
+        return (bool)Invoke(Api.SendX11ForwardingRequest, singleConnection, protocol, System.Text.Encoding.ASCII.GetBytes(cookie), screenNumber);
     }
 
     public void SendWindowChangeRequest(uint columns, uint rows)

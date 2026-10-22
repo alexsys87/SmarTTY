@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Threading;
 
 namespace VisualTTY;
@@ -17,7 +16,31 @@ public class XServerLaunchController : INotifyPropertyChanged
 
     private string _ErrorText;
 
+    private string _VcxsrvPath;
+
+    private readonly CancellationTokenSource _Cancellation = new CancellationTokenSource();
+
     public TcpClient SuccessfulSocket { get; private set; }
+
+    /// <summary>Path of the installed vcxsrv.exe; null if VcXsrv is not installed.</summary>
+    public string VcxsrvPath
+    {
+        get
+        {
+            return _VcxsrvPath;
+        }
+        private set
+        {
+            _VcxsrvPath = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("VcxsrvPath"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsVcxsrvInstalled"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("VcxsrvStatusText"));
+        }
+    }
+
+    public bool IsVcxsrvInstalled => _VcxsrvPath != null;
+
+    public string VcxsrvStatusText => VcxsrvSetup.DescribeInstallation(_VcxsrvPath);
 
     public string ProgressText
     {
@@ -60,6 +83,7 @@ public class XServerLaunchController : INotifyPropertyChanged
     public XServerLaunchController(TcpClient initialClient, IAsyncResult pendingConnection)
     {
         XServerLaunchController xServerLaunchController = this;
+        _VcxsrvPath = VcxsrvSetup.FindExecutable();
         ProgressText = "Connecting to port 6000...";
         _Thread = new Thread(() =>
         {
@@ -104,7 +128,8 @@ public class XServerLaunchController : INotifyPropertyChanged
             switch (xServer)
             {
                 case XServerType.Vcxsrv:
-                    text = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "vcxsrv\\vcxsrv.exe");
+                    VcxsrvPath = VcxsrvSetup.FindExecutable();
+                    text = VcxsrvPath ?? throw new FileNotFoundException(VcxsrvSetup.DescribeInstallation(null) + " Use the button below to download and install the latest version.");
                     break;
                 case XServerType.Custom:
                     text = customXServerPath;
@@ -136,12 +161,14 @@ public class XServerLaunchController : INotifyPropertyChanged
                 }
                 catch (Exception)
                 {
-                    if (process.HasExited || ((DateTime.Now - now).TotalSeconds > 5.0 && itemIndex > 0))
+                    if (process.HasExited || _Cancellation.IsCancellationRequested || ((DateTime.Now - now).TotalSeconds > 5.0 && itemIndex > 0))
                     {
                         throw;
                     }
                 }
                 itemIndex++;
+                // The X server needs a moment before it listens; do not spin while waiting for it.
+                Thread.Sleep(100);
             }
         }
         catch (Exception exception)
@@ -160,6 +187,43 @@ public class XServerLaunchController : INotifyPropertyChanged
 
     protected virtual void DoSaveSettings(XServerType xServer, string customXServerPath)
     {
+    }
+
+    /// <summary>Stops a download or installation in progress (the window was closed).</summary>
+    public void Cancel()
+    {
+        _Cancellation.Cancel();
+    }
+
+    /// <summary>
+    /// Downloads the installer of the latest VcXsrv release, runs it and then starts the installed X server.
+    /// </summary>
+    public void DownloadAndInstallVcxsrv()
+    {
+        ProgressText = "Looking for the latest VcXsrv release...";
+        ErrorText = null;
+        new Thread(() =>
+        {
+            try
+            {
+                VcxsrvPath = VcxsrvSetup.DownloadAndInstall((string step) => ProgressText = step, _Cancellation.Token);
+                LaunchAndConnectToXServer(XServerType.Vcxsrv, null);
+            }
+            catch (OperationCanceledException exception)
+            {
+                ErrorText = _Cancellation.IsCancellationRequested ? null : exception.Message;
+                ProgressText = null;
+            }
+            catch (Exception exception)
+            {
+                ErrorText = exception.Message + " You can download VcXsrv manually from " + VcxsrvSetup.ReleasesPage + ".";
+                ProgressText = null;
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "VcXsrv setup"
+        }.Start();
     }
 
     public void StartXServer(XServerType type)
