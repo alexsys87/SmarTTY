@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../LocalRepo/IpkIndexBuilder.cs" Link="IpkIndexBuilder.cs" />
+    <Compile Include="../../LocalRepo/LocalRepoFeed.cs" Link="LocalRepoFeed.cs" />
+    <Compile Include="../../LocalRepo/LocalRepoServer.cs" Link="LocalRepoServer.cs" />
+    <Compile Include="../../LocalRepo/OpkgFeedConfig.cs" Link="OpkgFeedConfig.cs" />
+    <Compile Include="../../LocalRepo/LocalRepoHost.cs" Link="LocalRepoHost.cs" />
+    <Compile Include="../../LocalRepo/LocalRepoSettings.cs" Link="LocalRepoSettings.cs" />
+    <Compile Include="../../Utilities/XmlStorage.cs" Link="XmlStorage.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+  </ItemGroup>
+</Project>
