@@ -157,6 +157,12 @@ public partial class TextEditorControl : EditableTextBrowser
                     {
                         ReplaceText(SelectionEnd, SelectionStart, select: false, "");
                     }
+                    else if (GetSpaceIndentBackspaceLength() > 0)
+                    {
+                        // In space indentation Backspace removes one level, back to the previous tab stop.
+                        int spaces = GetSpaceIndentBackspaceLength();
+                        ReplaceText(CaretPosition, new TextDocument.TextPosition(CaretPosition.Column - spaces, CaretPosition.Line), select: false, "");
+                    }
                     else
                     {
                         ReplaceText(CaretPosition, GetMovedPosition(CaretMove.Left), select: false, "");
@@ -175,6 +181,10 @@ public partial class TextEditorControl : EditableTextBrowser
                     else
                     {
                         string text = new string(e.KeyChar, 1);
+                        if (e.KeyChar == '\t' && InsertSpaces)
+                        {
+                            text = GetSpacesToNextTabStop();
+                        }
                         TextDocument.TextPosition textPosition = new TextDocument.TextPosition(-1, -1);
                         OnCharTyping(e.KeyChar, ref text, ref textPosition);
                         if (text != null)
@@ -199,6 +209,45 @@ public partial class TextEditorControl : EditableTextBrowser
             }
         }
         base.OnKeyPress(e);
+    }
+
+    /// <summary>The spaces that move the insertion point (the caret or the start of the selection) to the next tab stop.</summary>
+    private string GetSpacesToNextTabStop()
+    {
+        TextDocument.TextPosition position = CaretPosition;
+        if (_hasSelection && SelectionStart < position)
+        {
+            position = SelectionStart;
+        }
+        int tabSize = Math.Max(1, TabSize);
+        int column = IndexToColumn(position.Line, position.Column);
+        return new string(' ', tabSize - column % tabSize);
+    }
+
+    /// <summary>
+    /// With InsertSpaces, the number of spaces Backspace removes when the caret is inside leading spaces:
+    /// back to the previous tab stop. 0 when Backspace should remove a single character.
+    /// </summary>
+    private int GetSpaceIndentBackspaceLength()
+    {
+        if (!InsertSpaces || CaretPosition.Column == 0)
+        {
+            return 0;
+        }
+        string lineText = base.EditableDocument.GetLineText(CaretPosition.Line);
+        if (CaretPosition.Column > lineText.Length)
+        {
+            return 0;
+        }
+        for (int i = 0; i < CaretPosition.Column; i++)
+        {
+            if (lineText[i] != ' ')
+            {
+                return 0;
+            }
+        }
+        int tabSize = Math.Max(1, TabSize);
+        return (CaretPosition.Column - 1) % tabSize + 1;
     }
 
     protected virtual void OnCharTyping(char ch, ref string text, ref TextDocument.TextPosition textPosition)

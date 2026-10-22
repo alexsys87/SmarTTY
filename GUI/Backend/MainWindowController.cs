@@ -198,7 +198,9 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                ((_Controller.ActiveSession?.ActiveTab as EditorTabContext) ?? throw new Exception("No active editor tab")).Editor.Save();
+                // In the background: a slow connection must not freeze the window. Closing a tab or the
+                // window still saves synchronously (TrySave).
+                ((_Controller.ActiveSession?.ActiveTab as EditorTabContext) ?? throw new Exception("No active editor tab")).Editor.SaveInBackground();
             }
             catch (Exception exception)
             {
@@ -301,6 +303,8 @@ public class MainWindowController : INotifyPropertyChanged
                 SessionWrapper activeSession = RequireSshSession("Opening remote files");
                 tabWithCurrentDir = tabWithCurrentDir ?? activeSession.ActiveTab;
                 RemoteOpenFileDialog remoteOpenFileDialog = activeSession.CreateRemoteOpenFileDialog();
+                // A name that does not exist yet opens an empty editor that creates the file on save.
+                remoteOpenFileDialog.AllowNewFile = true;
                 string text = activeSession.TryExtractCurrentDir(tabWithCurrentDir) ?? activeSession.LastDownloadDir;
                 if ((tabWithCurrentDir as NormalTabContext)?.Terminal is SshTerminalControl sshTerminalControl)
                 {
@@ -356,8 +360,10 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 session.CloseFirstMatchingPage((ITabContext tabContext) => tabContext.EditorControl == editor, closeSessionIfEmpty: false);
             };
+            editor.SavingChanged += (object sender, EventArgs e) => UpdateEditorTitle(editor);
             editor.LoadCompleted += (object sender, EventArgs e) =>
             {
+                UpdateEditorTitle(editor);
                 // A file whose name tells nothing (e.g. a script without an extension) may still be
                 // recognized by its "#!" line now that the content is known.
                 if (_Controller.Settings.Editor.SyntaxHighlighting && SyntaxHighlighting.DetectLanguage(editor.RemotePath) == SyntaxHighlighting.Language.Plain)
@@ -371,22 +377,55 @@ public class MainWindowController : INotifyPropertyChanged
 
         internal void Search()
         {
-            _Controller.ActiveSession?.ActiveTab?.Searcher?.Activate();
+            TextSearcher searcher = _Controller.ActiveSession?.ActiveTab?.Searcher;
+            if (searcher != null)
+            {
+                searcher.IsReplaceVisible = false;
+                searcher.Activate();
+            }
+        }
+
+        private void GoToLine(RemoteFileEditor editor)
+        {
+            if (editor == null)
+            {
+                return;
+            }
+            GoToLineWindow window = new GoToLineWindow(editor.CaretPosition.Line + 1, Math.Max(1, editor.LineCount))
+            {
+                Owner = _Controller._Window
+            };
+            if (window.ShowDialog() == true)
+            {
+                editor.GoToPosition(window.Line - 1, Math.Max(0, window.Column - 1));
+            }
+            editor.Focus();
         }
 
         private void editor_UnsavedChanged(EditableTextBrowser editor, bool newValue)
         {
-            if (editor.Tag is EditorTabContext { Title: var title } editorTabContext)
+            UpdateEditorTitle(editor as RemoteFileEditor);
+        }
+
+        /// <summary>The tab title: the file name, "(new)" until the file exists, "(saving)" and "*" for unsaved changes.</summary>
+        private static void UpdateEditorTitle(RemoteFileEditor editor)
+        {
+            if (editor?.Tag is EditorTabContext editorTabContext)
             {
-                string text = title.TrimEnd(' ', '*');
+                string title = RemotePathUtils.GetFileName(editorTabContext.FilePath);
+                if (editor.IsNewFile)
+                {
+                    title += " (new)";
+                }
+                if (editor.IsSaving)
+                {
+                    title += " (saving)";
+                }
                 if (editor.IsModified)
                 {
-                    editorTabContext.Title = text + " *";
+                    title += " *";
                 }
-                else
-                {
-                    editorTabContext.Title = text;
-                }
+                editorTabContext.Title = title;
             }
         }
 
@@ -407,6 +446,15 @@ public class MainWindowController : INotifyPropertyChanged
                         break;
                     case Keys.F:
                         Search();
+                        break;
+                    case Keys.H:
+                        // Ctrl+H is also Backspace as a character: keep it from reaching the editor.
+                        e.SuppressKeyPress = true;
+                        _Controller.ActiveSession?.ActiveTab?.Searcher?.ActivateReplace();
+                        break;
+                    case Keys.G:
+                        e.SuppressKeyPress = true;
+                        GoToLine(sender as RemoteFileEditor);
                         break;
                 }
             }
@@ -1193,6 +1241,7 @@ public class MainWindowController : INotifyPropertyChanged
         edit.Brush = new SolidBrush(effectiveColors.LineNumberBackground);
         edit.LineNumberForegroundBrush = new SolidBrush(effectiveColors.LineNumberForeground);
         edit.TabSize = Settings.Editor.TabSize;
+        edit.InsertSpaces = Settings.Editor.InsertSpaces;
         edit.HideMargins = !Settings.Editor.ShowLineNumbers;
         ApplySyntaxHighlighting(edit);
     }

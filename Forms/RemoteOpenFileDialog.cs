@@ -18,6 +18,10 @@ public partial class RemoteOpenFileDialog : Component
     [Category("Behaviour")]
     public string FileName { get; set; }
 
+    /// <summary>Accept a typed file name that does not exist (after asking), to create a new file.</summary>
+    [Category("Behaviour")]
+    public bool AllowNewFile { get; set; }
+
     public event RemoteCommandStarter CommandRequested;
 
     public RemoteOpenFileDialog()
@@ -33,7 +37,7 @@ public partial class RemoteOpenFileDialog : Component
 
     public string ShowDialog()
     {
-        string text = RemoteOpenFileForm.Browse(CommandRequested, FileName, InitialDirectory, HostName);
+        string text = RemoteOpenFileForm.Browse(CommandRequested, FileName, InitialDirectory, HostName, allowNewFile: AllowNewFile);
         if (text != null)
         {
             FileName = text;

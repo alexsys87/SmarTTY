@@ -417,16 +417,27 @@ namespace SmarTTY.CodeEditing
             }
         }
 
-        /// <summary>Emits text[index] as a paired bracket token when it is a bracket.</summary>
-        private static bool TryAddBracket(string text, int index, ref int last, TokenCache.ITokenSink sink)
+        /// <summary>
+        /// The fold of a multi-line { } block: "if (x) {...}". A "{" alone on its line folds from the line above
+        /// (Allman style), and the blank line after the block stays visible.
+        /// </summary>
+        private static readonly TokenCache.RegionStyle CurlyBraceRegion = new TokenCache.RegionStyle(
+            TokenCache.RegionStyle.FoldBoundary.TokenEnd, TokenCache.RegionStyle.FoldBoundary.TokenEnd, unusedFlag: false,
+            TokenCache.RegionStyle.LabelSource.FixedText, "...", openingOnNextLine: true, trailingBlankLines: 0);
+
+        /// <summary>
+        /// Emits text[index] as a paired bracket token when it is a bracket. With <paramref name="foldCurlyBraces"/>
+        /// a { } pair spanning lines can be folded; other pairs are only used for matching-bracket highlighting.
+        /// </summary>
+        private static bool TryAddBracket(string text, int index, ref int last, TokenCache.ITokenSink sink, bool foldCurlyBraces = false)
         {
             if (!TryGetBracketPair(text[index], out int pairId, out bool isOpening))
             {
                 return false;
             }
             Normal(ref last, last, index, sink);
-            // No region style: the pair is only used for matching-bracket highlighting, not for folding.
-            sink.AddPairedToken(TypeNormal, index, index + 1, pairId, isOpening, null);
+            TokenCache.RegionStyle regionStyle = (foldCurlyBraces && pairId == PairCurlyBrace) ? CurlyBraceRegion : null;
+            sink.AddPairedToken(TypeNormal, index, index + 1, pairId, isOpening, regionStyle);
             last = index + 1;
             return true;
         }
@@ -1094,6 +1105,7 @@ namespace SmarTTY.CodeEditing
             public bool SingleQuoteStrings = true;
             public bool MarkupTags;            // <tag> and </tag> names are colored as keywords
             public bool Brackets;              // emit paired bracket tokens
+            public bool FoldCurlyBraces;       // multi-line { } blocks can be folded
             public string BlockCommentStart;
             public string BlockCommentEnd;
             public HashSet<string> Keywords;
@@ -1242,7 +1254,7 @@ namespace SmarTTY.CodeEditing
                         continue;
                     }
 
-                    if (Brackets && TryAddBracket(text, i, ref last, sink))
+                    if (Brackets && TryAddBracket(text, i, ref last, sink, FoldCurlyBraces))
                     {
                         i++;
                         continue;
@@ -1262,6 +1274,7 @@ namespace SmarTTY.CodeEditing
             SlashComments = true,
             Preprocessor = true,
             Brackets = true,
+            FoldCurlyBraces = true,
             BlockCommentStart = "/*",
             BlockCommentEnd = "*/",
             Keywords = CLikeKeywords

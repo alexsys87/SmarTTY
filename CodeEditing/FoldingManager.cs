@@ -209,6 +209,20 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         _tokenCache = tokenCache;
     }
 
+    /// <summary>
+    /// Expands every folded region. Needed whenever the tokens are rebuilt: a region refers to tokens of
+    /// the previous tokenization. Returns true if anything was folded.
+    /// </summary>
+    public bool Clear()
+    {
+        if (_regions.Count == 0)
+        {
+            return false;
+        }
+        _regions.Clear();
+        return true;
+    }
+
     private GutterState GetGutterState(int lineIndex)
     {
         bool hasPartnerEnd = false;
@@ -220,25 +234,24 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         {
             return GutterState.Plain;
         }
-        if (lineIndex < _tokenCache.LineCount - 1 && _tokenCache.GetLineTokens(lineIndex).Count != 0)
+        if (lineIndex < _tokenCache.LineCount - 1 && !IsBlankLine(lineIndex))
         {
             List<TokenCache.Token> nextTokens = _tokenCache.GetLineTokens(lineIndex + 1);
             if (nextTokens.Count > 0)
             {
                 TokenCache.Token firstToken = nextTokens[0];
-                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && firstToken.Partner != null && firstToken.Partner.LineNumber != firstToken.LineNumber)
+                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && firstToken.Partner != null && firstToken.Partner.LineNumber != firstToken.LineNumber && StartsLine(firstToken))
                 {
                     return GutterState.Expandable;
                 }
             }
         }
-        int tokenIndex = -1;
         foreach (TokenCache.Token token in _tokenCache.GetLineTokens(lineIndex))
         {
-            tokenIndex++;
             if (token.Style != null && token.IsOpening && token.Partner != null && token.Partner.LineNumber != token.LineNumber)
             {
-                if (tokenIndex != 0 || !token.Style.OpeningOnNextLine)
+                // An opening token alone on its line ("{" in Allman style) is folded from the line above.
+                if (!token.Style.OpeningOnNextLine || !StartsLine(token))
                 {
                     return GutterState.Expandable;
                 }
@@ -253,6 +266,26 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             return GutterState.SectionEnd;
         }
         return GutterState.Plain;
+    }
+
+    private bool IsBlankLine(int lineIndex)
+    {
+        return _tokenCache.Document.GetLineText(lineIndex).Trim(' ', '\t').Length == 0;
+    }
+
+    /// <summary>
+    /// Whether the token is the first text of its line. Tokenizers do not emit tokens for plain text, so the
+    /// first token of a line is not necessarily at its start.
+    /// </summary>
+    private bool StartsLine(TokenCache.Token token)
+    {
+        string text = _tokenCache.Document.GetLineText(token.LineNumber);
+        int index = 0;
+        while (index < token.Start && index < text.Length && (text[index] == ' ' || text[index] == '\t'))
+        {
+            index++;
+        }
+        return index == token.Start;
     }
 
     private int CountTrailingBlankLines(int lineIndex, int maxCount)
@@ -288,13 +321,13 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             _regions.Remove(lineIndex);
             return true;
         }
-        if (lineIndex < _tokenCache.LineCount - 1 && _tokenCache.GetLineTokens(lineIndex).Count != 0)
+        if (lineIndex < _tokenCache.LineCount - 1 && !IsBlankLine(lineIndex))
         {
             List<TokenCache.Token> nextTokens = _tokenCache.GetLineTokens(lineIndex + 1);
             if (nextTokens.Count > 0)
             {
                 TokenCache.Token firstToken = nextTokens[0];
-                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && firstToken.Partner != null && firstToken.Partner.LineNumber != firstToken.LineNumber)
+                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && firstToken.Partner != null && firstToken.Partner.LineNumber != firstToken.LineNumber && StartsLine(firstToken))
                 {
                     _regions[lineIndex] = new FoldedRegion(firstToken, firstToken.Partner, this, includesPrecedingLine: true, this.CountTrailingBlankLines(firstToken.Partner.LineNumber, firstToken.Style.TrailingBlankLines));
                     endToken = firstToken.Partner;

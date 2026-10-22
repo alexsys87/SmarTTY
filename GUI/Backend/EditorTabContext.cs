@@ -67,7 +67,10 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         WinFormsHostWrapper winFormsHostWrapper = new WinFormsHostWrapper();
         ((WindowsFormsHost)winFormsHostWrapper).Child = editor;
         Control = (FrameworkElement)winFormsHostWrapper;
-        Searcher = new TextSearcher(editor);
+        Searcher = new TextSearcher(editor)
+        {
+            CanReplace = true
+        };
         editor.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
         Title = RemotePathUtils.GetFileName(filePath);
         FilePath = filePath;
