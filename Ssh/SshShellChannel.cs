@@ -343,6 +343,11 @@ public class SshShellChannel : IAsyncChannel, IDisposable
                 {
                     throw new PtyRequestFailedException();
                 }
+                if (terminalType != null && subsystem == null)
+                {
+                    // Programs started in a terminal get DISPLAY; a refusal only disables X11 forwarding, not the channel.
+                    _session.X11?.RequestOn(_channel);
+                }
                 if (subsystem != null)
                 {
                     started = _channel.SendSubsystemRequest(subsystem);

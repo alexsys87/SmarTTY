@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace SmarTTY.Ssh.Tests;
 
@@ -11,6 +11,9 @@ internal sealed class TestEnvironment
     public string Host = "127.0.0.1";
 
     public int Port = 2222;
+
+    /// <summary>A port of the same server with X11 forwarding disabled (0 if setup-sshd.sh did not provide one).</summary>
+    public int NoX11Port;
 
     public string User = "smartty-test";
 
@@ -43,6 +46,7 @@ internal sealed class TestEnvironment
         TestEnvironment environment = new TestEnvironment();
         environment.Host = Value("SMARTTY_SSH_TEST_HOST", environment.Host);
         environment.Port = int.Parse(Value("SMARTTY_SSH_TEST_PORT", environment.Port.ToString()));
+        environment.NoX11Port = int.Parse(Value("SMARTTY_SSH_TEST_NO_X11_PORT", "0"));
         environment.User = Value("SMARTTY_SSH_TEST_USER", environment.User);
         environment.Password = Value("SMARTTY_SSH_TEST_PASSWORD", environment.Password);
         environment.KeyFile = Value("SMARTTY_SSH_TEST_KEY", environment.KeyFile);

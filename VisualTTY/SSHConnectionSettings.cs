@@ -47,6 +47,9 @@ public class SSHConnectionSettings
 
     public bool EnableCompression { get; set; }
 
+    /// <summary>Requests X11 forwarding, so that graphical programs started on the server open their windows here (VcXsrv).</summary>
+    public bool EnableX11Forwarding { get; set; }
+
     public bool EnableOnTheFlyTAR { get; set; } = true;
 
     public string ConnectionAlias { get; set; }
@@ -105,6 +108,10 @@ public class SSHConnectionSettings
             return false;
         }
         if (settings.EnableOnTheFlyTAR != EnableOnTheFlyTAR)
+        {
+            return false;
+        }
+        if (settings.EnableX11Forwarding != EnableX11Forwarding)
         {
             return false;
         }

@@ -1,7 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Window x:Class="SmarTTY.GUI.XServerLaunchWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" Style="{DynamicResource SecondaryWindowStyle}" Title="X Server Required" Width="400" SizeToContent="Height" WindowStartupLocation="CenterOwner">
   <StackPanel Orientation="Vertical" Margin="5">
-    <TextBlock Text="A remote application has initiated a connection to the X server that is used to display GUI for Linux programs. SmarTTY can start vcxsrv automatically to handle this." TextWrapping="Wrap" />
+    <TextBlock Text="A remote application has initiated a connection to the X server that is used to display GUI for Linux programs. SmarTTY can start VcXsrv automatically to handle this." TextWrapping="Wrap" />
+    <TextBlock Margin="0 8 0 0" TextWrapping="Wrap" Text="{Binding VcxsrvStatusText}" />
     <Grid Margin="0 10 0 5">
       <FrameworkElement.Style>
         <Style TargetType="{x:Type Grid}">
@@ -41,12 +42,14 @@
           </Style>
         </ResourceDictionary>
       </FrameworkElement.Resources>
-      <Button Content="Start vcxsrv (recommended)" Click="VCXSRV_Click" />
+      <Button Content="Start VcXsrv (recommended)" Click="VCXSRV_Click" IsEnabled="{Binding IsVcxsrvInstalled}" />
+      <Button Content="Download and install the latest VcXsrv" ToolTip="Downloads the 64-bit installer of the latest release from github.com/marchaesen/vcxsrv, runs it and starts the X server" Click="DownloadVcxsrv_Click" />
       <Button Content="Select an X server manually" Click="Manual_Click" />
       <Button Content="Cancel" Click="Cancel_Click" />
       <CheckBox Margin="5 5 0 10" IsChecked="{Binding SaveSettings}">
         <TextBlock Text="Remember my choice and don't ask again" />
       </CheckBox>
+      <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Margin="5 0 5 5" Content="Open the VcXsrv download page" Click="ReleasesPage_Click" />
     </StackPanel>
     <Grid Margin="5">
       <FrameworkElement.Style>

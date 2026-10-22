@@ -25,6 +25,11 @@ internal static class MessageBoxes
         return MessageBox.Show(message, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes;
     }
 
+    internal static void Warning(string text)
+    {
+        MessageBox.Show(text, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+    }
+
     internal static void Error(string text)
     {
         MessageBox.Show(text, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);

@@ -1,4 +1,4 @@
-using SmarTTY.Ssh;
+﻿using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.GUI.Backend;
 using SmarTTY.Transport;
@@ -272,6 +272,29 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     private void PublicKey_Click(object sender, RoutedEventArgs e)
     {
         Controller.MenuCommandHandlers.SetupPublicKey();
+    }
+
+    private void CheckX11_Click(object sender, RoutedEventArgs e)
+    {
+        SessionWrapper activeSession = Controller.ActiveSession;
+        if (activeSession == null || activeSession.IsDevice || activeSession.Session == null)
+        {
+            return;
+        }
+        // The check runs commands on the server.
+        System.Threading.ThreadPool.QueueUserWorkItem(delegate
+        {
+            string report;
+            try
+            {
+                report = activeSession.DescribeX11Forwarding();
+            }
+            catch (Exception exception)
+            {
+                report = "The X11 check failed: " + exception.Message;
+            }
+            Controller.BeginInvoke(() => MessageBoxes.Info(report));
+        });
     }
 
     private void TftpFirmware_Click(object sender, RoutedEventArgs e)

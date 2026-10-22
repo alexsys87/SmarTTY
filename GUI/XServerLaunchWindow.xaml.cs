@@ -100,6 +100,23 @@ public partial class XServerLaunchWindow : Window, IComponentConnector
         Controller.StartXServer(XServerType.Vcxsrv);
     }
 
+    private void DownloadVcxsrv_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.DownloadAndInstallVcxsrv();
+    }
+
+    private void ReleasesPage_Click(object sender, RoutedEventArgs e)
+    {
+        VcxsrvSetup.OpenReleasesPage();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        // A download or installation that is still running has nobody to report to.
+        Controller.Cancel();
+        base.OnClosed(e);
+    }
+
     private void Manual_Click(object sender, RoutedEventArgs e)
     {
         Controller.StartXServer(XServerType.Custom);

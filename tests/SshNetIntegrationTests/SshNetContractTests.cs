@@ -1,4 +1,4 @@
-using Renci.SshNet;
+﻿using Renci.SshNet;
 using Renci.SshNet.Common;
 using Renci.SshNet.Compression;
 using Renci.SshNet.Security;
@@ -50,6 +50,24 @@ internal static class SshNetContractTests
         RequireMethod(channelType, "SendData", typeof(byte[]), typeof(int), typeof(int));
         RequireMethod(channelType, "SendEof");
         Test.Check(Enum.IsDefined(typeof(TerminalModes), TerminalModes.ECHO), "TerminalModes enum is usable for the PTY request");
+
+        RequireMethod(channelSessionType, "SendX11ForwardingRequest", typeof(bool), typeof(string), typeof(byte[]), typeof(uint));
+
+        Test.Section("SSH.NET pieces used by X11Forwarding (channels opened by the server)");
+        Test.Check(typeof(Session).GetMethod("SendMessage", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(Renci.SshNet.Messages.Message) }, null) != null, "Session.SendMessage(Message) (non-public) exists");
+        PropertyInfo nextChannelNumber = typeof(Session).GetProperty("NextChannelNumber", BindingFlags.Instance | BindingFlags.NonPublic);
+        Test.Check(nextChannelNumber != null && nextChannelNumber.PropertyType == typeof(uint), "Session.NextChannelNumber (non-public, uint) exists");
+        foreach (string name in new[] { "ChannelOpenReceived", "ChannelDataReceived", "ChannelEofReceived", "ChannelCloseReceived", "ChannelWindowAdjustReceived" })
+        {
+            Test.Check(typeof(Session).GetEvent(name) != null, "public Session event " + name + " exists");
+        }
+        Test.Check(typeof(Session).GetMethod("RegisterMessage", new[] { typeof(string) }) != null, "Session.RegisterMessage(string) exists (enables SSH_MSG_CHANNEL_OPEN)");
+        Test.Check(RequireType("Renci.SshNet.Messages.Connection.ChannelOpenInfo").GetProperty("ChannelType") != null, "ChannelOpenInfo.ChannelType exists");
+        Test.Equal("x11", RequireType("Renci.SshNet.Messages.Connection.X11ChannelOpenInfo").GetField("Name")?.GetValue(null), "SSH.NET parses \"x11\" channel open requests");
+        Test.Check(HasConstructor(typeof(Renci.SshNet.Messages.Connection.ChannelOpenConfirmationMessage), typeof(uint), typeof(uint), typeof(uint), typeof(uint)), "ChannelOpenConfirmationMessage(uint, uint, uint, uint) exists");
+        Test.Check(HasConstructor(typeof(Renci.SshNet.Messages.Connection.ChannelOpenFailureMessage), typeof(uint), typeof(string), typeof(uint), typeof(string)), "ChannelOpenFailureMessage(uint, string, uint, string) exists");
+        Test.Check(HasConstructor(typeof(Renci.SshNet.Messages.Connection.ChannelDataMessage), typeof(uint), typeof(byte[]), typeof(int), typeof(int)), "ChannelDataMessage(uint, byte[], int, int) exists");
+        Test.Check(HasConstructor(typeof(Renci.SshNet.Messages.Connection.ChannelWindowAdjustMessage), typeof(uint), typeof(uint)), "ChannelWindowAdjustMessage(uint, uint) exists");
 
         Test.Section("SSH.NET channel events used by SshNetChannel");
         foreach (string name in new[] { "DataReceived", "ExtendedDataReceived", "Closed", "RequestReceived", "Exception" })

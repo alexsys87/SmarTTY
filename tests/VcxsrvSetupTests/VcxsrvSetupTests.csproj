@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <!-- VcxsrvSetup.cs targets .NET Framework 4.8: the registry is Windows-only and HttpWebRequest is obsolete in .NET 8. -->
+    <NoWarn>$(NoWarn);CA1416;SYSLIB0014;CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../VisualTTY/VcxsrvSetup.cs" Link="VcxsrvSetup.cs" />
+  </ItemGroup>
+</Project>

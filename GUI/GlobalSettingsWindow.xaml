@@ -204,6 +204,8 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -238,6 +240,9 @@
               </TextBox>
               <TextBlock Text="X server arguments:" Grid.Row="2" />
               <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding XServerArguments}" />
+              <TextBlock Name="txtVcxsrvStatus" Grid.Row="3" Grid.ColumnSpan="2" TextWrapping="Wrap" VerticalAlignment="Center" />
+              <Button Name="btnInstallVcxsrv" Grid.Row="3" Grid.Column="2" Margin="5 2 0 2" Padding="8 2" VerticalAlignment="Center" Content="Download latest VcXsrv..." ToolTip="Downloads the 64-bit installer of the latest VcXsrv release from github.com/marchaesen/vcxsrv and runs it" Click="InstallVcxsrv_Click" />
+              <TextBlock Grid.Row="4" Grid.ColumnSpan="3" TextWrapping="Wrap" Margin="0 4 0 0" Text="X11 forwarding is enabled per connection: &quot;Forward X11 (graphical programs)&quot; in the connection settings." />
             </Grid>
           </GroupBox>
           <GroupBox Header="Visual Settings">

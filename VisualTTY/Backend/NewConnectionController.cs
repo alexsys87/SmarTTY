@@ -178,6 +178,18 @@ public class NewConnectionController : INotifyPropertyChanged
         }
     }
 
+    public bool ForwardX11
+    {
+        get
+        {
+            return _Settings.EnableX11Forwarding;
+        }
+        set
+        {
+            _Settings.EnableX11Forwarding = value;
+        }
+    }
+
     public bool EmulateSCPWithCat
     {
         get

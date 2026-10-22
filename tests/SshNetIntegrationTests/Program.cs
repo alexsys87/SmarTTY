@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using Renci.SshNet;
 
@@ -26,6 +26,7 @@ internal static class Program
         SshNetContractTests.ReportVersion();
         SshNetContractTests.Run();
         PtySetupGateTests.Run();
+        X11ForwardingTests.Run();
 
         if (TestEnvironment.IntegrationEnabled())
         {
@@ -34,6 +35,7 @@ internal static class Program
             Console.WriteLine("Using the test server at " + environment.Host + ":" + environment.Port + " as " + environment.User);
             SshIntegrationTests.Run(environment);
             FileTransferManagerTests.Run(environment);
+            X11ForwardingTests.RunLive(environment);
         }
         else
         {
