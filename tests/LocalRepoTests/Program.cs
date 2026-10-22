@@ -492,6 +492,62 @@ internal static class Program
         }
     }
 
+    /// <summary>
+    /// Runs the probe of <see cref="OpenWrtDetector"/> under the given shell against a fake root: the probe looks for
+    /// /etc/openwrt_release and /etc/opkg, so the whole filesystem test is done with a prefix that is swapped in.
+    /// </summary>
+    private static bool RunProbe(string shell, string[] args, string etcDir, bool opkgOnPath)
+    {
+        string fakeBin = Path.Combine(_work, "probebin-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(fakeBin);
+        if (opkgOnPath)
+        {
+            File.WriteAllText(Path.Combine(fakeBin, "opkg"), "#!/bin/sh\nexit 0\n");
+            File.SetUnixFileMode(Path.Combine(fakeBin, "opkg"), UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+        string script = "PATH=" + fakeBin + "; " + OpenWrtDetector.ProbeCommand.Replace("/etc/", etcDir + "/");
+        int exit = RunArgs(shell, args.Concat(new[] { script }).ToArray(), out string output, out string error);
+        if (exit != 0)
+        {
+            throw new Exception("the probe command failed: " + output + error);
+        }
+        return OpenWrtDetector.Parse((output + error).Split('\n'));
+    }
+
+    private static void DetectorTests()
+    {
+        List<(string name, string shell, string[] args)> shells = new List<(string, string, string[])> { ("sh", "sh", new[] { "-c" }) };
+        if (Has("busybox"))
+        {
+            shells.Add(("busybox ash", "busybox", new[] { "ash", "-c" }));
+        }
+        foreach ((string name, string shell, string[] args) in shells)
+        {
+            string openwrtEtc = Path.Combine(_work, "etc-openwrt-" + name.Replace(' ', '-'));
+            string plainEtc = Path.Combine(_work, "etc-plain-" + name.Replace(' ', '-'));
+            string opkgEtc = Path.Combine(_work, "etc-opkgonly-" + name.Replace(' ', '-'));
+            Directory.CreateDirectory(openwrtEtc);
+            Directory.CreateDirectory(plainEtc);
+            Directory.CreateDirectory(Path.Combine(opkgEtc, "opkg"));
+            File.WriteAllText(Path.Combine(openwrtEtc, "openwrt_release"), "DISTRIB_ID='OpenWrt'\n");
+
+            Check(RunProbe(shell, args, openwrtEtc, opkgOnPath: true), name + ": OpenWrt with opkg is detected");
+            Check(!RunProbe(shell, args, openwrtEtc, opkgOnPath: false), name + ": OpenWrt without opkg is not offered");
+            Check(!RunProbe(shell, args, plainEtc, opkgOnPath: true), name + ": a plain host with opkg installed is not offered");
+            Check(!RunProbe(shell, args, plainEtc, opkgOnPath: false), name + ": a plain host is not offered");
+            Check(RunProbe(shell, args, opkgEtc, opkgOnPath: true), name + ": the opkg configuration directory alone counts as OpenWrt");
+        }
+
+        Check(!OpenWrtDetector.Parse(null), "probe output: none means not OpenWrt");
+        Check(!OpenWrtDetector.Parse(new[] { "" }), "probe output: empty means not OpenWrt");
+        Check(!OpenWrtDetector.Parse(new[] { OpenWrtDetector.OpenWrtMarker }), "probe output: OpenWrt alone is not enough");
+        Check(!OpenWrtDetector.Parse(new[] { OpenWrtDetector.OpkgMarker }), "probe output: opkg alone is not enough");
+        Check(OpenWrtDetector.Parse(new[] { OpenWrtDetector.OpenWrtMarker, OpenWrtDetector.OpkgMarker }), "probe output: both markers mean OpenWrt with opkg");
+        Check(!OpenWrtDetector.Parse(new[] { "SMARTTY_OS=other", OpenWrtDetector.OpkgMarker }), "probe output: another OS is refused");
+        Check(OpenWrtDetector.Parse(new[] { "  " + OpenWrtDetector.OpenWrtMarker + "  ", OpenWrtDetector.OpkgMarker + "\r" }), "probe output: surrounding blanks and CR are ignored");
+        Check(!OpenWrtDetector.Parse(new[] { "sh: opkg: not found" }), "probe output: an error line is not a positive answer");
+    }
+
     private static SshSession NewFakeSession(string conf)
     {
         SshSession session = new SshSession { LocalConfigFile = conf };
@@ -671,6 +727,7 @@ internal static class Program
             StaleTests();
             ScannerTests();
             ResolveTests();
+            DetectorTests();
             await ServerTests();
             ConfigTests();
             await HostTests();

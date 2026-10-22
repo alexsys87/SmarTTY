@@ -13,6 +13,7 @@
     <Compile Include="../../LocalRepo/OpkgFeedConfig.cs" Link="OpkgFeedConfig.cs" />
     <Compile Include="../../LocalRepo/LocalRepoHost.cs" Link="LocalRepoHost.cs" />
     <Compile Include="../../LocalRepo/LocalRepoSettings.cs" Link="LocalRepoSettings.cs" />
+    <Compile Include="../../LocalRepo/OpenWrtDetector.cs" Link="OpenWrtDetector.cs" />
     <Compile Include="../../Utilities/XmlStorage.cs" Link="XmlStorage.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
   </ItemGroup>
