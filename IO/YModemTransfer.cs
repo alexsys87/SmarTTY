@@ -13,11 +13,18 @@ namespace SmarTTY.IO;
 /// <see cref="XModemTransfer"/>, whose block, CRC-16 and link code it shares).
 ///
 /// A transfer is a sequence of files. Every file starts with a header block (block 0) that carries the file name and
-/// size, followed by the data as numbered XMODEM-1K blocks (CRC-16 only) and an EOT; the batch ends with an empty
-/// header block (block 0 with no file name). The receiver drives the handshake: it asks for each block 0 and for the
-/// data of each file with 'C', and answers the first EOT of a file with NAK (the second one with ACK).
+/// size, followed by the data as numbered blocks and an EOT; the batch ends with an empty header block (block 0 with no
+/// file name). The receiver drives the handshake: it asks for each block 0 and for the data of each file, and its
+/// request says which variant is used:
 ///
-/// Not supported: YMODEM-G (streaming, 'G' handshake) and the checksum variant (receiver NAK instead of 'C').
+///   'C'   YMODEM: CRC-16, 1024-byte blocks (a short tail goes in a 128-byte block). Every block is acknowledged and
+///         the first EOT of a file is answered with NAK, the second with ACK.
+///   NAK   the checksum variant: 8-bit checksum instead of CRC-16 and 128-byte blocks only, otherwise as above.
+///   'G'   YMODEM-G: CRC-16, 1024-byte blocks, streaming. Blocks are not acknowledged and a damaged one cannot be
+///         repeated: the receiver cancels the whole transfer instead (CAN CAN). Only for error-free links.
+///
+/// A sender follows the receiver's first request, so it serves all three. A receiver asks for 'C' and falls back to
+/// NAK by itself when the sender does not answer; YMODEM-G has to be asked for.
 /// </summary>
 public class YModemTransfer
 {
@@ -28,13 +35,55 @@ public class YModemTransfer
     private const byte NAK = XModemTransfer.NAK;
     private const byte CAN = XModemTransfer.CAN;
     private const byte C = XModemTransfer.C;
+    private const byte G = (byte)'G'; // the request of YMODEM-G
 
     private const int BlockSize = XModemTransfer.BlockSize;
     private const int LargeBlockSize = XModemTransfer.LargeBlockSize;
     private const int MaxRetries = XModemTransfer.MaxRetries;
     private const int EndOfBatchAttempts = 3; // the end-of-batch block carries no data, so it is not worth a long wait
 
-    private const XModemTransfer.XModemMode Crc = XModemTransfer.XModemMode.Crc16;
+    // A 'G' is also a letter, so a banner or an echo can contain one. A real request stands alone on the line (the
+    // receiver waits for the sender), text goes on: a 'G' counts only when nothing follows it for this long.
+    private const int StreamingRequestQuietMs = 50;
+
+    // How many bytes of what the receiver sends are looked at between two streamed blocks.
+    private const int StreamingPollBytes = 16;
+
+    /// <summary>What the blocks look like and how a receiver asks for them (see the class description).</summary>
+    private enum Variant
+    {
+        Crc,
+        Checksum,
+        Streaming
+    }
+
+    private static XModemTransfer.XModemMode ModeOf(Variant variant)
+    {
+        return variant == Variant.Checksum ? XModemTransfer.XModemMode.Checksum : XModemTransfer.XModemMode.Crc16;
+    }
+
+    private static byte RequestOf(Variant variant)
+    {
+        return variant == Variant.Streaming ? G : variant == Variant.Checksum ? NAK : C;
+    }
+
+    private static Variant VariantOf(byte request)
+    {
+        return request == G ? Variant.Streaming : request == NAK ? Variant.Checksum : Variant.Crc;
+    }
+
+    /// <summary>How a receiver asks for the files.</summary>
+    public enum YModemReceiveMode
+    {
+        /// <summary>'C' (CRC-16); when the sender does not answer, NAK (checksum). The usual choice.</summary>
+        Standard,
+
+        /// <summary>NAK from the start: a sender known to understand only the checksum variant.</summary>
+        Checksum,
+
+        /// <summary>'G' (YMODEM-G): streaming without acknowledgements. A damaged block aborts the transfer.</summary>
+        Streaming
+    }
 
     /// <summary>A file to be sent: a seekable stream (the size goes into the header) and the name the receiver will see.</summary>
     public sealed class FileToSend
@@ -256,17 +305,27 @@ public class YModemTransfer
     }
 
     /// <summary>
-    /// Waits for the receiver's 'C'. Anything else (a banner, the echo of the command that started the receiver) is
-    /// ignored, and so are copies of the 'C' that piled up meanwhile. Aborted means the transfer ended and was reported.
+    /// Waits for a request of the receiver: any of 'C', NAK and 'G' when <paramref name="anyRequest"/> is set (the first
+    /// one decides the variant), otherwise only <paramref name="expected"/>. Anything else (a banner, the echo of the
+    /// command that started the receiver, the ACK that comes before a 'G', copies of the request that piled up
+    /// meanwhile) is ignored. Aborted means the transfer ended and was reported.
     /// </summary>
-    private static Request AwaitRequest(XModemTransfer.Link link, int timeoutMs, XModemTransfer.ProgressHandler onProgress, long done, long total, int errors)
+    private static Request AwaitRequest(XModemTransfer.Link link, int timeoutMs, bool anyRequest, byte expected, out byte request,
+        XModemTransfer.ProgressHandler onProgress, long done, long total, int errors)
     {
+        request = 0;
         Stopwatch timer = Stopwatch.StartNew();
         bool previousWasCan = false;
+        byte? pending = null;
         while (true)
         {
-            int left = timeoutMs - (int)timer.ElapsedMilliseconds;
-            byte? b = left > 0 ? link.Read(left) : null;
+            byte? b = pending;
+            pending = null;
+            if (!b.HasValue)
+            {
+                int left = timeoutMs - (int)timer.ElapsedMilliseconds;
+                b = left > 0 ? link.Read(left) : null;
+            }
             if (link.IsCancelled)
             {
                 link.SendCancel();
@@ -288,26 +347,74 @@ public class YModemTransfer
                 continue;
             }
             previousWasCan = false;
-            if (b.Value == C)
+
+            bool isRequest = anyRequest ? b.Value == C || b.Value == NAK || b.Value == G : b.Value == expected;
+            if (!isRequest)
             {
-                link.Purge(0);
-                return Request.Got;
+                continue;
             }
+            if (b.Value == G)
+            {
+                byte? next = link.Read(StreamingRequestQuietMs);
+                if (next.HasValue)
+                {
+                    pending = next; // text, not a request
+                    continue;
+                }
+                if (link.IsCancelled)
+                {
+                    continue; // reported at the top of the loop
+                }
+            }
+
+            link.Purge(0);
+            request = b.Value;
+            return Request.Got;
         }
     }
 
     /// <summary>AwaitRequest where running out of time ends the transfer with <paramref name="timeoutMessage"/>.</summary>
-    private static bool RequireRequest(XModemTransfer.Link link, int timeoutMs, XModemTransfer.ProgressHandler onProgress, long done, long total, ref int errors, string timeoutMessage)
+    private static bool RequireRequest(XModemTransfer.Link link, int timeoutMs, bool anyRequest, byte expected, out byte request,
+        XModemTransfer.ProgressHandler onProgress, long done, long total, ref int errors, string timeoutMessage)
     {
-        Request request = AwaitRequest(link, timeoutMs, onProgress, done, total, errors);
-        if (request == Request.Got)
+        Request result = AwaitRequest(link, timeoutMs, anyRequest, expected, out request, onProgress, done, total, errors);
+        if (result == Request.Got)
         {
             return true;
         }
-        if (request == Request.Timeout)
+        if (result == Request.Timeout)
         {
             link.SendCancel();
             XModemTransfer.Report(onProgress, done, total, ++errors, timeoutMessage);
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Streaming has no acknowledgements, so the only way to learn that the receiver gave up is to look for CAN CAN in what
+    /// it sends meanwhile. <paramref name="previousWasCan"/> carries a single CAN over to the next look.
+    /// </summary>
+    private static bool ReceiverCancelled(XModemTransfer.Link link, ref bool previousWasCan)
+    {
+        for (int i = 0; i < StreamingPollBytes; i++)
+        {
+            byte? b = link.Read(0);
+            if (!b.HasValue)
+            {
+                return false;
+            }
+            if (b.Value == CAN)
+            {
+                if (previousWasCan)
+                {
+                    return true;
+                }
+                previousWasCan = true;
+            }
+            else
+            {
+                previousWasCan = false;
+            }
         }
         return false;
     }
@@ -374,8 +481,10 @@ public class YModemTransfer
     }
 
     /// <summary>
-    /// Sends the files one after another and ends the batch. A false result means the transfer was cancelled or failed;
-    /// the last status passed to <paramref name="onProgress"/> says why. Progress counts the bytes of all files together.
+    /// Sends the files one after another and ends the batch, in the variant the receiver asks for ('C': YMODEM, NAK: the
+    /// checksum variant, 'G': YMODEM-G). A false result means the transfer was cancelled or failed; the last status
+    /// passed to <paramref name="onProgress"/> says why. Progress counts the bytes of all files together; with YMODEM-G
+    /// it counts the bytes handed to the line, since nothing is acknowledged until the end of a file.
     /// </summary>
     internal static bool SendFiles(
         IReadOnlyList<FileToSend> files,
@@ -402,12 +511,27 @@ public class YModemTransfer
         byte[] data = new byte[LargeBlockSize];
         byte[] packet = new byte[3 + LargeBlockSize + 2];
 
+        // The receiver's first request decides the variant; its later requests ask for the same thing.
         XModemTransfer.Report(onProgress, 0, total, errors, "Waiting for the receiver...");
-        if (!RequireRequest(link, timeouts.SenderHandshakeMs, onProgress, done, total, ref errors,
-            "Handshake timeout: the receiver did not ask for data ('C'). YMODEM needs a receiver that uses CRC-16."))
+        if (!RequireRequest(link, timeouts.SenderHandshakeMs, true, 0, out byte request, onProgress, done, total, ref errors,
+            "Handshake timeout: the receiver did not ask for data ('C', NAK or 'G')."))
         {
             return false;
         }
+        Variant variant = VariantOf(request);
+        XModemTransfer.XModemMode blockMode = ModeOf(variant);
+        bool streaming = variant == Variant.Streaming;
+        int dataBlockSize = variant == Variant.Checksum ? BlockSize : LargeBlockSize;
+        if (streaming)
+        {
+            XModemTransfer.Report(onProgress, 0, total, errors, "The receiver asked for YMODEM-G: blocks go out without acknowledgements.");
+        }
+        else if (variant == Variant.Checksum)
+        {
+            XModemTransfer.Report(onProgress, 0, total, errors, "The receiver asked for the checksum variant: 128-byte blocks.");
+        }
+
+        bool receiverCan = false; // a single CAN seen while streaming
 
         for (int fileIndex = 0; fileIndex < files.Count; fileIndex++)
         {
@@ -416,31 +540,68 @@ public class YModemTransfer
 
             // Block 0: name and size.
             byte[] header = BuildHeaderPayload(file.Name, file.Length, file.ModifiedUtc);
-            int headerLength = XModemTransfer.BuildPacket(packet, header, header.Length, header.Length, 0, Crc);
-            XModemTransfer.Report(onProgress, done, total, errors, "Sending the header of " + label);
-            Delivery delivery = SendBlock(link, packet, headerLength, "the header of " + label, MaxRetries, timeouts.AckMs, onProgress, done, total, ref errors);
-            if (delivery == Delivery.Aborted)
-            {
-                return false;
-            }
-            if (delivery == Delivery.NoAnswer)
+            if (variant == Variant.Checksum && header.Length > BlockSize)
             {
                 link.SendCancel();
-                XModemTransfer.Report(onProgress, done, total, errors, "Transfer failed: the receiver did not accept the header of " + label + ".");
+                XModemTransfer.Report(onProgress, done, total, ++errors,
+                    "Transfer failed: the name of " + label + " is too long for a receiver that uses the checksum variant (128-byte blocks).");
                 return false;
             }
-            if (!RequireRequest(link, timeouts.NextRequestMs, onProgress, done, total, ref errors,
-                "Transfer failed: the receiver did not ask for the data of " + label + " ('C' expected after the header)."))
+            int headerLength = XModemTransfer.BuildPacket(packet, header, header.Length, header.Length, 0, blockMode);
+            XModemTransfer.Report(onProgress, done, total, errors, "Sending the header of " + label);
+
+            if (streaming)
+            {
+                if (link.IsCancelled)
+                {
+                    link.SendCancel();
+                    XModemTransfer.Report(onProgress, done, total, errors, "Transfer cancelled.");
+                    return false;
+                }
+                link.Send(packet, headerLength); // the receiver answers it with ACK and 'G', but a lost header cannot be repeated
+            }
+            else
+            {
+                Delivery delivery = SendBlock(link, packet, headerLength, "the header of " + label, MaxRetries, timeouts.AckMs, onProgress, done, total, ref errors);
+                if (delivery == Delivery.Aborted)
+                {
+                    return false;
+                }
+                if (delivery == Delivery.NoAnswer)
+                {
+                    link.SendCancel();
+                    XModemTransfer.Report(onProgress, done, total, errors, "Transfer failed: the receiver did not accept the header of " + label + ".");
+                    return false;
+                }
+            }
+            if (!RequireRequest(link, timeouts.NextRequestMs, false, request, out _, onProgress, done, total, ref errors,
+                "Transfer failed: the receiver did not ask for the data of " + label + " (" + RequestName(request) + " expected after the header)."))
             {
                 return false;
             }
 
-            // Data: numbered from 1; 1K blocks, a tail of up to 128 bytes as one 128-byte block.
+            // Data: numbered from 1. YMODEM and YMODEM-G send 1K blocks and a tail of up to 128 bytes as one 128-byte block;
+            // the checksum variant knows only 128-byte blocks.
             long remaining = file.Length;
             int blockIndex = 1;
             while (remaining > 0)
             {
-                int want = (int)Math.Min(LargeBlockSize, remaining);
+                if (streaming)
+                {
+                    if (link.IsCancelled)
+                    {
+                        link.SendCancel();
+                        XModemTransfer.Report(onProgress, done, total, errors, "Transfer cancelled.");
+                        return false;
+                    }
+                    if (ReceiverCancelled(link, ref receiverCan))
+                    {
+                        XModemTransfer.Report(onProgress, done, total, errors, "Cancelled by the receiver.");
+                        return false;
+                    }
+                }
+
+                int want = (int)Math.Min(dataBlockSize, remaining);
                 int read;
                 try
                 {
@@ -461,18 +622,25 @@ public class YModemTransfer
                 }
 
                 int size = read > BlockSize ? LargeBlockSize : BlockSize;
-                int packetLength = XModemTransfer.BuildPacket(packet, data, read, size, blockIndex, Crc);
-                delivery = SendBlock(link, packet, packetLength, "block " + blockIndex, MaxRetries, timeouts.AckMs, onProgress, done, total, ref errors);
-                if (delivery == Delivery.Aborted)
+                int packetLength = XModemTransfer.BuildPacket(packet, data, read, size, blockIndex, blockMode);
+                if (streaming)
                 {
-                    return false;
+                    link.Send(packet, packetLength);
                 }
-                if (delivery == Delivery.NoAnswer)
+                else
                 {
-                    link.SendCancel();
-                    XModemTransfer.Report(onProgress, done, total, errors,
-                        "Transfer failed: no valid answer to block " + blockIndex + " of " + label + " after " + MaxRetries + " attempts.");
-                    return false;
+                    Delivery delivery = SendBlock(link, packet, packetLength, "block " + blockIndex, MaxRetries, timeouts.AckMs, onProgress, done, total, ref errors);
+                    if (delivery == Delivery.Aborted)
+                    {
+                        return false;
+                    }
+                    if (delivery == Delivery.NoAnswer)
+                    {
+                        link.SendCancel();
+                        XModemTransfer.Report(onProgress, done, total, errors,
+                            "Transfer failed: no valid answer to block " + blockIndex + " of " + label + " after " + MaxRetries + " attempts.");
+                        return false;
+                    }
                 }
 
                 done += read;
@@ -481,7 +649,9 @@ public class YModemTransfer
                 blockIndex++;
             }
 
-            // EOT. A NAK to the first one is normal (it protects against a damaged byte that looks like EOT), so the EOT is repeated.
+            // EOT. A NAK to the first one is normal (it protects against a damaged byte that looks like EOT), so the EOT is
+            // repeated. A streaming receiver may still be working through the blocks, so it gets more time to answer.
+            int eotWaitMs = streaming ? Math.Max(timeouts.AckMs, timeouts.NextRequestMs) : timeouts.AckMs;
             bool eotAcknowledged = false;
             for (int attempt = 1; attempt <= MaxRetries && !eotAcknowledged; attempt++)
             {
@@ -493,7 +663,7 @@ public class YModemTransfer
                 }
 
                 link.Send(EOT);
-                XModemTransfer.Reply reply = XModemTransfer.WaitForReply(link, timeouts.AckMs);
+                XModemTransfer.Reply reply = XModemTransfer.WaitForReply(link, eotWaitMs);
                 if (reply == XModemTransfer.Reply.Ack)
                 {
                     eotAcknowledged = true;
@@ -518,8 +688,8 @@ public class YModemTransfer
             XModemTransfer.Report(onProgress, done, total, errors, label + " sent");
 
             if (fileIndex < files.Count - 1
-                && !RequireRequest(link, timeouts.NextRequestMs, onProgress, done, total, ref errors,
-                    "Transfer failed: the receiver did not ask for the next file after " + label + " ('C' expected)."))
+                && !RequireRequest(link, timeouts.NextRequestMs, false, request, out _, onProgress, done, total, ref errors,
+                    "Transfer failed: the receiver did not ask for the next file after " + label + " (" + RequestName(request) + " expected)."))
             {
                 return false;
             }
@@ -527,7 +697,7 @@ public class YModemTransfer
 
         // End of the batch: an empty block 0. The files are already acknowledged, so a receiver that goes away here
         // (typically a bootloader that starts the new program) does not make the transfer a failure.
-        Request end = AwaitRequest(link, timeouts.BatchEndRequestMs, onProgress, done, total, errors);
+        Request end = AwaitRequest(link, timeouts.BatchEndRequestMs, false, request, out _, onProgress, done, total, errors);
         if (end == Request.Aborted)
         {
             return false;
@@ -539,8 +709,8 @@ public class YModemTransfer
         }
 
         byte[] terminator = new byte[BlockSize];
-        int terminatorLength = XModemTransfer.BuildPacket(packet, terminator, terminator.Length, terminator.Length, 0, Crc);
-        Delivery last = SendBlock(link, packet, terminatorLength, "the end-of-batch block", EndOfBatchAttempts, timeouts.AckMs, onProgress, done, total, ref errors);
+        int terminatorLength = XModemTransfer.BuildPacket(packet, terminator, terminator.Length, terminator.Length, 0, blockMode);
+        Delivery last = SendBlock(link, packet, terminatorLength, "the end-of-batch block", streaming ? 1 : EndOfBatchAttempts, timeouts.AckMs, onProgress, done, total, ref errors);
         if (last == Delivery.Aborted)
         {
             return false;
@@ -549,6 +719,11 @@ public class YModemTransfer
             ? "Transfer complete."
             : "Transfer complete (the end-of-batch block was not acknowledged).");
         return true;
+    }
+
+    private static string RequestName(byte request)
+    {
+        return request == NAK ? "NAK" : "'" + (char)request + "'";
     }
 
     // ---------- receiver ----------
@@ -561,29 +736,37 @@ public class YModemTransfer
     }
 
     /// <summary>
-    /// Asks for block 0 with 'C' and reads it. Failed means the transfer ended and was reported. The block is not
+    /// Asks for block 0 and reads it. With <paramref name="negotiate"/> (the first request of a standard receiver) it asks
+    /// with 'C' and then with NAK, and <paramref name="variant"/> becomes the one the sender answered; otherwise it asks
+    /// the way <paramref name="variant"/> says. Failed means the transfer ended and was reported. The block is not
     /// acknowledged here: the caller does that once it knows where the file goes.
     /// </summary>
     private static HeaderResult ReceiveHeader(XModemTransfer.Link link, byte[] payload, XModemTransfer.ProgressHandler onProgress,
-        ref int errors, XModemTransfer.Timeouts timeouts, out FileHeader info)
+        ref int errors, XModemTransfer.Timeouts timeouts, ref Variant variant, bool negotiate, out FileHeader info)
     {
         info = null;
 
         byte? start = null;
-        for (int attempt = 0; attempt < MaxRetries && !start.HasValue; attempt++)
+        Variant[] phases = negotiate ? new[] { Variant.Crc, Variant.Checksum } : new[] { variant };
+        for (int phase = 0; phase < phases.Length && !start.HasValue; phase++)
         {
-            if (link.IsCancelled)
+            variant = phases[phase];
+            byte request = RequestOf(variant);
+            for (int attempt = 0; attempt < MaxRetries && !start.HasValue; attempt++)
             {
-                link.SendCancel();
-                XModemTransfer.Report(onProgress, 0, 0, errors, "Transfer cancelled.");
-                return HeaderResult.Failed;
-            }
-            link.Send(C);
-            start = XModemTransfer.ReadHeader(link, timeouts.ReceiverHandshakeAttemptMs);
-            if (start == EOT)
-            {
-                link.Send(ACK); // the repeated EOT of the previous file: its ACK was lost, the next 'C' follows
-                start = null;
+                if (link.IsCancelled)
+                {
+                    link.SendCancel();
+                    XModemTransfer.Report(onProgress, 0, 0, errors, "Transfer cancelled.");
+                    return HeaderResult.Failed;
+                }
+                link.Send(request);
+                start = XModemTransfer.ReadHeader(link, timeouts.ReceiverHandshakeAttemptMs);
+                if (start == EOT)
+                {
+                    link.Send(ACK); // the repeated EOT of the previous file: its ACK was lost, the next request follows
+                    start = null;
+                }
             }
         }
         if (link.IsCancelled)
@@ -598,6 +781,7 @@ public class YModemTransfer
             return HeaderResult.Failed;
         }
 
+        bool streaming = variant == Variant.Streaming;
         int consecutiveErrors = 0;
         while (true)
         {
@@ -608,7 +792,7 @@ public class YModemTransfer
             }
 
             int size = start == STX ? LargeBlockSize : BlockSize;
-            if (XModemTransfer.TryReadBlock(link, size, Crc, timeouts.ByteMs, payload, out byte number))
+            if (XModemTransfer.TryReadBlock(link, size, ModeOf(variant), timeouts.ByteMs, payload, out byte number))
             {
                 if (number != 0)
                 {
@@ -629,6 +813,13 @@ public class YModemTransfer
                 return HeaderResult.Failed;
             }
             errors++;
+            if (streaming)
+            {
+                // YMODEM-G has no way to ask for a repeat.
+                link.SendCancel();
+                XModemTransfer.Report(onProgress, 0, 0, errors, "Transfer failed: the file header is damaged and YMODEM-G cannot repeat it.");
+                return HeaderResult.Failed;
+            }
             if (++consecutiveErrors > MaxRetries)
             {
                 link.SendCancel();
@@ -656,11 +847,16 @@ public class YModemTransfer
 
     /// <summary>
     /// Receives the data blocks of one file, after its header has been acknowledged, up to the EOT. The padding of the
-    /// last block is cut off when the size is known. False means the transfer ended and was reported.
+    /// last block is cut off when the size is known. With YMODEM-G blocks are not acknowledged and anything that is not
+    /// the next block ends the transfer. False means the transfer ended and was reported.
     /// </summary>
-    private static bool ReceiveFileData(XModemTransfer.Link link, Stream target, FileHeader info, byte[] payload,
+    private static bool ReceiveFileData(XModemTransfer.Link link, Stream target, FileHeader info, byte[] payload, Variant variant,
         XModemTransfer.ProgressHandler onProgress, ref int errors, XModemTransfer.Timeouts timeouts)
     {
+        bool streaming = variant == Variant.Streaming;
+        XModemTransfer.XModemMode blockMode = ModeOf(variant);
+        byte request = RequestOf(variant);
+
         long total = info.Size > 0 ? info.Size : 0;
         long received = 0;
         int blocksAccepted = 0;
@@ -668,7 +864,7 @@ public class YModemTransfer
         bool eotSeen = false;
         int consecutiveErrors = 0;
 
-        // 'C' asks for the data. Without a data block the sender is idle or does not know the file is accepted.
+        // The request asks for the data. Without a data block the sender is idle or does not know the file is accepted.
         byte? header = null;
         for (int attempt = 0; attempt < MaxRetries && !header.HasValue; attempt++)
         {
@@ -678,7 +874,7 @@ public class YModemTransfer
                 XModemTransfer.Report(onProgress, received, total, errors, "Transfer cancelled.");
                 return false;
             }
-            link.Send(C);
+            link.Send(request);
             header = XModemTransfer.ReadHeader(link, timeouts.ReceiverHandshakeAttemptMs);
         }
         if (link.IsCancelled)
@@ -715,6 +911,12 @@ public class YModemTransfer
             if (!header.HasValue)
             {
                 errors++;
+                if (streaming)
+                {
+                    link.SendCancel();
+                    XModemTransfer.Report(onProgress, received, total, errors, "Transfer failed: the sender stopped sending and YMODEM-G cannot ask for a repeat.");
+                    return false;
+                }
                 if (++consecutiveErrors > MaxRetries)
                 {
                     link.SendCancel();
@@ -731,7 +933,7 @@ public class YModemTransfer
 
             if (start == EOT)
             {
-                if (!eotSeen)
+                if (!streaming && !eotSeen)
                 {
                     // NAK the first EOT: a damaged byte must not end a file. A real sender repeats it.
                     eotSeen = true;
@@ -766,13 +968,21 @@ public class YModemTransfer
             }
 
             int size = start == STX ? LargeBlockSize : BlockSize;
-            if (!XModemTransfer.TryReadBlock(link, size, Crc, timeouts.ByteMs, payload, out byte blockNumber))
+            byte blockNumber;
+            if (!XModemTransfer.TryReadBlock(link, size, blockMode, timeouts.ByteMs, payload, out blockNumber))
             {
                 if (link.IsCancelled)
                 {
                     continue; // reported at the top of the loop
                 }
                 errors++;
+                if (streaming)
+                {
+                    link.SendCancel();
+                    XModemTransfer.Report(onProgress, received, total, errors,
+                        "Transfer failed: block " + (blocksAccepted + 1) + " of " + info.Name + " is damaged and YMODEM-G cannot ask for a repeat.");
+                    return false;
+                }
                 if (++consecutiveErrors > MaxRetries)
                 {
                     link.SendCancel();
@@ -811,19 +1021,22 @@ public class YModemTransfer
                 received += count;
                 blocksAccepted++;
                 expectedBlock++;
-                link.Send(ACK);
+                if (!streaming)
+                {
+                    link.Send(ACK);
+                }
                 XModemTransfer.Report(onProgress, received, total, errors, info.Name + ": received block " + blocksAccepted);
             }
-            else if (blocksAccepted > 0 && blockNumber == (byte)(expectedBlock - 1))
+            else if (!streaming && blocksAccepted > 0 && blockNumber == (byte)(expectedBlock - 1))
             {
                 // The sender repeated a block whose ACK it did not see: acknowledge it again, keep the data once.
                 link.Send(ACK);
                 XModemTransfer.Report(onProgress, received, total, errors, "Repeated block " + blocksAccepted + " acknowledged");
             }
-            else if (blocksAccepted == 0 && blockNumber == 0)
+            else if (!streaming && blocksAccepted == 0 && blockNumber == 0)
             {
-                // The sender repeated the header whose ACK (or 'C') it did not see.
-                link.Send(ACK, C);
+                // The sender repeated the header whose ACK (or request) it did not see.
+                link.Send(ACK, request);
             }
             else
             {
@@ -840,7 +1053,8 @@ public class YModemTransfer
     /// to write it to (the stream is disposed when the file is complete or the transfer fails), or null to refuse the
     /// file, which ends the transfer. <paramref name="onFileReceived"/> (optional) is called once a file has been
     /// received completely and its stream is closed. Progress is per file: the size announced by the sender is the
-    /// total (0 when it did not announce one).
+    /// total (0 when it did not announce one). <paramref name="mode"/> says how the files are asked for (see
+    /// <see cref="YModemReceiveMode"/>).
     /// </summary>
     public static bool ReceiveFiles(
         Func<FileHeader, Stream> openTarget,
@@ -848,9 +1062,10 @@ public class YModemTransfer
         Func<int, byte?> readByteWithTimeout,
         CancellationToken cancellationToken,
         XModemTransfer.ProgressHandler onProgress,
-        Action<FileHeader> onFileReceived = null)
+        Action<FileHeader> onFileReceived = null,
+        YModemReceiveMode mode = YModemReceiveMode.Standard)
     {
-        return ReceiveFiles(openTarget, sendData, readByteWithTimeout, cancellationToken, onProgress, onFileReceived, new XModemTransfer.Timeouts());
+        return ReceiveFiles(openTarget, sendData, readByteWithTimeout, cancellationToken, onProgress, onFileReceived, new XModemTransfer.Timeouts(), mode);
     }
 
     internal static bool ReceiveFiles(
@@ -860,7 +1075,8 @@ public class YModemTransfer
         CancellationToken cancellationToken,
         XModemTransfer.ProgressHandler onProgress,
         Action<FileHeader> onFileReceived,
-        XModemTransfer.Timeouts timeouts)
+        XModemTransfer.Timeouts timeouts,
+        YModemReceiveMode mode = YModemReceiveMode.Standard)
     {
         if (openTarget == null) throw new ArgumentNullException(nameof(openTarget));
         if (sendData == null) throw new ArgumentNullException(nameof(sendData));
@@ -871,14 +1087,21 @@ public class YModemTransfer
         int errors = 0;
         int filesReceived = 0;
 
+        // A standard receiver settles the variant with its first request and keeps it for the rest of the batch.
+        Variant variant = mode == YModemReceiveMode.Streaming ? Variant.Streaming
+            : mode == YModemReceiveMode.Checksum ? Variant.Checksum
+            : Variant.Crc;
+        bool negotiate = mode == YModemReceiveMode.Standard;
+
         // Text that arrived before the handshake (a banner, an echo) must not be mistaken for the peer's first answer.
         link.Purge(0);
-        XModemTransfer.Report(onProgress, 0, 0, errors, "Waiting for the sender...");
+        XModemTransfer.Report(onProgress, 0, 0, errors, variant == Variant.Streaming ? "Waiting for the sender (YMODEM-G)..." : "Waiting for the sender...");
 
         while (true)
         {
             FileHeader info;
-            HeaderResult result = ReceiveHeader(link, payload, onProgress, ref errors, timeouts, out info);
+            HeaderResult result = ReceiveHeader(link, payload, onProgress, ref errors, timeouts, ref variant, negotiate, out info);
+            negotiate = false;
             if (result == HeaderResult.Failed)
             {
                 return false;
@@ -916,7 +1139,7 @@ public class YModemTransfer
             {
                 link.Send(ACK); // the header: the file is accepted and its data may start
                 XModemTransfer.Report(onProgress, 0, info.Size > 0 ? info.Size : 0, errors, "Receiving " + info.Name);
-                received = ReceiveFileData(link, target, info, payload, onProgress, ref errors, timeouts);
+                received = ReceiveFileData(link, target, info, payload, variant, onProgress, ref errors, timeouts);
             }
             if (!received)
             {

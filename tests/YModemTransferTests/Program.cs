@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 // Run with: dotnet run --project tests/YModemTransferTests
 internal static class Program
 {
-    private const byte SOH = 0x01, STX = 0x02, EOT = 0x04, ACK = 0x06, NAK = 0x15, CAN = 0x18, C = 0x43, SUB = 0x1A;
+    private const byte SOH = 0x01, STX = 0x02, EOT = 0x04, ACK = 0x06, NAK = 0x15, CAN = 0x18, C = 0x43, G = 0x47, SUB = 0x1A;
 
     private static int _passed;
     private static readonly List<string> Failures = new List<string>();
@@ -37,6 +37,8 @@ internal static class Program
         {
             return _bytes.TryTake(out byte b, timeoutMs) ? b : (byte?)null;
         }
+
+        public int Count => _bytes.Count;
     }
 
     private sealed class End
@@ -91,7 +93,7 @@ internal static class Program
         public bool CheckOk;
     }
 
-    private static Packet ReadPacket(End e, int firstTimeoutMs)
+    private static Packet ReadPacket(End e, int firstTimeoutMs, bool checksum = false)
     {
         byte? h = e.Read(firstTimeoutMs);
         while (h == C || h == NAK) // a late handshake byte of our own is not a packet
@@ -108,16 +110,29 @@ internal static class Program
         p.Number = e.Read(1000) ?? 0;
         p.Complement = e.Read(1000) ?? 0;
         for (int i = 0; i < size; i++) p.Data[i] = e.Read(1000) ?? 0;
-        int hi = e.Read(1000) ?? 0, lo = e.Read(1000) ?? 0;
-        p.CheckOk = (ushort)((hi << 8) | lo) == XModemTransfer.CalculateCrc16(p.Data, 0, size);
+        if (checksum)
+        {
+            int sum = e.Read(1000) ?? 0;
+            p.CheckOk = (byte)sum == XModemTransfer.CalculateChecksum(p.Data, 0, size);
+        }
+        else
+        {
+            int hi = e.Read(1000) ?? 0, lo = e.Read(1000) ?? 0;
+            p.CheckOk = (ushort)((hi << 8) | lo) == XModemTransfer.CalculateCrc16(p.Data, 0, size);
+        }
         p.CheckOk &= (byte)(p.Number + p.Complement) == 255;
         return p;
     }
 
-    private static byte[] Block(byte number, byte[] payload)
+    private static byte[] Block(byte number, byte[] payload, bool checksum = false)
     {
         List<byte> l = new List<byte> { payload.Length == 1024 ? STX : SOH, number, (byte)(255 - number) };
         l.AddRange(payload);
+        if (checksum)
+        {
+            l.Add(XModemTransfer.CalculateChecksum(payload, 0, payload.Length));
+            return l.ToArray();
+        }
         ushort c = XModemTransfer.CalculateCrc16(payload, 0, payload.Length);
         l.Add((byte)(c >> 8));
         l.Add((byte)c);
@@ -125,28 +140,28 @@ internal static class Program
     }
 
     /// <summary>A header block written by hand, independent of the code under test: text with \0 separators, zero padded.</summary>
-    private static byte[] HeaderBlock(string text, int size = 128)
+    private static byte[] HeaderBlock(string text, int size = 128, bool checksum = false)
     {
         byte[] payload = new byte[size];
         byte[] t = Encoding.UTF8.GetBytes(text);
         Array.Copy(t, payload, t.Length);
-        return Block(0, payload);
+        return Block(0, payload, checksum);
     }
 
-    private static byte[] EmptyHeaderBlock()
+    private static byte[] EmptyHeaderBlock(bool checksum = false)
     {
-        return Block(0, new byte[128]);
+        return Block(0, new byte[128], checksum);
     }
 
     /// <summary>The data blocks of a file as a YMODEM sender must produce them: 1K blocks, a tail of up to 128 bytes as a 128-byte block, SUB padding.</summary>
-    private static List<byte[]> DataPayloads(byte[] data)
+    private static List<byte[]> DataPayloads(byte[] data, bool only128 = false)
     {
         List<byte[]> blocks = new List<byte[]>();
         int offset = 0;
         while (offset < data.Length)
         {
             int left = data.Length - offset;
-            int size = left > 128 ? 1024 : 128;
+            int size = only128 || left <= 128 ? 128 : 1024;
             byte[] block = Enumerable.Repeat(SUB, size).ToArray();
             Array.Copy(data, offset, block, 0, Math.Min(size, left));
             blocks.Add(block);
@@ -195,8 +210,12 @@ internal static class Program
         _passed++;
     }
 
+    // YMODEM_TEST_FILTER=text runs only the tests whose name contains the text (for chasing one test, e.g. in a loop).
+    private static readonly string Filter = Environment.GetEnvironmentVariable("YMODEM_TEST_FILTER");
+
     private static void Run(string name, Action test)
     {
+        if (!string.IsNullOrEmpty(Filter) && !name.Contains(Filter)) return;
         Task t = Task.Run(test);
         bool finished;
         try { finished = t.Wait(40000); }
@@ -240,7 +259,11 @@ internal static class Program
 
     private sealed class RxScript
     {
-        public byte[] Initial = { C };
+        public byte Request = C;              // how the receiver asks: C (YMODEM), NAK (checksum), G (YMODEM-G)
+        public byte[] Initial;                // what it sends first; the request when left null
+        public bool OmitHeaderAck;            // asks for the data after the header without acknowledging it first
+        public int PauseAfterHeaderMs;        // does not read anything for a while after asking for the data
+        public int BytesWaitingAfterPause;    // what the sender had put on the line by then
         public bool AckFirstEotAtOnce;        // false: NAK the first EOT (as the YMODEM spec and lrzsz do)
         public int NakFirstArrivalOfPacket;   // 1-based over all packets (header = 1); answered with NAK the first time it arrives
         public int SilentFirstArrivalOfPacket;// ... processed but not answered the first time (a lost ACK)
@@ -260,12 +283,13 @@ internal static class Program
     {
         return Task.Run(() =>
         {
-            e.Send(s.Initial);
+            bool checksum = s.Request == NAK, streaming = s.Request == G;
+            e.Send(s.Initial ?? new[] { s.Request });
             bool nakedOnce = false, silencedOnce = false;
             while (true)
             {
                 // ---- block 0
-                Packet h = ReadPacket(e, s.TimeoutMs);
+                Packet h = ReadPacket(e, s.TimeoutMs, checksum);
                 if (h.Kind == "timeout" || h.Kind == "can") return;
                 if (h.Kind != "block" || h.Number != 0) { s.BadPacket = true; return; }
                 s.Packets++;
@@ -293,25 +317,30 @@ internal static class Program
                     s.Files.Add(file);
                 }
                 if (s.SilentFirstArrivalOfPacket == s.Packets && !silencedOnce) { silencedOnce = true; continue; }
-                e.Send(ACK);
-                if (!s.NoCAfterHeader) e.Send(C);
+                if (!s.OmitHeaderAck) e.Send(ACK);
+                if (!s.NoCAfterHeader) e.Send(s.Request);
+                if (s.PauseAfterHeaderMs > 0)
+                {
+                    Thread.Sleep(s.PauseAfterHeaderMs);
+                    s.BytesWaitingAfterPause = e.In.Count;
+                }
 
                 // ---- data
                 byte last = 0;
                 int eots = 0;
                 while (true)
                 {
-                    Packet p = ReadPacket(e, s.TimeoutMs);
+                    Packet p = ReadPacket(e, s.TimeoutMs, checksum);
                     if (p.Kind == "timeout" || p.Kind == "can") return;
                     if (p.Kind == "eot")
                     {
                         s.EotSeen++;
                         eots++;
-                        if (!s.AckFirstEotAtOnce && eots == 1) { e.Send(NAK); continue; }
+                        if (!s.AckFirstEotAtOnce && !streaming && eots == 1) { e.Send(NAK); continue; }
                         file.Complete = true;
                         e.Send(ACK);
                         if (s.Files.Count == s.ExpectedFiles && s.NoCAfterLastEot) return;
-                        e.Send(C);
+                        e.Send(s.Request);
                         break;
                     }
                     if (p.Kind != "block") { s.BadPacket = true; return; }
@@ -328,7 +357,7 @@ internal static class Program
                         last = p.Number;
                     }
                     if (s.SilentFirstArrivalOfPacket == s.Packets && !silencedOnce) { silencedOnce = true; continue; }
-                    e.Send(ACK);
+                    if (!streaming) e.Send(ACK); // YMODEM-G: no acknowledgement per block
                 }
             }
         });
@@ -336,14 +365,15 @@ internal static class Program
 
     // ---------- scripted sender (peer of a receiver under test) ----------
 
-    private static bool Expect(End e, byte value, int timeoutMs = 3000)
+    private static bool Expect(End e, byte value, int timeoutMs = 3000, bool skipNak = false)
     {
         while (true)
         {
             byte? b = e.Read(timeoutMs);
             if (!b.HasValue) return false;
             if (b.Value == value) return true;
-            if (b.Value == C && value != C) continue; // repeated requests of the receiver
+            if ((b.Value == C || b.Value == G) && value != b.Value) continue; // repeated requests of the receiver
+            if (skipNak && b.Value == NAK) continue; // the request of a checksum receiver, repeated while it waited
             return false;
         }
     }
@@ -379,36 +409,57 @@ internal static class Program
         public override void Write(byte[] buffer, int offset, int count) { throw new IOException("write failed"); }
     }
 
-    private static bool Receive(End u, Targets t, Progress p, XModemTransfer.Timeouts timeouts, CancellationToken token = default)
+    private static bool Receive(End u, Targets t, Progress p, XModemTransfer.Timeouts timeouts, CancellationToken token = default,
+        YModemTransfer.YModemReceiveMode mode = YModemTransfer.YModemReceiveMode.Standard)
     {
-        return YModemTransfer.ReceiveFiles(t.Open, u.Send, u.Read, token, p?.Handler, t.Done, timeouts);
+        return YModemTransfer.ReceiveFiles(t.Open, u.Send, u.Read, token, p?.Handler, t.Done, timeouts, mode);
     }
 
-    /// <summary>Plays a well-behaved YMODEM sender against the receiver under test; returns whether every step went as expected.</summary>
-    private static Task Sender(End peer, string headerText, byte[] data)
+    /// <summary>
+    /// Plays a well-behaved sender against the receiver under test, in the variant the request says: C (YMODEM), NAK
+    /// (checksum, 128-byte blocks) or G (YMODEM-G: nothing is acknowledged but the header, the EOT and the end of the batch).
+    /// </summary>
+    private static Task BatchSender(End peer, byte request, params (string header, byte[] data)[] files)
     {
         return Task.Run(() =>
         {
-            if (!Expect(peer, C)) return;
-            peer.Send(HeaderBlock(headerText));
-            if (!Expect(peer, ACK) || !Expect(peer, C)) return;
-            byte n = 1;
-            foreach (byte[] payload in DataPayloads(data))
+            bool checksum = request == NAK, streaming = request == G;
+            if (!Expect(peer, request)) return;
+            foreach (var f in files)
             {
-                peer.Send(Block(n++, payload));
-                if (!Expect(peer, ACK)) return;
+                peer.Send(HeaderBlock(f.header, 128, checksum));
+                if (!Expect(peer, ACK, 3000, checksum) || !Expect(peer, request)) return;
+                byte n = 1;
+                foreach (byte[] payload in DataPayloads(f.data, checksum))
+                {
+                    peer.Send(Block(n++, payload, checksum));
+                    if (!streaming && !Expect(peer, ACK)) return;
+                }
+                peer.Send(EOT);
+                if (!streaming)
+                {
+                    if (!Expect(peer, NAK)) return;
+                    peer.Send(EOT);
+                }
+                if (!Expect(peer, ACK) || !Expect(peer, request)) return;
             }
-            peer.Send(EOT);
-            if (!Expect(peer, NAK)) return;
-            peer.Send(EOT);
-            if (!Expect(peer, ACK) || !Expect(peer, C)) return;
-            peer.Send(EmptyHeaderBlock());
+            peer.Send(EmptyHeaderBlock(checksum));
             Expect(peer, ACK);
         });
     }
 
+    private static Task Sender(End peer, string headerText, byte[] data, byte request = C)
+    {
+        return BatchSender(peer, request, (headerText, data));
+    }
+
     private static int Main()
     {
+        // Every test needs the code under test and a scripted peer running at the same time, and both block while waiting
+        // for bytes. With the default minimum of one pool thread per core the peer can start hundreds of milliseconds late
+        // (the pool adds threads slowly), which is longer than the shortened protocol timeouts below and makes tests flaky.
+        ThreadPool.SetMinThreads(64, 64);
+
         // =============== file names ===============
 
         Run("names: path parts, forbidden characters and device names are neutralised", () =>
@@ -722,14 +773,226 @@ internal static class Program
             Check(u.Sent().Length == 2 && u.Sent()[0] == CAN, "only CAN CAN was sent: nothing was thrown at a silent line");
         });
 
-        Run("sender: a checksum receiver (NAK instead of 'C') is not served and the reason is clear", () =>
+        // ---- the checksum variant: the receiver asks with NAK
+
+        foreach (int size in new[] { 1, 127, 128, 129, 1000, 2500 })
+        {
+            int n = size;
+            Run("sender (checksum receiver): " + n + " bytes arrive intact in 128-byte blocks with an 8-bit checksum", () =>
+            {
+                NewLink(out End u, out End peer);
+                byte[] data = RandomData(n);
+                RxScript script = new RxScript { Request = NAK };
+                Task rx = Receiver(peer, script);
+                Progress progress = new Progress();
+                bool ok = SendBatch(u, progress, Fast(), F("data.bin", data));
+                rx.Wait();
+                Check(ok, "send succeeded: " + progress.Last);
+                Check(!script.BadPacket, "every block passed the checksum test");
+                RxFile f = script.Files.Single();
+                Check(f.Name == "data.bin" && f.Size == n, "name and size in the header");
+                Check(f.Data.Take(n).SequenceEqual(data), "data intact");
+                Check(f.Data.Count == (n + 127) / 128 * 128 && f.BlockSizes.All(x => x == 128), "only 128-byte blocks");
+                Check(f.WireNumbers.SequenceEqual(Enumerable.Range(1, f.WireNumbers.Count).Select(i => (byte)i)), "blocks numbered 1, 2, 3...");
+                Check(f.Data.Skip(n).All(b => b == SUB), "padding is SUB");
+                Check(u.Sent()[0] == SOH, "the header is a 128-byte SOH block");
+                Check(script.TerminatorSeen && script.TerminatorWasEmpty, "the batch ends with an empty block 0");
+                Check(f.Complete && script.EotSeen == 2, "EOT sent again after the receiver's NAK");
+                Check(progress.Status.Any(x => x.Contains("checksum variant")), "the variant is reported");
+                Check(progress.Last == "Transfer complete.", "final status: " + progress.Last);
+            });
+        }
+
+        Run("sender (checksum receiver): a batch of two files, each asked for with NAK", () =>
         {
             NewLink(out End u, out End peer);
-            peer.Send(NAK);
-            XModemTransfer.Timeouts t = Fast(); t.SenderHandshakeMs = 500;
+            byte[] a = RandomData(300, 1), b = RandomData(129, 2);
+            RxScript script = new RxScript { Request = NAK, ExpectedFiles = 2 };
+            Task rx = Receiver(peer, script);
             Progress progress = new Progress();
-            Check(!SendBatch(u, progress, t, F("a.bin", RandomData(10))), "send failed");
-            Check(progress.Last.Contains("CRC-16"), "says YMODEM needs CRC-16: " + progress.Last);
+            Check(SendBatch(u, progress, Fast(), F("a.bin", a), F("b.bin", b)), "send succeeded: " + progress.Last);
+            rx.Wait();
+            Check(script.Files.Count == 2 && !script.BadPacket, "two files, no damaged block");
+            Check(script.Files[0].Data.Take(300).SequenceEqual(a) && script.Files[1].Data.Take(129).SequenceEqual(b), "both intact");
+            Check(script.TerminatorSeen, "batch ended");
+        });
+
+        Run("sender (checksum receiver): NAK and a lost ACK are recovered like in the CRC variant", () =>
+        {
+            foreach (bool lostAck in new[] { false, true })
+            {
+                foreach (int packet in new[] { 1, 3 })
+                {
+                    NewLink(out End u, out End peer);
+                    byte[] data = RandomData(1000);
+                    RxScript script = new RxScript { Request = NAK };
+                    if (lostAck) script.SilentFirstArrivalOfPacket = packet; else script.NakFirstArrivalOfPacket = packet;
+                    Task rx = Receiver(peer, script);
+                    Check(SendBatch(u, null, Fast(lostAck ? 300 : 600), F("a.bin", data)), "send succeeded (packet " + packet + (lostAck ? ", ACK lost)" : ", NAK)"));
+                    rx.Wait();
+                    Check(script.Files.Single().Data.Take(1000).SequenceEqual(data), "data intact, a repeated block written once");
+                }
+            }
+        });
+
+        Run("sender (checksum receiver): a name that does not fit a 128-byte header is refused with the reason", () =>
+        {
+            NewLink(out End u, out End peer);
+            RxScript script = new RxScript { Request = NAK };
+            Task rx = Receiver(peer, script);
+            Progress progress = new Progress();
+            Check(!SendBatch(u, progress, Fast(), F(new string('n', 120) + ".bin", new byte[100])), "send failed");
+            rx.Wait();
+            Check(progress.Last.Contains("too long") && progress.Last.Contains("checksum"), "reason: " + progress.Last);
+            Check(u.Sent().Skip(u.Sent().Length - 2).SequenceEqual(new[] { CAN, CAN }), "CAN CAN sent, no half-valid block went out");
+            Check(script.Files.Count == 0, "no file started");
+        });
+
+        Run("sender: the first request decides, and a later one of another kind does not change the variant", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(3000);
+            RxScript script = new RxScript { Initial = new[] { C, NAK, NAK } };
+            Task rx = Receiver(peer, script);
+            Check(SendBatch(u, null, Fast(), F("a.bin", data)), "send succeeded");
+            rx.Wait();
+            Check(script.Files.Single().Data.Take(3000).SequenceEqual(data) && !script.BadPacket, "CRC-16 and 1K blocks, as the first request ('C') said");
+            Check(script.Files.Single().BlockSizes.Any(x => x == 1024), "1K blocks");
+        });
+
+        // ---- YMODEM-G: the receiver asks with 'G', blocks are streamed
+
+        foreach (int size in new[] { 1, 128, 1000, 1024, 1025, 5000, 1024 * 255 + 7 })
+        {
+            int n = size;
+            Run("sender (YMODEM-G): " + n + " bytes streamed intact, nothing acknowledged but the header, the EOT and the end", () =>
+            {
+                NewLink(out End u, out End peer);
+                byte[] data = RandomData(n);
+                RxScript script = new RxScript { Request = G };
+                Task rx = Receiver(peer, script);
+                Progress progress = new Progress();
+                bool ok = SendBatch(u, progress, Fast(), F("data.bin", data));
+                rx.Wait();
+                Check(ok, "send succeeded: " + progress.Last);
+                Check(!script.BadPacket, "no damaged packet");
+                RxFile f = script.Files.Single();
+                Check(f.Name == "data.bin" && f.Size == n, "name and size in the header");
+                Check(f.Data.Take(n).SequenceEqual(data), "data intact");
+                Check(f.WireNumbers.SequenceEqual(Enumerable.Range(1, f.WireNumbers.Count).Select(i => (byte)i)), "blocks numbered 1, 2, 3...");
+                int tail = n % 1024;
+                Check(f.BlockSizes.Last() == (tail == 0 ? 1024 : (tail <= 128 ? 128 : 1024)), "1K blocks with a short tail");
+                Check(f.Complete && script.EotSeen == 1, "one EOT, acknowledged at once");
+                Check(script.TerminatorSeen && script.TerminatorWasEmpty, "the batch ends with an empty block 0");
+                Check(peer.Sent().Count(b => b == ACK) == 3 && !peer.Sent().Contains(NAK), "the receiver sent only three ACKs and no NAK");
+                Check(progress.Status.Any(x => x.Contains("YMODEM-G")), "the variant is reported");
+                Check(progress.Last == "Transfer complete.", "final status: " + progress.Last);
+                Check(progress.Samples.Last()[0] == n, "progress ends at the file size");
+            });
+        }
+
+        Run("sender (YMODEM-G): a batch of three files, each asked for with 'G'", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] a = RandomData(3000, 1), b = RandomData(10, 2), c = RandomData(2048, 3);
+            RxScript script = new RxScript { Request = G, ExpectedFiles = 3 };
+            Task rx = Receiver(peer, script);
+            Progress progress = new Progress();
+            Check(SendBatch(u, progress, Fast(), F("a.bin", a), F("b.bin", b), F("c.bin", c)), "send succeeded: " + progress.Last);
+            rx.Wait();
+            Check(script.Files.Select(f => f.Name).SequenceEqual(new[] { "a.bin", "b.bin", "c.bin" }), "names in order");
+            Check(script.Files[0].Data.Take(3000).SequenceEqual(a) && script.Files[1].Data.Take(10).SequenceEqual(b) && script.Files[2].Data.Take(2048).SequenceEqual(c), "all intact");
+            Check(script.Files.All(f => f.Complete && f.WireNumbers.First() == 1), "each file restarts at block 1");
+            Check(script.TerminatorSeen, "batch ended");
+        });
+
+        Run("sender (YMODEM-G): a receiver that asks for the data without acknowledging the header is fine", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(2000);
+            RxScript script = new RxScript { Request = G, OmitHeaderAck = true };
+            Task rx = Receiver(peer, script);
+            Check(SendBatch(u, null, Fast(), F("a.bin", data)), "send succeeded");
+            rx.Wait();
+            Check(script.Files.Single().Data.Take(2000).SequenceEqual(data), "data intact");
+        });
+
+        Run("sender (YMODEM-G): it does not wait for answers between blocks", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(20000);
+            RxScript script = new RxScript { Request = G, PauseAfterHeaderMs = 400 };
+            Task rx = Receiver(peer, script);
+            Check(SendBatch(u, null, Fast(), F("a.bin", data)), "send succeeded");
+            rx.Wait();
+            Check(script.BytesWaitingAfterPause >= 20000, "the whole file was on the line while the receiver was not reading (" + script.BytesWaitingAfterPause + " bytes)");
+            Check(script.Files.Single().Data.Take(20000).SequenceEqual(data), "data intact");
+        });
+
+        Run("sender (YMODEM-G): CAN CAN from the receiver stops the stream within a block or two", () =>
+        {
+            foreach (int canAt in new[] { 1, 4 })
+            {
+                NewLink(out End u, out End peer);
+                RxScript script = new RxScript { Request = G, CanAfterPackets = canAt };
+                Task rx = Receiver(peer, script);
+                Progress progress = new Progress();
+                bool ok = YModemTransfer.SendFiles(new[] { F("big.bin", RandomData(1024 * 300)) }, (d, o, l) => { Thread.Sleep(1); u.Send(d, o, l); },
+                    u.Read, CancellationToken.None, progress.Handler, Fast());
+                rx.Wait();
+                Check(!ok && progress.Last == "Cancelled by the receiver.", "reported (CAN at packet " + canAt + "): " + progress.Last);
+                Check(u.Sent().Length < 100 * 1029, "the sender stopped long before the end of 300 blocks (" + u.Sent().Length + " bytes sent)");
+            }
+        });
+
+        Run("sender (YMODEM-G): a receiver that never asks for the data after the header makes it give up", () =>
+        {
+            NewLink(out End u, out End peer);
+            RxScript script = new RxScript { Request = G, NoCAfterHeader = true };
+            Task rx = Receiver(peer, script);
+            XModemTransfer.Timeouts t = Fast(); t.NextRequestMs = 400;
+            Progress progress = new Progress();
+            Check(!SendBatch(u, progress, t, F("a.bin", RandomData(100))), "send failed");
+            Check(progress.Last.Contains("did not ask for the data") && progress.Last.Contains("'G'"), "reason: " + progress.Last);
+            Check(u.Sent().Skip(u.Sent().Length - 2).SequenceEqual(new[] { CAN, CAN }), "CAN CAN sent");
+        });
+
+        Run("sender (YMODEM-G): cancel stops it quickly and tells the receiver", () =>
+        {
+            NewLink(out End u, out End peer);
+            RxScript script = new RxScript { Request = G, TimeoutMs = 2000 };
+            Task rx = Receiver(peer, script);
+            using CancellationTokenSource cts = new CancellationTokenSource();
+            Progress progress = new Progress();
+            bool ok = true;
+            Task send = Task.Run(() => ok = YModemTransfer.SendFiles(new[] { F("big.bin", RandomData(1024 * 300)) },
+                (d, o, l) => { Thread.Sleep(1); u.Send(d, o, l); }, u.Read, cts.Token, (d, t, e, s2) =>
+                {
+                    progress.Handler(d, t, e, s2);
+                    if (d >= 10 * 1024) cts.Cancel();
+                }, Fast()));
+            Check(send.Wait(5000), "returned promptly");
+            Check(!ok && progress.Last == "Transfer cancelled.", "reported: " + progress.Last);
+            Check(u.Sent().Skip(u.Sent().Length - 2).SequenceEqual(new[] { CAN, CAN }), "CAN CAN sent");
+        });
+
+        Run("sender: a 'G' inside a banner is text; only a 'G' that stands alone is a request", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(2500);
+            RxScript script = new RxScript { Request = G, Initial = Encoding.ASCII.GetBytes("Go ahead, Great news\r\n").Concat(new[] { G }).ToArray() };
+            Task rx = Receiver(peer, script);
+            Progress progress = new Progress();
+            Check(SendBatch(u, progress, Fast(), F("a.bin", data)), "send succeeded: " + progress.Last);
+            rx.Wait();
+            Check(script.Files.Single().Data.Take(2500).SequenceEqual(data), "data intact");
+
+            NewLink(out End u2, out End peer2);
+            peer2.Send(Encoding.ASCII.GetBytes("Go on, Good luck\r\n"));
+            XModemTransfer.Timeouts t = Fast(); t.SenderHandshakeMs = 600;
+            Progress progress2 = new Progress();
+            Check(!SendBatch(u2, progress2, t, F("a.bin", RandomData(10))), "text alone starts nothing");
+            Check(progress2.Last.StartsWith("Handshake timeout"), "reported: " + progress2.Last);
         });
 
         Run("sender: a dead receiver after the header ends in bounded retries", () =>
@@ -830,9 +1093,10 @@ internal static class Program
                 Expect(peer, ACK);
             });
             Targets targets = new Targets();
-            Check(Receive(u, targets, null, Fast()), "receive succeeded");
+            Progress progress = new Progress();
+            Check(Receive(u, targets, progress, Fast()), "receive succeeded: " + progress.Last);
             tx.Wait();
-            Check(sawNak && sawAck, "NAK then ACK");
+            Check(sawNak && sawAck, "NAK then ACK (receiver sent: " + BitConverter.ToString(u.Sent()) + "; last status: " + progress.Last + ")");
         });
 
         Run("receiver: two files in a batch, each in its own stream, then 'N files received'", () =>
@@ -957,7 +1221,8 @@ internal static class Program
                 peer.Send(EmptyHeaderBlock()); Expect(peer, ACK);
             });
             Targets targets = new Targets();
-            Check(Receive(u, targets, null, Fast()), "receive succeeded");
+            Progress progress = new Progress();
+            Check(Receive(u, targets, progress, Fast()), "receive succeeded: " + progress.Last + " | status log: " + string.Join(" / ", progress.Status.Take(12)));
             tx.Wait();
             Check(gotNak, "NAK for the damaged block");
             Check(targets.Streams["a.bin"].ToArray().SequenceEqual(data), "file intact, nothing written from the damaged block");
@@ -984,7 +1249,8 @@ internal static class Program
                 peer.Send(EmptyHeaderBlock()); Expect(peer, ACK);
             });
             Targets targets = new Targets();
-            Check(Receive(u, targets, null, Fast()), "receive succeeded");
+            Progress progress = new Progress();
+            Check(Receive(u, targets, progress, Fast()), "receive succeeded: " + progress.Last + " | status log: " + string.Join(" / ", progress.Status.Take(12)));
             tx.Wait();
             Check(targets.Streams["a.bin"].ToArray().SequenceEqual(data), "no duplicated data");
         });
@@ -1187,8 +1453,9 @@ internal static class Program
             Progress progress = new Progress();
             Check(!Receive(u, new Targets(), progress, Fast()), "receive failed");
             Check(progress.Last.Contains("did not respond"), "reason: " + progress.Last);
-            int requests = u.Sent().Count(b => b == C);
-            Check(requests == 10, "ten 'C' requests, then it stops (" + requests + ")");
+            byte[] sent = u.Sent();
+            Check(sent.Count(b => b == C) == 10 && sent.Count(b => b == NAK) == 10, "ten 'C' requests, then ten NAKs, then it stops (" + sent.Count(b => b == C) + "/" + sent.Count(b => b == NAK) + ")");
+            Check(sent.Take(10).All(b => b == C) && sent.Skip(10).All(b => b == NAK), "'C' first, NAK after");
         });
 
         Run("receiver: a sender that vanishes after the header gives up after bounded requests", () =>
@@ -1227,6 +1494,280 @@ internal static class Program
             Progress progress = new Progress();
             bool ok = true;
             Task rx = Task.Run(() => ok = Receive(u, new Targets(), progress, Fast(), cts.Token));
+            Thread.Sleep(150);
+            cts.Cancel();
+            Check(rx.Wait(3000), "returned promptly");
+            Check(!ok && progress.Last == "Transfer cancelled.", "reported: " + progress.Last);
+        });
+
+        // ---- the checksum variant: the receiver falls back to NAK, or is told to use it
+
+        foreach (int size in new[] { 1, 128, 300, 5000 })
+        {
+            int n = size;
+            Run("receiver: a checksum-only sender (ignores 'C') is served after the fallback to NAK: " + n + " bytes", () =>
+            {
+                NewLink(out End u, out End peer);
+                byte[] data = RandomData(n);
+                Task tx = Sender(peer, "a.bin\0" + n, data, NAK);
+                Targets targets = new Targets();
+                Progress progress = new Progress();
+                bool ok = Receive(u, targets, progress, Fast());
+                tx.Wait();
+                Check(ok, "receive succeeded: " + progress.Last);
+                Check(targets.Streams["a.bin"].ToArray().SequenceEqual(data), "exactly the file, no padding");
+                byte[] sent = u.Sent();
+                Check(sent.Take(10).All(b => b == C) && sent[10] == NAK, "ten 'C' requests, then NAK");
+                Check(!sent.Skip(10).Contains(C), "no 'C' after the switch");
+                Check(progress.Last == "File received successfully.", "final status: " + progress.Last);
+            });
+        }
+
+        Run("receiver (checksum): a batch of two files, each asked for with NAK", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] a = RandomData(300, 1), b = RandomData(129, 2);
+            Task tx = BatchSender(peer, NAK, ("a.bin\0" + 300, a), ("b.bin\0" + 129, b));
+            Targets targets = new Targets();
+            Progress progress = new Progress();
+            Check(Receive(u, targets, progress, Fast()), "receive succeeded: " + progress.Last);
+            tx.Wait();
+            Check(targets.Streams["a.bin"].ToArray().SequenceEqual(a) && targets.Streams["b.bin"].ToArray().SequenceEqual(b), "both intact");
+            Check(progress.Last == "2 files received successfully.", "final status: " + progress.Last);
+        });
+
+        Run("receiver (checksum mode): asks with NAK from the start and never with 'C'", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(700);
+            Task tx = Sender(peer, "a.bin\0" + 700, data, NAK);
+            Targets targets = new Targets();
+            Check(Receive(u, targets, null, Fast(), default, YModemTransfer.YModemReceiveMode.Checksum), "receive succeeded");
+            tx.Wait();
+            Check(targets.Streams["a.bin"].ToArray().SequenceEqual(data), "file intact");
+            Check(u.Sent()[0] == NAK && !u.Sent().Contains(C), "NAK only");
+        });
+
+        Run("receiver (checksum): a damaged block is NAKed and repeated", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(400);
+            bool gotNak = false;
+            Task tx = Task.Run(() =>
+            {
+                Expect(peer, NAK);
+                peer.Send(HeaderBlock("a.bin\0" + 400, 128, true));
+                Expect(peer, ACK, 3000, true); Expect(peer, NAK);
+                List<byte[]> blocks = DataPayloads(data, true);
+                byte[] bad = Block(1, blocks[0], true);
+                bad[bad.Length - 1] ^= 0x01; // broken checksum
+                peer.Send(bad);
+                gotNak = Expect(peer, NAK);
+                byte n = 1;
+                foreach (byte[] payload in blocks) { peer.Send(Block(n++, payload, true)); Expect(peer, ACK); }
+                peer.Send(EOT); Expect(peer, NAK); peer.Send(EOT); Expect(peer, ACK); Expect(peer, NAK);
+                peer.Send(EmptyHeaderBlock(true)); Expect(peer, ACK);
+            });
+            Targets targets = new Targets();
+            Progress progress = new Progress();
+            Check(Receive(u, targets, progress, Fast(), default, YModemTransfer.YModemReceiveMode.Checksum), "receive succeeded: " + progress.Last);
+            tx.Wait();
+            Check(gotNak, "NAK for the damaged block");
+            Check(targets.Streams["a.bin"].ToArray().SequenceEqual(data), "file intact");
+        });
+
+        Run("receiver (standard): a sender that answers 'C' is never sent a NAK as a request", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(3000);
+            Task tx = Sender(peer, "a.bin\0" + 3000, data);
+            Targets targets = new Targets();
+            Check(Receive(u, targets, null, Fast()), "receive succeeded");
+            tx.Wait();
+            Check(u.Sent()[0] == C, "asked with 'C'");
+            // the only NAK of a clean transfer is the answer to the first EOT
+            Check(u.Sent().Count(b => b == NAK) == 1, "one NAK (for the first EOT)");
+        });
+
+        // ---- YMODEM-G: the receiver asks with 'G'
+
+        foreach (int size in new[] { 1, 127, 128, 129, 1024, 1025, 5000, 1024 * 255 + 7 })
+        {
+            int n = size;
+            Run("receiver (YMODEM-G): " + n + " bytes streamed in, nothing acknowledged but the header, the EOT and the end", () =>
+            {
+                NewLink(out End u, out End peer);
+                byte[] data = RandomData(n);
+                Task tx = Sender(peer, "data.bin\0" + n + " 14000000000", data, G);
+                Targets targets = new Targets();
+                Progress progress = new Progress();
+                bool ok = Receive(u, targets, progress, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming);
+                tx.Wait();
+                Check(ok, "receive succeeded: " + progress.Last);
+                Check(targets.Streams["data.bin"].ToArray().SequenceEqual(data), "exactly the file, no padding");
+                Check(targets.Streams["data.bin"].Closed, "the file is closed");
+                byte[] sent = u.Sent();
+                Check(sent[0] == G && !sent.Contains(C) && !sent.Contains(NAK), "asked with 'G' only");
+                Check(sent.Count(b => b == ACK) == 3, "three ACKs: header, EOT, end of the batch (" + sent.Count(b => b == ACK) + ")");
+                Check(progress.Last == "File received successfully.", "final status: " + progress.Last);
+            });
+        }
+
+        Run("receiver (YMODEM-G): a batch of two files", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] a = RandomData(3000, 1), b = RandomData(77, 2);
+            Task tx = BatchSender(peer, G, ("a.bin\0" + 3000, a), ("b.bin\0" + 77, b));
+            Targets targets = new Targets();
+            Progress progress = new Progress();
+            Check(Receive(u, targets, progress, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming), "receive succeeded: " + progress.Last);
+            tx.Wait();
+            Check(targets.Streams["a.bin"].ToArray().SequenceEqual(a) && targets.Streams["b.bin"].ToArray().SequenceEqual(b), "both intact");
+            Check(u.Sent().Count(x => x == ACK) == 5, "ACKs: two headers, two EOTs, the end");
+            Check(progress.Last == "2 files received successfully.", "final status: " + progress.Last);
+        });
+
+        Run("receiver (YMODEM-G): a damaged block ends the transfer: there is no repeat, no NAK", () =>
+        {
+            NewLink(out End u, out End peer);
+            bool cancelled = false;
+            Task tx = Task.Run(() =>
+            {
+                Expect(peer, G);
+                peer.Send(HeaderBlock("a.bin\0" + 5000));
+                Expect(peer, ACK); Expect(peer, G);
+                List<byte[]> blocks = DataPayloads(RandomData(5000));
+                peer.Send(Block(1, blocks[0]));
+                byte[] bad = Block(2, blocks[1]);
+                bad[100] ^= 0x40;
+                peer.Send(bad);
+                peer.Send(Block(3, blocks[2]));
+                cancelled = Expect(peer, CAN) && Expect(peer, CAN);
+            });
+            Targets targets = new Targets();
+            Progress progress = new Progress();
+            Check(!Receive(u, targets, progress, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming), "receive failed");
+            tx.Wait();
+            Check(cancelled, "CAN CAN sent");
+            Check(progress.Last.Contains("block 2") && progress.Last.Contains("cannot ask for a repeat"), "reason: " + progress.Last);
+            Check(!u.Sent().Contains(NAK), "no NAK");
+            Check(targets.Streams["a.bin"].ToArray().Length == 1024 && targets.Streams["a.bin"].Closed, "only the good block was written, the file is closed");
+        });
+
+        Run("receiver (YMODEM-G): a damaged header ends the transfer", () =>
+        {
+            NewLink(out End u, out End peer);
+            Task tx = Task.Run(() =>
+            {
+                Expect(peer, G);
+                byte[] bad = HeaderBlock("a.bin\0" + 10);
+                bad[bad.Length - 1] ^= 0xFF;
+                peer.Send(bad);
+                Expect(peer, CAN);
+            });
+            Targets targets = new Targets();
+            Progress progress = new Progress();
+            Check(!Receive(u, targets, progress, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming), "receive failed");
+            tx.Wait();
+            Check(progress.Last.Contains("header is damaged"), "reason: " + progress.Last);
+            Check(targets.Opened.Count == 0, "no file was created");
+        });
+
+        Run("receiver (YMODEM-G): a lost block (gap) or a repeated one ends the transfer", () =>
+        {
+            foreach (bool gap in new[] { true, false })
+            {
+                NewLink(out End u, out End peer);
+                Task tx = Task.Run(() =>
+                {
+                    Expect(peer, G);
+                    peer.Send(HeaderBlock("a.bin\0" + 3000));
+                    Expect(peer, ACK); Expect(peer, G);
+                    List<byte[]> blocks = DataPayloads(RandomData(3000));
+                    peer.Send(Block(1, blocks[0]));
+                    peer.Send(gap ? Block(3, blocks[2]) : Block(1, blocks[0]));
+                });
+                Progress progress = new Progress();
+                Check(!Receive(u, new Targets(), progress, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming), "receive failed (" + (gap ? "gap" : "repeat") + ")");
+                tx.Wait();
+                Check(progress.Last.Contains("arrived while block 2 was expected"), "reason: " + progress.Last);
+            }
+        });
+
+        Run("receiver (YMODEM-G): a sender that goes silent mid-file is given up on at once", () =>
+        {
+            NewLink(out End u, out End peer);
+            Task tx = Task.Run(() =>
+            {
+                Expect(peer, G);
+                peer.Send(HeaderBlock("a.bin\0" + 3000));
+                Expect(peer, ACK); Expect(peer, G);
+                peer.Send(Block(1, DataPayloads(RandomData(3000))[0]));
+            });
+            Progress progress = new Progress();
+            Targets targets = new Targets();
+            Check(!Receive(u, targets, progress, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming), "receive failed");
+            tx.Wait();
+            Check(progress.Last.Contains("stopped sending"), "reason: " + progress.Last);
+            Check(!u.Sent().Contains(NAK), "no NAK nudges");
+            Check(targets.Streams["a.bin"].Closed, "the file is closed");
+        });
+
+        Run("receiver (YMODEM-G): a file that ends short of the announced size is not acknowledged", () =>
+        {
+            NewLink(out End u, out End peer);
+            bool gotAck = true;
+            Task tx = Task.Run(() =>
+            {
+                Expect(peer, G);
+                peer.Send(HeaderBlock("a.bin\0" + 5000));
+                Expect(peer, ACK); Expect(peer, G);
+                peer.Send(Block(1, DataPayloads(RandomData(5000))[0]));
+                peer.Send(EOT);
+                gotAck = Expect(peer, ACK, 500);
+            });
+            Progress progress = new Progress();
+            Check(!Receive(u, new Targets(), progress, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming), "receive failed");
+            tx.Wait();
+            Check(!gotAck, "no ACK for a truncated file");
+            Check(progress.Last.Contains("ended after 1024 of 5000 bytes"), "reason: " + progress.Last);
+        });
+
+        Run("receiver (YMODEM-G): CAN CAN from the sender ends the transfer", () =>
+        {
+            NewLink(out End u, out End peer);
+            Task tx = Task.Run(() =>
+            {
+                Expect(peer, G);
+                peer.Send(HeaderBlock("a.bin\0" + 3000));
+                Expect(peer, ACK); Expect(peer, G);
+                peer.Send(Block(1, DataPayloads(RandomData(3000))[0]));
+                peer.Send(CAN, CAN);
+            });
+            Progress progress = new Progress();
+            Targets targets = new Targets();
+            Check(!Receive(u, targets, progress, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming), "receive failed");
+            tx.Wait();
+            Check(progress.Last == "Cancelled by the sender.", "reported: " + progress.Last);
+            Check(targets.Streams["a.bin"].Closed, "the file is closed");
+        });
+
+        Run("receiver (YMODEM-G): no sender at all: ten 'G' requests, no fallback to another variant", () =>
+        {
+            NewLink(out End u, out End peer);
+            Progress progress = new Progress();
+            Check(!Receive(u, new Targets(), progress, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming), "receive failed");
+            Check(progress.Last.Contains("did not respond"), "reason: " + progress.Last);
+            Check(u.Sent().Count(b => b == G) == 10 && u.Sent().Count(b => b != G) == 0, "ten 'G', nothing else");
+        });
+
+        Run("receiver (YMODEM-G): cancel stops it quickly", () =>
+        {
+            NewLink(out End u, out End peer);
+            using CancellationTokenSource cts = new CancellationTokenSource();
+            Progress progress = new Progress();
+            bool ok = true;
+            Task rx = Task.Run(() => ok = Receive(u, new Targets(), progress, Fast(), cts.Token, YModemTransfer.YModemReceiveMode.Streaming));
             Thread.Sleep(150);
             cts.Cancel();
             Check(rx.Wait(3000), "returned promptly");
@@ -1276,6 +1817,68 @@ internal static class Program
                 Check(targets.Streams.ContainsKey(f.Name) && targets.Streams[f.Name].ToArray().SequenceEqual(f.Data), "file " + f.Name + " intact");
             }
             Check(rp.Last == "4 files received successfully.", "final status: " + rp.Last);
+        });
+
+        foreach (int size in new[] { 0, 1, 1025, 70000 })
+        {
+            int n = size;
+            Run("loopback (YMODEM-G): " + n + " bytes from our sender to our receiver", () =>
+            {
+                NewLink(out End a, out End b);
+                byte[] data = RandomData(n);
+                Targets targets = new Targets();
+                Progress sp = new Progress(), rp = new Progress();
+                Task<bool> rx = Task.Run(() => Receive(b, targets, rp, Fast(), default, YModemTransfer.YModemReceiveMode.Streaming));
+                bool sent = SendBatch(a, sp, Fast(), F("g.bin", data));
+                Check(rx.Wait(20000) && rx.Result, "receiver finished: " + rp.Last);
+                Check(sent, "sender finished: " + sp.Last);
+                Check(targets.Streams["g.bin"].ToArray().SequenceEqual(data), "file intact");
+                Check(sp.LastErrors == 0 && rp.LastErrors == 0, "no errors on a clean line");
+                Check(sp.Status.Any(x => x.Contains("YMODEM-G")), "the sender followed the receiver into YMODEM-G");
+            });
+        }
+
+        foreach (int size in new[] { 0, 1, 129, 5000 })
+        {
+            int n = size;
+            Run("loopback (checksum): " + n + " bytes from our sender to our receiver", () =>
+            {
+                NewLink(out End a, out End b);
+                byte[] data = RandomData(n);
+                Targets targets = new Targets();
+                Progress sp = new Progress(), rp = new Progress();
+                Task<bool> rx = Task.Run(() => Receive(b, targets, rp, Fast(), default, YModemTransfer.YModemReceiveMode.Checksum));
+                bool sent = SendBatch(a, sp, Fast(), F("c.bin", data));
+                Check(rx.Wait(20000) && rx.Result, "receiver finished: " + rp.Last);
+                Check(sent, "sender finished: " + sp.Last);
+                Check(targets.Streams["c.bin"].ToArray().SequenceEqual(data), "file intact");
+                Check(sp.LastErrors == 0 && rp.LastErrors == 0, "no errors on a clean line");
+                Check(sp.Status.Any(x => x.Contains("checksum variant")), "the sender followed the receiver into the checksum variant");
+            });
+        }
+
+        Run("loopback (YMODEM-G and checksum): batches of three files", () =>
+        {
+            foreach (YModemTransfer.YModemReceiveMode mode in new[] { YModemTransfer.YModemReceiveMode.Streaming, YModemTransfer.YModemReceiveMode.Checksum })
+            {
+                NewLink(out End a, out End b);
+                var files = new[]
+                {
+                    new { Name = "one.bin", Data = RandomData(5000, 1) },
+                    new { Name = "empty", Data = new byte[0] },
+                    new { Name = "two words.txt", Data = RandomData(130, 3) }
+                };
+                Targets targets = new Targets();
+                Progress rp = new Progress();
+                Task<bool> rx = Task.Run(() => Receive(b, targets, rp, Fast(), default, mode));
+                bool sent = SendBatch(a, null, Fast(), files.Select(f => F(f.Name, f.Data)).ToArray());
+                Check(rx.Wait(20000) && rx.Result, "receiver finished (" + mode + "): " + rp.Last);
+                Check(sent, "sender finished (" + mode + ")");
+                foreach (var f in files)
+                {
+                    Check(targets.Streams.ContainsKey(f.Name) && targets.Streams[f.Name].ToArray().SequenceEqual(f.Data), "file " + f.Name + " intact (" + mode + ")");
+                }
+            }
         });
 
         Console.WriteLine();
