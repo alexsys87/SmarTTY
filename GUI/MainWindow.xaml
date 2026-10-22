@@ -205,6 +205,11 @@
             <Image Source="../icons/MainWindow/pubkey.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="_TFTP server / U-Boot upload..." Click="TftpFirmware_Click" Visibility="{Binding Path=ActiveSession.DeviceOnlyVisibility, FallbackValue=Collapsed}">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/upload.png" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="_Settings" Click="Settings_Click">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/settings.png" />

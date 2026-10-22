@@ -145,6 +145,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// <summary>True for the trailing "connect to another target" pseudo session (neither SSH nor device).</summary>
     public bool IsPlaceholder => Session == null && DeviceSettings == null;
 
+    /// <summary>Visible for COM/TCP sessions only (the TFTP / U-Boot upload item of the Tools menu).</summary>
+    public System.Windows.Visibility DeviceOnlyVisibility => IsDevice ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+
     public System.Windows.Visibility SshOnlyVisibility => IsDevice ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
     /// <summary>
