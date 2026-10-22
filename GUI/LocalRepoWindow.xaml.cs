@@ -25,6 +25,9 @@ public partial class LocalRepoWindow : Window
 
     private readonly LocalRepoHost _Host;
 
+    /// <summary>The package manager of the device: apk on OpenWrt 25.12 and newer, otherwise opkg.</summary>
+    private readonly LocalRepoPackageManager _Manager;
+
     private readonly LocalRepoSettings _Settings;
 
     private readonly ObservableCollection<string> _Folders;
@@ -39,10 +42,13 @@ public partial class LocalRepoWindow : Window
         InitializeComponent();
         _Session = session;
         _Host = session.LocalRepo;
+        _Manager = _Host.IsRunning ? _Host.Manager : (session.LocalRepoManager ?? LocalRepoPackageManager.Opkg);
         _Settings = LocalRepoSettings.Load();
         _Folders = new ObservableCollection<string>(_Settings.Folders);
         FoldersList.ItemsSource = _Folders;
         PortBox.Text = (_Host.IsRunning ? _Host.Port : _Settings.Port).ToString();
+        TrustKeyBox.Visibility = _Manager == LocalRepoPackageManager.Apk ? Visibility.Visible : Visibility.Collapsed;
+        TrustKeyBox.IsChecked = _Settings.TrustBuildKey;
 
         StringBuilder history = new StringBuilder();
         foreach (string line in _Host.GetHistory())
@@ -81,6 +87,7 @@ public partial class LocalRepoWindow : Window
         RemoveButton.IsEnabled = editable;
         FoldersList.IsEnabled = editable;
         PortBox.IsEnabled = editable;
+        TrustKeyBox.IsEnabled = editable;
         StartButton.IsEnabled = editable;
         StopButton.IsEnabled = running && idle;
         CleanButton.IsEnabled = editable;
@@ -99,7 +106,7 @@ public partial class LocalRepoWindow : Window
             StringBuilder text = new StringBuilder("Running on port " + _Host.Port + ". Feeds added on the device:");
             foreach (LocalRepoFeed feed in _Host.Feeds)
             {
-                text.AppendLine().Append("  ").Append(OpkgFeedConfig.FeedLine(feed, _Host.Port));
+                text.AppendLine().Append("  ").Append(_Host.DescribeFeed(feed));
             }
             StatusText.Text = text.ToString();
         }
@@ -196,11 +203,14 @@ public partial class LocalRepoWindow : Window
         string[] folders = _Folders.ToArray();
         _Settings.Folders = folders.ToList();
         _Settings.Port = port;
+        bool trustKey = TrustKeyBox.IsChecked == true && _Manager == LocalRepoPackageManager.Apk;
+        _Settings.TrustBuildKey = TrustKeyBox.IsChecked == true;
         _Settings.Save();
+        LocalRepoPackageManager manager = _Manager;
         SetBusy(true);
         try
         {
-            await Task.Run(() => _Host.Start(ssh, folders, port));
+            await Task.Run(() => _Host.Start(ssh, folders, port, manager, trustKey));
         }
         catch (Exception exception)
         {
@@ -237,8 +247,9 @@ public partial class LocalRepoWindow : Window
         SetBusy(true);
         try
         {
-            string problem = await Task.Run(() => _Host.RemoveFeeds(ssh));
-            _Host.Report(problem ?? "The feeds of this server were removed from /etc/opkg/customfeeds.conf on the device.");
+            LocalRepoPackageManager manager = _Manager;
+            string problem = await Task.Run(() => _Host.RemoveFeeds(ssh, manager));
+            _Host.Report(problem ?? "The feeds of this server were removed from " + (manager == LocalRepoPackageManager.Apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile) + " on the device.");
             if (problem != null)
             {
                 MessageBoxes.Error(problem);

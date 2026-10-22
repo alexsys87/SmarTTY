@@ -95,7 +95,7 @@ jobs:
       - name: Run editor text model and syntax highlighting checks
         run: dotnet run --project tests/EditorTextTests -c Release
 
-      - name: Run local OpenWrt repository checks (opkg index, HTTP server, feed scripts, tunnel host)
+      - name: Run local OpenWrt repository checks (opkg and apk feeds, HTTP server, feed scripts, tunnel host)
         run: dotnet run --project tests/LocalRepoTests -c Release
 
   sshnet:

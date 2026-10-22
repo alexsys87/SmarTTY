@@ -36,8 +36,14 @@ public static class OpkgFeedConfig
     /// <summary>Replaces the block of local feeds in the configuration file (creating the file if needed).</summary>
     public static string BuildEnableScript(IList<LocalRepoFeed> feeds, int port, string configFile = DefaultConfigFile)
     {
+        return BuildBlockEnableScript(feeds.Select((LocalRepoFeed feed) => FeedLine(feed, port)), configFile);
+    }
+
+    /// <summary>The same for any list of repository lines: the lines are written between the markers, replacing an earlier block.</summary>
+    public static string BuildBlockEnableScript(IEnumerable<string> feedLines, string configFile)
+    {
         string file = RemotePathUtils.ShellQuote(configFile);
-        string lines = string.Join(" ", new[] { BeginMarker }.Concat(feeds.Select((LocalRepoFeed feed) => FeedLine(feed, port))).Concat(new[] { EndMarker }).Select(RemotePathUtils.ShellQuote).ToArray());
+        string lines = string.Join(" ", new[] { BeginMarker }.Concat(feedLines).Concat(new[] { EndMarker }).Select(RemotePathUtils.ShellQuote).ToArray());
         return "f=" + file + "; " +
             "mkdir -p \"$(dirname \"$f\")\" && touch \"$f\" && " + BuildDeleteBlock() + " && " +
             "{ [ -z \"$(tail -c1 \"$f\")\" ] || echo >> \"$f\"; } && " +
@@ -46,6 +52,11 @@ public static class OpkgFeedConfig
 
     /// <summary>Removes the block of local feeds; succeeds if there is none.</summary>
     public static string BuildDisableScript(string configFile = DefaultConfigFile)
+    {
+        return BuildBlockDisableScript(configFile);
+    }
+
+    public static string BuildBlockDisableScript(string configFile)
     {
         return "f=" + RemotePathUtils.ShellQuote(configFile) + "; [ ! -f \"$f\" ] || " + BuildDeleteBlock();
     }

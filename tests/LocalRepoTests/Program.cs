@@ -712,6 +712,439 @@ internal static class Program
         return Catch<T>(action) != null;
     }
 
+    private static string ExecShell(string shell, string[] args, string script, out int exit)
+    {
+        exit = RunArgs(shell, args.Concat(new[] { script }).ToArray(), out string output, out string error);
+        return output + error;
+    }
+
+    private static List<(string name, string shell, string[] args)> Shells()
+    {
+        List<(string name, string shell, string[] args)> shells = new List<(string, string, string[])> { ("sh", "sh", new[] { "-c" }) };
+        if (Has("busybox"))
+        {
+            shells.Add(("busybox ash", "busybox", new[] { "ash", "-c" }));
+        }
+        return shells;
+    }
+
+    private static void MakeFakeProgram(string directory, string name)
+    {
+        Directory.CreateDirectory(directory);
+        string path = Path.Combine(directory, name);
+        File.WriteAllText(path, "#!/bin/sh\nexit 0\n");
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+    }
+
+    private static LocalRepoPackageManager? RunProbeDetect(string shell, string[] args, string etcDir, bool opkgOnPath, bool apkOnPath)
+    {
+        string fakeBin = Path.Combine(_work, "probebin-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(fakeBin);
+        if (opkgOnPath)
+        {
+            MakeFakeProgram(fakeBin, "opkg");
+        }
+        if (apkOnPath)
+        {
+            MakeFakeProgram(fakeBin, "apk");
+        }
+        string script = "PATH=" + fakeBin + "; " + OpenWrtDetector.ProbeCommand.Replace("/etc/", etcDir + "/");
+        int exit = RunArgs(shell, args.Concat(new[] { script }).ToArray(), out string output, out string error);
+        if (exit != 0)
+        {
+            throw new Exception("the probe command failed: " + output + error);
+        }
+        return OpenWrtDetector.Detect((output + error).Split('\n'));
+    }
+
+    private static string FindApk()
+    {
+        foreach (string candidate in new[] { Environment.GetEnvironmentVariable("SMARTTY_APK"), "apk", "/tmp/apk-tools/build/src/apk" })
+        {
+            if (string.IsNullOrEmpty(candidate))
+            {
+                continue;
+            }
+            try
+            {
+                if (Run(candidate, "--version", null, out string output, out _) == 0 && output.Contains("apk-tools 3"))
+                {
+                    return candidate;
+                }
+            }
+            catch
+            {
+            }
+        }
+        return null;
+    }
+
+    private const string TestPublicKey = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtestkeytestkeytestkey\n-----END PUBLIC KEY-----";
+
+    private static void ApkDetectorAndScannerTests()
+    {
+        // Detection of the package manager from the probe output.
+        Check(OpenWrtDetector.Detect(new[] { OpenWrtDetector.OpenWrtMarker, OpenWrtDetector.ApkMarker }) == LocalRepoPackageManager.Apk, "probe output: OpenWrt with apk");
+        Check(OpenWrtDetector.Detect(new[] { OpenWrtDetector.OpenWrtMarker, OpenWrtDetector.OpkgMarker }) == LocalRepoPackageManager.Opkg, "probe output: OpenWrt with opkg");
+        Check(OpenWrtDetector.Detect(new[] { OpenWrtDetector.OpenWrtMarker, OpenWrtDetector.OpkgMarker, OpenWrtDetector.ApkMarker }) == LocalRepoPackageManager.Apk, "probe output: apk wins when both are installed");
+        Check(OpenWrtDetector.Detect(new[] { OpenWrtDetector.OpenWrtMarker, "SMARTTY_PKG=none" }) == null, "probe output: OpenWrt without a package manager is not offered");
+        Check(OpenWrtDetector.Detect(new[] { "SMARTTY_OS=other", OpenWrtDetector.ApkMarker }) == null, "probe output: apk on another OS (Alpine) is not offered");
+        Check(OpenWrtDetector.Detect(null) == null && OpenWrtDetector.Parse(new[] { OpenWrtDetector.OpenWrtMarker, OpenWrtDetector.ApkMarker }), "probe output: Parse accepts apk too");
+
+        foreach ((string name, string shell, string[] args) in Shells())
+        {
+            string tag = name.Replace(' ', '-');
+            string openwrtEtc = Path.Combine(_work, "apk-etc-openwrt-" + tag);
+            string listOnlyEtc = Path.Combine(_work, "apk-etc-listonly-" + tag);
+            string alpineEtc = Path.Combine(_work, "apk-etc-alpine-" + tag);
+            Directory.CreateDirectory(openwrtEtc);
+            Directory.CreateDirectory(Path.Combine(listOnlyEtc, "apk", "repositories.d"));
+            Directory.CreateDirectory(Path.Combine(alpineEtc, "apk"));
+            File.WriteAllText(Path.Combine(openwrtEtc, "openwrt_release"), "DISTRIB_ID='OpenWrt'\n");
+            File.WriteAllText(Path.Combine(listOnlyEtc, "apk", "repositories.d", "customfeeds.list"), "");
+            File.WriteAllText(Path.Combine(alpineEtc, "apk", "repositories"), "https://dl-cdn.alpinelinux.org/alpine/v3.20/main\n");
+
+            Check(RunProbeDetect(shell, args, openwrtEtc, opkgOnPath: false, apkOnPath: true) == LocalRepoPackageManager.Apk, name + ": OpenWrt with apk is detected");
+            Check(RunProbeDetect(shell, args, openwrtEtc, opkgOnPath: true, apkOnPath: false) == LocalRepoPackageManager.Opkg, name + ": OpenWrt with opkg is still detected");
+            Check(RunProbeDetect(shell, args, openwrtEtc, opkgOnPath: true, apkOnPath: true) == LocalRepoPackageManager.Apk, name + ": apk is preferred when both are installed");
+            Check(RunProbeDetect(shell, args, openwrtEtc, opkgOnPath: false, apkOnPath: false) == null, name + ": OpenWrt without opkg and apk is not offered");
+            Check(RunProbeDetect(shell, args, listOnlyEtc, opkgOnPath: false, apkOnPath: true) == LocalRepoPackageManager.Apk, name + ": the custom apk repository list alone counts as OpenWrt");
+            Check(RunProbeDetect(shell, args, alpineEtc, opkgOnPath: false, apkOnPath: true) == null, name + ": Alpine Linux (apk without the OpenWrt files) is not offered");
+        }
+
+        // Feeds of both kinds in one tree.
+        string root = Path.Combine(_work, "kinds", "bin", "packages", "x86_64");
+        Directory.CreateDirectory(Path.Combine(root, "base"));
+        File.WriteAllText(Path.Combine(root, "base", "packages.adb"), "adb");
+        File.WriteAllText(Path.Combine(root, "base", "a-1.0-r1.apk"), "apk");
+        Directory.CreateDirectory(Path.Combine(root, "late"));
+        File.WriteAllText(Path.Combine(root, "late", "b-1.0-r1.apk"), "apk without an index");
+        MakeIpk(Path.Combine(root, "ipk"), "foo", "1.0", "An opkg feed");
+        Directory.CreateDirectory(Path.Combine(root, "mixed"));
+        File.WriteAllText(Path.Combine(root, "mixed", "packages.adb"), "adb");
+        File.WriteAllText(Path.Combine(root, "mixed", "Packages"), "");
+        Directory.CreateDirectory(Path.Combine(root, "empty"));
+        File.WriteAllText(Path.Combine(root, "empty", "index.json"), "{}");
+        List<LocalRepoFeed> feeds = LocalRepoFeedScanner.Scan(new[] { root });
+        Check(feeds.Select(f => Path.GetFileName(f.Directory)).SequenceEqual(new[] { "base", "ipk", "late", "mixed" }), "scanner finds apk feeds (packages.adb or .apk files) next to opkg feeds");
+        LocalRepoFeed Find(string name) => feeds.First(f => Path.GetFileName(f.Directory) == name);
+        Check(Find("base").HasApk && !Find("base").HasOpkg && Find("late").HasApk && !Find("late").HasOpkg, "a folder with packages.adb or .apk files is an apk feed");
+        Check(Find("ipk").HasOpkg && !Find("ipk").HasApk, "a folder with .ipk files is an opkg feed");
+        Check(Find("mixed").HasOpkg && Find("mixed").HasApk, "a folder with both indexes is a feed of both kinds");
+        Check(feeds.Count(f => f.IsFor(LocalRepoPackageManager.Apk)) == 3 && feeds.Count(f => f.IsFor(LocalRepoPackageManager.Opkg)) == 2, "IsFor picks the feeds of a package manager");
+
+        string stale = Path.Combine(_work, "kinds-stale");
+        Directory.CreateDirectory(stale);
+        File.WriteAllText(Path.Combine(stale, "packages.adb"), "adb");
+        string older = Path.Combine(stale, "old-1.0-r1.apk");
+        string newer = Path.Combine(stale, "new-1.0-r1.apk");
+        File.WriteAllText(older, "x");
+        File.WriteAllText(newer, "x");
+        DateTime indexTime = File.GetLastWriteTimeUtc(Path.Combine(stale, "packages.adb"));
+        File.SetLastWriteTimeUtc(older, indexTime.AddMinutes(-5));
+        File.SetLastWriteTimeUtc(newer, indexTime.AddMinutes(5));
+        Check(ApkFeedInfo.CountPackagesNewerThanIndex(stale) == 1, "ApkFeedInfo counts the .apk files newer than the index");
+        Check(ApkFeedInfo.CountPackagesNewerThanIndex(Path.Combine(_work, "kinds-nope")) == 0 && ApkFeedInfo.CountPackagesNewerThanIndex(Path.Combine(root, "late")) == 0, "no index: nothing is reported");
+
+        // The public key of the build tree is found above the feeds.
+        string tree = Path.Combine(_work, "tree");
+        string deepFeed = Path.Combine(tree, "bin", "packages", "x86_64", "base");
+        Directory.CreateDirectory(deepFeed);
+        Check(ApkFeedConfig.FindBuildPublicKey(new[] { deepFeed }) == null, "no public key: null");
+        File.WriteAllText(Path.Combine(tree, "public-key.pem"), "not a key at all");
+        Check(ApkFeedConfig.FindBuildPublicKey(new[] { deepFeed }) == null, "a public-key.pem that is not a public key is ignored");
+        File.WriteAllText(Path.Combine(tree, "public-key.pem"), TestPublicKey.Replace("\n", "\r\n") + "\r\n");
+        Check(ApkFeedConfig.FindBuildPublicKey(new[] { deepFeed }) == TestPublicKey, "the key is found four levels up and normalized to LF without trailing blanks");
+        Check(ApkFeedConfig.FindBuildPublicKey(new[] { Path.Combine(_work, "elsewhere"), tree }) == TestPublicKey, "several start folders are tried");
+    }
+
+    private static void ApkConfigTests()
+    {
+        List<LocalRepoFeed> feeds = new List<LocalRepoFeed>
+        {
+            new LocalRepoFeed { Name = "smartty_base", UrlPath = "/r0/base", Directory = "/x", HasApk = true },
+            new LocalRepoFeed { Name = "smartty_luci", UrlPath = "/r0/lu%20ci", Directory = "/y", HasApk = true }
+        };
+        Check(ApkFeedConfig.FeedLine(feeds[0], 8765) == "http://127.0.0.1:8765/r0/base/packages.adb", "apk repository line is the URL of packages.adb");
+
+        foreach ((string name, string shell, string[] args) in Shells())
+        {
+            string dir = Path.Combine(_work, "apkconf-" + name.Replace(' ', '-'));
+            string list = Path.Combine(dir, "repositories.d", "customfeeds.list");
+            string key = Path.Combine(dir, "keys", "smartty-local.pem");
+            string fakeBin = Path.Combine(dir, "bin");
+            string emptyBin = Path.Combine(dir, "empty");
+            MakeFakeProgram(fakeBin, "apk");
+            Directory.CreateDirectory(emptyBin);
+            Directory.CreateDirectory(Path.Combine(dir, "keys"));
+
+            ExecShell(shell, args, "PATH=" + fakeBin + "; " + ApkFeedConfig.BuildCheckScript(), out int foundExit);
+            ExecShell(shell, args, "PATH=" + emptyBin + "; " + ApkFeedConfig.BuildCheckScript(), out int missingExit);
+            Check(foundExit == 0 && missingExit != 0, name + ": the apk check script tells whether apk exists");
+
+            ExecShell(shell, args, ApkFeedConfig.BuildEnableScript(feeds, 8765, null, list, key), out int exit1);
+            Check(exit1 == 0 && File.ReadAllText(list) == "# smartty-local-begin\nhttp://127.0.0.1:8765/r0/base/packages.adb\nhttp://127.0.0.1:8765/r0/lu%20ci/packages.adb\n# smartty-local-end\n" && !File.Exists(key), name + ": enable writes the marked block of repository URLs and no key");
+
+            File.WriteAllText(list, "# my own\nhttps://example.com/packages.adb");
+            File.WriteAllText(key, "stale key of an earlier run");
+            ExecShell(shell, args, ApkFeedConfig.BuildEnableScript(feeds.Take(1).ToList(), 9000, TestPublicKey, list, key), out int exit2);
+            Check(exit2 == 0 && File.ReadAllText(list) == "# my own\nhttps://example.com/packages.adb\n# smartty-local-begin\nhttp://127.0.0.1:9000/r0/base/packages.adb\n# smartty-local-end\n", name + ": enable keeps the user's repositories and replaces the old block");
+            Check(File.ReadAllText(key) == TestPublicKey + "\n", name + ": enable with a public key writes it (multi-line PEM intact)");
+
+            ExecShell(shell, args, ApkFeedConfig.BuildEnableScript(feeds, 9000, null, list, key), out int exit3);
+            Check(exit3 == 0 && !File.Exists(key), name + ": enable without a key removes the key of an earlier run");
+
+            ExecShell(shell, args, ApkFeedConfig.BuildEnableScript(feeds.Take(1).ToList(), 9000, TestPublicKey, list, key), out _);
+            File.AppendAllText(list, "https://example.com/after/packages.adb\n");
+            ExecShell(shell, args, ApkFeedConfig.BuildDisableScript(list, key), out int exit4);
+            Check(exit4 == 0 && File.ReadAllText(list) == "# my own\nhttps://example.com/packages.adb\nhttps://example.com/after/packages.adb\n" && !File.Exists(key), name + ": disable removes the block and the key, nothing else");
+            ExecShell(shell, args, ApkFeedConfig.BuildDisableScript(list, key), out int exit5);
+            ExecShell(shell, args, ApkFeedConfig.BuildDisableScript(Path.Combine(dir, "no-such.list"), Path.Combine(dir, "no-such.pem")), out int exit6);
+            Check(exit5 == 0 && exit6 == 0, name + ": disable succeeds when there is nothing to remove");
+
+            string hostile = "x'; touch " + Path.Combine(dir, "pwned") + "; '";
+            ExecShell(shell, args, ApkFeedConfig.BuildEnableScript(feeds, 1, "-----BEGIN PUBLIC KEY-----\n" + hostile + "\n-----END PUBLIC KEY-----", list, key), out _);
+            Check(!File.Exists(Path.Combine(dir, "pwned")), name + ": quotes inside the key do not run commands");
+        }
+    }
+
+    private static async Task ApkServerAndHostTests()
+    {
+        // Serving: the index and the packages of the build are served as is; a stale index is reported.
+        string tree = Path.Combine(_work, "apkserver");
+        string root = Path.Combine(tree, "bin", "packages", "x86_64");
+        string feed = Path.Combine(root, "base");
+        Directory.CreateDirectory(feed);
+        byte[] index = new byte[5000];
+        new Random(1).NextBytes(index);
+        byte[] package = new byte[200 * 1024];
+        new Random(2).NextBytes(package);
+        File.WriteAllBytes(Path.Combine(feed, "packages.adb"), index);
+        File.WriteAllBytes(Path.Combine(feed, "tool-1.0-r1.apk"), package);
+        File.SetLastWriteTimeUtc(Path.Combine(feed, "packages.adb"), DateTime.UtcNow.AddMinutes(5));
+        List<string> log = new List<string>();
+        using (LocalRepoServer server = new LocalRepoServer(new[] { root }, 0))
+        using (HttpClient client = new HttpClient())
+        {
+            server.RequestLogged += (string line) => { lock (log) { log.Add(line); } };
+            server.Start();
+            string baseUrl = "http://127.0.0.1:" + server.Port;
+            (int status, byte[] body) adb = await GetAsync(client, baseUrl + "/r0/base/packages.adb");
+            Check(adb.status == 200 && adb.body.SequenceEqual(index), "packages.adb is served byte for byte");
+            (int status, byte[] body) apk = await GetAsync(client, baseUrl + "/r0/base/tool-1.0-r1.apk");
+            Check(apk.status == 200 && apk.body.SequenceEqual(package), "an .apk is served byte for byte (200 KiB)");
+            Check((await GetAsync(client, baseUrl + "/r0/base/Packages")).status == 404, "an apk feed has no opkg index");
+            Check((await GetAsync(client, baseUrl + "/r0/base/../../../../secret")).status != 200, "path traversal is refused for apk feeds too");
+            lock (log)
+            {
+                Check(log.Any(l => l.StartsWith("GET /r0/base/packages.adb - 200") && !l.Contains("warning")), "a fresh index is logged without a warning");
+            }
+            File.SetLastWriteTimeUtc(Path.Combine(feed, "tool-1.0-r1.apk"), DateTime.UtcNow.AddMinutes(30));
+            await GetAsync(client, baseUrl + "/r0/base/packages.adb");
+            lock (log)
+            {
+                Check(log.Any(l => l.StartsWith("GET /r0/base/packages.adb - 200") && l.Contains("warning: 1 .apk file is newer than packages.adb") && l.Contains("make package/index")), "a package newer than the index is reported with the way to fix it");
+            }
+            if (Has("wget"))
+            {
+                string target = Path.Combine(_work, "wget-packages.adb");
+                Check(Run("wget", "-q -O " + target + " " + baseUrl + "/r0/base/packages.adb", null, out _, out _) == 0 && File.ReadAllBytes(target).SequenceEqual(index), "wget downloads packages.adb");
+            }
+        }
+
+        // The host with an apk device: only apk feeds are served, the apk repository list and key are managed.
+        string conf = Path.Combine(_work, "apkhost", "customfeeds.list");
+        string keyFile = Path.Combine(_work, "apkhost", "keys", "smartty-local.pem");
+        Directory.CreateDirectory(Path.GetDirectoryName(conf));
+        Directory.CreateDirectory(Path.GetDirectoryName(keyFile));
+        File.WriteAllText(Path.Combine(tree, "public-key.pem"), TestPublicKey + "\n");
+        MakeIpk(Path.Combine(root, "ipk"), "foo", "1.0", "An opkg feed in the same tree");
+        File.WriteAllText(conf, "# the user's own repository\nhttps://example.com/packages.adb\n");
+
+        SshSession NewApkSession()
+        {
+            SshSession s = NewFakeSession(null);
+            s.LocalConfigFile = null;
+            s.ApkConfigFile = conf;
+            s.ApkKeyFile = keyFile;
+            return s;
+        }
+
+        LocalRepoHost host = new LocalRepoHost();
+        SshSession session = NewApkSession();
+        host.Start(session, new[] { root }, 0, LocalRepoPackageManager.Apk);
+        int port = host.Port;
+        Check(host.Manager == LocalRepoPackageManager.Apk && host.Feeds.Count == 1 && Path.GetFileName(host.Feeds[0].Directory) == "base", "Start serves only the apk feeds of the tree");
+        Check(File.ReadAllText(conf) == "# the user's own repository\nhttps://example.com/packages.adb\n# smartty-local-begin\nhttp://127.0.0.1:" + port + "/r0/base/packages.adb\n# smartty-local-end\n" && !File.Exists(keyFile), "Start adds the repository to the apk list and keeps the user's lines, no key by default");
+        Check(host.DescribeFeed(host.Feeds[0]) == "http://127.0.0.1:" + port + "/r0/base/packages.adb", "the feed is described by its repository line");
+        Check(session.Commands.Contains("command -v apk >/dev/null 2>&1") && !session.Commands.Contains("command -v opkg >/dev/null 2>&1"), "apk is checked on the device, opkg is not");
+        host.Stop(session);
+        Check(File.ReadAllText(conf) == "# the user's own repository\nhttps://example.com/packages.adb\n" && !host.IsRunning && !PortIsOpen(port), "Stop removes the repository again");
+
+        host.Start(session, new[] { root }, 0, LocalRepoPackageManager.Apk, trustBuildKey: true);
+        Check(File.ReadAllText(keyFile) == TestPublicKey + "\n", "with trust requested the public key of the build tree is written to the keys directory");
+        Check(host.GetHistory().Any(l => l.Contains("the key of the build is trusted by apk")), "and the log says so");
+        File.WriteAllText(conf, "# wiped by a reboot\n");
+        File.Delete(keyFile);
+        SshSession next = NewApkSession();
+        host.Reattach(next);
+        Check(host.IsTunnelCurrent(next) && File.ReadAllText(conf).Contains("/r0/base/packages.adb") && File.ReadAllText(keyFile) == TestPublicKey + "\n", "Reattach restores the repository and the key on the new connection");
+        host.Stop(next);
+        Check(!File.Exists(keyFile) && !File.ReadAllText(conf).Contains("smartty-local"), "Stop removes the key as well");
+        File.WriteAllText(keyFile, "left over");
+        File.WriteAllText(conf, "a\n# smartty-local-begin\nhttp://127.0.0.1:1/r0/x/packages.adb\n# smartty-local-end\nb\n");
+        Check(host.RemoveFeeds(NewApkSession(), LocalRepoPackageManager.Apk) == null && File.ReadAllText(conf) == "a\nb\n" && !File.Exists(keyFile), "RemoveFeeds cleans up the leftovers of an earlier apk run");
+
+        // Refusals.
+        string opkgOnly = Path.Combine(_work, "apkhost-opkgonly");
+        MakeIpk(Path.Combine(opkgOnly, "base"), "bar", "1.0", "opkg only");
+        LocalRepoHost refused = new LocalRepoHost();
+        SshSession apkDevice = NewApkSession();
+        InvalidOperationException wrongKind = Catch<InvalidOperationException>(() => refused.Start(apkDevice, new[] { opkgOnly }, 0, LocalRepoPackageManager.Apk));
+        Check(wrongKind != null && wrongKind.Message.Contains("only opkg (.ipk) feeds") && wrongKind.Message.Contains("the device uses apk") && apkDevice.TunnelStarts == 0, "opkg feeds for an apk device: refused with an explanation");
+        InvalidOperationException otherWay = Catch<InvalidOperationException>(() => refused.Start(NewFakeSession(conf), new[] { root.Replace("x86_64", "x86_64") + "/base" }, 0, LocalRepoPackageManager.Opkg));
+        Check(otherWay != null && otherWay.Message.Contains("only apk (.apk) feeds") && otherWay.Message.Contains("the device uses opkg"), "apk feeds for an opkg device: refused with an explanation");
+        SshSession noApk = NewApkSession();
+        noApk.ApkMissing = true;
+        Check(Throws<InvalidOperationException>(() => refused.Start(noApk, new[] { root }, 0, LocalRepoPackageManager.Apk)) && noApk.TunnelStarts == 0 && !File.ReadAllText(conf).Contains("smartty"), "no apk on the device: refused before anything is changed");
+        string keyless = Path.Combine(_work, "apkhost-nokey", "bin", "packages", "x86_64");
+        Directory.CreateDirectory(Path.Combine(keyless, "base"));
+        File.WriteAllText(Path.Combine(keyless, "base", "packages.adb"), "adb");
+        SshSession keylessSession = NewApkSession();
+        InvalidOperationException noKey = Catch<InvalidOperationException>(() => refused.Start(keylessSession, new[] { keyless }, 0, LocalRepoPackageManager.Apk, trustBuildKey: true));
+        Check(noKey != null && noKey.Message.Contains("public-key.pem") && keylessSession.TunnelStarts == 0 && !refused.IsRunning && !File.ReadAllText(conf).Contains("smartty"), "trust requested but no public key above the folders: refused, nothing changed");
+        SshSession noTunnel = NewApkSession();
+        noTunnel.FailTunnel = true;
+        Check(Throws<InvalidOperationException>(() => refused.Start(noTunnel, new[] { root }, 0, LocalRepoPackageManager.Apk)) && !File.ReadAllText(conf).Contains("smartty"), "the tunnel is refused: nothing configured");
+        SshSession noConfig = NewApkSession();
+        noConfig.FailEnable = true;
+        Check(Throws<InvalidOperationException>(() => refused.Start(noConfig, new[] { root }, 0, LocalRepoPackageManager.Apk)) && noConfig.TunnelStops == 1 && !refused.IsRunning, "the repository list cannot be written: the tunnel is closed again");
+    }
+
+    /// <summary>
+    /// The whole chain with the real apk-tools 3: the host writes the repository list and the key, the HTTP server serves the signed
+    /// index and packages, and apk resolves a dependency, installs, and refuses an untrusted repository. Skipped when apk-tools 3 or
+    /// openssl is not installed (set SMARTTY_APK to the path of an apk binary).
+    /// </summary>
+    private static async Task ApkEndToEndTests()
+    {
+        string apk = FindApk();
+        if (apk == null || !Has("openssl"))
+        {
+            Skip("end-to-end with the real apk", "apk-tools 3 or openssl is not installed; set SMARTTY_APK to an apk binary");
+            return;
+        }
+        string tree = Path.Combine(_work, "e2e");
+        string root = Path.Combine(tree, "bin", "packages", "x86_64");
+        string feed = Path.Combine(root, "base");
+        Directory.CreateDirectory(feed);
+        string priv = Path.Combine(tree, "private-key.pem");
+        string pub = Path.Combine(tree, "public-key.pem");
+        Check(Run("openssl", "genrsa -out " + priv + " 2048", null, out _, out _) == 0 && Run("openssl", "rsa -in " + priv + " -pubout -out " + pub, null, out _, out _) == 0, "e2e: a signing key pair is created");
+
+        void MakePackage(string name, string version, string depends)
+        {
+            string files = Path.Combine(_work, "e2e-files-" + name);
+            Directory.CreateDirectory(files);
+            File.WriteAllText(Path.Combine(files, name + ".txt"), name + "\n");
+            List<string> arguments = new List<string> { "mkpkg", "--info", "name:" + name, "--info", "version:" + version, "--info", "arch:x86_64", "--info", "description:Test " + name };
+            if (depends != null)
+            {
+                arguments.AddRange(new[] { "--info", "depends:" + depends });
+            }
+            arguments.AddRange(new[] { "--files", files, "--sign", priv, "--output", Path.Combine(feed, name + "-" + version + ".apk") });
+            Check(RunArgs(apk, arguments.ToArray(), out _, out string error) == 0, "e2e: mkpkg " + name + " " + error);
+        }
+
+        void MakeIndex()
+        {
+            ProcessStartInfo info = new ProcessStartInfo(apk) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, WorkingDirectory = feed };
+            foreach (string argument in new[] { "mkndx", "--allow-untrusted", "--sign", priv, "--output", "packages.adb" }.Concat(Directory.GetFiles(feed, "*.apk").Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal)))
+            {
+                info.ArgumentList.Add(argument);
+            }
+            using (Process process = Process.Start(info))
+            {
+                process.StandardOutput.ReadToEnd();
+                process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                Check(process.ExitCode == 0, "e2e: mkndx");
+            }
+        }
+
+        MakePackage("hello", "1.0-r1", null);
+        MakePackage("hello-dep", "2.0-r1", "hello");
+        MakeIndex();
+
+        string device = Path.Combine(_work, "e2e-device");
+        string list = Path.Combine(device, "repositories.d", "customfeeds.list");
+        string deviceKeys = Path.Combine(device, "keys");
+        string keyFile = Path.Combine(deviceKeys, "smartty-local.pem");
+        Directory.CreateDirectory(Path.GetDirectoryName(list));
+        Directory.CreateDirectory(deviceKeys);
+        SshSession session = NewFakeSession(null);
+        session.LocalConfigFile = null;
+        session.ApkConfigFile = list;
+        session.ApkKeyFile = keyFile;
+
+        string[] Apk(string rootDir, string keysDir, params string[] command)
+        {
+            return new[] { "--root", rootDir, "--arch", "x86_64", "--keys-dir", keysDir, "--repositories-file", list, "--no-cache" }.Concat(command).ToArray();
+        }
+
+        string NewDeviceRoot(string name)
+        {
+            string dir = Path.Combine(_work, "e2e-root-" + name);
+            Directory.CreateDirectory(Path.Combine(dir, "etc", "apk"));
+            Directory.CreateDirectory(Path.Combine(dir, "lib", "apk", "db"));
+            return dir;
+        }
+
+        // The key is not trusted: apk ignores the repository and cannot find the package.
+        LocalRepoHost untrusted = new LocalRepoHost();
+        untrusted.Start(session, new[] { root }, 0, LocalRepoPackageManager.Apk);
+        string untrustedRoot = NewDeviceRoot("untrusted");
+        int untrustedExit = RunArgs(apk, Apk(untrustedRoot, deviceKeys, "add", "--initdb", "--no-scripts", "hello"), out string untrustedOut, out string untrustedErr);
+        Check(untrustedExit != 0 && !File.Exists(Path.Combine(untrustedRoot, "hello.txt")), "e2e: a device that does not trust the key of the build does not take its packages");
+        untrusted.Stop(session);
+
+        // With the key trusted by SmarTTY the same repository works: index, dependency and packages come over HTTP.
+        List<string> log = new List<string>();
+        LocalRepoHost host = new LocalRepoHost();
+        host.Log += (string line) => { lock (log) { log.Add(line); } };
+        host.Start(session, new[] { root }, 0, LocalRepoPackageManager.Apk, trustBuildKey: true);
+        string deviceRoot = NewDeviceRoot("trusted");
+        int addExit = RunArgs(apk, Apk(deviceRoot, deviceKeys, "add", "--initdb", "--no-scripts", "hello-dep"), out string addOut, out string addErr);
+        Check(addExit == 0 && File.Exists(Path.Combine(deviceRoot, "hello.txt")) && File.Exists(Path.Combine(deviceRoot, "hello-dep.txt")), "e2e: apk installs a package and its dependency from the served repository " + addOut + addErr);
+        int listExit = RunArgs(apk, Apk(deviceRoot, deviceKeys, "list", "--installed"), out string installed, out _);
+        Check(listExit == 0 && installed.Contains("hello-1.0-r1") && installed.Contains("hello-dep-2.0-r1"), "e2e: both packages are installed");
+        lock (log)
+        {
+            Check(log.Any(l => l.Contains("GET /r0/base/packages.adb - 200")) && log.Any(l => l.Contains("GET /r0/base/hello-dep-2.0-r1.apk - 200")) && log.Any(l => l.Contains("GET /r0/base/hello-1.0-r1.apk - 200")), "e2e: the log shows the index and both packages fetched by apk");
+        }
+
+        // A package built later is not in the index until the index is made again; the log says so.
+        MakePackage("late", "3.0-r1", null);
+        File.SetLastWriteTimeUtc(Path.Combine(feed, "late-3.0-r1.apk"), File.GetLastWriteTimeUtc(Path.Combine(feed, "packages.adb")).AddMinutes(10));
+        RunArgs(apk, Apk(deviceRoot, deviceKeys, "update"), out _, out _);
+        int missingExit = RunArgs(apk, Apk(deviceRoot, deviceKeys, "add", "--no-scripts", "late"), out _, out _);
+        Check(missingExit != 0, "e2e: a package that is not in the index cannot be installed");
+        lock (log)
+        {
+            Check(log.Any(l => l.Contains("GET /r0/base/packages.adb - 200") && l.Contains("warning: 1 .apk file is newer than packages.adb")), "e2e: the log warns about the package that is not in the index");
+        }
+        MakeIndex();
+        RunArgs(apk, Apk(deviceRoot, deviceKeys, "update"), out _, out _);
+        int lateExit = RunArgs(apk, Apk(deviceRoot, deviceKeys, "add", "--no-scripts", "late"), out _, out string lateErr);
+        Check(lateExit == 0 && File.Exists(Path.Combine(deviceRoot, "late.txt")), "e2e: after the index is made again the package installs " + lateErr);
+
+        host.Stop(session);
+        Check(!File.Exists(keyFile) && !File.ReadAllText(list).Contains("smartty-local"), "e2e: Stop takes the repository and the key away");
+        int afterStop = RunArgs(apk, Apk(NewDeviceRoot("after"), deviceKeys, "add", "--initdb", "--no-scripts", "hello"), out _, out _);
+        Check(afterStop != 0, "e2e: after Stop the device no longer sees the packages");
+        await Task.CompletedTask;
+    }
+
     private static async Task<int> Main()
     {
         _work = Path.Combine(Path.GetTempPath(), "smartty-localrepo-" + Guid.NewGuid().ToString("N"));
@@ -731,6 +1164,10 @@ internal static class Program
             await ServerTests();
             ConfigTests();
             await HostTests();
+            ApkDetectorAndScannerTests();
+            ApkConfigTests();
+            await ApkServerAndHostTests();
+            await ApkEndToEndTests();
             Console.WriteLine();
             Console.WriteLine("All checks passed: " + _passed + " passed, " + _skipped + " skipped");
             return 0;

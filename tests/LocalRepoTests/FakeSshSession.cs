@@ -15,6 +15,8 @@ namespace SmarTTY.Ssh
 
         public bool OpkgMissing;
 
+        public bool ApkMissing;
+
         public bool FailEnable;
 
         public bool FailTunnel;
@@ -27,6 +29,11 @@ namespace SmarTTY.Ssh
 
         /// <summary>When set, the feed scripts are run by a real shell with the configuration file path replaced by this one.</summary>
         public string LocalConfigFile;
+
+        /// <summary>The same for the apk repository list and the key that SmarTTY may add to /etc/apk/keys.</summary>
+        public string ApkConfigFile;
+
+        public string ApkKeyFile;
 
         public Func<string, string> RunShell;
 
@@ -44,17 +51,34 @@ namespace SmarTTY.Ssh
             {
                 return OpkgMissing ? null : new List<string>();
             }
+            if (command == "command -v apk >/dev/null 2>&1")
+            {
+                return ApkMissing ? null : new List<string>();
+            }
             if (command.Contains("smartty-local-begin"))
             {
                 if (FailEnable && command.Contains("printf"))
                 {
                     return null;
                 }
-                if (command.StartsWith("sudo -n sh -c ") || LocalConfigFile == null)
+                if (command.StartsWith("sudo -n sh -c ") || (LocalConfigFile == null && ApkConfigFile == null))
                 {
                     return new List<string>();
                 }
-                string output = RunShell(command.Replace("/etc/opkg/customfeeds.conf", LocalConfigFile));
+                string mapped = command;
+                if (LocalConfigFile != null)
+                {
+                    mapped = mapped.Replace("/etc/opkg/customfeeds.conf", LocalConfigFile);
+                }
+                if (ApkConfigFile != null)
+                {
+                    mapped = mapped.Replace("/etc/apk/repositories.d/customfeeds.list", ApkConfigFile);
+                }
+                if (ApkKeyFile != null)
+                {
+                    mapped = mapped.Replace("/etc/apk/keys/smartty-local.pem", ApkKeyFile);
+                }
+                string output = RunShell(mapped);
                 return output == null ? null : new List<string>();
             }
             return new List<string>();

@@ -122,9 +122,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     private static readonly TimeSpan ByteProbeTimeout = TimeSpan.FromSeconds(3);
 
-    // Whether the host of this session is OpenWrt with opkg, so that "Tools > Local OpenWrt repository server" is offered:
-    // null until the probe has answered. A host that is not OpenWrt (or has no opkg) never sees the item.
-    private bool? _OpenWrtWithOpkg;
+    // The package manager of the host of this session if it is OpenWrt (opkg, or apk on OpenWrt 25.12 and newer), so that
+    // "Tools > Local OpenWrt repository server" is offered: null until the probe has answered. A host that is not OpenWrt
+    // (or has neither opkg nor apk) never sees the item.
+    private LocalRepoPackageManager? _LocalRepoManager;
 
     private object _Sync = new object();
 
@@ -211,11 +212,14 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     }
 
     /// <summary>
-    /// Visibility of the "Tools > Local OpenWrt repository server" item: the server feeds opkg on OpenWrt, so the item
-    /// is offered only for an SSH session whose host answered the probe as OpenWrt with opkg installed. Until the probe
+    /// Visibility of the "Tools > Local OpenWrt repository server" item: the server feeds opkg or apk on OpenWrt, so the item
+    /// is offered only for an SSH session whose host answered the probe as OpenWrt with opkg or apk installed. Until the probe
     /// answers it stays hidden, so that it does not appear on the hosts that cannot use it.
     /// </summary>
-    public System.Windows.Visibility LocalRepoMenuVisibility => (_OpenWrtWithOpkg == true) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    public System.Windows.Visibility LocalRepoMenuVisibility => (_LocalRepoManager != null) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+
+    /// <summary>The package manager of the OpenWrt host (null if the host is not OpenWrt or has not answered the probe yet).</summary>
+    public LocalRepoPackageManager? LocalRepoManager => _LocalRepoManager;
 
     public SshSession Session { get; private set; }
 
@@ -552,7 +556,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     }
 
     /// <summary>
-    /// Asks the host once per connection whether it is OpenWrt with opkg (in the background, the session works meanwhile)
+    /// Asks the host once per connection whether it is OpenWrt with opkg or apk (in the background, the session works meanwhile)
     /// and raises the visibility of the "Tools > Local OpenWrt repository server" item when it is. On any other host the
     /// item stays hidden. A failed probe leaves the previous answer alone, so a reconnect to the same kind of host does not
     /// hide the item for good.
@@ -579,7 +583,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 // The command could not be run (the connection went away): keep the previous answer.
                 return;
             }
-            bool isOpenWrtWithOpkg = OpenWrtDetector.Parse(output);
+            LocalRepoPackageManager? manager = OpenWrtDetector.Detect(output);
             _Controller.BeginInvoke(() =>
             {
                 // A reconnect may have replaced the connection while the probe ran: only the current one counts.
@@ -587,7 +591,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 {
                     return;
                 }
-                _OpenWrtWithOpkg = isOpenWrtWithOpkg;
+                _LocalRepoManager = manager;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalRepoMenuVisibility"));
             });
         });

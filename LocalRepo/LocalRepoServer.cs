@@ -259,6 +259,16 @@ public sealed class LocalRepoServer : IDisposable
             SendText(stream, 404, "Not Found", "Not found", head);
             return null;
         }
+        string fileNote = null;
+        if (fileName == ApkFeedInfo.IndexName && directory != null)
+        {
+            // The apk index is written by apk only, so it cannot be regenerated here; tell what is missing from it.
+            int newer = ApkFeedInfo.CountPackagesNewerThanIndex(directory);
+            if (newer > 0)
+            {
+                fileNote = "warning: " + newer + (newer == 1 ? " .apk file is" : " .apk files are") + " newer than " + ApkFeedInfo.IndexName + " and not in it - run 'make package/index' in the build tree";
+            }
+        }
         using (FileStream file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
         {
             status = 200;
@@ -269,7 +279,7 @@ public sealed class LocalRepoServer : IDisposable
                 file.CopyTo(stream, 64 * 1024);
             }
         }
-        return null;
+        return fileNote;
     }
 
     /// <summary>Maps "/r0/base/foo.ipk" to a file of the first root folder; returns null for anything that is not inside a root folder.</summary>

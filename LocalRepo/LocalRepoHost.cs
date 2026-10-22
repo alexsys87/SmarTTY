@@ -10,8 +10,9 @@ namespace SmarTTY.LocalRepo;
 /// <summary>
 /// Serves local OpenWrt package folders to the device of an SSH session: an HTTP server on the loopback interface of this computer,
 /// a reverse SSH tunnel (like "ssh -R") that makes it reachable as http://127.0.0.1:PORT on the device, and the feeds that are
-/// added to /etc/opkg/customfeeds.conf there. The packages then show up in the package manager window (Tools > Manage Linux
-/// Packages) after "opkg update" and are installed like any other package. One host belongs to one session.
+/// added to /etc/opkg/customfeeds.conf (opkg) or /etc/apk/repositories.d/customfeeds.list (apk) there. The packages then show
+/// up in the package manager window (Tools > Manage Linux Packages) after "opkg update" / "apk update" and are installed like
+/// any other package. One host belongs to one session.
 /// </summary>
 public sealed class LocalRepoHost
 {
@@ -22,6 +23,10 @@ public sealed class LocalRepoHost
     private SshSession _TunnelSession;
 
     private IList<LocalRepoFeed> _Feeds = new LocalRepoFeed[0];
+
+    private LocalRepoPackageManager _Manager;
+
+    private string _PublicKey;
 
     private readonly List<string> _History = new List<string>();
 
@@ -58,6 +63,27 @@ public sealed class LocalRepoHost
             {
                 return (_Server != null) ? _Server.Port : 0;
             }
+        }
+    }
+
+    /// <summary>The package manager whose feeds are served (valid while the server runs).</summary>
+    public LocalRepoPackageManager Manager
+    {
+        get
+        {
+            lock (_Sync)
+            {
+                return _Manager;
+            }
+        }
+    }
+
+    /// <summary>The line of the device's repository list for a feed, as written by Start (opkg: "src/gz NAME URL", apk: the URL of packages.adb).</summary>
+    public string DescribeFeed(LocalRepoFeed feed)
+    {
+        lock (_Sync)
+        {
+            return _Manager == LocalRepoPackageManager.Apk ? ApkFeedConfig.FeedLine(feed, _Server?.Port ?? 0) : OpkgFeedConfig.FeedLine(feed, _Server?.Port ?? 0);
         }
     }
 
@@ -108,9 +134,14 @@ public sealed class LocalRepoHost
         return output != null && output.Any((string line) => line.Trim() == "0");
     }
 
-    /// <summary>Starts the server and the tunnel and adds the feeds to the device; throws with a message for the user when it cannot.</summary>
-    public void Start(SshSession session, IList<string> folders, int port)
+    /// <summary>
+    /// Starts the server and the tunnel and adds the feeds to the device; throws with a message for the user when it cannot.
+    /// <paramref name="manager"/> is the package manager of the device: only the feeds for it are served.
+    /// <paramref name="trustBuildKey"/> (apk only) also makes the device trust public-key.pem of the build tree.
+    /// </summary>
+    public void Start(SshSession session, IList<string> folders, int port, LocalRepoPackageManager manager = LocalRepoPackageManager.Opkg, bool trustBuildKey = false)
     {
+        bool apk = manager == LocalRepoPackageManager.Apk;
         if (session == null)
         {
             throw new InvalidOperationException("There is no SSH connection.");
@@ -134,14 +165,30 @@ public sealed class LocalRepoHost
                 throw new DirectoryNotFoundException("The folder was not found: " + root);
             }
         }
-        List<LocalRepoFeed> feeds = LocalRepoFeedScanner.Scan(roots);
+        List<LocalRepoFeed> allFeeds = LocalRepoFeedScanner.Scan(roots);
+        List<LocalRepoFeed> feeds = allFeeds.Where((LocalRepoFeed feed) => feed.IsFor(manager)).ToList();
         if (feeds.Count == 0)
         {
-            throw new InvalidOperationException("No package feeds were found in the selected folders. A feed is a folder with a Packages file or with .ipk files, for example bin/packages/<arch>/base.");
+            if (allFeeds.Count > 0)
+            {
+                throw new InvalidOperationException("The selected folders hold only " + (apk ? "opkg (.ipk)" : "apk (.apk)") + " feeds, but the device uses " + (apk ? "apk" : "opkg") + ". Select the folders of a build for " + (apk ? "apk (OpenWrt 25.12 or newer)" : "opkg (OpenWrt 24.10 or older)") + ".");
+            }
+            throw new InvalidOperationException(apk
+                ? "No package feeds were found in the selected folders. A feed is a folder with packages.adb or with .apk files, for example bin/packages/<arch>/base."
+                : "No package feeds were found in the selected folders. A feed is a folder with a Packages file or with .ipk files, for example bin/packages/<arch>/base.");
         }
-        if (session.RunCommandChecked(OpkgFeedConfig.BuildCheckScript(), requireSuccess: true) == null)
+        if (session.RunCommandChecked(apk ? ApkFeedConfig.BuildCheckScript() : OpkgFeedConfig.BuildCheckScript(), requireSuccess: true) == null)
         {
-            throw new InvalidOperationException("opkg was not found on the device. The local repository server works with OpenWrt's opkg.");
+            throw new InvalidOperationException((apk ? "apk" : "opkg") + " was not found on the device. The local repository server works with the package manager of OpenWrt (opkg or apk).");
+        }
+        string publicKey = null;
+        if (apk && trustBuildKey)
+        {
+            publicKey = ApkFeedConfig.FindBuildPublicKey(roots.Concat(feeds.Select((LocalRepoFeed feed) => feed.Directory)));
+            if (publicKey == null)
+            {
+                throw new InvalidOperationException("The public key of the build (" + ApkFeedConfig.BuildPublicKeyName + ", in the root of the OpenWrt tree) was not found above the selected folders. Select folders inside the build tree, or clear \"Trust the build key\".");
+            }
         }
         bool isRoot = IsRoot(session);
 
@@ -169,7 +216,7 @@ public sealed class LocalRepoHost
             {
                 throw new InvalidOperationException("The SSH server of the device did not accept the reverse tunnel for port " + server.Port + " (the port may be busy on the device, or TCP forwarding is disabled in its SSH server): " + exception.Message, exception);
             }
-            ConfigureDevice(session, feeds, server.Port, isRoot);
+            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey);
         }
         catch
         {
@@ -186,8 +233,10 @@ public sealed class LocalRepoHost
             _Server = server;
             _TunnelSession = session;
             _Feeds = feeds;
+            _Manager = manager;
+            _PublicKey = publicKey;
         }
-        Report("Server started on port " + server.Port + ", " + feeds.Count + (feeds.Count == 1 ? " feed" : " feeds") + " added to " + OpkgFeedConfig.DefaultConfigFile + " on the device.");
+        Report("Server started on port " + server.Port + ", " + feeds.Count + (feeds.Count == 1 ? " feed" : " feeds") + " added to " + (apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile) + " on the device" + (publicKey != null ? "; the key of the build is trusted by apk" : "") + ".");
     }
 
     /// <summary>
@@ -198,10 +247,12 @@ public sealed class LocalRepoHost
     {
         LocalRepoServer server;
         SshSession tunnel;
+        LocalRepoPackageManager manager;
         lock (_Sync)
         {
             server = _Server;
             tunnel = _TunnelSession;
+            manager = _Manager;
             _Server = null;
             _TunnelSession = null;
             _Feeds = new LocalRepoFeed[0];
@@ -210,18 +261,20 @@ public sealed class LocalRepoHost
         {
             return;
         }
-        string failure = RemoveFeeds(session);
+        string failure = RemoveFeeds(session, manager);
         TryStopTunnel(tunnel);
         server.Stop();
         Report(failure == null ? "Server stopped, the feeds were removed from the device." : "Server stopped. " + failure);
     }
 
     /// <summary>
-    /// Removes the block of local feeds from the opkg configuration of the device; succeeds if there is none.
-    /// Returns null on success or a message why it could not be done.
+    /// Removes the block of local feeds (and, for apk, the key that was added for them) from the package manager
+    /// configuration of the device; succeeds if there is none. Returns null on success or a message why it could not be done.
     /// </summary>
-    public string RemoveFeeds(SshSession session)
+    public string RemoveFeeds(SshSession session, LocalRepoPackageManager manager = LocalRepoPackageManager.Opkg)
     {
+        bool apk = manager == LocalRepoPackageManager.Apk;
+        string configFile = apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile;
         if (session == null)
         {
             return "The feeds could not be removed from the device: there is no SSH connection. Use \"Remove feeds from device\" after reconnecting.";
@@ -229,9 +282,10 @@ public sealed class LocalRepoHost
         try
         {
             bool isRoot = IsRoot(session);
-            if (session.RunCommandChecked(OpkgFeedConfig.WrapForPrivileges(OpkgFeedConfig.BuildDisableScript(), isRoot), requireSuccess: true) == null)
+            string script = apk ? ApkFeedConfig.BuildDisableScript() : OpkgFeedConfig.BuildDisableScript();
+            if (session.RunCommandChecked(OpkgFeedConfig.WrapForPrivileges(script, isRoot), requireSuccess: true) == null)
             {
-                return "The feeds could not be removed from " + OpkgFeedConfig.DefaultConfigFile + " on the device. Remove the lines between \"" + OpkgFeedConfig.BeginMarker + "\" and \"" + OpkgFeedConfig.EndMarker + "\" by hand.";
+                return "The feeds could not be removed from " + configFile + " on the device. Remove the lines between \"" + OpkgFeedConfig.BeginMarker + "\" and \"" + OpkgFeedConfig.EndMarker + "\" by hand.";
             }
             return null;
         }
@@ -249,10 +303,14 @@ public sealed class LocalRepoHost
     {
         LocalRepoServer server;
         IList<LocalRepoFeed> feeds;
+        LocalRepoPackageManager manager;
+        string publicKey;
         lock (_Sync)
         {
             server = _Server;
             feeds = _Feeds;
+            manager = _Manager;
+            publicKey = _PublicKey;
             if (server == null || ReferenceEquals(_TunnelSession, session))
             {
                 return;
@@ -262,7 +320,7 @@ public sealed class LocalRepoHost
         {
             bool isRoot = IsRoot(session);
             session.StartRemoteForward((uint)server.Port, "127.0.0.1", (uint)server.Port);
-            ConfigureDevice(session, feeds, server.Port, isRoot);
+            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey);
             lock (_Sync)
             {
                 if (_Server == server)
@@ -278,12 +336,13 @@ public sealed class LocalRepoHost
         }
     }
 
-    private static void ConfigureDevice(SshSession session, IList<LocalRepoFeed> feeds, int port, bool isRoot)
+    private static void ConfigureDevice(SshSession session, LocalRepoPackageManager manager, IList<LocalRepoFeed> feeds, int port, bool isRoot, string publicKey)
     {
-        string script = OpkgFeedConfig.BuildEnableScript(feeds, port);
+        bool apk = manager == LocalRepoPackageManager.Apk;
+        string script = apk ? ApkFeedConfig.BuildEnableScript(feeds, port, publicKey) : OpkgFeedConfig.BuildEnableScript(feeds, port);
         if (session.RunCommandChecked(OpkgFeedConfig.WrapForPrivileges(script, isRoot), requireSuccess: true) == null)
         {
-            throw new InvalidOperationException("Could not add the feeds to " + OpkgFeedConfig.DefaultConfigFile + " on the device." + (isRoot ? "" : " Non-root users need passwordless sudo: log in as root or allow sudo for this user."));
+            throw new InvalidOperationException("Could not add the feeds to " + (apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile) + " on the device." + (isRoot ? "" : " Non-root users need passwordless sudo: log in as root or allow sudo for this user."));
         }
     }
 

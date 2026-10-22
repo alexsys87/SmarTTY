@@ -17,6 +17,9 @@ public class LocalRepoSettings
 
     public int Port = DefaultPort;
 
+    /// <summary>For apk devices: also make the device trust the public key of the build (public-key.pem of the OpenWrt tree).</summary>
+    public bool TrustBuildKey;
+
     private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SmarTTY\\LocalRepo.xml");
 
     public static LocalRepoSettings Load()

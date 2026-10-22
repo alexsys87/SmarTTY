@@ -6,13 +6,28 @@ using System.Text;
 
 namespace SmarTTY.LocalRepo;
 
-/// <summary>A directory of an OpenWrt build that holds an opkg feed (a "Packages" index and/or .ipk files).</summary>
+/// <summary>
+/// A directory of an OpenWrt build that holds a feed: for opkg a "Packages" index and/or .ipk files, for apk a "packages.adb"
+/// index and/or .apk files.
+/// </summary>
 public sealed class LocalRepoFeed
 {
     /// <summary>The feed name used in the opkg configuration ("src/gz NAME URL").</summary>
     public string Name { get; set; }
 
     public string Directory { get; set; }
+
+    /// <summary>The folder is an opkg feed (it has a Packages index or .ipk files).</summary>
+    public bool HasOpkg { get; set; }
+
+    /// <summary>The folder is an apk feed (it has packages.adb or .apk files).</summary>
+    public bool HasApk { get; set; }
+
+    /// <summary>True if the device with the given package manager can use this feed.</summary>
+    public bool IsFor(LocalRepoPackageManager manager)
+    {
+        return manager == LocalRepoPackageManager.Apk ? HasApk : HasOpkg;
+    }
 
     /// <summary>The path of the feed on the local server, e.g. "/r0/base"; the URL of the feed is the server address plus this path.</summary>
     public string UrlPath { get; set; }
@@ -29,9 +44,19 @@ public static class LocalRepoFeedScanner
         return "/r" + rootIndex;
     }
 
-    public static bool IsFeedDirectory(string directory)
+    public static bool IsOpkgFeedDirectory(string directory)
     {
         return File.Exists(Path.Combine(directory, "Packages")) || File.Exists(Path.Combine(directory, "Packages.gz")) || IpkIndexBuilder.HasPackageFiles(directory);
+    }
+
+    public static bool IsApkFeedDirectory(string directory)
+    {
+        return ApkFeedInfo.HasIndex(directory) || ApkFeedInfo.HasPackageFiles(directory);
+    }
+
+    public static bool IsFeedDirectory(string directory)
+    {
+        return IsOpkgFeedDirectory(directory) || IsApkFeedDirectory(directory);
     }
 
     public static List<LocalRepoFeed> Scan(IList<string> roots)
@@ -102,7 +127,14 @@ public static class LocalRepoFeedScanner
         {
             name = baseName + "_" + suffix;
         }
-        return new LocalRepoFeed { Name = name, Directory = directory, UrlPath = urlPath.ToString() };
+        return new LocalRepoFeed
+        {
+            Name = name,
+            Directory = directory,
+            UrlPath = urlPath.ToString(),
+            HasOpkg = IsOpkgFeedDirectory(directory),
+            HasApk = IsApkFeedDirectory(directory)
+        };
     }
 
     private static string Sanitize(string text)

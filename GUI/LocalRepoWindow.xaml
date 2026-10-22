@@ -19,8 +19,8 @@
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
-    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0 0 0 8" Text="Serves OpenWrt packages built on this computer to the device of this SSH connection. The server listens on this computer only; the device reaches it through a reverse SSH tunnel as http://127.0.0.1:PORT and gets the feeds in /etc/opkg/customfeeds.conf. After starting, open the package manager, press Refresh and install the packages as usual." />
-    <TextBlock Grid.Row="1" TextWrapping="Wrap" Text="Package folders: the build output with the feeds, e.g. bin/packages/&lt;arch&gt; (base, packages, luci ...) and bin/targets/&lt;target&gt;/&lt;subtarget&gt;/packages. For a build in WSL use a path like \\wsl.localhost\Ubuntu\home\user\openwrt\bin\packages\arm_cortex-a9_neon." />
+    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0 0 0 8" Text="Serves OpenWrt packages built on this computer to the device of this SSH connection. The server listens on this computer only; the device reaches it through a reverse SSH tunnel as http://127.0.0.1:PORT and gets the feeds in /etc/opkg/customfeeds.conf (opkg) or /etc/apk/repositories.d/customfeeds.list (apk, OpenWrt 25.12 and newer). After starting, open the package manager, press Refresh and install the packages as usual." />
+    <TextBlock Grid.Row="1" TextWrapping="Wrap" Text="Package folders: the build output with the feeds, e.g. bin/packages/&lt;arch&gt; (base, packages, luci ...; .ipk with a Packages index for opkg, .apk with packages.adb for apk) and bin/targets/&lt;target&gt;/&lt;subtarget&gt;/packages. For a build in WSL use a path like \\wsl.localhost\Ubuntu\home\user\openwrt\bin\packages\arm_cortex-a9_neon." />
     <Grid Grid.Row="2" Margin="0 4 0 0">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
@@ -34,13 +34,14 @@
       <Button x:Name="RemoveButton" Grid.Column="3" Content="Remove selected" Click="Remove_Click" />
     </Grid>
     <ListBox x:Name="FoldersList" Grid.Row="3" Height="90" Margin="3" SelectionMode="Extended" />
-    <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0 4 0 0">
+    <WrapPanel Grid.Row="4" Orientation="Horizontal" Margin="0 4 0 0">
       <TextBlock Text="TCP port:" VerticalAlignment="Center" Margin="3 0 6 0" />
       <TextBox x:Name="PortBox" Width="70" VerticalContentAlignment="Center" Margin="3" MaxLength="5" />
       <Button x:Name="StartButton" Content="Start" Click="Start_Click" Margin="14 3 3 3" MinWidth="70" />
       <Button x:Name="StopButton" Content="Stop" Click="Stop_Click" MinWidth="70" />
-      <Button x:Name="CleanButton" Content="Remove feeds from device" Click="Clean_Click" ToolTip="Takes the lines of this server out of /etc/opkg/customfeeds.conf, e.g. if SmarTTY was closed while the server was running" />
-    </StackPanel>
+      <Button x:Name="CleanButton" Content="Remove feeds from device" Click="Clean_Click" ToolTip="Takes the lines of this server out of the repository list of the device (customfeeds.conf / customfeeds.list), e.g. if SmarTTY was closed while the server was running" />
+      <CheckBox x:Name="TrustKeyBox" Content="Trust the build key (apk)" VerticalAlignment="Center" Margin="10 0 0 0" ToolTip="Adds public-key.pem of the OpenWrt tree (found above the selected folders) to /etc/apk/keys for the time the server runs. Needed only if the firmware of the device was not built from this tree; a firmware built from it already trusts the key." />
+    </WrapPanel>
     <TextBlock x:Name="StatusText" Grid.Row="5" TextWrapping="Wrap" Margin="3 6 3 3" />
     <TextBox x:Name="LogBox" Grid.Row="6" Margin="3" IsReadOnly="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap" />
     <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 4 0 0">
