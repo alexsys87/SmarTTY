@@ -886,8 +886,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
     }
 
-    /// <summary>Queues data for the device; false when the connection has already ended and the data was dropped.</summary>
-    private bool SendToDevice(byte[] buffer, int count)
+    /// <summary>
+    /// Queues data for the device; false when the connection has already ended and the data was dropped (and
+    /// <paramref name="completed"/> will not be called). Otherwise <paramref name="completed"/> is called once, on a
+    /// worker thread, when the data has been written or dropped.
+    /// </summary>
+    private bool SendToDevice(byte[] buffer, int count, Action<bool> completed = null)
     {
         AsyncTransportConnection connection = _asyncTransportConnection;
         if (connection == null)
@@ -895,7 +899,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             throw new InvalidOperationException("The connection is closed. Use Reconnect first.");
         }
         // A connection that has already ended drops the data; the toolbar says it is closed.
-        if (!connection.Send(buffer, count))
+        if (!connection.Send(buffer, count, completed))
         {
             return false;
         }
@@ -1190,6 +1194,14 @@ public partial class DeviceTerminalControl : DpiAwareControl
         });
     }
 
+    /// <summary>
+    /// How much a transfer may have queued for the device and not yet written. A protocol that waits for answers never
+    /// gets near it. YMODEM-G streams without waiting: without a limit the whole file would go into the queue at once,
+    /// the progress window would race ahead of the line and a cancel (or the receiver's CAN CAN) would take effect
+    /// only after the queue has drained.
+    /// </summary>
+    private const int MaxQueuedTransferBytes = 4096;
+
     /// <summary>The protocol part of a transfer. Runs on a worker thread and returns whether the transfer succeeded.</summary>
     private delegate bool LineTransferRun(
         SmarTTY.IO.XModemTransfer.SendDataHandler sendData,
@@ -1227,6 +1239,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
             string error = null;
             try
             {
+                object queueGate = new object();
+                int queuedBytes = 0; // handed to the transport and not yet written
                 SmarTTY.IO.XModemTransfer.SendDataHandler sendData = (data, offset, length) =>
                 {
                     // Writes are queued, so a failure of an earlier one is only known now: end the transfer with its reason
@@ -1236,9 +1250,43 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     {
                         throw new IOException(writeError);
                     }
-                    byte[] copy = new byte[length];
-                    Array.Copy(data, offset, copy, 0, length);
-                    if (!SendToDevice(copy, length))
+                    lock (queueGate)
+                    {
+                        // Wait for the line to catch up; a cancel or an ended connection ends the wait (the caller notices them).
+                        while (queuedBytes > MaxQueuedTransferBytes && !transferForm.IsCancelled && _asyncTransportConnection?.HasEnded == false)
+                        {
+                            Monitor.Wait(queueGate, 100);
+                        }
+                        queuedBytes += length;
+                    }
+
+                    bool queued = false;
+                    try
+                    {
+                        byte[] copy = new byte[length];
+                        Array.Copy(data, offset, copy, 0, length);
+                        queued = SendToDevice(copy, length, written =>
+                        {
+                            lock (queueGate)
+                            {
+                                queuedBytes -= length;
+                                Monitor.PulseAll(queueGate);
+                            }
+                        });
+                    }
+                    finally
+                    {
+                        if (!queued)
+                        {
+                            // Nothing will report this write as done.
+                            lock (queueGate)
+                            {
+                                queuedBytes -= length;
+                                Monitor.PulseAll(queueGate);
+                            }
+                        }
+                    }
+                    if (!queued)
                     {
                         throw new IOException("The connection is closed.");
                     }

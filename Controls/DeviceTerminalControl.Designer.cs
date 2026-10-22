@@ -56,6 +56,8 @@ public partial class DeviceTerminalControl
 
 	private ToolStripMenuItem receiveFilesViaYMODEMToolStripMenuItem;
 
+	private ToolStripMenuItem receiveFilesViaYMODEMGToolStripMenuItem;
+
 	private ToolStripMenuItem sendFilesViaZModemToolStripMenuItem;
 
 	private ToolStripMenuItem receiveFilesViaZModemToolStripMenuItem;
@@ -142,6 +144,7 @@ public partial class DeviceTerminalControl
             this.receiveFileViaXMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.sendFilesViaYMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.receiveFilesViaYMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.receiveFilesViaYMODEMGToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.sendFilesViaZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.receiveFilesViaZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.autoReceiveZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -335,6 +338,7 @@ public partial class DeviceTerminalControl
             this.receiveFileViaXMODEMToolStripMenuItem,
             this.sendFilesViaYMODEMToolStripMenuItem,
             this.receiveFilesViaYMODEMToolStripMenuItem,
+            this.receiveFilesViaYMODEMGToolStripMenuItem,
             this.sendFilesViaZModemToolStripMenuItem,
             this.receiveFilesViaZModemToolStripMenuItem,
             this.autoReceiveZModemToolStripMenuItem,
@@ -376,12 +380,21 @@ public partial class DeviceTerminalControl
             this.sendFilesViaYMODEMToolStripMenuItem.Name = "sendFilesViaYMODEMToolStripMenuItem";
             this.sendFilesViaYMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
             this.sendFilesViaYMODEMToolStripMenuItem.Text = "Send file(s) via YMODEM...";
+            this.sendFilesViaYMODEMToolStripMenuItem.ToolTipText = "The receiver chooses the variant: YMODEM (CRC-16), the checksum variant or YMODEM-G (streaming).";
             // 
             // receiveFilesViaYMODEMToolStripMenuItem
             // 
             this.receiveFilesViaYMODEMToolStripMenuItem.Name = "receiveFilesViaYMODEMToolStripMenuItem";
             this.receiveFilesViaYMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
             this.receiveFilesViaYMODEMToolStripMenuItem.Text = "Receive file(s) via YMODEM...";
+            this.receiveFilesViaYMODEMToolStripMenuItem.ToolTipText = "Asks for CRC-16 and falls back to the checksum variant when the sender does not answer.";
+            // 
+            // receiveFilesViaYMODEMGToolStripMenuItem
+            // 
+            this.receiveFilesViaYMODEMGToolStripMenuItem.Name = "receiveFilesViaYMODEMGToolStripMenuItem";
+            this.receiveFilesViaYMODEMGToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.receiveFilesViaYMODEMGToolStripMenuItem.Text = "Receive file(s) via YMODEM-G...";
+            this.receiveFilesViaYMODEMGToolStripMenuItem.ToolTipText = "Streaming without acknowledgements: for error-free links only; a damaged block cancels the transfer.";
             // 
             // sendFilesViaZModemToolStripMenuItem
             // 

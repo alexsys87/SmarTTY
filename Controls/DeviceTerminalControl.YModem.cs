@@ -17,6 +17,8 @@ public partial class DeviceTerminalControl
         sendFilesViaYMODEMToolStripMenuItem.Click += sendFilesViaYMODEMToolStripMenuItem_Click;
         receiveFilesViaYMODEMToolStripMenuItem.Click -= receiveFilesViaYMODEMToolStripMenuItem_Click;
         receiveFilesViaYMODEMToolStripMenuItem.Click += receiveFilesViaYMODEMToolStripMenuItem_Click;
+        receiveFilesViaYMODEMGToolStripMenuItem.Click -= receiveFilesViaYMODEMGToolStripMenuItem_Click;
+        receiveFilesViaYMODEMGToolStripMenuItem.Click += receiveFilesViaYMODEMGToolStripMenuItem_Click;
     }
 
     private void sendFilesViaYMODEMToolStripMenuItem_Click(object sender, EventArgs e)
@@ -26,7 +28,12 @@ public partial class DeviceTerminalControl
 
     private void receiveFilesViaYMODEMToolStripMenuItem_Click(object sender, EventArgs e)
     {
-        ReceiveFilesViaYModem();
+        ReceiveFilesViaYModem(streaming: false);
+    }
+
+    private void receiveFilesViaYMODEMGToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        ReceiveFilesViaYModem(streaming: true);
     }
 
     private void SendFilesViaYModem()
@@ -80,15 +87,20 @@ public partial class DeviceTerminalControl
         });
     }
 
-    private void ReceiveFilesViaYModem()
+    /// <summary>
+    /// Receives files. The standard receiver asks for CRC-16 and falls back to the checksum variant by itself; YMODEM-G
+    /// (<paramref name="streaming"/>) has to be asked for because the sender cannot tell the difference.
+    /// </summary>
+    private void ReceiveFilesViaYModem(bool streaming)
     {
+        string protocolName = streaming ? "YMODEM-G" : "YMODEM";
         if (IsLineBusy())
         {
             return;
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            MessageBox.Show("Please connect first before receiving files via YMODEM.", "YMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("Please connect first before receiving files via " + protocolName + ".", protocolName + " Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -109,7 +121,7 @@ public partial class DeviceTerminalControl
         Dictionary<int, string> pathByIndex = new Dictionary<int, string>();
         string[] incomplete = new string[1]; // the file being written right now
 
-        StartLineTransfer("YMODEM Receive", "YMODEM", "receive", (sendData, progress, token) =>
+        StartLineTransfer(protocolName + " Receive", protocolName, "receive", (sendData, progress, token) =>
         {
             bool success = false;
             try
@@ -140,7 +152,8 @@ public partial class DeviceTerminalControl
                                 // The time is a courtesy: the file itself is fine.
                             }
                         }
-                    });
+                    },
+                    streaming ? SmarTTY.IO.YModemTransfer.YModemReceiveMode.Streaming : SmarTTY.IO.YModemTransfer.YModemReceiveMode.Standard);
                 return success;
             }
             finally
