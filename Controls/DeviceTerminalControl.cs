@@ -852,6 +852,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _telnetTransport = null;
         if (deviceTransport is TelnetTransport telnetTransport && _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet telnetSettings)
         {
+            // The server may propose a character set (option CHARSET): the terminal's own one is accepted.
+            telnetTransport.Charset = _textEncoding?.WebName;
             AttachTelnet(telnetTransport, telnetSettings);
         }
         _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, connectTimeoutMs);

@@ -15,488 +15,531 @@
     </ResourceDictionary>
   </FrameworkElement.Resources>
   <StackPanel Margin="10 0 10 10">
-    <local:SettingsGroupBox Text="{Binding TCPSettingsHeader}" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <TextBlock Text="Connect to: " VerticalAlignment="Center" />
-        <TextBox Name="txtHost" Grid.Column="2" Margin="2" VerticalContentAlignment="Center" Text="{Binding TCPEndpoint, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsChecked, ElementName=rbTCP}" Tag="&lt;hostname or IP address&gt;:&lt;port&gt;" />
-        <TextBlock Text="Keep-alive (seconds, 0 = off):" Grid.Row="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" Visibility="{Binding TcpKeepAliveSettingsVisibility}" />
-        <TextBox Grid.Column="1" Grid.Row="2" Margin="2" Width="60" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding TcpKeepAliveSettingsVisibility}" ToolTip="Asks the operating system to detect a dropped TCP connection by probing an idle connection; nothing is written to the socket, so the device protocol is not disturbed. 0 switches it off." />
-        <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Grid.Row="1" Grid.ColumnSpan="2" Click="Test_Click">
-          <StackPanel Orientation="Horizontal">
-            <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
-            <TextBlock Text="Test connection now" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
-      </Grid>
-    </local:SettingsGroupBox>
-    <local:SettingsGroupBox Text="Automatic reconnect" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <CheckBox Name="chkReconnectAutomatically" Grid.ColumnSpan="2" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding ReconnectAutomatically}" ToolTip="Open the connection again by itself when it drops or cannot be opened. Useful for unreliable links. A COM port is also opened again as soon as its USB adapter is plugged back in.">
-          <TextBlock Text="Automatically reconnect when the connection breaks or fails" />
-        </CheckBox>
-        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" IsEnabled="{Binding IsChecked, ElementName=chkReconnectAutomatically}">
-          <RadioButton Margin="25 4 0 2" VerticalContentAlignment="Center" GroupName="ReconnectMode" IsChecked="{Binding ReconnectImmediately}" Content="Immediately" ToolTip="Try to reopen the connection without any delay." />
-          <RadioButton Margin="15 4 0 2" VerticalContentAlignment="Center" GroupName="ReconnectMode" IsChecked="{Binding ReconnectWithInterval}" Content="Repeat every" ToolTip="Wait between reconnect attempts." />
-          <TextBox Margin="2" Width="40" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding ReconnectIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" ToolTip="Seconds between reconnect attempts (1-5)." />
-          <TextBlock Text="seconds" VerticalAlignment="Center" Margin="2 0 0 0" />
-        </StackPanel>
-        <CheckBox Grid.Row="2" Grid.ColumnSpan="2" Margin="25 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding ClearContentsWhenReconnecting}" ToolTip="When enabled, the terminal screen is wiped before each automatic reconnect.">
-          <TextBlock Text="Clear the terminal screen when reconnecting" />
-        </CheckBox>
-      </Grid>
-    </local:SettingsGroupBox>
-    <local:SettingsGroupBox Text="Telnet options" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <TextBlock Text="Terminal type:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
-        <TextBox Grid.Column="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetTerminalType, UpdateSourceTrigger=PropertyChanged}" ToolTip="Reported to the server when it asks for the terminal type (option TERMINAL-TYPE). The terminal understands xterm." />
-        <TextBlock Text="Local echo:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
-        <ComboBox Grid.Column="1" Grid.Row="1" Margin="2" HorizontalAlignment="Left" MinWidth="260" ItemsSource="{Binding TelnetLocalEchoChoices}" DisplayMemberPath="Text" SelectedValuePath="Value" SelectedValue="{Binding TelnetLocalEcho}" ToolTip="Automatic: typed characters are shown by the terminal until the server announces that it echoes them (option ECHO)." />
-        <TextBlock Text="Keep-alive (seconds, 0 = off):" Grid.Row="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
-        <TextBox Grid.Column="1" Grid.Row="2" Margin="2" Width="60" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" ToolTip="Send a harmless NOP command this often to keep an idle connection open." />
-        <CheckBox Grid.Row="3" Grid.ColumnSpan="2" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetActiveNegotiation}" ToolTip="Most telnet clients do this. Leave it off for servers that do not speak Telnet properly: nothing is sent until the server asks.">
-          <TextBlock Text="Offer terminal type, window size and suppress-go-ahead at connect" />
-        </CheckBox>
-        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetLineMode}" ToolTip="When the server asks for LINEMODE (RFC 1184), the line is edited here (Backspace, Ctrl+U, Ctrl+W) and sent when Enter is pressed; Ctrl+C, Ctrl+\ and Ctrl+Z become Telnet signals if the server wants that. Leave it off if unsure: the server then sends and receives single characters.">
-          <TextBlock Text="Allow line mode (LINEMODE) when the server asks" />
-        </CheckBox>
-        <TextBlock Text="Automatic login (typed when the server asks; sent once per connection, a rejected password is not retried):" Grid.Row="5" Grid.ColumnSpan="2" Margin="5 10 0 2" TextWrapping="Wrap" MaxWidth="430" HorizontalAlignment="Left" Style="{StaticResource HeaderText}" />
-        <TextBlock Text="User name:" Grid.Row="6" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
-        <TextBox Grid.Column="1" Grid.Row="6" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetAutoLoginUserName, UpdateSourceTrigger=PropertyChanged}" ToolTip="Leave empty for a device that asks only for a password." />
-        <TextBlock Text="Password:" Grid.Row="7" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
-        <PasswordBox Name="txtTelnetPassword" Grid.Column="1" Grid.Row="7" Margin="2" MaxLength="64" VerticalContentAlignment="Center" Padding="2 1 2 2" ToolTip="Stored encrypted for the current Windows user (like saved SSH passwords). Telnet itself sends it over the network unencrypted." />
-        <TextBlock Text="Login prompt ends with:" Grid.Row="8" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
-        <TextBox Grid.Column="1" Grid.Row="8" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetLoginPrompts, UpdateSourceTrigger=PropertyChanged}" ToolTip="Texts separated by ';', case does not matter. Empty: login:;username:;user name:;user:" />
-        <TextBlock Text="Password prompt ends with:" Grid.Row="9" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
-        <TextBox Grid.Column="1" Grid.Row="9" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetPasswordPrompts, UpdateSourceTrigger=PropertyChanged}" ToolTip="Texts separated by ';', case does not matter. Empty: password:;passcode:" />
-      </Grid>
-    </local:SettingsGroupBox>
-    <local:SettingsGroupBox Text="Telnet security (TLS)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
-      <StackPanel Orientation="Vertical">
-        <CheckBox Name="chkTelnetTls" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetTls}" ToolTip="Telnet over TLS (telnets): the TLS handshake is made right after connecting and everything, including the password, travels encrypted. The port is 992 when none is given. The server must speak TLS from the first byte; the in-band STARTTLS option of Telnet is not supported.">
-          <TextBlock Text="Use TLS (telnets, default port 992)" />
-        </CheckBox>
-        <CheckBox Margin="25 4 0 2" VerticalContentAlignment="Center" IsEnabled="{Binding IsChecked, ElementName=chkTelnetTls}" IsChecked="{Binding TelnetTlsAllowInvalidCertificate}" ToolTip="For devices with a self-signed certificate. The connection stays encrypted, but nothing protects it against someone who sits between you and the server. Leave it off if unsure.">
-          <TextBlock Text="Accept any server certificate (insecure)" />
-        </CheckBox>
-      </StackPanel>
-    </local:SettingsGroupBox>
-    <local:SettingsGroupBox Text="Telnet data for the server (when it asks)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <TextBlock Text="Terminal speed:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
-        <TextBox Grid.Column="1" Margin="2" Width="120" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetTerminalSpeed, UpdateSourceTrigger=PropertyChanged}" ToolTip="Reported to the server when it asks (option TSPEED): 38400,38400 (transmit,receive) or one number for both. Empty: the option is refused." />
-        <TextBlock Text="X display location:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
-        <TextBox Grid.Column="1" Grid.Row="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetXDisplayLocation, UpdateSourceTrigger=PropertyChanged}" ToolTip="Reported to the server when it asks (option XDISPLOC), for example mypc:0.0. The server's X programs connect to this display over the network, so use it only on a trusted network. Empty: the option is refused. It is also sent as the variable DISPLAY unless you set that variable below." />
-        <TextBlock Text="Environment variables:" Grid.Row="2" Style="{StaticResource HeaderText}" VerticalAlignment="Top" Margin="0 6 0 0" />
-        <TextBox Grid.Column="1" Grid.Row="2" Margin="2" Height="64" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="2 1 2 2" Text="{Binding TelnetEnvironmentVariables, UpdateSourceTrigger=PropertyChanged}" ToolTip="Handed to the server when it asks (option NEW-ENVIRON), one NAME=value per line; lines starting with # and invalid lines are ignored. Empty: the option is refused. Be careful with USER: some servers log that user in without asking for a password." />
-      </Grid>
-    </local:SettingsGroupBox>
-    <local:SettingsGroupBox ImageSource="../icons/com16.png" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">
-      <StackPanel Orientation="Vertical">
-        <Grid Margin="0 0 0 0">
-          <FrameworkElement.Resources>
-            <ResourceDictionary>
-              <Style x:Key="{x:Type ListBox}" TargetType="{x:Type ListBox}" BasedOn="{StaticResource LightHorizontalListBox}">
-                <Style.Resources>
-                  <ResourceDictionary>
-                    <Style x:Key="{x:Type TextBlock}" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource LargeSelectableLabel}" />
-                  </ResourceDictionary>
-                </Style.Resources>
-                <Setter Property="Margin" Value="0 2 0 2" />
-                <EventSetter Event="SelectionChanged" Handler="ListBox_SelectionChanged" />
-              </Style>
-              <Style x:Key="{x:Type ComboBox}" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Type ComboBox}}">
-                <Setter Property="Margin" Value="0 2 0 2" />
-                <EventSetter Event="SelectionChanged" Handler="ListBox_SelectionChanged" />
-              </Style>
-            </ResourceDictionary>
-          </FrameworkElement.Resources>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
-          </Grid.ColumnDefinitions>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-          </Grid.RowDefinitions>
-          <TextBlock Text="Bits per second:" Style="{StaticResource HeaderText}" />
-          <ComboBox Name="cbBaudRate" Grid.Column="1" IsEditable="True" Text="{Binding Path=SerialSettings.AdvancedSettings.BaudRate, UpdateSourceTrigger=PropertyChanged}" TextBoxBase.TextChanged="ComboBox_TextChanged">
-            <ItemsControl.ItemsSource>
-              <coll:ArrayList>
-                <sys:Int32>1200</sys:Int32>
-                <sys:Int32>2400</sys:Int32>
-                <sys:Int32>4800</sys:Int32>
-                <sys:Int32>9600</sys:Int32>
-                <sys:Int32>19200</sys:Int32>
-                <sys:Int32>38400</sys:Int32>
-                <sys:Int32>57600</sys:Int32>
-                <sys:Int32>74880</sys:Int32>
-                <sys:Int32>115200</sys:Int32>
-                <sys:Int32>230400</sys:Int32>
-                <sys:Int32>460800</sys:Int32>
-                <sys:Int32>921600</sys:Int32>
-                <sys:Int32>1000000</sys:Int32>
-                <sys:Int32>2000000</sys:Int32>
-              </coll:ArrayList>
-            </ItemsControl.ItemsSource>
-          </ComboBox>
-          <TextBlock Text="Data bits:" Style="{StaticResource HeaderText}" Grid.Row="1" />
-          <ListBox Grid.Column="1" Grid.Row="1" SelectedItem="{Binding Path=SerialSettings.AdvancedSettings.DataBits}">
-            <ItemsControl.ItemsSource>
-              <coll:ArrayList>
-                <sys:Int32>5</sys:Int32>
-                <sys:Int32>6</sys:Int32>
-                <sys:Int32>7</sys:Int32>
-                <sys:Int32>8</sys:Int32>
-              </coll:ArrayList>
-            </ItemsControl.ItemsSource>
-          </ListBox>
-          <TextBlock Text="Parity:" Style="{StaticResource HeaderText}" Grid.Row="2" />
-          <ListBox Grid.Column="1" Grid.Row="2" SelectedItem="{Binding Path=SerialSettings.AdvancedSettings.Parity}">
-            <ItemsControl.ItemsSource>
-              <coll:ArrayList>
-                <ports:Parity>None</ports:Parity>
-                <ports:Parity>Odd</ports:Parity>
-                <ports:Parity>Even</ports:Parity>
-                <ports:Parity>Mark</ports:Parity>
-                <ports:Parity>Space</ports:Parity>
-              </coll:ArrayList>
-            </ItemsControl.ItemsSource>
-          </ListBox>
-          <TextBlock Text="Stop bits:" Style="{StaticResource HeaderText}" Grid.Row="3" />
-          <ListBox Grid.Column="1" Grid.Row="3" SelectedItem="{Binding Path=SerialSettings.AdvancedSettings.StopBits}">
-            <ItemsControl.ItemsSource>
-              <coll:ArrayList>
-                <ports:StopBits>One</ports:StopBits>
-                <ports:StopBits>OnePointFive</ports:StopBits>
-                <ports:StopBits>Two</ports:StopBits>
-              </coll:ArrayList>
-            </ItemsControl.ItemsSource>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <TextBlock>
-                  <FrameworkElement.Style>
-                    <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
-                      <Style.Triggers>
-                        <DataTrigger Value="One" Binding="{Binding}">
-                          <Setter Property="Text" Value="1" />
-                        </DataTrigger>
-                        <DataTrigger Value="OnePointFive" Binding="{Binding}">
-                          <Setter Property="Text" Value="1.5" />
-                        </DataTrigger>
-                        <DataTrigger Value="Two" Binding="{Binding}">
-                          <Setter Property="Text" Value="2" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </FrameworkElement.Style>
-                </TextBlock>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ListBox>
-          <TextBlock Text="Flow control:" Style="{StaticResource HeaderText}" Grid.Row="4" />
-          <ListBox Grid.Column="1" Grid.Row="4" SelectedItem="{Binding Path=SerialSettings.AdvancedSettings.FlowControl}">
-            <ItemsControl.ItemsSource>
-              <coll:ArrayList>
-                <ports:Handshake>None</ports:Handshake>
-                <ports:Handshake>XOnXOff</ports:Handshake>
-                <ports:Handshake>RequestToSend</ports:Handshake>
-                <ports:Handshake>RequestToSendXOnXOff</ports:Handshake>
-              </coll:ArrayList>
-            </ItemsControl.ItemsSource>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <TextBlock>
-                  <FrameworkElement.Style>
-                    <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
-                      <Style.Triggers>
-                        <DataTrigger Value="None" Binding="{Binding}">
-                          <Setter Property="Text" Value="None" />
-                        </DataTrigger>
-                        <DataTrigger Value="XOnXOff" Binding="{Binding}">
-                          <Setter Property="Text" Value="Software (XON/XOFF)" />
-                        </DataTrigger>
-                        <DataTrigger Value="RequestToSend" Binding="{Binding}">
-                          <Setter Property="Text" Value="Hardware (RTS/CTS)" />
-                        </DataTrigger>
-                        <DataTrigger Value="RequestToSendXOnXOff" Binding="{Binding}">
-                          <Setter Property="Text" Value="Both" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </FrameworkElement.Style>
-                </TextBlock>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ListBox>
-          <StackPanel Orientation="Horizontal" Grid.Row="5" Grid.Column="1" Margin="0 5 0 5">
-            <TextBlock Text="Maximum speed:" Margin="0 0 5 0" />
-            <TextBlock FontWeight="Bold" Text="{Binding MaximumSpeed}" />
-          </StackPanel>
-          <TextBlock Text="When opened:" Style="{StaticResource HeaderText}" Grid.Row="6" />
-          <StackPanel Orientation="Horizontal" Grid.Row="6" Grid.Column="1" Margin="0 2 0 5">
-            <CheckBox Margin="0 0 15 0" VerticalContentAlignment="Center" IsChecked="{Binding Path=SerialSettings.AdvancedSettings.DtrOnOpen}" ToolTip="Many boards (Arduino, ESP) reset when DTR changes: switch it off for a connection that must not restart the device. The Windows driver may still raise DTR for a moment while it opens the port.">
-              <TextBlock Text="Raise DTR" />
-            </CheckBox>
-            <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding Path=SerialSettings.AdvancedSettings.RtsOnOpen}" ToolTip="Ignored with hardware (RTS/CTS) flow control, which drives RTS itself.">
-              <TextBlock Text="Raise RTS" />
-            </CheckBox>
-          </StackPanel>
-        </Grid>
-        <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Click="Test_Click">
-          <StackPanel Orientation="Horizontal">
-            <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
-            <TextBlock Text="Test connection now" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
-      </StackPanel>
-    </local:SettingsGroupBox>
-    <local:SettingsGroupBox Text="Terminal colors" ImageSource="..\icons\color16.png">
-      <Grid DataContext="{Binding Path=Settings}">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <FrameworkElement.Resources>
-          <ResourceDictionary>
-            <Style x:Key="{x:Type TextBlock}" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource {x:Type TextBlock}}">
-              <Setter Property="Margin" Value="5 2 5 2" />
-            </Style>
-            <Style x:Key="{x:Type Border}" TargetType="{x:Type Border}">
-              <Setter Property="Margin" Value="5 2 5 2" />
-              <EventSetter Event="MouseDown" Handler="Border_MouseDown" />
-            </Style>
-          </ResourceDictionary>
-        </FrameworkElement.Resources>
-        <TextBlock Text="Background color:" />
-        <Border Width="40" Grid.Column="1" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Background="{Binding Path=Colors.Background, Converter={StaticResource ColorWrapperConverter}}" />
-        <TextBlock Text="Received text color:" Grid.Column="3" />
-        <Border Width="40" Grid.Column="4" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Background="{Binding Path=Colors.Text, Converter={StaticResource ColorWrapperConverter}}" />
-        <TextBlock Text="Background color (disconnected):" Grid.Column="0" Grid.Row="1" />
-        <Border Width="40" Grid.Column="1" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Grid.Row="1" Background="{Binding Path=Colors.Disconnected, Converter={StaticResource ColorWrapperConverter}}" />
-        <TextBlock Text="Echoed characters color:" Grid.Column="3" Grid.Row="1" />
-        <Border Width="40" Grid.Column="4" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Grid.Row="1" Background="{Binding Path=Colors.Echo, Converter={StaticResource ColorWrapperConverter}}" />
-      </Grid>
-    </local:SettingsGroupBox>
-    <local:SettingsGroupBox Text="Terminal settings" ImageSource="..\Icons\term16.png">
-      <Grid>
-        <FrameworkElement.Resources>
-          <ResourceDictionary>
-            <Style x:Key="{x:Type ListBox}" TargetType="{x:Type ListBox}" BasedOn="{StaticResource LightHorizontalListBox}">
-              <Style.Resources>
+    <!-- Two columns keep the window short: connection settings on the left, security and the terminal on the right. -->
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0" MinWidth="380" MaxWidth="450" VerticalAlignment="Top">
+        <local:SettingsGroupBox Text="{Binding TCPSettingsHeader}" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Connect to: " VerticalAlignment="Center" />
+            <TextBox Name="txtHost" Grid.Column="1" Grid.ColumnSpan="3" Margin="2" VerticalContentAlignment="Center" Text="{Binding TCPEndpoint, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsChecked, ElementName=rbTCP}" Tag="&lt;hostname or IP address&gt;:&lt;port&gt;" ToolTip="host, host:port or [IPv6 address]:port. Without a port telnet uses 23 (992 with TLS)." />
+            <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Grid.Row="1" Grid.ColumnSpan="2" Click="Test_Click">
+              <StackPanel Orientation="Horizontal">
+                <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
+                <TextBlock Text="Test connection now" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <TextBlock Text="Keep-alive, s:" Grid.Row="1" Grid.Column="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" Visibility="{Binding TcpKeepAliveSettingsVisibility}" />
+            <TextBox Grid.Column="3" Grid.Row="1" Margin="2" Width="50" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding TcpKeepAliveSettingsVisibility}" ToolTip="Seconds (0 = off). Asks the operating system to detect a dropped TCP connection by probing an idle connection; nothing is written to the socket, so the device protocol is not disturbed." />
+          </Grid>
+        </local:SettingsGroupBox>
+        <local:SettingsGroupBox ImageSource="../icons/com16.png" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">
+          <StackPanel Orientation="Vertical">
+            <Grid Margin="0 0 0 0">
+              <FrameworkElement.Resources>
                 <ResourceDictionary>
-                  <Style x:Key="{x:Type TextBlock}" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource LargeSelectableLabel}" />
+                  <Style x:Key="{x:Type ListBox}" TargetType="{x:Type ListBox}" BasedOn="{StaticResource LightHorizontalListBox}">
+                    <Style.Resources>
+                      <ResourceDictionary>
+                        <Style x:Key="{x:Type TextBlock}" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource LargeSelectableLabel}" />
+                      </ResourceDictionary>
+                    </Style.Resources>
+                    <Setter Property="Margin" Value="0 2 0 2" />
+                    <EventSetter Event="SelectionChanged" Handler="ListBox_SelectionChanged" />
+                  </Style>
+                  <Style x:Key="{x:Type ComboBox}" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Type ComboBox}}">
+                    <Setter Property="Margin" Value="0 2 0 2" />
+                    <EventSetter Event="SelectionChanged" Handler="ListBox_SelectionChanged" />
+                  </Style>
                 </ResourceDictionary>
-              </Style.Resources>
-              <Setter Property="Margin" Value="0 2 0 2" />
-              <EventSetter Event="SelectionChanged" Handler="ListBox_SelectionChanged" />
-            </Style>
-          </ResourceDictionary>
-        </FrameworkElement.Resources>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <CheckBox VerticalContentAlignment="Center" Grid.ColumnSpan="2" IsChecked="{Binding Path=Settings.EchoTypedCharacters}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
-          <TextBlock Text="Echo back typed characters (with different color)" />
-        </CheckBox>
-        <TextBlock Text="Line ending style:" Grid.Row="1" Style="{StaticResource HeaderText}" />
-        <ListBox Grid.Column="1" Grid.Row="1" ItemsSource="{Binding LineEndings}" SelectedItem="{Binding Path=Settings.LineEnding}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <TextBlock>
-                <FrameworkElement.Style>
-                  <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
-                    <Style.Triggers>
-                      <DataTrigger Value="CR" Binding="{Binding}">
-                        <Setter Property="Text" Value="CR (\r)" />
-                      </DataTrigger>
-                      <DataTrigger Value="LF" Binding="{Binding}">
-                        <Setter Property="Text" Value="LF (\n)" />
-                      </DataTrigger>
-                      <DataTrigger Value="CRLF" Binding="{Binding}">
-                        <Setter Property="Text" Value="CRLF (\r\n)" />
-                      </DataTrigger>
-                    </Style.Triggers>
-                  </Style>
-                </FrameworkElement.Style>
-              </TextBlock>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ListBox>
-        <CheckBox Grid.Row="2" Grid.Column="1" VerticalContentAlignment="Center" IsChecked="{Binding Path=Settings.TreatLFAsCRLF}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
-          <TextBlock Text="Treat incoming LF as CRLF when in text mode" />
-        </CheckBox>
-        <TextBlock Text="Text encoding:" Grid.Row="3" Style="{StaticResource HeaderText}" />
-        <ComboBox Grid.Column="1" Grid.Row="3" Margin="0 2 0 2" HorizontalAlignment="Left" MinWidth="220" ItemsSource="{Binding TextEncodings}" DisplayMemberPath="DisplayName" SelectedValuePath="Name" SelectedValue="{Binding Path=Settings.TextEncoding}" ToolTip="Encoding of the text exchanged with the device: used to decode received data and to encode typed and pasted text." />
-        <TextBlock Text="Display mode:" Grid.Row="4" Style="{StaticResource HeaderText}" />
-        <ListBox Grid.Column="1" Grid.Row="4" SelectedItem="{Binding Path=EffectiveDisplayMode}">
-          <ItemsControl.ItemsSource>
-            <coll:ArrayList>
-              <local:EffectiveDisplayMode>Text</local:EffectiveDisplayMode>
-              <local:EffectiveDisplayMode>Hex</local:EffectiveDisplayMode>
-              <local:EffectiveDisplayMode>Both</local:EffectiveDisplayMode>
-            </coll:ArrayList>
-          </ItemsControl.ItemsSource>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <TextBlock>
-                <FrameworkElement.Style>
-                  <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
-                    <Style.Triggers>
-                      <DataTrigger Value="Text" Binding="{Binding}">
-                        <Setter Property="Text" Value="Text only" />
-                      </DataTrigger>
-                      <DataTrigger Value="Hex" Binding="{Binding}">
-                        <Setter Property="Text" Value="Hex only" />
-                      </DataTrigger>
-                      <DataTrigger Value="Both" Binding="{Binding}">
-                        <Setter Property="Text" Value="Text and hex" />
-                      </DataTrigger>
-                    </Style.Triggers>
-                  </Style>
-                </FrameworkElement.Style>
-              </TextBlock>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ListBox>
-        <TextBlock Text="Send data:" Grid.Row="5" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
-        <ListBox Grid.Column="1" Grid.Row="5" SelectedItem="{Binding Path=Settings.HexSettings.AutoSend}" IsEnabled="{Binding HexModeEnabled}">
-          <ItemsControl.ItemsSource>
-            <coll:ArrayList>
-              <sys:Boolean>true</sys:Boolean>
-              <sys:Boolean>false</sys:Boolean>
-            </coll:ArrayList>
-          </ItemsControl.ItemsSource>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <TextBlock>
-                <FrameworkElement.Style>
-                  <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
-                    <Style.Triggers>
-                      <DataTrigger Value="true" Binding="{Binding}">
-                        <Setter Property="Text" Value="As you type it" />
-                      </DataTrigger>
-                      <DataTrigger Value="false" Binding="{Binding}">
-                        <Setter Property="Text" Value="When Enter or 'Send' is pressed" />
-                      </DataTrigger>
-                    </Style.Triggers>
-                  </Style>
-                </FrameworkElement.Style>
-              </TextBlock>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ListBox>
-        <TextBlock Text="Interpret typed data as:" Grid.Row="6" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
-        <ListBox Grid.Column="1" Grid.Row="6" SelectedItem="{Binding Path=Settings.HexSettings.SendAsHex}" IsEnabled="{Binding HexModeEnabled}">
-          <ItemsControl.ItemsSource>
-            <coll:ArrayList>
-              <sys:Boolean>false</sys:Boolean>
-              <sys:Boolean>true</sys:Boolean>
-            </coll:ArrayList>
-          </ItemsControl.ItemsSource>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <TextBlock>
-                <FrameworkElement.Style>
-                  <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
-                    <Style.Triggers>
-                      <DataTrigger Value="true" Binding="{Binding}">
-                        <Setter Property="Text" Value="Hexadecimal numbers" />
-                      </DataTrigger>
-                      <DataTrigger Value="false" Binding="{Binding}">
-                        <Setter Property="Text" Value="Characters" />
-                      </DataTrigger>
-                    </Style.Triggers>
-                  </Style>
-                </FrameworkElement.Style>
-              </TextBlock>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ListBox>
-        <TextBlock Text="Maximum bytes per line:" Grid.Row="7" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
-        <TextBox Grid.Row="7" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Path=Settings.HexSettings.MaximumBytesPerLine}" IsEnabled="{Binding HexModeEnabled}" TextChanged="ComboBox_TextChanged" />
-        <TextBlock Text="Additional line breaks" Grid.Row="8" Style="{StaticResource PaddedHeaderText}" Grid.ColumnSpan="2" IsEnabled="{Binding HexModeEnabled}" />
-        <CheckBox Grid.Row="9" Grid.ColumnSpan="2" Margin="60 5 0 5" VerticalContentAlignment="Center" IsChecked="{Binding Path=Settings.HexSettings.BreaksAroundEcho}" IsEnabled="{Binding HexModeEnabled}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
-          <TextBlock Text="Between echoed and received data" />
-        </CheckBox>
-        <CheckBox Name="cbInactivity" Grid.Row="10" Grid.ColumnSpan="2" Margin="60 5 0 5" VerticalContentAlignment="Center" IsEnabled="{Binding HexModeEnabled}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
-          <StackPanel Orientation="Horizontal">
-            <TextBlock Text="After " VerticalAlignment="Center" />
-            <TextBox Width="60" VerticalAlignment="Center" Text="{Binding Path=Settings.HexSettings.TimeoutForAutoBreak}" TextChanged="ComboBox_TextChanged" />
-            <TextBlock Text=" msec of inactivity " VerticalAlignment="Center" />
+              </FrameworkElement.Resources>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <TextBlock Text="Bits per second:" Style="{StaticResource HeaderText}" />
+              <ComboBox Name="cbBaudRate" Grid.Column="1" IsEditable="True" Text="{Binding Path=SerialSettings.AdvancedSettings.BaudRate, UpdateSourceTrigger=PropertyChanged}" TextBoxBase.TextChanged="ComboBox_TextChanged">
+                <ItemsControl.ItemsSource>
+                  <coll:ArrayList>
+                    <sys:Int32>1200</sys:Int32>
+                    <sys:Int32>2400</sys:Int32>
+                    <sys:Int32>4800</sys:Int32>
+                    <sys:Int32>9600</sys:Int32>
+                    <sys:Int32>19200</sys:Int32>
+                    <sys:Int32>38400</sys:Int32>
+                    <sys:Int32>57600</sys:Int32>
+                    <sys:Int32>74880</sys:Int32>
+                    <sys:Int32>115200</sys:Int32>
+                    <sys:Int32>230400</sys:Int32>
+                    <sys:Int32>460800</sys:Int32>
+                    <sys:Int32>921600</sys:Int32>
+                    <sys:Int32>1000000</sys:Int32>
+                    <sys:Int32>2000000</sys:Int32>
+                  </coll:ArrayList>
+                </ItemsControl.ItemsSource>
+              </ComboBox>
+              <TextBlock Text="Data bits:" Style="{StaticResource HeaderText}" Grid.Row="1" />
+              <ListBox Grid.Column="1" Grid.Row="1" SelectedItem="{Binding Path=SerialSettings.AdvancedSettings.DataBits}">
+                <ItemsControl.ItemsSource>
+                  <coll:ArrayList>
+                    <sys:Int32>5</sys:Int32>
+                    <sys:Int32>6</sys:Int32>
+                    <sys:Int32>7</sys:Int32>
+                    <sys:Int32>8</sys:Int32>
+                  </coll:ArrayList>
+                </ItemsControl.ItemsSource>
+              </ListBox>
+              <TextBlock Text="Parity:" Style="{StaticResource HeaderText}" Grid.Row="2" />
+              <ListBox Grid.Column="1" Grid.Row="2" SelectedItem="{Binding Path=SerialSettings.AdvancedSettings.Parity}">
+                <ItemsControl.ItemsSource>
+                  <coll:ArrayList>
+                    <ports:Parity>None</ports:Parity>
+                    <ports:Parity>Odd</ports:Parity>
+                    <ports:Parity>Even</ports:Parity>
+                    <ports:Parity>Mark</ports:Parity>
+                    <ports:Parity>Space</ports:Parity>
+                  </coll:ArrayList>
+                </ItemsControl.ItemsSource>
+              </ListBox>
+              <TextBlock Text="Stop bits:" Style="{StaticResource HeaderText}" Grid.Row="3" />
+              <ListBox Grid.Column="1" Grid.Row="3" SelectedItem="{Binding Path=SerialSettings.AdvancedSettings.StopBits}">
+                <ItemsControl.ItemsSource>
+                  <coll:ArrayList>
+                    <ports:StopBits>One</ports:StopBits>
+                    <ports:StopBits>OnePointFive</ports:StopBits>
+                    <ports:StopBits>Two</ports:StopBits>
+                  </coll:ArrayList>
+                </ItemsControl.ItemsSource>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock>
+                      <FrameworkElement.Style>
+                        <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
+                          <Style.Triggers>
+                            <DataTrigger Value="One" Binding="{Binding}">
+                              <Setter Property="Text" Value="1" />
+                            </DataTrigger>
+                            <DataTrigger Value="OnePointFive" Binding="{Binding}">
+                              <Setter Property="Text" Value="1.5" />
+                            </DataTrigger>
+                            <DataTrigger Value="Two" Binding="{Binding}">
+                              <Setter Property="Text" Value="2" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </FrameworkElement.Style>
+                    </TextBlock>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ListBox>
+              <TextBlock Text="Flow control:" Style="{StaticResource HeaderText}" Grid.Row="4" />
+              <ListBox Grid.Column="1" Grid.Row="4" SelectedItem="{Binding Path=SerialSettings.AdvancedSettings.FlowControl}">
+                <ItemsControl.ItemsSource>
+                  <coll:ArrayList>
+                    <ports:Handshake>None</ports:Handshake>
+                    <ports:Handshake>XOnXOff</ports:Handshake>
+                    <ports:Handshake>RequestToSend</ports:Handshake>
+                    <ports:Handshake>RequestToSendXOnXOff</ports:Handshake>
+                  </coll:ArrayList>
+                </ItemsControl.ItemsSource>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock>
+                      <FrameworkElement.Style>
+                        <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
+                          <Style.Triggers>
+                            <DataTrigger Value="None" Binding="{Binding}">
+                              <Setter Property="Text" Value="None" />
+                            </DataTrigger>
+                            <DataTrigger Value="XOnXOff" Binding="{Binding}">
+                              <Setter Property="Text" Value="Software (XON/XOFF)" />
+                            </DataTrigger>
+                            <DataTrigger Value="RequestToSend" Binding="{Binding}">
+                              <Setter Property="Text" Value="Hardware (RTS/CTS)" />
+                            </DataTrigger>
+                            <DataTrigger Value="RequestToSendXOnXOff" Binding="{Binding}">
+                              <Setter Property="Text" Value="Both" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </FrameworkElement.Style>
+                    </TextBlock>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ListBox>
+              <StackPanel Orientation="Horizontal" Grid.Row="5" Grid.Column="1" Margin="0 5 0 5">
+                <TextBlock Text="Maximum speed:" Margin="0 0 5 0" />
+                <TextBlock FontWeight="Bold" Text="{Binding MaximumSpeed}" />
+              </StackPanel>
+              <TextBlock Text="When opened:" Style="{StaticResource HeaderText}" Grid.Row="6" />
+              <StackPanel Orientation="Horizontal" Grid.Row="6" Grid.Column="1" Margin="0 2 0 5">
+                <CheckBox Margin="0 0 15 0" VerticalContentAlignment="Center" IsChecked="{Binding Path=SerialSettings.AdvancedSettings.DtrOnOpen}" ToolTip="Many boards (Arduino, ESP) reset when DTR changes: switch it off for a connection that must not restart the device. The Windows driver may still raise DTR for a moment while it opens the port.">
+                  <TextBlock Text="Raise DTR" />
+                </CheckBox>
+                <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding Path=SerialSettings.AdvancedSettings.RtsOnOpen}" ToolTip="Ignored with hardware (RTS/CTS) flow control, which drives RTS itself.">
+                  <TextBlock Text="Raise RTS" />
+                </CheckBox>
+              </StackPanel>
+            </Grid>
+            <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Click="Test_Click">
+              <StackPanel Orientation="Horizontal">
+                <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
+                <TextBlock Text="Test connection now" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
           </StackPanel>
-        </CheckBox>
-      </Grid>
-    </local:SettingsGroupBox>
+        </local:SettingsGroupBox>
+        <local:SettingsGroupBox Text="Automatic reconnect" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal">
+              <CheckBox Name="chkReconnectAutomatically" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding ReconnectAutomatically}" ToolTip="Open the connection again by itself when it drops or cannot be opened. Useful for unreliable links. A COM port is also opened again as soon as its USB adapter is plugged back in.">
+                <TextBlock Text="Reconnect when the connection breaks:" />
+              </CheckBox>
+              <RadioButton Margin="10 4 0 2" VerticalContentAlignment="Center" GroupName="ReconnectMode" IsEnabled="{Binding IsChecked, ElementName=chkReconnectAutomatically}" IsChecked="{Binding ReconnectImmediately}" Content="at once" ToolTip="Try to reopen the connection without any delay." />
+              <RadioButton Margin="10 4 0 2" VerticalContentAlignment="Center" GroupName="ReconnectMode" IsEnabled="{Binding IsChecked, ElementName=chkReconnectAutomatically}" IsChecked="{Binding ReconnectWithInterval}" Content="every" ToolTip="Wait between reconnect attempts." />
+              <TextBox Margin="2" Width="32" VerticalContentAlignment="Center" Padding="2 1 2 2" IsEnabled="{Binding IsChecked, ElementName=chkReconnectAutomatically}" Text="{Binding ReconnectIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" ToolTip="Seconds between reconnect attempts (1-5)." />
+              <TextBlock Text="s" VerticalAlignment="Center" Margin="2 0 0 0" />
+            </StackPanel>
+            <CheckBox Grid.Row="1" Margin="25 4 0 2" VerticalContentAlignment="Center" IsEnabled="{Binding IsChecked, ElementName=chkReconnectAutomatically}" IsChecked="{Binding ClearContentsWhenReconnecting}" ToolTip="When enabled, the terminal screen is wiped before each automatic reconnect.">
+              <TextBlock Text="Clear the terminal screen when reconnecting" />
+            </CheckBox>
+          </Grid>
+        </local:SettingsGroupBox>
+        <local:SettingsGroupBox Text="Telnet options" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Terminal type:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetTerminalType, UpdateSourceTrigger=PropertyChanged}" ToolTip="Reported to the server when it asks for the terminal type (option TERMINAL-TYPE). The terminal understands xterm." />
+            <TextBlock Text="Keep-alive, s:" Grid.Column="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="3" Margin="2" Width="50" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" ToolTip="Seconds (0 = off). Send a harmless NOP command this often to keep an idle connection open." />
+            <TextBlock Text="Local echo:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="1" Margin="2" ItemsSource="{Binding TelnetLocalEchoChoices}" DisplayMemberPath="Text" SelectedValuePath="Value" SelectedValue="{Binding TelnetLocalEcho}" ToolTip="Automatic: typed characters are shown by the terminal until the server announces that it echoes them (option ECHO)." />
+            <CheckBox Grid.Row="2" Grid.ColumnSpan="4" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetActiveNegotiation}" ToolTip="Most telnet clients do this. Leave it off for servers that do not speak Telnet properly: nothing is sent until the server asks.">
+              <TextBlock Text="Offer terminal type, window size and suppress-go-ahead at connect" />
+            </CheckBox>
+            <CheckBox Grid.Row="3" Grid.ColumnSpan="4" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetLineMode}" ToolTip="When the server asks for LINEMODE (RFC 1184), the line is edited here (Backspace, Ctrl+U, Ctrl+W) and sent when Enter is pressed, Ctrl+D sends it without a line end (EOF on an empty line); Ctrl+C, Ctrl+\ and Ctrl+Z become Telnet signals if the server wants that. Leave it off if unsure: the server then sends and receives single characters.">
+              <TextBlock Text="Allow line mode (LINEMODE) when the server asks" />
+            </CheckBox>
+          </Grid>
+        </local:SettingsGroupBox>
+        <local:SettingsGroupBox Text="Automatic login (typed once when the server asks)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+          <Grid ToolTip="The user name and the password are typed when the text from the server ends with a login or password prompt. Each is sent at most once per connection (a rejected password is not retried) and only during the first 30 seconds.">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="User name:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetAutoLoginUserName, UpdateSourceTrigger=PropertyChanged}" ToolTip="Leave empty for a device that asks only for a password." />
+            <TextBlock Text="Password:" Grid.Column="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <PasswordBox Name="txtTelnetPassword" Grid.Column="3" Margin="2" MaxLength="64" VerticalContentAlignment="Center" Padding="2 1 2 2" ToolTip="Stored encrypted for the current Windows user (like saved SSH passwords). Without TLS, Telnet itself sends it over the network unencrypted." />
+            <TextBlock Text="Login prompt ends with:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetLoginPrompts, UpdateSourceTrigger=PropertyChanged}" Tag="login:;username:;user name:;user:" ToolTip="Texts separated by ';', case does not matter. Empty: login:;username:;user name:;user:" />
+            <TextBlock Text="Password prompt ends with:" Grid.Row="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="2" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetPasswordPrompts, UpdateSourceTrigger=PropertyChanged}" Tag="password:;passcode:" ToolTip="Texts separated by ';', case does not matter. Empty: password:;passcode:" />
+          </Grid>
+        </local:SettingsGroupBox>
+        <local:SettingsGroupBox Text="Data for the server (sent when it asks)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Terminal speed:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Margin="2" Width="100" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetTerminalSpeed, UpdateSourceTrigger=PropertyChanged}" Tag="38400,38400" ToolTip="Reported to the server when it asks (option TSPEED): 38400,38400 (transmit,receive) or one number for both. Empty: 38400,38400 with automatic values, otherwise the option is refused." />
+            <TextBlock Text="X display:" Grid.Column="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="3" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetXDisplayLocation, UpdateSourceTrigger=PropertyChanged}" Tag="mypc:0.0" ToolTip="Reported to the server when it asks (option XDISPLOC), for example mypc:0.0. The server's X programs connect to this display over the network, so use it only on a trusted network. Empty: the DISPLAY variable of this computer with automatic values (when it names a host), otherwise the option is refused. It is also sent as the variable DISPLAY unless you set that variable below." />
+            <TextBlock Text="Environment:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Top" Margin="5 6 5 5" />
+            <TextBox Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="1" Margin="2" Height="44" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="2 1 2 2" Text="{Binding TelnetEnvironmentVariables, UpdateSourceTrigger=PropertyChanged}" Tag="NAME=value, one per line" ToolTip="Handed to the server when it asks (option NEW-ENVIRON), one NAME=value per line; lines starting with # and invalid lines are ignored. Be careful with USER: some servers log that user in without asking for a password." />
+            <CheckBox Grid.Row="2" Grid.ColumnSpan="4" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetSendAutomaticValues}" ToolTip="When a field above is empty, the server still gets a sensible answer: the terminal speed 38400,38400, the X display of this computer (its DISPLAY variable, when it names a host) and the user name of the automatic login as USER (never a name that starts with '-'). NEW-ENVIRON is then also agreed to with no variables at all. Off: only what is configured is sent, an empty field refuses the option.">
+              <TextBlock Text="Send automatic values for empty fields (speed, DISPLAY, USER)" />
+            </CheckBox>
+          </Grid>
+        </local:SettingsGroupBox>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Margin="16 0 0 0" MinWidth="380" VerticalAlignment="Top">
+        <local:SettingsGroupBox Text="Telnet security (TLS)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <CheckBox Name="chkTelnetTls" Grid.ColumnSpan="4" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding TelnetTls}" ToolTip="Telnet over TLS (telnets): the TLS handshake is made right after connecting and everything, including the password, travels encrypted. The port is 992 when none is given. The server must speak TLS from the first byte.">
+              <TextBlock Text="TLS from the first byte (telnets, default port 992)" />
+            </CheckBox>
+            <TextBlock Text="STARTTLS:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="1" Margin="2" IsEnabled="{Binding TelnetStartTlsEnabled}" ItemsSource="{Binding TelnetStartTlsChoices}" DisplayMemberPath="Text" SelectedValuePath="Value" SelectedValue="{Binding TelnetStartTls}" ToolTip="TLS negotiated inside a plain telnet session (Telnet option START_TLS, 46) on the normal telnet port. 'When offered' encrypts the session if the server asks for it. 'Required' offers it at once, sends nothing typed before the handshake and ends the connection if the server refuses or sends text first, so the password never travels in clear text." />
+            <CheckBox Grid.Row="2" Grid.ColumnSpan="4" Margin="5 4 0 2" VerticalContentAlignment="Center" IsEnabled="{Binding TelnetTlsInUse}" IsChecked="{Binding TelnetTlsAllowInvalidCertificate}" ToolTip="For devices with a self-signed certificate. The connection stays encrypted, but nothing protects it against someone who sits between you and the server. Leave it off if unsure.">
+              <TextBlock Text="Accept any server certificate (insecure)" />
+            </CheckBox>
+            <TextBlock Text="Client certificate:" Grid.Row="3" Style="{StaticResource HeaderText}" VerticalAlignment="Center" IsEnabled="{Binding TelnetTlsInUse}" />
+            <TextBox Grid.Column="1" Grid.Row="3" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" IsEnabled="{Binding TelnetTlsInUse}" Text="{Binding TelnetTlsClientCertificate, UpdateSourceTrigger=PropertyChanged}" Tag="none" ToolTip="Presented when the TLS server asks for a client certificate: the thumbprint of a certificate in your personal Windows certificate store (with its private key), or the path of a .pfx / .p12 file without a password. A file with a password: import it into the store (double click) and select it from there. Empty: none." />
+            <Button Grid.Column="2" Grid.Row="3" Margin="2" Padding="6 1" IsEnabled="{Binding TelnetTlsInUse}" Click="SelectClientCertificate_Click" ToolTip="Choose a certificate with a private key from your personal Windows certificate store.">
+              <AccessText Text="_Store..." />
+            </Button>
+            <Button Grid.Column="3" Grid.Row="3" Margin="2" Padding="6 1" IsEnabled="{Binding TelnetTlsInUse}" Click="BrowseClientCertificate_Click" ToolTip="Choose a .pfx / .p12 file without a password.">
+              <AccessText Text="_File..." />
+            </Button>
+          </Grid>
+        </local:SettingsGroupBox>
+        <local:SettingsGroupBox Text="Terminal colors" ImageSource="..\icons\color16.png">
+          <Grid DataContext="{Binding Path=Settings}">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <FrameworkElement.Resources>
+              <ResourceDictionary>
+                <Style x:Key="{x:Type TextBlock}" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource {x:Type TextBlock}}">
+                  <Setter Property="Margin" Value="5 2 5 2" />
+                </Style>
+                <Style x:Key="{x:Type Border}" TargetType="{x:Type Border}">
+                  <Setter Property="Margin" Value="5 2 5 2" />
+                  <EventSetter Event="MouseDown" Handler="Border_MouseDown" />
+                </Style>
+              </ResourceDictionary>
+            </FrameworkElement.Resources>
+            <TextBlock Text="Background color:" />
+            <Border Width="40" Grid.Column="1" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Background="{Binding Path=Colors.Background, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Received text color:" Grid.Column="3" />
+            <Border Width="40" Grid.Column="4" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Background="{Binding Path=Colors.Text, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Background color (disconnected):" Grid.Column="0" Grid.Row="1" />
+            <Border Width="40" Grid.Column="1" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Grid.Row="1" Background="{Binding Path=Colors.Disconnected, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Echoed characters color:" Grid.Column="3" Grid.Row="1" />
+            <Border Width="40" Grid.Column="4" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Grid.Row="1" Background="{Binding Path=Colors.Echo, Converter={StaticResource ColorWrapperConverter}}" />
+          </Grid>
+        </local:SettingsGroupBox>
+        <local:SettingsGroupBox Text="Terminal settings" ImageSource="..\Icons\term16.png">
+          <Grid>
+            <FrameworkElement.Resources>
+              <ResourceDictionary>
+                <Style x:Key="{x:Type ListBox}" TargetType="{x:Type ListBox}" BasedOn="{StaticResource LightHorizontalListBox}">
+                  <Style.Resources>
+                    <ResourceDictionary>
+                      <Style x:Key="{x:Type TextBlock}" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource LargeSelectableLabel}" />
+                    </ResourceDictionary>
+                  </Style.Resources>
+                  <Setter Property="Margin" Value="0 2 0 2" />
+                  <EventSetter Event="SelectionChanged" Handler="ListBox_SelectionChanged" />
+                </Style>
+              </ResourceDictionary>
+            </FrameworkElement.Resources>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <CheckBox VerticalContentAlignment="Center" Grid.ColumnSpan="2" IsChecked="{Binding Path=Settings.EchoTypedCharacters}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
+              <TextBlock Text="Echo back typed characters (with different color)" />
+            </CheckBox>
+            <TextBlock Text="Line ending style:" Grid.Row="1" Style="{StaticResource HeaderText}" />
+            <ListBox Grid.Column="1" Grid.Row="1" ItemsSource="{Binding LineEndings}" SelectedItem="{Binding Path=Settings.LineEnding}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock>
+                    <FrameworkElement.Style>
+                      <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
+                        <Style.Triggers>
+                          <DataTrigger Value="CR" Binding="{Binding}">
+                            <Setter Property="Text" Value="CR (\r)" />
+                          </DataTrigger>
+                          <DataTrigger Value="LF" Binding="{Binding}">
+                            <Setter Property="Text" Value="LF (\n)" />
+                          </DataTrigger>
+                          <DataTrigger Value="CRLF" Binding="{Binding}">
+                            <Setter Property="Text" Value="CRLF (\r\n)" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </FrameworkElement.Style>
+                  </TextBlock>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ListBox>
+            <CheckBox Grid.Row="2" Grid.Column="1" VerticalContentAlignment="Center" IsChecked="{Binding Path=Settings.TreatLFAsCRLF}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
+              <TextBlock Text="Treat incoming LF as CRLF when in text mode" />
+            </CheckBox>
+            <TextBlock Text="Text encoding:" Grid.Row="3" Style="{StaticResource HeaderText}" />
+            <ComboBox Grid.Column="1" Grid.Row="3" Margin="0 2 0 2" HorizontalAlignment="Left" MinWidth="220" ItemsSource="{Binding TextEncodings}" DisplayMemberPath="DisplayName" SelectedValuePath="Name" SelectedValue="{Binding Path=Settings.TextEncoding}" ToolTip="Encoding of the text exchanged with the device: used to decode received data and to encode typed and pasted text." />
+            <TextBlock Text="Display mode:" Grid.Row="4" Style="{StaticResource HeaderText}" />
+            <ListBox Grid.Column="1" Grid.Row="4" SelectedItem="{Binding Path=EffectiveDisplayMode}">
+              <ItemsControl.ItemsSource>
+                <coll:ArrayList>
+                  <local:EffectiveDisplayMode>Text</local:EffectiveDisplayMode>
+                  <local:EffectiveDisplayMode>Hex</local:EffectiveDisplayMode>
+                  <local:EffectiveDisplayMode>Both</local:EffectiveDisplayMode>
+                </coll:ArrayList>
+              </ItemsControl.ItemsSource>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock>
+                    <FrameworkElement.Style>
+                      <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
+                        <Style.Triggers>
+                          <DataTrigger Value="Text" Binding="{Binding}">
+                            <Setter Property="Text" Value="Text only" />
+                          </DataTrigger>
+                          <DataTrigger Value="Hex" Binding="{Binding}">
+                            <Setter Property="Text" Value="Hex only" />
+                          </DataTrigger>
+                          <DataTrigger Value="Both" Binding="{Binding}">
+                            <Setter Property="Text" Value="Text and hex" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </FrameworkElement.Style>
+                  </TextBlock>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="Send data:" Grid.Row="5" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
+            <ListBox Grid.Column="1" Grid.Row="5" SelectedItem="{Binding Path=Settings.HexSettings.AutoSend}" IsEnabled="{Binding HexModeEnabled}">
+              <ItemsControl.ItemsSource>
+                <coll:ArrayList>
+                  <sys:Boolean>true</sys:Boolean>
+                  <sys:Boolean>false</sys:Boolean>
+                </coll:ArrayList>
+              </ItemsControl.ItemsSource>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock>
+                    <FrameworkElement.Style>
+                      <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
+                        <Style.Triggers>
+                          <DataTrigger Value="true" Binding="{Binding}">
+                            <Setter Property="Text" Value="As you type it" />
+                          </DataTrigger>
+                          <DataTrigger Value="false" Binding="{Binding}">
+                            <Setter Property="Text" Value="When Enter or 'Send' is pressed" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </FrameworkElement.Style>
+                  </TextBlock>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="Interpret typed data as:" Grid.Row="6" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
+            <ListBox Grid.Column="1" Grid.Row="6" SelectedItem="{Binding Path=Settings.HexSettings.SendAsHex}" IsEnabled="{Binding HexModeEnabled}">
+              <ItemsControl.ItemsSource>
+                <coll:ArrayList>
+                  <sys:Boolean>false</sys:Boolean>
+                  <sys:Boolean>true</sys:Boolean>
+                </coll:ArrayList>
+              </ItemsControl.ItemsSource>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock>
+                    <FrameworkElement.Style>
+                      <Style BasedOn="{StaticResource LargeSelectableLabel}" TargetType="{x:Type TextBlock}">
+                        <Style.Triggers>
+                          <DataTrigger Value="true" Binding="{Binding}">
+                            <Setter Property="Text" Value="Hexadecimal numbers" />
+                          </DataTrigger>
+                          <DataTrigger Value="false" Binding="{Binding}">
+                            <Setter Property="Text" Value="Characters" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </FrameworkElement.Style>
+                  </TextBlock>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ListBox>
+            <TextBlock Text="Maximum bytes per line:" Grid.Row="7" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
+            <TextBox Grid.Row="7" Grid.Column="1" VerticalAlignment="Center" Text="{Binding Path=Settings.HexSettings.MaximumBytesPerLine}" IsEnabled="{Binding HexModeEnabled}" TextChanged="ComboBox_TextChanged" />
+            <TextBlock Text="Extra line breaks:" Grid.Row="8" Style="{StaticResource PaddedHeaderText}" IsEnabled="{Binding HexModeEnabled}" />
+            <CheckBox Grid.Row="8" Grid.Column="1" Margin="0 5 0 2" VerticalContentAlignment="Center" IsChecked="{Binding Path=Settings.HexSettings.BreaksAroundEcho}" IsEnabled="{Binding HexModeEnabled}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
+              <TextBlock Text="Between echoed and received data" />
+            </CheckBox>
+            <CheckBox Name="cbInactivity" Grid.Row="9" Grid.Column="1" Margin="0 2 0 5" VerticalContentAlignment="Center" IsEnabled="{Binding HexModeEnabled}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="After " VerticalAlignment="Center" />
+                <TextBox Width="60" VerticalAlignment="Center" Text="{Binding Path=Settings.HexSettings.TimeoutForAutoBreak}" TextChanged="ComboBox_TextChanged" />
+                <TextBlock Text=" msec of inactivity " VerticalAlignment="Center" />
+              </StackPanel>
+            </CheckBox>
+          </Grid>
+        </local:SettingsGroupBox>
+      </StackPanel>
+    </Grid>
     <CheckBox Margin="0 5 0 0" Visibility="{Binding SaveCheckboxVisibility}" IsChecked="{Binding SaveSettings}">
       <TextBlock Text="Save connection settings in the connection list" />
     </CheckBox>
