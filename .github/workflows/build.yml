@@ -65,6 +65,9 @@ jobs:
       - name: Run transport write failure checks
         run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
 
+      - name: Run Telnet protocol checks (options, LINEMODE, STATUS, CHARSET, TLS and STARTTLS, output queue)
+        run: dotnet run --project tests/TelnetStreamTests -c Release
+
       - name: Run TAR extractor security checks
         run: dotnet run --project tests/TarExtractorSecurityTests -c Release
 

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using VisualTTY.DeviceTerminal;
 
@@ -27,7 +29,13 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
 
     private int _rows = TelnetStream.DefaultRows;
 
-    public string ConnectingMessage => "Connecting to " + _telnet.Host + ":" + _telnet.Port + (_telnet.Tls ? " (telnet over TLS)..." : " (telnet)...");
+    public string ConnectingMessage => "Connecting to " + _telnet.Host + ":" + _telnet.Port + " (" + DescribeKind() + ")...";
+
+    /// <summary>
+    /// The character set of the terminal ("utf-8", "koi8-r", ...), accepted when the server proposes it (option
+    /// CHARSET). Set before the connection is opened; empty: the option is refused.
+    /// </summary>
+    public string Charset { get; set; }
 
     /// <summary>The server answered a status request (<see cref="RequestRemoteStatus"/>). Raised on the reading thread.</summary>
     public event EventHandler RemoteStatusReceived;
@@ -46,10 +54,21 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
         return stream.RequestRemoteStatus();
     }
 
-    /// <summary>The options in force on both sides, as text; empty when there is no connection.</summary>
+    /// <summary>The encryption and the options in force on both sides, as text; empty when there is no connection.</summary>
     public string DescribeOptions()
     {
-        return _stream?.DescribeOptions() ?? "";
+        TelnetStream stream = _stream;
+        if (stream == null)
+        {
+            return "";
+        }
+        string encryption = "none (the session, passwords included, travels in clear text)";
+        if (stream.InnerStream is SslStream ssl)
+        {
+            encryption = (stream.StartTlsActive ? "TLS negotiated in the session (STARTTLS)" : "TLS from the first byte (telnets)") + ", " + ssl.SslProtocol
+                + (ssl.IsMutuallyAuthenticated ? ", with a client certificate" : "");
+        }
+        return "Encryption: " + encryption + "\r\n\r\n" + stream.DescribeOptions();
     }
 
     /// <summary>The server started or stopped echoing what is typed. Raised on the reading thread.</summary>
@@ -84,11 +103,14 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 columns = _columns;
                 rows = _rows;
             }
+            // Loaded for every attempt, before anything is sent: a missing certificate is reported as the reason the
+            // connection cannot be made.
+            X509Certificate2 clientCertificate = _telnet.UsesTls ? TelnetTls.LoadClientCertificate(_telnet.TlsClientCertificate) : null;
             Stream wire = client.GetStream();
             if (_telnet.Tls)
             {
                 // The certificate is checked against the name the user typed, not against the resolved address.
-                wire = TelnetTls.Authenticate(wire, _telnet.Host, _telnet.TlsAllowInvalidCertificate);
+                wire = TelnetTls.Authenticate(wire, _telnet.Host, _telnet.TlsAllowInvalidCertificate, clientCertificate: clientCertificate);
             }
             stream = new TelnetStream(wire, new TelnetOptions
             {
@@ -98,9 +120,16 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 ActiveNegotiation = _telnet.ActiveNegotiation,
                 AllowLineMode = _telnet.LineMode,
                 AutoLogin = CreateAutoLogin(),
-                TerminalSpeed = _telnet.TerminalSpeed,
-                XDisplayLocation = _telnet.XDisplayLocation,
-                Environment = TelnetEnvironment.Parse(_telnet.EnvironmentVariables)
+                TerminalSpeed = _telnet.EffectiveTerminalSpeed(),
+                XDisplayLocation = _telnet.EffectiveXDisplayLocation(System.Environment.GetEnvironmentVariable("DISPLAY")),
+                Environment = TelnetEnvironment.Parse(_telnet.EffectiveEnvironmentVariables()),
+                AcceptEnvironmentRequests = _telnet.SendAutomaticValues,
+                Charset = Charset,
+                // telnets is TLS already: the in-band option is not needed (and refused).
+                StartTls = _telnet.Tls ? TelnetStartTlsMode.Off : ToStreamMode(_telnet.StartTls),
+                UpgradeToTls = _telnet.Tls || _telnet.StartTls == DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Off
+                    ? null
+                    : (Func<Stream, Stream>)(raw => TelnetTls.Authenticate(raw, _telnet.Host, _telnet.TlsAllowInvalidCertificate, clientCertificate: clientCertificate))
             });
             stream.RemoteEchoChanged += OnStreamRemoteEchoChanged;
             stream.RemoteStatusReceived += OnStreamRemoteStatusReceived;
@@ -137,8 +166,39 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
 
     public string GetDisplayName(bool includeParameters)
     {
-        string name = _telnet.Host + ":" + _telnet.Port;
-        return includeParameters ? name + (_telnet.Tls ? " (telnet over TLS)" : " (telnet)") : name;
+        // An IPv6 address is put in brackets, so the port can be told from it.
+        string name = (_telnet.Host != null && _telnet.Host.Contains(":") ? "[" + _telnet.Host + "]" : _telnet.Host) + ":" + _telnet.Port;
+        return includeParameters ? name + " (" + DescribeKind() + ")" : name;
+    }
+
+    private string DescribeKind()
+    {
+        if (_telnet.Tls)
+        {
+            return "telnet over TLS";
+        }
+        switch (_telnet.StartTls)
+        {
+            case DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Required:
+                return "telnet, STARTTLS required";
+            case DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.WhenOffered:
+                return "telnet, STARTTLS when offered";
+            default:
+                return "telnet";
+        }
+    }
+
+    private static TelnetStartTlsMode ToStreamMode(DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode mode)
+    {
+        switch (mode)
+        {
+            case DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Required:
+                return TelnetStartTlsMode.Require;
+            case DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.WhenOffered:
+                return TelnetStartTlsMode.Accept;
+            default:
+                return TelnetStartTlsMode.Off;
+        }
     }
 
     /// <summary>

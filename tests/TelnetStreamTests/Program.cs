@@ -576,7 +576,14 @@ internal static class Program
             CheckBytes(connection.TakeWritten(), Cat(Text("x"), B(0xFF, 0xFF), Text("\r\n")), "linemode: 0xFF in a line is doubled");
             stream.Write(Text("abc"), 0, 3);
             stream.Write(B(3), 0, 1);
-            Check(connection.Written.Length == 0, "linemode: without TRAPSIG Ctrl+C is only a character");
+            CheckBytes(connection.TakeWritten(), Cat(Text("abc"), B(3)), "linemode: without TRAPSIG Ctrl+C is a character that goes out at once, with the text before it");
+            stream.Write(Text("\r"), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(13, 10), "linemode: ...and the line is empty afterwards");
+            stream.Write(Text("ls"), 0, 2);
+            stream.Write(B(4), 0, 1);
+            CheckBytes(connection.TakeWritten(), Text("ls"), "linemode: Ctrl+D sends the typed text without a line end");
+            stream.Write(B(4), 0, 1);
+            CheckBytes(connection.TakeWritten(), B(IAC, TelnetStream.Eof), "linemode: Ctrl+D on an empty line is EOF");
         }
         {
             byte LM = TelnetStream.OptLineMode;
@@ -640,14 +647,15 @@ internal static class Program
             byte[] slc = B(IAC, SB, LM, 3,
                 3, 2, 0x18,      // IP -> Ctrl+X
                 10, 2, 0x08,     // EC -> Backspace
-                8, 2, 4,         // EOF: not supported here
-                5, 0, 0,         // AYT: no support on the server's side either, nothing to answer
+                8, 2, 4,         // EOF -> Ctrl+D
+                5, 2, 0x14,      // AYT: not supported here
+                6, 0, 0,         // AO: no support on the server's side either, nothing to answer
                 IAC, SE);
             FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 1, 3, IAC, SE), slc);
             TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AllowLineMode = true });
             ReadAllChunks(stream, 3);
             byte[] sent = connection.TakeWritten();
-            byte[] expectedTail = B(IAC, SB, LM, 3, 3, 2 | 0x80, 0x18, 10, 2 | 0x80, 0x08, 8, 0, 0, IAC, SE);
+            byte[] expectedTail = B(IAC, SB, LM, 3, 3, 2 | 0x80, 0x18, 10, 2 | 0x80, 0x08, 8, 2 | 0x80, 4, 5, 0, 0, IAC, SE);
             Check(sent.Skip(sent.Length - expectedTail.Length).SequenceEqual(expectedTail), "linemode: SLC: known functions are acknowledged, unknown ones declined (got " + Show(sent) + ")");
             stream.Write(B(0x18), 0, 1);
             CheckBytes(connection.TakeWritten(), B(IAC, 244), "linemode: the server's interrupt character is trapped");
@@ -661,7 +669,7 @@ internal static class Program
             FakeConnection connection = Marked(B(IAC, DO, LM), B(IAC, SB, LM, 3, 0, 3, 0, IAC, SE));
             ReadAllChunks(new TelnetStream(connection, new TelnetOptions { AllowLineMode = true }), 2);
             byte[] sent = connection.TakeWritten();
-            byte[] expected = B(IAC, WILL, LM, IAC, SB, LM, 3, 3, 2, 3, 7, 2, 28, 9, 2, 26, 10, 2, 127, 11, 2, 21, 12, 2, 23, IAC, SE);
+            byte[] expected = B(IAC, WILL, LM, IAC, SB, LM, 3, 3, 2, 3, 7, 2, 28, 8, 2, 4, 9, 2, 26, 10, 2, 127, 11, 2, 21, 12, 2, 23, IAC, SE);
             CheckBytes(sent, expected, "linemode: SLC: the defaults are sent on request");
         }
         {
@@ -794,8 +802,8 @@ internal static class Program
                 "status: DO STATUS is agreed to");
             ReadAllChunks(stream, 1);
             CheckBytes(connection.TakeWritten(),
-                B(IAC, SB, ST, 0, DO, TelnetStream.OptEcho, WILL, ST, WILL, TelnetStream.OptNaws, IAC, SE),
-                "status: SEND is answered with the options that are on (WILL ours, DO the server's)");
+                B(IAC, SB, ST, 0, DO, TelnetStream.OptEcho, WILL, ST, WILL, TelnetStream.OptNaws, SB, TelnetStream.OptNaws, 0, 80, 0, 24, SE, IAC, SE),
+                "status: SEND is answered with the options that are on (WILL ours, DO the server's) and the window size");
             Check(stream.DescribeOptions().Contains("NAWS") && stream.DescribeOptions().Contains("ECHO"), "status: the options in force can be listed");
 
             // the other direction: the server offers STATUS and we ask
@@ -811,8 +819,8 @@ internal static class Program
             CheckBytes(asking.TakeWritten(), B(IAC, SB, ST, 1, IAC, SE), "status: the request is STATUS SEND");
             ReadAllChunks(askingStream, 1);
             Check(received == 1, "status: the server's report raises the event once");
-            Check(askingStream.RemoteStatus == "WILL ECHO\r\nDO NAWS\r\nWILL option 240\r\nSB TERMINAL-TYPE (2 bytes of parameters)",
-                "status: the server's report is read (a doubled SE is one option code, SB entries are summarized)");
+            Check(askingStream.RemoteStatus == "WILL ECHO\r\nDO NAWS\r\nWILL option 240\r\nSB TERMINAL-TYPE 01 02",
+                "status: the server's report is read (a doubled SE is one option code, unknown SB parameters are shown as bytes)");
         }
 
         // --- active negotiation also offers what is configured to hand over ---
@@ -835,6 +843,9 @@ internal static class Program
 
         // --- telnet over TLS ---
         TlsChecks.Run(Check);
+
+        // --- STARTTLS, CHARSET, TIMING-MARK, STATUS parameters, automatic values, the output queue ---
+        NegotiationChecks.Run(Check);
 
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed.");
