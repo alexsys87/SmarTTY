@@ -56,12 +56,22 @@ public class XModemTransfer
         /// <summary>Quiet time on the line that ends the discarding of a damaged block.</summary>
         public int PurgeQuietMs = 300;
 
+        /// <summary>
+        /// XMODEM receiver: how long the line has to stay quiet after an EOT before the file is taken as complete. A sender
+        /// waits for the answer to its EOT, so anything arriving meanwhile shows that the "EOT" was a damaged block start.
+        /// </summary>
+        public int EotQuietMs = 250;
+
+        /// <summary>YMODEM sender: how long to wait for the answer to the end-of-batch block. Silence counts as success.</summary>
+        public int BatchEndAckMs = 1500;
+
         /// <summary>YMODEM sender: how long to wait for the receiver's 'C' after a file header or a file's EOT was acknowledged
         /// (a bootloader may erase or flash first, so this is long).</summary>
         public int NextRequestMs = 60000;
 
         /// <summary>YMODEM sender: how long to wait for the 'C' that asks for the end-of-batch block after the last file.
-        /// A receiver that restarts into the new program right after the file never sends it.</summary>
+        /// A receiver that restarts into the new program right after the file never sends it. YMODEM receiver: how long
+        /// to ask for the next file header before a silent sender is taken to have finished the batch.</summary>
         public int BatchEndRequestMs = 10000;
     }
 
@@ -139,14 +149,15 @@ public class XModemTransfer
         /// <summary>The next byte, or null when nothing arrives within <paramref name="timeoutMs"/> or the transfer is cancelled.</summary>
         public byte? Read(int timeoutMs)
         {
-            Stopwatch timer = Stopwatch.StartNew();
+            // Called for every byte of a transfer: the clock is a plain time stamp, not an allocated Stopwatch.
+            long start = Stopwatch.GetTimestamp();
             while (true)
             {
                 if (_token.IsCancellationRequested)
                 {
                     return null;
                 }
-                int left = timeoutMs - (int)timer.ElapsedMilliseconds;
+                int left = timeoutMs - ElapsedMs(start);
                 byte? b = _read(Math.Max(0, Math.Min(SliceMs, left)));
                 if (b.HasValue)
                 {
@@ -167,6 +178,12 @@ public class XModemTransfer
             {
             }
         }
+    }
+
+    /// <summary>Milliseconds since <paramref name="start"/>, a <see cref="Stopwatch.GetTimestamp"/> value.</summary>
+    internal static int ElapsedMs(long start)
+    {
+        return (int)Math.Min(int.MaxValue, (Stopwatch.GetTimestamp() - start) * 1000 / Stopwatch.Frequency);
     }
 
     internal static void Report(ProgressHandler onProgress, long done, long total, int errors, string status)
@@ -712,6 +729,27 @@ public class XModemTransfer
 
             if (start == EOT)
             {
+                // A single damaged byte can look like EOT. A real end is followed by silence (the sender waits for the
+                // answer) or by a repeated EOT; anything else is the rest of a block, which is asked for again.
+                byte? next = link.Read(timeouts.EotQuietMs);
+                if (link.IsCancelled)
+                {
+                    continue; // reported at the top of the loop
+                }
+                if (next.HasValue && next.Value != EOT)
+                {
+                    errorCount++;
+                    if (++consecutiveErrors > MaxRetries)
+                    {
+                        link.SendCancel();
+                        Report(onProgress, bytesReceived, 0, errorCount, "Transfer failed: too many damaged blocks.");
+                        return false;
+                    }
+                    link.Purge(timeouts.PurgeQuietMs);
+                    Report(onProgress, bytesReceived, 0, errorCount, "Damaged block " + (blocksAccepted + 1) + ", asking again");
+                    link.Send(NAK);
+                    continue;
+                }
                 link.Send(ACK);
                 Report(onProgress, bytesReceived, 0, errorCount, "File received successfully.");
                 return true;

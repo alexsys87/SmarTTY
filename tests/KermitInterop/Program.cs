@@ -42,14 +42,30 @@ internal static class Program
         }) { IsBackground = true };
         reader.Start();
 
-        KermitTransfer.SendDataHandler send = (data, offset, length) => net.Write(data, offset, length);
-        // KERMIT_TRACE=<file> records what arrives, for finding out why a real program's packet was refused.
+        // KERMIT_TRACE=<file> records the packets both ways with time stamps (milliseconds), for finding out why a real
+        // program's packet was refused or where a transfer waited.
         string tracePath = Environment.GetEnvironmentVariable("KERMIT_TRACE");
-        List<byte> trace = new List<byte>();
+        System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+        System.Text.StringBuilder trace = new System.Text.StringBuilder();
+        List<byte> incoming = new List<byte>();
+        string Show(IEnumerable<byte> bytes) => new string(bytes.Take(24).Select(b => b >= 32 && b < 127 ? (char)b : '.').ToArray());
+        KermitTransfer.SendDataHandler send = (data, offset, length) =>
+        {
+            if (tracePath != null) lock (trace) trace.AppendLine(clock.ElapsedMilliseconds + " > " + Show(data.Skip(offset).Take(length)));
+            net.Write(data, offset, length);
+        };
         Func<int, byte?> read = timeout =>
         {
             if (!rx.TryTake(out byte b, timeout)) return null;
-            if (tracePath != null) trace.Add(b);
+            if (tracePath != null)
+            {
+                if (b == 1 && incoming.Count > 0)
+                {
+                    lock (trace) trace.AppendLine(clock.ElapsedMilliseconds + " < " + Show(incoming));
+                    incoming.Clear();
+                }
+                incoming.Add(b);
+            }
             return b;
         };
         string last = string.Empty;
@@ -82,7 +98,7 @@ internal static class Program
                 name => File.Delete(Path.Combine(directory, name)),
                 send, read, CancellationToken.None, progress);
         }
-        if (tracePath != null) File.WriteAllBytes(tracePath, trace.ToArray());
+        if (tracePath != null) File.WriteAllText(tracePath, trace.ToString());
         Console.WriteLine(ok ? "RESULT: ok" : "RESULT: FAILED");
         return ok ? 0 : 1;
     }

@@ -107,6 +107,32 @@ jobs:
       - name: Run VcXsrv setup checks (installer selection from the GitHub release data)
         run: dotnet run --project tests/VcxsrvSetupTests -c Release
 
+  interop:
+    name: File transfer interoperability (lrzsz, C-Kermit, G-Kermit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install lrzsz, C-Kermit and G-Kermit
+        run: sudo apt-get update && sudo apt-get install -y lrzsz ckermit gkermit python3
+
+      - name: Build the command line clients
+        run: |
+          dotnet build tests/ModemInterop -c Release
+          dotnet build tests/KermitInterop -c Release
+
+      - name: XMODEM, YMODEM and ZMODEM against lrzsz (sx/rx, sb/rb, sz/rz; clean and noisy lines)
+        run: python3 tests/ModemInterop/run_interop.py
+
+      - name: Kermit against C-Kermit and G-Kermit (sliding windows, clean and noisy lines)
+        run: python3 tests/KermitInterop/run_interop.py
+
   sshnet:
     name: SSH.NET integration tests
     runs-on: ubuntu-latest

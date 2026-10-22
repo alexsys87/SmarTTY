@@ -1796,6 +1796,53 @@ internal static class Program
             });
         }
 
+        Run("sender: silence after the end-of-batch block is success at once, without repeating it (lrzsz rb never answers it)", () =>
+        {
+            NewLink(out End u, out End peer);
+            RxScript script = new RxScript { NoTerminatorAck = true };
+            Task rx = Receiver(peer, script);
+            Progress progress = new Progress();
+            XModemTransfer.Timeouts t = Fast();
+            t.BatchEndAckMs = 300;
+            Check(SendBatch(u, progress, t, F("a.bin", RandomData(100))), "send succeeded: " + progress.Last);
+            rx.Wait();
+            byte[] sent = u.Sent();
+            int terminators = 0;
+            for (int i = 0; i + 3 < sent.Length; i++)
+            {
+                if (sent[i] == SOH && sent[i + 1] == 0 && sent[i + 2] == 0xFF && sent[i + 3] == 0) terminators++;
+            }
+            Check(terminators == 1, "the end-of-batch block went once (" + terminators + ")");
+        });
+
+        Run("receiver: a sender that goes quiet after a complete file (no end-of-batch block, as lrzsz sb -g) is a success", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(700);
+            Task tx = Task.Run(() =>
+            {
+                if (!Expect(peer, C)) return;
+                peer.Send(HeaderBlock("q.bin\0" + data.Length));
+                if (!Expect(peer, ACK) || !Expect(peer, C)) return;
+                byte n = 1;
+                foreach (byte[] payload in DataPayloads(data))
+                {
+                    peer.Send(Block(n++, payload));
+                    if (!Expect(peer, ACK)) return;
+                }
+                peer.Send(EOT);
+                if (!Expect(peer, NAK)) return;
+                peer.Send(EOT);
+                Expect(peer, ACK); // and then nothing more
+            });
+            Targets targets = new Targets();
+            Progress progress = new Progress();
+            Check(Receive(u, targets, progress, Fast()), "success: " + progress.Last);
+            tx.Wait();
+            Check(targets.Streams["q.bin"].ToArray().SequenceEqual(data), "file intact");
+            Check(progress.Last.Contains("did not send the end-of-batch block"), "the situation is reported: " + progress.Last);
+        });
+
         Run("loopback: a batch of four files (one empty) with special names", () =>
         {
             NewLink(out End a, out End b);

@@ -47,7 +47,8 @@ public partial class DeviceTerminalControl
         foreach (string path in openFileDialog.FileNames)
         {
             string fileName = path;
-            sources.Add(new KermitTransfer.Source(Path.GetFileName(fileName), new FileInfo(fileName).Length, () => File.OpenRead(fileName)));
+            FileInfo info = new FileInfo(fileName);
+            sources.Add(new KermitTransfer.Source(info.Name, info.Length, () => File.OpenRead(fileName), info.LastWriteTimeUtc));
         }
         StartLineTransfer("Kermit Send", "Kermit", "send", (sendData, progress, token) =>
             KermitTransfer.SendFiles(sources, sendData.Invoke, ReadXModemByte, token, progress.Invoke));
@@ -81,13 +82,10 @@ public partial class DeviceTerminalControl
                 name =>
                 {
                     // An existing file is never overwritten: the new one gets " (1)", " (2)"... before the extension.
-                    string path = Path.Combine(folder, name);
-                    for (int i = 1; File.Exists(path); i++)
-                    {
-                        path = Path.Combine(folder, Path.GetFileNameWithoutExtension(name) + " (" + i + ")" + Path.GetExtension(name));
-                    }
+                    string path = UniqueFilePathIn(folder, name);
+                    FileStream stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
                     created[name] = path;
-                    return File.Create(path);
+                    return stream;
                 },
                 name =>
                 {
@@ -96,6 +94,20 @@ public partial class DeviceTerminalControl
                         File.Delete(path);
                     }
                 },
-                sendData.Invoke, ReadXModemByte, token, progress.Invoke));
+                sendData.Invoke, ReadXModemByte, token, progress.Invoke,
+                (name, modifiedUtc) =>
+                {
+                    // The sender's modification time, when it gave one; the time is a courtesy, the file itself is fine.
+                    if (modifiedUtc.HasValue && created.TryGetValue(name, out string path))
+                    {
+                        try
+                        {
+                            File.SetLastWriteTimeUtc(path, modifiedUtc.Value);
+                        }
+                        catch (Exception)
+                        {
+                        }
+                    }
+                }));
     }
 }
