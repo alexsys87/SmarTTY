@@ -49,6 +49,8 @@ public partial class LocalRepoWindow : Window
         PortBox.Text = (_Host.IsRunning ? _Host.Port : _Settings.Port).ToString();
         TrustKeyBox.Visibility = _Manager == LocalRepoPackageManager.Apk ? Visibility.Visible : Visibility.Collapsed;
         TrustKeyBox.IsChecked = _Settings.TrustBuildKey;
+        AllowUnsignedBox.Visibility = _Manager == LocalRepoPackageManager.Opkg ? Visibility.Visible : Visibility.Collapsed;
+        AllowUnsignedBox.IsChecked = _Settings.AllowUnsignedFeeds;
 
         StringBuilder history = new StringBuilder();
         foreach (string line in _Host.GetHistory())
@@ -69,10 +71,16 @@ public partial class LocalRepoWindow : Window
         {
             if (LogBox.Text.Length > MaxLogCharacters)
             {
-                LogBox.Text = LogBox.Text.Substring(MaxLogCharacters / 2);
+                // Whole lines are dropped, so that the log does not start in the middle of one.
+                string text = LogBox.Text;
+                int cut = text.IndexOf('\n', text.Length - MaxLogCharacters / 2);
+                LogBox.Text = cut < 0 ? "" : text.Substring(cut + 1);
             }
             LogBox.AppendText(line + Environment.NewLine);
             LogBox.ScrollToEnd();
+            // The host also reports what happens without this window: the tunnel restored after a reconnect, the server
+            // stopped when the session ended. The status and the buttons follow it.
+            UpdateState();
         }));
     }
 
@@ -88,6 +96,7 @@ public partial class LocalRepoWindow : Window
         FoldersList.IsEnabled = editable;
         PortBox.IsEnabled = editable;
         TrustKeyBox.IsEnabled = editable;
+        AllowUnsignedBox.IsEnabled = editable;
         StartButton.IsEnabled = editable;
         StopButton.IsEnabled = running && idle;
         CleanButton.IsEnabled = editable;
@@ -205,12 +214,14 @@ public partial class LocalRepoWindow : Window
         _Settings.Port = port;
         bool trustKey = TrustKeyBox.IsChecked == true && _Manager == LocalRepoPackageManager.Apk;
         _Settings.TrustBuildKey = TrustKeyBox.IsChecked == true;
+        bool allowUnsigned = AllowUnsignedBox.IsChecked == true && _Manager == LocalRepoPackageManager.Opkg;
+        _Settings.AllowUnsignedFeeds = AllowUnsignedBox.IsChecked == true;
         _Settings.Save();
         LocalRepoPackageManager manager = _Manager;
         SetBusy(true);
         try
         {
-            await Task.Run(() => _Host.Start(ssh, folders, port, manager, trustKey));
+            await Task.Run(() => _Host.Start(ssh, folders, port, manager, trustKey, allowUnsigned));
         }
         catch (Exception exception)
         {

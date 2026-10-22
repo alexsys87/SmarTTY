@@ -214,6 +214,16 @@ internal static class Program
             RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySearchSteps, CompletionSteps }, serverName);
         }
 
+        // The shell of the interactive wrapper chosen automatically: bash, or the BusyBox ash login shell (OpenWRT).
+        using (SshSession session = Connect(host, port, user, password))
+        {
+            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { (terminal, context) => AutoShellSteps(terminal, context, bash) }, serverName + ", automatic shell", settings =>
+            {
+                settings.InteractiveModeWrapper = true;
+                settings.ShellMode = VirtualTerminalSettings.ShellSelectionMode.Auto;
+            });
+        }
+
         // BusyBox ash without Unicode support (OpenWrt) edits in UTF-8 bytes: byte mode. bash: the normal mode.
         bool byteMode = !bash;
         if (byteMode)
@@ -227,7 +237,7 @@ internal static class Program
         }
     }
 
-    private static void RunSteps(SshSession session, string user, bool bash, Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] scenarios, string label)
+    private static void RunSteps(SshSession session, string user, bool bash, Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] scenarios, string label, Action<VirtualTerminalSettings> configure = null)
     {
         SessionContext context = new SessionContext
         {
@@ -236,6 +246,7 @@ internal static class Program
         };
         context.VTSettings.InteractiveModeWrapper = bash;
         context.VTSettings.DefaultShell = bash ? "bash" : "sh";
+        configure?.Invoke(context.VTSettings);
         using Form form = new Form
         {
             Width = 1000,
@@ -626,6 +637,27 @@ internal static class Program
                 Key(terminal, Keys.Tab);
             },
             Done = () => InputText(terminal) == expected
+        };
+    }
+
+    // In the automatic mode the wrapper runs bash on OpenSSH and the BusyBox ash login shell on Dropbear, as on OpenWRT:
+    // ash without -i, which would print its banner before the output of every command, and with ~/.ash_history.
+    private static IEnumerable<Step> AutoShellSteps(SshTerminalControl terminal, SessionContext context, bool bash)
+    {
+        string historyFile = bash ? "~/.bash_history" : "~/.ash_history";
+        string marker = "smartty-auto-shell-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+        yield return Check(bash ? "bash is chosen" : "the BusyBox ash login shell is chosen", () =>
+        {
+            ShellSelection.Choice shell = context.ProvideAnalyzer().GetInteractiveShell(TimeSpan.Zero);
+            return shell != null && (bash ? shell.Name == "bash" && !shell.IsAsh : shell.Name == "ash" && shell.IsAsh);
+        });
+        yield return Run(terminal, "echo " + marker + "-$((40 + 2))", marker + "-42", "a command runs in the wrapper");
+        yield return Check("no shell banner before the output", () => !DocumentText(terminal).Contains("built-in shell"));
+        yield return new Step
+        {
+            Name = "the command is appended to " + historyFile,
+            Done = () => (context.Session.RunCommand("cat " + historyFile, out _) ?? new List<string>()).Any(line => line.Contains(marker)),
+            TimeoutMs = 10000
         };
     }
 

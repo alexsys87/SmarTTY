@@ -251,16 +251,29 @@ public static class IpkIndexBuilder
     }
 
     /// <summary>
-    /// Reads the "control" file of an OpenWrt .ipk: a gzip-compressed TAR that holds control.tar.gz, which in turn holds ./control.
+    /// Reads the "control" file of an .ipk: control.tar.gz, which holds ./control, inside either a gzip-compressed TAR
+    /// (OpenWrt's ipkg-build) or an "ar" archive like a .deb (opkg-build of opkg-utils: Entware, Yocto, some SDKs).
     /// Returns null when either of them is missing.
     /// </summary>
     internal static string ReadControl(string ipkFile)
     {
         byte[] controlTarGz;
         using (FileStream stream = new FileStream(ipkFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-        using (GZipStream outer = new GZipStream(stream, CompressionMode.Decompress))
         {
-            controlTarGz = FindTarEntry(outer, "control.tar.gz");
+            byte[] magic = new byte[ArMagic.Length];
+            int magicLength = ReadFully(stream, magic, magic.Length);
+            stream.Position = 0;
+            if (magicLength == ArMagic.Length && magic.SequenceEqual(ArMagic))
+            {
+                controlTarGz = FindArMember(stream, "control.tar.gz");
+            }
+            else
+            {
+                using (GZipStream outer = new GZipStream(stream, CompressionMode.Decompress))
+                {
+                    controlTarGz = FindTarEntry(outer, "control.tar.gz");
+                }
+            }
         }
         if (controlTarGz == null)
         {
@@ -272,6 +285,45 @@ public static class IpkIndexBuilder
             byte[] control = FindTarEntry(inner, "control");
             return control == null ? null : new UTF8Encoding(false).GetString(control);
         }
+    }
+
+    private static readonly byte[] ArMagic = Encoding.ASCII.GetBytes("!<arch>\n");
+
+    /// <summary>
+    /// Returns the content of a member of an "ar" archive (positioned at its start), or null when there is no such member.
+    /// Member names may end with "/" (GNU ar); members start at even offsets.
+    /// </summary>
+    internal static byte[] FindArMember(Stream stream, string wantedName)
+    {
+        Skip(stream, ArMagic.Length);
+        byte[] header = new byte[60];
+        while (ReadFully(stream, header, header.Length) == header.Length)
+        {
+            if (header[58] != '`' || header[59] != '\n')
+            {
+                throw new InvalidDataException("The ar archive is damaged");
+            }
+            string name = Encoding.ASCII.GetString(header, 0, 16).TrimEnd(' ');
+            if (name.EndsWith("/", StringComparison.Ordinal) && name.Length > 1)
+            {
+                name = name.Substring(0, name.Length - 1);
+            }
+            if (!long.TryParse(Encoding.ASCII.GetString(header, 48, 10).Trim(), out long size) || size < 0)
+            {
+                throw new InvalidDataException("The ar archive is damaged");
+            }
+            if (name == wantedName)
+            {
+                return ReadExact(stream, size);
+            }
+            Skip(stream, size);
+            if ((size & 1) != 0)
+            {
+                // The padding byte; an archive that ends without it is still read.
+                stream.ReadByte();
+            }
+        }
+        return null;
     }
 
     /// <summary>Reads a TAR stream sequentially and returns the content of the first regular file with the given name (a leading "./" is ignored).</summary>

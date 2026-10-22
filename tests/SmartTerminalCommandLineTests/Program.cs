@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using SmarTTY.Terminal;
 
@@ -9,7 +11,9 @@ using SmarTTY.Terminal;
 //  * quoting completed paths and reading back what was typed,
 //  * joining pasted lines, export/unset parsing, history file lines, "~" in the prompt,
 //  * the bash-like history search (Ctrl+R), $variables and host names,
-//  * parsing aliases, functions, variables and host files for completion.
+//  * parsing aliases, functions, variables and host files for completion,
+//  * choosing the shell of the interactive wrapper (bash, or BusyBox ash as on OpenWrt) and its history file; the probe
+//    and the wrapper are run by the system shells and by BusyBox when it is installed.
 // Run with: dotnet run --project tests/SmartTerminalCommandLineTests
 internal static class Program
 {
@@ -269,10 +273,179 @@ internal static class Program
         Equal(hosts[0].Source, "ssh config", "the source of a host");
     }
 
+    /// <summary>Runs a script with "sh -c" in the given environment; returns stdout (stderr goes to <paramref name="error"/>).</summary>
+    private static string RunScript(string script, Dictionary<string, string> environment, out string error, out int exitCode)
+    {
+        ProcessStartInfo info = new ProcessStartInfo("sh")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            RedirectStandardInput = true,
+            UseShellExecute = false
+        };
+        info.ArgumentList.Add("-c");
+        info.ArgumentList.Add(script);
+        foreach (KeyValuePair<string, string> item in environment)
+        {
+            if (item.Value == null)
+            {
+                info.Environment.Remove(item.Key);
+            }
+            else
+            {
+                info.Environment[item.Key] = item.Value;
+            }
+        }
+        using Process process = Process.Start(info);
+        process.StandardInput.Close();
+        System.Threading.Tasks.Task<string> errorTask = process.StandardError.ReadToEndAsync();
+        string output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        error = errorTask.Result;
+        exitCode = process.ExitCode;
+        return output.Replace("\r", "");
+    }
+
+    private static string FindProgram(string name)
+    {
+        foreach (string dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(':'))
+        {
+            string path = Path.Combine(dir, name);
+            if (dir.Length > 0 && File.Exists(path))
+            {
+                return path;
+            }
+        }
+        return null;
+    }
+
+    private static void ShellSelectionChecks()
+    {
+        // The answer of the probe.
+        ShellSelection.ProbeResult openWrt = ShellSelection.ParseProbe(new[] { "SMARTTY_LOGIN_SHELL=/bin/ash", "SMARTTY_BUSYBOX=/bin/ash", "SMARTTY_SHELL=ash", "SMARTTY_BUSYBOX=ash", "SMARTTY_SHELL=sh", "SMARTTY_BUSYBOX=sh" });
+        ShellSelection.Choice choice = ShellSelection.ChooseAutomatic(openWrt);
+        Check(choice.Command == "/bin/ash" && choice.IsAsh && choice.Name == "ash", "OpenWrt: the login shell /bin/ash, BusyBox");
+        ShellSelection.ProbeResult openWrtWithBash = ShellSelection.ParseProbe(new[] { "SMARTTY_LOGIN_SHELL=/bin/ash", "SMARTTY_SHELL=bash", "SMARTTY_SHELL=ash", "SMARTTY_SHELL=sh" });
+        Equal(ShellSelection.ChooseAutomatic(openWrtWithBash).Command, "/bin/ash", "OpenWrt with bash installed: still the ash the user logs in to");
+        ShellSelection.ProbeResult debian = ShellSelection.ParseProbe(new[] { "SMARTTY_LOGIN_SHELL=/bin/bash", "SMARTTY_SHELL=bash", "SMARTTY_SHELL=sh" });
+        choice = ShellSelection.ChooseAutomatic(debian);
+        Check(choice.Command == "/bin/bash" && !choice.IsAsh, "a bash login shell is used as is");
+        ShellSelection.ProbeResult zshUser = ShellSelection.ParseProbe(new[] { "SMARTTY_LOGIN_SHELL=/usr/bin/zsh", "SMARTTY_SHELL=bash", "SMARTTY_SHELL=sh" });
+        Equal(ShellSelection.ChooseAutomatic(zshUser).Command, "bash", "another login shell (zsh): bash, as before");
+        ShellSelection.ProbeResult alpine = ShellSelection.ParseProbe(new[] { "SMARTTY_LOGIN_SHELL=/bin/sh", "SMARTTY_BUSYBOX=/bin/sh", "SMARTTY_SHELL=ash", "SMARTTY_BUSYBOX=ash", "SMARTTY_SHELL=sh", "SMARTTY_BUSYBOX=sh" });
+        choice = ShellSelection.ChooseAutomatic(alpine);
+        Check(choice.Command == "ash" && choice.IsAsh, "no bash, login shell sh: ash");
+        ShellSelection.ProbeResult onlySh = ShellSelection.ParseProbe(new[] { "SMARTTY_LOGIN_SHELL=", "SMARTTY_SHELL=sh", "SMARTTY_BUSYBOX=sh" });
+        choice = ShellSelection.ChooseAutomatic(onlySh);
+        Check(choice.Command == "sh" && choice.IsAsh, "only a BusyBox sh: sh, started like ash");
+        Check(ShellSelection.ChooseAutomatic(ShellSelection.ParseProbe(new[] { "SMARTTY_LOGIN_SHELL=/bin/bash" })).Command == "/bin/bash", "nothing in PATH, but the login shell is bash");
+        Check(ShellSelection.ChooseAutomatic(ShellSelection.ParseProbe(new[] { "SMARTTY_LOGIN_SHELL=" })) == null, "nothing known: no shell");
+        Check(ShellSelection.ParseProbe(null) == null && ShellSelection.ParseProbe(new[] { "sh: syntax error" }) == null, "no answer or an error line is no probe result");
+        ShellSelection.ProbeResult hostile = ShellSelection.ParseProbe(new[] { "SMARTTY_LOGIN_SHELL=/bin/bash;reboot", "SMARTTY_SHELL=rm -rf /", "SMARTTY_SHELL=sh" });
+        Check(hostile.LoginShell == null && hostile.Installed.SequenceEqual(new[] { "sh" }), "a login shell path with odd characters and unknown shells are ignored");
+        Check(ShellSelection.ParseProbe(new[] { "  SMARTTY_LOGIN_SHELL=/bin/ash\r", "SMARTTY_SHELL=ash\r" }).LoginShell == "/bin/ash", "CR and blanks around the lines are ignored");
+
+        // The manual mode.
+        Check(ShellSelection.ChooseManual("  ", openWrt) == null && ShellSelection.ChooseManual(null, null) == null, "manual: an empty shell means the automatic choice");
+        choice = ShellSelection.ChooseManual("bash --norc", debian);
+        Check(choice.Command == "bash --norc" && !choice.IsAsh && choice.Name == "bash", "manual: the shell is used as typed, with arguments");
+        Check(ShellSelection.ChooseManual("/bin/ash", null).IsAsh, "manual: ash is recognized by its name");
+        Check(ShellSelection.ChooseManual("sh", openWrt).IsAsh && !ShellSelection.ChooseManual("sh", debian).IsAsh, "manual: sh is started like ash where it is BusyBox (OpenWrt), not on Debian");
+
+        // The wrapper.
+        Equal(ShellSelection.WrapInteractive(new ShellSelection.Choice { Command = "bash" }, "echo \"$HOME\""), "bash -i -c \"echo \\\"\\$HOME\\\"\"", "bash: -i -c with the command escaped");
+        string ashWrapper = ShellSelection.WrapInteractive(new ShellSelection.Choice { Command = "/bin/ash", IsAsh = true }, "ll");
+        Check(ashWrapper.StartsWith("/bin/ash -c \"") && !ashWrapper.Contains(" -i ") && ashWrapper.Contains("\\${ENV:-/etc/shinit}") && ashWrapper.EndsWith("\nll\""), "ash: no -i, $ENV (OpenWrt: /etc/shinit) read first, the command on its own line");
+
+        // The history file.
+        Equal(ShellSelection.GetHistoryFile("~/.bash_history", ShellSelection.ChooseAutomatic(openWrt)), "~/.ash_history", "history: BusyBox ash keeps ~/.ash_history");
+        Equal(ShellSelection.GetHistoryFile("~/.bash_history", ShellSelection.ChooseAutomatic(debian)), "~/.bash_history", "history: bash keeps ~/.bash_history");
+        Equal(ShellSelection.GetHistoryFile(null, new ShellSelection.Choice { Command = "zsh" }), "~/.zsh_history", "history: zsh (manual) keeps ~/.zsh_history");
+        Equal(ShellSelection.GetHistoryFile("", null), "~/.bash_history", "history: nothing known, the old default");
+        Equal(ShellSelection.GetHistoryFile("~/.my_history", ShellSelection.ChooseAutomatic(openWrt)), "~/.my_history", "history: a file set by the user is kept");
+
+        // The probe and the wrapper in real shells.
+        string work = Path.Combine(Path.GetTempPath(), "smartty-shells-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            string busybox = FindProgram("busybox");
+            if (busybox == null)
+            {
+                Console.WriteLine("SKIP: the probe and the wrapper under BusyBox ash (busybox is not installed)");
+            }
+            else
+            {
+                // An OpenWrt-like system: /bin/ash and /bin/sh are BusyBox, there is no bash.
+                string bin = Path.Combine(work, "owrt-bin");
+                Directory.CreateDirectory(bin);
+                foreach (string applet in new[] { "ash", "sh", "readlink", "cat" })
+                {
+                    File.CreateSymbolicLink(Path.Combine(bin, applet), busybox);
+                }
+                string ash = Path.Combine(bin, "ash");
+                Dictionary<string, string> environment = new Dictionary<string, string> { ["PATH"] = bin, ["SHELL"] = ash, ["ENV"] = null, ["HOME"] = work };
+                string probeOutput = RunScript(Path.Combine(bin, "ash") + " -c " + Quote(ShellSelection.ProbeCommand), environment, out string probeError, out _);
+                ShellSelection.Choice detected = ShellSelection.ChooseAutomatic(ShellSelection.ParseProbe(probeOutput.Split('\n')));
+                bool found = detected != null && detected.Command == ash && detected.IsAsh;
+                Check(found, "BusyBox: the probe finds the ash login shell and that it is BusyBox" + (found ? "" : ": " + probeOutput + probeError));
+                Dictionary<string, string> noShell = new Dictionary<string, string>(environment) { ["SHELL"] = null };
+                detected = ShellSelection.ChooseAutomatic(ShellSelection.ParseProbe(RunScript(ash + " -c " + Quote(ShellSelection.ProbeCommand), noShell, out _, out _).Split('\n')));
+                Check(detected != null && detected.Command == "ash" && detected.IsAsh, "BusyBox without $SHELL: ash from PATH");
+
+                // The wrapper prints nothing but the output of the command (BusyBox ash -i would print its banner) and has the aliases of $ENV.
+                string shinit = Path.Combine(work, "shinit");
+                File.WriteAllText(shinit, "alias ll='echo from-alias'\nhello() { echo from-function; }\n");
+                Dictionary<string, string> withEnv = new Dictionary<string, string>(environment) { ["ENV"] = shinit };
+                string output = RunScript(ShellSelection.WrapInteractive(new ShellSelection.Choice { Command = ash, IsAsh = true }, "export A=1 && ll && hello && echo \"$A\""), withEnv, out string error, out int exit);
+                Equal(output, "from-alias\nfrom-function\n1\n", "BusyBox ash wrapper: aliases and functions of $ENV, no banner" + (output == "from-alias\nfrom-function\n1\n" ? "" : ": " + error));
+                output = RunScript(ShellSelection.WrapInteractive(new ShellSelection.Choice { Command = ash, IsAsh = true }, "echo plain; exit 3"), environment, out error, out exit);
+                Check(output == "plain\n" && exit == 3, "BusyBox ash wrapper without $ENV and /etc/shinit: the command runs, its exit code is kept" + (exit == 3 ? "" : ": " + error));
+                output = RunScript(ash + " -i -c 'echo x' </dev/null", environment, out _, out _);
+                Check(output.Contains("BusyBox"), "(why ash gets no -i: BusyBox ash -i -c prints its banner)");
+            }
+
+            string bashPath = FindProgram("bash");
+            if (bashPath == null)
+            {
+                Console.WriteLine("SKIP: the bash wrapper (bash is not installed)");
+            }
+            else
+            {
+                string home = Path.Combine(work, "home");
+                Directory.CreateDirectory(home);
+                File.WriteAllText(Path.Combine(home, ".bashrc"), "alias ll='echo from-bashrc'\n");
+                Dictionary<string, string> environment = new Dictionary<string, string> { ["HOME"] = home, ["SHELL"] = bashPath };
+                string probeOutput = RunScript(ShellSelection.ProbeCommand, environment, out _, out _);
+                ShellSelection.Choice detected = ShellSelection.ChooseAutomatic(ShellSelection.ParseProbe(probeOutput.Split('\n')));
+                bool found = detected != null && detected.Command == bashPath && !detected.IsAsh;
+                Check(found, "bash: the probe finds the bash login shell" + (found ? "" : ": " + probeOutput));
+                string output = RunScript(ShellSelection.WrapInteractive(detected, "ll"), environment, out string error, out _);
+                Equal(output, "from-bashrc\n", "bash wrapper: the alias of .bashrc works" + (output == "from-bashrc\n" ? "" : ": " + error));
+            }
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(work, true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private static string Quote(string text)
+    {
+        return "'" + text.Replace("'", "'\\''") + "'";
+    }
+
     private static int Main()
     {
         try
         {
+            ShellSelectionChecks();
             VariableAndHostChecks();
             HistorySearchChecks();
             CompletionSourceChecks();

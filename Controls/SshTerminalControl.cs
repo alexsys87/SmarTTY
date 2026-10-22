@@ -1410,7 +1410,13 @@ public class SshTerminalControl : TerminalEmulatorControl
         command = exports + command;
         if (interactive.Value)
         {
-            command = _context.VTSettings.DefaultShell + " -i -c \"" + ShellCompletionAnalyzer.EscapeForShell(command) + "\"";
+            // bash, or ash on OpenWrt, unless a shell is set by hand; until the shell of the host is known (or if it cannot be
+            // found out) the command runs without the wrapper rather than in a shell that may be missing there.
+            ShellSelection.Choice shell = _context.ProvideAnalyzer().GetInteractiveShell();
+            if (shell != null)
+            {
+                command = ShellSelection.WrapInteractive(shell, command);
+            }
         }
         return text + command;
     }

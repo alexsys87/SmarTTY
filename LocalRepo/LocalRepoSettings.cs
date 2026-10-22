@@ -20,6 +20,9 @@ public class LocalRepoSettings
     /// <summary>For apk devices: also make the device trust the public key of the build (public-key.pem of the OpenWrt tree).</summary>
     public bool TrustBuildKey;
 
+    /// <summary>For opkg devices: turn the signature check of opkg off while the server runs, for feeds without a trusted Packages.sig.</summary>
+    public bool AllowUnsignedFeeds;
+
     private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SmarTTY\\LocalRepo.xml");
 
     public static LocalRepoSettings Load()
