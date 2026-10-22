@@ -213,8 +213,22 @@ public class SavedConnectionStore
             }
         }
         _rawConnections.Add(rawConnectionSettings);
-        rawConnectionSettings.FileName = Path.Combine(_directory, $"{rawConnectionSettings.Settings.Connection.FileNameBase}.rawconnection");
+        rawConnectionSettings.FileName = Path.Combine(_directory, ToFileName(rawConnectionSettings.Settings.Connection.FileNameBase) + ".rawconnection");
         rawConnectionSettings.Save();
+    }
+
+    /// <summary>
+    /// The connection key as a file name: an IPv6 host ("::1_23") or a serial device description may contain characters
+    /// that Windows does not allow in a file name, and saving such a connection used to fail.
+    /// </summary>
+    internal static string ToFileName(string fileNameBase)
+    {
+        string name = string.IsNullOrWhiteSpace(fileNameBase) ? "connection" : fileNameBase;
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+        {
+            name = name.Replace(invalid, '_');
+        }
+        return name;
     }
 
     public void DeleteRawConnection(RawConnectionSettings rawConnectionSettings)

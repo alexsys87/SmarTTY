@@ -35,7 +35,7 @@
               <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock Text="Connect to: " VerticalAlignment="Center" />
-            <TextBox Name="txtHost" Grid.Column="1" Grid.ColumnSpan="3" Margin="2" VerticalContentAlignment="Center" Text="{Binding TCPEndpoint, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsChecked, ElementName=rbTCP}" Tag="&lt;hostname or IP address&gt;:&lt;port&gt;" ToolTip="host, host:port or [IPv6 address]:port. Without a port telnet uses 23 (992 with TLS)." />
+            <TextBox Name="txtHost" Grid.Column="1" Grid.ColumnSpan="3" Margin="2" VerticalContentAlignment="Center" Text="{Binding TCPEndpoint, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsChecked, ElementName=rbTCP}" Tag="&lt;hostname or IP address&gt;:&lt;port&gt;" ToolTip="host, host:port or [IPv6 address]:port, optionally with tcp:// in front. Without a port telnet uses 23 (992 with TLS)." />
             <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Grid.Row="1" Grid.ColumnSpan="2" Click="Test_Click">
               <StackPanel Orientation="Horizontal">
                 <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
@@ -43,7 +43,7 @@
               </StackPanel>
             </Button>
             <TextBlock Text="Keep-alive, s:" Grid.Row="1" Grid.Column="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" Visibility="{Binding TcpKeepAliveSettingsVisibility}" />
-            <TextBox Grid.Column="3" Grid.Row="1" Margin="2" Width="50" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding TcpKeepAliveSettingsVisibility}" ToolTip="Seconds (0 = off). Asks the operating system to detect a dropped TCP connection by probing an idle connection; nothing is written to the socket, so the device protocol is not disturbed." />
+            <TextBox Grid.Column="3" Grid.Row="1" Margin="2" Width="50" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding TcpKeepAliveSettingsVisibility}" ToolTip="Seconds (0 = off). After this many idle seconds the operating system probes the connection every few seconds, so a dropped link (power loss, pulled cable, NAT timeout) is noticed soon after; nothing is written into the data stream, so the device protocol is not disturbed." />
           </Grid>
         </local:SettingsGroupBox>
         <local:SettingsGroupBox ImageSource="../icons/com16.png" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">

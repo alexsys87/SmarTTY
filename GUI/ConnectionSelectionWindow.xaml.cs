@@ -47,7 +47,26 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private class Context : IDisposable
         {
-            public readonly TcpClient Client = new TcpClient();
+            // A dual-stack socket: the parameterless TcpClient of .NET Framework is IPv4 only and could never reach a
+            // host that is given by (or resolves only to) an IPv6 address.
+            public readonly TcpClient Client = CreateClient();
+
+            private static TcpClient CreateClient()
+            {
+                if (Socket.OSSupportsIPv6)
+                {
+                    try
+                    {
+                        TcpClient client = new TcpClient(AddressFamily.InterNetworkV6);
+                        client.Client.DualMode = true;
+                        return client;
+                    }
+                    catch (SocketException)
+                    {
+                    }
+                }
+                return new TcpClient();
+            }
 
             public State State;
 
@@ -472,7 +491,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public SubtypeImage TypeImage => SubtypeImage.Terminal;
 
-            public string Title => (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.Host + ":" + (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.Port.ToString();
+            public string Title => (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.ToString() ?? "";
 
             public virtual string Detail1 => "raw tcp";
 

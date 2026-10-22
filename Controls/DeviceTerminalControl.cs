@@ -139,7 +139,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         return connection switch
         {
             DeviceTerminalSettings.ConnectionSettings.Serial serial => serial.ComPortName,
-            DeviceTerminalSettings.ConnectionSettings.Tcp tcp => tcp.Host + ":" + tcp.Port,
+            DeviceTerminalSettings.ConnectionSettings.Tcp tcp => tcp.ToString(),
             _ => "Raw Terminal",
         };
     }
@@ -1068,12 +1068,28 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
     }
 
+    // A test of a network connection gives up after this long instead of the operating system's connect timeout.
+    private const int TestConnectTimeoutMs = 10000;
+
+    /// <summary>
+    /// Opens the connection once and closes it again; throws with the reason when it cannot be made. It blocks, so the
+    /// caller runs it on a worker thread.
+    /// </summary>
     public static string TestConnection(DeviceTerminalSettings.ConnectionSettings connectionSettings)
     {
         using IDeviceTransport deviceTransport = new CallbackTransportFactory(CreateTransportCallback(connectionSettings) ?? throw new Exception("Connection type not specified")).CreateTransport();
         if (deviceTransport == null)
         {
             throw new Exception("Unspecified error");
+        }
+        switch (deviceTransport)
+        {
+            case TcpTransport tcpTransport:
+                tcpTransport.ConnectTimeoutMs = TestConnectTimeoutMs;
+                break;
+            case TelnetTransport telnetTransport:
+                telnetTransport.ConnectTimeoutMs = TestConnectTimeoutMs;
+                break;
         }
         deviceTransport.Open(null);
         return deviceTransport.GetDisplayName(includeParameters: true);

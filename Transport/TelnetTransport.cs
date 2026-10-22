@@ -19,9 +19,14 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
 
     private readonly object _sizeLock = new object();
 
-    private TcpClient _tcpClient;
+    private Socket _socket;
 
     private TelnetStream _stream;
+
+    // The connect in progress, so Close() from the UI thread can abort it.
+    private TcpConnector _connector;
+
+    private bool _closed;
 
     private Timer _keepAliveTimer;
 
@@ -29,7 +34,10 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
 
     private int _rows = TelnetStream.DefaultRows;
 
-    public string ConnectingMessage => "Connecting to " + _telnet.Host + ":" + _telnet.Port + " (" + DescribeKind() + ")...";
+    public string ConnectingMessage => "Connecting to " + _telnet + " (" + DescribeKind() + ")...";
+
+    /// <summary>How long one <see cref="Open"/> may take to reach the server, in milliseconds; 0 leaves it to the operating system.</summary>
+    public int ConnectTimeoutMs { get; set; }
 
     /// <summary>
     /// The character set of the terminal ("utf-8", "koi8-r", ...), accepted when the server proposes it (option
@@ -84,17 +92,52 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
 
     public void Open(IHostNameResolver hostNameResolver)
     {
-        // A fresh client for every attempt: the caller retries Open() after a failure.
-        TcpClient client = new TcpClient();
+        // A fresh socket for every attempt: the caller retries Open() after a failure.
+        TcpConnector connector = new TcpConnector();
+        lock (_sizeLock)
+        {
+            if (_closed)
+            {
+                throw new ObjectDisposedException(nameof(TelnetTransport), "The connection is closed.");
+            }
+            _connector = connector;
+        }
+        Socket client;
+        try
+        {
+            client = connector.Connect(hostNameResolver?.ResolveHostName(_telnet.Host) ?? _telnet.Host, _telnet.Port, ConnectTimeoutMs);
+        }
+        finally
+        {
+            lock (_sizeLock)
+            {
+                if (_connector == connector)
+                {
+                    _connector = null;
+                }
+            }
+        }
+        lock (_sizeLock)
+        {
+            if (_closed)
+            {
+                client.Close();
+                throw new ObjectDisposedException(nameof(TelnetTransport), "The connection was closed while it was being made.");
+            }
+            // Known from now on, so Close() also ends a TLS handshake or a negotiation that hangs.
+            _socket = client;
+        }
         TelnetStream stream;
         try
         {
-            client.NoDelay = true;
-            client.Connect(hostNameResolver?.ResolveHostName(_telnet.Host) ?? _telnet.Host, _telnet.Port);
-            if (_telnet.KeepAliveSeconds > 0)
+            try
             {
-                // The operating system's own keep-alive would help with a half-dead connection, too.
-                client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+                // The operating system's own keep-alive finds a half-dead connection, too.
+                TcpConnector.EnableKeepAlive(client, _telnet.KeepAliveSeconds);
+            }
+            catch (SocketException)
+            {
+                // The NOP timer below still keeps the connection busy.
             }
             int columns;
             int rows;
@@ -106,7 +149,7 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
             // Loaded for every attempt, before anything is sent: a missing certificate is reported as the reason the
             // connection cannot be made.
             X509Certificate2 clientCertificate = _telnet.UsesTls ? TelnetTls.LoadClientCertificate(_telnet.TlsClientCertificate) : null;
-            Stream wire = client.GetStream();
+            Stream wire = new NetworkStream(client, ownsSocket: true);
             if (_telnet.Tls)
             {
                 // The certificate is checked against the name the user typed, not against the resolved address.
@@ -142,9 +185,12 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
         }
         lock (_sizeLock)
         {
+            if (_closed)
+            {
+                client.Close();
+                throw new ObjectDisposedException(nameof(TelnetTransport), "The connection was closed while it was being made.");
+            }
             StopKeepAlive();
-            _tcpClient?.Close();
-            _tcpClient = client;
             _stream = stream;
             StartKeepAlive(stream);
         }
@@ -152,11 +198,16 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
 
     public void Close()
     {
+        TcpConnector connector;
         lock (_sizeLock)
         {
+            _closed = true;
             StopKeepAlive();
-            _tcpClient?.Close();
+            connector = _connector;
+            _connector = null;
+            _socket?.Close();
         }
+        connector?.Abort();
     }
 
     public Stream GetStream()
@@ -167,7 +218,7 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
     public string GetDisplayName(bool includeParameters)
     {
         // An IPv6 address is put in brackets, so the port can be told from it.
-        string name = (_telnet.Host != null && _telnet.Host.Contains(":") ? "[" + _telnet.Host + "]" : _telnet.Host) + ":" + _telnet.Port;
+        string name = _telnet.ToString();
         return includeParameters ? name + " (" + DescribeKind() + ")" : name;
     }
 
