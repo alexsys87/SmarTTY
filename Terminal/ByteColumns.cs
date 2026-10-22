@@ -207,6 +207,82 @@ public static class ByteColumns
         return bytes != null && bytes.Count > 0 && bytes.Count < SequenceLength(bytes[0]) && IsContinuation(value);
     }
 
+    /// <summary>
+    /// The terminal's own copy of the remote command line while the user types, so that the number of key presses
+    /// does not depend on how far the echo has come: typing ahead of a slow link (or holding Backspace over mixed
+    /// Latin and Cyrillic text) would otherwise count the bytes of a letter the screen does not show yet, or no
+    /// longer shows. It starts from the screen line and follows the keys the way the remote line editor does
+    /// (letters are inserted at the cursor). Keys it cannot follow (Enter, Tab, history, Ctrl+...) end it.
+    /// </summary>
+    public sealed class LinePrediction
+    {
+        private string _line;
+
+        public LinePrediction(string line, int column)
+        {
+            _line = line ?? "";
+            Column = column;
+        }
+
+        public string Line => _line;
+
+        public int Column { get; private set; }
+
+        /// <summary>Key presses for Backspace, or 0 at the start of the line (nothing to erase).</summary>
+        public int Backspace()
+        {
+            if (Column <= 0)
+            {
+                return 0;
+            }
+            int count = CellByteLength(_line, Column - 1);
+            if (Column - 1 < _line.Length)
+            {
+                _line = _line.Remove(Column - 1, 1);
+            }
+            Column--;
+            return count;
+        }
+
+        /// <summary>Key presses for Left, or 0 at the start of the line.</summary>
+        public int Left()
+        {
+            if (Column <= 0)
+            {
+                return 0;
+            }
+            Column--;
+            return CellByteLength(_line, Column);
+        }
+
+        public int Right()
+        {
+            int count = CellByteLength(_line, Column);
+            Column++;
+            return count;
+        }
+
+        public int Delete()
+        {
+            int count = CellByteLength(_line, Column);
+            if (Column < _line.Length)
+            {
+                _line = _line.Remove(Column, 1);
+            }
+            return count;
+        }
+
+        public void Type(string text)
+        {
+            if (Column > _line.Length)
+            {
+                _line = _line.PadRight(Column);
+            }
+            _line = _line.Insert(Column, text);
+            Column += text.Length;
+        }
+    }
+
     /// <summary>How many Delete or Right presses the remote editor needs to step over the character under the cursor.</summary>
     public static int ForwardKeyCount(string line, int column, int offset)
     {

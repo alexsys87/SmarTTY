@@ -109,6 +109,14 @@ internal sealed class SshNetChannel : IDisposable
         { TerminalModes.IUTF8, 1u }
     };
 
+    // IUTF8 turned off, for a shell whose own line editor counts bytes (BusyBox without Unicode support, OpenWrt):
+    // the terminal then repeats Backspace once per byte, and the kernel line discipline must count bytes as well,
+    // or a doubled Backspace in cat or read would erase two letters.
+    private static readonly IDictionary<TerminalModes, uint> ByteTtyTerminalModes = new Dictionary<TerminalModes, uint>
+    {
+        { TerminalModes.IUTF8, 0u }
+    };
+
     private readonly object _channel;
 
     private readonly List<KeyValuePair<EventInfo, Delegate>> _subscriptions = new List<KeyValuePair<EventInfo, Delegate>>();
@@ -185,9 +193,9 @@ internal sealed class SshNetChannel : IDisposable
         Invoke(Api.Open);
     }
 
-    public bool SendPseudoTerminalRequest(string terminalType, uint columns, uint rows)
+    public bool SendPseudoTerminalRequest(string terminalType, uint columns, uint rows, bool utf8Tty = true)
     {
-        return (bool)Invoke(Api.SendPseudoTerminalRequest, terminalType, columns, rows, 0u, 0u, PtyTerminalModes);
+        return (bool)Invoke(Api.SendPseudoTerminalRequest, terminalType, columns, rows, 0u, 0u, utf8Tty ? PtyTerminalModes : ByteTtyTerminalModes);
     }
 
     public bool SendExecRequest(string command)

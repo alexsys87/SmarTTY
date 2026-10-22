@@ -14,6 +14,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
 
@@ -117,7 +118,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // null until the probe started by the first classic terminal tab has answered.
     private bool? _ByteOrientedShell;
 
-    private bool _ByteOrientedShellProbeStarted;
+    private Task<bool> _ByteOrientedShellProbe;
+
+    private static readonly TimeSpan ByteProbeTimeout = TimeSpan.FromSeconds(3);
 
     // Whether the host of this session is OpenWrt with opkg, so that "Tools > Local OpenWrt repository server" is offered:
     // null until the probe has answered. A host that is not OpenWrt (or has no opkg) never sees the item.
@@ -641,56 +644,49 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     }
 
     /// <summary>
-    /// Applies the "byte-oriented line editing" setting to a classic terminal tab of this session. In the automatic
-    /// mode the login shell is probed once per session (in the background, the tab works meanwhile) and every
-    /// classic terminal tab of the session follows the answer.
+    /// Whether a new terminal tab of this session works in byte mode: its login shell edits the command line in
+    /// UTF-8 bytes (BusyBox without Unicode support, OpenWrt), so the terminal repeats Backspace, Delete and the arrows
+    /// once per byte and the tab's PTY is opened without IUTF8 (see SshSession.OpenShellChannel). Classic and Smart
+    /// Terminal tabs have a setting each; in the automatic mode the shell is probed once per session. The answer is
+    /// needed before the PTY is opened, so the probe is waited for, but never longer than <see cref="ByteProbeTimeout"/>:
+    /// a slow server keeps the normal mode for that tab instead of freezing the window, and later tabs get the answer.
     /// </summary>
-    public void ApplyByteOrientedLineEditing(TerminalEmulatorControl ctl)
+    public bool UsesByteOrientedLineEditing(bool smartTerminal)
     {
-        if (!(ctl.Tag is TerminalTag terminalTag) || terminalTag.Channel == null || ctl.IsDisposed)
-        {
-            return;
-        }
-        switch (_Controller.Settings.ByteOrientedLineEditing)
+        GlobalSettings.ByteOrientedLineEditingMode mode = smartTerminal ? _Controller.Settings.VirtualTerminal.ByteOrientedLineEditing : _Controller.Settings.ByteOrientedLineEditing;
+        switch (mode)
         {
             case GlobalSettings.ByteOrientedLineEditingMode.Always:
-                ctl.ByteOrientedLineEditing = true;
-                return;
+                return true;
             case GlobalSettings.ByteOrientedLineEditingMode.Never:
-                ctl.ByteOrientedLineEditing = false;
-                return;
+                return false;
         }
         if (_ByteOrientedShell.HasValue)
         {
-            ctl.ByteOrientedLineEditing = _ByteOrientedShell.Value;
-            return;
+            return _ByteOrientedShell.Value;
         }
-        ctl.ByteOrientedLineEditing = false;
         SshSession session = Session;
-        if (_ByteOrientedShellProbeStarted || session == null)
+        if (session == null)
         {
-            return;
+            return false;
         }
-        _ByteOrientedShellProbeStarted = true;
-        ThreadPool.QueueUserWorkItem(delegate
+        if (_ByteOrientedShellProbe == null)
         {
-            bool byteOriented = false;
-            try
+            _ByteOrientedShellProbe = Task.Run(() => ByteColumns.ParseProbe(session.RunCommand(ByteColumns.ProbeCommand, out _)));
+        }
+        try
+        {
+            if (_ByteOrientedShellProbe.Wait(ByteProbeTimeout))
             {
-                byteOriented = ByteColumns.ParseProbe(session.RunCommand(ByteColumns.ProbeCommand, out _));
+                _ByteOrientedShell = _ByteOrientedShellProbe.Result;
+                return _ByteOrientedShell.Value;
             }
-            catch
-            {
-            }
-            _Controller.BeginInvoke(() =>
-            {
-                _ByteOrientedShell = byteOriented;
-                foreach (NormalTabContext tab in Tabs.OfType<NormalTabContext>())
-                {
-                    ApplyByteOrientedLineEditing(tab.Terminal);
-                }
-            });
-        });
+        }
+        catch
+        {
+            _ByteOrientedShell = false;
+        }
+        return false;
     }
 
     private static bool IsChannelAttached(TerminalEmulatorControl ctl, SshShellChannel chn)

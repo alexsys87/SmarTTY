@@ -222,6 +222,20 @@ internal static class ByteColumnChecks
         ByteColumns.MoveForward("$ при", ref column, ref offset, 3, 80);
         Program.Check(column == 3 && offset == 1, "three bytes forward cross one letter and enter the next");
 
+        // Keys pressed faster than the echo comes back are counted on the terminal's own copy of the command line.
+        ByteColumns.LinePrediction prediction = new ByteColumns.LinePrediction("$ ", 2);
+        prediction.Type("ab");
+        prediction.Type("пр");
+        Program.Check(prediction.Backspace() == 2 && prediction.Backspace() == 2 && prediction.Backspace() == 1, "prediction: Backspace over 'р', 'п', 'b' before any echo: 2, 2, 1");
+        Program.Check(prediction.Line == "$ a" && prediction.Column == 3, "prediction: the copy follows the erased letters");
+        prediction.Type("жук");
+        Program.Check(prediction.Left() == 2 && prediction.Left() == 2, "prediction: Left over 'к', 'у'");
+        prediction.Type("Я");
+        Program.Check(prediction.Line == "$ aжЯук" && prediction.Column == 5, "prediction: a letter typed in the middle is inserted");
+        Program.Check(prediction.Delete() == 2 && prediction.Line == "$ aжЯк", "prediction: Delete over 'у'");
+        Program.Check(prediction.Right() == 2 && prediction.Column == 6, "prediction: Right over 'к'");
+        Program.Check(new ByteColumns.LinePrediction("", 0).Backspace() == 0, "prediction: nothing to erase at the start of the line");
+
         Program.Check(ByteColumns.ParseProbe(new[] { "2" }), "probe: BusyBox counting bytes");
         Program.Check(!ByteColumns.ParseProbe(new[] { "1" }), "probe: Unicode-aware BusyBox");
         Program.Check(!ByteColumns.ParseProbe(new[] { "shell:/usr/bin/bash" }), "probe: bash");

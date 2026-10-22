@@ -1246,15 +1246,12 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         if (_inputLine == null && EchoRawInput && !e.Control && !e.Alt)
         {
+            // Backspace is echoed in OnKeyPress, after it was sent: in byte mode the number of DELs depends on the
+            // letter that is still shown before the cursor.
             if (e.KeyCode == Keys.Enter)
             {
-                ProcessOutput("\r\n");
+                ProcessLocalOutput("\r\n");
                 _rawEchoLength = 0;
-            }
-            else if (e.KeyCode == Keys.Back && _rawEchoLength > 0)
-            {
-                ProcessOutput("\b \b");
-                _rawEchoLength--;
             }
         }
 
@@ -1406,9 +1403,14 @@ public class SerialTerminalControl : TerminalEmulatorControl
             if (EchoRawInput && !char.IsControl(e.KeyChar))
             {
                 _rawEchoLength++;
-                ProcessOutput(e.KeyChar.ToString());
+                ProcessLocalOutput(e.KeyChar.ToString());
             }
             base.OnKeyPress(e);
+            if (EchoRawInput && e.KeyChar == '\b' && _rawEchoLength > 0)
+            {
+                ProcessLocalOutput("\b \b");
+                _rawEchoLength--;
+            }
             return;
         }
 

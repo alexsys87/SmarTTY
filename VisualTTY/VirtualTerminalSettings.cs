@@ -16,5 +16,11 @@ public class VirtualTerminalSettings
 
     public bool ShowFileExplorer { get; set; } = true;
 
+    /// <summary>
+    /// Byte mode for programs run in Smart Terminal tabs when the shell counts UTF-8 bytes (BusyBox without Unicode
+    /// support, OpenWrt); the command line itself is always edited locally. See GlobalSettings.ByteOrientedLineEditing.
+    /// </summary>
+    public GlobalSettings.ByteOrientedLineEditingMode ByteOrientedLineEditing { get; set; }
+
     public string AutoLinkExtensions { get; set; } = ".c;.cpp;.h;.sh;.txt;.js";
 }

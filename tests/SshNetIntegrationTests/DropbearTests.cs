@@ -144,9 +144,22 @@ internal static class DropbearTests
         string brokenLine = TypeInShell(session, "echo AAпри\u007fBB\r");
         Test.Check(!brokenLine.Contains("AAпрBB"), "a single DEL leaves half of the letter: the shell really counts bytes");
 
+        // The PTY of a byte-mode tab counts bytes too, so that cat and read (the kernel line editing) agree with BusyBox.
+        Test.Check(TtyModes(session, utf8Tty: false).Contains("-iutf8"), "a byte-mode PTY is opened without IUTF8");
+        string normalModes = TtyModes(session, utf8Tty: true);
+        Test.Check(normalModes.Contains("iutf8") && !normalModes.Contains("-iutf8"), "a normal PTY is opened with IUTF8");
+
         // Left over 'т' and 'е', Backspace over 'в', then a letter typed in the middle of the word.
         string inserted = TypeInShell(session, "echo AAпривет" + "\u001b[D\u001b[D\u001b[D\u001b[D" + "\u007f\u007f" + "Ж" + "\r");
         Test.Check(inserted.Contains("AAприЖет"), "keys repeated per byte edit the middle of a Cyrillic word (got '" + inserted.Trim() + "')");
+    }
+
+    private static string TtyModes(SshSession session, bool utf8Tty)
+    {
+        using SshShellChannel channel = session.OpenShellChannel("stty -a", "xterm", ExtendedDataMode.Merge, utf8Tty);
+        string modes = new StreamReader(channel.Output).ReadToEnd();
+        channel.WaitClosed();
+        return modes;
     }
 
     // Types keys into an interactive BusyBox ash (with a PTY, as a terminal tab) and returns what the shell printed.

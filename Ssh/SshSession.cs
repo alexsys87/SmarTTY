@@ -722,10 +722,14 @@ public class SshSession : IDisposable
         }
     }
 
-    public SshShellChannel OpenShellChannel(string command = null, string terminalType = null, ExtendedDataMode extendedDataMode = ExtendedDataMode.Normal)
+    /// <param name="utf8Tty">
+    /// With a PTY: whether the remote tty is told that input is UTF-8 (IUTF8), so the kernel line discipline erases
+    /// a whole character on Backspace. Off for a shell that counts UTF-8 bytes (see Terminal/ByteColumns.cs).
+    /// </param>
+    public SshShellChannel OpenShellChannel(string command = null, string terminalType = null, ExtendedDataMode extendedDataMode = ExtendedDataMode.Normal, bool utf8Tty = true)
     {
         EnsureAuthenticated();
-        return new SshShellChannel(this, SshNetChannel.Create(_client), command, terminalType, extendedDataMode);
+        return new SshShellChannel(this, SshNetChannel.Create(_client), command, terminalType, extendedDataMode, utf8Tty);
     }
 
     /// <summary>

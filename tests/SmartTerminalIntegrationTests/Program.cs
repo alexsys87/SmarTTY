@@ -213,6 +213,18 @@ internal static class Program
         {
             RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySearchSteps, CompletionSteps }, serverName);
         }
+
+        // BusyBox ash without Unicode support (OpenWrt) edits in UTF-8 bytes: byte mode. bash: the normal mode.
+        bool byteMode = !bash;
+        if (byteMode)
+        {
+            using SshSession session = Connect(host, port, user, password);
+            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { SmartByteModeSteps }, serverName + ", byte mode");
+        }
+        using (SshSession session = Connect(host, port, user, password))
+        {
+            RunClassicTerminal(session, byteMode, serverName + ", classic terminal" + (byteMode ? " in byte mode" : ""));
+        }
     }
 
     private static void RunSteps(SshSession session, string user, bool bash, Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] scenarios, string label)
@@ -251,6 +263,13 @@ internal static class Program
         {
             steps.AddRange(scenario(terminal, context));
         }
+        ExecuteSteps(form, terminal, steps, label);
+    }
+
+    // Runs the steps one after another on the UI thread of the form (keys and output are handled there, as in the
+    // application), failing a step that does not finish within its timeout.
+    private static void ExecuteSteps(Form form, TerminalEmulatorControl terminal, List<Step> steps, string label)
+    {
         int index = 0;
         bool started = false;
         DateTime startedAt = DateTime.UtcNow;
@@ -297,6 +316,188 @@ internal static class Program
         form.Shown += (sender, e) => timer.Start();
         Application.Run(form);
         timer.Dispose();
+    }
+
+    // A program run from Smart Terminal reads a line through the kernel line editing (read): in byte mode the PTY
+    // counts bytes (no IUTF8) and Backspace is sent once per byte, so it removes exactly one Cyrillic letter.
+    private static IEnumerable<Step> SmartByteModeSteps(SshTerminalControl terminal, SessionContext context)
+    {
+        yield return new Step
+        {
+            Name = "a command started in byte mode waits for input",
+            Act = () =>
+            {
+                terminal.ByteOrientedLineEditing = true;
+                if (!terminal.Submit("read x; echo \"got:$x:\""))
+                {
+                    throw new InvalidOperationException("the terminal was not at the prompt");
+                }
+            },
+            Done = () => !terminal.IsAtPrompt
+        };
+        yield return new Step
+        {
+            Name = "Backspace after 'при' removes one letter from what read receives",
+            Act = () =>
+            {
+                Type(terminal, "AAпри");
+                Key(terminal, Keys.Back);
+                Type(terminal, "BB");
+                Key(terminal, Keys.Return);
+            },
+            Done = () => terminal.IsAtPrompt && DocumentText(terminal).Contains("got:AAпрBB:")
+        };
+        yield return Check("the screen shows the edited line", () => CountLines(terminal, "AAпрBB") >= 1);
+    }
+
+    /// <summary>
+    /// A classic terminal tab: the real TerminalEmulatorControl on an interactive login shell, wired as
+    /// MainWindowController.CreateNewTerminal and SessionWrapper.AttachChannelToControl do it.
+    /// </summary>
+    private static void RunClassicTerminal(SshSession session, bool byteMode, string label)
+    {
+        using Form form = new Form
+        {
+            Width = 1000,
+            Height = 600
+        };
+        TerminalEmulatorControl terminal = new TerminalEmulatorControl
+        {
+            Dock = DockStyle.Fill,
+            ByteOrientedLineEditing = byteMode
+        };
+        form.Controls.Add(terminal);
+        SshShellChannel channel = null;
+        Utf8StreamDecoder decoder = new Utf8StreamDecoder();
+        terminal.DataEntered += (object sender, byte[] input, TerminalEmulatorControl.InputKind kind) => channel?.Input.Write(input, 0, input.Length);
+        string screenLine = null;
+        DateTime catStarted = DateTime.MaxValue;
+        List<Step> steps = new List<Step>
+        {
+            new Step
+            {
+                Name = "the shell prompt is shown",
+                Act = () =>
+                {
+                    channel = session.OpenShellChannel(null, "xterm", ExtendedDataMode.Merge, utf8Tty: !byteMode);
+                    channel.DataReceived += (object sender, byte[] data, int offset, int length, int value) =>
+                    {
+                        decoder.EscapeInvalidBytes = terminal.ByteOrientedLineEditing;
+                        terminal.EnqueueOutput(decoder.Decode(data, offset, length));
+                    };
+                    channel.PollingEnabled = true;
+                    channel.ResizePty(terminal.TerminalSize.Width, terminal.TerminalSize.Height);
+                },
+                Done = () => DocumentText(terminal).TrimEnd().EndsWith("$")
+            },
+            new Step
+            {
+                // bash edits in characters only with a UTF-8 locale; the runner's default must not decide the check.
+                Name = "the locale is UTF-8 (normal mode) or none (byte mode, as on OpenWrt)",
+                Act = () => Type(terminal, byteMode ? "unset LANG LC_ALL LC_CTYPE\r" : "export LANG=C.UTF-8 LC_ALL=C.UTF-8\r"),
+                Done = () => DocumentText(terminal).TrimEnd().EndsWith("$") && DocumentText(terminal).Contains(byteMode ? "LC_CTYPE\n" : "C.UTF-8\n")
+            },
+            new Step
+            {
+                Name = "Backspace after 'при' at the shell prompt removes one letter on the screen",
+                Act = () =>
+                {
+                    Type(terminal, "echo AAпри");
+                    Key(terminal, Keys.Back);
+                },
+                Done = () => (screenLine = LastLine(terminal)).EndsWith("echo AAпр")
+            },
+            new Step
+            {
+                Name = "and one letter from the command line",
+                Act = () =>
+                {
+                    Type(terminal, "BB");
+                    Key(terminal, Keys.Return);
+                },
+                Done = () => DocumentText(terminal).Contains("\nAAпрBB\n")
+            },
+            new Step
+            {
+                Name = "Left, Left, Backspace and a letter typed in the middle of a word",
+                Act = () =>
+                {
+                    Type(terminal, "echo CCпривет");
+                    Key(terminal, Keys.Left);
+                    Key(terminal, Keys.Left);
+                    Key(terminal, Keys.Back);
+                    Type(terminal, "Ж");
+                },
+                Done = () => (screenLine = LastLine(terminal)).EndsWith("echo CCприЖет")
+            },
+            new Step
+            {
+                Name = "the edited word reaches the shell",
+                Act = () => Key(terminal, Keys.Return),
+                Done = () => DocumentText(terminal).Contains("\nCCприЖет\n")
+            },
+            new Step
+            {
+                Name = "Backspace held over mixed text faster than the echo comes back",
+                Act = () =>
+                {
+                    Type(terminal, "echo xyz приве");
+                    for (int press = 0; press < 6; press++)
+                    {
+                        Key(terminal, Keys.Back);
+                    }
+                    Type(terminal, "Q");
+                    Key(terminal, Keys.Return);
+                },
+                Done = () => CountLines(terminal, "xyzQ") >= 1
+            },
+            new Step
+            {
+                // Keys typed before cat has put the tty back into line mode would reach it as raw bytes.
+                Name = "cat starts",
+                Act = () =>
+                {
+                    Type(terminal, "cat\r");
+                    catStarted = DateTime.UtcNow;
+                },
+                Done = () => DocumentText(terminal).Contains("cat\n") && (DateTime.UtcNow - catStarted).TotalMilliseconds > 500
+            },
+            new Step
+            {
+                Name = "Backspace in cat (the kernel line editing) removes one letter",
+                Act = () =>
+                {
+                    Type(terminal, "DDпри");
+                    Key(terminal, Keys.Back);
+                    Type(terminal, "\r\u0004");
+                },
+                // The typed line and what cat prints back ("\b \b" may leave a blank at the end of the first).
+                Done = () => CountLines(terminal, "DDпр") >= 2
+            },
+            new Step
+            {
+                Name = "exit",
+                Act = () => Type(terminal, "exit\r"),
+                Done = () => channel.TryWaitClosed()
+            }
+        };
+        ExecuteSteps(form, terminal, steps, label);
+        if (screenLine != null && Environment.GetEnvironmentVariable("SMARTTY_TEST_TRACE") == "1")
+        {
+            Console.WriteLine("  last screen line: " + screenLine);
+        }
+        channel?.Dispose();
+    }
+
+    private static int CountLines(TerminalEmulatorControl terminal, string text)
+    {
+        return DocumentText(terminal).Split('\n').Count((string line) => line.TrimEnd() == text);
+    }
+
+    private static string LastLine(TerminalEmulatorControl terminal)
+    {
+        string[] lines = DocumentText(terminal).TrimEnd('\n', ' ').Split('\n');
+        return lines[lines.Length - 1].TrimEnd();
     }
 
     private static IEnumerable<Step> FirstCommandSteps(SshTerminalControl terminal, SessionContext context)
@@ -456,7 +657,7 @@ internal static class Program
         };
     }
 
-    private static void Key(SshTerminalControl terminal, Keys keyData)
+    private static void Key(TerminalEmulatorControl terminal, Keys keyData)
     {
         KeyEventArgs e = new KeyEventArgs(keyData);
         OnKeyDownMethod.Invoke(terminal, new object[] { e });
@@ -483,7 +684,7 @@ internal static class Program
         }
     }
 
-    private static void Type(SshTerminalControl terminal, string text)
+    private static void Type(TerminalEmulatorControl terminal, string text)
     {
         foreach (char ch in text)
         {
@@ -508,7 +709,7 @@ internal static class Program
         return line == null ? "" : (string)line.GetType().GetField("Prompt").GetValue(line);
     }
 
-    private static string DocumentText(SshTerminalControl terminal)
+    private static string DocumentText(TerminalEmulatorControl terminal)
     {
         EditableTextDocument document = (EditableTextDocument)typeof(EditableTextBrowser).GetProperty("EditableDocument", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).GetValue(terminal);
         StringBuilder text = new StringBuilder();
@@ -535,11 +736,14 @@ internal static class Program
         Console.WriteLine("PASS: " + name);
     }
 
-    private static void Fail(string name, SshTerminalControl terminal)
+    private static void Fail(string name, TerminalEmulatorControl terminal)
     {
         Failures.Add(name);
         Console.WriteLine("FAIL: " + name);
-        Console.WriteLine("  input line: '" + InputPrompt(terminal) + "' + '" + InputText(terminal) + "'");
+        if (terminal is SshTerminalControl smartTerminal)
+        {
+            Console.WriteLine("  input line: '" + InputPrompt(smartTerminal) + "' + '" + InputText(smartTerminal) + "'");
+        }
         string[] lines = DocumentText(terminal).Split('\n');
         Console.WriteLine("  last lines of the terminal:");
         foreach (string line in lines.Skip(Math.Max(0, lines.Length - 15)))

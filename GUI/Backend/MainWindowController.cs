@@ -505,7 +505,6 @@ public class MainWindowController : INotifyPropertyChanged
                     {
                         terminal.Font = font;
                         _Controller.ApplyTerminalSettings(terminal);
-                        allSession.ApplyByteOrientedLineEditing(terminal);
                         terminal.UpdateLayout();
                         terminal.Redraw();
                     }
@@ -1453,12 +1452,15 @@ public class MainWindowController : INotifyPropertyChanged
             };
             vt.CompletionPopupRequested += MainWindowController_VirtualTerminalPopupRequested;
             vt.OpenFileRequested += Vt_FileOpenRequested;
+            vt.ByteOrientedLineEditing = session.UsesByteOrientedLineEditing(smartTerminal: true);
             terminalEmulatorControl = vt;
         }
         else
         {
             terminalEmulatorControl = new TerminalEmulatorControl();
-            SshShellChannel sshShellChannel = session.Session.OpenShellChannel(initialCommand.Command, "xterm");
+            // Decided before the shell starts: the PTY of a byte-counting shell is opened without IUTF8.
+            terminalEmulatorControl.ByteOrientedLineEditing = session.UsesByteOrientedLineEditing(smartTerminal: false);
+            SshShellChannel sshShellChannel = session.Session.OpenShellChannel(initialCommand.Command, "xterm", ExtendedDataMode.Normal, utf8Tty: !terminalEmulatorControl.ByteOrientedLineEditing);
             sshShellChannel.ExtendedDataMode = ExtendedDataMode.Merge;
             terminalEmulatorControl.DataEntered += terminalEmulatorControl1_HandleTerminalInput;
             terminalEmulatorControl.TerminalSizeChanged += terminalEmulatorControl1_TerminalSizeChanged;
@@ -1468,7 +1470,6 @@ public class MainWindowController : INotifyPropertyChanged
                 Session = session
             };
             session.AttachChannelToControl(terminalEmulatorControl, sshShellChannel, initialCommand.Command != null, initialCommand.TabKeptAfterExit);
-            session.ApplyByteOrientedLineEditing(terminalEmulatorControl);
         }
         terminalEmulatorControl.CaretWhenUnfocused = false;
         // Pasted line breaks reach the remote program as Enter (CR), as in other terminal emulators; a bare LF is

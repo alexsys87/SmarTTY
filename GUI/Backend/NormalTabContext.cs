@@ -145,7 +145,7 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             Terminal.HideCaret = false;
             try
             {
-                SshShellChannel sshShellChannel = session.OpenShellChannel(null, "xterm");
+                SshShellChannel sshShellChannel = session.OpenShellChannel(null, "xterm", ExtendedDataMode.Normal, utf8Tty: !Terminal.ByteOrientedLineEditing);
                 sshShellChannel.ExtendedDataMode = ExtendedDataMode.Merge;
                 terminalTag.Channel = sshShellChannel;
                 _Session.AttachChannelToControl(Terminal, sshShellChannel, isAutoLaunchedCommand: false);

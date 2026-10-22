@@ -215,6 +215,8 @@ public class SshTerminalControl : TerminalEmulatorControl
 
         private void OnDataReceived(object sender, byte[] buffer, int offset, int count, int flags)
         {
+            // In byte mode the terminal needs to see which stray byte arrived (see Utf8StreamDecoder).
+            _decoder.EscapeInvalidBytes = _terminal.ByteOrientedLineEditing;
             string text = _decoder.Decode(buffer, offset, count);
             if (!this._outputStarted)
             {
@@ -1538,7 +1540,9 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     private void RunRemoteCommand(string command)
     {
-        SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(BuildRemoteCommand(command), "xterm", ExtendedDataMode.Merge);
+        // In byte mode (a shell counting UTF-8 bytes, OpenWrt) the PTY is opened without IUTF8, so that a program using
+        // the kernel line editing (read, cat) counts bytes like BusyBox does and the repeated Backspace matches it.
+        SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(BuildRemoteCommand(command), "xterm", ExtendedDataMode.Merge, utf8Tty: !ByteOrientedLineEditing);
         if (sshShellChannel == null)
         {
             throw new Exception("Failed to open an SSH channel");
@@ -1547,6 +1551,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         _runs.Add(item);
         CommandChannel commandChannel = new CommandChannel(sshShellChannel, this, item);
         _channel = commandChannel;
+        ResetByteColumns();
         sshShellChannel.Finished += (object sender) =>
         {
             // Read on the session thread: the exit status may still be on its way when the channel reports EOF.
@@ -1634,6 +1639,7 @@ public class SshTerminalControl : TerminalEmulatorControl
                 return;
             }
             ResetLinkTracking();
+            ResetByteColumns();
             _channel = null;
             string message = null;
             if (connectionLost)
