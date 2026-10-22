@@ -52,6 +52,14 @@ public partial class DeviceTerminalControl
 
 	private ToolStripMenuItem receiveFileViaXMODEMToolStripMenuItem;
 
+	private ToolStripMenuItem sendFilesViaZModemToolStripMenuItem;
+
+	private ToolStripMenuItem receiveFilesViaZModemToolStripMenuItem;
+
+	private ToolStripMenuItem autoReceiveZModemToolStripMenuItem;
+
+	private ToolStripMenuItem escapeZModemControlToolStripMenuItem;
+
 	private ToolStripButton toolStripButton2;
 
 	private OpenFileDialog _openFileDialog;
@@ -125,6 +133,10 @@ public partial class DeviceTerminalControl
             this.sendFileViaXMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.sendFileViaXMODEM1KToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.receiveFileViaXMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.sendFilesViaZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.receiveFilesViaZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.autoReceiveZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.escapeZModemControlToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripButton2 = new System.Windows.Forms.ToolStripButton();
             this.btnLog = new System.Windows.Forms.ToolStripButton();
             this.btnReplay = new System.Windows.Forms.ToolStripButton();
@@ -309,7 +321,11 @@ public partial class DeviceTerminalControl
             this.sendBinaryFileToolStripMenuItem,
             this.sendFileViaXMODEMToolStripMenuItem,
             this.sendFileViaXMODEM1KToolStripMenuItem,
-            this.receiveFileViaXMODEMToolStripMenuItem});
+            this.receiveFileViaXMODEMToolStripMenuItem,
+            this.sendFilesViaZModemToolStripMenuItem,
+            this.receiveFilesViaZModemToolStripMenuItem,
+            this.autoReceiveZModemToolStripMenuItem,
+            this.escapeZModemControlToolStripMenuItem});
             this.toolStripButton3.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton3.Image")));
             this.toolStripButton3.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton3.Name = "toolStripButton3";
@@ -339,6 +355,34 @@ public partial class DeviceTerminalControl
             this.receiveFileViaXMODEMToolStripMenuItem.Name = "receiveFileViaXMODEMToolStripMenuItem";
             this.receiveFileViaXMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
             this.receiveFileViaXMODEMToolStripMenuItem.Text = "Receive file via XMODEM...";
+            // 
+            // sendFilesViaZModemToolStripMenuItem
+            // 
+            this.sendFilesViaZModemToolStripMenuItem.Name = "sendFilesViaZModemToolStripMenuItem";
+            this.sendFilesViaZModemToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.sendFilesViaZModemToolStripMenuItem.Text = "Send files via ZMODEM...";
+            // 
+            // receiveFilesViaZModemToolStripMenuItem
+            // 
+            this.receiveFilesViaZModemToolStripMenuItem.Name = "receiveFilesViaZModemToolStripMenuItem";
+            this.receiveFilesViaZModemToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.receiveFilesViaZModemToolStripMenuItem.Text = "Receive files via ZMODEM...";
+            // 
+            // autoReceiveZModemToolStripMenuItem
+            // 
+            this.autoReceiveZModemToolStripMenuItem.Checked = true;
+            this.autoReceiveZModemToolStripMenuItem.CheckOnClick = true;
+            this.autoReceiveZModemToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.autoReceiveZModemToolStripMenuItem.Name = "autoReceiveZModemToolStripMenuItem";
+            this.autoReceiveZModemToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.autoReceiveZModemToolStripMenuItem.Text = "Start ZMODEM receive automatically";
+            // 
+            // escapeZModemControlToolStripMenuItem
+            // 
+            this.escapeZModemControlToolStripMenuItem.CheckOnClick = true;
+            this.escapeZModemControlToolStripMenuItem.Name = "escapeZModemControlToolStripMenuItem";
+            this.escapeZModemControlToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
+            this.escapeZModemControlToolStripMenuItem.Text = "ZMODEM: escape control characters";
             // 
             // toolStripButton2
             // 
