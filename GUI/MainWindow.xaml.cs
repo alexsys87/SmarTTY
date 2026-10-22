@@ -274,6 +274,23 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         Controller.MenuCommandHandlers.SetupPublicKey();
     }
 
+    private void TftpFirmware_Click(object sender, RoutedEventArgs e)
+    {
+        DeviceTerminalControl terminal = Controller.ActiveSession?.DeviceTab?.Terminal;
+        if (terminal == null)
+        {
+            return;
+        }
+        try
+        {
+            terminal.ShowTftpFirmwareWindow(new System.Windows.Interop.WindowInteropHelper((Window)this).Handle);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         Controller.MenuCommandHandlers.Settings();

@@ -44,6 +44,12 @@ jobs:
       - name: Run Kermit protocol checks
         run: dotnet run --project tests/KermitTransferTests -c Release
 
+      - name: Run TFTP server protocol checks
+        run: dotnet run --project tests/TftpServerTests -c Release
+
+      - name: Run U-Boot firmware upload helper checks
+        run: dotnet run --project tests/UBootFirmwareScriptTests -c Release
+
       - name: Run text stream decoder checks
         run: dotnet run --project tests/TextStreamDecoderTests -c Release
 

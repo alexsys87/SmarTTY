@@ -255,6 +255,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         InitializeZModemMenu();
         InitializeYModemMenu();
         InitializeKermitMenu();
+        InitializeTftpSupport();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
         ThemeManager.ThemeChanged += OnThemeChanged;
         ApplyToolbarTheme();
@@ -1108,6 +1109,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private void OnDataReceived(object sender, byte[] buffer, int value)
     {
         Interlocked.Add(ref _bytesReceived, value);
+        _consoleTap?.Invoke(buffer, value);
         if (_isXModemActive)
         {
             for (int i = 0; i < value; i++)
