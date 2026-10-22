@@ -10,6 +10,7 @@ public partial class AboutForm : DpiAwareForm
     public AboutForm()
     {
         InitializeComponent();
+        FormIcons.Apply(this, "about");
         if (VersionTextOverride != null)
         {
             label2.Text = VersionTextOverride;

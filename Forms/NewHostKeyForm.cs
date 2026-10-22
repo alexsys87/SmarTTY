@@ -10,6 +10,7 @@ public partial class NewHostKeyForm : DpiAwareForm
     private NewHostKeyForm(SSHConnectionSettings sshConnectionSettings, string text)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "host-key-new");
         _sshConnectionSettings = sshConnectionSettings;
         this.lblHostName.Text = sshConnectionSettings.HostName;
         lblKey.Text = text;

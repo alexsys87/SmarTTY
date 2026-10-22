@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using SmarTTY.Forms;
 using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Controls;
@@ -10,14 +11,14 @@ namespace SmarTTY.Controls;
 /// Editor for a user command list of the line-input mode: one command per line, lines starting with '#' are
 /// comments. Built in code so it needs no designer file.
 /// </summary>
-internal sealed class DeviceCommandListDialog : Form
+internal sealed class DeviceCommandListDialog : DpiAwareForm
 {
     private readonly TextBox _text;
 
     public DeviceCommandListDialog(string title, string description, IEnumerable<string> commands)
     {
-        AutoScaleMode = AutoScaleMode.Dpi;
-        AutoScaleDimensions = new SizeF(96f, 96f);
+        // Laid out for 96 DPI: DpiAwareForm scales it for the monitor it is on.
+        FormIcons.Apply(this, "command-list");
         Text = title;
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;

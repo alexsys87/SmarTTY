@@ -12,6 +12,7 @@ public partial class PasswordRequestForm : DpiAwareForm
     private PasswordRequestForm(SSHConnectionSettings sshConnectionSettings, string previousPassword, bool isPassphrase)
     {
         this.InitializeComponent();
+        FormIcons.Apply(this, "password");
         _sshConnectionSettings = sshConnectionSettings;
         if (isPassphrase)
         {

@@ -8,6 +8,7 @@ public partial class ProxyAuthForm : DpiAwareForm
     private ProxyAuthForm(string hostName, string credentials)
     {
         this.InitializeComponent();
+        FormIcons.Apply(this, "proxy");
         lblHostName.Text = hostName;
         if (credentials != null)
         {

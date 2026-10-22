@@ -47,6 +47,7 @@ public partial class SCPDownloadForm : DpiAwareForm
     public SCPDownloadForm(RemoteCommandStarter callback, string text, bool showCheckBox = false)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "download");
         _remoteFileDialog.CommandRequested += callback;
         _initialDirectory = text;
         checkBox1.Visible = showCheckBox;

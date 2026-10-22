@@ -23,6 +23,7 @@ public partial class XModemTransferForm : DpiAwareForm
     public XModemTransferForm(string title, bool showErrorCount = true)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "xmodem");
         Text = title;
         _showErrorCount = showErrorCount;
     }

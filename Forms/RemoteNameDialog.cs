@@ -7,7 +7,7 @@ namespace SmarTTY.Forms;
 /// <summary>
 /// Asks for the name of a new or renamed file or folder in the file list. Built in code so it needs no designer file.
 /// </summary>
-internal sealed class RemoteNameDialog : Form
+internal sealed class RemoteNameDialog : DpiAwareForm
 {
     private readonly TextBox _name;
 
@@ -15,8 +15,8 @@ internal sealed class RemoteNameDialog : Form
 
     public RemoteNameDialog(string title, string prompt, string initialName, bool selectStemOnly)
     {
-        AutoScaleMode = AutoScaleMode.Dpi;
-        AutoScaleDimensions = new SizeF(96f, 96f);
+        // Laid out for 96 DPI: DpiAwareForm scales it for the monitor it is on.
+        FormIcons.Apply(this, "rename");
         Text = title;
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;

@@ -12,6 +12,7 @@ public partial class SudoConfirmationForm : FormBase
     {
         SudoConfirmationForm sudoConfirmationForm = this;
         this.InitializeComponent();
+        FormIcons.Apply(this, "sudo");
         this.terminalEmulatorControl1.ProcessOutput(promptText + "\r\n");
         Utf8StreamDecoder utf8StreamDecoder = new Utf8StreamDecoder();
         sshShellChannel.Finished += (object sender) =>

@@ -23,6 +23,7 @@ public partial class PublicKeyManagerForm : DpiAwareForm
     public PublicKeyManagerForm(SshSession sshSession, SSHConnectionSettings sshConnectionSettings)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "public-key");
         txtHost.Text = sshSession.HostName;
         txtUser.Text = sshSession.UserName;
         _settings = sshConnectionSettings;

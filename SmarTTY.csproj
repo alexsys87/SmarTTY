@@ -18,6 +18,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- Declares per-monitor DPI awareness (see the comment in the file). -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
@@ -47,6 +49,9 @@
 
   <ItemGroup>
     <EmbeddedResource Include="VisualTTY\XTermKeys.xml" LogicalName="VisualTTY.XTermKeys.xml" />
+    <!-- Window icons of the WinForms dialogs, loaded by Forms/FormIcons.cs. -->
+    <EmbeddedResource Include="icons\forms\*.ico" LogicalName="SmarTTY.FormIcons.%(Filename).ico" />
+    <EmbeddedResource Include="app.ico" LogicalName="SmarTTY.FormIcons.app.ico" />
     <Resource Include="icons\**\*.png" />
   </ItemGroup>
 

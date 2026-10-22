@@ -8,6 +8,7 @@ public partial class TransferErrorForm : DpiAwareForm
     public TransferErrorForm(Exception exception, string text)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "transfer-error");
         this.txtErrors.Text = text;
         if (exception != null)
         {
