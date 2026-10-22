@@ -91,16 +91,22 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
             [XmlIgnore]
             public override string FileNameBase => Host + "_" + Port;
 
+            /// <summary>"host:port", with an IPv6 address in brackets so the port can be told from it.</summary>
+            public static string FormatEndpoint(string host, int port)
+            {
+                return (host != null && host.Contains(":") && !host.StartsWith("[", StringComparison.Ordinal) ? "[" + host + "]" : host) + ":" + port;
+            }
+
             public override string ToString()
             {
-                return Host + ":" + Port;
+                return FormatEndpoint(Host, Port);
             }
 
             public override bool IsValid()
             {
-                if (!string.IsNullOrEmpty(Host))
+                if (!string.IsNullOrWhiteSpace(Host))
                 {
-                    return Port > 0;
+                    return Port > 0 && Port <= 65535;
                 }
                 return false;
             }

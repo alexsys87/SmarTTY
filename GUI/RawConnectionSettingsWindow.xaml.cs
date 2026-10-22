@@ -3,6 +3,7 @@ using System;
 using System.ComponentModel;
 using System.IO.Ports;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -377,6 +378,14 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             {
                 endpoint = endpoint.Substring("telnet://".Length).TrimEnd('/');
             }
+            else if (endpoint.StartsWith("tcp://", StringComparison.OrdinalIgnoreCase))
+            {
+                endpoint = endpoint.Substring("tcp://".Length).TrimEnd('/');
+            }
+            else if (endpoint.StartsWith("raw://", StringComparison.OrdinalIgnoreCase))
+            {
+                endpoint = endpoint.Substring("raw://".Length).TrimEnd('/');
+            }
             port = null;
             if (endpoint.StartsWith("[", StringComparison.Ordinal) && endpoint.IndexOf(']') > 0)
             {
@@ -386,6 +395,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 if (rest.StartsWith(":", StringComparison.Ordinal))
                 {
                     port = ParsePort(rest.Substring(1));
+                }
+                else if (rest.Length != 0)
+                {
+                    // "[::1]23" or "[::1]x": not a port, so the endpoint is rejected instead of the text being ignored.
+                    port = 0;
                 }
                 return;
             }
@@ -608,10 +622,15 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             return SerialPortRules.ValidateFrame(advancedSerialPortSettings.DataBits, SerialPortRules.StopBitsKindFrom((int)advancedSerialPortSettings.StopBits));
         }
 
-        public string TestConnectionOrThrow()
+        /// <summary>
+        /// Takes the settings as they are now (on the UI thread) and tests them on a worker thread, so the window keeps
+        /// painting while a host that does not answer is waited for.
+        /// </summary>
+        public Task<string> TestConnectionAsync()
         {
             ApplyTCPEndpoint();
-            return DeviceTerminalControl.TestConnection(EffectiveConnectionSettings);
+            DeviceTerminalSettings.ConnectionSettings connection = EffectiveConnectionSettings;
+            return Task.Run(() => DeviceTerminalControl.TestConnection(connection));
         }
 
         public void EditColor(Border border)
@@ -698,10 +717,43 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         }
     }
 
+    private bool _Closed;
+
+    private bool _Testing;
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        // The result of a test that is still running would have nowhere to go.
+        if (_Testing)
+        {
+            e.Cancel = true;
+        }
+        base.OnClosing(e);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
+        _Closed = true;
         base.OnClosed(e);
         _Controller.ApplyTCPEndpoint();
+    }
+
+    /// <summary>Runs the connection test with the window locked and a wait cursor; rethrows the failure.</summary>
+    private async Task<string> RunConnectionTestAsync()
+    {
+        _Testing = true;
+        IsEnabled = false;
+        Cursor = System.Windows.Input.Cursors.Wait;
+        try
+        {
+            return await _Controller.TestConnectionAsync();
+        }
+        finally
+        {
+            _Testing = false;
+            IsEnabled = true;
+            Cursor = null;
+        }
     }
 
     private void ListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -709,11 +761,22 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         _Controller.UpdateMaximumSpeed();
     }
 
-    private void Test_Click(object sender, RoutedEventArgs e)
+    private async void Test_Click(object sender, RoutedEventArgs e)
     {
+        if (_Testing)
+        {
+            return;
+        }
+        string endpointProblem = _Controller.ValidateEndpoint();
+        if (endpointProblem != null)
+        {
+            MessageBoxes.Error(endpointProblem);
+            txtHost.Focus();
+            return;
+        }
         try
         {
-            string text = _Controller.TestConnectionOrThrow();
+            string text = await RunConnectionTestAsync();
             MessageBoxes.Info("Connection test to " + text + " succeeded. Your settings appear to be valid.");
         }
         catch (Exception exception)
@@ -797,8 +860,12 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         }
     }
 
-    private void OK_Click(object sender, RoutedEventArgs e)
+    private async void OK_Click(object sender, RoutedEventArgs e)
     {
+        if (_Testing)
+        {
+            return;
+        }
         string endpointProblem = _Controller.ValidateEndpoint();
         if (endpointProblem != null)
         {
@@ -817,15 +884,18 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         {
             try
             {
-                _Controller.TestConnectionOrThrow();
-                this.DialogResult = true;
-                return;
+                await RunConnectionTestAsync();
             }
             catch (Exception exception)
             {
                 MessageBoxes.Exception(exception);
                 return;
             }
+            if (!_Closed)
+            {
+                this.DialogResult = true;
+            }
+            return;
         }
         this.DialogResult = true;
     }

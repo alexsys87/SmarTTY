@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The real raw TCP transport and the connection class that drives it; Stubs.cs replaces the Windows-only pieces. -->
+    <Compile Include="../../Transport/TcpConnector.cs" Link="TcpConnector.cs" />
+    <Compile Include="../../Transport/TcpTransport.cs" Link="TcpTransport.cs" />
+    <Compile Include="../../Transport/AsyncTransportConnection.cs" Link="AsyncTransportConnection.cs" />
+    <Compile Include="../../Transport/IDeviceTransport.cs" Link="IDeviceTransport.cs" />
+    <Compile Include="../../Transport/IHostNameResolver.cs" Link="IHostNameResolver.cs" />
+    <Compile Include="../../Transport/ITerminalSizeAwareTransport.cs" Link="ITerminalSizeAwareTransport.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/ConnectionStateEnum.cs" Link="ConnectionStateEnum.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/DeviceTerminalSettings.cs" Link="DeviceTerminalSettings.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/TerminalEncodings.cs" Link="TerminalEncodings.cs" />
+  </ItemGroup>
+</Project>
