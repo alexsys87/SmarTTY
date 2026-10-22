@@ -119,6 +119,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     private bool _ByteOrientedShellProbeStarted;
 
+    // Whether the host of this session is OpenWrt with opkg, so that "Tools > Local OpenWrt repository server" is offered:
+    // null until the probe has answered. A host that is not OpenWrt (or has no opkg) never sees the item.
+    private bool? _OpenWrtWithOpkg;
+
     private object _Sync = new object();
 
     private string _DeviceTitle;
@@ -202,6 +206,13 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             return IconType.Terminal;
         }
     }
+
+    /// <summary>
+    /// Visibility of the "Tools > Local OpenWrt repository server" item: the server feeds opkg on OpenWrt, so the item
+    /// is offered only for an SSH session whose host answered the probe as OpenWrt with opkg installed. Until the probe
+    /// answers it stays hidden, so that it does not appear on the hosts that cannot use it.
+    /// </summary>
+    public System.Windows.Visibility LocalRepoMenuVisibility => (_OpenWrtWithOpkg == true) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
     public SshSession Session { get; private set; }
 
@@ -534,6 +545,49 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             previousAnalyzer.Dispose();
         }
         IsInactive = false;
+        StartOpenWrtProbe();
+    }
+
+    /// <summary>
+    /// Asks the host once per connection whether it is OpenWrt with opkg (in the background, the session works meanwhile)
+    /// and raises the visibility of the "Tools > Local OpenWrt repository server" item when it is. On any other host the
+    /// item stays hidden. A failed probe leaves the previous answer alone, so a reconnect to the same kind of host does not
+    /// hide the item for good.
+    /// </summary>
+    private void StartOpenWrtProbe()
+    {
+        SshSession session = Session;
+        if (session == null)
+        {
+            return;
+        }
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            List<string> output = null;
+            try
+            {
+                output = session.RunCommand(OpenWrtDetector.ProbeCommand, out _);
+            }
+            catch
+            {
+            }
+            if (output == null)
+            {
+                // The command could not be run (the connection went away): keep the previous answer.
+                return;
+            }
+            bool isOpenWrtWithOpkg = OpenWrtDetector.Parse(output);
+            _Controller.BeginInvoke(() =>
+            {
+                // A reconnect may have replaced the connection while the probe ran: only the current one counts.
+                if (!ReferenceEquals(Session, session))
+                {
+                    return;
+                }
+                _OpenWrtWithOpkg = isOpenWrtWithOpkg;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalRepoMenuVisibility"));
+            });
+        });
     }
 
     public void AttachChannelToControl(TerminalEmulatorControl ctl, SshShellChannel chn, bool isAutoLaunchedCommand, Action tabKeptAfterExit = null)
