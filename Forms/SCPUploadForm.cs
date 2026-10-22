@@ -57,6 +57,7 @@ public partial class SCPUploadForm : DpiAwareForm
     public SCPUploadForm(RemoteCommandStarter callback)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "upload");
         _remoteFolderDialog.CommandRequested += callback;
         _openFileDialog.Multiselect = true;
     }

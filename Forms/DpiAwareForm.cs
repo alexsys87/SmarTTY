@@ -29,6 +29,9 @@ public partial class DpiAwareForm : Form
 
     private bool _isScaling;
 
+    // DPI the layout of the form is scaled for (0 until the window exists).
+    private int _dpi;
+
     public AutoScaleMode CurrentAutoScaleMode => AutoScaleMode;
 
     public static SizeF ScaleFactor
@@ -37,9 +40,8 @@ public partial class DpiAwareForm : Form
         {
             if (_scaleFactor.Width == 0f)
             {
-                using Form form = new Form();
-                using Graphics graphics = form.CreateGraphics();
-                _scaleFactor = new SizeF(graphics.DpiX / 96f, graphics.DpiY / 96f);
+                float factor = (float)DpiScaling.SystemDpi / DpiScaling.DesignDpi;
+                _scaleFactor = new SizeF(factor, factor);
             }
             return _scaleFactor;
         }
@@ -120,6 +122,12 @@ public partial class DpiAwareForm : Form
     public DpiAwareForm()
     {
         InitializeComponent();
+        // The application icon instead of the generic WinForms one; most dialogs choose their own (FormIcons.Apply).
+        Icon applicationIcon = FormIcons.Application;
+        if (applicationIcon != null)
+        {
+            Icon = applicationIcon;
+        }
         if (AutoScaleMode != AutoScaleMode.None)
         {
             AutoScaleMode = AutoScaleMode.None;
@@ -137,13 +145,69 @@ public partial class DpiAwareForm : Form
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        if (!_isScaled && IsHighDpi)
+        if (!_isScaled)
         {
-            ApplyDpiScaling();
+            ApplyDpiScaling(DpiScaling.GetWindowDpi(Handle));
         }
     }
 
-    private void ApplyDpiScaling()
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == DpiScaling.WM_DPICHANGED)
+        {
+            DpiScaling.ReadDpiChanged(ref m, out int dpi, out Rectangle suggestedBounds);
+            FollowMonitorDpi(dpi, suggestedBounds);
+            m.Result = IntPtr.Zero;
+            return;
+        }
+        base.WndProc(ref m);
+    }
+
+    /// <summary>Lays the form out for the DPI of the monitor it was created on (designer sizes are for 96 DPI).</summary>
+    private void ApplyDpiScaling(int dpi)
+    {
+        _dpi = dpi;
+        if (dpi != DpiScaling.DesignDpi)
+        {
+            ScaleWindow(new SizeF((float)dpi / DpiScaling.DesignDpi, (float)dpi / DpiScaling.DesignDpi));
+        }
+        // Fonts in points already come out at the system DPI.
+        DpiScaling.ScaleFonts(this, DpiScaling.SystemDpi, dpi, scaleRootFont: true);
+        _isScaled = true;
+        foreach (Control control in Controls)
+        {
+            ScaleDpiChildren(control);
+        }
+    }
+
+    /// <summary>The form was moved to a monitor with another scale: Windows suggests the new window rectangle.</summary>
+    private void FollowMonitorDpi(int dpi, Rectangle suggestedBounds)
+    {
+        if (_isScaled && dpi != _dpi && _dpi != 0)
+        {
+            int oldDpi = _dpi;
+            _dpi = dpi;
+            float factor = (float)dpi / oldDpi;
+            try
+            {
+                _isScaling = true;
+                SuspendLayout();
+                Scale(new SizeF(factor, factor));
+                DpiScaling.ScaleFonts(this, oldDpi, dpi, scaleRootFont: true);
+            }
+            finally
+            {
+                ResumeLayout(performLayout: true);
+                _isScaling = false;
+            }
+        }
+        if (WindowState == FormWindowState.Normal)
+        {
+            Bounds = suggestedBounds;
+        }
+    }
+
+    private void ScaleWindow(SizeF factor)
     {
         try
         {
@@ -154,12 +218,12 @@ public partial class DpiAwareForm : Form
                 WindowState = FormWindowState.Normal;
                 wasMaximized = true;
             }
-            Size size = new Size((int)((float)Width * ScaleFactor.Width), (int)((float)Height * ScaleFactor.Height));
+            Size size = new Size((int)((float)Width * factor.Width), (int)((float)Height * factor.Height));
             if (MinimumSize.Width > 10 && MinimumSize.Height > 10)
             {
                 Size = MinimumSize;
             }
-            Scale(ScaleFactor);
+            Scale(factor);
             Size = size;
             if (wasMaximized)
             {
@@ -172,11 +236,6 @@ public partial class DpiAwareForm : Form
             else if (StartPosition == FormStartPosition.CenterParent)
             {
                 CenterToParent();
-            }
-            _isScaled = true;
-            foreach (Control control in Controls)
-            {
-                ScaleDpiChildren(control);
             }
         }
         finally

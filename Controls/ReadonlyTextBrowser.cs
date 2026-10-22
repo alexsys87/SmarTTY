@@ -840,6 +840,12 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    // The font chosen by the application (terminal settings) and the factor it is shown with on the current
+    // monitor (monitor DPI / system DPI, see DpiScaling): a font assigned later still gets the monitor scale.
+    private Font _logicalFont;
+
+    private float _fontDpiScale = 1f;
+
     public override Font Font
     {
         get
@@ -848,7 +854,21 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
         set
         {
-            base.Font = value;
+            _logicalFont = value;
+            base.Font = value == null || _fontDpiScale == 1f ? value : SmarTTY.Forms.DpiScaling.ScaleFont(value, _fontDpiScale);
+        }
+    }
+
+    internal void SetFontDpiScale(float scale)
+    {
+        if (scale == _fontDpiScale)
+        {
+            return;
+        }
+        _fontDpiScale = scale;
+        if (_logicalFont != null)
+        {
+            base.Font = scale == 1f ? _logicalFont : SmarTTY.Forms.DpiScaling.ScaleFont(_logicalFont, scale);
         }
     }
 

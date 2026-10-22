@@ -34,7 +34,7 @@ internal sealed class WindowHandleOwner : IWin32Window
 /// user chose for the image (boot it, write it to flash, ...). The window is built in code, like the other small dialogs.
 /// The server runs only while the window is open.
 /// </summary>
-internal sealed class TftpFirmwareForm : Form
+internal sealed class TftpFirmwareForm : DpiAwareForm
 {
     private sealed class ServedFile
     {
@@ -127,8 +127,8 @@ internal sealed class TftpFirmwareForm : Form
     {
         _terminal = terminal;
 
-        AutoScaleMode = AutoScaleMode.Dpi;
-        AutoScaleDimensions = new SizeF(96f, 96f);
+        // Laid out for 96 DPI: DpiAwareForm scales it for the monitor it is on.
+        FormIcons.Apply(this, "firmware");
         Text = "TFTP server / U-Boot upload - " + terminalTitle;
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;

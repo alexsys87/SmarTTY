@@ -50,6 +50,7 @@ public partial class PaletteEditForm : OKCancelFormBase
     public PaletteEditForm(ConsolePalette consolePalette)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "palette");
         _palette = consolePalette.Clone();
         if (_palette.NormalColors.Length < tableLayoutPanel1.RowCount - 1 || _palette.BrightColors.Length < tableLayoutPanel1.RowCount - 1)
         {

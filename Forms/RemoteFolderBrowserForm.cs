@@ -47,6 +47,7 @@ public partial class RemoteFolderBrowserForm : DpiAwareForm
     private RemoteFolderBrowserForm(bool usePrefixedListing)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "remote-folder");
         _usePrefixedListing = usePrefixedListing;
     }
 

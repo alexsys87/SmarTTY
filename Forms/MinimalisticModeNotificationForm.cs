@@ -19,5 +19,6 @@ public partial class MinimalisticModeNotificationForm : FormBase
     public MinimalisticModeNotificationForm()
     {
         InitializeComponent();
+        FormIcons.Apply(this, "minimal-mode");
     }
 }

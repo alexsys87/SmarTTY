@@ -58,6 +58,7 @@ public partial class DirectoryTransferForm : DpiAwareForm
     public DirectoryTransferForm(SshSession sshSession, bool isUpload)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "folder-transfer");
         this._session = sshSession;
         _isUpload = isUpload;
         if (isUpload)

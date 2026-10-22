@@ -149,6 +149,7 @@ public partial class RemoteOpenFileForm : DpiAwareForm
     private RemoteOpenFileForm(RemoteCommandStarter callback)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "remote-file");
         _runCommand = callback;
         DpiAwareForm.ConfigureToolStrip(tsControls);
     }

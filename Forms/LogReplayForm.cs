@@ -41,6 +41,7 @@ public partial class LogReplayForm : DpiAwareForm
     private LogReplayForm(TerminalEmulatorControl terminalEmulatorControl)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "replay");
         _terminalEmulatorControl = terminalEmulatorControl;
         Text = "Replay log";
     }

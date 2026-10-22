@@ -14,6 +14,7 @@ public partial class SerialPortSettingsForm : OKCancelFormBase
     public SerialPortSettingsForm(DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings advancedSerialPortSettings, string portName)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "serial-settings");
         if (string.IsNullOrEmpty(portName))
         {
             portName = "the selected COM port";

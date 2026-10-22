@@ -11,6 +11,7 @@ public partial class HostKeyMismatchForm : DpiAwareForm
     private HostKeyMismatchForm(SSHConnectionSettings sshConnectionSettings)
     {
         InitializeComponent();
+        FormIcons.Apply(this, "host-key-warning");
         _sshConnectionSettings = sshConnectionSettings;
         lblHostName.Text = sshConnectionSettings.HostName;
     }
