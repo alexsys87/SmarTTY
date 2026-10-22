@@ -106,8 +106,10 @@ public class GlobalSettings : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Whether SSH terminals compensate for a shell that edits its command line in UTF-8 bytes rather than
-    /// characters (see TerminalEmulatorControl.ByteOrientedLineEditing).
+    /// Whether SSH terminal tabs work in byte mode, for a shell that edits its command line in UTF-8 bytes rather than
+    /// characters (see TerminalEmulatorControl.ByteOrientedLineEditing and SessionWrapper.UsesByteOrientedLineEditing).
+    /// Used for classic tabs (<see cref="ByteOrientedLineEditing"/>) and Smart Terminal tabs
+    /// (VirtualTerminalSettings.ByteOrientedLineEditing); decided when a tab opens, as its PTY depends on it.
     /// </summary>
     public enum ByteOrientedLineEditingMode
     {

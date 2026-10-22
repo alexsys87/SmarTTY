@@ -223,7 +223,34 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
-    private bool ByteColumnsActive => _byteOrientedLineEditing && base.ActiveBufferIndex == 0;
+    private bool ByteColumnsActive => _byteOrientedLineEditing && base.ActiveBufferIndex == 0 && !_processingLocalOutput;
+
+    // Set while text the terminal draws on its own (the local echo of a COM/TCP connection) is processed: it is
+    // measured in characters, not in the remote editor's bytes.
+    private bool _processingLocalOutput;
+
+    /// <summary>
+    /// Draws text that the terminal produces itself (local echo) rather than the remote side: in byte mode
+    /// (<see cref="ByteOrientedLineEditing"/>) its "\b" steps back one character, not one byte.
+    /// </summary>
+    protected void ProcessLocalOutput(string output)
+    {
+        _processingLocalOutput = true;
+        try
+        {
+            ProcessOutput(output);
+        }
+        finally
+        {
+            _processingLocalOutput = false;
+        }
+    }
+
+    /// <summary>Forgets a half-crossed character of byte mode, e.g. when a new command starts in Smart Terminal.</summary>
+    protected void ResetByteColumns()
+    {
+        ResetByteState();
+    }
 
     /// <summary>
     /// What a line break of pasted text is sent as while the remote side reads the keyboard (<see cref="UsesTerminalInput"/>).
@@ -1342,7 +1369,79 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         _byteOffset = offset;
     }
 
-    // How many times a key that crosses one character must be sent (byte mode); 1 otherwise.
+    // Byte mode: the terminal's copy of the remote command line while the user types (see ByteColumns.LinePrediction).
+    private ByteColumns.LinePrediction _prediction;
+
+    private DateTime _predictionKeyTime;
+
+    // After a pause the screen has caught up with the remote line, and the copy is taken from it again.
+    private static readonly TimeSpan PredictionLifetime = TimeSpan.FromSeconds(1);
+
+    // The prediction for the next key: the current one, or a new one taken from the screen. Null outside byte mode
+    // and when the remote cursor is inside a character (the screen cannot say where).
+    private ByteColumns.LinePrediction GetPrediction()
+    {
+        if (!ByteColumnsActive)
+        {
+            _prediction = null;
+            return null;
+        }
+        DateTime now = DateTime.UtcNow;
+        if (_prediction == null || now - _predictionKeyTime > PredictionLifetime)
+        {
+            FlushOutput();
+            _prediction = null;
+            if (_byteOffset == 0)
+            {
+                Point cursor = base.CursorPosition;
+                _prediction = new ByteColumns.LinePrediction(GetLineText(cursor.Y), Math.Min(cursor.X, _visibleColumns));
+            }
+        }
+        _predictionKeyTime = now;
+        return _prediction;
+    }
+
+    // How many times Backspace, Left, Right or Delete must be sent: once per UTF-8 byte of the character it crosses
+    // in byte mode, once otherwise.
+    private int ByteKeyCount(Keys key)
+    {
+        ByteColumns.LinePrediction prediction = GetPrediction();
+        if (prediction == null)
+        {
+            return KeyRepeatCount(key == Keys.Back || key == Keys.Left);
+        }
+        int count;
+        switch (key)
+        {
+            case Keys.Back:
+                count = prediction.Backspace();
+                break;
+            case Keys.Left:
+                count = prediction.Left();
+                break;
+            case Keys.Right:
+                count = prediction.Right();
+                break;
+            default:
+                count = prediction.Delete();
+                break;
+        }
+        if (count <= 0)
+        {
+            // The start of the line (or of its screen row): the copy cannot follow further.
+            _prediction = null;
+            return 1;
+        }
+        return count;
+    }
+
+    // A key the copy of the command line cannot follow (Enter, Tab, history, Ctrl+..., a paste).
+    private void DropPrediction()
+    {
+        _prediction = null;
+    }
+
+    // How many times a key that crosses one character must be sent (byte mode), counted on the screen; 1 otherwise.
     private int KeyRepeatCount(bool backward)
     {
         if (!ByteColumnsActive)
@@ -1517,14 +1616,18 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             text = XtermProtocol.ApplyKeyModifiers("\u001b" + text, e.Shift, e.Alt, e.Control);
             if (!e.Shift && !e.Alt && !e.Control)
             {
-                if (e.KeyCode == Keys.Left)
+                if (e.KeyCode == Keys.Left || e.KeyCode == Keys.Right || e.KeyCode == Keys.Delete)
                 {
-                    text = Repeat(text, KeyRepeatCount(backward: true));
+                    text = Repeat(text, ByteKeyCount(e.KeyCode));
                 }
-                else if (e.KeyCode == Keys.Right || e.KeyCode == Keys.Delete)
+                else
                 {
-                    text = Repeat(text, KeyRepeatCount(backward: false));
+                    DropPrediction();
                 }
+            }
+            else
+            {
+                DropPrediction();
             }
             SendText(text, InputKind.KeySequence);
             e.SuppressKeyPress = true;
@@ -1563,14 +1666,23 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
         else if (e.KeyChar == '\b' && !string.IsNullOrEmpty(BackspaceSequence))
         {
-            SendText(Repeat(BackspaceSequence, KeyRepeatCount(backward: true)), InputKind.Typed);
+            SendText(Repeat(BackspaceSequence, ByteColumnsActive ? ByteKeyCount(Keys.Back) : 1), InputKind.Typed);
         }
         else if (e.KeyChar == '\r' && EnterSequence != null)
         {
+            DropPrediction();
             SendText(EnterSequence, InputKind.Typed);
         }
         else
         {
+            if (char.IsControl(e.KeyChar))
+            {
+                DropPrediction();
+            }
+            else if (ByteColumnsActive)
+            {
+                GetPrediction()?.Type(new string(e.KeyChar, 1));
+            }
             SendText(new string(e.KeyChar, 1), InputKind.Typed);
         }
     }
@@ -1765,6 +1877,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public override void Paste()
     {
+        DropPrediction();
         try
         {
             if (!UsesTerminalInput)

@@ -65,6 +65,14 @@ internal static class Program
         Check(new TextStreamDecoder(Encoding.UTF8).Decode(withOffset, 2, utf8.Length) == hello, "UTF-8: non-zero offset");
         Check(new TextStreamDecoder(Encoding.UTF8).Decode(utf8, 0, 0) == "", "UTF-8: empty read");
 
+        // --- byte mode (a device shell counting UTF-8 bytes, BusyBox on OpenWrt): stray bytes are kept, escaped ---
+        TextStreamDecoder escaping = new TextStreamDecoder(Encoding.UTF8) { EscapeInvalidBytes = true };
+        Check(escaping.Decode(new byte[] { 0xD0, 0xD0, 0xB5, 0x96 }, 0, 4) == "\uDCD0\u0435\uDC96", "byte mode: each stray byte arrives escaped, the letter between them intact");
+        Check(DecodeInChunks(new TextStreamDecoder(Encoding.UTF8) { EscapeInvalidBytes = true }, utf8, 1) == hello, "byte mode: valid text split byte by byte still decodes");
+        Check(new TextStreamDecoder(Encoding.UTF8).Decode(new byte[] { 0xD0, 0x41 }, 0, 2) == "\uFFFDA", "without byte mode a stray byte is U+FFFD");
+        TextStreamDecoder cp1251Escaping = new TextStreamDecoder(Encoding.GetEncoding(1251)) { EscapeInvalidBytes = true };
+        Check(cp1251Escaping.Decode(Encoding.GetEncoding(1251).GetBytes("Привет"), 0, 6) == "Привет", "byte mode does not change a single-byte code page");
+
         // --- invalid data and reset ---
         Check(new TextStreamDecoder(Encoding.UTF8).Decode(new byte[] { 0x61, 0xFF, 0x62 }, 0, 3) == "a�b", "UTF-8: invalid byte is replaced, not thrown");
 

@@ -190,7 +190,7 @@
                   </ResourceDictionary>
                 </FrameworkElement.Resources>
               </ListBox>
-              <TextBlock Text="Shells that count UTF-8 bytes:" Grid.Row="7" ToolTip="Backspace, Delete and the arrows are repeated once per byte of a non-Latin letter, and the shell&apos;s cursor moves are counted in bytes. Needed for BusyBox ash without UTF-8 support (OpenWrt)." />
+              <TextBlock Text="Shells that count UTF-8 bytes:" Grid.Row="7" ToolTip="SSH terminal tabs: Backspace, Delete and the arrows are repeated once per byte of a non-Latin letter, and the shell&apos;s cursor moves are counted in bytes. Needed for BusyBox ash without UTF-8 support (OpenWrt). Applies to tabs opened afterwards; Smart Terminal and COM/TCP/Telnet have settings of their own." />
               <ListBox Grid.Row="7" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=ByteOrientedLineEditing, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ByteOrientedLineEditing}" />
             </Grid>
           </GroupBox>
@@ -454,6 +454,8 @@
               <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding AutoLinkExtensions}" />
               <CheckBox Grid.Row="5" Grid.ColumnSpan="2" Margin="5" Content="Wrap launched commands in an interactive shell" IsChecked="{Binding InteractiveModeWrapper}" />
               <CheckBox Grid.Row="6" Grid.ColumnSpan="2" Margin="5" Content="Show the exit code of a command that fails" IsChecked="{Binding ShowExitCodes}" />
+              <TextBlock Text="Programs in shells that count UTF-8 bytes:" Grid.Row="7" ToolTip="For commands run from a Smart Terminal tab when the shell edits its input in UTF-8 bytes (BusyBox without UTF-8 support, OpenWrt): Backspace, Delete and the arrows are sent once per byte of a non-Latin letter. The command line itself is always edited by SmarTTY. Applies to tabs opened afterwards." />
+              <ListBox Grid.Row="7" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=ByteOrientedLineEditing, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ByteOrientedLineEditing}" />
             </Grid>
           </GroupBox>
           <GroupBox Header="Command Completion" DataContext="{Binding VirtualTerminal}">

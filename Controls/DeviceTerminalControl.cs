@@ -641,6 +641,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.InputEncoding = _textEncoding;
         // A recording in progress follows the change, so a text log matches what the terminal shows.
         _logWriter?.SetEncoding(_textEncoding);
+        ApplyByteOrientedLineEditing();
+    }
+
+    // Byte mode (DeviceTerminalSettings.ByteOrientedLineEditing) only means something with UTF-8: in a single-byte
+    // code page every letter is one byte, as the device's shell counts them.
+    private void ApplyByteOrientedLineEditing()
+    {
+        bool byteMode = (_deviceTerminalSettings?.ByteOrientedLineEditing ?? false) && _textEncoding.CodePage == Encoding.UTF8.CodePage;
+        _serialTerminalControl.ByteOrientedLineEditing = byteMode;
+        _textDecoder.EscapeInvalidBytes = byteMode;
     }
 
     private void SelectEncodingInToolbar(string encodingName)

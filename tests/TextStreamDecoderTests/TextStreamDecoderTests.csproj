@@ -8,5 +8,7 @@
   <ItemGroup>
     <Compile Include="../../Terminal/TextStreamDecoder.cs" Link="TextStreamDecoder.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/TerminalEncodings.cs" Link="TerminalEncodings.cs" />
+    <Compile Include="../../Terminal/Utf8StreamDecoder.cs" Link="Utf8StreamDecoder.cs" />
+    <Compile Include="../../Terminal/ByteColumns.cs" Link="ByteColumns.cs" />
   </ItemGroup>
 </Project>

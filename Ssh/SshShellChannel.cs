@@ -310,15 +310,15 @@ public class SshShellChannel : IAsyncChannel, IDisposable
     /// Opens a session channel and starts <paramref name="command"/> (or a shell if it is null),
     /// requesting a PTY of type <paramref name="terminalType"/> if it is not null.
     /// </summary>
-    internal SshShellChannel(SshSession session, SshNetChannel channel, string command, string terminalType, ExtendedDataMode extendedDataMode)
-        : this(session, channel, command, terminalType, extendedDataMode, subsystem: null)
+    internal SshShellChannel(SshSession session, SshNetChannel channel, string command, string terminalType, ExtendedDataMode extendedDataMode, bool utf8Tty = true)
+        : this(session, channel, command, terminalType, extendedDataMode, subsystem: null, utf8Tty)
     {
     }
 
     /// <summary>
     /// Opens a session channel for the <paramref name="subsystem"/> (e.g. "sftp") when it is not null, otherwise as above.
     /// </summary>
-    internal SshShellChannel(SshSession session, SshNetChannel channel, string command, string terminalType, ExtendedDataMode extendedDataMode, string subsystem)
+    internal SshShellChannel(SshSession session, SshNetChannel channel, string command, string terminalType, ExtendedDataMode extendedDataMode, string subsystem, bool utf8Tty = true)
     {
         _session = session;
         _channel = channel;
@@ -339,7 +339,7 @@ public class SshShellChannel : IAsyncChannel, IDisposable
             try
             {
                 _channel.Open();
-                if (terminalType != null && !_channel.SendPseudoTerminalRequest(terminalType, 80, 25))
+                if (terminalType != null && !_channel.SendPseudoTerminalRequest(terminalType, 80, 25, utf8Tty))
                 {
                     throw new PtyRequestFailedException();
                 }

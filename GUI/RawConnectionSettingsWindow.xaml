@@ -437,7 +437,12 @@
               <TextBlock Text="Treat incoming LF as CRLF when in text mode" />
             </CheckBox>
             <TextBlock Text="Text encoding:" Grid.Row="3" Style="{StaticResource HeaderText}" />
-            <ComboBox Grid.Column="1" Grid.Row="3" Margin="0 2 0 2" HorizontalAlignment="Left" MinWidth="220" ItemsSource="{Binding TextEncodings}" DisplayMemberPath="DisplayName" SelectedValuePath="Name" SelectedValue="{Binding Path=Settings.TextEncoding}" ToolTip="Encoding of the text exchanged with the device: used to decode received data and to encode typed and pasted text." />
+            <StackPanel Grid.Column="1" Grid.Row="3">
+              <ComboBox Margin="0 2 0 2" HorizontalAlignment="Left" MinWidth="220" ItemsSource="{Binding TextEncodings}" DisplayMemberPath="DisplayName" SelectedValuePath="Name" SelectedValue="{Binding Path=Settings.TextEncoding}" ToolTip="Encoding of the text exchanged with the device: used to decode received data and to encode typed and pasted text." />
+              <CheckBox VerticalContentAlignment="Center" Margin="0 2 0 2" IsChecked="{Binding Path=Settings.ByteOrientedLineEditing}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent" ToolTip="For a shell that edits its command line in UTF-8 bytes (BusyBox without UTF-8 support, OpenWrt): Backspace, Delete and the arrows are sent once per byte of a non-Latin letter. Used with UTF-8 only, while keys go to the device directly.">
+                <TextBlock Text="Shell counts UTF-8 bytes (BusyBox without UTF-8, OpenWrt)" />
+              </CheckBox>
+            </StackPanel>
             <TextBlock Text="Display mode:" Grid.Row="4" Style="{StaticResource HeaderText}" />
             <ListBox Grid.Column="1" Grid.Row="4" SelectedItem="{Binding Path=EffectiveDisplayMode}">
               <ItemsControl.ItemsSource>

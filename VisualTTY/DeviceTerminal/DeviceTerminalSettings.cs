@@ -674,6 +674,15 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
     /// </summary>
     public string TextEncoding { get; set; } = TerminalEncodings.DefaultName;
 
+    /// <summary>
+    /// The device's shell edits its command line in UTF-8 bytes rather than characters (BusyBox without Unicode
+    /// support, as on OpenWrt; also the kernel line editing of a tty without IUTF8, e.g. behind telnetd). Backspace,
+    /// Delete and the arrows are then sent once per byte of a non-Latin letter, and the device's cursor moves are
+    /// counted in bytes. Used only with the UTF-8 encoding (single-byte code pages have one byte per letter) and only
+    /// while keys go to the device directly; the local input line is edited by SmarTTY itself.
+    /// </summary>
+    public bool ByteOrientedLineEditing { get; set; }
+
     public event PropertyChangedEventHandler PropertyChanged;
 
     private void OnPropertyChanged(string name)
