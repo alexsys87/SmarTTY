@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.LocalRepoWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Local OpenWrt Repository" Width="660" Height="600" MinWidth="520" MinHeight="480" WindowStartupLocation="CenterOwner">
+  <Grid Margin="8">
+    <FrameworkElement.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
+          <Setter Property="Margin" Value="3" />
+          <Setter Property="Padding" Value="8 3 8 3" />
+        </Style>
+      </ResourceDictionary>
+    </FrameworkElement.Resources>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0 0 0 8" Text="Serves OpenWrt packages built on this computer to the device of this SSH connection. The server listens on this computer only; the device reaches it through a reverse SSH tunnel as http://127.0.0.1:PORT and gets the feeds in /etc/opkg/customfeeds.conf. After starting, open the package manager, press Refresh and install the packages as usual." />
+    <TextBlock Grid.Row="1" TextWrapping="Wrap" Text="Package folders: the build output with the feeds, e.g. bin/packages/&lt;arch&gt; (base, packages, luci ...) and bin/targets/&lt;target&gt;/&lt;subtarget&gt;/packages. For a build in WSL use a path like \\wsl.localhost\Ubuntu\home\user\openwrt\bin\packages\arm_cortex-a9_neon." />
+    <Grid Grid.Row="2" Margin="0 4 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBox x:Name="FolderBox" Grid.Column="0" Margin="3" VerticalContentAlignment="Center" KeyDown="FolderBox_KeyDown" />
+      <Button x:Name="BrowseButton" Grid.Column="1" Content="Browse..." Click="Browse_Click" />
+      <Button x:Name="AddButton" Grid.Column="2" Content="Add" Click="Add_Click" />
+      <Button x:Name="RemoveButton" Grid.Column="3" Content="Remove selected" Click="Remove_Click" />
+    </Grid>
+    <ListBox x:Name="FoldersList" Grid.Row="3" Height="90" Margin="3" SelectionMode="Extended" />
+    <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0 4 0 0">
+      <TextBlock Text="TCP port:" VerticalAlignment="Center" Margin="3 0 6 0" />
+      <TextBox x:Name="PortBox" Width="70" VerticalContentAlignment="Center" Margin="3" MaxLength="5" />
+      <Button x:Name="StartButton" Content="Start" Click="Start_Click" Margin="14 3 3 3" MinWidth="70" />
+      <Button x:Name="StopButton" Content="Stop" Click="Stop_Click" MinWidth="70" />
+      <Button x:Name="CleanButton" Content="Remove feeds from device" Click="Clean_Click" ToolTip="Takes the lines of this server out of /etc/opkg/customfeeds.conf, e.g. if SmarTTY was closed while the server was running" />
+    </StackPanel>
+    <TextBlock x:Name="StatusText" Grid.Row="5" TextWrapping="Wrap" Margin="3 6 3 3" />
+    <TextBox x:Name="LogBox" Grid.Row="6" Margin="3" IsReadOnly="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap" />
+    <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 4 0 0">
+      <Button x:Name="PackagesButton" Content="Open package manager" Click="Packages_Click" ToolTip="Closes this window and opens Tools &gt; Manage Linux Packages" />
+      <Button Content="Close" MinWidth="70" IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>

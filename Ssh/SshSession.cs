@@ -906,6 +906,82 @@ public class SshSession : IDisposable
 
     #endregion
 
+    #region Reverse port forwarding
+
+    private readonly object _forwardLock = new object();
+
+    private ForwardedPortRemote _remoteForward;
+
+    /// <summary>
+    /// Asks the SSH server to listen on <paramref name="boundPort"/> of its own loopback interface and to tunnel every connection
+    /// to <paramref name="host"/>:<paramref name="hostPort"/> as seen from this computer (the equivalent of "ssh -R").
+    /// There is one such tunnel per session; starting another replaces it. Throws if the server refuses the request.
+    /// </summary>
+    public void StartRemoteForward(uint boundPort, string host, uint hostPort)
+    {
+        EnsureAuthenticated();
+        StopRemoteForward();
+        ForwardedPortRemote port = new ForwardedPortRemote("127.0.0.1", boundPort, host, hostPort);
+        _client.AddForwardedPort(port);
+        try
+        {
+            port.Start();
+        }
+        catch
+        {
+            try
+            {
+                _client.RemoveForwardedPort(port);
+            }
+            catch
+            {
+            }
+            port.Dispose();
+            throw;
+        }
+        lock (_forwardLock)
+        {
+            _remoteForward = port;
+        }
+    }
+
+    public void StopRemoteForward()
+    {
+        ForwardedPortRemote port;
+        lock (_forwardLock)
+        {
+            port = _remoteForward;
+            _remoteForward = null;
+        }
+        if (port == null)
+        {
+            return;
+        }
+        try
+        {
+            port.Stop();
+        }
+        catch
+        {
+        }
+        try
+        {
+            _client.RemoveForwardedPort(port);
+        }
+        catch
+        {
+        }
+        try
+        {
+            port.Dispose();
+        }
+        catch
+        {
+        }
+    }
+
+    #endregion
+
     public void Disconnect()
     {
         _client.Disconnect();

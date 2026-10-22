@@ -711,6 +711,31 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         ShowPackageManager(activeSession);
     }
 
+    private void LocalRepo_Click(object sender, RoutedEventArgs e)
+    {
+        SessionWrapper activeSession = Controller.ActiveSession;
+        if (activeSession == null || activeSession.IsDevice || activeSession.Session == null)
+        {
+            return;
+        }
+        try
+        {
+            LocalRepoWindow localRepoWindow = new LocalRepoWindow(activeSession)
+            {
+                Owner = this
+            };
+            localRepoWindow.ShowDialog();
+            if (localRepoWindow.OpenPackageManagerRequested)
+            {
+                ShowPackageManager(activeSession);
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     private void ShowPackageManager(SessionWrapper activeSession)
     {
         try

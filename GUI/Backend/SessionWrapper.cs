@@ -2,6 +2,7 @@
 using SmarTTY.Controls;
 using SmarTTY.Forms;
 using SmarTTY.IO;
+using SmarTTY.LocalRepo;
 using SmarTTY.Terminal;
 using SmarTTY.Transport;
 using SmarTTY.Utilities;
@@ -203,6 +204,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     }
 
     public SshSession Session { get; private set; }
+
+    /// <summary>The local OpenWrt repository served to this session's device (Tools > Local OpenWrt repository server).</summary>
+    public LocalRepoHost LocalRepo { get; } = new LocalRepoHost();
 
     public FileTransferManager TransferManager { get; private set; }
 
@@ -476,6 +480,11 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         bool firstConnection = Session == null;
         Session?.Dispose();
         Session = session;
+        if (!firstConnection && LocalRepo.IsRunning)
+        {
+            // The reverse tunnel belonged to the old connection: restore it (and the feeds) on the new one, off the UI thread.
+            ThreadPool.QueueUserWorkItem((object state) => LocalRepo.Reattach((SshSession)state), session);
+        }
         TransferManager?.Dispose();
         TransferManager = new FileTransferManager
         {
@@ -1146,6 +1155,14 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         // Saved before the queue is stopped, so that the transfers still waiting come back as waiting, not as failed.
         SaveTransferQueue();
         TransferManager?.Dispose();
+        try
+        {
+            // Takes the feeds out of the opkg configuration of the device while the connection is still open.
+            LocalRepo.Stop(Session);
+        }
+        catch
+        {
+        }
         Session?.Dispose();
         foreach (DeviceTabContext deviceTab in Tabs.OfType<DeviceTabContext>().ToList())
         {
