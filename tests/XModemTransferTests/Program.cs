@@ -818,6 +818,42 @@ internal static class Program
             Check(rx.Wait(5000) && rx.Result && target.ToArray().SequenceEqual(data), "data intact");
         });
 
+        Run("receiver: a damaged block start that reads as EOT does not end the file", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(256);
+            MemoryStream target = new MemoryStream();
+            Progress prog = new Progress();
+            Task<bool> rx = Task.Run(() => XModemTransfer.ReceiveFile(target, u.Send, u.Read, CancellationToken.None, prog.Handler, Fast()));
+            peer.Read(2000);
+            peer.Send(BuildBlock(1, Chunk(data, 0), true));
+            Check(peer.Read(2000) == ACK, "block 1 acknowledged");
+            byte[] block2 = BuildBlock(2, Chunk(data, 1), true);
+            block2[0] = EOT; // the SOH was hit by noise: the rest of the block follows at once
+            peer.Send(block2);
+            Check(peer.Read(2000) == NAK, "the false EOT is answered with NAK, not ACK");
+            peer.Send(BuildBlock(2, Chunk(data, 1), true));
+            Check(peer.Read(2000) == ACK, "the repeat is acknowledged");
+            peer.Send(EOT);
+            Check(peer.Read(2000) == ACK, "a real EOT (quiet line after it) is acknowledged");
+            Check(rx.Wait(5000) && rx.Result, "receive succeeded");
+            Check(target.ToArray().SequenceEqual(data), "the file is complete");
+        });
+
+        Run("receiver: EOT EOT sent back to back is a clean end", () =>
+        {
+            NewLink(out End u, out End peer);
+            byte[] data = RandomData(128);
+            MemoryStream target = new MemoryStream();
+            Task<bool> rx = Task.Run(() => XModemTransfer.ReceiveFile(target, u.Send, u.Read, CancellationToken.None, null, Fast()));
+            peer.Read(2000);
+            peer.Send(BuildBlock(1, Chunk(data, 0), true));
+            Check(peer.Read(2000) == ACK, "block acknowledged");
+            peer.Send(EOT, EOT);
+            Check(peer.Read(2000) == ACK, "acknowledged");
+            Check(rx.Wait(5000) && rx.Result && target.ToArray().SequenceEqual(data), "receive succeeded");
+        });
+
         Run("receiver: repeated block (lost ACK) is acknowledged but written once", () =>
         {
             NewLink(out End u, out End peer);

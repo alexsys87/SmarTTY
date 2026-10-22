@@ -56,8 +56,17 @@ public sealed class ZModemOptions
     /// <summary>Use 32-bit CRCs when the other side supports them. Turn off only to talk to very old programs.</summary>
     public bool UseCrc32 { get; set; } = true;
 
-    /// <summary>Payload bytes per data subpacket (64..8192). Smaller values recover faster from a noisy line.</summary>
+    /// <summary>
+    /// Payload bytes per data subpacket (64..8192): the largest size the sender uses. On a noisy line the sender halves
+    /// it after repeated errors and grows it back once the data gets through again.
+    /// </summary>
     public int SubpacketBytes { get; set; } = 1024;
+
+    /// <summary>
+    /// The sender types "rz" + CR before its first frame, as lrzsz's sz does: a device waiting at a shell prompt starts its
+    /// receiver by itself, and a receiver that is already running skips the text like any other noise.
+    /// </summary>
+    public bool SendRzCommand { get; set; } = true;
 }
 
 /// <summary>
@@ -65,8 +74,12 @@ public sealed class ZModemOptions
 /// hex headers, 16- and 32-bit CRCs, ZDLE escaping, windowed streaming with acknowledgement requests, retransmission from
 /// the position the receiver asks for, batches of files and cancelling with a burst of CAN bytes.
 /// The link is a "send bytes" callback plus a "read one byte with a timeout" callback, like <see cref="XModemTransfer"/>,
-/// so the protocol has no dependency on the terminal. Not supported: ZCOMMAND (a sender must never be able to run
-/// commands here), compression and crash-recovery by CRC (the receiver always takes files from the start).
+/// so the protocol has no dependency on the terminal. The sender honours the receiver's buffer size (segmented
+/// streaming with ZCRCW when the receiver cannot take a continuous stream), adapts the subpacket size to the line
+/// quality and resumes from any position the receiver asks for (ZRPOS, ZCRC), so a receiver's crash recovery works.
+/// The receiver keeps the sender's attention string (ZSINIT) and sends it before asking for a retransmission.
+/// Not supported: ZCOMMAND (a sender must never be able to run commands here), compression, and crash recovery on the
+/// receiving side (the receiver always takes files from the start).
 /// </summary>
 public static class ZModemTransfer
 {
@@ -99,7 +112,10 @@ public static class ZModemTransfer
     private const byte CANFDX = 0x01, CANOVIO = 0x02, CANFC32 = 0x20, ESCCTL = 0x40;
 
     private const int MaxRetries = 10;
+    private const int MaxDataErrors = 20;      // damaged subpackets in a row before a receiver gives up
     private const int MaxSubpacketBytes = 8192;
+    private const int MinSubpacketBytes = 64;  // the smallest size the sender shrinks to on a noisy line
+    private const int MaxPollGarbage = 4 * MaxSubpacketBytes; // bytes one look at the line may skip without a header
     private const int AckEverySubpackets = 4;
     private const int WindowAcks = 4; // the sender waits for an ACK once this many requests are unanswered
 
@@ -129,6 +145,12 @@ public static class ZModemTransfer
 
         /// <summary>How long a receiver waits for the closing "OO" after ZFIN.</summary>
         public int OverAndOutMs = 500;
+
+        /// <summary>
+        /// A receiver that gets the end of a file at the wrong position repeats its request to go back when it made it at
+        /// least this long ago: the sender has evidently not seen it.
+        /// </summary>
+        public int RepeatRequestMs = 1000;
     }
 
     // ================= CRC =================
@@ -307,14 +329,15 @@ public static class ZModemTransfer
             {
                 return _pushback.Pop();
             }
-            Stopwatch timer = Stopwatch.StartNew();
+            // Called for every byte of a transfer: the clock is a plain time stamp, not an allocated Stopwatch.
+            long start = Stopwatch.GetTimestamp();
             while (true)
             {
                 if (_token.IsCancellationRequested)
                 {
                     return -1;
                 }
-                int left = timeoutMs - (int)timer.ElapsedMilliseconds;
+                int left = timeoutMs - ElapsedMs(start);
                 byte? b = _read(Math.Max(0, Math.Min(SliceMs, left)));
                 if (b.HasValue)
                 {
@@ -336,6 +359,11 @@ public static class ZModemTransfer
             {
             }
         }
+    }
+
+    private static int ElapsedMs(long start)
+    {
+        return (int)Math.Min(int.MaxValue, (Stopwatch.GetTimestamp() - start) * 1000 / Stopwatch.Frequency);
     }
 
     // ================= building frames =================
@@ -622,22 +650,29 @@ public static class ZModemTransfer
 
     /// <summary>
     /// Waits up to <paramref name="timeoutMs"/> for the start of a header (ZPAD ZDLE format) and reads it. Everything else
-    /// on the line - echo, banners, the tail of an abandoned data stream - is skipped. A timeout of 0 only looks at what has
-    /// already arrived.
+    /// on the line - echo, banners, the tail of an abandoned data stream - is skipped, but only until the time is up: a
+    /// peer that keeps streaming must not keep this side from answering. A timeout of 0 only looks at what has already
+    /// arrived (and at most <see cref="MaxPollGarbage"/> bytes of it).
     /// </summary>
     private static HeaderStatus ReadHeader(Link link, int timeoutMs, int byteMs, int trailerMs, out Header header)
     {
         header = default;
-        Stopwatch timer = Stopwatch.StartNew();
+        long start = Stopwatch.GetTimestamp();
         int cans = 0;
+        int skipped = 0;
         while (true)
         {
-            int left = Math.Max(0, timeoutMs - (int)timer.ElapsedMilliseconds);
+            int left = Math.Max(0, timeoutMs - ElapsedMs(start));
+            if (timeoutMs > 0 ? left == 0 && skipped > 0 : skipped >= MaxPollGarbage)
+            {
+                return HeaderStatus.Timeout;
+            }
             int c = link.Read(left);
             if (c < 0)
             {
                 return HeaderStatus.Timeout;
             }
+            skipped++;
             if (c == ZDLE)
             {
                 if (++cans >= 5)
@@ -985,6 +1020,8 @@ public static class ZModemTransfer
         private readonly ProgressHandler _progress;
         private Enc _enc;
         private bool _crc32;
+        private int _rxBufferLength;  // from ZRINIT: the receiver takes at most this much before a ZCRCW (0 = no limit)
+        private bool _rxCanStream;    // from ZRINIT: full duplex and overlapped I/O, so a continuous stream is fine
         private int _errors;
         private string _fileLabel = string.Empty;
         private long _total;
@@ -1079,6 +1116,10 @@ public static class ZModemTransfer
         {
             Report(0, "Waiting for the receiver...");
             Stopwatch total = Stopwatch.StartNew();
+            if (_options.SendRzCommand)
+            {
+                _link.Send(Encoding.ASCII.GetBytes("rz\r"));
+            }
             SendHex(ZRQINIT, new byte[4]);
             while (total.ElapsedMilliseconds < _t.HandshakeMs)
             {
@@ -1101,6 +1142,8 @@ public static class ZModemTransfer
                 if (h.Type == ZRINIT)
                 {
                     _crc32 = _options.UseCrc32 && (h.F0 & CANFC32) != 0;
+                    _rxBufferLength = h.P0 | (h.P1 << 8);
+                    _rxCanStream = (h.F0 & (CANFDX | CANOVIO)) == (CANFDX | CANOVIO);
                     if ((h.F0 & ESCCTL) != 0 && !_options.EscapeControlCharacters)
                     {
                         _enc = new Enc(2 * MaxSubpacketBytes + 64, true);
@@ -1189,7 +1232,7 @@ public static class ZModemTransfer
                             Report(0, "Transfer failed: the receiver asked for data beyond the end of the file.");
                             return FileResult.Failed;
                         }
-                        return StreamFile(item, h.Pos) ? FileResult.Sent : FileResult.Failed;
+                        return StreamFile(item, h.Pos);
                     case ZSKIP:
                         Report(0, "Skipped by the receiver: " + _fileLabel);
                         return FileResult.Skipped;
@@ -1219,8 +1262,20 @@ public static class ZModemTransfer
                     case ZCHALLENGE:
                         SendHex(ZACK, PosBytes(h.Pos));
                         continue;
+                    case ZRINIT:
+                        // The receiver is still waiting for a file: our offer was lost or damaged. A copy of its answer
+                        // to our ZRQINIT may arrive here too; then the offer goes twice, which a receiver takes in its stride.
+                        _errors++;
+                        if (++attempts >= MaxRetries)
+                        {
+                            _link.SendCancel();
+                            Report(0, "Transfer failed: the receiver did not take the file offer.");
+                            return FileResult.Failed;
+                        }
+                        send = true;
+                        continue;
                     default:
-                        continue; // a repeated ZRINIT or noise: the answer is still to come
+                        continue; // noise: the answer is still to come
                 }
             }
         }
@@ -1267,12 +1322,18 @@ public static class ZModemTransfer
         {
             Nothing,
             Restart,
+            Skip,
+            Timeout,
+            Damaged,
             Failed
         }
 
         /// <summary>
         /// Looks at the answers that arrived while data was streaming: a ZACK moves the acknowledged position, a ZRPOS means
-        /// "go back to this position", a cancel ends the transfer. Never waits.
+        /// "go back to this position" (Restart, with <paramref name="position"/> set to it), ZSKIP drops the rest of the
+        /// file, a cancel ends the transfer. Without <paramref name="wait"/> it never waits; with it, it returns on the
+        /// first ZACK, or Timeout when the receiver stays silent. Damaged means a header arrived damaged: most likely the
+        /// receiver's request to go back, whose position is lost with it.
         /// </summary>
         private PollResult Poll(ref long position, ref long acked, long length, bool wait)
         {
@@ -1290,19 +1351,12 @@ public static class ZModemTransfer
                 }
                 if (status == HeaderStatus.Timeout)
                 {
-                    if (wait)
-                    {
-                        _errors++;
-                        _link.SendCancel();
-                        Report(position, "Transfer failed: the receiver stopped acknowledging the data.");
-                        return PollResult.Failed;
-                    }
-                    return PollResult.Nothing;
+                    return wait ? PollResult.Timeout : PollResult.Nothing;
                 }
                 if (status == HeaderStatus.Bad)
                 {
                     _errors++;
-                    continue;
+                    return PollResult.Damaged;
                 }
                 switch (h.Type)
                 {
@@ -1333,29 +1387,83 @@ public static class ZModemTransfer
                         Report(position, "Cancelled by the receiver.");
                         return PollResult.Failed;
                     case ZSKIP:
-                        // The receiver does not want the rest of this file; treat it as the end of the data.
-                        position = length;
-                        acked = length;
-                        return PollResult.Restart;
+                        return PollResult.Skip;
+                    case ZNAK:
+                        // The receiver could not read our ZDATA header: start the frame again.
+                        _errors++;
+                        return PollResult.Damaged;
                     default:
                         continue;
                 }
             }
         }
 
-        private bool StreamFile(ZModemSendItem item, long startPosition)
+        /// <summary>
+        /// Sends the data of a file from <paramref name="startPosition"/> and its ZEOF, answering the receiver's requests to
+        /// go back. A receiver that announced a buffer size (or cannot take a continuous stream) gets the data in segments
+        /// that each end with ZCRCW and wait for its ZACK; otherwise the data streams with an ACK request (ZCRCQ) every few
+        /// subpackets and the sender never runs more than a window ahead of the acknowledged position.
+        /// </summary>
+        private FileResult StreamFile(ZModemSendItem item, long startPosition)
         {
             long length = Math.Max(0, item.Length);
-            int subpacket = ClampSubpacket(_options);
-            byte[] chunk = new byte[subpacket];
+            int maxSubpacket = ClampSubpacket(_options);
+            if (_rxBufferLength > 0)
+            {
+                maxSubpacket = Math.Max(MinSubpacketBytes, Math.Min(maxSubpacket, _rxBufferLength));
+            }
+            // Bytes per segment that ends with ZCRCW; 0 = one continuous frame.
+            int segment = _rxBufferLength > 0 ? Math.Max(_rxBufferLength, MinSubpacketBytes) : _rxCanStream ? 0 : maxSubpacket;
+            long window = (long)WindowAcks * AckEverySubpackets * maxSubpacket;
+            int subpacket = maxSubpacket;
+            byte[] chunk = new byte[maxSubpacket];
             long position = startPosition;
             long acked = startPosition;
-            long window = (long)WindowAcks * AckEverySubpackets * subpacket;
-            int eofTries = 0;
+            int silentWaits = 0;      // waits for an acknowledgement that ended in silence, in a row
+            int errorsInRow = 0;      // retransmission requests since the data last got through
+            long lastRetransmit = -1; // the position of the last retransmission request
+            int sameRetransmits = 0;  // requests for that same position in a row
+            long goodBytes = 0;       // sent since the last request, for growing the subpackets again
             // Where the source stream is now; a stream that cannot seek has to be at the start position already.
             long streamPosition = item.Stream.CanSeek ? item.Stream.Position : startPosition;
 
-            while (true) // one pass per (re)start of the data frame
+            // A retransmission request (or silence) moved the position back: false when the transfer has to stop.
+            bool OnRetransmit(bool silence)
+            {
+                goodBytes = 0;
+                if (silence)
+                {
+                    _errors++;
+                    if (++silentWaits > MaxRetries)
+                    {
+                        _link.SendCancel();
+                        Report(position, "Transfer failed: the receiver stopped acknowledging the data.");
+                        return false;
+                    }
+                }
+                else
+                {
+                    silentWaits = 0;
+                    sameRetransmits = position == lastRetransmit ? sameRetransmits + 1 : 0;
+                    lastRetransmit = position;
+                    if (sameRetransmits > MaxDataErrors)
+                    {
+                        _link.SendCancel();
+                        Report(position, "Transfer failed: the receiver keeps asking for the data at " + FormatBytes(position) + ".");
+                        return false;
+                    }
+                }
+                // A noisy line: smaller subpackets lose less to each damaged byte.
+                if (++errorsInRow >= 2 && subpacket > MinSubpacketBytes)
+                {
+                    subpacket = Math.Max(MinSubpacketBytes, subpacket / 2);
+                    errorsInRow = 0;
+                }
+                Report(position, "Retransmitting " + _fileLabel + " from " + FormatBytes(position));
+                return true;
+            }
+
+            while (true) // one pass per ZDATA frame
             {
                 if (position != streamPosition)
                 {
@@ -1363,7 +1471,7 @@ public static class ZModemTransfer
                     {
                         _link.SendCancel();
                         Report(position, "Transfer failed: the receiver asked to repeat data and the source cannot seek.");
-                        return false;
+                        return FileResult.Failed;
                     }
                     try
                     {
@@ -1374,39 +1482,49 @@ public static class ZModemTransfer
                     {
                         _link.SendCancel();
                         Report(position, "Cannot read the file: " + ex.Message);
-                        return false;
+                        return FileResult.Failed;
                     }
                 }
                 acked = position;
                 SendBinary(ZDATA, PosBytes(position));
+                long frameStart = position;
                 int sinceAckRequest = 0;
-                bool restart = false;
+                bool endOfData = false;
 
-                while (true)
+                while (true) // the subpackets of this frame
                 {
                     if (Cancelled())
                     {
-                        return false;
+                        return FileResult.Failed;
+                    }
+                    int want = subpacket;
+                    if (segment > 0)
+                    {
+                        want = (int)Math.Min(want, segment - (position - frameStart));
                     }
                     int n;
                     try
                     {
-                        n = ReadFully(item.Stream, chunk, chunk.Length);
+                        n = ReadFully(item.Stream, chunk, want);
                         streamPosition += n;
                     }
                     catch (Exception ex)
                     {
                         _link.SendCancel();
                         Report(position, "Cannot read the file: " + ex.Message);
-                        return false;
+                        return FileResult.Failed;
                     }
-                    bool last = n < chunk.Length || position + n >= length;
+                    endOfData = n < want || position + n >= length;
                     byte terminator;
-                    if (last)
+                    if (endOfData)
                     {
                         terminator = ZCRCE;
                     }
-                    else if (++sinceAckRequest >= AckEverySubpackets)
+                    else if (segment > 0 && position + n - frameStart >= segment)
+                    {
+                        terminator = ZCRCW;
+                    }
+                    else if (segment == 0 && ++sinceAckRequest >= AckEverySubpackets)
                     {
                         sinceAckRequest = 0;
                         terminator = ZCRCQ;
@@ -1417,109 +1535,151 @@ public static class ZModemTransfer
                     }
                     SendData(chunk, n, terminator);
                     position += n;
+                    goodBytes += n;
+                    if (goodBytes >= 8L * subpacket)
+                    {
+                        // The line has been good for a while: back towards the configured size.
+                        errorsInRow = 0;
+                        goodBytes = 0;
+                        subpacket = Math.Min(maxSubpacket, subpacket * 2);
+                    }
                     Report(position, "Sending " + _fileLabel + ": " + FormatBytes(position) + " of " + FormatBytes(length));
-                    if (last)
+                    if (endOfData)
                     {
                         break;
                     }
 
-                    PollResult poll = Poll(ref position, ref acked, length, wait: false);
-                    if (poll == PollResult.Nothing && position - acked >= window)
+                    PollResult poll;
+                    if (terminator == ZCRCW)
                     {
-                        // Too many unanswered requests: do not run ahead of a receiver that is slow or whose ACKs are lost.
-                        poll = Poll(ref position, ref acked, length, wait: true);
+                        // The receiver's buffer is full: wait until it says it has written this segment.
+                        do
+                        {
+                            poll = Poll(ref position, ref acked, length, wait: true);
+                        }
+                        while (poll == PollResult.Nothing && acked < position);
+                        if (poll == PollResult.Nothing)
+                        {
+                            silentWaits = 0;
+                            break; // acknowledged: the next segment is a new frame
+                        }
                     }
+                    else
+                    {
+                        poll = Poll(ref position, ref acked, length, wait: false);
+                        // Too many unanswered requests: do not run ahead of a receiver that is slow or whose ACKs are lost.
+                        while (poll == PollResult.Nothing && segment == 0 && position - acked >= window)
+                        {
+                            poll = Poll(ref position, ref acked, length, wait: true);
+                            if (poll == PollResult.Nothing)
+                            {
+                                silentWaits = 0;
+                            }
+                        }
+                        if (poll == PollResult.Nothing)
+                        {
+                            continue;
+                        }
+                    }
+
                     if (poll == PollResult.Failed)
                     {
-                        return false;
+                        return FileResult.Failed;
                     }
-                    if (poll == PollResult.Restart)
+                    if (poll == PollResult.Skip)
                     {
-                        restart = true;
-                        break;
+                        Report(position, "Skipped by the receiver: " + _fileLabel);
+                        return FileResult.Skipped;
                     }
+                    if (poll == PollResult.Timeout || poll == PollResult.Damaged)
+                    {
+                        // An answer was lost or damaged (often a request to go back): start a new frame from what the
+                        // receiver has confirmed, rather than stream on blindly; a receiver that has more says so with ZRPOS.
+                        position = acked;
+                    }
+                    if (!OnRetransmit(poll == PollResult.Timeout))
+                    {
+                        return FileResult.Failed;
+                    }
+                    break;
                 }
-                if (restart)
+                if (!endOfData)
                 {
-                    Report(position, "Retransmitting " + _fileLabel + " from " + FormatBytes(position));
-                    if (position >= length && eofTries++ > MaxRetries)
-                    {
-                        _link.SendCancel();
-                        Report(position, "Transfer failed: too many retransmissions.");
-                        return false;
-                    }
-                    continue;
+                    continue; // a new frame: after a ZCRCW segment or from the position the receiver asked for
                 }
 
                 // The frame ended: announce the end of the file and wait for the receiver to take it or ask again.
                 int tries = 0;
+                bool again = false;
                 SendBinary(ZEOF, PosBytes(position));
-                while (true)
+                while (!again)
                 {
                     HeaderStatus status = ReadHeader(_link, _t.ReplyMs, _t.ByteMs, _t.TrailerMs, out Header h);
                     if (Cancelled())
                     {
-                        return false;
+                        return FileResult.Failed;
                     }
                     if (status == HeaderStatus.Cancelled)
                     {
                         Report(position, "Cancelled by the receiver.");
-                        return false;
+                        return FileResult.Failed;
                     }
-                    if (status != HeaderStatus.Ok)
+                    if (status != HeaderStatus.Ok || h.Type == ZNAK)
                     {
                         _errors++;
                         if (++tries >= MaxRetries)
                         {
                             _link.SendCancel();
                             Report(position, "Transfer failed: the end of the file was not acknowledged.");
-                            return false;
+                            return FileResult.Failed;
+                        }
+                        if (status == HeaderStatus.Timeout && tries % 2 == 0 && acked < position)
+                        {
+                            // Silence twice in a row: the receiver may have lost the start of the data and ignore an
+                            // end-of-file at a position it has not reached (lrzsz rz does, until its own timeout). A new
+                            // frame from the confirmed position makes it answer at once.
+                            position = acked;
+                            if (!OnRetransmit(true))
+                            {
+                                return FileResult.Failed;
+                            }
+                            again = true;
+                            continue;
                         }
                         SendBinary(ZEOF, PosBytes(position));
                         continue;
                     }
-                    if (h.Type == ZRINIT || h.Type == ZSKIP)
+                    switch (h.Type)
                     {
-                        Report(position, "Sent " + _fileLabel);
-                        return true;
+                        case ZRINIT:
+                            Report(position, "Sent " + _fileLabel);
+                            return FileResult.Sent;
+                        case ZSKIP:
+                            Report(position, "Skipped by the receiver: " + _fileLabel);
+                            return FileResult.Skipped;
+                        case ZRPOS:
+                            if (h.Pos > length)
+                            {
+                                _link.SendCancel();
+                                Report(position, "Transfer failed: the receiver asked for data beyond the end of the file.");
+                                return FileResult.Failed;
+                            }
+                            _errors++;
+                            position = h.Pos;
+                            if (!OnRetransmit(false))
+                            {
+                                return FileResult.Failed;
+                            }
+                            again = true; // back to the outer loop: a new ZDATA frame from that position
+                            break;
+                        case ZABORT:
+                        case ZFERR:
+                        case ZCAN:
+                            Report(position, "Cancelled by the receiver.");
+                            return FileResult.Failed;
+                        default:
+                            break; // a late ZACK or noise: keep waiting
                     }
-                    if (h.Type == ZRPOS)
-                    {
-                        if (h.Pos > length)
-                        {
-                            _link.SendCancel();
-                            Report(position, "Transfer failed: the receiver asked for data beyond the end of the file.");
-                            return false;
-                        }
-                        _errors++;
-                        position = h.Pos;
-                        if (++eofTries > MaxRetries)
-                        {
-                            _link.SendCancel();
-                            Report(position, "Transfer failed: too many retransmissions.");
-                            return false;
-                        }
-                        Report(position, "Retransmitting " + _fileLabel + " from " + FormatBytes(position));
-                        break; // back to the outer loop: a new ZDATA frame from that position
-                    }
-                    if (h.Type == ZNAK)
-                    {
-                        _errors++;
-                        if (++tries >= MaxRetries)
-                        {
-                            _link.SendCancel();
-                            Report(position, "Transfer failed: the end of the file was not acknowledged.");
-                            return false;
-                        }
-                        SendBinary(ZEOF, PosBytes(position));
-                        continue;
-                    }
-                    if (h.Type == ZABORT || h.Type == ZFERR || h.Type == ZCAN)
-                    {
-                        Report(position, "Cancelled by the receiver.");
-                        return false;
-                    }
-                    // A late ZACK or noise: keep waiting.
                 }
             }
         }
@@ -1571,6 +1731,9 @@ public static class ZModemTransfer
         private Stream _currentStream;
         private long _position;
         private int _filesReceived;
+        private int _dataErrors;                 // damaged or misplaced data in a row; reset by data that gets through
+        private readonly Stopwatch _sinceRequest = new Stopwatch(); // since the last ZRPOS
+        private byte[] _attention = new byte[0]; // the sender's Attn string from ZSINIT
 
         public Receiver(Link link, ZModemOptions options, Timeouts timeouts, Func<ZModemFileInfo, Stream> openFile,
             Action<ZModemFileInfo, bool> fileFinished, ProgressHandler progress)
@@ -1594,6 +1757,50 @@ public static class ZModemTransfer
         {
             byte[] frame = BuildHexHeader(type, p);
             _link.Send(frame, frame.Length);
+        }
+
+        /// <summary>
+        /// Asks the sender to go back to <see cref="_position"/>. Its attention string comes first: it interrupts a sender
+        /// that only looks for answers between its writes. In that string 0xDD is a break (not possible here) and 0xDE a
+        /// pause of one second.
+        /// </summary>
+        private void RequestPosition()
+        {
+            if (_attention.Length > 0)
+            {
+                int from = 0;
+                for (int i = 0; i <= _attention.Length; i++)
+                {
+                    if (i == _attention.Length || _attention[i] == 0xDD || _attention[i] == 0xDE)
+                    {
+                        if (i > from)
+                        {
+                            byte[] part = new byte[i - from];
+                            Buffer.BlockCopy(_attention, from, part, 0, part.Length);
+                            _link.Send(part, part.Length);
+                        }
+                        if (i < _attention.Length && _attention[i] == 0xDE)
+                        {
+                            Thread.Sleep(1000);
+                        }
+                        from = i + 1;
+                    }
+                }
+            }
+            SendHex(ZRPOS, PosBytes(_position));
+            _sinceRequest.Restart();
+        }
+
+        /// <summary>Counts damaged or misplaced data; false (the transfer has ended) when there has been too much of it in a row.</summary>
+        private bool CountDataError()
+        {
+            _errors++;
+            if (++_dataErrors > MaxDataErrors)
+            {
+                Fail("Transfer failed: too many damaged data blocks.", true);
+                return false;
+            }
+            return true;
         }
 
         private void SendZrinit()
@@ -1686,7 +1893,7 @@ public static class ZModemTransfer
                     }
                     else
                     {
-                        SendHex(ZRPOS, PosBytes(_position));
+                        RequestPosition();
                     }
                     continue;
                 }
@@ -1713,9 +1920,14 @@ public static class ZModemTransfer
 
                     case ZSINIT:
                         {
-                            DataStatus ds = ReadSubpacket(_link, h.Crc32, _buffer, _t.ByteMs, out _, out _);
+                            DataStatus ds = ReadSubpacket(_link, h.Crc32, _buffer, _t.ByteMs, out int length, out _);
                             if (ds == DataStatus.Ok)
                             {
+                                // The attention string, up to its terminating NUL (at most 32 bytes by the specification).
+                                int end = Array.IndexOf(_buffer, (byte)0, 0, length);
+                                int count = Math.Min(32, end < 0 ? length : end);
+                                _attention = new byte[count];
+                                Buffer.BlockCopy(_buffer, 0, _attention, 0, count);
                                 SendHex(ZACK, PosBytes(1));
                             }
                             else
@@ -1742,8 +1954,11 @@ public static class ZModemTransfer
                         }
                         if (h.Pos != _position)
                         {
-                            _errors++;
-                            SendHex(ZRPOS, PosBytes(_position));
+                            if (!CountDataError())
+                            {
+                                return false;
+                            }
+                            RequestPosition();
                             break;
                         }
                         if (!ReceiveData(h.Crc32))
@@ -1760,7 +1975,18 @@ public static class ZModemTransfer
                         }
                         if (h.Pos != _position)
                         {
-                            break; // the end of an abandoned stream; the data it belonged to is being sent again
+                            // The end of an abandoned stream. Usually the data it belonged to is already being sent again,
+                            // but when our request is long gone it was lost (or damaged) on the way: ask again now
+                            // instead of waiting for a timeout.
+                            if (_sinceRequest.IsRunning && _sinceRequest.ElapsedMilliseconds >= _t.RepeatRequestMs)
+                            {
+                                if (!CountDataError())
+                                {
+                                    return false;
+                                }
+                                RequestPosition();
+                            }
+                            break;
                         }
                         {
                             long done = _position;
@@ -1799,8 +2025,21 @@ public static class ZModemTransfer
                             break;
                         }
 
+                    case ZNAK:
+                        // The sender could not read our last header: repeat it.
+                        if (_current == null)
+                        {
+                            SendZrinit();
+                        }
+                        else
+                        {
+                            RequestPosition();
+                        }
+                        break;
+
                     case ZFREECNT:
-                        SendHex(ZACK, new byte[4]);
+                        // The free space is not known here (the caller picks the folder): "plenty", as lrzsz says.
+                        SendHex(ZACK, PosBytes(int.MaxValue));
                         break;
 
                     case ZCHALLENGE:
@@ -1861,6 +2100,7 @@ public static class ZModemTransfer
             _current = info;
             _currentStream = stream;
             _position = 0;
+            _dataErrors = 0;
             string more = info.FilesRemaining > 1 ? " (" + info.FilesRemaining + " files left)" : string.Empty;
             Report(0, info.Length, "Receiving " + info.RemoteName + more);
             SendHex(ZRPOS, PosBytes(0));
@@ -1913,7 +2153,6 @@ public static class ZModemTransfer
         /// <summary>Reads the subpackets of one ZDATA frame. False only when the whole transfer has to end.</summary>
         private bool ReceiveData(bool crc32)
         {
-            int consecutiveErrors = 0;
             while (true)
             {
                 DataStatus ds = ReadSubpacket(_link, crc32, _buffer, _t.ByteMs, out int length, out byte terminator);
@@ -1929,16 +2168,15 @@ public static class ZModemTransfer
                 {
                     // Damaged or incomplete: ask for the data again from here; everything the sender streams until it
                     // reacts is skipped while waiting for the next ZDATA header.
-                    _errors++;
-                    if (++consecutiveErrors > MaxRetries)
+                    if (!CountDataError())
                     {
-                        return Fail("Transfer failed: too many damaged data blocks.", true);
+                        return false;
                     }
-                    SendHex(ZRPOS, PosBytes(_position));
+                    RequestPosition();
                     Report(_position, CurrentTotal, "Damaged data at " + FormatBytes(_position) + ", asking again");
                     return true;
                 }
-                consecutiveErrors = 0;
+                _dataErrors = 0;
 
                 try
                 {

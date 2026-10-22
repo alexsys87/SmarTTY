@@ -234,6 +234,127 @@ internal static class Program
         return o;
     }
 
+    // ---------- hand-made frames (independent of the code under test, except for the CRC and hex header helpers) ----------
+
+    /// <summary>A binary header with a CRC-16 ('A'), with ZDLE, DLE, XON and XOFF escaped as the protocol demands.</summary>
+    private static byte[] BinHeader(byte type, byte p0 = 0, byte p1 = 0, byte p2 = 0, byte p3 = 0)
+    {
+        byte[] h = { type, p0, p1, p2, p3 };
+        ushort crc = ZModemTransfer.Crc16(h, 0, 5);
+        List<byte> frame = new List<byte> { 0x2A, 0x18, 0x41 };
+        foreach (byte b in h.Concat(new[] { (byte)(crc >> 8), (byte)crc }))
+        {
+            if ((b & 0x7F) == 0x10 || (b & 0x7F) == 0x11 || (b & 0x7F) == 0x13 || b == 0x18)
+            {
+                frame.Add(0x18);
+                frame.Add((byte)(b ^ 0x40));
+            }
+            else
+            {
+                frame.Add(b);
+            }
+        }
+        return frame.ToArray();
+    }
+
+    /// <summary>A data subpacket with a CRC-16 for plain text (no byte of it needs escaping); <paramref name="damage"/> spoils the CRC.</summary>
+    private static byte[] TextSubpacket(string text, byte terminator, bool damage = false)
+    {
+        byte[] data = Encoding.ASCII.GetBytes(text);
+        ushort crc = ZModemTransfer.Crc16(data.Concat(new[] { terminator }).ToArray(), 0, data.Length + 1);
+        if (damage) crc ^= 0x0101;
+        return data.Concat(new byte[] { 0x18, terminator, (byte)(crc >> 8), (byte)crc }).ToArray();
+    }
+
+    private static int CountOf(byte[] haystack, byte[] needle)
+    {
+        int n = 0;
+        for (int i = 0; i + needle.Length <= haystack.Length; i++)
+        {
+            int j = 0;
+            while (j < needle.Length && haystack[i + j] == needle[j]) j++;
+            if (j == needle.Length) n++;
+        }
+        return n;
+    }
+
+    /// <summary>The start of a hex header of this type, as a receiver writes it ("**" ZDLE 'B' and two hex digits).</summary>
+    private static byte[] HexStart(byte type)
+    {
+        return new byte[] { 0x2A, 0x2A, 0x18, 0x42, (byte)"0123456789abcdef"[type >> 4], (byte)"0123456789abcdef"[type & 15] };
+    }
+
+    /// <summary>Waits until the receiver under test has sent a hex header of this type (a new one, after <paramref name="from"/> bytes).</summary>
+    private static bool WaitForHex(End e, byte type, int from, int timeoutMs = 3000)
+    {
+        System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+        while (clock.ElapsedMilliseconds < timeoutMs)
+        {
+            byte[] sent = e.Sent();
+            if (CountOf(sent.Skip(from).ToArray(), HexStart(type)) > 0) return true;
+            Thread.Sleep(10);
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Reads frame headers sent by a sender under test and returns the next one's type (CRC-16 binary or hex), or -1.
+    /// Data in between is skipped.
+    /// </summary>
+    private static int NextHeaderType(End e, int timeoutMs = 3000)
+    {
+        while (true)
+        {
+            byte? b = e.Read(timeoutMs);
+            if (!b.HasValue) return -1;
+            if (b != 0x2A) continue;
+            byte? c = e.Read(500);
+            while (c == 0x2A) c = e.Read(500);
+            if (c != 0x18) continue;
+            byte? f = e.Read(500);
+            if (f == 0x41 || f == 0x43)
+            {
+                byte? t = e.Read(500);
+                if (t == 0x18) t = (byte)(e.Read(500).Value ^ 0x40);
+                return t ?? -1;
+            }
+            if (f == 0x42)
+            {
+                int hi = "0123456789abcdef".IndexOf((char)e.Read(500).Value);
+                int lo = "0123456789abcdef".IndexOf((char)e.Read(500).Value);
+                return hi * 16 + lo;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Runs our sender against our receiver, but the receiver's ZRINIT is replaced by one with this buffer size and these
+    /// flags (as a small embedded receiver would send it).
+    /// </summary>
+    private static Outcome TransferWithReceiverLimits(byte[] data, int bufferSize, byte flags)
+    {
+        NewLink(out End s, out End r);
+        Outcome o = new Outcome { SenderEnd = s, ReceiverEnd = r };
+        byte[] original = ZModemTransfer.BuildHexHeader(ZModemTransfer.ZRINIT, new byte[] { 0, 0, 0, 0x23 }); // CANFDX|CANOVIO|CANFC32
+        byte[] replacement = ZModemTransfer.BuildHexHeader(ZModemTransfer.ZRINIT, new byte[] { (byte)bufferSize, (byte)(bufferSize >> 8), 0, flags });
+        ZModemTransfer.SendDataHandler rewrite = (d, off, len) =>
+        {
+            if (len == original.Length && d.Skip(off).Take(len).SequenceEqual(original))
+            {
+                r.Send(replacement, 0, replacement.Length);
+                return;
+            }
+            r.Send(d, off, len);
+        };
+        Task<bool> rt = Task.Run(() => ZModemTransfer.ReceiveFiles(o.Rx.Open, o.Rx.Finished, rewrite, r.Read, CancellationToken.None,
+            o.ReceiverProgress.Handler, null, Fast()));
+        Task<bool> st = Task.Run(() => ZModemTransfer.SendFiles(new[] { Item("limits.bin", data) }, s.Send, s.Read, CancellationToken.None,
+            o.SenderProgress.Handler, null, Fast()));
+        o.SenderOk = st.Result;
+        o.ReceiverOk = rt.Result;
+        return o;
+    }
+
     // ---------- test plumbing ----------
 
     private static void Check(bool condition, string what)
@@ -722,6 +843,218 @@ internal static class Program
             Task<bool> st = Task.Run(() => ZModemTransfer.SendFiles(new[] { Item("f.bin", data) }, s.Send, s.Read, CancellationToken.None, null, null, Fast()));
             Check(st.Result && rt.Result, "a normal session is unaffected");
             Check(rx.Streams[0].ToArray().SequenceEqual(data), "content identical");
+        });
+
+        Run("sender: types \"rz\" CR before its first ZRQINIT (starts a receiver at a shell prompt); the option turns it off", () =>
+        {
+            foreach (bool on in new[] { true, false })
+            {
+                NewLink(out End s, out End r);
+                ZModemTransfer.Timeouts t = Fast();
+                t.HandshakeMs = 300;
+                ZModemOptions options = new ZModemOptions { SendRzCommand = on };
+                ZModemTransfer.SendFiles(new[] { Item("f.bin", RandomData(10)) }, s.Send, s.Read, CancellationToken.None, null, options, t);
+                byte[] sent = s.Sent();
+                bool startsWithRz = sent.Length > 3 && sent[0] == (byte)'r' && sent[1] == (byte)'z' && sent[2] == 0x0D && sent[3] == 0x2A;
+                Check(startsWithRz == on, on ? "\"rz\\r\" first, then the ZRQINIT" : "only frames when switched off");
+            }
+        });
+
+        Run("sender: a receiver with a 2 KB buffer gets the data in ZCRCW segments of at most 2 KB", () =>
+        {
+            byte[] data = RandomData(20000, 31);
+            Outcome o = TransferWithReceiverLimits(data, 2048, 0x23);
+            Check(o.SenderOk && o.ReceiverOk, "transfer ok: " + o.SenderProgress.Last + " / " + o.ReceiverProgress.Last);
+            Check(o.Rx.Streams[0].ToArray().SequenceEqual(data), "content identical");
+            byte[] sent = o.SenderEnd.Sent();
+            int crcw = CountOf(sent, new byte[] { 0x18, ZModemTransfer.ZCRCW });
+            int crcq = CountOf(sent, new byte[] { 0x18, ZModemTransfer.ZCRCQ });
+            Check(crcw >= 9, "a ZCRCW at the end of every 2 KB (" + crcw + ")");
+            Check(crcq == 0, "no streaming ACK requests (" + crcq + ")");
+        });
+
+        Run("sender: a receiver that cannot overlap disk and line I/O gets a ZCRCW after every subpacket", () =>
+        {
+            byte[] data = RandomData(6000, 32);
+            Outcome o = TransferWithReceiverLimits(data, 0, 0x21); // CANFDX|CANFC32, no CANOVIO
+            Check(o.SenderOk && o.ReceiverOk, "transfer ok: " + o.SenderProgress.Last + " / " + o.ReceiverProgress.Last);
+            Check(o.Rx.Streams[0].ToArray().SequenceEqual(data), "content identical");
+            int crcw = CountOf(o.SenderEnd.Sent(), new byte[] { 0x18, ZModemTransfer.ZCRCW });
+            Check(crcw >= 5, "one ZCRCW per 1 KB subpacket (" + crcw + ")");
+        });
+
+        Run("sender: a ZSKIP while the data streams moves on to the next file at once", () =>
+        {
+            NewLink(out End s, out End r);
+            byte[] big = RandomData(300000, 33);
+            List<int> seen = new List<int>();
+            Task script = Task.Run(() =>
+            {
+                byte[] init = ZModemTransfer.BuildHexHeader(ZModemTransfer.ZRINIT, new byte[] { 0, 0, 0, 0x03 }); // CRC-16 only
+                r.Send(init, 0, init.Length);
+                int files = 0;
+                while (true)
+                {
+                    int type = NextHeaderType(r);
+                    seen.Add(type);
+                    if (type < 0) return;
+                    byte[] answer = null;
+                    if (type == ZModemTransfer.ZFILE)
+                    {
+                        files++;
+                        answer = ZModemTransfer.BuildHexHeader(ZModemTransfer.ZRPOS, new byte[4]);
+                    }
+                    else if (type == ZModemTransfer.ZDATA && files == 1)
+                    {
+                        answer = ZModemTransfer.BuildHexHeader(ZModemTransfer.ZSKIP, new byte[4]);
+                    }
+                    else if (type == ZModemTransfer.ZEOF)
+                    {
+                        answer = init;
+                    }
+                    else if (type == ZModemTransfer.ZFIN)
+                    {
+                        answer = ZModemTransfer.BuildHexHeader(ZModemTransfer.ZFIN, new byte[4]);
+                        r.Send(answer, 0, answer.Length);
+                        return;
+                    }
+                    if (answer != null) r.Send(answer, 0, answer.Length);
+                }
+            });
+            Progress sp = new Progress();
+            bool ok = ZModemTransfer.SendFiles(new[] { Item("skipped.bin", big), Item("small.bin", RandomData(100)) }, s.Send, s.Read,
+                CancellationToken.None, sp.Handler, new ZModemOptions { SendRzCommand = false }, Fast());
+            script.Wait(5000);
+            Check(ok, "the session ended normally: " + sp.Last);
+            Check(sp.Status.Any(x => x.Contains("Skipped by the receiver: skipped.bin")), "the skip is reported");
+            Check(s.Sent().Length < big.Length / 2, "the skipped file was not streamed to its end (" + s.Sent().Length + " bytes)");
+            Check(seen.Count(t => t == ZModemTransfer.ZFILE) == 2, "the second file was offered");
+        });
+
+        Run("receiver: data that keeps arriving damaged makes it give up instead of asking forever", () =>
+        {
+            NewLink(out End s, out End r);
+            Progress rp = new Progress();
+            Received rx = new Received();
+            Task<bool> rt = Task.Run(() => ZModemTransfer.ReceiveFiles(rx.Open, rx.Finished, r.Send, r.Read, CancellationToken.None, rp.Handler, null, Fast()));
+            Check(WaitForHex(r, ZModemTransfer.ZRINIT, 0), "ZRINIT");
+            int mark = r.Sent().Length;
+            byte[] offer = BinHeader(ZModemTransfer.ZFILE).Concat(TextSubpacket("bad.bin\0" + "100", ZModemTransfer.ZCRCW)).ToArray();
+            s.Send(offer, 0, offer.Length);
+            Check(WaitForHex(r, ZModemTransfer.ZRPOS, mark), "ZRPOS for the offer");
+            for (int i = 0; i < 40 && !rt.IsCompleted; i++)
+            {
+                byte[] frame = BinHeader(ZModemTransfer.ZDATA).Concat(TextSubpacket("garbage", ZModemTransfer.ZCRCG, damage: true)).ToArray();
+                s.Send(frame, 0, frame.Length);
+                Thread.Sleep(20);
+            }
+            Check(rt.Wait(5000) && !rt.Result, "gave up");
+            Check(rp.Last.Contains("too many damaged data blocks"), "reported: " + rp.Last);
+            Check(rx.Complete.SequenceEqual(new[] { false }), "the file was closed as incomplete");
+        });
+
+        Run("receiver: a sender that keeps streaming junk cannot keep it from asking again", () =>
+        {
+            NewLink(out End s, out End r);
+            Received rx = new Received();
+            Task<bool> rt = Task.Run(() => ZModemTransfer.ReceiveFiles(rx.Open, rx.Finished, r.Send, r.Read, CancellationToken.None, null, null, Fast()));
+            Check(WaitForHex(r, ZModemTransfer.ZRINIT, 0), "ZRINIT");
+            int mark = r.Sent().Length;
+            byte[] offer = BinHeader(ZModemTransfer.ZFILE).Concat(TextSubpacket("junk.bin\0" + "100", ZModemTransfer.ZCRCW)).ToArray();
+            s.Send(offer, 0, offer.Length);
+            Check(WaitForHex(r, ZModemTransfer.ZRPOS, mark), "ZRPOS for the offer");
+            mark = r.Sent().Length;
+            byte[] junk = Encoding.ASCII.GetBytes("junk without any header ");
+            System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+            while (clock.ElapsedMilliseconds < 1500)
+            {
+                s.Send(junk, 0, junk.Length);
+                Thread.Sleep(1);
+            }
+            int requests = CountOf(r.Sent().Skip(mark).ToArray(), HexStart(ZModemTransfer.ZRPOS));
+            Check(requests >= 2, "it asked again while the junk kept coming (" + requests + " ZRPOS in 1.5 s)");
+            byte[] cans = Enumerable.Repeat((byte)0x18, 8).ToArray();
+            s.Send(cans, 0, cans.Length);
+            rt.Wait(5000);
+        });
+
+        Run("receiver: ZNAK (the sender could not read our header) repeats the last header", () =>
+        {
+            NewLink(out End s, out End r);
+            Received rx = new Received();
+            Task<bool> rt = Task.Run(() => ZModemTransfer.ReceiveFiles(rx.Open, rx.Finished, r.Send, r.Read, CancellationToken.None, null, null, Fast(2000)));
+            Check(WaitForHex(r, ZModemTransfer.ZRINIT, 0), "ZRINIT");
+            int mark = r.Sent().Length;
+            byte[] nak = BinHeader(ZModemTransfer.ZNAK);
+            s.Send(nak, 0, nak.Length);
+            Check(WaitForHex(r, ZModemTransfer.ZRINIT, mark, 300), "ZRINIT again at once");
+            byte[] offer = BinHeader(ZModemTransfer.ZFILE).Concat(TextSubpacket("n.bin\0" + "5", ZModemTransfer.ZCRCW)).ToArray();
+            s.Send(offer, 0, offer.Length);
+            Check(WaitForHex(r, ZModemTransfer.ZRPOS, mark), "ZRPOS for the offer");
+            mark = r.Sent().Length;
+            s.Send(nak, 0, nak.Length);
+            Check(WaitForHex(r, ZModemTransfer.ZRPOS, mark, 300), "ZRPOS again at once");
+            byte[] cans = Enumerable.Repeat((byte)0x18, 8).ToArray();
+            s.Send(cans, 0, cans.Length);
+            rt.Wait(5000);
+        });
+
+        Run("receiver: the sender's attention string (ZSINIT) goes out before a request to go back", () =>
+        {
+            NewLink(out End s, out End r);
+            Received rx = new Received();
+            Task<bool> rt = Task.Run(() => ZModemTransfer.ReceiveFiles(rx.Open, rx.Finished, r.Send, r.Read, CancellationToken.None, null, null, Fast(2000)));
+            Check(WaitForHex(r, ZModemTransfer.ZRINIT, 0), "ZRINIT");
+            int mark = r.Sent().Length;
+            byte[] sinit = BinHeader(ZModemTransfer.ZSINIT).Concat(TextSubpacket("ATTN!\0", ZModemTransfer.ZCRCW)).ToArray();
+            s.Send(sinit, 0, sinit.Length);
+            Check(WaitForHex(r, ZModemTransfer.ZACK, mark), "ZSINIT acknowledged");
+            mark = r.Sent().Length;
+            byte[] offer = BinHeader(ZModemTransfer.ZFILE).Concat(TextSubpacket("a.bin\0" + "100", ZModemTransfer.ZCRCW)).ToArray();
+            s.Send(offer, 0, offer.Length);
+            Check(WaitForHex(r, ZModemTransfer.ZRPOS, mark), "ZRPOS for the offer");
+            Check(CountOf(r.Sent().Skip(mark).ToArray(), Encoding.ASCII.GetBytes("ATTN!")) == 0, "no attention string for the first request");
+            mark = r.Sent().Length;
+            byte[] damaged = BinHeader(ZModemTransfer.ZDATA).Concat(TextSubpacket("data", ZModemTransfer.ZCRCG, damage: true)).ToArray();
+            s.Send(damaged, 0, damaged.Length);
+            Check(WaitForHex(r, ZModemTransfer.ZRPOS, mark), "ZRPOS after the damaged data");
+            byte[] after = r.Sent().Skip(mark).ToArray();
+            int attn = CountOf(after, Encoding.ASCII.GetBytes("ATTN!"));
+            Check(attn == 1, "the attention string went out once");
+            string text = Encoding.ASCII.GetString(after);
+            Check(text.IndexOf("ATTN!", StringComparison.Ordinal) < text.IndexOf("**", StringComparison.Ordinal), "before the ZRPOS");
+            byte[] cans = Enumerable.Repeat((byte)0x18, 8).ToArray();
+            s.Send(cans, 0, cans.Length);
+            rt.Wait(5000);
+        });
+
+        Run("receiver: ZFREECNT is answered with plenty of space, not with 0", () =>
+        {
+            NewLink(out End s, out End r);
+            Task<bool> rt = Task.Run(() => ZModemTransfer.ReceiveFiles(new Received().Open, null, r.Send, r.Read, CancellationToken.None, null, null, Fast(2000)));
+            Check(WaitForHex(r, ZModemTransfer.ZRINIT, 0), "ZRINIT");
+            int mark = r.Sent().Length;
+            byte[] ask = BinHeader(ZModemTransfer.ZFREECNT);
+            s.Send(ask, 0, ask.Length);
+            Check(WaitForHex(r, ZModemTransfer.ZACK, mark), "answered with ZACK");
+            string text = Encoding.ASCII.GetString(r.Sent().Skip(mark).ToArray());
+            Check(!text.Contains("B0300000000"), "the free space is not reported as 0");
+            byte[] cans = Enumerable.Repeat((byte)0x18, 8).ToArray();
+            s.Send(cans, 0, cans.Length);
+            rt.Wait(5000);
+        });
+
+        Run("line errors: a very noisy line (about one damaged byte in 600, both ways) still gets the file through", () =>
+        {
+            byte[] data = RandomData(60000, 34);
+            Random noise = new Random(35);
+            Outcome o = Transfer(new[] { Item("noisy.bin", data) }, null, null, Fast(), (toReceiver, toSender) =>
+            {
+                toReceiver.Tamper = (i, b) => noise.Next(600) == 0 ? (byte)(b ^ 0x10) : b;
+                toSender.Tamper = (i, b) => noise.Next(600) == 0 ? (byte)(b ^ 0x10) : b;
+            });
+            Check(o.SenderOk && o.ReceiverOk, "transfer ok: " + o.SenderProgress.Last + " / " + o.ReceiverProgress.Last);
+            Check(o.Rx.Streams[0].ToArray().SequenceEqual(data), "content identical");
         });
 
         Run("receiver: a repeated ZRQINIT right after the first reply is not answered twice, a late one is", () =>

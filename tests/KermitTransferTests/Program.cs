@@ -144,7 +144,8 @@ internal static class Program
             ReceiverNudgeMs = 300,
             AckMs = 400,
             PacketMs = 400,
-            ByteMs = 150
+            ByteMs = 150,
+            WindowRepeatMs = 100
         };
     }
 
@@ -175,11 +176,24 @@ internal static class Program
         }
     }
 
+    /// <summary>A stream that records when it is closed.</summary>
+    private sealed class TrackedStream : MemoryStream
+    {
+        private readonly List<bool> _closed;
+        public TrackedStream(List<bool> closed) { _closed = closed; }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) lock (_closed) { _closed.Add(true); }
+            base.Dispose(disposing);
+        }
+    }
+
     private sealed class Outcome
     {
         public bool SendOk, ReceiveOk;
         public readonly Dictionary<string, MemoryStream> Files = new Dictionary<string, MemoryStream>();
         public readonly List<string> Discarded = new List<string>();
+        public readonly Dictionary<string, DateTime?> Dates = new Dictionary<string, DateTime?>();
         public Progress SenderProgress = new Progress(), ReceiverProgress = new Progress();
         public End Sender, Receiver;
         public byte[] Get(string name) => Files[name].ToArray();
@@ -207,11 +221,46 @@ internal static class Program
                 return ms;
             },
             name => { lock (outcome.Discarded) { outcome.Discarded.Add(name); } },
-            r.Send, r.Read, receiverToken, outcome.ReceiverProgress.Handler, receiverSettings ?? new KermitTransfer.Settings(), timeouts));
+            r.Send, r.Read, receiverToken, outcome.ReceiverProgress.Handler, receiverSettings ?? new KermitTransfer.Settings(), timeouts,
+            (name, date) => { lock (outcome.Dates) { outcome.Dates[name] = date; } }));
         outcome.SendOk = KermitTransfer.SendFiles(files, s.Send, s.Read, senderToken, outcome.SenderProgress.Handler,
             senderSettings ?? new KermitTransfer.Settings(), timeouts);
         outcome.ReceiveOk = rx.Wait(15000) && rx.Result;
         return outcome;
+    }
+
+    // ---------- a hand-written receiver (block check 1, normal packets), independent of the code under test ----------
+
+    private static byte[] Frame(int seq, char type, string data)
+    {
+        byte[] body = new byte[3 + data.Length];
+        body[0] = (byte)(32 + 3 + data.Length);
+        body[1] = (byte)(32 + seq);
+        body[2] = (byte)type;
+        Encoding.ASCII.GetBytes(data, 0, data.Length, body, 3);
+        return new byte[] { 1 }.Concat(body).Concat(new[] { (byte)(32 + KermitTransfer.Checksum6(body, 0, body.Length)), (byte)13 }).ToArray();
+    }
+
+    /// <summary>Reads the next packet: (seq, type, data), or null on timeout. Only normal packets with the 6-bit check.</summary>
+    private static Tuple<int, char, string> ReadFrame(End e, int timeoutMs = 3000)
+    {
+        while (true)
+        {
+            byte? b = e.Read(timeoutMs);
+            if (!b.HasValue) return null;
+            if (b != 1) continue;
+            int len = e.Read(1000).Value - 32;
+            byte[] rest = new byte[len];
+            for (int i = 0; i < len; i++) rest[i] = e.Read(1000).Value;
+            e.Read(1000); // CR
+            return Tuple.Create(rest[0] - 32, (char)rest[1], Encoding.ASCII.GetString(rest, 2, len - 3));
+        }
+    }
+
+    /// <summary>Settings for a sender talking to the hand-written receiver: the simplest packets.</summary>
+    private static KermitTransfer.Settings Plain()
+    {
+        return new KermitTransfer.Settings { BlockCheck = (byte)'1', LongPackets = false, WindowSize = 1, RepeatPrefix = 0 };
     }
 
     // ---------- test plumbing ----------
@@ -521,6 +570,182 @@ internal static class Program
         });
 
         // =============== failures ===============
+
+        Run("windows: the receiver agrees to the smaller window and both say so in the Send-Init exchange", () =>
+        {
+            byte[] data = RandomData(20000, 41);
+            KermitTransfer.Settings sender = new KermitTransfer.Settings { WindowSize = 8, MaxPacket = 300 };
+            Outcome o = Transfer(new[] { Src("w.bin", data) }, sender, new KermitTransfer.Settings());
+            Check(o.SendOk && o.ReceiveOk && o.Get("w.bin").SequenceEqual(data), "transfer ok: " + o.SenderProgress.Last() + " / " + o.ReceiverProgress.Last());
+            byte[] sent = o.Receiver.Sent();
+            int at = -1;
+            for (int i = 0; i + 3 < sent.Length; i++)
+            {
+                if (sent[i] == 1 && sent[i + 2] == (byte)' ' && sent[i + 3] == (byte)'Y') { at = i; break; }
+            }
+            Check(at >= 0, "the Send-Init was acknowledged");
+            byte capas = sent[at + 4 + 9];
+            byte window = sent[at + 4 + 10];
+            Check(((capas - 32) & 4) != 0, "the sliding window capability is set");
+            Check(window - 32 == 8, "the window is 8 (" + (window - 32) + ")");
+        });
+
+        Run("windows: several packets are on their way before the first ACK", () =>
+        {
+            byte[] data = RandomData(30000, 42);
+            KermitTransfer.Settings small = new KermitTransfer.Settings { MaxPacket = 500 };
+            int dataPacketsBeforeFirstAck = -1;
+            Outcome o = Transfer(new[] { Src("w.bin", data) }, small, small, (sndr, rcvr) =>
+            {
+                int seenD = 0;
+                bool counting = false;
+                sndr.Filter = chunk =>
+                {
+                    // Packets go out one per write: count the D packets the sender writes before it has read any ACK of one.
+                    if (chunk.Length > 4 && chunk[0] == 1 && (chunk[3] == (byte)'D' || chunk[6] == (byte)'D'))
+                    {
+                        counting = true;
+                        Interlocked.Increment(ref seenD);
+                    }
+                    return chunk;
+                };
+                rcvr.Filter = chunk =>
+                {
+                    if (counting && dataPacketsBeforeFirstAck < 0 && chunk.Length > 3 && chunk[3] == (byte)'Y')
+                    {
+                        dataPacketsBeforeFirstAck = Volatile.Read(ref seenD);
+                    }
+                    return chunk;
+                };
+            });
+            Check(o.SendOk && o.ReceiveOk && o.Get("w.bin").SequenceEqual(data), "transfer ok");
+            Check(dataPacketsBeforeFirstAck > 1, "more than one data packet in flight (" + dataPacketsBeforeFirstAck + ")");
+        });
+
+        Run("windows: one packet at a time when either side asks for it", () =>
+        {
+            byte[] data = RandomData(8000, 43);
+            KermitTransfer.Settings one = new KermitTransfer.Settings { WindowSize = 1, MaxPacket = 500 };
+            Outcome o = Transfer(new[] { Src("w.bin", data) }, new KermitTransfer.Settings { MaxPacket = 500 }, one);
+            Check(o.SendOk && o.ReceiveOk && o.Get("w.bin").SequenceEqual(data), "transfer ok");
+        });
+
+        Run("windows: one packet at a time also repairs damaged and lost bytes", () =>
+        {
+            byte[] data = RandomData(30000);
+            KermitTransfer.Settings small = new KermitTransfer.Settings { MaxPacket = 200, WindowSize = 1 };
+            Outcome o = Transfer(new[] { Src("n.bin", data) }, small, small, (sndr, rcvr) =>
+            {
+                sndr.Filter = Noise(7, 0.001, 0.0005);
+                rcvr.Filter = Noise(107, 0.001, 0.0005);
+            });
+            Check(o.SendOk && o.ReceiveOk, "succeeded: " + o.SenderProgress.Last() + " / " + o.ReceiverProgress.Last());
+            Check(o.Get("n.bin").SequenceEqual(data), "content identical");
+        });
+
+        Run("windows: a heavily damaged line with large packets still gets through (the packets get shorter)", () =>
+        {
+            byte[] data = RandomData(40000, 44);
+            foreach (int window in new[] { 1, 16 })
+            {
+                KermitTransfer.Settings settings = new KermitTransfer.Settings { MaxPacket = 2000, WindowSize = window };
+                Outcome o = Transfer(new[] { Src("h.bin", data) }, settings, settings, (sndr, rcvr) =>
+                {
+                    sndr.Filter = Noise(window, 0.0008, 0);
+                    rcvr.Filter = Noise(window + 50, 0.0008, 0);
+                });
+                Check(o.SendOk && o.ReceiveOk, "window " + window + " succeeded: " + o.SenderProgress.Last() + " / " + o.ReceiverProgress.Last());
+                Check(o.Get("h.bin").SequenceEqual(data), "window " + window + ": content identical");
+            }
+        });
+
+        Run("attributes: the modification time travels with the file", () =>
+        {
+            byte[] data = RandomData(3000, 45);
+            DateTime when = new DateTime(2023, 4, 5, 6, 7, 8, DateTimeKind.Utc);
+            Outcome o = Transfer(new[] { new KermitTransfer.Source("dated.bin", data.Length, () => new MemoryStream(data), when) });
+            Check(o.SendOk && o.ReceiveOk && o.Get("dated.bin").SequenceEqual(data), "transfer ok");
+            Check(o.Dates.TryGetValue("dated.bin", out DateTime? got) && got == when, "the time arrived: " + (o.Dates.ContainsKey("dated.bin") ? o.Dates["dated.bin"].ToString() : "none"));
+        });
+
+        Run("attributes: a file without a time is reported without one", () =>
+        {
+            Outcome o = Transfer(new[] { Src("plain.bin", RandomData(10)) });
+            Check(o.SendOk && o.ReceiveOk, "transfer ok");
+            Check(o.Dates.TryGetValue("plain.bin", out DateTime? got) && got == null, "no time");
+        });
+
+        Run("sender: a receiver that refuses a file in its answer to the attributes makes it skip the file", () =>
+        {
+            NewLink(out End u, out End peer);
+            List<string> flow = new List<string>();
+            Task rx = Task.Run(() =>
+            {
+                while (true)
+                {
+                    Tuple<int, char, string> p = ReadFrame(peer);
+                    if (p == null) return;
+                    flow.Add(p.Item2 + p.Item3.Substring(0, Math.Min(1, p.Item3.Length)));
+                    switch (p.Item2)
+                    {
+                        case 'S':
+                            peer.Send(Frame(p.Item1, 'Y', "~* @-#N1 ( "));
+                            break;
+                        case 'A':
+                            peer.Send(Frame(p.Item1, 'Y', flow.Count(x => x[0] == 'A') == 1 ? "N" : ""));
+                            break;
+                        case 'B':
+                            peer.Send(Frame(p.Item1, 'Y', ""));
+                            return;
+                        default:
+                            peer.Send(Frame(p.Item1, 'Y', ""));
+                            break;
+                    }
+                }
+            });
+            Progress progress = new Progress();
+            bool ok = KermitTransfer.SendFiles(new[] { Src("no.bin", RandomData(5000)), Src("yes.bin", RandomData(10)) }, u.Send, u.Read,
+                CancellationToken.None, progress.Handler, Plain(), Fast());
+            rx.Wait(5000);
+            Check(ok, "the batch ended normally: " + progress.Last());
+            Check(progress.Status.Any(x => x.Contains("refused no.bin")), "the refusal is reported");
+            int refusedEof = flow.IndexOf("ZD");
+            Check(refusedEof > 0 && flow.Take(refusedEof).All(x => x[0] != 'D'), "no data of the refused file, its end marked 'discard': " + string.Join(" ", flow));
+            Check(flow.Skip(refusedEof).Count(x => x[0] == 'D') == 1, "the next file was sent: " + string.Join(" ", flow));
+        });
+
+        Run("receiver: on a 7-bit line it asks a willing sender to prefix 8-bit bytes", () =>
+        {
+            byte[] data = TrickyData();
+            Outcome o = Transfer(new[] { Src("t.bin", data) }, new KermitTransfer.Settings { EightBitPrefix = (byte)'Y' },
+                new KermitTransfer.Settings { EightBitPrefix = (byte)'&' });
+            Check(o.SendOk && o.ReceiveOk && o.Get("t.bin").SequenceEqual(data), "transfer ok: " + o.SenderProgress.Last() + " / " + o.ReceiverProgress.Last());
+            Check(o.Sender.Sent().All(b => b < 0x80), "the sender sent 7-bit bytes only");
+        });
+
+        Run("receiver: a line that breaks while a file is being written closes the file and throws it away", () =>
+        {
+            NewLink(out End s, out End r);
+            byte[] data = RandomData(50000, 46);
+            List<string> discarded = new List<string>();
+            List<bool> closed = new List<bool>();
+            int writes = 0;
+            KermitTransfer.SendDataHandler broken = (d, off, len) =>
+            {
+                if (Interlocked.Increment(ref writes) > 8) throw new IOException("line gone");
+                r.Send(d, off, len);
+            };
+            KermitTransfer.Settings small = new KermitTransfer.Settings { MaxPacket = 300, WindowSize = 1 };
+            Task<bool> rx = Task.Run(() => KermitTransfer.ReceiveFiles(
+                name => new TrackedStream(closed), name => discarded.Add(name), broken, r.Read, CancellationToken.None, null, small, Fast()));
+            Task<bool> tx = Task.Run(() => KermitTransfer.SendFiles(new[] { Src("cut.bin", data) }, s.Send, s.Read, CancellationToken.None, null, small, Fast()));
+            bool threw = false;
+            try { rx.Wait(10000); } catch (AggregateException ex) { threw = ex.InnerException is IOException; }
+            Check(threw, "the exception reaches the caller");
+            Check(closed.SequenceEqual(new[] { true }), "the file was closed");
+            Check(discarded.SequenceEqual(new[] { "cut.bin" }), "and thrown away");
+            tx.Wait(10000);
+        });
 
         Run("sender: silence from the receiver ends with a handshake timeout", () =>
         {

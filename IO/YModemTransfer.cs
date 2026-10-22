@@ -710,15 +710,75 @@ public class YModemTransfer
 
         byte[] terminator = new byte[BlockSize];
         int terminatorLength = XModemTransfer.BuildPacket(packet, terminator, terminator.Length, terminator.Length, 0, blockMode);
-        Delivery last = SendBlock(link, packet, terminatorLength, "the end-of-batch block", streaming ? 1 : EndOfBatchAttempts, timeouts.AckMs, onProgress, done, total, ref errors);
-        if (last == Delivery.Aborted)
+
+        // Many receivers (lrzsz rb among them) leave without acknowledging the end-of-batch block, so silence counts as
+        // success at once; only a receiver that asks again (NAK, or its request byte) gets the block again.
+        for (int attempt = 1; attempt <= EndOfBatchAttempts; attempt++)
         {
-            return false;
+            if (link.IsCancelled)
+            {
+                link.SendCancel();
+                XModemTransfer.Report(onProgress, done, total, errors, "Transfer cancelled.");
+                return false;
+            }
+            link.Send(packet, terminatorLength);
+            BatchEndAnswer answer = AwaitBatchEndAnswer(link, timeouts.BatchEndAckMs, request);
+            if (answer == BatchEndAnswer.Ack)
+            {
+                XModemTransfer.Report(onProgress, done, total, errors, "Transfer complete.");
+                return true;
+            }
+            if (answer == BatchEndAnswer.Cancelled)
+            {
+                XModemTransfer.Report(onProgress, done, total, errors, "Cancelled by the receiver.");
+                return false;
+            }
+            if (answer == BatchEndAnswer.Silence)
+            {
+                break;
+            }
+            errors++;
         }
-        XModemTransfer.Report(onProgress, done, total, errors, last == Delivery.Acked
-            ? "Transfer complete."
-            : "Transfer complete (the end-of-batch block was not acknowledged).");
+        XModemTransfer.Report(onProgress, done, total, errors, "Transfer complete (the end-of-batch block was not acknowledged).");
         return true;
+    }
+
+    private enum BatchEndAnswer
+    {
+        Ack,
+        Again,
+        Silence,
+        Cancelled
+    }
+
+    /// <summary>The receiver's answer to the end-of-batch block; Again when it asked for the block once more.</summary>
+    private static BatchEndAnswer AwaitBatchEndAnswer(XModemTransfer.Link link, int timeoutMs, byte request)
+    {
+        long start = Stopwatch.GetTimestamp();
+        bool previousWasCan = false;
+        while (true)
+        {
+            int left = timeoutMs - XModemTransfer.ElapsedMs(start);
+            byte? b = left > 0 ? link.Read(left) : null;
+            if (!b.HasValue)
+            {
+                return link.IsCancelled ? BatchEndAnswer.Again : BatchEndAnswer.Silence;
+            }
+            if (b.Value == ACK)
+            {
+                return BatchEndAnswer.Ack;
+            }
+            if (b.Value == NAK || b.Value == request)
+            {
+                link.Purge(0);
+                return BatchEndAnswer.Again;
+            }
+            if (b.Value == CAN && previousWasCan)
+            {
+                return BatchEndAnswer.Cancelled;
+            }
+            previousWasCan = b.Value == CAN;
+        }
     }
 
     private static string RequestName(byte request)
@@ -732,6 +792,7 @@ public class YModemTransfer
     {
         File,
         EndOfBatch,
+        SenderGone,
         Failed
     }
 
@@ -742,17 +803,20 @@ public class YModemTransfer
     /// acknowledged here: the caller does that once it knows where the file goes.
     /// </summary>
     private static HeaderResult ReceiveHeader(XModemTransfer.Link link, byte[] payload, XModemTransfer.ProgressHandler onProgress,
-        ref int errors, XModemTransfer.Timeouts timeouts, ref Variant variant, bool negotiate, out FileHeader info)
+        ref int errors, XModemTransfer.Timeouts timeouts, ref Variant variant, bool negotiate, bool first, out FileHeader info)
     {
         info = null;
 
         byte? start = null;
         Variant[] phases = negotiate ? new[] { Variant.Crc, Variant.Checksum } : new[] { variant };
+        // After a complete file a sender that stays silent has finished: some (lrzsz sb in YMODEM-G) never send the
+        // end-of-batch block, so the next header is not waited for as long as the first one.
+        int attempts = first ? MaxRetries : Math.Max(1, timeouts.BatchEndRequestMs / Math.Max(1, timeouts.ReceiverHandshakeAttemptMs));
         for (int phase = 0; phase < phases.Length && !start.HasValue; phase++)
         {
             variant = phases[phase];
             byte request = RequestOf(variant);
-            for (int attempt = 0; attempt < MaxRetries && !start.HasValue; attempt++)
+            for (int attempt = 0; attempt < attempts && !start.HasValue; attempt++)
             {
                 if (link.IsCancelled)
                 {
@@ -777,6 +841,10 @@ public class YModemTransfer
         }
         if (!start.HasValue)
         {
+            if (!first)
+            {
+                return HeaderResult.SenderGone;
+            }
             XModemTransfer.Report(onProgress, 0, 0, ++errors, "The sender did not respond to the handshake.");
             return HeaderResult.Failed;
         }
@@ -1100,11 +1168,18 @@ public class YModemTransfer
         while (true)
         {
             FileHeader info;
-            HeaderResult result = ReceiveHeader(link, payload, onProgress, ref errors, timeouts, ref variant, negotiate, out info);
+            HeaderResult result = ReceiveHeader(link, payload, onProgress, ref errors, timeouts, ref variant, negotiate, filesReceived == 0, out info);
             negotiate = false;
             if (result == HeaderResult.Failed)
             {
                 return false;
+            }
+            if (result == HeaderResult.SenderGone)
+            {
+                // Every file so far arrived complete (its size and its EOT were checked); only the closing block is missing.
+                XModemTransfer.Report(onProgress, 0, 0, errors, (filesReceived == 1 ? "File received successfully" : filesReceived + " files received successfully")
+                    + " (the sender did not send the end-of-batch block).");
+                return true;
             }
             if (result == HeaderResult.EndOfBatch)
             {

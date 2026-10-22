@@ -422,7 +422,7 @@ public partial class DeviceTerminalControl
 
         using OpenFileDialog openFileDialog = new OpenFileDialog
         {
-            Title = "Select files to send via ZMODEM (start the receive on the device first, for example: rz)",
+            Title = "Select files to send via ZMODEM (at a shell prompt the device's rz is started automatically)",
             Filter = "All files (*.*)|*.*",
             Multiselect = true
         };
