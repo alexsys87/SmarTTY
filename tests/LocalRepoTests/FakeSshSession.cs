@@ -35,6 +35,12 @@ namespace SmarTTY.Ssh
 
         public string ApkKeyFile;
 
+        /// <summary>When set, /etc/opkg.conf of the scripts (the signature check of opkg) is this file, and the probe of the check is run too.</summary>
+        public string OpkgConfFile;
+
+        /// <summary>Runs the check whether the device reaches the server: here the "device" is this computer, the tunnel the identity.</summary>
+        public bool RunFetchCheck;
+
         public Func<string, string> RunShell;
 
         public List<string> RunCommandChecked(string command, bool requireSuccess, string terminalType = null)
@@ -55,6 +61,14 @@ namespace SmarTTY.Ssh
             {
                 return ApkMissing ? null : new List<string>();
             }
+            if (command.Contains("SMARTTY_SIGCHECK") && OpkgConfFile != null)
+            {
+                return RunMapped(command);
+            }
+            if (command.Contains("SMARTTY_FETCH"))
+            {
+                return RunFetchCheck ? RunMapped(command) : new List<string>();
+            }
             if (command.Contains("smartty-local-begin"))
             {
                 if (FailEnable && command.Contains("printf"))
@@ -65,23 +79,32 @@ namespace SmarTTY.Ssh
                 {
                     return new List<string>();
                 }
-                string mapped = command;
-                if (LocalConfigFile != null)
-                {
-                    mapped = mapped.Replace("/etc/opkg/customfeeds.conf", LocalConfigFile);
-                }
-                if (ApkConfigFile != null)
-                {
-                    mapped = mapped.Replace("/etc/apk/repositories.d/customfeeds.list", ApkConfigFile);
-                }
-                if (ApkKeyFile != null)
-                {
-                    mapped = mapped.Replace("/etc/apk/keys/smartty-local.pem", ApkKeyFile);
-                }
-                string output = RunShell(mapped);
-                return output == null ? null : new List<string>();
+                return RunMapped(command) == null ? null : new List<string>();
             }
             return new List<string>();
+        }
+
+        private List<string> RunMapped(string command)
+        {
+            string mapped = command;
+            if (LocalConfigFile != null)
+            {
+                mapped = mapped.Replace("/etc/opkg/customfeeds.conf", LocalConfigFile);
+            }
+            if (ApkConfigFile != null)
+            {
+                mapped = mapped.Replace("/etc/apk/repositories.d/customfeeds.list", ApkConfigFile);
+            }
+            if (ApkKeyFile != null)
+            {
+                mapped = mapped.Replace("/etc/apk/keys/smartty-local.pem", ApkKeyFile);
+            }
+            if (OpkgConfFile != null)
+            {
+                mapped = mapped.Replace("/etc/opkg.conf", OpkgConfFile);
+            }
+            string output = RunShell(mapped);
+            return output == null ? null : new List<string>(output.Split('\n', StringSplitOptions.RemoveEmptyEntries));
         }
 
         public void StartRemoteForward(uint boundPort, string host, uint hostPort)

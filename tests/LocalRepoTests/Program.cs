@@ -477,6 +477,177 @@ internal static class Program
         }
     }
 
+    /// <summary>The scripts that probe, turn off and turn on again the signature check of opkg, under sh and BusyBox ash.</summary>
+    private static void OpkgSignatureTests()
+    {
+        List<LocalRepoFeed> feeds = new List<LocalRepoFeed> { new LocalRepoFeed { Name = "smartty_base", UrlPath = "/r0/base", Directory = "/x" } };
+        const string original = "dest root /\ndest ram /tmp\nlists_dir ext /var/opkg-lists\noption overlay_root /overlay\noption check_signature\n";
+        foreach ((string name, string shell, string[] args) in Shells())
+        {
+            string Exec(string script, out int exit)
+            {
+                exit = RunArgs(shell, args.Concat(new[] { script }).ToArray(), out string output, out string error);
+                return output + error;
+            }
+
+            bool Probe(string opkgConf)
+            {
+                return OpkgFeedConfig.ParseSignatureProbe(Exec(OpkgFeedConfig.BuildSignatureProbe(opkgConf), out _).Split('\n'));
+            }
+
+            string dir = Path.Combine(_work, "sig-" + name.Replace(' ', '-'));
+            Directory.CreateDirectory(dir);
+            string opkgConf = Path.Combine(dir, "opkg.conf");
+            string missing = Path.Combine(dir, "missing.conf");
+            string conf = Path.Combine(dir, "customfeeds.conf");
+
+            File.WriteAllText(opkgConf, original);
+            Check(Probe(opkgConf), name + ": the probe sees option check_signature");
+            File.WriteAllText(opkgConf, "option check_signature 0\n");
+            Check(!Probe(opkgConf), name + ": check_signature 0 is no check");
+            File.WriteAllText(opkgConf, "option check_signature_x\n# option check_signature\n");
+            Check(!Probe(opkgConf), name + ": a commented option or another option is no check");
+            Check(!Probe(missing), name + ": no opkg.conf is no check");
+
+            File.WriteAllText(opkgConf, original);
+            Exec(OpkgFeedConfig.BuildEnableScript(feeds, 8765, conf, allowUnsigned: true, opkgConf: opkgConf), out int exit1);
+            string off = File.ReadAllText(opkgConf);
+            Check(exit1 == 0 && off == original.Replace("option check_signature\n", OpkgFeedConfig.SignatureOffMarker + "option check_signature\n") && File.ReadAllText(conf).Contains("src/gz smartty_base"), name + ": enable with unsigned feeds allowed comments the check out and adds the feeds");
+            Check(!Probe(opkgConf), name + ": and the probe sees no check then");
+            Exec(OpkgFeedConfig.BuildEnableScript(feeds, 8765, conf, allowUnsigned: true, opkgConf: opkgConf), out int exit2);
+            Check(exit2 == 0 && File.ReadAllText(opkgConf) == off, name + ": enabling again does not add a second marker");
+            Exec(OpkgFeedConfig.BuildDisableScript(conf, opkgConf), out int exit3);
+            Check(exit3 == 0 && File.ReadAllText(opkgConf) == original && !File.ReadAllText(conf).Contains("smartty"), name + ": disable removes the feeds and gives the check back unchanged");
+
+            // A run that allowed unsigned feeds left the marker (SmarTTY was killed); the next run without it restores the check.
+            File.WriteAllText(opkgConf, off);
+            Exec(OpkgFeedConfig.BuildEnableScript(feeds, 8765, conf, allowUnsigned: false, opkgConf: opkgConf), out int exit4);
+            Check(exit4 == 0 && File.ReadAllText(opkgConf) == original, name + ": enable without unsigned feeds turns a check left off by an earlier run on again");
+            File.WriteAllText(opkgConf, "option check_signature 0\n");
+            Exec(OpkgFeedConfig.BuildEnableScript(feeds, 8765, conf, allowUnsigned: true, opkgConf: opkgConf), out int exit5);
+            Check(exit5 == 0 && File.ReadAllText(opkgConf) == "option check_signature 0\n", name + ": an opkg.conf without the check is not touched");
+            Exec(OpkgFeedConfig.BuildEnableScript(feeds, 8765, conf, allowUnsigned: true, opkgConf: missing), out int exit6);
+            Exec(OpkgFeedConfig.BuildDisableScript(conf, missing), out int exit7);
+            Check(exit6 == 0 && exit7 == 0 && !File.Exists(missing), name + ": no opkg.conf: enable and disable succeed without creating it");
+        }
+    }
+
+    /// <summary>The host with the signature check of opkg on the device, and the check that the device reaches the server.</summary>
+    private static void SignatureHostTests()
+    {
+        string root = Path.Combine(_work, "sighost", "bin", "packages", "arm");
+        string feed = Path.Combine(root, "base");
+        MakeIpk(feed, "unsigned", "1.0", "No signature");
+        string dir = Path.Combine(_work, "sighost", "device");
+        Directory.CreateDirectory(dir);
+        string conf = Path.Combine(dir, "customfeeds.conf");
+        string opkgConf = Path.Combine(dir, "opkg.conf");
+        const string original = "dest root /\noption check_signature\n";
+
+        // The check is on and unsigned feeds are not allowed: the feed is added, with a warning that opkg drops it.
+        File.WriteAllText(opkgConf, original);
+        LocalRepoHost host = new LocalRepoHost();
+        SshSession session = NewFakeSession(conf);
+        session.OpkgConfFile = opkgConf;
+        session.RunFetchCheck = Has("wget") || Has("curl");
+        host.Start(session, new[] { root }, 0);
+        Check(File.ReadAllText(opkgConf) == original && host.GetHistory().Any(l => l.Contains("Warning: opkg checks signatures") && l.Contains("smartty_arm_base") && l.Contains("Allow unsigned feeds")), "check on: the feed without a signature is named in a warning, opkg.conf is left alone");
+        if (session.RunFetchCheck)
+        {
+            Check(host.GetHistory().Any(l => l.Contains("The device reaches the server at http://127.0.0.1:" + host.Port + "/")), "the device fetches the start page of the server through the tunnel");
+        }
+        else
+        {
+            Skip("the device reaches the server", "neither wget nor curl is installed");
+        }
+        host.Stop(session);
+        Check(!host.GetHistory().Last().Contains("signatures again"), "Stop without the check turned off does not claim to turn it on");
+
+        // Allowed: the check is off while the server runs and on again after Stop.
+        host.Start(session, new[] { root }, 0, LocalRepoPackageManager.Opkg, allowUnsigned: true);
+        Check(File.ReadAllText(opkgConf).Contains(OpkgFeedConfig.SignatureOffMarker + "option check_signature") && host.GetHistory().Any(l => l.Contains("is commented out until the server is stopped")), "unsigned feeds allowed: the check is commented out and the log says so");
+        SshSession next = NewFakeSession(conf);
+        next.OpkgConfFile = opkgConf;
+        File.WriteAllText(opkgConf, original);
+        host.Reattach(next);
+        Check(File.ReadAllText(opkgConf).Contains(OpkgFeedConfig.SignatureOffMarker), "Reattach turns the check off again (the device rebooted meanwhile)");
+        host.Stop(next);
+        Check(File.ReadAllText(opkgConf) == original && host.GetHistory().Last().Contains("opkg checks signatures again"), "Stop turns the check on again and says so");
+
+        // A fresh index with its signature is fine for opkg: no warning.
+        File.WriteAllText(Path.Combine(feed, "Packages"), "Package: unsigned\n\n");
+        File.WriteAllText(Path.Combine(feed, "Packages.sig"), "untrusted comment: signed by key 0123456789abcdef\nRWQ=\n");
+        File.SetLastWriteTimeUtc(Path.Combine(feed, "Packages"), DateTime.UtcNow.AddMinutes(5));
+        Check(LocalRepoHost.DescribeUnsignedFeeds(LocalRepoFeedScanner.Scan(new[] { root })) == null, "a fresh index with Packages.sig needs no warning");
+        File.SetLastWriteTimeUtc(Path.Combine(feed, "Packages"), DateTime.UtcNow.AddHours(-1));
+        Check(LocalRepoHost.DescribeUnsignedFeeds(LocalRepoFeedScanner.Scan(new[] { root })) != null, "a stale index is generated and has no signature: warning");
+
+        // The tunnel leads nowhere: the warning tells what to check.
+        LocalRepoHost broken = new LocalRepoHost();
+        SshSession nowhere = NewFakeSession(conf);
+        nowhere.RunFetchCheck = true;
+        nowhere.RunShell = (string script) => script.Contains("SMARTTY_FETCH") ? "SMARTTY_FETCH=failed\n" : "";
+        broken.Start(nowhere, new[] { root }, 0);
+        Check(broken.GetHistory().Any(l => l.Contains("Warning: the device could not fetch") && l.Contains("TCP forwarding")), "a device that cannot reach the server gets a warning in the log");
+        broken.Stop(nowhere);
+    }
+
+    /// <summary>Writes an "ar" archive like opkg-build of opkg-utils makes (and dpkg-deb): debian-binary, control.tar.gz, data.tar.gz.</summary>
+    private static string MakeArIpk(string directory, string name, string version, bool gnuNames, bool oddSizes)
+    {
+        string staging = Path.Combine(_work, "arstage-" + Guid.NewGuid().ToString("N"));
+        string ctl = Path.Combine(staging, "ctl");
+        Directory.CreateDirectory(ctl);
+        File.WriteAllText(Path.Combine(ctl, "control"), "Package: " + name + "\nVersion: " + version + "\nArchitecture: all\nDescription: From an ar archive\n");
+        Check(Run("tar", "-czf control.tar.gz -C ctl ./control", staging, out _, out string e1) == 0, "tar control.tar.gz " + e1);
+        byte[] control = File.ReadAllBytes(Path.Combine(staging, "control.tar.gz"));
+        byte[] data = new byte[oddSizes ? 1001 : 1000];
+        string ipk = Path.Combine(directory, name + "_" + version + "_all.ipk");
+        Directory.CreateDirectory(directory);
+        using (FileStream output = File.Create(ipk))
+        {
+            void Member(string memberName, byte[] content)
+            {
+                string header = (memberName + (gnuNames ? "/" : "")).PadRight(16) + "0".PadRight(12) + "0".PadRight(6) + "0".PadRight(6) + "100644".PadRight(8) + content.Length.ToString().PadRight(10) + "`\n";
+                output.Write(Encoding.ASCII.GetBytes(header));
+                output.Write(content);
+                if (content.Length % 2 != 0)
+                {
+                    output.WriteByte((byte)'\n');
+                }
+            }
+            output.Write(Encoding.ASCII.GetBytes("!<arch>\n"));
+            Member("debian-binary", Encoding.ASCII.GetBytes(oddSizes ? "2.0\n\n\n" : "2.0\n"));
+            Member("control.tar.gz", control);
+            Member("data.tar.gz", data);
+        }
+        return ipk;
+    }
+
+    private static void ArIpkTests()
+    {
+        string dir = Path.Combine(_work, "ar-feed");
+        string plain = MakeArIpk(dir, "fromar", "1.0", gnuNames: false, oddSizes: false);
+        string gnu = MakeArIpk(dir, "fromgnuar", "2.0", gnuNames: true, oddSizes: true);
+        MakeIpk(dir, "fromtar", "3.0", "OpenWrt style");
+        Check(IpkIndexBuilder.ReadControl(plain)?.Contains("Package: fromar") == true, "the control file of an .ipk in ar format is read");
+        Check(IpkIndexBuilder.ReadControl(gnu)?.Contains("Package: fromgnuar") == true, "GNU ar member names (with '/') and odd member sizes are read");
+        IpkIndexBuilder.Index index = IpkIndexBuilder.Build(dir);
+        string text = Encoding.UTF8.GetString(index.Packages);
+        Check(index.Count == 3 && index.Warnings.Count == 0 && text.Contains("Package: fromar") && text.Contains("Package: fromgnuar") && text.Contains("Package: fromtar"), "ar and tar packages are indexed side by side");
+        Check(text.Contains("Filename: fromar_1.0_all.ipk\nSize: " + new FileInfo(plain).Length), "the file fields of an ar package");
+        if (Has("ar"))
+        {
+            string arDir = Path.Combine(_work, "ar-tool");
+            Directory.CreateDirectory(arDir);
+            File.Copy(plain, Path.Combine(arDir, "copy.ipk"));
+            Check(Run("ar", "t copy.ipk", arDir, out string members, out _) == 0 && members.Replace("\r", "") == "debian-binary\ncontrol.tar.gz\ndata.tar.gz\n", "the test archive is a valid ar archive for the system ar");
+        }
+        File.WriteAllBytes(Path.Combine(dir, "broken_1.0_all.ipk"), Encoding.ASCII.GetBytes("!<arch>\nnot a header at all"));
+        IpkIndexBuilder.Index withBroken = IpkIndexBuilder.Build(dir);
+        Check(withBroken.Count == 3 && withBroken.Warnings.Count == 1 && withBroken.Warnings[0].StartsWith("broken_1.0_all.ipk"), "a damaged ar archive is skipped with a warning");
+    }
+
     private static bool PortIsOpen(int port)
     {
         try
@@ -505,6 +676,7 @@ internal static class Program
             File.WriteAllText(Path.Combine(fakeBin, "opkg"), "#!/bin/sh\nexit 0\n");
             File.SetUnixFileMode(Path.Combine(fakeBin, "opkg"), UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
+        LinkGrep(fakeBin);
         string script = "PATH=" + fakeBin + "; " + OpenWrtDetector.ProbeCommand.Replace("/etc/", etcDir + "/");
         int exit = RunArgs(shell, args.Concat(new[] { script }).ToArray(), out string output, out string error);
         if (exit != 0)
@@ -512,6 +684,16 @@ internal static class Program
             throw new Exception("the probe command failed: " + output + error);
         }
         return OpenWrtDetector.Parse((output + error).Split('\n'));
+    }
+
+    /// <summary>The probe reads /etc/os-release with grep, the only program it needs besides the shell.</summary>
+    private static void LinkGrep(string fakeBin)
+    {
+        string grep = new[] { "/usr/bin/grep", "/bin/grep" }.FirstOrDefault(File.Exists);
+        if (grep != null)
+        {
+            File.CreateSymbolicLink(Path.Combine(fakeBin, "grep"), grep);
+        }
     }
 
     private static void DetectorTests()
@@ -536,6 +718,20 @@ internal static class Program
             Check(!RunProbe(shell, args, plainEtc, opkgOnPath: true), name + ": a plain host with opkg installed is not offered");
             Check(!RunProbe(shell, args, plainEtc, opkgOnPath: false), name + ": a plain host is not offered");
             Check(RunProbe(shell, args, opkgEtc, opkgOnPath: true), name + ": the opkg configuration directory alone counts as OpenWrt");
+
+            // Derivatives tell about their OpenWrt base in /etc/os-release only.
+            string derivativeEtc = Path.Combine(_work, "etc-immortalwrt-" + name.Replace(' ', '-'));
+            Directory.CreateDirectory(derivativeEtc);
+            File.WriteAllText(Path.Combine(derivativeEtc, "os-release"), "NAME=\"ImmortalWrt\"\nID=\"immortalwrt\"\nID_LIKE=\"lede openwrt\"\n");
+            Check(RunProbe(shell, args, derivativeEtc, opkgOnPath: true), name + ": a derivative with ID_LIKE=openwrt in os-release is detected");
+            string openwrtOsRelease = Path.Combine(_work, "etc-osrelease-" + name.Replace(' ', '-'));
+            Directory.CreateDirectory(openwrtOsRelease);
+            File.WriteAllText(Path.Combine(openwrtOsRelease, "os-release"), "NAME=\"OpenWrt\"\nID=\"openwrt\"\n");
+            Check(RunProbe(shell, args, openwrtOsRelease, opkgOnPath: true), name + ": ID=openwrt in os-release is detected");
+            string debianEtc = Path.Combine(_work, "etc-debian-" + name.Replace(' ', '-'));
+            Directory.CreateDirectory(debianEtc);
+            File.WriteAllText(Path.Combine(debianEtc, "os-release"), "NAME=\"Debian GNU/Linux\"\nID=debian\nHOME_URL=\"https://openwrt.org/\"\n");
+            Check(!RunProbe(shell, args, debianEtc, opkgOnPath: true), name + ": another system in os-release is not taken for OpenWrt, even if the word appears elsewhere");
         }
 
         Check(!OpenWrtDetector.Parse(null), "probe output: none means not OpenWrt");
@@ -748,6 +944,7 @@ internal static class Program
         {
             MakeFakeProgram(fakeBin, "apk");
         }
+        LinkGrep(fakeBin);
         string script = "PATH=" + fakeBin + "; " + OpenWrtDetector.ProbeCommand.Replace("/etc/", etcDir + "/");
         int exit = RunArgs(shell, args.Concat(new[] { script }).ToArray(), out string output, out string error);
         if (exit != 0)
@@ -935,6 +1132,9 @@ internal static class Program
             Check(apk.status == 200 && apk.body.SequenceEqual(package), "an .apk is served byte for byte (200 KiB)");
             Check((await GetAsync(client, baseUrl + "/r0/base/Packages")).status == 404, "an apk feed has no opkg index");
             Check((await GetAsync(client, baseUrl + "/r0/base/../../../../secret")).status != 200, "path traversal is refused for apk feeds too");
+            server.Feeds = LocalRepoFeedScanner.Scan(new[] { root });
+            string startPage = Encoding.UTF8.GetString((await GetAsync(client, baseUrl + "/")).body);
+            Check(startPage.Contains("href=\"/r0/base/packages.adb\"") && !startPage.Contains("/r0/base/Packages"), "the start page links an apk feed to its packages.adb, not to an opkg index");
             lock (log)
             {
                 Check(log.Any(l => l.StartsWith("GET /r0/base/packages.adb - 200") && !l.Contains("warning")), "a fresh index is logged without a warning");
@@ -1163,7 +1363,10 @@ internal static class Program
             DetectorTests();
             await ServerTests();
             ConfigTests();
+            OpkgSignatureTests();
+            ArIpkTests();
             await HostTests();
+            SignatureHostTests();
             ApkDetectorAndScannerTests();
             ApkConfigTests();
             await ApkServerAndHostTests();

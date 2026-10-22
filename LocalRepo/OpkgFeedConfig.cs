@@ -17,6 +17,20 @@ public static class OpkgFeedConfig
 
     public const string EndMarker = "# smartty-local-end";
 
+    /// <summary>The main configuration of opkg, where OpenWrt turns the signature check of the package lists on.</summary>
+    public const string OpkgConfFile = "/etc/opkg.conf";
+
+    /// <summary>
+    /// Put in front of "option check_signature" while the server runs with unsigned feeds allowed; taken away again by
+    /// Stop and by "Remove feeds from device".
+    /// </summary>
+    public const string SignatureOffMarker = "# smartty-local-off: ";
+
+    public const string SignatureCheckOnMarker = "SMARTTY_SIGCHECK=on";
+
+    // "option check_signature" (as OpenWrt writes it) or with a value other than 0.
+    private const string SignatureOptionPattern = "^[[:space:]]*option[[:space:]][[:space:]]*check_signature([[:space:]]*$|[[:space:]][[:space:]]*[^0[:space:]])";
+
     /// <summary>The address of the server as the device sees it: the end of the reverse tunnel on the device itself.</summary>
     public static string BaseUrl(int port)
     {
@@ -33,10 +47,43 @@ public static class OpkgFeedConfig
         return "command -v opkg >/dev/null 2>&1";
     }
 
-    /// <summary>Replaces the block of local feeds in the configuration file (creating the file if needed).</summary>
-    public static string BuildEnableScript(IList<LocalRepoFeed> feeds, int port, string configFile = DefaultConfigFile)
+    /// <summary>
+    /// Replaces the block of local feeds in the configuration file (creating the file if needed). With
+    /// <paramref name="allowUnsigned"/> the signature check of opkg is turned off until the feeds are removed, otherwise
+    /// a check turned off by an earlier run is turned on again.
+    /// </summary>
+    public static string BuildEnableScript(IList<LocalRepoFeed> feeds, int port, string configFile = DefaultConfigFile, bool allowUnsigned = false, string opkgConf = OpkgConfFile)
     {
-        return BuildBlockEnableScript(feeds.Select((LocalRepoFeed feed) => FeedLine(feed, port)), configFile);
+        return BuildBlockEnableScript(feeds.Select((LocalRepoFeed feed) => FeedLine(feed, port)), configFile) + " && " +
+            (allowUnsigned ? BuildSignatureOffScript(opkgConf) : BuildSignatureRestoreScript(opkgConf));
+    }
+
+    /// <summary>Prints <see cref="SignatureCheckOnMarker"/> when opkg checks the signatures of the package lists.</summary>
+    public static string BuildSignatureProbe(string opkgConf = OpkgConfFile)
+    {
+        return "grep -qsE '" + SignatureOptionPattern + "' " + RemotePathUtils.ShellQuote(opkgConf) + " && echo " + SignatureCheckOnMarker + " || echo SMARTTY_SIGCHECK=off";
+    }
+
+    /// <summary>True when the output of <see cref="BuildSignatureProbe"/> says that opkg checks signatures.</summary>
+    public static bool ParseSignatureProbe(IEnumerable<string> lines)
+    {
+        return lines != null && lines.Any((string line) => line?.Trim() == SignatureCheckOnMarker);
+    }
+
+    /// <summary>
+    /// Comments out the "option check_signature" lines with the marker of SmarTTY in front, so that the restore gives back
+    /// the very same lines; does nothing when opkg does not check signatures.
+    /// </summary>
+    public static string BuildSignatureOffScript(string opkgConf = OpkgConfFile)
+    {
+        return "{ c=" + RemotePathUtils.ShellQuote(opkgConf) + "; ! grep -qsE '" + SignatureOptionPattern + "' \"$c\" || " +
+            "sed -i 's/^\\([[:space:]]*option[[:space:]][[:space:]]*check_signature\\)/" + SignatureOffMarker + "\\1/' \"$c\"; }";
+    }
+
+    /// <summary>Takes the marker of SmarTTY away, so that opkg checks signatures again; does nothing when there is none.</summary>
+    public static string BuildSignatureRestoreScript(string opkgConf = OpkgConfFile)
+    {
+        return "{ c=" + RemotePathUtils.ShellQuote(opkgConf) + "; ! grep -qs '^" + SignatureOffMarker + "' \"$c\" || sed -i 's/^" + SignatureOffMarker + "//' \"$c\"; }";
     }
 
     /// <summary>The same for any list of repository lines: the lines are written between the markers, replacing an earlier block.</summary>
@@ -50,10 +97,10 @@ public static class OpkgFeedConfig
             "printf '%s\\n' " + lines + " >> \"$f\"";
     }
 
-    /// <summary>Removes the block of local feeds; succeeds if there is none.</summary>
-    public static string BuildDisableScript(string configFile = DefaultConfigFile)
+    /// <summary>Removes the block of local feeds and turns the signature check on again if SmarTTY turned it off; succeeds if there is none.</summary>
+    public static string BuildDisableScript(string configFile = DefaultConfigFile, string opkgConf = OpkgConfFile)
     {
-        return BuildBlockDisableScript(configFile);
+        return BuildBlockDisableScript(configFile) + " && " + BuildSignatureRestoreScript(opkgConf);
     }
 
     public static string BuildBlockDisableScript(string configFile)

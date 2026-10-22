@@ -28,6 +28,11 @@ public sealed class LocalRepoHost
 
     private string _PublicKey;
 
+    private bool _AllowUnsigned;
+
+    // The signature check of opkg was on and is commented out while the server runs.
+    private bool _SignatureCheckOff;
+
     private readonly List<string> _History = new List<string>();
 
     private const int MaxHistoryLines = 500;
@@ -138,10 +143,12 @@ public sealed class LocalRepoHost
     /// Starts the server and the tunnel and adds the feeds to the device; throws with a message for the user when it cannot.
     /// <paramref name="manager"/> is the package manager of the device: only the feeds for it are served.
     /// <paramref name="trustBuildKey"/> (apk only) also makes the device trust public-key.pem of the build tree.
+    /// <paramref name="allowUnsigned"/> (opkg only) turns the signature check of opkg off while the server runs.
     /// </summary>
-    public void Start(SshSession session, IList<string> folders, int port, LocalRepoPackageManager manager = LocalRepoPackageManager.Opkg, bool trustBuildKey = false)
+    public void Start(SshSession session, IList<string> folders, int port, LocalRepoPackageManager manager = LocalRepoPackageManager.Opkg, bool trustBuildKey = false, bool allowUnsigned = false)
     {
         bool apk = manager == LocalRepoPackageManager.Apk;
+        allowUnsigned = allowUnsigned && !apk;
         if (session == null)
         {
             throw new InvalidOperationException("There is no SSH connection.");
@@ -191,6 +198,16 @@ public sealed class LocalRepoHost
             }
         }
         bool isRoot = IsRoot(session);
+        // opkg drops the list of a feed whose signature is missing or not trusted when "option check_signature" is set,
+        // so its packages would silently not show up: say so, or say that the check is off for the time the server runs.
+        string signatureNote = null;
+        bool signatureCheckOn = !apk && OpkgFeedConfig.ParseSignatureProbe(session.RunCommandChecked(OpkgFeedConfig.BuildSignatureProbe(), requireSuccess: false));
+        if (signatureCheckOn)
+        {
+            signatureNote = allowUnsigned
+                ? "opkg checks signatures on the device: \"option check_signature\" in " + OpkgFeedConfig.OpkgConfFile + " is commented out until the server is stopped."
+                : DescribeUnsignedFeeds(feeds);
+        }
 
         LocalRepoServer server = new LocalRepoServer(roots, port);
         server.Feeds = feeds;
@@ -216,7 +233,7 @@ public sealed class LocalRepoHost
             {
                 throw new InvalidOperationException("The SSH server of the device did not accept the reverse tunnel for port " + server.Port + " (the port may be busy on the device, or TCP forwarding is disabled in its SSH server): " + exception.Message, exception);
             }
-            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey);
+            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey, allowUnsigned);
         }
         catch
         {
@@ -235,8 +252,80 @@ public sealed class LocalRepoHost
             _Feeds = feeds;
             _Manager = manager;
             _PublicKey = publicKey;
+            _AllowUnsigned = allowUnsigned;
+            _SignatureCheckOff = allowUnsigned && signatureCheckOn;
         }
         Report("Server started on port " + server.Port + ", " + feeds.Count + (feeds.Count == 1 ? " feed" : " feeds") + " added to " + (apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile) + " on the device" + (publicKey != null ? "; the key of the build is trusted by apk" : "") + ".");
+        if (signatureNote != null)
+        {
+            Report(signatureNote);
+        }
+        CheckDeviceReachesServer(session, server.Port);
+    }
+
+    /// <summary>
+    /// The warning for feeds that opkg with the signature check on cannot use: those without a Packages.sig of the build
+    /// next to an up-to-date index (a generated index has no signature). Null when every feed has one.
+    /// </summary>
+    internal static string DescribeUnsignedFeeds(IList<LocalRepoFeed> feeds)
+    {
+        List<string> unsigned = feeds.Where((LocalRepoFeed feed) => !HasUsableSignature(feed.Directory)).Select((LocalRepoFeed feed) => feed.Name).ToList();
+        if (unsigned.Count == 0)
+        {
+            return null;
+        }
+        return "Warning: opkg checks signatures on the device (\"option check_signature\" in " + OpkgFeedConfig.OpkgConfFile + "), and " +
+            (unsigned.Count == 1 ? "this feed has" : "these feeds have") + " no signature, so \"opkg update\" drops " + (unsigned.Count == 1 ? "it" : "them") + ": " + string.Join(", ", unsigned.ToArray()) +
+            ". Restart the server with \"Allow unsigned feeds (opkg)\", or serve a fresh index of the build with its Packages.sig (make package/index) to a firmware built from the same tree.";
+    }
+
+    private static bool HasUsableSignature(string directory)
+    {
+        try
+        {
+            return File.Exists(Path.Combine(directory, "Packages.sig")) && !IpkIndexBuilder.NeedsGeneratedIndex(directory);
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Fetches the start page of the server on the device through the tunnel (with uclient-fetch, wget or curl, whichever it
+    /// has), so that a tunnel that is accepted but leads nowhere shows up in the log now rather than as a failed update later.
+    /// </summary>
+    private void CheckDeviceReachesServer(SshSession session, int port)
+    {
+        string url = OpkgFeedConfig.BaseUrl(port) + "/";
+        string script =
+            "if command -v uclient-fetch >/dev/null 2>&1; then f='uclient-fetch -q -T 10 -O /dev/null'; " +
+            "elif command -v wget >/dev/null 2>&1; then f='wget -q -T 10 -O /dev/null'; " +
+            "elif command -v curl >/dev/null 2>&1; then f='curl -fsS -m 10 -o /dev/null'; " +
+            "else echo SMARTTY_FETCH=none; exit 0; fi; " +
+            "if $f " + url + " >/dev/null 2>&1; then echo SMARTTY_FETCH=ok; else echo SMARTTY_FETCH=failed; fi";
+        List<string> output;
+        try
+        {
+            output = session.RunCommandChecked(script, requireSuccess: false);
+        }
+        catch (Exception exception)
+        {
+            Report("Could not check whether the device reaches the server: " + exception.Message);
+            return;
+        }
+        if (output == null)
+        {
+            return;
+        }
+        if (output.Any((string line) => line.Trim() == "SMARTTY_FETCH=ok"))
+        {
+            Report("The device reaches the server at " + url + ".");
+        }
+        else if (output.Any((string line) => line.Trim() == "SMARTTY_FETCH=failed"))
+        {
+            Report("Warning: the device could not fetch " + url + " through the tunnel. Check that TCP forwarding is allowed in the SSH server of the device and that the port is not used there; the package manager will not reach the feeds otherwise.");
+        }
     }
 
     /// <summary>
@@ -248,11 +337,13 @@ public sealed class LocalRepoHost
         LocalRepoServer server;
         SshSession tunnel;
         LocalRepoPackageManager manager;
+        bool signatureCheckOff;
         lock (_Sync)
         {
             server = _Server;
             tunnel = _TunnelSession;
             manager = _Manager;
+            signatureCheckOff = _SignatureCheckOff;
             _Server = null;
             _TunnelSession = null;
             _Feeds = new LocalRepoFeed[0];
@@ -264,7 +355,7 @@ public sealed class LocalRepoHost
         string failure = RemoveFeeds(session, manager);
         TryStopTunnel(tunnel);
         server.Stop();
-        Report(failure == null ? "Server stopped, the feeds were removed from the device." : "Server stopped. " + failure);
+        Report(failure == null ? "Server stopped, the feeds were removed from the device" + (signatureCheckOff ? " and opkg checks signatures again." : ".") : "Server stopped. " + failure);
     }
 
     /// <summary>
@@ -305,12 +396,14 @@ public sealed class LocalRepoHost
         IList<LocalRepoFeed> feeds;
         LocalRepoPackageManager manager;
         string publicKey;
+        bool allowUnsigned;
         lock (_Sync)
         {
             server = _Server;
             feeds = _Feeds;
             manager = _Manager;
             publicKey = _PublicKey;
+            allowUnsigned = _AllowUnsigned;
             if (server == null || ReferenceEquals(_TunnelSession, session))
             {
                 return;
@@ -320,7 +413,7 @@ public sealed class LocalRepoHost
         {
             bool isRoot = IsRoot(session);
             session.StartRemoteForward((uint)server.Port, "127.0.0.1", (uint)server.Port);
-            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey);
+            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey, allowUnsigned);
             lock (_Sync)
             {
                 if (_Server == server)
@@ -336,10 +429,10 @@ public sealed class LocalRepoHost
         }
     }
 
-    private static void ConfigureDevice(SshSession session, LocalRepoPackageManager manager, IList<LocalRepoFeed> feeds, int port, bool isRoot, string publicKey)
+    private static void ConfigureDevice(SshSession session, LocalRepoPackageManager manager, IList<LocalRepoFeed> feeds, int port, bool isRoot, string publicKey, bool allowUnsigned)
     {
         bool apk = manager == LocalRepoPackageManager.Apk;
-        string script = apk ? ApkFeedConfig.BuildEnableScript(feeds, port, publicKey) : OpkgFeedConfig.BuildEnableScript(feeds, port);
+        string script = apk ? ApkFeedConfig.BuildEnableScript(feeds, port, publicKey) : OpkgFeedConfig.BuildEnableScript(feeds, port, allowUnsigned: allowUnsigned);
         if (session.RunCommandChecked(OpkgFeedConfig.WrapForPrivileges(script, isRoot), requireSuccess: true) == null)
         {
             throw new InvalidOperationException("Could not add the feeds to " + (apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile) + " on the device." + (isRoot ? "" : " Non-root users need passwordless sudo: log in as root or allow sudo for this user."));

@@ -465,8 +465,26 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ListBox>
-              <TextBlock Text="Default shell for background commands:" Grid.Row="2" />
-              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding DefaultShell}" />
+              <TextBlock Text="Shell for launched commands:" Grid.Row="2" ToolTip="The shell that runs the commands of Smart Terminal tabs in the interactive wrapper (with its aliases and functions) and whose history file is used. Detect: per connection, the login shell if it is bash or ash, otherwise bash, ash or sh, whichever is installed; on OpenWrt that is BusyBox ash with the aliases of /etc/shinit and ~/.ash_history. Manual: the shell typed here." />
+              <Grid Grid.Row="2" Grid.Column="1">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ListBox Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=ShellMode, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ShellMode}" />
+                <TextBox Grid.Column="1" Text="{Binding DefaultShell}" ToolTip="The shell of the manual mode, e.g. bash, ash, zsh or /bin/bash; BusyBox ash is started without -i, so that it does not print its banner before every command">
+                  <FrameworkElement.Style>
+                    <Style BasedOn="{StaticResource {x:Type TextBox}}" TargetType="{x:Type TextBox}">
+                      <Setter Property="IsEnabled" Value="False" />
+                      <Style.Triggers>
+                        <DataTrigger Value="Manual" Binding="{Binding ShellMode}">
+                          <Setter Property="IsEnabled" Value="True" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </FrameworkElement.Style>
+                </TextBox>
+              </Grid>
               <TextBlock Text="When opening new Smart Terminals:" Grid.Row="3" />
               <ListBox Grid.Row="3" Grid.Column="1" ItemsSource="{StaticResource TrueFalse}" Style="{StaticResource TrueFalseListBox}" SelectedItem="{Binding ShowFileExplorer}">
                 <FrameworkElement.Resources>

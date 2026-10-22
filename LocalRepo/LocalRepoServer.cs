@@ -344,7 +344,9 @@ public sealed class LocalRepoServer : IDisposable
             page.Append("<ul>");
             foreach (LocalRepoFeed feed in feeds)
             {
-                page.Append("<li><a href=\"").Append(WebUtility.HtmlEncode(feed.UrlPath)).Append("/Packages\">").Append(WebUtility.HtmlEncode(feed.UrlPath)).Append("</a> &mdash; ").Append(WebUtility.HtmlEncode(feed.Directory)).Append("</li>");
+                // The index the device reads: Packages for opkg, packages.adb for an apk feed (it has no Packages).
+                string index = (feed.HasApk && !feed.HasOpkg) ? ApkFeedInfo.IndexName : "Packages";
+                page.Append("<li><a href=\"").Append(WebUtility.HtmlEncode(feed.UrlPath + "/" + index)).Append("\">").Append(WebUtility.HtmlEncode(feed.UrlPath)).Append("</a> &mdash; ").Append(WebUtility.HtmlEncode(feed.Directory)).Append("</li>");
             }
             page.Append("</ul>");
         }
