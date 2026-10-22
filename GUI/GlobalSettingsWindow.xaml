@@ -356,24 +356,45 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <TextBlock Text="Background color:" Grid.Row="0" />
             <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.BackColor, Converter={StaticResource ColorWrapperConverter}}" />
-            <TextBlock Text="Text color:" Grid.Row="1" />
-            <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.TextColor, Converter={StaticResource ColorWrapperConverter}}" />
-            <TextBlock Text="Line number background:" Grid.Row="2" />
-            <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.LineNumberBackground, Converter={StaticResource ColorWrapperConverter}}" />
-            <TextBlock Text="Line number text:" Grid.Row="3" />
-            <Border Grid.Row="3" Grid.Column="1" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.LineNumberForeground, Converter={StaticResource ColorWrapperConverter}}" />
-            <TextBlock Text="Tab size:" Grid.Row="4" />
-            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding EditorWrapper.TabSize}" />
-            <TextBlock Text="Temporary directory for uploaded files:" Grid.Row="5" />
-            <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding EditorWrapper.TemporaryDirectory}" />
-            <CheckBox Content="Enable syntax highlighting" Grid.Row="6" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.SyntaxHighlighting}" />
+            <TextBlock Text="Text color:" Grid.Row="0" Grid.Column="2" />
+            <Border Grid.Row="0" Grid.Column="3" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.TextColor, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Line number background:" Grid.Row="1" />
+            <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.LineNumberBackground, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Line number text:" Grid.Row="1" Grid.Column="2" />
+            <Border Grid.Row="1" Grid.Column="3" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.LineNumberForeground, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Keywords, tags:" Grid.Row="2" />
+            <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.KeywordColor, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Strings, removed lines:" Grid.Row="2" Grid.Column="2" />
+            <Border Grid.Row="2" Grid.Column="3" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.StringColor, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Comments, added lines:" Grid.Row="3" />
+            <Border Grid.Row="3" Grid.Column="1" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.CommentColor, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Numbers:" Grid.Row="3" Grid.Column="2" />
+            <Border Grid.Row="3" Grid.Column="3" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.NumberColor, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Variables, keys:" Grid.Row="4" />
+            <Border Grid.Row="4" Grid.Column="1" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.VariableColor, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Sections, diff hunks:" Grid.Row="4" Grid.Column="2" />
+            <Border Grid.Row="4" Grid.Column="3" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.SectionColor, Converter={StaticResource ColorWrapperConverter}}" />
+            <TextBlock Text="Preprocessor, shebang:" Grid.Row="5" />
+            <Border Grid.Row="5" Grid.Column="1" Style="{StaticResource ColorEditor}" Background="{Binding Path=EditorWrapper.Colors.PreprocessorColor, Converter={StaticResource ColorWrapperConverter}}" />
+            <Button Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" HorizontalAlignment="Right" Margin="{StaticResource GridLabelPadding}" Padding="8 2" Content="Reset colors to defaults" ToolTip="Restore the default editor colors of the current theme" Click="ResetEditorColors_Click" />
+            <TextBlock Text="Tab size:" Grid.Row="6" />
+            <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding EditorWrapper.TabSize}" />
+            <CheckBox Content="Insert spaces instead of tabs" Grid.Row="7" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.InsertSpaces}" ToolTip="Tab and indentation insert 'Tab size' spaces; Backspace in leading spaces removes one level" />
+            <TextBlock Text="Temporary directory for uploaded files:" Grid.Row="8" />
+            <TextBox Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding EditorWrapper.TemporaryDirectory}" />
+            <CheckBox Content="Enable syntax highlighting" Grid.Row="9" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.SyntaxHighlighting}" />
           </Grid>
         </GroupBox>
       </TabItem>

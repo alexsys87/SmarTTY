@@ -29,6 +29,18 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool InsertSpaces
+    {
+        get
+        {
+            return _Settings.Editor.InsertSpaces;
+        }
+        set
+        {
+            _Settings.Editor.InsertSpaces = value;
+        }
+    }
+
     public bool SyntaxHighlighting
     {
         get

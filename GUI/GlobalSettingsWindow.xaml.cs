@@ -145,6 +145,27 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
         }
     }
 
+    private void ResetEditorColors_Click(object sender, RoutedEventArgs e)
+    {
+        GlobalSettings.EditorColors colors = _ClonedSettings.EditorWrapper.Colors;
+        GlobalSettings.EditorColors defaults = (_ClonedSettings.Theme == SmarTTYTheme.Dark) ? GlobalSettings.EditorColors.DarkColors : GlobalSettings.EditorColors.LightColors;
+        foreach (PropertyInfo property in typeof(GlobalSettings.EditorColors).GetProperties())
+        {
+            if (property.CanWrite && property.PropertyType == typeof(DeviceTerminalSettings.ColorWrapper))
+            {
+                property.SetValue(colors, property.GetValue(defaults, null), null);
+            }
+        }
+        // The color swatches are siblings of the button; refresh them from the reset values.
+        if (((FrameworkElement)sender).Parent is System.Windows.Controls.Panel panel)
+        {
+            foreach (UIElement child in panel.Children)
+            {
+                (child as Border)?.GetBindingExpression(Border.BackgroundProperty)?.UpdateTarget();
+            }
+        }
+    }
+
     private void Border_MouseDown(object sender, MouseButtonEventArgs e)
     {
         Border border = sender as Border;

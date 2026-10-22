@@ -611,6 +611,30 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
         return default;
     }
 
+    /// <summary>
+    /// Replaces every non-overlapping occurrence of <paramref name="searchText"/> (left to right) and adds the
+    /// number of replacements to <paramref name="count"/>. Returns <paramref name="text"/> itself when nothing matched.
+    /// </summary>
+    public static string ReplaceAll(string text, string searchText, string replacement, StringComparison comparison, ref int count)
+    {
+        int index = string.IsNullOrEmpty(searchText) ? -1 : text.IndexOf(searchText, comparison);
+        if (index < 0)
+        {
+            return text;
+        }
+        StringBuilder result = new StringBuilder();
+        int last = 0;
+        while (index >= 0)
+        {
+            result.Append(text, last, index - last).Append(replacement);
+            count++;
+            last = index + searchText.Length;
+            index = text.IndexOf(searchText, last, comparison);
+        }
+        result.Append(text, last, text.Length - last);
+        return result.ToString();
+    }
+
     public static string GetLineEndingText(LineEnding lineEnding)
     {
         return lineEnding switch

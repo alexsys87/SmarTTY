@@ -357,6 +357,31 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as TextSearcher)?.Hide();
     }
 
+    private void Replace_Click(object sender, RoutedEventArgs e)
+    {
+        ((sender as FrameworkElement)?.DataContext as TextSearcher)?.Replace();
+    }
+
+    private void ReplaceAll_Click(object sender, RoutedEventArgs e)
+    {
+        ((sender as FrameworkElement)?.DataContext as TextSearcher)?.ReplaceAll();
+    }
+
+    private void txtReplace_KeyDown(object sender, KeyEventArgs e)
+    {
+        TextSearcher searcher = (sender as FrameworkElement)?.DataContext as TextSearcher;
+        if (e.Key == Key.Enter)
+        {
+            searcher?.Replace();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            searcher?.Hide();
+            e.Handled = true;
+        }
+    }
+
     private void txtSearch_KeyDown(object sender, KeyEventArgs e)
     {
         if ((int)e.Key == 6)

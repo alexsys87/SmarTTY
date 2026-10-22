@@ -193,13 +193,26 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     protected override void OnTextReplaced()
     {
+        // OnTextReplaced may run from the base constructor, before the folding manager exists.
+        _foldingManager?.Clear();
         base.OnTextReplaced();
         _tokenCache.SetDocument(base.EditableDocument, Tokenizing);
     }
 
+    /// <summary>
+    /// Rebuilds the tokens (e.g. after the highlighting settings changed) without treating the text as
+    /// replaced, which would also wipe the undo history.
+    /// </summary>
     public void Retokenize()
     {
-        OnTextReplaced();
+        bool hadFolds = _foldingManager.Clear();
+        _tokenCache.SetDocument(base.EditableDocument, Tokenizing);
+        if (hadFolds)
+        {
+            RebuildDisplayRows();
+            UpdateLayout();
+        }
+        Redraw();
     }
 
     /// <summary>

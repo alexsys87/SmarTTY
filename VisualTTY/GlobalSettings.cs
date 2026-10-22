@@ -81,6 +81,9 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public bool SyntaxHighlighting;
 
+        // Tab and indentation insert TabSize spaces instead of a tab character.
+        public bool InsertSpaces;
+
         public EditorColors DarkColors;
 
         public EditorColors LightColors;

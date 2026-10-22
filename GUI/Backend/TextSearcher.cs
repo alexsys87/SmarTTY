@@ -17,6 +17,10 @@ public class TextSearcher : INotifyPropertyChanged
 
     private bool _CaseSensitive;
 
+    private bool _IsReplaceVisible;
+
+    private string _ReplacementText;
+
     public bool IsVisible
     {
         get
@@ -53,6 +57,35 @@ public class TextSearcher : INotifyPropertyChanged
         {
             _CaseSensitive = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CaseSensitive"));
+        }
+    }
+
+    /// <summary>The searched view is an editable document, so the Replace row may be shown (file editor tabs).</summary>
+    public bool CanReplace { get; set; }
+
+    public bool IsReplaceVisible
+    {
+        get
+        {
+            return _IsReplaceVisible;
+        }
+        set
+        {
+            _IsReplaceVisible = value && CanReplace;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsReplaceVisible"));
+        }
+    }
+
+    public string ReplacementText
+    {
+        get
+        {
+            return _ReplacementText;
+        }
+        set
+        {
+            _ReplacementText = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ReplacementText"));
         }
     }
 
@@ -117,14 +150,80 @@ public class TextSearcher : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Replaces the current match (the selection, when it equals the searched text) and selects the next one.
+    /// </summary>
+    public void Replace()
+    {
+        try
+        {
+            TextEditorControl editor = _GetEditor?.Invoke();
+            string query = SearchedText;
+            if (editor == null || !CanReplace || string.IsNullOrEmpty(query))
+            {
+                return;
+            }
+            if (editor.HasSelection && editor.SelectionStart != editor.SelectionEnd)
+            {
+                string selected = editor.EditableDocument.GetRangeText(editor.SelectionStart, editor.SelectionEnd);
+                if (string.Equals(selected, query, CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase))
+                {
+                    editor.ReplaceText(editor.SelectionEnd, editor.SelectionStart, select: false, ReplacementText ?? "");
+                }
+            }
+            Search(up: false);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    public void ReplaceAll()
+    {
+        try
+        {
+            TextEditorControl editor = _GetEditor?.Invoke();
+            string query = SearchedText;
+            if (editor == null || !CanReplace || string.IsNullOrEmpty(query))
+            {
+                return;
+            }
+            int count = editor.ReplaceAll(query, ReplacementText ?? "", !CaseSensitive);
+            MessageBoxes.Info((count == 0) ? ("Cannot find \"" + query + "\"") : ("Replaced " + count + " occurrence" + ((count == 1) ? "" : "s") + "."));
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     public void Activate()
     {
         IsVisible = false;
         IsVisible = true;
     }
 
+    /// <summary>Shows the search bar with its Replace row (Ctrl+H), starting from the selected text.</summary>
+    public void ActivateReplace()
+    {
+        if (!CanReplace)
+        {
+            Activate();
+            return;
+        }
+        TextEditorControl editor = _GetEditor?.Invoke();
+        if (editor != null && editor.HasSelection && editor.SelectionStart.Line == editor.SelectionEnd.Line && editor.SelectionStart != editor.SelectionEnd)
+        {
+            SearchedText = editor.EditableDocument.GetRangeText(editor.SelectionStart, editor.SelectionEnd);
+        }
+        IsReplaceVisible = true;
+        Activate();
+    }
+
     public void Hide()
     {
         IsVisible = false;
+        IsReplaceVisible = false;
     }
 }

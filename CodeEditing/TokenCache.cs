@@ -78,8 +78,9 @@ public class TokenCache
 
         public static RegionStyle Plain = new RegionStyle(FoldBoundary.LineStart, FoldBoundary.LineStart, unusedFlag: false, LabelSource.NextToken, null, openingOnNextLine: false);
 
-        public RegionStyle(FoldBoundary startBoundary, FoldBoundary endBoundary, bool unusedFlag, LabelSource labelSource, string text, bool openingOnNextLine)
+        public RegionStyle(FoldBoundary startBoundary, FoldBoundary endBoundary, bool unusedFlag, LabelSource labelSource, string text, bool openingOnNextLine, int trailingBlankLines = 1)
         {
+            TrailingBlankLines = trailingBlankLines;
             StartBoundary = startBoundary;
             this.EndBoundary = endBoundary;
             this.UnusedFlag = unusedFlag;

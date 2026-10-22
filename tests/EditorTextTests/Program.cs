@@ -225,6 +225,10 @@ internal static class Program
 
         TokenCache.Token brace = c.At(1, 11);
         Check(brace != null && brace.Partner != null && brace.Partner.LineNumber == 2, "'{' is paired with '}' on the next line");
+        Check(brace.Style != null && brace.Style.OpeningOnNextLine && brace.Style.TrailingBlankLines == 0, "C-like '{' can be folded, also from the line above, without hiding a following blank line");
+        Check(c.At(1, 8).Style == null, "'(' is not foldable");
+        Highlighted pyBraces = new Highlighted(L.Python, "x = {\n}");
+        Check(pyBraces.At(0, 4).Style == null, "Python braces are paired but not folded");
 
         Highlighted html = new Highlighted(L.Markup, "<p class=\"x\">Don't <!-- note\n--> stop</p>");
         Equal(Join(html.Tokens(0, SyntaxHighlighting.TypeKeyword)), "<p", "tag name");
@@ -339,11 +343,29 @@ internal static class Program
         Check(c.Cache.GetLineTokens(3).Any(t => t.Kind == TokenCache.Token.TokenKind.Paired) && outer.Partner != null && outer.Partner.LineNumber == 5, "removing the /* restores code and pairs");
     }
 
+    private static void ReplaceChecks()
+    {
+        int count = 0;
+        Equal(TextDocument.ReplaceAll("foo bar foo", "foo", "baz", StringComparison.Ordinal, ref count), "baz bar baz", "every occurrence is replaced");
+        Equal(count, 2, "the replacements are counted");
+        count = 0;
+        Equal(TextDocument.ReplaceAll("Foo FOO foo", "foo", "x", StringComparison.OrdinalIgnoreCase, ref count), "x x x", "case-insensitive replace");
+        Equal(count, 3, "case-insensitive count");
+        count = 0;
+        Equal(TextDocument.ReplaceAll("aaaa", "aa", "a", StringComparison.Ordinal, ref count), "aa", "matches do not overlap and replaced text is not searched again");
+        count = 0;
+        Equal(TextDocument.ReplaceAll("ab", "b", "bb", StringComparison.Ordinal, ref count), "abb", "a replacement containing the searched text does not loop");
+        count = 0;
+        Equal(TextDocument.ReplaceAll("abc", "", "x", StringComparison.Ordinal, ref count), "abc", "an empty search text replaces nothing");
+        Equal(count, 0, "nothing counted for an empty search text");
+    }
+
     private static int Main()
     {
         try
         {
             LineEndingChecks();
+            ReplaceChecks();
             LanguageDetectionChecks();
             ConfigChecks();
             BashChecks();

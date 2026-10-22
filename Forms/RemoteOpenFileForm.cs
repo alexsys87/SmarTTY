@@ -33,6 +33,11 @@ public partial class RemoteOpenFileForm : DpiAwareForm
 
     protected bool _usePrefixedListing;
 
+    // Open mode: a typed name that does not exist may be accepted to create a new file.
+    protected bool _allowNewFile;
+
+    private bool _newFileDeclined;
+
     private RemoteCommandStarter _runCommand;
 
     private bool _updatingDirCombo;
@@ -172,7 +177,7 @@ public partial class RemoteOpenFileForm : DpiAwareForm
         return null;
     }
 
-    public static string Browse(RemoteCommandStarter callback, string filePath = null, string dirPath = null, string hostDisplayName = null, DialogMode dialogMode = RemoteOpenFileForm.DialogMode.Open, bool usePrefixedListing = false)
+    public static string Browse(RemoteCommandStarter callback, string filePath = null, string dirPath = null, string hostDisplayName = null, DialogMode dialogMode = RemoteOpenFileForm.DialogMode.Open, bool usePrefixedListing = false, bool allowNewFile = false)
     {
         if (dirPath == null && filePath != null)
         {
@@ -188,7 +193,8 @@ public partial class RemoteOpenFileForm : DpiAwareForm
             Text = "Browse File System on " + (hostDisplayName ?? "Remote Host"),
             Mode = dialogMode,
             _initialFileName = RemotePathUtils.GetFileName(filePath),
-            _usePrefixedListing = usePrefixedListing
+            _usePrefixedListing = usePrefixedListing,
+            _allowNewFile = allowNewFile
         };
         if (remoteOpenFileForm.ShowModal() != DialogResult.OK)
         {
@@ -592,6 +598,21 @@ public partial class RemoteOpenFileForm : DpiAwareForm
                 DialogResult = DialogResult.OK;
                 return true;
             }
+            if (_allowNewFile && tbFileName.Text.Trim().Length != 0 && !tbFileName.Text.EndsWith("/"))
+            {
+                if (MessageBox.Show(tbFileName.Text + " does not exist. Create a new file?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    _enteredPath = tbFileName.Text;
+                    DialogResult = DialogResult.OK;
+                }
+                else
+                {
+                    DialogResult = DialogResult.None;
+                    _newFileDeclined = true;
+                }
+                // Handled either way: no "does not exist" error on top of the question.
+                return true;
+            }
             return false;
         }
         if (isDirectory)
@@ -642,9 +663,15 @@ public partial class RemoteOpenFileForm : DpiAwareForm
     {
         if (e.KeyCode == Keys.Return)
         {
+            _newFileDeclined = false;
             if (!TryAcceptEnteredPath())
             {
                 MessageBox.Show(tbFileName.Text + " does not exist", "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            }
+            else if (DialogResult == DialogResult.OK || _newFileDeclined)
+            {
+                // A new file was accepted or declined: there is no directory to list.
+                return;
             }
             NavigateTo(tbFileName.Text);
         }
