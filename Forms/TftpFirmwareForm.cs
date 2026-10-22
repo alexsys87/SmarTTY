@@ -321,7 +321,7 @@ internal sealed class TftpFirmwareForm : Form
 
     private void AddFile()
     {
-        using OpenFileDialog dialog = new OpenFileDialog
+        using System.Windows.Forms.OpenFileDialog dialog = new System.Windows.Forms.OpenFileDialog
         {
             Title = "Select the firmware (or any file the board should fetch over TFTP)",
             Filter = "All files (*.*)|*.*",
