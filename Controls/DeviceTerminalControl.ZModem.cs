@@ -6,6 +6,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Controls;
 
