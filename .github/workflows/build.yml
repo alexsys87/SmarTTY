@@ -35,8 +35,14 @@ jobs:
       - name: Run XMODEM protocol checks
         run: dotnet run --project tests/XModemTransferTests -c Release
 
+      - name: Run YMODEM protocol checks
+        run: dotnet run --project tests/YModemTransferTests -c Release
+
       - name: Run ZMODEM protocol checks
         run: dotnet run --project tests/ZModemTransferTests -c Release
+
+      - name: Run Kermit protocol checks
+        run: dotnet run --project tests/KermitTransferTests -c Release
 
       - name: Run text stream decoder checks
         run: dotnet run --project tests/TextStreamDecoderTests -c Release

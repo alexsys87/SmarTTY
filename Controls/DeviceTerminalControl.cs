@@ -43,7 +43,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private bool _updatingEncodingSelection;
 
-    // Active XMODEM/ZMODEM byte buffer for interception during file transfers.
+    // Active XMODEM/YMODEM/ZMODEM/Kermit byte buffer for interception during file transfers.
     private readonly System.Collections.Concurrent.BlockingCollection<byte> _xmodemRxQueue = new System.Collections.Concurrent.BlockingCollection<byte>();
     // Set on the UI thread before a transfer starts and cleared when it ends; while set, everything received belongs to the
     // protocol and typing, pasting and sending from the toolbar are refused so nothing else gets into the data stream.
@@ -253,6 +253,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         SelectEncodingInToolbar(TerminalEncodings.DefaultName);
         InitializeSerialLineControls();
         InitializeZModemMenu();
+        InitializeYModemMenu();
+        InitializeKermitMenu();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
         ThemeManager.ThemeChanged += OnThemeChanged;
         ApplyToolbarTheme();
@@ -1148,12 +1150,34 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// </summary>
     private void StartXModemTransfer(string title, string verb, Func<FileStream> fileStream, bool isSend, bool useLargeBlocks = false)
     {
+        string protocolName = useLargeBlocks ? "XMODEM-1K" : "XMODEM";
+        StartLineTransfer(title, protocolName, verb, (sendData, progress, token) =>
+        {
+            using FileStream stream = fileStream();
+            return isSend
+                ? SmarTTY.IO.XModemTransfer.SendFile(stream, sendData, ReadXModemByte, token, progress, useLargeBlocks)
+                : SmarTTY.IO.XModemTransfer.ReceiveFile(stream, sendData, ReadXModemByte, token, progress);
+        });
+    }
+
+    /// <summary>The protocol part of a transfer. Runs on a worker thread and returns whether the transfer succeeded.</summary>
+    private delegate bool LineTransferRun(
+        SmarTTY.IO.XModemTransfer.SendDataHandler sendData,
+        SmarTTY.IO.XModemTransfer.ProgressHandler progress,
+        CancellationToken token);
+
+    /// <summary>
+    /// Runs one file transfer protocol (XMODEM, YMODEM, Kermit) on a worker thread with a progress window;
+    /// <paramref name="run"/> is the protocol itself and gets the line (callbacks for sending bytes and reporting
+    /// progress, the cancel token). <paramref name="successNote"/> (optional) is called on the UI thread after a
+    /// successful transfer and may return an extra paragraph for the final message. Must be called on the UI thread.
+    /// </summary>
+    private void StartLineTransfer(string title, string protocolName, string verb, LineTransferRun run, Func<string> successNote = null)
+    {
         if (IsLineClaimed)
         {
             return;
         }
-
-        string protocolName = useLargeBlocks ? "XMODEM-1K" : "XMODEM";
 
         // Not a "using": the window is modeless and outlives this method; it is closed (and disposed) when the transfer ends.
         SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm(title);
@@ -1173,7 +1197,6 @@ public partial class DeviceTerminalControl : DpiAwareControl
             string error = null;
             try
             {
-                using FileStream stream = fileStream();
                 SmarTTY.IO.XModemTransfer.SendDataHandler sendData = (data, offset, length) =>
                 {
                     // Writes are queued, so a failure of an earlier one is only known now: end the transfer with its reason
@@ -1192,9 +1215,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 };
                 SmarTTY.IO.XModemTransfer.ProgressHandler progress = (bytesTransferred, totalBytes, errorCount, status) =>
                     transferForm.UpdateProgress(bytesTransferred, totalBytes, errorCount, status);
-                success = isSend
-                    ? SmarTTY.IO.XModemTransfer.SendFile(stream, sendData, ReadXModemByte, transferForm.CancellationToken, progress, useLargeBlocks)
-                    : SmarTTY.IO.XModemTransfer.ReceiveFile(stream, sendData, ReadXModemByte, transferForm.CancellationToken, progress);
+                success = run(sendData, progress, transferForm.CancellationToken);
             }
             catch (Exception ex)
             {
@@ -1219,7 +1240,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     }
                     if (success)
                     {
-                        MessageBox.Show(protocolName + " " + verb + " completed successfully.", title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        string note = successNote?.Invoke();
+                        MessageBox.Show(protocolName + " " + verb + " completed successfully." + (string.IsNullOrEmpty(note) ? string.Empty : "\r\n\r\n" + note),
+                            title, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else if (!cancelled)
                     {
@@ -1252,7 +1275,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         if (_isXModemActive)
         {
-            MessageBox.Show("A file transfer (XMODEM or ZMODEM) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM or Kermit) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return true;
         }
         if (_isFileSendActive)
