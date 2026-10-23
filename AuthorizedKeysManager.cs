@@ -37,25 +37,15 @@ internal static class AuthorizedKeysManager
     {
         try
         {
-            using ScpDownloadStream stream = sshSession.OpenDownload(path);
-            using StreamReader streamReader = new StreamReader(stream);
-            while (!streamReader.EndOfStream)
-            {
-                string line = streamReader.ReadLine();
-                if (line == null)
-                {
-                    break;
-                }
-                if (AuthorizedKeysFile.LineHoldsKey(line, keyBlob))
-                {
-                    return true;
-                }
-            }
+            // "cat" rather than SCP: OpenWrt and other minimal systems have no scp program, and a check that always failed
+            // would make the key be appended again on every connection.
+            List<string> lines = sshSession.RunCommandChecked("cat " + ScpChannelStream.QuotePath(path), requireSuccess: true);
+            return lines != null && lines.Any(line => AuthorizedKeysFile.LineHoldsKey(line, keyBlob));
         }
         catch
         {
+            return false;
         }
-        return false;
     }
 
     /// <summary>
