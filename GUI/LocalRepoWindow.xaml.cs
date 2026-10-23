@@ -47,6 +47,9 @@ public partial class LocalRepoWindow : Window
     /// <summary>Set when the user chose "Open package manager": the caller opens it after this window is closed.</summary>
     public bool OpenPackageManagerRequested { get; private set; }
 
+    /// <summary>Set when the user chose "Edit feeds file": the path on the device that the caller opens in an editor tab after this window is closed.</summary>
+    public string FileToEdit { get; private set; }
+
     public LocalRepoWindow(SessionWrapper session)
     {
         InitializeComponent();
@@ -121,6 +124,7 @@ public partial class LocalRepoWindow : Window
         StartButton.IsEnabled = editable;
         StopButton.IsEnabled = running && idle;
         CleanButton.IsEnabled = editable;
+        EditFeedsButton.IsEnabled = idle;
         PackagesButton.IsEnabled = running && idle;
 
         if (!running)
@@ -475,6 +479,12 @@ public partial class LocalRepoWindow : Window
         {
             SetBusy(false);
         }
+    }
+
+    private void EditFeeds_Click(object sender, RoutedEventArgs e)
+    {
+        FileToEdit = _Manager == LocalRepoPackageManager.Apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile;
+        Close();
     }
 
     private void Packages_Click(object sender, RoutedEventArgs e)
