@@ -534,6 +534,40 @@ public class SshSession : IDisposable
     public void ConfigureKeepAlive(int intervalSeconds)
     {
         _client.KeepAliveInterval = (intervalSeconds > 0) ? TimeSpan.FromSeconds(intervalSeconds) : Timeout.InfiniteTimeSpan;
+        if (intervalSeconds > 0)
+        {
+            EnableTcpKeepAlive(intervalSeconds);
+        }
+    }
+
+    /// <summary>
+    /// SSH.NET's keep-alive messages are written without waiting for an answer, so with a pulled cable they only fill the
+    /// send buffer and the receive thread keeps waiting. TCP keep-alive probes make the OS give up on a silent peer and fail
+    /// the pending read, which raises <see cref="ConnectionLost"/> without any input from the user.
+    /// </summary>
+    private void EnableTcpKeepAlive(int intervalSeconds)
+    {
+        try
+        {
+            Session session = SshNetChannel.GetSession(_client);
+            System.Reflection.FieldInfo socketField = session?.GetType()
+                .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .FirstOrDefault((System.Reflection.FieldInfo field) => field.FieldType == typeof(System.Net.Sockets.Socket));
+            if (!(socketField?.GetValue(session) is System.Net.Sockets.Socket socket))
+            {
+                return;
+            }
+            // Windows: on/off, idle time (ms) before the first probe, interval (ms) between probes (10 probes are sent).
+            byte[] values = new byte[12];
+            BitConverter.GetBytes(1).CopyTo(values, 0);
+            BitConverter.GetBytes(intervalSeconds * 1000).CopyTo(values, 4);
+            BitConverter.GetBytes(Math.Min(intervalSeconds, 5) * 1000).CopyTo(values, 8);
+            socket.IOControl(System.Net.Sockets.IOControlCode.KeepAliveValues, values, null);
+        }
+        catch (Exception)
+        {
+            // Best effort: the SSH keep-alive messages still work, and the platform may not support the control code.
+        }
     }
 
     /// <summary>
