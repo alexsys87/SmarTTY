@@ -731,7 +731,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         };
     }
 
-    internal static CallbackTransportFactory.TransportCallback CreateTransportCallback(DeviceTerminalSettings.ConnectionSettings connectionSettings)
+    internal static CallbackTransportFactory.TransportCallback CreateTransportCallback(DeviceTerminalSettings.ConnectionSettings connectionSettings, string enterSequence = null)
     {
         if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Serial)
         {
@@ -740,7 +740,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // Telnet derives from Tcp, so it has to be recognized first.
         if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Telnet telnet)
         {
-            return () => new TelnetTransport(telnet);
+            return () => new TelnetTransport(telnet, enterSequence);
         }
         if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Tcp)
         {
@@ -791,7 +791,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
     public void ApplySettings(DeviceTerminalSettings deviceTerminalSettings)
     {
         _deviceTerminalSettings = deviceTerminalSettings;
-        CallbackTransportFactory.TransportCallback callback = CreateTransportCallback(deviceTerminalSettings.Connection);
+        // The automatic login of a telnet connection ends its lines like the Enter key does (a bare CR when none is set).
+        CallbackTransportFactory.TransportCallback callback = CreateTransportCallback(deviceTerminalSettings.Connection, GetLineEnding(deviceTerminalSettings.LineEnding) ?? "\r");
         if (callback != null)
         {
             _transportFactory = new CallbackTransportFactory(callback);
