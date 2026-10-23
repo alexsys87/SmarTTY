@@ -82,6 +82,12 @@ internal static class Program
         Check(RemoteFileOperations.IsSameOrInside("/x", "/"), "everything is inside /");
         Equal(RemoteFileOperations.Join("/", "etc"), "/etc", "join to the root");
         Equal(RemoteFileOperations.Join("/home/u/", "f"), "/home/u/f", "join with a trailing slash");
+
+        Check(RemoteFileOperations.IsExtractableArchive("backup.tar.gz") && RemoteFileOperations.IsExtractableArchive("backup.tgz") && RemoteFileOperations.IsExtractableArchive("backup.tar"), ".tar.gz, .tgz and .tar can be extracted");
+        Check(RemoteFileOperations.IsExtractableArchive("BACKUP.TAR.GZ") && RemoteFileOperations.IsExtractableArchive("a b.Tgz"), "the extension is not case-sensitive");
+        Check(!RemoteFileOperations.IsExtractableArchive("backup.gz") && !RemoteFileOperations.IsExtractableArchive("backup.zip") && !RemoteFileOperations.IsExtractableArchive("tar") && !RemoteFileOperations.IsExtractableArchive("backup.tar.bz2") && !RemoteFileOperations.IsExtractableArchive(null), "other files are not offered");
+        Equal(RemoteFileOperations.ExtractCommand("/a b/it's.tar.gz", "/a b"), "tar -xzf '/a b/it'\\''s.tar.gz' -C '/a b'", "the extract command quotes both paths and asks for gzip");
+        Equal(RemoteFileOperations.ExtractCommand("/a/plain.tar", "/a"), "tar -xf '/a/plain.tar' -C '/a'", "a plain tar is not decompressed");
     }
 
     private static void CommandChecks(string root)
@@ -132,6 +138,26 @@ internal static class Program
         File.WriteAllText(newFile, "keep");
         Check(Run(RemoteFileOperations.CreateFileCommand(newFile), out _) != 0 && File.ReadAllText(newFile) == "keep", "creating an existing file fails and keeps its content");
 
+        // Extract here: archives made with the host tar (names with spaces, quotes and $), unpacked by this shell's tar.
+        string packed = Path.Combine(root, "packed dir");
+        Directory.CreateDirectory(Path.Combine(packed, "docs"));
+        File.WriteAllText(Path.Combine(packed, "it's $one.txt"), "one");
+        File.WriteAllText(Path.Combine(packed, "docs", "two.txt"), "two");
+        string archiveDirectory = Path.Combine(root, "it's archives");
+        Directory.CreateDirectory(archiveDirectory);
+        string gz = Path.Combine(archiveDirectory, "pack $1.tar.gz");
+        string plain = Path.Combine(archiveDirectory, "pack.tar");
+        Equal(Run("tar -czf " + RemotePathUtils.ShellQuote(gz) + " -C " + RemotePathUtils.ShellQuote(root) + " 'packed dir'", out _), 0, "make a .tar.gz");
+        Equal(Run("tar -cf " + RemotePathUtils.ShellQuote(plain) + " -C " + RemotePathUtils.ShellQuote(root) + " 'packed dir'", out _), 0, "make a .tar");
+        Equal(Run(RemoteFileOperations.ExtractCommand(gz, archiveDirectory), out errors), 0, _shell + ": extract a .tar.gz" + errors);
+        Equal(File.ReadAllText(Path.Combine(archiveDirectory, "packed dir", "it's $one.txt")), "one", "the extracted file is next to the archive");
+        Check(File.Exists(Path.Combine(archiveDirectory, "packed dir", "docs", "two.txt")) && File.Exists(gz), "the nested file is extracted and the archive is kept");
+        Directory.Delete(Path.Combine(archiveDirectory, "packed dir"), recursive: true);
+        Equal(Run(RemoteFileOperations.ExtractCommand(plain, archiveDirectory), out errors), 0, _shell + ": extract a .tar" + errors);
+        Check(File.Exists(Path.Combine(archiveDirectory, "packed dir", "docs", "two.txt")), "the plain tar is extracted");
+        File.WriteAllText(Path.Combine(archiveDirectory, "broken.tar.gz"), "this is not an archive");
+        Check(Run(RemoteFileOperations.ExtractCommand(Path.Combine(archiveDirectory, "broken.tar.gz"), archiveDirectory), out errors) != 0 && errors.Length > 0, "a file that is not an archive fails with a message");
+
         Equal(Run(RemoteFileOperations.DeleteCommand(new[] { newFile, Path.Combine(target, "my dir") }), out _), 0, "delete a file and a folder");
         Check(!File.Exists(newFile) && !Directory.Exists(Path.Combine(target, "my dir")), "both are gone");
     }
@@ -159,7 +185,7 @@ internal static class Program
                 {
                     _appletPath = Path.Combine(root, "applets");
                     Directory.CreateDirectory(_appletPath);
-                    foreach (string applet in new[] { "cp", "mv", "rm", "mkdir" })
+                    foreach (string applet in new[] { "cp", "mv", "rm", "mkdir", "tar" })
                     {
                         File.CreateSymbolicLink(Path.Combine(_appletPath, applet), shell.Split(' ')[0]);
                     }

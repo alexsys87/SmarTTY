@@ -1,5 +1,6 @@
 ﻿using SmarTTY.Forms;
 using SmarTTY.GUI.Backend;
+using SmarTTY.IO;
 using System;
 using System.Collections;
 using System.Linq;
@@ -112,6 +113,11 @@ public partial class FileListControl : UserControl, IComponentConnector
         }
     }
 
+    private void Extract_Click(object sender, RoutedEventArgs e)
+    {
+        Explorer?.Extract(SelectedEntries());
+    }
+
     private void DownloadArchive_Click(object sender, RoutedEventArgs e)
     {
         foreach (FileExplorer.ItemWrapper item in ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>())
@@ -134,6 +140,7 @@ public partial class FileListControl : UserControl, IComponentConnector
             _SelDepth++;
             bool directorySelectionChanged = false;
             bool archivableSelected = false;
+            bool extractableSelected = false;
             bool fileSelectionChanged = false;
             foreach (FileExplorer.ItemWrapper item in ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>())
             {
@@ -146,10 +153,12 @@ public partial class FileListControl : UserControl, IComponentConnector
                 else
                 {
                     fileSelectionChanged = true;
+                    extractableSelected |= RemoteFileOperations.IsExtractableArchive(item.Name);
                 }
             }
             cmdDownload.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             cmdEdit.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
+            cmdExtract.Visibility = extractableSelected ? Visibility.Visible : Visibility.Collapsed;
             cmdDownloadArchive.Visibility = archivableSelected ? Visibility.Visible : Visibility.Collapsed;
             cmdNavigate.Visibility = ((!directorySelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             if (((ListBox)TransferList).SelectedItems.Count == 0 && ((CollectionView)TransferList.Items).Count > 0 && _SelDepth < 5)

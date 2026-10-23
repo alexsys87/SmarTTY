@@ -470,6 +470,20 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         RunOperations("Deleting " + Describe(selected.Length) + "...", new List<string> { RemoteFileOperations.DeleteCommand(selected.Select((ItemWrapper item) => item.FullPath)) }, null);
     }
 
+    /// <summary>
+    /// Unpacks the selected .tar.gz, .tgz and .tar archives into the current directory (the one the list shows).
+    /// </summary>
+    public void Extract(IEnumerable<ItemWrapper> items)
+    {
+        ItemWrapper[] archives = items.Where((ItemWrapper item) => !item.Entry.IsDirectory && RemoteFileOperations.IsExtractableArchive(item.Name)).ToArray();
+        if (archives.Length == 0)
+        {
+            return;
+        }
+        List<string> commands = archives.Select((ItemWrapper item) => RemoteFileOperations.ExtractCommand(item.FullPath, _WorkingDirectory)).ToList();
+        RunOperations(archives.Length == 1 ? "Extracting " + archives[0].Name + "..." : "Extracting " + archives.Length + " archives...", commands, null);
+    }
+
     public void Rename(ItemWrapper item, string newName)
     {
         if (item == null || item.Name == ".." || newName == item.Name)
