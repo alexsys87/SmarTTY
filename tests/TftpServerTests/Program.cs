@@ -1,6 +1,7 @@
 using SmarTTY.IO;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -196,6 +197,114 @@ internal static class Program
         }
     }
 
+    /// <summary>
+    /// A client that answers like U-Boot's net/tftp.c: an acknowledgement only at the end of a window, and after a gap
+    /// exactly one (tftp_last_nack: "let's just send one"); packets that arrive after the gap are ignored in silence.
+    /// </summary>
+    private static DownloadResult DownloadLikeUBoot(IPEndPoint server, byte[] request, ClientBehavior behavior = null)
+    {
+        behavior = behavior ?? new ClientBehavior();
+        DownloadResult result = new DownloadResult();
+        using Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        socket.SendTo(request, server);
+
+        MemoryStream data = new MemoryStream();
+        EndPoint peer = null;
+        int blockSize = 512;
+        int window = 1;
+        int cur = 0;          // tftp_cur_block
+        int nextAck = 1;      // tftp_next_ack
+        int lastNack = 0;     // tftp_last_nack
+        HashSet<long> dropped = new HashSet<long>();
+        byte[] buffer = new byte[70000];
+
+        while (true)
+        {
+            if (!socket.Poll(behavior.ReceiveTimeoutMs * 1000, SelectMode.SelectRead))
+            {
+                return result;
+            }
+            EndPoint from = new IPEndPoint(IPAddress.Any, 0);
+            int n = socket.ReceiveFrom(buffer, ref from);
+            if (peer == null)
+            {
+                peer = from;
+            }
+            else if (!from.Equals(peer))
+            {
+                continue;
+            }
+            int opcode = (buffer[0] << 8) | buffer[1];
+            if (opcode == 5)
+            {
+                result.ErrorCode = (buffer[2] << 8) | buffer[3];
+                return result;
+            }
+            if (opcode == 6)
+            {
+                List<string> fields = new List<string>();
+                int pos = 2;
+                while (pos < n)
+                {
+                    int end = Array.IndexOf(buffer, (byte)0, pos, n - pos);
+                    fields.Add(Encoding.ASCII.GetString(buffer, pos, end - pos));
+                    pos = end + 1;
+                }
+                result.OackOptions = fields.ToArray();
+                for (int i = 0; i + 1 < fields.Count; i += 2)
+                {
+                    if (fields[i] == "blksize") blockSize = int.Parse(fields[i + 1]);
+                    if (fields[i] == "windowsize") window = int.Parse(fields[i + 1]);
+                }
+                nextAck = window;
+                socket.SendTo(Ack(0), peer);
+                continue;
+            }
+            if (opcode != 3)
+            {
+                continue;
+            }
+
+            int wire = (buffer[2] << 8) | buffer[3];
+            result.BlockArrivals[wire] = result.BlockArrivals.TryGetValue(wire, out int seen) ? seen + 1 : 1;
+            if (behavior.DropDataOnce.Contains(wire) && dropped.Add(wire))
+            {
+                continue; // lost on the way
+            }
+
+            if (wire != (ushort)(cur + 1))
+            {
+                if ((ushort)(cur + 1) - (short)wire > 0)
+                {
+                    continue; // old or repeated: no answer
+                }
+                if (lastNack != cur)
+                {
+                    socket.SendTo(Ack(cur), peer);
+                    lastNack = cur;
+                    nextAck = (ushort)(cur + window);
+                }
+                continue;
+            }
+
+            cur++;
+            data.Write(buffer, 4, n - 4);
+            if (n - 4 < blockSize)
+            {
+                socket.SendTo(Ack(cur), peer);
+                result.Completed = true;
+                result.Data = data.ToArray();
+                return result;
+            }
+            if (cur == nextAck)
+            {
+                socket.SendTo(Ack(cur), peer);
+                nextAck += window;
+            }
+        }
+    }
+
     private static void SendAck(Socket socket, EndPoint peer, long block, ClientBehavior behavior, HashSet<long> skipped)
     {
         if (behavior.SkipAckOnce.Contains(block) && skipped.Add(block))
@@ -224,7 +333,7 @@ internal static class Program
 
     private static TftpServer StartServer(params string[] files)
     {
-        TftpServer server = new TftpServer(IPAddress.Loopback, 0) { DefaultTimeoutMs = 300, MaxRetries = 4 };
+        TftpServer server = new TftpServer(IPAddress.Loopback, 0) { DefaultTimeoutMs = 300, MaxRetries = 4, WindowPacingMicroseconds = 0 };
         foreach (string path in files)
         {
             server.AddFile(Path.GetFileName(path), path);
@@ -526,6 +635,340 @@ internal static class Program
         Check("a server bound to all interfaces works", Same(rd.Data, c));
     }
 
+    // ---------- regression tests for the problems found in the review ----------
+
+    private static TftpServer StartServerWith(int timeoutMs, int retries, params string[] files)
+    {
+        TftpServer server = new TftpServer(IPAddress.Loopback, 0) { DefaultTimeoutMs = timeoutMs, MaxRetries = retries, WindowPacingMicroseconds = 0 };
+        foreach (string path in files)
+        {
+            server.AddFile(Path.GetFileName(path), path);
+        }
+        server.Start();
+        return server;
+    }
+
+    /// <summary>Sends a request and returns the socket and the transfer's own endpoint once its first packet has arrived.</summary>
+    private static Socket BeginTransfer(TftpServer server, byte[] request, out IPEndPoint tid, out byte[] first)
+    {
+        Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        socket.SendTo(request, server.LocalEndPoint);
+        byte[] buffer = new byte[70000];
+        tid = null;
+        first = null;
+        if (socket.Poll(3000000, SelectMode.SelectRead))
+        {
+            EndPoint from = new IPEndPoint(IPAddress.Any, 0);
+            int n = socket.ReceiveFrom(buffer, ref from);
+            tid = (IPEndPoint)from;
+            first = new byte[n];
+            Array.Copy(buffer, first, n);
+        }
+        return socket;
+    }
+
+    private static int DrainPackets(Socket socket, int opcode)
+    {
+        byte[] buffer = new byte[70000];
+        int count = 0;
+        while (socket.Poll(0, SelectMode.SelectRead))
+        {
+            EndPoint from = new IPEndPoint(IPAddress.Any, 0);
+            socket.ReceiveFrom(buffer, ref from);
+            if (((buffer[0] << 8) | buffer[1]) == opcode)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static void WindowGapTests()
+    {
+        // A client that behaves like U-Boot: one acknowledgement per gap, then silence. The server must start the window
+        // again at once instead of waiting for its timeout (2 s here: a recovery that waits shows as seconds).
+        string f = MakeFile("gap.bin", 100 * 512 + 100, 11);
+        using TftpServer server = StartServerWith(2000, 4, f);
+
+        ClientBehavior middle = new ClientBehavior { ReceiveTimeoutMs = 10000 };
+        middle.DropDataOnce.Add(5);
+        middle.DropDataOnce.Add(30);
+        Stopwatch watch = Stopwatch.StartNew();
+        DownloadResult r = DownloadLikeUBoot(server.LocalEndPoint, Request(1, "gap.bin", "octet", "windowsize", "8"), middle);
+        long elapsed = watch.ElapsedMilliseconds;
+        Check("U-Boot style client: lost blocks inside windows give the right file", r.Completed && Same(r.Data, f));
+        Check("U-Boot style client: a lost block is resent without waiting for the timeout", elapsed < 1500, elapsed + " ms");
+
+        ClientBehavior first = new ClientBehavior { ReceiveTimeoutMs = 10000 };
+        first.DropDataOnce.Add(9);
+        first.DropDataOnce.Add(17);
+        watch.Restart();
+        r = DownloadLikeUBoot(server.LocalEndPoint, Request(1, "gap.bin", "octet", "windowsize", "8"), first);
+        elapsed = watch.ElapsedMilliseconds;
+        Check("U-Boot style client: the first block of a window lost", r.Completed && Same(r.Data, f) && elapsed < 1500, elapsed + " ms");
+
+        r = DownloadLikeUBoot(server.LocalEndPoint, Request(1, "gap.bin", "octet", "windowsize", "8"));
+        Check("U-Boot style client: a clean transfer", r.Completed && Same(r.Data, f));
+    }
+
+    private static void StopOrderTests()
+    {
+        // TransferEnded takes its time (a slow handler widens the window of a race): Stop must not return before it is out.
+        string f = MakeFile("stoporder.bin", 100000, 12);
+        int late = 0;
+        for (int i = 0; i < 8; i++)
+        {
+            using TftpServer server = StartServer(f);
+            int delivered = 0;
+            server.TransferEnded += t =>
+            {
+                Thread.Sleep(60);
+                Volatile.Write(ref delivered, 1);
+            };
+            using Socket socket = BeginTransfer(server, Request(1, "stoporder.bin", "octet"), out IPEndPoint tid, out byte[] firstPacket);
+            server.Stop();
+            if (Volatile.Read(ref delivered) == 0)
+            {
+                late++;
+            }
+        }
+        Check("stop: TransferEnded is out before Stop returns", late == 0, late + " of 8 runs came back too early");
+    }
+
+    private static void RestartTests()
+    {
+        string f = MakeFile("restart.bin", 20000, 13);
+        using TftpServer server = StartServer(f);
+        List<TftpTransfer> ended = new List<TftpTransfer>();
+        server.TransferEnded += t => { lock (ended) ended.Add(t); };
+
+        byte[] request = Request(1, "restart.bin", "octet");
+        using Socket socket = BeginTransfer(server, request, out IPEndPoint tid, out byte[] firstPacket);
+        Check("restart: the first block arrives", tid != null && firstPacket[3] == 1);
+        socket.SendTo(Ack(1), tid);
+        byte[] buffer = new byte[2048];
+        Check("restart: the transfer is under way (block 2)", socket.Poll(2000000, SelectMode.SelectRead));
+        EndPoint from = new IPEndPoint(IPAddress.Any, 0);
+        socket.ReceiveFrom(buffer, ref from);
+
+        // The board starts the download again from the same address and port (a fixed tftpsrcp, a reset board).
+        socket.SendTo(request, server.LocalEndPoint);
+        IPEndPoint newTid = null;
+        int block = -1;
+        DateTime deadline = DateTime.UtcNow.AddSeconds(3);
+        while (newTid == null && DateTime.UtcNow < deadline && socket.Poll(500000, SelectMode.SelectRead))
+        {
+            from = new IPEndPoint(IPAddress.Any, 0);
+            socket.ReceiveFrom(buffer, ref from);
+            if (!from.Equals(tid))
+            {
+                newTid = (IPEndPoint)from;
+                block = (buffer[2] << 8) | buffer[3];
+            }
+        }
+        Check("restart: a request after the first acknowledgement starts a new transfer", newTid != null && block == 1, newTid == null ? "no answer" : "block " + block);
+        Check("restart: the old transfer is cancelled", WaitFor(() => { lock (ended) return ended.Count >= 1 && ended[0].State == TftpTransferState.Cancelled; }));
+    }
+
+    private static void DeadlineTests()
+    {
+        string f = MakeFile("deadline.bin", 10000, 14);
+
+        // A client that keeps sending acknowledgements that mean nothing must not keep the transfer alive.
+        using (TftpServer server = StartServerWith(300, 2, f))
+        {
+            TftpTransfer ended = null;
+            server.TransferEnded += t => ended = t;
+            using Socket socket = BeginTransfer(server, Request(1, "deadline.bin", "octet"), out IPEndPoint tid, out byte[] firstPacket);
+            Stopwatch watch = Stopwatch.StartNew();
+            while (Volatile.Read(ref ended) == null && watch.ElapsedMilliseconds < 4000)
+            {
+                socket.SendTo(Ack(0), tid);
+                Thread.Sleep(50);
+                DrainPackets(socket, 3);
+            }
+            Check("deadline: stale acknowledgements do not extend the wait", Volatile.Read(ref ended) != null && ended.State == TftpTransferState.Failed && watch.ElapsedMilliseconds < 2500, watch.ElapsedMilliseconds + " ms");
+        }
+
+        // The same while the options are waiting for their acknowledgement: no resending at every stray packet, and a limit.
+        using (TftpServer server = StartServerWith(300, 2, f))
+        {
+            TftpTransfer ended = null;
+            server.TransferEnded += t => ended = t;
+            using Socket socket = BeginTransfer(server, Request(1, "deadline.bin", "octet", "blksize", "1024"), out IPEndPoint tid, out byte[] firstPacket);
+            int oacks = firstPacket != null && firstPacket[1] == 6 ? 1 : 0;
+            Stopwatch watch = Stopwatch.StartNew();
+            while (Volatile.Read(ref ended) == null && watch.ElapsedMilliseconds < 4000)
+            {
+                socket.SendTo(Ack(7), tid);
+                Thread.Sleep(50);
+                oacks += DrainPackets(socket, 6);
+            }
+            Check("deadline: a chatty client does not keep the options waiting for ever", Volatile.Read(ref ended) != null && ended.State == TftpTransferState.Failed && watch.ElapsedMilliseconds < 2500, watch.ElapsedMilliseconds + " ms");
+            Check("deadline: the options are resent on the timeout only", oacks <= 4, oacks + " copies");
+        }
+    }
+
+    private static void MinorTests()
+    {
+        string f = MakeFile("minor.bin", 3000, 15);
+        using TftpServer server = StartServer(f);
+
+        foreach (string name in new[] { "/./minor.bin", ".//minor.bin", "//minor.bin", "./././minor.bin", "/.\\minor.bin" })
+        {
+            DownloadResult r = Download(server.LocalEndPoint, Request(1, name, "octet"));
+            Check("the name \"" + name + "\" is served", r.Completed && Same(r.Data, f));
+        }
+
+        // An ERROR packet from a stranger is not answered (two peers could keep answering each other); anything else is.
+        using (Socket socket = BeginTransfer(server, Request(1, "minor.bin", "octet"), out IPEndPoint tid, out byte[] firstPacket))
+        using (Socket stranger = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+        {
+            stranger.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            stranger.SendTo(new byte[] { 0, 5, 0, 5, (byte)'x', 0 }, tid);
+            Check("a stranger's ERROR gets no answer", !stranger.Poll(500000, SelectMode.SelectRead));
+            stranger.SendTo(Ack(1), tid);
+            Check("a stranger's ACK still gets error 5", stranger.Poll(2000000, SelectMode.SelectRead));
+        }
+
+        // The file is gone or cannot be opened: the right error, and the listener is not the one to wait for the disk.
+        string gone = MakeFile("gone.bin", 100, 16);
+        server.AddFile("gone.bin", gone);
+        File.Delete(gone);
+        DownloadResult missing = Download(server.LocalEndPoint, Request(1, "gone.bin", "octet"));
+        Check("a registered file that was deleted gets error 1", missing.ErrorCode == 1, missing.ErrorCode.ToString());
+
+        string locked = MakeFile("locked.bin", 100, 17);
+        server.AddFile("locked.bin", locked);
+        using (new FileStream(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            DownloadResult busy = Download(server.LocalEndPoint, Request(1, "locked.bin", "octet"));
+            if (!busy.Completed)
+            {
+                Check("a file that is in use by another program gets an error that makes the client try again (0, not 1 or 2)", busy.ErrorCode == 0, busy.ErrorCode.ToString());
+            }
+        }
+    }
+
+    private static void ChangedFileTests()
+    {
+        // A firmware rebuilt while it is being sent must not pass as a good transfer.
+        string f = MakeFile("changed.bin", 20 * 512, 18);
+        using TftpServer server = StartServer(f);
+        List<TftpTransfer> ended = new List<TftpTransfer>();
+        server.TransferEnded += t => { lock (ended) ended.Add(t); };
+
+        using Socket socket = BeginTransfer(server, Request(1, "changed.bin", "octet"), out IPEndPoint tid, out byte[] firstPacket);
+        bool written = false;
+        try
+        {
+            using FileStream writer = new FileStream(f, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+            writer.Seek(0, SeekOrigin.End);
+            writer.Write(new byte[100], 0, 100);
+            written = true;
+        }
+        catch (IOException)
+        {
+            // The server holds the file so that nobody can change it: the best outcome.
+        }
+
+        byte[] buffer = new byte[2048];
+        long block = firstPacket[3];
+        bool last = firstPacket.Length - 4 < 512;
+        while (true)
+        {
+            socket.SendTo(Ack(block), tid);
+            if (last || !socket.Poll(2000000, SelectMode.SelectRead))
+            {
+                break;
+            }
+            EndPoint from = new IPEndPoint(IPAddress.Any, 0);
+            int n = socket.ReceiveFrom(buffer, ref from);
+            if (buffer[1] != 3)
+            {
+                break;
+            }
+            block = (buffer[2] << 8) | buffer[3];
+            last = n - 4 < 512;
+        }
+
+        Check("changed file: the transfer ends", WaitFor(() => { lock (ended) return ended.Count == 1; }));
+        if (written)
+        {
+            Check("changed file: a file that grew while it was sent is reported as failed", ended.Count == 1 && ended[0].State == TftpTransferState.Failed && ended[0].Error.Contains("changed"), ended.Count == 1 ? ended[0].State + " " + ended[0].Error : "no event");
+        }
+        else
+        {
+            Check("changed file: the file could not be written to while it was sent", ended.Count == 1 && ended[0].Succeeded);
+        }
+    }
+
+    private static void SetFilesTests()
+    {
+        string a = MakeFile("set-a.bin", 3000, 19);
+        string b = MakeFile("set-b.bin", 3000, 20);
+        using TftpServer server = StartServer(a, b);
+        KeyValuePair<string, string>[] both =
+        {
+            new KeyValuePair<string, string>("set-a.bin", a),
+            new KeyValuePair<string, string>("set-b.bin", b)
+        };
+
+        // The list is replaced over and over while requests come in: none of them may find it empty.
+        int stop = 0;
+        Thread changer = new Thread(() =>
+        {
+            while (Volatile.Read(ref stop) == 0)
+            {
+                server.SetFiles(both);
+            }
+        });
+        changer.Start();
+        int notFound = 0;
+        int completed = 0;
+        for (int i = 0; i < 150; i++)
+        {
+            DownloadResult r = Download(server.LocalEndPoint, Request(1, i % 2 == 0 ? "set-a.bin" : "set-b.bin", "octet"));
+            if (r.ErrorCode == 1)
+            {
+                notFound++;
+            }
+            if (r.Completed)
+            {
+                completed++;
+            }
+        }
+        Volatile.Write(ref stop, 1);
+        changer.Join();
+        Check("SetFiles: a request during a replacement never finds the list empty", notFound == 0 && completed == 150, notFound + " not found, " + completed + " completed");
+
+        server.SetFiles(new[] { new KeyValuePair<string, string>("./only.bin", a) });
+        Check("SetFiles: the list is replaced", server.GetFiles().Length == 1 && server.GetFiles()[0].Key == "./only.bin");
+        DownloadResult old = Download(server.LocalEndPoint, Request(1, "set-a.bin", "octet"));
+        DownloadResult now = Download(server.LocalEndPoint, Request(1, "only.bin", "octet"));
+        Check("SetFiles: the old names are gone, the new one is served", old.ErrorCode == 1 && now.Completed && Same(now.Data, a));
+    }
+
+    private static void PacingTests()
+    {
+        Check("pacing: 80 microseconds between the packets of a window by default", new TftpServer(IPAddress.Loopback, 0).WindowPacingMicroseconds == 80);
+
+        string f = MakeFile("pace.bin", 2 * 8 * 512 + 100, 21); // windows of 8, 8 and 1 blocks
+        using TftpServer server = StartServer(f);
+        server.WindowPacingMicroseconds = 5000;
+        Stopwatch watch = Stopwatch.StartNew();
+        DownloadResult r = Download(server.LocalEndPoint, Request(1, "pace.bin", "octet", "windowsize", "8"));
+        long paced = watch.ElapsedMilliseconds;
+        Check("pacing: the transfer still gives the right file", r.Completed && Same(r.Data, f));
+        Check("pacing: the packets of a window leave with a pause between them", paced >= 60, paced + " ms");
+
+        server.WindowPacingMicroseconds = 0;
+        watch.Restart();
+        r = Download(server.LocalEndPoint, Request(1, "pace.bin", "octet", "windowsize", "8"));
+        Check("pacing: switched off, the same transfer is quick", r.Completed && watch.ElapsedMilliseconds < paced, watch.ElapsedMilliseconds + " ms");
+    }
+
     private static int Main()
     {
         _dir = Path.Combine(Path.GetTempPath(), "tftp-tests-" + Guid.NewGuid().ToString("N"));
@@ -540,6 +983,14 @@ internal static class Program
             EventTests();
             StopTests();
             ConcurrencyAndMisc();
+            WindowGapTests();
+            StopOrderTests();
+            RestartTests();
+            DeadlineTests();
+            MinorTests();
+            ChangedFileTests();
+            SetFilesTests();
+            PacingTests();
         }
         finally
         {

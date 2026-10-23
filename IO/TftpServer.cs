@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Net;
@@ -26,6 +27,12 @@ public sealed class TftpTransfer
 
     internal Socket Socket;
     internal volatile bool CancelRequested;
+
+    /// <summary>The request packet as it came, to tell a repeated request from a new one.</summary>
+    internal byte[] Request;
+
+    /// <summary>True once the client has acknowledged anything: from then on a request from it is a restart, not a repeat.</summary>
+    internal volatile bool FirstAckReceived;
 
     public int Id { get; internal set; }
 
@@ -131,6 +138,13 @@ public sealed class TftpServer : IDisposable
     /// <summary>The largest window (blocks sent before waiting for an acknowledgement) the server accepts.</summary>
     public int MaxWindowSize { get; set; } = 64;
 
+    /// <summary>
+    /// The pause between two data packets of one window, in microseconds (RFC 7440 section 6 asks for the rate to follow
+    /// the congestion guidelines of RFC 5405; its example for Ethernet is 80). The small receive buffers of boards lose
+    /// the packets of a window that arrives back to back. 0 switches the pause off.
+    /// </summary>
+    public int WindowPacingMicroseconds { get; set; } = 80;
+
     public bool IsRunning => _running;
 
     /// <summary>The address and port the server listens on; valid while it is running (the real port when 0 was asked for).</summary>
@@ -181,6 +195,44 @@ public sealed class TftpServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Replaces all the registered files at once: a request that arrives while the list changes sees the old list or the new
+    /// one, never an empty one (as it would between <see cref="ClearFiles"/> and <see cref="AddFile"/>).
+    /// </summary>
+    public void SetFiles(IEnumerable<KeyValuePair<string, string>> files)
+    {
+        if (files == null)
+        {
+            throw new ArgumentNullException(nameof(files));
+        }
+        Dictionary<string, string> paths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, string> file in files)
+        {
+            string key = NormalizeName(file.Key);
+            if (string.IsNullOrEmpty(key))
+            {
+                throw new ArgumentException("The served name is empty.", nameof(files));
+            }
+            if (string.IsNullOrEmpty(file.Value))
+            {
+                throw new ArgumentException("The file path is empty.", nameof(files));
+            }
+            paths[key] = file.Value;
+            names[key] = file.Key;
+        }
+        lock (_lock)
+        {
+            _files.Clear();
+            _displayNames.Clear();
+            foreach (KeyValuePair<string, string> pair in paths)
+            {
+                _files[pair.Key] = pair.Value;
+                _displayNames[pair.Key] = names[pair.Key];
+            }
+        }
+    }
+
     public void ClearFiles()
     {
         lock (_lock)
@@ -211,11 +263,23 @@ public sealed class TftpServer : IDisposable
             return null;
         }
         string n = name.Trim().Replace('\\', '/');
-        while (n.StartsWith("./", StringComparison.Ordinal))
+        // Leading "/" and "./" in any order and number ("/./fw.bin", ".//fw.bin").
+        while (true)
         {
-            n = n.Substring(2);
+            if (n.StartsWith("./", StringComparison.Ordinal))
+            {
+                n = n.Substring(2);
+            }
+            else if (n.StartsWith("/", StringComparison.Ordinal))
+            {
+                n = n.Substring(1);
+            }
+            else
+            {
+                break;
+            }
         }
-        return n.TrimStart('/');
+        return n;
     }
 
     // ---------- start and stop ----------
@@ -312,9 +376,10 @@ public sealed class TftpServer : IDisposable
         {
             listenerThread.Join(2000);
         }
-        // The transfer threads end by themselves; give them a moment so their events are out before Stop returns.
-        DateTime deadline = DateTime.UtcNow.AddSeconds(2);
-        while (ActiveTransferCount > 0 && DateTime.UtcNow < deadline)
+        // The transfer threads end by themselves. A transfer leaves the active list only after its TransferEnded event was
+        // raised, so when the list is empty every event is out; give the threads a moment for that before Stop returns.
+        long deadline = NowMs() + 2000;
+        while (ActiveTransferCount > 0 && NowMs() < deadline)
         {
             Thread.Sleep(10);
         }
@@ -418,10 +483,12 @@ public sealed class TftpServer : IDisposable
         }
 
         string key = NormalizeName(fileName);
+        byte[] requestCopy = new byte[length];
+        Buffer.BlockCopy(packet, 0, requestCopy, 0, length);
         string path;
         string servedName = null;
-        bool duplicate = false;
-        bool tooMany = false;
+        TftpTransfer current = null; // a transfer of this client that is still running
+        int running = 0;
         lock (_lock)
         {
             if (!_files.TryGetValue(key ?? string.Empty, out path))
@@ -434,23 +501,16 @@ public sealed class TftpServer : IDisposable
             }
             foreach (TftpTransfer other in _active)
             {
-                if (other.Client.Equals(client))
+                if (other.CancelRequested)
                 {
-                    duplicate = true; // the client repeated its request while the first answer was on its way
-                    break;
+                    continue;
+                }
+                running++;
+                if (current == null && other.Client.Equals(client))
+                {
+                    current = other;
                 }
             }
-            tooMany = path != null && !duplicate && _active.Count >= MaxConcurrentTransfers;
-        }
-        if (duplicate)
-        {
-            return;
-        }
-        if (tooMany)
-        {
-            RaiseLog("Refused \"" + fileName + "\" for " + client + ": too many transfers.");
-            ReplyError(local, client, ErrNotDefined, "Too many transfers in progress.");
-            return;
         }
         if (path == null)
         {
@@ -458,18 +518,29 @@ public sealed class TftpServer : IDisposable
             ReplyError(local, client, ErrFileNotFound, "File not found.");
             return;
         }
-
-        FileStream stream;
-        long fileLength;
-        try
+        if (current != null)
         {
-            stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            fileLength = stream.Length;
+            if (!current.FirstAckReceived && BytesEqual(current.Request, requestCopy))
+            {
+                return; // the client repeated its request while the first answer was on its way
+            }
+            // The client asks again from the same address and port after it has taken part in a transfer: it started over
+            // (a reset board, a fixed source port). The old transfer would only run into its timeout; let it go.
+            RaiseLog("New request from " + client + ": the transfer in progress is cancelled.");
+            current.CancelRequested = true;
+            try
+            {
+                current.Socket?.Close();
+            }
+            catch (Exception)
+            {
+            }
+            running--;
         }
-        catch (Exception ex)
+        if (running >= MaxConcurrentTransfers)
         {
-            RaiseLog("Cannot read \"" + path + "\": " + ex.Message);
-            ReplyError(local, client, ErrAccessViolation, "The file cannot be read.");
+            RaiseLog("Refused \"" + fileName + "\" for " + client + ": too many transfers.");
+            ReplyError(local, client, ErrNotDefined, "Too many transfers in progress.");
             return;
         }
 
@@ -480,37 +551,50 @@ public sealed class TftpServer : IDisposable
         }
         catch (Exception ex)
         {
-            stream.Dispose();
             RaiseLog("Cannot open a transfer socket: " + ex.Message);
             return;
         }
 
+        // The file is opened by the transfer's own thread: a slow or unreachable path must not hold up the other requests.
         TftpTransfer transfer = new TftpTransfer
         {
             Id = Interlocked.Increment(ref _nextTransferId),
             Client = client,
             FileName = servedName,
             FilePath = path,
-            Length = fileLength,
             StartedUtc = DateTime.UtcNow,
-            Socket = socket
+            Socket = socket,
+            Request = requestCopy
         };
-
-        NegotiateOptions(options, transfer, out byte[] oack, out int timeoutMs);
 
         lock (_lock)
         {
             if (!_running)
             {
                 socket.Close();
-                stream.Dispose();
                 return;
             }
             _active.Add(transfer);
         }
 
-        Thread thread = new Thread(() => RunTransfer(transfer, stream, socket, oack, timeoutMs)) { IsBackground = true, Name = "TFTP transfer " + transfer.Id };
+        Thread thread = new Thread(() => RunTransfer(transfer, socket, options)) { IsBackground = true, Name = "TFTP transfer " + transfer.Id };
         thread.Start();
+    }
+
+    private static bool BytesEqual(byte[] a, byte[] b)
+    {
+        if (a == null || b == null || a.Length != b.Length)
+        {
+            return false;
+        }
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (a[i] != b[i])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>Splits a request into the file name, the mode and the options. False when it is malformed.</summary>
@@ -619,8 +703,28 @@ public sealed class TftpServer : IDisposable
         }
     }
 
-    private void RunTransfer(TftpTransfer transfer, FileStream stream, Socket socket, byte[] oack, int timeoutMs)
+    private void RunTransfer(TftpTransfer transfer, Socket socket, List<KeyValuePair<string, string>> options)
     {
+        FileStream stream = null;
+        byte[] oack;
+        int timeoutMs;
+        try
+        {
+            // Not shared for writing: a firmware rebuilt in place while it is being sent would reach the board half old,
+            // half new. Replacing the file (rename, delete and create) is still possible; the transfer goes on with the
+            // content it opened.
+            stream = new FileStream(transfer.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            transfer.Length = stream.Length;
+            NegotiateOptions(options, transfer, out oack, out timeoutMs);
+        }
+        catch (Exception ex)
+        {
+            stream?.Dispose();
+            RefuseTransfer(transfer, socket, ex);
+            return;
+        }
+
+        long startedMs = NowMs();
         string description = "\"" + transfer.FileName + "\" to " + transfer.Client.Address + ":" + transfer.Client.Port;
         RaiseLog("Sending " + description + " (" + transfer.Length.ToString(CultureInfo.InvariantCulture) + " bytes, block size "
             + transfer.BlockSize + (transfer.WindowSize > 1 ? ", window " + transfer.WindowSize : string.Empty) + ").");
@@ -661,7 +765,7 @@ public sealed class TftpServer : IDisposable
 
         if (transfer.State == TftpTransferState.Completed)
         {
-            double seconds = Math.Max(0.001, (transfer.EndedUtc - transfer.StartedUtc).TotalSeconds);
+            double seconds = Math.Max(0.001, (NowMs() - startedMs) / 1000.0);
             RaiseLog("Sent " + description + ": " + transfer.Length.ToString(CultureInfo.InvariantCulture) + " bytes in "
                 + seconds.ToString("0.0", CultureInfo.InvariantCulture) + " s ("
                 + (transfer.Length / seconds / 1024).ToString("0", CultureInfo.InvariantCulture) + " KB/s).");
@@ -675,11 +779,57 @@ public sealed class TftpServer : IDisposable
             RaiseLog("Failed " + description + ": " + transfer.Error);
         }
 
+        // The event comes first: Stop() waits for the transfer to leave the list, and what it promises is that every
+        // TransferEnded event is out when it returns.
+        try
+        {
+            RaiseEvent(TransferEnded, transfer);
+        }
+        finally
+        {
+            RemoveActive(transfer);
+        }
+    }
+
+    private void RemoveActive(TftpTransfer transfer)
+    {
         lock (_lock)
         {
             _active.Remove(transfer);
         }
-        RaiseEvent(TransferEnded, transfer);
+    }
+
+    /// <summary>The file could not be opened: tell the client what is wrong and forget the transfer (it never started).</summary>
+    private void RefuseTransfer(TftpTransfer transfer, Socket socket, Exception ex)
+    {
+        int code = ErrNotDefined; // the client may try again (U-Boot does for this one)
+        string message = "The file cannot be read.";
+        if (ex is FileNotFoundException || ex is DirectoryNotFoundException)
+        {
+            code = ErrFileNotFound;
+            message = "File not found.";
+        }
+        else if (ex is UnauthorizedAccessException)
+        {
+            code = ErrAccessViolation;
+            message = "Access violation.";
+        }
+        RaiseLog("Cannot read \"" + transfer.FilePath + "\": " + ex.Message);
+        try
+        {
+            socket.SendTo(BuildError(code, message), transfer.Client);
+        }
+        catch (Exception)
+        {
+        }
+        try
+        {
+            socket.Close();
+        }
+        catch (Exception)
+        {
+        }
+        RemoveActive(transfer);
     }
 
     private void SendFile(TftpTransfer transfer, FileStream stream, Socket socket, byte[] oack, int timeoutMs)
@@ -692,44 +842,59 @@ public sealed class TftpServer : IDisposable
         byte[] incoming = new byte[2048];
         int retries = 0;
         int maxRetries = Math.Max(1, MaxRetries);
+        int pacing = Math.Max(0, WindowPacingMicroseconds);
         long streamPosition = 0;
-        int lastProgress = Environment.TickCount;
+        long lastProgress = NowMs();
 
-        // An accepted option is confirmed first; the client answers with an acknowledgement of block 0.
+        // An accepted option is confirmed first; the client answers with an acknowledgement of block 0. Every sending of the
+        // confirmation gets one wait of the full timeout: whatever else arrives meanwhile does not extend it, so a client
+        // that only chatters cannot keep the transfer waiting, and the attempts are counted.
         if (oack != null)
         {
             while (true)
             {
                 ThrowIfCancelled(transfer);
                 socket.SendTo(oack, client);
-                int n = Receive(transfer, socket, incoming, timeoutMs, out int opcode);
-                if (n < 0)
+                long oackDeadline = NowMs() + timeoutMs;
+                bool confirmed = false;
+                while (!confirmed)
                 {
-                    if (++retries > maxRetries)
+                    int n = Receive(transfer, socket, incoming, oackDeadline, out int opcode);
+                    if (n < 0)
                     {
-                        throw new TransferFailure("The client did not answer.");
+                        break;
                     }
-                    continue;
+                    if (opcode == OpError)
+                    {
+                        throw new TransferFailure("The client refused the options" + ErrorText(incoming, n) + ".");
+                    }
+                    if (opcode == OpAck && n >= 4 && ((incoming[2] << 8) | incoming[3]) == 0)
+                    {
+                        confirmed = true;
+                    }
                 }
-                if (opcode == OpError)
-                {
-                    throw new TransferFailure("The client refused the options" + ErrorText(incoming, n) + ".");
-                }
-                if (opcode == OpAck && n >= 4 && ((incoming[2] << 8) | incoming[3]) == 0)
+                if (confirmed)
                 {
                     break;
                 }
+                if (++retries > maxRetries)
+                {
+                    throw new TransferFailure("The client did not answer.");
+                }
             }
             retries = 0;
+            transfer.FirstAckReceived = true;
         }
 
         long acked = 0;
         long next = 1;
         long gapResendFor = -1; // the acknowledged block for which the window was already sent again after a reported gap
+        long deadline = NowMs() + timeoutMs;
         while (acked < lastBlock)
         {
             ThrowIfCancelled(transfer);
 
+            bool sent = false;
             while (next <= lastBlock && next - acked <= window)
             {
                 long offset = (next - 1) * blockSize;
@@ -754,11 +919,22 @@ public sealed class TftpServer : IDisposable
                 packet[1] = OpData;
                 packet[2] = (byte)((next >> 8) & 0xFF);
                 packet[3] = (byte)(next & 0xFF);
+                if (sent && pacing > 0)
+                {
+                    Pace(pacing); // between the packets of one window
+                }
                 socket.SendTo(packet, 0, 4 + count, SocketFlags.None, client);
                 next++;
+                sent = true;
+            }
+            if (sent)
+            {
+                // One deadline for what has been sent. Only sending (or an acknowledgement that moves on) starts it again;
+                // a repeated or meaningless packet from the client does not.
+                deadline = NowMs() + timeoutMs;
             }
 
-            int received = Receive(transfer, socket, incoming, timeoutMs, out int code);
+            int received = Receive(transfer, socket, incoming, deadline, out int code);
             if (received < 0)
             {
                 if (++retries > maxRetries)
@@ -778,29 +954,45 @@ public sealed class TftpServer : IDisposable
             {
                 continue;
             }
+            transfer.FirstAckReceived = true;
 
             long ack = ResolveBlock((incoming[2] << 8) | incoming[3], acked);
             if (ack > acked && ack < next)
             {
                 acked = ack;
                 retries = 0;
+                deadline = NowMs() + timeoutMs;
                 transfer.BytesAcknowledged = Math.Min(transfer.Length, acked * blockSize);
-                int now = Environment.TickCount;
+                long now = NowMs();
                 if (now - lastProgress >= 100)
                 {
                     lastProgress = now;
                     RaiseEvent(TransferProgress, transfer);
                 }
+                if (ack < next - 1)
+                {
+                    // An acknowledgement of a block that is not the last one sent: the client has a gap after it (RFC 7440
+                    // section 4: the next window begins after the block acknowledged). A client such as U-Boot says this
+                    // once and then waits, so the window has to start again now; the blocks sent after the gap are of no use.
+                    gapResendFor = ack;
+                    next = ack + 1;
+                }
             }
-            else if (ack == acked && window > 1 && gapResendFor != acked)
+            else if (ack == acked && window > 1 && next - 1 > acked && gapResendFor != acked)
             {
                 // With a window, the same acknowledgement again says the block after it did not arrive. Without one it is
                 // just a late duplicate, and answering it would make every block go out twice. Every packet that arrives
-                // after the gap makes the client repeat the acknowledgement: only the first one is acted upon, the
+                // after the gap makes some clients repeat the acknowledgement: only the first one is acted upon, the
                 // timeout takes care of a repeat that got lost as well.
                 gapResendFor = acked;
                 next = acked + 1;
             }
+        }
+
+        if (stream.Length != transfer.Length)
+        {
+            // The sharing mode keeps writers out where the system enforces it; this is for where it does not.
+            throw new TransferFailure("The file changed while it was being sent: the client may have a mixture of the old and the new content.");
         }
 
         transfer.BytesAcknowledged = transfer.Length;
@@ -808,17 +1000,18 @@ public sealed class TftpServer : IDisposable
     }
 
     /// <summary>
-    /// Waits up to <paramref name="timeoutMs"/> for a packet from the client. Returns its length, or -1 on timeout.
-    /// Packets from anyone else get an "unknown transfer ID" error and do not disturb the transfer.
+    /// Waits until <paramref name="deadlineMs"/> (a <see cref="NowMs"/> time) for a packet from the client. Returns its length,
+    /// or -1 when the time is up; the deadline is the caller's, so a packet that is of no use does not move it.
+    /// Packets from anyone else get an "unknown transfer ID" error (an ERROR packet is not answered, so that two such
+    /// peers cannot keep answering each other) and do not disturb the transfer.
     /// </summary>
-    private static int Receive(TftpTransfer transfer, Socket socket, byte[] buffer, int timeoutMs, out int opcode)
+    private static int Receive(TftpTransfer transfer, Socket socket, byte[] buffer, long deadlineMs, out int opcode)
     {
         opcode = -1;
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (true)
         {
             ThrowIfCancelled(transfer);
-            double remaining = (deadline - DateTime.UtcNow).TotalMilliseconds;
+            long remaining = deadlineMs - NowMs();
             if (remaining <= 0)
             {
                 return -1;
@@ -834,12 +1027,16 @@ public sealed class TftpServer : IDisposable
                 IPEndPoint source = (IPEndPoint)from;
                 if (!source.Equals(transfer.Client))
                 {
-                    try
+                    bool isError = length >= 2 && buffer[0] == 0 && buffer[1] == OpError;
+                    if (!isError)
                     {
-                        socket.SendTo(BuildError(ErrUnknownTransferId, "Unknown transfer ID."), source);
-                    }
-                    catch (SocketException)
-                    {
+                        try
+                        {
+                            socket.SendTo(BuildError(ErrUnknownTransferId, "Unknown transfer ID."), source);
+                        }
+                        catch (SocketException)
+                        {
+                        }
                     }
                     continue;
                 }
@@ -867,6 +1064,23 @@ public sealed class TftpServer : IDisposable
                 }
                 throw new TransferFailure("Network error: " + ex.Message);
             }
+        }
+    }
+
+    // A clock that does not follow changes of the system time (a time zone, a correction, a daylight saving switch).
+    private static readonly Stopwatch Clock = Stopwatch.StartNew();
+
+    private static long NowMs()
+    {
+        return Clock.ElapsedMilliseconds;
+    }
+
+    private static void Pace(int microseconds)
+    {
+        long target = Stopwatch.GetTimestamp() + microseconds * Stopwatch.Frequency / 1000000L;
+        while (Stopwatch.GetTimestamp() < target)
+        {
+            Thread.SpinWait(20);
         }
     }
 
