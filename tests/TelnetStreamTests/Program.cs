@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -489,11 +490,19 @@ internal static class Program
             CheckBytes(connection.TakeWritten(), Text("root\r\n"), "auto login: without a password only the user name is sent");
         }
         {
-            // the password prompt does not get the user name and the other way round
+            // The password prompt does not get the user name. A password prompt that comes first (the server took the
+            // user name from the NEW-ENVIRON option and skipped its own login question) gets the password.
             FakeConnection connection = new FakeConnection(Text("Password: "), Text("login: "));
             TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("u", "p", null, null) });
             ReadAll(stream);
-            CheckBytes(connection.TakeWritten(), Text("u\r\n"), "auto login: the order is login first; a password prompt before it is ignored");
+            CheckBytes(connection.TakeWritten(), Text("p\r\n"), "auto login: a password prompt before the login prompt gets the password, and the login is then done");
+        }
+        {
+            // Power PMAC with the saved connection: USER=root is passed in the negotiation, the first prompt is "Password: "
+            FakeConnection connection = new FakeConnection(Text("Debian GNU/Linux 7\r\nPassword: "), Text("\r\nLast login: Mon Dec 10\r\nroot@host:~# "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("root", "deltatau", null, null) });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Text("deltatau\r\n"), "auto login: password-only server with a user name configured");
         }
         {
             // custom prompts, case does not matter
@@ -844,6 +853,33 @@ internal static class Program
             all.TakeWritten();
             ReadAll(stream);
             Check(all.Written.Length == 0, "active negotiation: the server's agreement to the extra offers is not answered again");
+        }
+
+        // The bytes a Power PMAC (Debian 7) sent in a recorded session, answered by the automatic login.
+        {
+            FakeConnection connection = new FakeConnection(
+                B(IAC, 253, 24, IAC, 253, 32, IAC, 253, 35, IAC, 253, 39),
+                B(IAC, 250, 32, 1, IAC, 240, IAC, 250, 39, 1, IAC, 240, IAC, 250, 24, 1, IAC, 240),
+                B(IAC, 251, 3, IAC, 253, 1, IAC, 253, 31, IAC, 251, 5, IAC, 253, 33),
+                B(IAC, 251, 1),
+                Text("Debian GNU/Linux 7\r\n"),
+                Text("powerpmac login: "),
+                Text("\r\nPassword: "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("root", "deltatau", null, null, 0, null, "\r\n") });
+            ReadAll(stream);
+            byte[] sent = connection.TakeWritten();
+            string sentText = Encoding.ASCII.GetString(sent);
+            Check(sentText.Contains("root\r\n") && sentText.Contains("deltatau\r\n"), "auto login: the login and the password answer the prompts of a Power PMAC session");
+        }
+        {
+            // What the automatic login does is told to the trace, without the values.
+            List<string> notes = new List<string>();
+            TelnetAutoLogin login = new TelnetAutoLogin("root", "deltatau", null, null) { Log = notes.Add };
+            Check(login.Describe() == "user name yes, password yes" && new TelnetAutoLogin("", "x", null, null).Describe() == "user name no, password yes", "auto login: Describe() tells what is configured");
+            login.Feed(Text("powerpmac login: "), 0, 17);
+            login.Feed(Text("Password: "), 0, 10);
+            Check(notes.Count == 2 && notes[0].Contains("user name sent") && notes[1].Contains("password sent") && !notes.Any(n => n.Contains("root") || n.Contains("deltatau")),
+                "auto login: the prompts it answers are told to the trace, without the user name and the password");
         }
 
         // --- the diagnostic trace of a connection (SMARTTY_TELNET_TRACE) ---
