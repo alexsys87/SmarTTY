@@ -73,6 +73,85 @@ public static class LocalRepoFolders
         return Candidates(path).FirstOrDefault(exists);
     }
 
+    /// <summary>
+    /// The package folders of the target of a build tree that belong to a folder of its feeds: for ".../bin/packages/arm_cortex-a9_neon"
+    /// (or the folder of one of its feeds, or bin/packages itself) these are ".../bin/targets/&lt;target&gt;/&lt;subtarget&gt;/packages" -
+    /// the kernel modules (kmod-*) and the kernel package, which the feeds of bin/packages do not have. When several targets were built,
+    /// those whose packages are for the architecture of the folder are kept. Empty for a folder that is not in bin/packages.
+    /// <paramref name="architectureOf"/> tells the architecture of a package folder (null when unknown).
+    /// </summary>
+    public static IList<string> FindTargetPackageFolders(string folder, Func<string, bool> exists, Func<string, IList<string>> subdirectories, Func<string, string> architectureOf)
+    {
+        List<string> result = new List<string>();
+        string path = Clean(folder);
+        string normalized = path.Replace('/', '\\');
+        int at = normalized.LastIndexOf("\\bin\\packages", StringComparison.OrdinalIgnoreCase);
+        int end = at + "\\bin\\packages".Length;
+        if (at < 0 || (end < normalized.Length && normalized[end] != '\\'))
+        {
+            return result;
+        }
+        string separator = path.Contains("\\") ? "\\" : "/";
+        string[] after = normalized.Substring(Math.Min(end + 1, normalized.Length)).Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries);
+        string architecture = after.Length > 0 ? after[0] : null;
+        string targets = path.Substring(0, at) + separator + "bin" + separator + "targets";
+        try
+        {
+            if (!exists(targets))
+            {
+                return result;
+            }
+            foreach (string target in subdirectories(targets).OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+            {
+                foreach (string subtarget in subdirectories(targets + separator + target).OrderBy(name => name, StringComparer.OrdinalIgnoreCase))
+                {
+                    string candidate = targets + separator + target + separator + subtarget + separator + "packages";
+                    if (exists(candidate))
+                    {
+                        result.Add(candidate);
+                    }
+                }
+            }
+        }
+        catch (Exception exception) when (exception is System.IO.IOException || exception is UnauthorizedAccessException)
+        {
+            return new List<string>();
+        }
+        if (architecture != null && result.Count > 1)
+        {
+            List<string> matching = result.Where(candidate => string.Equals(architectureOf(candidate), architecture, StringComparison.Ordinal)).ToList();
+            if (matching.Count > 0)
+            {
+                return matching;
+            }
+        }
+        return result;
+    }
+
+    /// <summary>The Architecture of the first package of the index (Packages) in the folder, or null.</summary>
+    public static string ReadArchitecture(string packageFolder)
+    {
+        try
+        {
+            string index = System.IO.Path.Combine(packageFolder, "Packages");
+            if (!System.IO.File.Exists(index))
+            {
+                return null;
+            }
+            foreach (string line in System.IO.File.ReadLines(index).Take(400))
+            {
+                if (line.StartsWith("Architecture:", StringComparison.Ordinal))
+                {
+                    return line.Substring("Architecture:".Length).Trim();
+                }
+            }
+        }
+        catch (Exception exception) when (exception is System.IO.IOException || exception is UnauthorizedAccessException)
+        {
+        }
+        return null;
+    }
+
     public static bool IsWslPath(string path)
     {
         return path.StartsWith(WslLocalhost, StringComparison.OrdinalIgnoreCase) || path.StartsWith(WslDollar, StringComparison.OrdinalIgnoreCase);

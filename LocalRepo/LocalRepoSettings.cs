@@ -29,6 +29,12 @@ public class LocalRepoSettings
     /// </summary>
     public bool SignGeneratedIndexes = true;
 
+    /// <summary>
+    /// Also serve the packages of the target of the build (bin/targets/&lt;target&gt;/&lt;subtarget&gt;/packages: the kernel modules, kmod-*)
+    /// when a folder of bin/packages is in the list, without the user adding that folder by hand.
+    /// </summary>
+    public bool AddTargetPackages = true;
+
     private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SmarTTY\\LocalRepo.xml");
 
     public static LocalRepoSettings Load()
