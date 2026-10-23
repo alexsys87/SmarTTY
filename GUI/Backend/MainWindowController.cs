@@ -694,6 +694,29 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
+        /// <summary>Asks for a local shell script and runs it on the server in a new terminal tab.</summary>
+        internal void RunScript()
+        {
+            try
+            {
+                SessionWrapper activeSession = RequireSshSession("Running scripts");
+                using OpenFileDialog dialog = new OpenFileDialog
+                {
+                    Title = "Select a shell script to run on the server",
+                    Filter = "Shell scripts (*.sh;*.ash;*.bash)|*.sh;*.ash;*.bash|All files (*.*)|*.*",
+                    CheckFileExists = true
+                };
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    activeSession.RunScript(dialog.FileName);
+                }
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
         internal void DownloadFile()
         {
             try

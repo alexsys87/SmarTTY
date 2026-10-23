@@ -33,6 +33,21 @@ internal static class Program
         Check(equal, name + (equal ? "" : $" (expected '{expected}', got '{actual}')"));
     }
 
+    private static string RunOutput(string command)
+    {
+        ProcessStartInfo startInfo = new ProcessStartInfo(_shell.Split(' ')[0]) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        foreach (string argument in _shell.Split(' ')[1..])
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add(command);
+        using Process process = Process.Start(startInfo);
+        string output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        return output;
+    }
+
     private static int Run(string command, out string errors)
     {
         ProcessStartInfo startInfo = new ProcessStartInfo(_shell.Split(' ')[0])
@@ -88,6 +103,50 @@ internal static class Program
         Check(!RemoteFileOperations.IsExtractableArchive("backup.gz") && !RemoteFileOperations.IsExtractableArchive("backup.zip") && !RemoteFileOperations.IsExtractableArchive("tar") && !RemoteFileOperations.IsExtractableArchive("backup.tar.bz2") && !RemoteFileOperations.IsExtractableArchive(null), "other files are not offered");
         Equal(RemoteFileOperations.ExtractCommand("/a b/it's.tar.gz", "/a b"), "tar -xzf '/a b/it'\\''s.tar.gz' -C '/a b'", "the extract command quotes both paths and asks for gzip");
         Equal(RemoteFileOperations.ExtractCommand("/a/plain.tar", "/a"), "tar -xf '/a/plain.tar' -C '/a'", "a plain tar is not decompressed");
+    }
+
+    private static void ScriptNameChecks()
+    {
+        Equal(RemoteScript.MakeRemotePath("backup.sh", "ab12cd34"), "/tmp/smartty-ab12cd34-backup.sh", "a script goes to /tmp with a token in its name");
+        Equal(RemoteScript.MakeRemotePath("my script $(rm -rf x).sh", "t"), "/tmp/smartty-t-my_script___rm_-rf_x_.sh", "unusual characters of the name are replaced");
+        Equal(RemoteScript.MakeRemotePath("-rf", "t"), "/tmp/smartty-t-rf", "a leading dash is dropped");
+        Equal(RemoteScript.MakeRemotePath("", "t"), "/tmp/smartty-t-script.sh", "an empty name gets a default");
+        Check(RemoteScript.MakeRemotePath(new string('a', 300), "t").Length < 80, "a long name is cut");
+
+        Check(RemoteScript.Validate(new byte[0]) != null, "an empty file is not a script");
+        Check(RemoteScript.Validate(new byte[] { 0x7F, 0x45, 0x4C, 0x46, 0, 1 }) != null, "a binary file is not a script");
+        Check(RemoteScript.Validate(new byte[RemoteScript.MaxLength + 1]) != null, "a huge file is not a script");
+        Check(RemoteScript.Validate(System.Text.Encoding.UTF8.GetBytes("echo hi\n")) == null, "a text file is a script");
+
+        string windows = "\uFEFF#!/bin/sh\r\necho one\r\nif true; then\r\n  echo \"a\rb\"\r\nfi\r\n";
+        byte[] normalized = RemoteScript.Normalize(System.Text.Encoding.UTF8.GetBytes(windows));
+        Equal(System.Text.Encoding.UTF8.GetString(normalized), "#!/bin/sh\necho one\nif true; then\n  echo \"a\rb\"\nfi\n", "CR LF becomes LF, a lone CR stays, the byte order mark is dropped");
+        Check(RemoteScript.HasShebang(normalized) && !RemoteScript.HasShebang(System.Text.Encoding.UTF8.GetBytes("echo hi")), "a shebang is recognized after the byte order mark is dropped");
+
+        Equal(RemoteScript.BuildCommand("/tmp/s 1.sh", true, "/home/u"), "cd '/home/u' && '/tmp/s 1.sh'; rc=$?; rm -f '/tmp/s 1.sh'; exit $rc", "a script with a shebang is run as a program in the working directory");
+        Equal(RemoteScript.BuildCommand("/tmp/s.sh", false, null), "sh '/tmp/s.sh'; rc=$?; rm -f '/tmp/s.sh'; exit $rc", "a script without one is given to sh");
+    }
+
+    private static void ScriptRunChecks(string root)
+    {
+        string work = Path.Combine(root, "work dir");
+        Directory.CreateDirectory(work);
+        foreach (bool shebang in new[] { true, false })
+        {
+            string path = Path.Combine(root, "it's a $script" + (shebang ? "-shebang" : "-plain") + ".sh");
+            byte[] script = RemoteScript.Normalize(System.Text.Encoding.UTF8.GetBytes((shebang ? "#!/bin/sh\r\n" : "") + "echo \"in $(pwd | sed 's|.*/||')\"\r\necho to-stderr >&2\r\nexit 7\r\n"));
+            File.WriteAllBytes(path, script);
+            if (shebang)
+            {
+                Equal(Run("chmod 700 " + RemotePathUtils.ShellQuote(path), out _), 0, "make the script executable");
+            }
+            int exit = Run(RemoteScript.BuildCommand(path, shebang, work), out string errors);
+            Equal(exit, 7, _shell + ": the exit status of the script is the exit status of the command (" + (shebang ? "shebang" : "no shebang") + ")");
+            Check(errors.Contains("to-stderr"), "the script's error output comes through");
+            Check(!File.Exists(path), "the script is removed after it has run");
+        }
+        string output = RunOutput(RemoteScript.BuildCommand(Path.Combine(root, "missing.sh"), true, work));
+        Check(output.Length >= 0 && !File.Exists(Path.Combine(root, "missing.sh")), "a missing script fails without leaving anything behind");
     }
 
     private static void CommandChecks(string root)
@@ -168,6 +227,7 @@ internal static class Program
         try
         {
             NameChecks();
+            ScriptNameChecks();
             List<string> shells = new List<string> { "/bin/sh" };
             foreach (string busybox in new[] { "/bin/busybox", "/usr/bin/busybox" })
             {
@@ -193,6 +253,7 @@ internal static class Program
                 string shellRoot = Path.Combine(root, Path.GetFileName(shell.Replace(" ", "-")));
                 Directory.CreateDirectory(shellRoot);
                 CommandChecks(shellRoot);
+                ScriptRunChecks(shellRoot);
             }
         }
         catch (Exception exception)

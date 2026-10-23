@@ -274,6 +274,11 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         Controller.MenuCommandHandlers.SetupPublicKey();
     }
 
+    private void RunScript_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.MenuCommandHandlers.RunScript();
+    }
+
     private void CheckX11_Click(object sender, RoutedEventArgs e)
     {
         SessionWrapper activeSession = Controller.ActiveSession;

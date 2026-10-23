@@ -221,6 +221,11 @@
             <Image Source="../icons/MainWindow/pubkey.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="Run _script..." Click="RunScript_Click" ToolTip="Uploads a shell script (bash or ash) to /tmp on the server, makes it executable, runs it in a new terminal tab and removes it afterwards" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+          <MenuItem.Icon>
+            <Image Source="../icons/terminal.png" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="Check _X11 forwarding..." Click="CheckX11_Click" ToolTip="Shows whether X11 forwarding works for this connection: the server's answer, xauth and libX11 on the remote host, and VcXsrv on this computer" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/x11.png" />
