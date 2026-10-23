@@ -326,6 +326,81 @@ internal static class Program
         Check(!LocalRepoFolders.DescribeMissing("\\\\h\\s\\a", p => p == "\\\\h\\s", f => throw new System.IO.IOException("denied")).Contains("holds"), "describe: a folder that cannot be listed adds nothing");
     }
 
+    /// <summary>A build tree: the feeds of bin/packages/&lt;arch&gt; and the kernel modules of bin/targets/&lt;target&gt;/&lt;subtarget&gt;/packages as a second folder.</summary>
+    private static async Task TargetPackagesTests()
+    {
+        string tree = Path.Combine(_work, "tree");
+        string packages = Path.Combine(tree, "bin", "packages", "arm_cortex-a9_neon");
+        string kmods = Path.Combine(tree, "bin", "targets", "zynq", "generic", "packages");
+        MakeIpk(Path.Combine(packages, "base"), "busybox", "1.36", "Shell");
+        MakeIpk(Path.Combine(packages, "luci"), "luci-base", "1.0", "Web UI");
+        string kmod = MakeIpk(kmods, "kmod-usb-storage", "5.15.1-1", "USB storage");
+        MakeIpk(kmods, "kernel", "5.15.1-1-abc", "The kernel meta package");
+        File.WriteAllText(Path.Combine(kmods, "Packages"), "Package: kmod-usb-storage\nFilename: " + Path.GetFileName(kmod) + "\nSize: " + new FileInfo(kmod).Length + "\n\n");
+        File.SetLastWriteTimeUtc(Path.Combine(kmods, "Packages"), DateTime.UtcNow.AddMinutes(5));
+        File.WriteAllText(Path.Combine(kmods, "Packages.sig"), "untrusted comment: build\nRWQ=\n");
+
+        List<LocalRepoFeed> feeds = LocalRepoFeedScanner.Scan(new[] { packages, kmods });
+        Check(feeds.Select(f => f.UrlPath).SequenceEqual(new[] { "/r0/base", "/r0/luci", "/r1" }), "two folders: the feeds of the first and the second folder itself as a feed (" + string.Join(", ", feeds.Select(f => f.UrlPath)) + ")");
+        Check(feeds.Select(f => f.Name).Distinct().Count() == 3 && feeds.Last().Name == "smartty_packages", "their names differ (" + string.Join(", ", feeds.Select(f => f.Name)) + ")");
+
+        string dir = Path.Combine(_work, "tree-device");
+        Directory.CreateDirectory(dir);
+        string conf = Path.Combine(dir, "customfeeds.conf");
+        LocalRepoHost host = new LocalRepoHost();
+        SshSession session = NewFakeSession(conf);
+        host.Start(session, new[] { packages, kmods }, 0);
+        string written = File.ReadAllText(conf);
+        Check(written.Contains("src/gz smartty_arm_cortex_a9_neon_base http://127.0.0.1:" + host.Port + "/r0/base") && written.Contains("src/gz smartty_packages http://127.0.0.1:" + host.Port + "/r1"), "both folders are written to customfeeds.conf");
+        using (HttpClient client = new HttpClient())
+        {
+            string baseUrl = "http://127.0.0.1:" + host.Port;
+            Check((await GetAsync(client, baseUrl + "/r1/Packages")).status == 200 && (await GetAsync(client, baseUrl + "/r1/" + Path.GetFileName(kmod))).body.SequenceEqual(File.ReadAllBytes(kmod)), "the kernel module feed serves its index and its packages");
+            Check((await GetAsync(client, baseUrl + "/r1/Packages.sig")).status == 200, "and the signature of the build");
+        }
+        host.Stop(session);
+    }
+
+    /// <summary>Finding bin/targets/&lt;target&gt;/&lt;subtarget&gt;/packages for a folder of bin/packages.</summary>
+    private static void TargetPackageFolderTests()
+    {
+        const string tree = "D:\\openwrt";
+        HashSet<string> folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            tree + "\\bin\\targets",
+            tree + "\\bin\\targets\\zynq", tree + "\\bin\\targets\\zynq\\generic", tree + "\\bin\\targets\\zynq\\generic\\packages",
+            tree + "\\bin\\targets\\mvebu", tree + "\\bin\\targets\\mvebu\\cortexa9", tree + "\\bin\\targets\\mvebu\\cortexa9\\packages"
+        };
+        IList<string> Children(string directory)
+        {
+            string prefix = directory.TrimEnd('\\') + "\\";
+            return folders.Where(f => f.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && f.IndexOf('\\', prefix.Length) < 0).Select(f => f.Substring(prefix.Length)).ToList();
+        }
+        Dictionary<string, string> architectures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [tree + "\\bin\\targets\\zynq\\generic\\packages"] = "arm_cortex-a9_neon",
+            [tree + "\\bin\\targets\\mvebu\\cortexa9\\packages"] = "arm_cortex-a9_vfpv3-d16"
+        };
+        IList<string> Find(string folder) => LocalRepoFolders.FindTargetPackageFolders(folder, folders.Contains, Children, d => architectures.TryGetValue(d, out string a) ? a : null);
+
+        IList<string> both = Find(tree + "\\bin\\packages");
+        Check(both.Count == 2, "bin/packages itself: both targets that were built");
+        IList<string> matching = Find(tree + "\\bin\\packages\\arm_cortex-a9_neon");
+        Check(matching.Count == 1 && matching[0] == tree + "\\bin\\targets\\zynq\\generic\\packages", "bin/packages/<arch>: only the target for that architecture (" + string.Join(", ", matching) + ")");
+        Check(Find(tree + "\\bin\\packages\\arm_cortex-a9_neon\\base\\").SequenceEqual(matching), "a feed inside bin/packages/<arch> leads to the same folder, a trailing backslash does not matter");
+        Check(Find(tree.ToLowerInvariant() + "\\BIN\\Packages\\arm_cortex-a9_neon").Count == 1, "the case of the path does not matter");
+        Check(Find("\"" + tree + "\\bin\\packages\\unknown_arch\"").Count == 2, "an architecture that no target matches: all targets are offered");
+        Check(Find(tree + "\\bin\\targets\\zynq\\generic\\packages").Count == 0, "the target folder itself is not a folder of bin/packages");
+        Check(Find(tree + "\\bin\\packages2\\x").Count == 0 && Find("D:\\other\\base").Count == 0 && Find("").Count == 0, "other folders have nothing to add");
+        Check(LocalRepoFolders.FindTargetPackageFolders("E:\\nobin\\bin\\packages\\arm", p => false, d => new List<string>(), d => null).Count == 0, "a tree without bin/targets has nothing to add");
+        Check(LocalRepoFolders.FindTargetPackageFolders(tree + "\\bin\\packages\\arm", folders.Contains, d => throw new System.IO.IOException("denied"), d => null).Count == 0, "a folder that cannot be listed adds nothing");
+        Check(LocalRepoFolders.FindTargetPackageFolders("/home/a/openwrt/bin/packages/arm", p => p == "/home/a/openwrt/bin/targets" || p.EndsWith("/zynq/generic/packages"), d => d.EndsWith("targets") ? new List<string> { "zynq" } : d.EndsWith("zynq") ? new List<string> { "generic" } : new List<string>(), d => null).SequenceEqual(new[] { "/home/a/openwrt/bin/targets/zynq/generic/packages" }), "a Unix path keeps its slashes");
+        string zynq = Path.Combine(_work, "arch-zynq");
+        Directory.CreateDirectory(zynq);
+        File.WriteAllText(Path.Combine(zynq, "Packages"), "Package: kmod-x\nVersion: 1\nArchitecture: arm_cortex-a9_neon\n\n");
+        Check(LocalRepoFolders.ReadArchitecture(zynq) == "arm_cortex-a9_neon" && LocalRepoFolders.ReadArchitecture(Path.Combine(_work, "no-such")) == null, "the architecture is read from the first package of the index");
+    }
+
     private static void ScannerTests()
     {
         string root = Path.Combine(_work, "bin", "packages", "arm_cortex-a9_neon");
@@ -1643,6 +1718,8 @@ internal static class Program
             ArIpkTests();
             await HostTests();
             SignatureHostTests();
+            await TargetPackagesTests();
+            TargetPackageFolderTests();
             FolderPathTests();
             SigningScriptTests();
             SigningShellTests();

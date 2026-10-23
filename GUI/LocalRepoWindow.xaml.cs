@@ -67,6 +67,7 @@ public partial class LocalRepoWindow : Window
         TrustKeyBox.IsChecked = _Settings.TrustBuildKey;
         AllowUnsignedBox.Visibility = _Manager == LocalRepoPackageManager.Opkg ? Visibility.Visible : Visibility.Collapsed;
         AllowUnsignedBox.IsChecked = _Settings.AllowUnsignedFeeds;
+        TargetPackagesBox.IsChecked = _Settings.AddTargetPackages;
         SignGeneratedBox.Visibility = _Manager == LocalRepoPackageManager.Opkg ? Visibility.Visible : Visibility.Collapsed;
         SignGeneratedBox.IsChecked = _Settings.SignGeneratedIndexes;
 
@@ -121,6 +122,7 @@ public partial class LocalRepoWindow : Window
         TrustKeyBox.IsEnabled = editable;
         AllowUnsignedBox.IsEnabled = editable;
         SignGeneratedBox.IsEnabled = editable;
+        TargetPackagesBox.IsEnabled = editable;
         StartButton.IsEnabled = editable;
         StopButton.IsEnabled = running && idle;
         CleanButton.IsEnabled = editable;
@@ -215,6 +217,37 @@ public partial class LocalRepoWindow : Window
         PutFolder(found);
         FolderBox.Clear();
         return true;
+    }
+
+    /// <summary>
+    /// The folders to serve: the listed ones and, when "Add kernel modules of the build" is on, the target package folders
+    /// (bin/targets/.../packages) of the builds that the listed folders belong to, if they are not listed already. Says in the log what was added.
+    /// </summary>
+    private string[] WithTargetPackages(string[] listed)
+    {
+        if (TargetPackagesBox.IsChecked != true)
+        {
+            return listed;
+        }
+        List<string> all = listed.ToList();
+        List<string> added = new List<string>();
+        foreach (string folder in listed)
+        {
+            IList<string> extra = LocalRepoFolders.FindTargetPackageFolders(folder, System.IO.Directory.Exists, ListFolders, LocalRepoFolders.ReadArchitecture);
+            foreach (string target in extra)
+            {
+                if (!all.Contains(target, StringComparer.OrdinalIgnoreCase))
+                {
+                    all.Add(target);
+                    added.Add(target);
+                }
+            }
+        }
+        if (added.Count > 0)
+        {
+            _Host.Report("Kernel modules of the build are served too: " + string.Join(", ", added.ToArray()));
+        }
+        return all.ToArray();
     }
 
     private static IList<string> ListFolders(string directory)
@@ -368,8 +401,10 @@ public partial class LocalRepoWindow : Window
         {
             return;
         }
-        string[] folders = _Folders.ToArray();
-        _Settings.Folders = folders.ToList();
+        string[] listed = _Folders.ToArray();
+        string[] folders = WithTargetPackages(listed);
+        _Settings.Folders = listed.ToList();
+        _Settings.AddTargetPackages = TargetPackagesBox.IsChecked == true;
         _Settings.Port = port;
         bool trustKey = TrustKeyBox.IsChecked == true && _Manager == LocalRepoPackageManager.Apk;
         _Settings.TrustBuildKey = TrustKeyBox.IsChecked == true;
@@ -383,7 +418,7 @@ public partial class LocalRepoWindow : Window
         try
         {
             await Task.Run(() => _Host.Start(ssh, folders, port, manager, trustKey, allowUnsigned, signGenerated));
-            _AppliedFolders = folders;
+            _AppliedFolders = listed;
         }
         catch (Exception exception)
         {
@@ -409,13 +444,15 @@ public partial class LocalRepoWindow : Window
         {
             return;
         }
-        string[] folders = _Folders.ToArray();
+        string[] listed = _Folders.ToArray();
+        string[] folders = WithTargetPackages(listed);
+        _Settings.AddTargetPackages = TargetPackagesBox.IsChecked == true;
         int port = _Host.Port;
         LocalRepoPackageManager manager = _Manager;
         bool trustKey = TrustKeyBox.IsChecked == true && manager == LocalRepoPackageManager.Apk;
         bool allowUnsigned = AllowUnsignedBox.IsChecked == true && manager == LocalRepoPackageManager.Opkg;
         bool signGenerated = SignGeneratedBox.IsChecked == true && manager == LocalRepoPackageManager.Opkg;
-        _Settings.Folders = folders.ToList();
+        _Settings.Folders = listed.ToList();
         _Settings.Save();
         SetBusy(true);
         try
@@ -426,7 +463,7 @@ public partial class LocalRepoWindow : Window
                 _Host.Stop(ssh);
                 _Host.Start(ssh, folders, port, manager, trustKey, allowUnsigned, signGenerated);
             });
-            _AppliedFolders = folders;
+            _AppliedFolders = listed;
         }
         catch (Exception exception)
         {
