@@ -463,6 +463,15 @@ public class SshShellChannel : IAsyncChannel, IDisposable
 
     private void OnChannelException(Exception exception)
     {
+        // An error on a channel that was still open is not the shell exiting: it is handled like a lost connection
+        // (reconnect prompt) instead of closing the tab as a normal exit.
+        lock (_sync)
+        {
+            if (!_closed)
+            {
+                _closedByConnectionLoss = true;
+            }
+        }
         MarkClosed();
     }
 

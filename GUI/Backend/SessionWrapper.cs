@@ -242,7 +242,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         set
         {
             ITabContext sender = null;
-            if (_ActiveTabIndex >= 0 && _ActiveTabIndex <= Tabs.Count)
+            if (_ActiveTabIndex >= 0 && _ActiveTabIndex < Tabs.Count)
             {
                 sender = Tabs[_ActiveTabIndex];
             }
@@ -520,6 +520,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             _Controller.BeginInvoke(() =>
             {
+                // A late notification of a session that has already been replaced must not start a reconnect prompt
+                // for the new one or overwrite the transfers waiting to be resumed.
+                if (session != Session)
+                {
+                    return;
+                }
                 // The transfers that were under way continue after reconnecting, from where they stopped.
                 _TransfersToResume = SCPController.Jobs.Where((FileTransferManager.TransferJob job) => job.State == FileTransferManager.TransferState.Queued || job.State == FileTransferManager.TransferState.InProgress).ToList();
                 Fixer = new SessionFixer(this);

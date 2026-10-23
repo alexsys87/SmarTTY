@@ -77,6 +77,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private System.Windows.Forms.Timer _autoReconnectTimer;
 
+    // Throttles automatic reconnects: a server that accepts a connection and closes it at once (session limit,
+    // device restarting) would otherwise be reconnected in a tight loop, wiping the screen each time.
+    private readonly AutoReconnectPolicy _reconnectPolicy = new AutoReconnectPolicy();
+
     /// <summary>Raised on the UI thread whenever the transport state or the displayed title changes.</summary>
     public event EventHandler StatusChanged;
 
@@ -832,12 +836,17 @@ public partial class DeviceTerminalControl : DpiAwareControl
         Connect();
     }
 
-    private void Connect(bool resetTerminal = true, int value = 0)
+    private void Connect(bool resetTerminal = true, int value = 0, bool automatic = false)
     {
         // Any explicit connect (reconnect button, auto-reconnect, settings change) cancels a pending auto-reconnect
         // and is not treated as a manual disconnect anymore.
         _manualDisconnect = false;
         StopAutoReconnectTimer();
+        if (!automatic)
+        {
+            // The user (re)connected by hand: earlier failed automatic attempts no longer count.
+            _reconnectPolicy.Reset();
+        }
         int connectTimeoutMs = value;
         if (_asyncTransportConnection != null)
         {
@@ -935,7 +944,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
         StopAutoReconnectTimer();
-        if (settings.ReconnectImmediately)
+        int delayMs = _reconnectPolicy.NextDelayMs(settings.ReconnectImmediately, settings.ReconnectIntervalSeconds * 1000);
+        if (delayMs <= 0)
         {
             // Open the new connection right away, once the current state change has finished being handled.
             if (!IsDisposed && IsHandleCreated)
@@ -956,7 +966,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             _autoReconnectTimer = new System.Windows.Forms.Timer();
             _autoReconnectTimer.Tick += OnAutoReconnectTimerTick;
         }
-        _autoReconnectTimer.Interval = settings.ReconnectIntervalSeconds * 1000;
+        _autoReconnectTimer.Interval = delayMs;
         _autoReconnectTimer.Start();
     }
 
@@ -979,7 +989,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         if (CanAutoReconnect && _deviceTerminalSettings != null)
         {
-            Connect(resetTerminal: _deviceTerminalSettings.ClearContentsWhenReconnecting);
+            // After a connection that ended at once the screen keeps the last output (it usually says why the server
+            // hung up) instead of being wiped on every round of the loop.
+            bool resetTerminal = _deviceTerminalSettings.ClearContentsWhenReconnecting && _reconnectPolicy.FailedAttempts == 0;
+            Connect(resetTerminal: resetTerminal, automatic: true);
         }
     }
 
@@ -1011,6 +1024,21 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private void OnConnectionStateChanged(object sender, ConnectionStateEnum connectionStateEnum, string value)
     {
         _connectionState = connectionStateEnum;
+        if (connectionStateEnum == ConnectionStateEnum.Connected)
+        {
+            _reconnectPolicy.OnConnected(TrafficClock.ElapsedMilliseconds);
+        }
+        else if (connectionStateEnum == ConnectionStateEnum.Disconnected || connectionStateEnum == ConnectionStateEnum.Failed)
+        {
+            if (_manualDisconnect)
+            {
+                _reconnectPolicy.Reset();
+            }
+            else
+            {
+                _reconnectPolicy.OnEnded(TrafficClock.ElapsedMilliseconds);
+            }
+        }
         try
         {
             ApplyConnectionState(connectionStateEnum, value);

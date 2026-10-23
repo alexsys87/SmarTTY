@@ -29,6 +29,9 @@ jobs:
       - name: Run COM/TCP command history checks
         run: dotnet run --project tests/DeviceLineInputTests -c Release
 
+      - name: Run automatic reconnect delay checks
+        run: dotnet run --project tests/AutoReconnectPolicyTests -c Release
+
       - name: Run package manager checks (apk, apt, dnf, yum, zypper, pacman, portage, opkg)
         run: dotnet run --project tests/ApkPackageManagerTests -c Release
 
