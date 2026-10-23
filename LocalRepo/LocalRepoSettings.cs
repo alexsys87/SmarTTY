@@ -23,6 +23,12 @@ public class LocalRepoSettings
     /// <summary>For opkg devices: turn the signature check of opkg off while the server runs, for feeds without a trusted Packages.sig.</summary>
     public bool AllowUnsignedFeeds;
 
+    /// <summary>
+    /// For opkg devices with the signature check on: sign the indexes that SmarTTY generates with a temporary key of the device
+    /// (trusted until the server stops), so that the check passes for them. Ignored when unsigned feeds are allowed.
+    /// </summary>
+    public bool SignGeneratedIndexes = true;
+
     private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SmarTTY\\LocalRepo.xml");
 
     public static LocalRepoSettings Load()

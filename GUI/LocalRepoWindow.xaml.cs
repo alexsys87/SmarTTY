@@ -51,6 +51,8 @@ public partial class LocalRepoWindow : Window
         TrustKeyBox.IsChecked = _Settings.TrustBuildKey;
         AllowUnsignedBox.Visibility = _Manager == LocalRepoPackageManager.Opkg ? Visibility.Visible : Visibility.Collapsed;
         AllowUnsignedBox.IsChecked = _Settings.AllowUnsignedFeeds;
+        SignGeneratedBox.Visibility = _Manager == LocalRepoPackageManager.Opkg ? Visibility.Visible : Visibility.Collapsed;
+        SignGeneratedBox.IsChecked = _Settings.SignGeneratedIndexes;
 
         StringBuilder history = new StringBuilder();
         foreach (string line in _Host.GetHistory())
@@ -97,6 +99,7 @@ public partial class LocalRepoWindow : Window
         PortBox.IsEnabled = editable;
         TrustKeyBox.IsEnabled = editable;
         AllowUnsignedBox.IsEnabled = editable;
+        SignGeneratedBox.IsEnabled = editable;
         StartButton.IsEnabled = editable;
         StopButton.IsEnabled = running && idle;
         CleanButton.IsEnabled = editable;
@@ -216,12 +219,14 @@ public partial class LocalRepoWindow : Window
         _Settings.TrustBuildKey = TrustKeyBox.IsChecked == true;
         bool allowUnsigned = AllowUnsignedBox.IsChecked == true && _Manager == LocalRepoPackageManager.Opkg;
         _Settings.AllowUnsignedFeeds = AllowUnsignedBox.IsChecked == true;
+        bool signGenerated = SignGeneratedBox.IsChecked == true && _Manager == LocalRepoPackageManager.Opkg;
+        _Settings.SignGeneratedIndexes = SignGeneratedBox.IsChecked == true;
         _Settings.Save();
         LocalRepoPackageManager manager = _Manager;
         SetBusy(true);
         try
         {
-            await Task.Run(() => _Host.Start(ssh, folders, port, manager, trustKey, allowUnsigned));
+            await Task.Run(() => _Host.Start(ssh, folders, port, manager, trustKey, allowUnsigned, signGenerated));
         }
         catch (Exception exception)
         {
