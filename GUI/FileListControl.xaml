@@ -54,6 +54,11 @@
                 <Image Source="../icons/MainWindow/archive16.png" />
               </MenuItem.Icon>
             </MenuItem>
+            <MenuItem Name="cmdExtract" Header="Extract here" ToolTip="Unpacks the selected .tar.gz, .tgz or .tar archive into this folder (existing files of the same name are overwritten)" Click="Extract_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/menu/extract.png" />
+              </MenuItem.Icon>
+            </MenuItem>
             <Separator />
             <MenuItem Name="cmdCut" Header="Cut" InputGestureText="Ctrl+X" Click="Cut_Click">
               <MenuItem.Icon>

@@ -92,6 +92,25 @@ public static class RemoteFileOperations
         return "rm -rf " + string.Join(" ", paths.Select(RemotePathUtils.ShellQuote));
     }
 
+    /// <summary>True for the archives "Extract here" handles: .tar.gz, .tgz and .tar (case-insensitive).</summary>
+    public static bool IsExtractableArchive(string name)
+    {
+        return name != null && (name.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".tar", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Unpacks the archive <paramref name="archive"/> (see <see cref="IsExtractableArchive"/>) into <paramref name="directory"/>.
+    /// Files of the same name are overwritten, as tar does; the gzip decompression is asked for explicitly, because not
+    /// every BusyBox tar recognizes it by itself.
+    /// </summary>
+    public static string ExtractCommand(string archive, string directory)
+    {
+        string flags = archive.EndsWith(".tar", StringComparison.OrdinalIgnoreCase) ? "-xf" : "-xzf";
+        return "tar " + flags + " " + RemotePathUtils.ShellQuote(archive) + " -C " + RemotePathUtils.ShellQuote(directory);
+    }
+
     public static string CreateDirectoryCommand(string path)
     {
         return "mkdir " + RemotePathUtils.ShellQuote(path);
