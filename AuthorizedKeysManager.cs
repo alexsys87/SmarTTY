@@ -37,25 +37,15 @@ internal static class AuthorizedKeysManager
     {
         try
         {
-            using ScpDownloadStream stream = sshSession.OpenDownload(path);
-            using StreamReader streamReader = new StreamReader(stream);
-            while (!streamReader.EndOfStream)
-            {
-                string line = streamReader.ReadLine();
-                if (line == null)
-                {
-                    break;
-                }
-                if (AuthorizedKeysFile.LineHoldsKey(line, keyBlob))
-                {
-                    return true;
-                }
-            }
+            // "cat" rather than SCP: OpenWrt and other minimal systems have no scp program, and a check that always failed
+            // would make the key be appended again on every connection.
+            List<string> lines = sshSession.RunCommandChecked("cat " + ScpChannelStream.QuotePath(path), requireSuccess: true);
+            return lines != null && lines.Any(line => AuthorizedKeysFile.LineHoldsKey(line, keyBlob));
         }
         catch
         {
+            return false;
         }
-        return false;
     }
 
     /// <summary>
@@ -78,6 +68,24 @@ internal static class AuthorizedKeysManager
         {
         }
         return files;
+    }
+
+    /// <summary>
+    /// True when the home directory can be written by its group or by others. sshd with StrictModes (the default) then ignores
+    /// ~/.ssh/authorized_keys, so a public key cannot be used for this account. A failed check counts as "no".
+    /// </summary>
+    public static bool IsHomeDirectoryWritableByOthers(SshSession sshSession)
+    {
+        try
+        {
+            const string script = "d=\"$HOME\"; [ -n \"$d\" ] || d=$(pwd); [ -n \"$(find \"$d\" -maxdepth 0 \\( -perm -020 -o -perm -002 \\) 2>/dev/null)\" ] && echo SMARTTY_UNSAFE_HOME";
+            List<string> output = sshSession.RunCommandChecked("sh -c " + ScpChannelStream.QuotePath(script), requireSuccess: false);
+            return output != null && output.Any(line => line.Trim() == "SMARTTY_UNSAFE_HOME");
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static void RemoveAuthorizedKey(SshSession sshSession, byte[] keyBlob)

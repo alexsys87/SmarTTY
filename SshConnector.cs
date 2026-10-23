@@ -228,7 +228,7 @@ public partial class SshConnector : Component
         return confirmed;
     }
 
-    private void Authenticate(SshSession session, SSHConnectionSettings sshConnectionSettings, string password, ref bool forcePasswordAuth)
+    private void Authenticate(SshSession session, SSHConnectionSettings sshConnectionSettings, string password, ref bool forcePasswordAuth, System.Runtime.CompilerServices.StrongBox<string> acceptedPassword)
     {
         bool passwordConfirmed = false;
         while (true)
@@ -305,6 +305,7 @@ public partial class SshConnector : Component
                     }
                     if (session.Authenticate(sshConnectionSettings.UserName, password ?? ""))
                     {
+                        acceptedPassword.Value = password;
                         if (passwordConfirmed && sshConnectionSettings.EncryptedSavedPassword != null && password != null)
                         {
                             sshConnectionSettings.EncryptedSavedPassword = PasswordProtector.Encrypt(password, "com.sysprogs.smartty.passwords");
@@ -464,8 +465,21 @@ public partial class SshConnector : Component
                 }
             }
             ReportStatus(connectionAttempt, "Authenticating...");
-            Authenticate(sshSession, sshConnectionSettings, password, ref forcePasswordAuth);
-            if (forcePasswordAuth)
+            System.Runtime.CompilerServices.StrongBox<string> acceptedPassword = new System.Runtime.CompilerServices.StrongBox<string>();
+            Authenticate(sshSession, sshConnectionSettings, password, ref forcePasswordAuth, acceptedPassword);
+            if (forcePasswordAuth && sshConnectionSettings.AuthenticationType == AuthType.Password && AuthorizedKeysManager.IsHomeDirectoryWritableByOthers(sshSession))
+            {
+                // The server (StrictModes) would refuse authorized_keys in a home directory others can write to, e.g. a world-writable
+                // /root on tmpfs: a key set up here could never be used, and every connection would fall back to the password.
+                bool savePassword = sshConnectionSettings.EncryptedSavedPassword == null && acceptedPassword.Value != null && Confirm(PromptKind.YesNoWarning,
+                    "Public key authentication cannot work on this device: its home directory can be written by other users, so the SSH server will refuse the key.\n\nSave the password for this connection instead?");
+                if (savePassword)
+                {
+                    sshConnectionSettings.EncryptedSavedPassword = PasswordProtector.Encrypt(acceptedPassword.Value, "com.sysprogs.smartty.passwords");
+                    sshConnectionSettings.Save();
+                }
+            }
+            else if (forcePasswordAuth)
             {
                 ISshKeyPair sshKeyPair = AppEnvironment.KeyFactory.CreateKey(sshConnectionSettings.KeyType.ResolveAuto(PublicKeyType.RSA));
                 ReportStatus(connectionAttempt, "Configuring...");
