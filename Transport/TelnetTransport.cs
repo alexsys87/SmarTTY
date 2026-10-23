@@ -159,19 +159,7 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 // The certificate is checked against the name the user typed, not against the resolved address.
                 wire = TelnetTls.Authenticate(wire, _telnet.Host, _telnet.TlsAllowInvalidCertificate, clientCertificate: clientCertificate);
             }
-            // A diagnostic record of the traffic, only when SMARTTY_TELNET_TRACE names a file.
-            wire = TelnetTraceStream.WrapIfRequested(wire, _telnet.Host + ":" + _telnet.Port);
             TelnetAutoLogin autoLogin = CreateAutoLogin();
-            if (wire is TelnetTraceStream trace)
-            {
-                trace.Annotate(autoLogin == null
-                    ? "automatic login: not configured (no user name, no password)"
-                    : "automatic login: configured (" + autoLogin.Describe() + ")");
-                if (autoLogin != null)
-                {
-                    autoLogin.Log = trace.Annotate;
-                }
-            }
             stream = new TelnetStream(wire, new TelnetOptions
             {
                 TerminalType = _telnet.TerminalType,
