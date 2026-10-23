@@ -787,6 +787,23 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         ShowPackageManager(activeSession);
     }
 
+    private void ProcessManager_Click(object sender, RoutedEventArgs e)
+    {
+        SessionWrapper activeSession = Controller.ActiveSession;
+        if (activeSession == null || activeSession.IsDevice || activeSession.Session == null)
+        {
+            return;
+        }
+        try
+        {
+            ProcessManagerWindow.ShowFor(activeSession, this);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     private void LocalRepo_Click(object sender, RoutedEventArgs e)
     {
         SessionWrapper activeSession = Controller.ActiveSession;

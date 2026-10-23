@@ -141,6 +141,87 @@ internal static class Program
         return RemoteScript.BuildRunInPlaceCommand(path, probe.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
     }
 
+    private static string[] RunLines(string command)
+    {
+        return RunOutput(command).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private static Process StartHelper(string script)
+    {
+        return Process.Start(new ProcessStartInfo("/bin/sh") { ArgumentList = { "-c", script }, UseShellExecute = false });
+    }
+
+    // The process list of the Process manager (read from the local /proc by this shell) and the commands that stop a process.
+    private static void ProcessChecks()
+    {
+        Process busy = StartHelper("while :; do :; done");
+        Process sleeper = StartHelper("exec sleep 60");
+        Process stubborn = StartHelper("trap '' 15; while :; do sleep 1; done");
+        try
+        {
+            ProcessSnapshot first = RemoteProcessList.Parse(RunLines(RemoteProcessList.ListCommand), null);
+            System.Threading.Thread.Sleep(1500);
+            ProcessSnapshot second = RemoteProcessList.Parse(RunLines(RemoteProcessList.ListCommand), first);
+            string shell = _shell + ": ";
+            Check(second.Processes.Count >= 4, shell + "the list has the processes (" + second.Processes.Count + ")");
+            Check(second.TotalTicks > first.TotalTicks && second.CpuCount >= 1, shell + "the processor time of all cores grows and the cores are counted (" + second.CpuCount + ")");
+            Check(second.UptimeSeconds > 0 && second.MemTotalKb > 0 && second.MemFreeKb.HasValue && second.LoadAverage != null && second.LoadAverage.Split(' ').Length == 3, shell + "uptime, memory and load are read");
+
+            RemoteProcess self = second.Processes.Find(p => p.Pid == Environment.ProcessId);
+            Check(self != null && self.Command.Length > 0 && self.MemoryKb > 0 && self.State.Length == 1 && self.ParentPid > 0, shell + "this test's own process is listed with command, memory, state and parent");
+            Check(first.Processes.TrueForAll(p => p.CpuPercent == null), shell + "the first list has no processor shares yet");
+
+            RemoteProcess busyRow = second.Processes.Find(p => p.Pid == busy.Id);
+            Check(busyRow != null && busyRow.CpuPercent > 40 && busyRow.CpuPercent < 150, shell + "a process in a loop uses about one core (" + busyRow?.CpuPercent + " %)");
+            RemoteProcess sleeperRow = second.Processes.Find(p => p.Pid == sleeper.Id);
+            Check(sleeperRow != null && sleeperRow.CpuPercent < 5 && sleeperRow.Command.Contains("sleep 60") && sleeperRow.Name == "sleep" && sleeperRow.ParentPid == Environment.ProcessId, shell + "a sleeping process uses no processor, its name, command line and parent are right");
+            Check(busyRow.User == sleeperRow.User && busyRow.User.Length > 0, shell + "the user is the same for both");
+            Check(second.Processes.TrueForAll(p => p.Command.Length > 0 && p.Name.Length > 0 && p.State.Length > 0), shell + "every process has a name, a command and a state");
+
+            Equal(RemoteProcessList.SignalCommand(42, force: false), "kill -15 42", "ending a process is kill -15");
+            Equal(RemoteProcessList.SignalCommand(42, force: true), "kill -9 42", "killing a process is kill -9");
+            Equal(Run(RemoteProcessList.SignalCommand(sleeper.Id, force: false), out _), 0, shell + "a process is asked to end");
+            Check(sleeper.WaitForExit(3000), shell + "it ends");
+            System.Threading.Thread.Sleep(500);
+            Equal(Run(RemoteProcessList.SignalCommand(stubborn.Id, force: false), out _), 0, shell + "a process that ignores the request is signalled");
+            System.Threading.Thread.Sleep(700);
+            Check(!stubborn.HasExited, shell + "it ignores the request to end");
+            Equal(Run(RemoteProcessList.SignalCommand(stubborn.Id, force: true), out _), 0, shell + "it is killed");
+            Check(stubborn.WaitForExit(3000), shell + "and it is gone");
+            Check(Run(RemoteProcessList.SignalCommand(sleeper.Id, force: false), out string errors) != 0 && errors.Length > 0, shell + "signalling a process that is gone fails with a message");
+        }
+        finally
+        {
+            foreach (Process helper in new[] { busy, sleeper, stubborn })
+            {
+                try
+                {
+                    if (!helper.HasExited)
+                    {
+                        helper.Kill();
+                    }
+                }
+                catch (Exception)
+                {
+                }
+            }
+        }
+        // Lines of the shell that are not part of the list are skipped, a command line may hold the separator.
+        ProcessSnapshot parsed = RemoteProcessList.Parse(new[]
+        {
+            "sh: can't open something", "T|1000|4", "U|3600.5", "L|0.10 0.05 0.01", "M|2048000|100000|1500000", "N|0|root", "N|0|toor", "N|1000|alice",
+            "P|1|0|S|10|1200|0|init|/sbin/init splash", "P|20|1|R|50|0|1000|worker|worker --opt a|b  ", "garbage", "P|x|1|S|0|0|0|bad|bad"
+        }, null);
+        Equal(parsed.Processes.Count, 2, "only well-formed process lines are taken");
+        Check(parsed.Processes[1].User == "alice" && parsed.Processes[1].Command == "worker --opt a|b" && parsed.Processes[1].MemoryKb == 0 && parsed.Processes[0].User == "root", "users are named, the first name of a number wins, a command line may hold a |");
+        Check(parsed.MemTotalKb == 2048000 && parsed.MemFreeKb == 1500000 && parsed.CpuCount == 4 && parsed.UptimeSeconds == 3600.5, "the numbers around the list are read (available memory is preferred to free)");
+        ProcessSnapshot later = RemoteProcessList.Parse(new[] { "T|1400|4", "P|1|0|S|10|1200|0|init|init", "P|20|1|R|150|0|1000|worker|worker", "P|30|1|S|5|0|0|new|new" }, parsed);
+        Check(later.Processes[0].CpuPercent == 0 && later.Processes[1].CpuPercent == 100 && later.Processes[2].CpuPercent == null, "the share is the process time of the interval in the time of all cores, 4 cores x 100 ticks of 400 is 100 %, a new process has none yet");
+        Equal(RemoteProcessList.FormatKb(512), "512 kB", "small sizes are in kilobytes");
+        Equal(RemoteProcessList.FormatKb(100 * 1024), "100 MB", "larger sizes are in megabytes");
+        Equal(RemoteProcessList.FormatKb(3L * 1024 * 1024 * 10), "30 GB", "the largest in gigabytes");
+    }
+
     private static void RunInPlaceChecks(string root)
     {
         Check(RemoteScript.IsScriptFileName("run.sh") && RemoteScript.IsScriptFileName("RUN.SH") && RemoteScript.IsScriptFileName("a.bash") && RemoteScript.IsScriptFileName("a.ash") && RemoteScript.IsScriptFileName("a b.ksh") && RemoteScript.IsScriptFileName("x.zsh") && RemoteScript.IsScriptFileName("x.dash"), "shell script extensions are recognized");
@@ -294,7 +375,7 @@ internal static class Program
                 {
                     _appletPath = Path.Combine(root, "applets");
                     Directory.CreateDirectory(_appletPath);
-                    foreach (string applet in new[] { "cp", "mv", "rm", "mkdir", "tar" })
+                    foreach (string applet in new[] { "cp", "mv", "rm", "mkdir", "tar", "sh", "tr" })
                     {
                         File.CreateSymbolicLink(Path.Combine(_appletPath, applet), shell.Split(' ')[0]);
                     }
@@ -304,6 +385,10 @@ internal static class Program
                 CommandChecks(shellRoot);
                 ScriptRunChecks(shellRoot);
                 RunInPlaceChecks(shellRoot);
+                if (Directory.Exists("/proc/self"))
+                {
+                    ProcessChecks();
+                }
             }
         }
         catch (Exception exception)
