@@ -80,6 +80,24 @@ internal static class AuthorizedKeysManager
         return files;
     }
 
+    /// <summary>
+    /// True when the home directory can be written by its group or by others. sshd with StrictModes (the default) then ignores
+    /// ~/.ssh/authorized_keys, so a public key cannot be used for this account. A failed check counts as "no".
+    /// </summary>
+    public static bool IsHomeDirectoryWritableByOthers(SshSession sshSession)
+    {
+        try
+        {
+            const string script = "d=\"$HOME\"; [ -n \"$d\" ] || d=$(pwd); [ -n \"$(find \"$d\" -maxdepth 0 \\( -perm -020 -o -perm -002 \\) 2>/dev/null)\" ] && echo SMARTTY_UNSAFE_HOME";
+            List<string> output = sshSession.RunCommandChecked("sh -c " + ScpChannelStream.QuotePath(script), requireSuccess: false);
+            return output != null && output.Any(line => line.Trim() == "SMARTTY_UNSAFE_HOME");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static void RemoveAuthorizedKey(SshSession sshSession, byte[] keyBlob)
     {
         string homeDir = AuthorizedKeysFile.PickHomeDirectory(sshSession.RunCommandChecked("pwd", requireSuccess: true))
