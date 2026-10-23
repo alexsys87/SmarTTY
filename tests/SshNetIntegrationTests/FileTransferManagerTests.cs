@@ -69,6 +69,7 @@ internal static class FileTransferManagerTests
             }
             RunScriptOnServer();
             RunScriptInPlace();
+            ProcessListOnServer();
             Test.Section("Folder download as .tar.gz");
             using (FileTransferManager archiveManager = NewManager())
             {
@@ -267,6 +268,31 @@ internal static class FileTransferManagerTests
         Test.Equal(4, exitStatus ?? -1, "a script that is not executable runs through the interpreter of its shebang; its exit status comes back");
         Test.Check(output != null && output.Contains("in run in place"), "it runs in the folder it is in (got: " + string.Join(" | ", output ?? new List<string>()) + ")");
         Test.Equal("644", RemoteStat(script).Split(' ')[0], "the file's permissions are not changed");
+    }
+
+    // "Tools > Process manager": the list is read from /proc through an exec channel, the signal commands stop a process.
+    private static void ProcessListOnServer()
+    {
+        Test.Section("Process list");
+        List<string> lines = _session.RunCommand(RemoteProcessList.ListCommand, out int? exitStatus);
+        Test.Equal(0, exitStatus ?? -1, "the list command succeeds");
+        ProcessSnapshot snapshot = RemoteProcessList.Parse(lines, null);
+        Test.Check(snapshot.Processes.Count > 3 && snapshot.MemTotalKb > 0 && snapshot.CpuCount >= 1 && snapshot.TotalTicks > 0, "the server's processes, memory and processor time are listed (" + snapshot.Processes.Count + " processes)");
+        Test.Check(snapshot.Processes.Exists(p => p.User == _environment.User && p.Command.Length > 0), "the processes of the login user are listed under the user's name");
+
+        // A process of the login user: started by one command, ended by another.
+        List<string> started = _session.RunCommand("sleep 300 >/dev/null 2>&1 & echo $!", out _);
+        int pid = int.Parse(started.Find(l => l.Trim().Length > 0 && char.IsDigit(l.Trim()[0])).Trim());
+        ProcessSnapshot second = RemoteProcessList.Parse(_session.RunCommand(RemoteProcessList.ListCommand, out _), snapshot);
+        RemoteProcess sleeper = second.Processes.Find(p => p.Pid == pid);
+        Test.Check(sleeper != null && sleeper.Command.Contains("sleep 300") && !sleeper.CpuPercent.HasValue, "a process that was just started is in the next list, without a processor share yet");
+        RemoteProcess sleeperLater = RemoteProcessList.Parse(_session.RunCommand(RemoteProcessList.ListCommand, out _), second).Processes.Find(p => p.Pid == pid);
+        Test.Check(sleeperLater != null && sleeperLater.CpuPercent.HasValue && sleeperLater.CpuPercent < 5, "and has one in the list after that (a sleeping process uses no processor)");
+        _session.RunCommand(RemoteProcessList.SignalCommand(pid, force: false), out int? killStatus);
+        Test.Equal(0, killStatus ?? -1, "the end command is accepted");
+        Test.WaitUntil(() => RemoteProcessList.Parse(_session.RunCommand(RemoteProcessList.ListCommand, out _), null).Processes.TrueForAll(p => p.Pid != pid), TimeSpan.FromSeconds(5), "the process is gone from the list after it was ended");
+        _session.RunCommand(RemoteProcessList.SignalCommand(pid, force: true), out int? goneStatus);
+        Test.Check(goneStatus != 0, "signalling a process that is gone fails");
     }
 
     private static void ArchiveDownload(FileTransferManager manager)

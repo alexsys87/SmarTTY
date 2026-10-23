@@ -9,5 +9,6 @@
     <Compile Include="../../IO/RemoteFileOperations.cs" Link="RemoteFileOperations.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
     <Compile Include="../../IO/RemoteScript.cs" Link="RemoteScript.cs" />
+    <Compile Include="../../IO/RemoteProcessList.cs" Link="RemoteProcessList.cs" />
   </ItemGroup>
 </Project>

@@ -32,6 +32,7 @@
     <Compile Include="../../IO/RemotePathUtils.cs" Link="IO/RemotePathUtils.cs" />
     <Compile Include="../../IO/RemoteFileOperations.cs" Link="IO/RemoteFileOperations.cs" />
     <Compile Include="../../IO/RemoteScript.cs" Link="IO/RemoteScript.cs" />
+    <Compile Include="../../IO/RemoteProcessList.cs" Link="IO/RemoteProcessList.cs" />
     <Compile Include="../../IProjectAwareException.cs" Link="IProjectAwareException.cs" />
     <Compile Include="../../Terminal/ByteColumns.cs" Link="Terminal/ByteColumns.cs" />
     <Compile Include="../../Transport/FileTransferManager.cs" Link="Transport/FileTransferManager.cs" />
