@@ -871,6 +871,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 new Thread(UpdateThreadBody).Start();
             }
+            // Without it the connector runs its callbacks (progress, error message boxes, credential prompts, the new session)
+            // on its worker thread instead of the UI thread.
+            _Initiator.Dispatcher = dispatcher;
             _Initiator.StatusChanged += _Initiator_ConnectionProgress;
             _Initiator.CredentialsRequested += _Initiator_PasswordRequest;
             _Initiator.ProxyCredentialsRequested += _Initiator_ProxyAuthRequest;

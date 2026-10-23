@@ -65,6 +65,9 @@ public partial class SshConnector : Component
         }
     }
 
+    // Used when the connection settings do not enable keep-alive packets, so that a dead link is detected without user input.
+    private const int DefaultKeepAliveSeconds = 15;
+
     public Dispatcher Dispatcher;
 
     private ConnectionAttempt _currentAttempt;
@@ -470,10 +473,8 @@ public partial class SshConnector : Component
                 }
                 sshConnectionSettings.AuthenticationType = AuthType.PublicKey;
             }
-            if (sshConnectionSettings.KeepaliveInterval != 0)
-            {
-                sshSession.ConfigureKeepAlive(sshConnectionSettings.KeepaliveInterval);
-            }
+            // Without periodic traffic a pulled cable is only noticed once the user types something, so a default is used when none is set.
+            sshSession.ConfigureKeepAlive(sshConnectionSettings.KeepaliveInterval != 0 ? sshConnectionSettings.KeepaliveInterval : DefaultKeepAliveSeconds);
             RaiseConnected(sshSession, sshConnectionSettings);
         }
         catch (Exception exception)
