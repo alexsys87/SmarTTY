@@ -21,6 +21,9 @@ namespace SmarTTY.Ssh
 
         public bool FailTunnel;
 
+        /// <summary>The number of following tunnel requests the device refuses as if the port were still held by an earlier run.</summary>
+        public int RefuseTunnels;
+
         public uint? TunnelPort;
 
         public int TunnelStarts;
@@ -137,7 +140,12 @@ namespace SmarTTY.Ssh
             {
                 throw new InvalidOperationException("administratively prohibited");
             }
-            if (host != "127.0.0.1" || boundPort != hostPort)
+            if (RefuseTunnels > 0)
+            {
+                RefuseTunnels--;
+                throw new InvalidOperationException("address already in use");
+            }
+            if (host != "127.0.0.1" || boundPort < hostPort)
             {
                 throw new InvalidOperationException("unexpected tunnel " + boundPort + " -> " + host + ":" + hostPort);
             }

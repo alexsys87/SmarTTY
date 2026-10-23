@@ -1198,6 +1198,18 @@ internal static class Program
         Check(!host.IsRunning && host.Port == 0 && session.TunnelPort == null && session.TunnelStops == 1, "Stop closes the tunnel");
         Check(File.ReadAllText(conf) == "# the user's own feed\nsrc/gz mine http://example.com/feed\n", "Stop removes the feeds from the device");
         Check(!PortIsOpen(port), "Stop closes the server");
+
+        // The device still holds the port of the run before: the next free port of the device is used and named in the feeds.
+        LocalRepoHost held = new LocalRepoHost();
+        SshSession heldSession = NewFakeSession(conf);
+        heldSession.RefuseTunnels = 2;
+        held.Start(heldSession, new[] { root }, 0);
+        Check(held.IsRunning && heldSession.TunnelPort == (uint)(held.Port + 2) && File.ReadAllText(conf).Contains("http://127.0.0.1:" + (held.Port + 2) + "/r0/base") && held.DescribeFeed(held.Feeds[0]).Contains(":" + (held.Port + 2) + "/"), "a port that the device still holds: the tunnel moves to the next free port and the feeds name it");
+        held.Stop(heldSession);
+        SshSession allHeld = NewFakeSession(conf);
+        allHeld.RefuseTunnels = 100;
+        LocalRepoHost refusedAll = new LocalRepoHost();
+        Check(Throws<InvalidOperationException>(() => refusedAll.Start(allHeld, new[] { root }, 0)) && !refusedAll.IsRunning, "every port refused: Start fails and stops the server");
         host.Stop(session);
         Check(session.TunnelStops == 1, "a second Stop does nothing");
 
