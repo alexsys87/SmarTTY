@@ -1,4 +1,3 @@
-using CodeEditPP.Properties;
 using SmarTTY.Controls;
 using System.Collections.Generic;
 using System.Drawing;
@@ -41,7 +40,7 @@ public class InlineMessageProvider : ReadonlyTextBrowser.IVirtualLineProvider
             }
             StringFormat format = new StringFormat(StringFormat.GenericDefault);
             Font font = new Font(FontFamily.GenericSerif, bounds.Height * 5 / 8);
-            Image image = ((this._severity == MessageSeverity.Error) ? Resources.error : Resources.warning);
+            Image image = Icons.Load((this._severity == MessageSeverity.Error) ? "message-error" : "message-warning");
             int height = bounds.Height;
             ImageAttributes imageAttributes = new ImageAttributes();
             int textWidth = (int)graphics.MeasureString(this._text, font).Width + 3;

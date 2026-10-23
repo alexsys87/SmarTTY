@@ -244,7 +244,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             sendFilesViaYMODEMToolStripMenuItem, sendFilesViaZModemToolStripMenuItem, sendFilesViaKermitToolStripMenuItem
         })
         {
-            MenuIcons.Apply(item, "upload");
+            Icons.Apply(item, "upload");
         }
         foreach (ToolStripMenuItem item in new[]
         {
@@ -252,10 +252,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
             receiveFilesViaZModemToolStripMenuItem, receiveFilesViaKermitToolStripMenuItem
         })
         {
-            MenuIcons.Apply(item, "download");
+            Icons.Apply(item, "download");
         }
-        MenuIcons.Apply(terminalTypeToolStripMenuItem, "terminal");
-        MenuIcons.Apply(changeSettingsToolStripMenuItem, "settings");
+        Icons.Apply(terminalTypeToolStripMenuItem, "terminal");
+        Icons.Apply(changeSettingsToolStripMenuItem, "settings");
     }
 
     public DeviceTerminalControl()
@@ -379,7 +379,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             ToolTipText = "Show the input line again if the keys keep going to a program that has already ended (mc, htop ...)"
         };
-        MenuIcons.Apply(_returnToInputLineMenuItem, "go");
+        Icons.Apply(_returnToInputLineMenuItem, "go");
         contextMenuStrip1.Items.Add(_returnToInputLineMenuItem);
     }
 
@@ -403,7 +403,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             ToolTipText = "Types \"export COLUMNS=N LINES=M; stty cols N rows M\" for the shell on the device (available at the input line when nothing is typed in it)."
         };
-        MenuIcons.Apply(_sendRemoteSizeMenuItem, "refresh");
+        Icons.Apply(_sendRemoteSizeMenuItem, "refresh");
         contextMenuStrip1.Items.Add(_syncRemoteSizeMenuItem);
         contextMenuStrip1.Items.Add(_sendRemoteSizeMenuItem);
     }
@@ -502,7 +502,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         if (_telnetMenu == null)
         {
             _telnetMenu = new ToolStripMenuItem("Telnet");
-            MenuIcons.Apply(_telnetMenu, "network");
+            Icons.Apply(_telnetMenu, "network");
             AddTelnetCommand("Send Break", TelnetStream.Break);
             AddTelnetCommand("Send Interrupt Process (IP)", TelnetStream.InterruptProcess);
             AddTelnetCommand("Send Are You There (AYT)", TelnetStream.AreYouThere);
@@ -510,10 +510,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
             AddTelnetCommand("Send NOP", TelnetStream.NOP);
             _telnetMenu.DropDownItems.Add(new ToolStripSeparator());
             ToolStripMenuItem showOptions = new ToolStripMenuItem("Show negotiated options", null, (sender, args) => ShowTelnetOptions());
-            MenuIcons.Apply(showOptions, "question");
+            Icons.Apply(showOptions, "question");
             _telnetMenu.DropDownItems.Add(showOptions);
             ToolStripMenuItem askStatus = new ToolStripMenuItem("Ask server for its option status (STATUS)", null, (sender, args) => RequestTelnetStatus());
-            MenuIcons.Apply(askStatus, "refresh");
+            Icons.Apply(askStatus, "refresh");
             _telnetMenu.DropDownItems.Add(askStatus);
             _telnetMenu.DropDownOpening += (sender, args) =>
             {
@@ -594,7 +594,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 // The connection is gone; the status line says so.
             }
         });
-        MenuIcons.Apply(item, "upload");
+        Icons.Apply(item, "upload");
         _telnetMenu.DropDownItems.Add(item);
     }
 

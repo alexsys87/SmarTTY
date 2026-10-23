@@ -1,11 +1,11 @@
 using SmarTTY.Ssh;
+using SmarTTY.Controls;
 using System;
 using System.Drawing;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using VisualTTY;
-using VisualTTY.Properties;
 
 namespace SmarTTY.Forms;
 
@@ -65,7 +65,7 @@ public partial class PublicKeyManagerForm : DpiAwareForm
             {
                 txtKeyStatus.Text = "accepted";
                 txtKeyStatus.ForeColor = Color.DarkGreen;
-                picRemoteSettings.Image = Resources.unlocked;
+                picRemoteSettings.Image = Icons.Load("key-unlocked");
                 if (updateSettings && _settings != null)
                 {
                     _settings.AuthenticationType = AuthType.PublicKey;
@@ -75,7 +75,7 @@ public partial class PublicKeyManagerForm : DpiAwareForm
             {
                 txtKeyStatus.Text = "not accepted";
                 txtKeyStatus.ForeColor = Color.Red;
-                picRemoteSettings.Image = Resources.locked;
+                picRemoteSettings.Image = Icons.Load("key-locked");
                 if (updateSettings && _settings != null)
                 {
                     _settings.AuthenticationType = AuthType.Password;

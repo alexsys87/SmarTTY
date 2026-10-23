@@ -52,18 +52,24 @@
     <!-- Window icons of the WinForms dialogs, loaded by Forms/FormIcons.cs. -->
     <EmbeddedResource Include="icons\forms\*.ico" LogicalName="SmarTTY.FormIcons.%(Filename).ico" />
     <EmbeddedResource Include="app.ico" LogicalName="SmarTTY.FormIcons.app.ico" />
-    <!-- Images of the menu items of the WinForms controls, loaded by Controls/MenuIcons.cs. -->
-    <EmbeddedResource Include="icons\MainWindow\upload.png" LogicalName="SmarTTY.MenuIcons.upload.png" />
-    <EmbeddedResource Include="icons\MainWindow\download.png" LogicalName="SmarTTY.MenuIcons.download.png" />
-    <EmbeddedResource Include="icons\term16.png" LogicalName="SmarTTY.MenuIcons.terminal.png" />
-    <EmbeddedResource Include="icons\gear16.png" LogicalName="SmarTTY.MenuIcons.settings.png" />
-    <EmbeddedResource Include="icons\edit16.png" LogicalName="SmarTTY.MenuIcons.edit.png" />
-    <EmbeddedResource Include="icons\delete16.png" LogicalName="SmarTTY.MenuIcons.delete.png" />
-    <EmbeddedResource Include="icons\net16.png" LogicalName="SmarTTY.MenuIcons.network.png" />
-    <EmbeddedResource Include="icons\MainWindow\refresh16.png" LogicalName="SmarTTY.MenuIcons.refresh.png" />
-    <EmbeddedResource Include="icons\question16.png" LogicalName="SmarTTY.MenuIcons.question.png" />
-    <EmbeddedResource Include="icons\MainWindow\go16.png" LogicalName="SmarTTY.MenuIcons.go.png" />
-    <EmbeddedResource Include="icons\event16.png" LogicalName="SmarTTY.MenuIcons.event.png" />
+    <!-- Images that the WinForms code uses (menu items, context menus, picture boxes, what the editors draw), loaded by Controls/Icons.cs. -->
+    <EmbeddedResource Include="icons\MainWindow\upload.png" LogicalName="SmarTTY.Icons.upload.png" />
+    <EmbeddedResource Include="icons\MainWindow\download.png" LogicalName="SmarTTY.Icons.download.png" />
+    <EmbeddedResource Include="icons\term16.png" LogicalName="SmarTTY.Icons.terminal.png" />
+    <EmbeddedResource Include="icons\gear16.png" LogicalName="SmarTTY.Icons.settings.png" />
+    <EmbeddedResource Include="icons\edit16.png" LogicalName="SmarTTY.Icons.edit.png" />
+    <EmbeddedResource Include="icons\delete16.png" LogicalName="SmarTTY.Icons.delete.png" />
+    <EmbeddedResource Include="icons\net16.png" LogicalName="SmarTTY.Icons.network.png" />
+    <EmbeddedResource Include="icons\MainWindow\refresh16.png" LogicalName="SmarTTY.Icons.refresh.png" />
+    <EmbeddedResource Include="icons\question16.png" LogicalName="SmarTTY.Icons.question.png" />
+    <EmbeddedResource Include="icons\MainWindow\go16.png" LogicalName="SmarTTY.Icons.go.png" />
+    <EmbeddedResource Include="icons\event16.png" LogicalName="SmarTTY.Icons.event.png" />
+    <EmbeddedResource Include="icons\MainWindow\copy.png" LogicalName="SmarTTY.Icons.copy.png" />
+    <EmbeddedResource Include="icons\MainWindow\paste.png" LogicalName="SmarTTY.Icons.paste.png" />
+    <EmbeddedResource Include="icons\MainWindow\add16.png" LogicalName="SmarTTY.Icons.add.png" />
+    <EmbeddedResource Include="icons\editor\*.png" LogicalName="SmarTTY.Icons.%(Filename).png" />
+    <EmbeddedResource Include="icons\keys\locked.png" LogicalName="SmarTTY.Icons.key-locked.png" />
+    <EmbeddedResource Include="icons\keys\unlocked.png" LogicalName="SmarTTY.Icons.key-unlocked.png" />
     <Resource Include="icons\**\*.png" />
   </ItemGroup>
 
@@ -338,9 +344,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Update="CodeEditPP\Properties\Resources.resx">
-      <DependentUpon>Resources.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Update="Controls\DeviceTerminalControl.resx">
       <DependentUpon>DeviceTerminalControl.cs</DependentUpon>
     </EmbeddedResource>
@@ -379,12 +382,6 @@
     </EmbeddedResource>
     <EmbeddedResource Update="Forms\SCPUploadForm.resx">
       <DependentUpon>SCPUploadForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Properties\Resources.resx">
-      <DependentUpon>Resources.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="VisualTTY\Properties\Resources.resx">
-      <DependentUpon>Resources.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
 
