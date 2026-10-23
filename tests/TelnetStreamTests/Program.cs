@@ -490,11 +490,19 @@ internal static class Program
             CheckBytes(connection.TakeWritten(), Text("root\r\n"), "auto login: without a password only the user name is sent");
         }
         {
-            // the password prompt does not get the user name and the other way round
+            // The password prompt does not get the user name. A password prompt that comes first (the server took the
+            // user name from the NEW-ENVIRON option and skipped its own login question) gets the password.
             FakeConnection connection = new FakeConnection(Text("Password: "), Text("login: "));
             TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("u", "p", null, null) });
             ReadAll(stream);
-            CheckBytes(connection.TakeWritten(), Text("u\r\n"), "auto login: the order is login first; a password prompt before it is ignored");
+            CheckBytes(connection.TakeWritten(), Text("p\r\n"), "auto login: a password prompt before the login prompt gets the password, and the login is then done");
+        }
+        {
+            // Power PMAC with the saved connection: USER=root is passed in the negotiation, the first prompt is "Password: "
+            FakeConnection connection = new FakeConnection(Text("Debian GNU/Linux 7\r\nPassword: "), Text("\r\nLast login: Mon Dec 10\r\nroot@host:~# "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("root", "deltatau", null, null) });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Text("deltatau\r\n"), "auto login: password-only server with a user name configured");
         }
         {
             // custom prompts, case does not matter

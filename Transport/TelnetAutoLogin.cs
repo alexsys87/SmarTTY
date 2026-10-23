@@ -135,11 +135,16 @@ internal sealed class TelnetAutoLogin
             Log?.Invoke("automatic login: login prompt recognised, user name sent");
             return new[] { _userName + _lineEnding };
         }
-        if (_stage == Stage.WaitingForPassword && EndsWithAny(visible, _passwordPrompts))
+        // A password prompt before any login prompt is a server that took the user name from the telnet
+        // NEW-ENVIRON option (the client announces USER there) and skips its own "login:" question.
+        bool passwordFirst = _stage == Stage.WaitingForLogin && _password.Length > 0;
+        if ((_stage == Stage.WaitingForPassword || passwordFirst) && EndsWithAny(visible, _passwordPrompts))
         {
             _tail.Clear();
             _stage = Stage.Finished;
-            Log?.Invoke("automatic login: password prompt recognised, password sent");
+            Log?.Invoke(passwordFirst
+                ? "automatic login: password prompt came first (user name was passed by the telnet environment option), password sent"
+                : "automatic login: password prompt recognised, password sent");
             return new[] { _password + _lineEnding };
         }
         return Array.Empty<string>();
