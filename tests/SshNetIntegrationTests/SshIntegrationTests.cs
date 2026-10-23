@@ -398,6 +398,13 @@ internal static class SshIntegrationTests
         Test.Check(lost.WaitOne(TimeSpan.FromSeconds(30)), "ConnectionLost is raised when the connection goes away");
         Test.Check(channel.TryWaitClosed(), "open channels are closed when the connection goes away");
         Test.Check(channel.ClosedByConnectionLoss, "a channel closed by the lost connection says so");
+        Test.Equal(-1, channel.ExitStatus, "a channel closed by the lost connection does not report success");
+        Test.Check(session.IsConnectionClosed, "the session knows its connection is gone");
+        Test.Check(session.RunCommand("echo after", out int? statusAfterLoss) == null && statusAfterLoss == null, "a command on a lost connection is reported as not run");
+        // A subscriber that comes late still learns about the loss (it is latched).
+        ManualResetEvent lateLost = new ManualResetEvent(false);
+        session.ConnectionLost += (object sender, EventArgs e) => lateLost.Set();
+        Test.Check(lateLost.WaitOne(TimeSpan.FromSeconds(10)), "a ConnectionLost handler added after the loss is called as well");
     }
 
     private static string ReadToEnd(Stream stream)

@@ -148,12 +148,15 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                 SshShellChannel sshShellChannel = session.OpenShellChannel(null, "xterm", ExtendedDataMode.Normal, utf8Tty: !Terminal.ByteOrientedLineEditing);
                 sshShellChannel.ExtendedDataMode = ExtendedDataMode.Merge;
                 terminalTag.Channel = sshShellChannel;
+                terminalTag.ShellOpenFailed = false;
                 _Session.AttachChannelToControl(Terminal, sshShellChannel, isAutoLaunchedCommand: false);
             }
             catch (Exception exception)
             {
-                // Keep the other tabs reconnecting; this one shows why it has no shell.
-                Terminal.ProcessOutput(TerminalEmulatorControl.Colorize("Failed to open a shell: " + exception.Message, 1) + "\r\n");
+                // Keep the other tabs reconnecting; this one shows why it has no shell. Its channel is the old, closed
+                // one, and the session counts as healthy, so nothing else would ever try again: a key press does.
+                terminalTag.ShellOpenFailed = true;
+                Terminal.ProcessOutput(TerminalEmulatorControl.Colorize("Failed to open a shell: " + exception.Message + ". Press any key to try again.", 1) + "\r\n");
             }
             DisposeChannel(previousChannel);
         }

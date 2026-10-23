@@ -88,6 +88,12 @@ public class FileTransferManager : IDisposable
         /// </summary>
         public volatile string Checksum;
 
+        /// <summary>
+        /// True when the last attempt failed because the SSH connection went away, not because of the transfer itself.
+        /// Such a job is taken up again after reconnecting. Set before <see cref="State"/> becomes Failed.
+        /// </summary>
+        public volatile bool InterruptedByConnectionLoss;
+
         // What the source looked like when the data in the partial file was written; a resumed transfer continues
         // only if it still looks the same.
         public long RemoteSize = -1;
@@ -397,6 +403,7 @@ public class FileTransferManager : IDisposable
             job.State = TransferState.Queued;
             job.CancelRequested = false;
             job.ErrorMessage = null;
+            job.InterruptedByConnectionLoss = false;
             job.Phase = null;
             job.Checksum = null;
             job.BytesPerSecond = 0;
@@ -468,6 +475,7 @@ public class FileTransferManager : IDisposable
     private void RunJob(TransferJob job)
     {
         job.ErrorMessage = null;
+        job.InterruptedByConnectionLoss = false;
         job.Phase = null;
         job.Checksum = null;
         job.ResumedFrom = 0;
@@ -515,6 +523,14 @@ public class FileTransferManager : IDisposable
             else
             {
                 job.ErrorMessage = exception.Message;
+                // The channels are closed before a transfer thread sees the short read, so the session already knows
+                // about the loss here. Say so (instead of "The transfer ended after N of M bytes") and mark the job,
+                // so that it is resumed after reconnecting even though it has failed by the time the loss is reported.
+                if (Session != null && Session.IsConnectionClosed)
+                {
+                    job.ErrorMessage = "The connection to the server was lost. " + exception.Message;
+                    job.InterruptedByConnectionLoss = true;
+                }
                 job.State = TransferState.Failed;
             }
         }

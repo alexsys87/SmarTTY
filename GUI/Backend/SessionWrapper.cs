@@ -66,12 +66,27 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
         private void _MainController_SessionCreated()
         {
-            if (_ReconnectionController?.CreatedSession != null)
+            SshSession created = _ReconnectionController?.CreatedSession;
+            if (created != null)
             {
                 _Session._Controller.BeginInvoke(() =>
                 {
-                    _Session.AttachNewSession(_ReconnectionController.CreatedSession);
-                    _Session.Fixer = null;
+                    try
+                    {
+                        _Session.AttachNewSession(created);
+                    }
+                    catch (Exception exception)
+                    {
+                        // This runs straight on the dispatcher, where nothing catches it and the application would go down.
+                        MessageBoxes.Exception(exception);
+                    }
+                    // Whether the new connection took over decides what is left to fix: if it did, the prompt is done
+                    // (even when something after the switch failed); if not, the prompt stays so that the user can try again.
+                    if (ReferenceEquals(_Session.Session, created))
+                    {
+                        _Session.IsInactive = false;
+                        _Session.Fixer = null;
+                    }
                 });
             }
         }
@@ -118,7 +133,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // null until the probe started by the first classic terminal tab has answered.
     private bool? _ByteOrientedShell;
 
-    private Task<bool> _ByteOrientedShellProbe;
+    // The running or finished probe of the current connection; its result is null when the probe command could not be
+    // run (the connection went away), which must not be remembered as an answer.
+    private Task<bool?> _ByteOrientedShellProbe;
 
     private static readonly TimeSpan ByteProbeTimeout = TimeSpan.FromSeconds(3);
 
@@ -516,18 +533,22 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         };
         ApplyTransferSettings();
         TransferManager.JobFinished += OnTransferFinished;
+        // A loss that happened before this line (the session is replaced step by step) is reported at once: the event is latched.
         session.ConnectionLost += (object sender, EventArgs e) =>
         {
             _Controller.BeginInvoke(() =>
             {
-                // A late notification of a session that has already been replaced must not start a reconnect prompt
-                // for the new one or overwrite the transfers waiting to be resumed.
-                if (session != Session)
+                if (!ReferenceEquals(Session, session))
                 {
+                    // A connection that has been replaced meanwhile needs no reconnect prompt.
                     return;
                 }
-                // The transfers that were under way continue after reconnecting, from where they stopped.
-                _TransfersToResume = SCPController.Jobs.Where((FileTransferManager.TransferJob job) => job.State == FileTransferManager.TransferState.Queued || job.State == FileTransferManager.TransferState.InProgress).ToList();
+                // The transfers that were under way continue after reconnecting, from where they stopped. Their threads
+                // usually see the loss (a short read) before this runs and have already failed, so a transfer that failed
+                // because of the loss counts as well.
+                List<FileTransferManager.TransferJob> interrupted = SCPController.Jobs.Where((FileTransferManager.TransferJob job) => job.State == FileTransferManager.TransferState.Queued || job.State == FileTransferManager.TransferState.InProgress || (job.State == FileTransferManager.TransferState.Failed && job.InterruptedByConnectionLoss)).ToList();
+                // What an earlier loss collected and no reconnect has taken up yet stays in the list.
+                _TransfersToResume = (_TransfersToResume == null) ? interrupted : _TransfersToResume.Union(interrupted).ToList();
                 Fixer = new SessionFixer(this);
             });
         };
@@ -547,23 +568,49 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 }
             });
         }
-        foreach (ITabContext tab in Tabs)
+        // From here on the new connection is in place: a failure of one step must not leave the others undone (the session
+        // would stay inactive with no way to retry), so the failures are collected and reported at the end.
+        Exception deferredError = null;
+        if (!_ByteOrientedShell.HasValue)
         {
-            tab.OnSessionReconnected(session);
+            // A probe that started on the old connection (and may have been cut off) says nothing about the new one.
+            _ByteOrientedShellProbe = null;
+        }
+        foreach (ITabContext tab in Tabs.ToList())
+        {
+            try
+            {
+                tab.OnSessionReconnected(session);
+            }
+            catch (Exception exception)
+            {
+                deferredError = deferredError ?? exception;
+            }
         }
         if (_Analyzer != null)
         {
-            ShellCompletionAnalyzer previousAnalyzer;
-            lock (_Sync)
+            try
             {
-                previousAnalyzer = _Analyzer;
-                _Analyzer = new ShellCompletionAnalyzer(this, session);
+                ShellCompletionAnalyzer previousAnalyzer;
+                lock (_Sync)
+                {
+                    previousAnalyzer = _Analyzer;
+                    _Analyzer = new ShellCompletionAnalyzer(this, session);
+                }
+                // Its history channel belongs to the lost connection.
+                previousAnalyzer.Dispose();
             }
-            // Its history channel belongs to the lost connection.
-            previousAnalyzer.Dispose();
+            catch (Exception exception)
+            {
+                deferredError = deferredError ?? exception;
+            }
         }
         IsInactive = false;
         StartOpenWrtProbe();
+        if (deferredError != null)
+        {
+            MessageBoxes.Exception(deferredError);
+        }
     }
 
     /// <summary>
@@ -606,6 +653,27 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalRepoMenuVisibility"));
             });
         });
+    }
+
+    /// <summary>
+    /// Tries again to open the shell of a classic terminal tab whose shell could not be reopened after a reconnect.
+    /// Called on the UI thread; does nothing while there is no working connection (the reconnect prompt owns that case).
+    /// </summary>
+    internal void RetryShell(TerminalEmulatorControl ctl)
+    {
+        SshSession session = Session;
+        if (session == null || IsInactive || session.IsConnectionClosed)
+        {
+            return;
+        }
+        foreach (ITabContext tab in Tabs.ToList())
+        {
+            if (tab is NormalTabContext normalTab && ReferenceEquals(normalTab.Terminal, ctl))
+            {
+                normalTab.OnSessionReconnected(session);
+                return;
+            }
+        }
     }
 
     public void AttachChannelToControl(TerminalEmulatorControl ctl, SshShellChannel chn, bool isAutoLaunchedCommand, Action tabKeptAfterExit = null)
@@ -685,23 +753,44 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             return false;
         }
-        if (_ByteOrientedShellProbe == null)
+        Task<bool?> probe = _ByteOrientedShellProbe;
+        if (probe == null)
         {
-            _ByteOrientedShellProbe = Task.Run(() => ByteColumns.ParseProbe(session.RunCommand(ByteColumns.ProbeCommand, out _)));
+            // A probe that could not run (the connection went away: RunCommand gives null) has no answer, which is not the
+            // same as "not a byte-oriented shell": such a result is not remembered, the next tab asks again.
+            probe = Task.Run(() =>
+            {
+                List<string> output = session.RunCommand(ByteColumns.ProbeCommand, out _);
+                return (output == null) ? null : (bool?)ByteColumns.ParseProbe(output);
+            });
+            _ByteOrientedShellProbe = probe;
         }
         try
         {
-            if (_ByteOrientedShellProbe.Wait(ByteProbeTimeout))
+            if (probe.Wait(ByteProbeTimeout))
             {
-                _ByteOrientedShell = _ByteOrientedShellProbe.Result;
-                return _ByteOrientedShell.Value;
+                bool? answer = probe.Result;
+                if (answer.HasValue)
+                {
+                    _ByteOrientedShell = answer;
+                    return answer.Value;
+                }
+                ForgetByteOrientedShellProbe(probe);
             }
         }
         catch
         {
-            _ByteOrientedShell = false;
+            ForgetByteOrientedShellProbe(probe);
         }
         return false;
+    }
+
+    private void ForgetByteOrientedShellProbe(Task<bool?> probe)
+    {
+        if (ReferenceEquals(_ByteOrientedShellProbe, probe))
+        {
+            _ByteOrientedShellProbe = null;
+        }
     }
 
     private static bool IsChannelAttached(TerminalEmulatorControl ctl, SshShellChannel chn)

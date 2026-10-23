@@ -192,6 +192,11 @@ public class SshSession : IDisposable
                 {
                     if (!_serving)
                     {
+                        if (_stopped)
+                        {
+                            // The connection went away (or the session was closed) while nobody was authenticating.
+                            throw new IOException("The SSH connection was closed before authentication was completed");
+                        }
                         throw new InvalidOperationException("The SSH connection is not waiting for authentication");
                     }
                     _request = request;
@@ -272,6 +277,21 @@ public class SshSession : IDisposable
 
     public bool KeepAliveEnabled => _client.KeepAliveInterval > TimeSpan.Zero;
 
+    /// <summary>
+    /// True once the connection has gone away or the session was disposed. <see cref="IsAuthenticated"/> says nothing
+    /// about it: it stays true for the whole life of the object.
+    /// </summary>
+    public bool IsConnectionClosed
+    {
+        get
+        {
+            lock (_channels)
+            {
+                return _connectionClosed;
+            }
+        }
+    }
+
     /// <summary>Software version of the server from its identification string (e.g. "OpenSSH_9.6p1").</summary>
     public string ServerVersion => _client.ConnectionInfo?.ServerVersion;
 
@@ -286,7 +306,42 @@ public class SshSession : IDisposable
 
     public static string UserSshDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh");
 
-    public event EventHandler ConnectionLost;
+    private readonly object _connectionLostSync = new object();
+
+    private EventHandler _connectionLost;
+
+    /// <summary>
+    /// Raised once, on a thread pool thread, when the connection goes away (not when the session is disposed).
+    /// The loss is latched: a handler added after it happened is called at once, so a loss in the window before the
+    /// subscription (while the owner is still setting the session up, or while the password prompt is open) is
+    /// not missed.
+    /// </summary>
+    public event EventHandler ConnectionLost
+    {
+        add
+        {
+            bool lostAlready;
+            lock (_connectionLostSync)
+            {
+                _connectionLost += value;
+                lostAlready = _connectionLostRaised != 0;
+            }
+            if (lostAlready && Volatile.Read(ref _disposed) == 0)
+            {
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    value(this, EventArgs.Empty);
+                });
+            }
+        }
+        remove
+        {
+            lock (_connectionLostSync)
+            {
+                _connectionLost -= value;
+            }
+        }
+    }
 
     /// <summary>
     /// Connects to the server and completes the key exchange. Returns once the server waits for
@@ -508,14 +563,25 @@ public class SshSession : IDisposable
     private void RaiseConnectionLost()
     {
         CloseAllChannels();
-        if (Volatile.Read(ref _disposed) != 0 || Interlocked.Exchange(ref _connectionLostRaised, 1) != 0)
+        // Do not leave the connect thread waiting for credentials on a connection that is already gone.
+        _authGate.Stop();
+        EventHandler handlers;
+        lock (_connectionLostSync)
         {
-            return;
+            if (Volatile.Read(ref _disposed) != 0 || _connectionLostRaised != 0)
+            {
+                return;
+            }
+            _connectionLostRaised = 1;
+            handlers = _connectionLost;
         }
-        ThreadPool.QueueUserWorkItem(delegate
+        if (handlers != null)
         {
-            ConnectionLost?.Invoke(this, EventArgs.Empty);
-        });
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                handlers(this, EventArgs.Empty);
+            });
+        }
     }
 
     public string GetTempPath(string fileName)
@@ -569,6 +635,7 @@ public class SshSession : IDisposable
             // Best effort: the SSH keep-alive messages still work, and the platform may not support the control code.
         }
     }
+
 
     /// <summary>
     /// Requests X11 forwarding on every PTY channel opened from now on (terminal tabs and Smart Terminal commands).
@@ -775,6 +842,11 @@ public class SshSession : IDisposable
         {
             throw new InvalidOperationException("The SSH session is not authenticated");
         }
+        // IsAuthenticated stays true after the connection is gone; say so instead of failing somewhere inside SSH.NET.
+        if (IsConnectionClosed)
+        {
+            throw new IOException("The SSH connection is closed");
+        }
     }
 
     /// <param name="utf8Tty">
@@ -819,6 +891,13 @@ public class SshSession : IDisposable
                 }
             }
             channel.WaitClosed();
+            if (channel.ClosedByConnectionLoss)
+            {
+                // The connection went away while the command was running: the output is cut short and there is no
+                // exit status, which must not read as "the command succeeded" (callers treat null as "not run").
+                exitStatus = null;
+                return null;
+            }
             exitStatus = channel.ExitStatus;
             return lines;
         }
@@ -945,22 +1024,48 @@ public class SshSession : IDisposable
             {
                 return new RemotePathException(context, RemotePathProblem.NotAbsolute);
             }
-            if (RunCommandChecked("test -e " + RemotePathUtils.ShellQuote(path), requireSuccess: true) != null)
+            // A test that could not be run at all (the connection is gone) tells nothing about the path: no diagnosis,
+            // so that the caller reports the original error instead of blaming the directory.
+            bool? exists = RunRemoteTest("test -e", path);
+            if (exists == null)
             {
-                if (RunCommandChecked("test -w " + RemotePathUtils.ShellQuote(path), requireSuccess: true) == null)
+                return null;
+            }
+            if (exists == true)
+            {
+                bool? writable = RunRemoteTest("test -w", path);
+                if (writable == false)
                 {
                     return new RemotePathException(context, RemotePathProblem.FileNotWritable);
                 }
             }
-            else if (RunCommandChecked("test -w " + RemotePathUtils.ShellQuote(RemotePathUtils.GetDirectoryName(path)), requireSuccess: true) == null)
+            else
             {
-                return new RemotePathException(context, RemotePathProblem.DirectoryNotWritable);
+                bool? directoryWritable = RunRemoteTest("test -w", RemotePathUtils.GetDirectoryName(path));
+                if (directoryWritable == false)
+                {
+                    return new RemotePathException(context, RemotePathProblem.DirectoryNotWritable);
+                }
             }
         }
         catch
         {
         }
         return null;
+    }
+
+    /// <summary>
+    /// Runs "<paramref name="test"/> path" remotely: true if it succeeded, false if the command ran and failed,
+    /// null if it could not be run to the end (no connection, connection lost meanwhile).
+    /// </summary>
+    private bool? RunRemoteTest(string test, string path)
+    {
+        List<string> output = RunCommand(test + " " + RemotePathUtils.ShellQuote(path), out int? exitStatus);
+        if (output == null || exitStatus == null)
+        {
+            return null;
+        }
+        return exitStatus == 0;
     }
 
     #endregion
