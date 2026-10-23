@@ -665,6 +665,35 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
+        /// <summary>
+        /// Downloads a remote folder as a .tar.gz archive into the default download directory (asked for when it is not set).
+        /// </summary>
+        public void QuickDownloadArchive(string remoteDirectory)
+        {
+            try
+            {
+                SessionWrapper activeSession = RequireSshSession("File transfer");
+                string text = _Controller.Settings.DefaultDownloadDirectory;
+                if (string.IsNullOrEmpty(text) || !Directory.Exists(text))
+                {
+                    FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog
+                    {
+                        Description = "Select download directory"
+                    };
+                    if (folderBrowserDialog.ShowDialog() != DialogResult.OK)
+                    {
+                        return;
+                    }
+                    text = folderBrowserDialog.SelectedPath;
+                }
+                activeSession.DoDownloadArchive(remoteDirectory, text, _Controller.Settings.OpenLocalDirAfterDownload);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
         internal void DownloadFile()
         {
             try

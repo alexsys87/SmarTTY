@@ -67,6 +67,11 @@ internal static class FileTransferManagerTests
                 ResumeUpload();
                 DisposeFailsQueuedTransfers();
             }
+            Test.Section("Folder download as .tar.gz");
+            using (FileTransferManager archiveManager = NewManager())
+            {
+                ArchiveDownload(archiveManager);
+            }
             SftpFallback();
         }
         finally
@@ -201,7 +206,7 @@ internal static class FileTransferManagerTests
         DateTime localTime = new DateTime(2025, 1, 2, 3, 4, 5, DateTimeKind.Utc);
         List<FileTransferManager.TransferJob> jobs = new List<FileTransferManager.TransferJob>
         {
-            new FileTransferManager.TransferJob { IsDownload = true, RemotePath = "/r/a", LocalPath = "C:\\a", State = FileTransferManager.TransferState.InProgress, TotalBytes = 10, TransferredBytes = 4, RemoteSize = 10, RemoteModifyTime = remoteTime, OpenFolderWhenDone = true },
+            new FileTransferManager.TransferJob { IsDownload = true, RemotePath = "/r/a", LocalPath = "C:\\a", State = FileTransferManager.TransferState.InProgress, TotalBytes = 10, TransferredBytes = 4, RemoteSize = 10, RemoteModifyTime = remoteTime, OpenFolderWhenDone = true, IsArchive = true },
             new FileTransferManager.TransferJob { IsDownload = false, RemotePath = "/r/b", LocalPath = "C:\\b", State = FileTransferManager.TransferState.Failed, ErrorMessage = "boom", LocalSize = 5, LocalModifyTime = localTime, RemoteTempPath = "/r/.b.smartty-part" },
             new FileTransferManager.TransferJob { IsDownload = false, RemotePath = "/r/c", LocalPath = "C:\\c", State = FileTransferManager.TransferState.Completed }
         };
@@ -209,6 +214,7 @@ internal static class FileTransferManagerTests
         List<FileTransferManager.TransferJob> loaded = TransferQueueStore.Load(path);
         Test.Equal(2, loaded.Count, "completed transfers are not saved");
         Test.Check(loaded[0].Id == jobs[0].Id && loaded[0].IsDownload && loaded[0].State == FileTransferManager.TransferState.Queued && loaded[0].TransferredBytes == 4 && loaded[0].RemoteModifyTime == remoteTime && loaded[0].OpenFolderWhenDone, "a running transfer comes back queued, with what it needs to resume");
+        Test.Check(loaded[0].IsArchive && !loaded[1].IsArchive, "a folder archive download stays one after the queue is saved");
         Test.Check(loaded[1].State == FileTransferManager.TransferState.Failed && loaded[1].ErrorMessage == "boom" && loaded[1].LocalModifyTime == localTime && loaded[1].RemoteTempPath == "/r/.b.smartty-part", "a failed transfer comes back failed, with its temporary file");
         TransferQueueStore.Save(path, new FileTransferManager.TransferJob[0]);
         Test.Check(!File.Exists(path), "an empty queue removes the file");
@@ -227,6 +233,65 @@ internal static class FileTransferManagerTests
         Test.Check(!File.Exists(Local("hello.txt") + FileTransferManager.PartialDownloadSuffix), Label("no partial file is left after a download"));
         Test.Equal(5L, job.TransferredBytes, Label("the progress reaches the file size"));
         Test.Equal("SHA-256 verified", job.Checksum, Label("the download is verified with SHA-256"));
+    }
+
+    private static void ArchiveDownload(FileTransferManager manager)
+    {
+        // A name with a space and a quote, a nested folder and a file whose name starts with '-'.
+        string folder = Remote("my 'folder'");
+        string quoted = RemotePathUtils.ShellQuote(folder);
+        RunRemote("mkdir -p " + quoted + "/sub && printf one > " + quoted + "/a.txt && printf two > " + quoted + "/sub/b.txt && printf three > " + quoted + "/-dash.txt");
+        File.WriteAllText(Local("my 'folder'.tar.gz"), "an older archive");
+        FileTransferManager.TransferJob job = manager.EnqueueDirectoryArchiveDownload(folder, Local("my 'folder'.tar.gz"));
+        Test.Check(job.IsDownload && job.IsArchive, "a folder archive is a download job marked as an archive");
+        WaitForState(job, FileTransferManager.TransferState.Completed, "a folder archive download completes");
+        Test.Equal("tar", job.Protocol, "the archive is made by tar");
+        Test.Check(job.TransferredBytes > 0 && job.TotalBytes == 0, "the progress counts the bytes received; the size is not known in advance");
+        Test.Check(!File.Exists(Local("my 'folder'.tar.gz") + FileTransferManager.PartialDownloadSuffix), "no partial file is left after an archive download");
+        string listing = RunLocal("tar", "-tzf", Local("my 'folder'.tar.gz"));
+        Test.Check(listing.Contains("my 'folder'/a.txt") && listing.Contains("my 'folder'/sub/b.txt") && listing.Contains("-dash.txt"), "the archive holds the folder with its files (listing: " + listing.Replace("\n", " ") + ")");
+        Test.Check(!listing.Contains(Remote("")), "the archive holds the folder by its name, not by its full path");
+
+        Test.Throws<IOException>(() => manager.EnqueueDirectoryArchiveDownload(folder + "/a.txt", Local("file.tar.gz")), "queueing the archive of a file is refused");
+        Test.Throws<IOException>(() => manager.EnqueueDirectoryArchiveDownload(Remote("missing-folder"), Local("missing.tar.gz")), "queueing the archive of a missing folder is refused");
+        Test.Throws<IOException>(() => manager.EnqueueDirectoryArchiveDownload("/", Local("root.tar.gz")), "the root directory has no name to archive and is refused");
+
+        // A cancelled archive leaves the existing file alone.
+        string big = RemotePathUtils.ShellQuote(Remote("big folder"));
+        RunRemote("mkdir -p " + big + " && head -c " + LargeFileSize + " /dev/urandom > " + big + "/random.bin");
+        File.WriteAllText(Local("big.tar.gz"), "original");
+        manager.SpeedLimitBytesPerSecond = SlowRate;
+        FileTransferManager.TransferJob slow = manager.EnqueueDirectoryArchiveDownload(Remote("big folder"), Local("big.tar.gz"));
+        try
+        {
+            WaitUntilRunning(slow);
+            manager.Cancel(slow);
+            Test.WaitUntil(() => slow.State == FileTransferManager.TransferState.Cancelled, TimeSpan.FromSeconds(10), "a running archive download can be cancelled");
+        }
+        finally
+        {
+            manager.SpeedLimitBytesPerSecond = 0;
+        }
+        Test.Equal("original", File.ReadAllText(Local("big.tar.gz")), "a cancelled archive download leaves the existing local file untouched");
+        Test.Check(!File.Exists(Local("big.tar.gz") + FileTransferManager.PartialDownloadSuffix), "a cancelled archive download leaves no partial file");
+    }
+
+    private static string RunLocal(string fileName, params string[] arguments)
+    {
+        System.Diagnostics.ProcessStartInfo start = new System.Diagnostics.ProcessStartInfo(fileName)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        foreach (string argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
+        using System.Diagnostics.Process process = System.Diagnostics.Process.Start(start);
+        string output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        return output;
     }
 
     private static void CancelledDownloadKeepsFile(FileTransferManager manager)

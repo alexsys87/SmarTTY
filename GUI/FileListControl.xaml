@@ -49,6 +49,11 @@
                 <Image Source="../icons/MainWindow/go16.png" />
               </MenuItem.Icon>
             </MenuItem>
+            <MenuItem Name="cmdDownloadArchive" Header="Download folder as .tar.gz..." Click="DownloadArchive_Click" ToolTip="Packs the selected folder with tar and gzip on the server and downloads the archive">
+              <MenuItem.Icon>
+                <Image Source="../icons/MainWindow/archive16.png" />
+              </MenuItem.Icon>
+            </MenuItem>
             <Separator />
             <MenuItem Name="cmdCut" Header="Cut" InputGestureText="Ctrl+X" Click="Cut_Click">
               <MenuItem.Icon>

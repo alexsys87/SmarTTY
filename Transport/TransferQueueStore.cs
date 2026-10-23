@@ -25,6 +25,9 @@ public static class TransferQueueStore
 
         public bool OpenFolderWhenDone;
 
+        /// <summary>A directory downloaded as a .tar.gz archive (see <see cref="FileTransferManager.TransferJob.IsArchive"/>).</summary>
+        public bool IsArchive;
+
         /// <summary>
         /// True if the transfer was queued or running (it continues by itself), false if it had failed.
         /// </summary>
@@ -82,6 +85,7 @@ public static class TransferQueueStore
                 RemotePath = job.RemotePath,
                 LocalPath = job.LocalPath,
                 OpenFolderWhenDone = job.OpenFolderWhenDone,
+                IsArchive = job.IsArchive,
                 WasActive = state != FileTransferManager.TransferState.Failed,
                 ErrorMessage = job.ErrorMessage,
                 TotalBytes = job.TotalBytes,
@@ -142,6 +146,7 @@ public static class TransferQueueStore
             RemotePath = saved.RemotePath,
             LocalPath = saved.LocalPath,
             OpenFolderWhenDone = saved.OpenFolderWhenDone,
+            IsArchive = saved.IsArchive,
             State = saved.WasActive ? FileTransferManager.TransferState.Queued : FileTransferManager.TransferState.Failed,
             ErrorMessage = saved.WasActive ? null : saved.ErrorMessage,
             TotalBytes = saved.TotalBytes,
