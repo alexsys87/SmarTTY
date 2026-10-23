@@ -35,6 +35,9 @@ public class LocalRepoSettings
     /// </summary>
     public bool AddTargetPackages = true;
 
+    /// <summary>Comment out the official feeds of OpenWrt (distfeeds) while the server runs, so that only the local feeds are used.</summary>
+    public bool DisableOfficialFeeds;
+
     private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SmarTTY\\LocalRepo.xml");
 
     public static LocalRepoSettings Load()

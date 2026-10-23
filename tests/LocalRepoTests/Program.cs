@@ -637,6 +637,55 @@ internal static class Program
         }
     }
 
+    /// <summary>Turning the official feeds (distfeeds) off while the server runs and giving them back, under sh and BusyBox ash.</summary>
+    private static void OfficialFeedsTests()
+    {
+        List<LocalRepoFeed> feeds = new List<LocalRepoFeed> { new LocalRepoFeed { Name = "smartty_base", UrlPath = "/r0/base", Directory = "/x" } };
+        const string original = "src/gz openwrt_base https://downloads.openwrt.org/releases/23.05.6/packages/arm_cortex-a9_neon/base\n# own comment\n\nsrc/gz openwrt_luci https://downloads.openwrt.org/releases/23.05.6/packages/arm_cortex-a9_neon/luci\n";
+        const string off = "# smartty-local-off-feed: src/gz openwrt_base https://downloads.openwrt.org/releases/23.05.6/packages/arm_cortex-a9_neon/base\n# own comment\n\n# smartty-local-off-feed: src/gz openwrt_luci https://downloads.openwrt.org/releases/23.05.6/packages/arm_cortex-a9_neon/luci\n";
+        foreach ((string name, string shell, string[] args) in Shells())
+        {
+            string Exec(string script, out int exit)
+            {
+                exit = RunArgs(shell, args.Concat(new[] { script }).ToArray(), out string output, out string error);
+                return output + error;
+            }
+
+            string dir = Path.Combine(_work, "dist-" + name.Replace(' ', '-'));
+            Directory.CreateDirectory(dir);
+            string dist = Path.Combine(dir, "distfeeds.conf");
+            string conf = Path.Combine(dir, "customfeeds.conf");
+            string opkgConf = Path.Combine(dir, "opkg.conf");
+            string missing = Path.Combine(dir, "missing.conf");
+
+            File.WriteAllText(dist, original);
+            Exec(OpkgFeedConfig.BuildEnableScript(feeds, 8765, conf, opkgConf: opkgConf, disableOfficial: true, distFeedsFile: dist), out int exit1);
+            Check(exit1 == 0 && File.ReadAllText(dist) == off && File.ReadAllText(conf).Contains("src/gz smartty_base"), name + ": enable with the official feeds off comments their lines out");
+            Exec(OpkgFeedConfig.BuildEnableScript(feeds, 8765, conf, opkgConf: opkgConf, disableOfficial: true, distFeedsFile: dist), out int exit2);
+            Check(exit2 == 0 && File.ReadAllText(dist) == off, name + ": enabling again does not add a second marker");
+            Exec(OpkgFeedConfig.BuildDisableScript(conf, opkgConf, dist), out int exit3);
+            Check(exit3 == 0 && File.ReadAllText(dist) == original, name + ": disable gives the official feeds back unchanged");
+
+            File.WriteAllText(dist, off);
+            Exec(OpkgFeedConfig.BuildEnableScript(feeds, 8765, conf, opkgConf: opkgConf, disableOfficial: false, distFeedsFile: dist), out int exit4);
+            Check(exit4 == 0 && File.ReadAllText(dist) == original, name + ": enable without it gives back lines left off by an earlier run");
+
+            Exec(OpkgFeedConfig.BuildEnableScript(feeds, 8765, conf, opkgConf: opkgConf, disableOfficial: true, distFeedsFile: missing), out int exit5);
+            Exec(OpkgFeedConfig.BuildDisableScript(conf, opkgConf, missing), out int exit6);
+            Check(exit5 == 0 && exit6 == 0 && !File.Exists(missing), name + ": no distfeeds file: enable and disable succeed without creating it");
+
+            // apk: the list has plain URLs.
+            string apkList = Path.Combine(dir, "distfeeds.list");
+            string apkConf = Path.Combine(dir, "customfeeds.list");
+            string key = Path.Combine(dir, "smartty.pem");
+            File.WriteAllText(apkList, "https://downloads.openwrt.org/releases/25.12.0/packages/x/base/packages.adb\n");
+            Exec(ApkFeedConfig.BuildEnableScript(feeds, 8765, null, apkConf, key, true, apkList), out int exit7);
+            Check(exit7 == 0 && File.ReadAllText(apkList) == "# smartty-local-off-feed: https://downloads.openwrt.org/releases/25.12.0/packages/x/base/packages.adb\n", name + ": apk: the official repositories are commented out");
+            Exec(ApkFeedConfig.BuildDisableScript(apkConf, key, apkList), out int exit8);
+            Check(exit8 == 0 && File.ReadAllText(apkList) == "https://downloads.openwrt.org/releases/25.12.0/packages/x/base/packages.adb\n", name + ": apk: disable gives them back");
+        }
+    }
+
     /// <summary>The scripts that probe, turn off and turn on again the signature check of opkg, under sh and BusyBox ash.</summary>
     private static void OpkgSignatureTests()
     {
@@ -1715,6 +1764,7 @@ internal static class Program
             await ServerTests();
             ConfigTests();
             OpkgSignatureTests();
+            OfficialFeedsTests();
             ArIpkTests();
             await HostTests();
             SignatureHostTests();

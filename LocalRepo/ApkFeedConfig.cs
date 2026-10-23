@@ -19,6 +19,9 @@ public static class ApkFeedConfig
     public const string KeysDirectory = "/etc/apk/keys";
 
     /// <summary>The key that SmarTTY adds on request and removes together with the feeds.</summary>
+    /// <summary>The list of the official repositories of OpenWrt.</summary>
+    public const string DistFeedsFile = "/etc/apk/repositories.d/distfeeds.list";
+
     public const string TrustedKeyFile = KeysDirectory + "/smartty-local.pem";
 
     /// <summary>The public key of an OpenWrt build tree (BUILD_KEY_APK_PUB), in the root of the tree.</summary>
@@ -43,9 +46,10 @@ public static class ApkFeedConfig
     /// Replaces the block of local repositories in the list file (creating it if needed) and, when a public key is given,
     /// makes apk trust it; without a key a key of an earlier run is removed.
     /// </summary>
-    public static string BuildEnableScript(IList<LocalRepoFeed> feeds, int port, string publicKey = null, string configFile = DefaultConfigFile, string keyFile = TrustedKeyFile)
+    public static string BuildEnableScript(IList<LocalRepoFeed> feeds, int port, string publicKey = null, string configFile = DefaultConfigFile, string keyFile = TrustedKeyFile, bool disableOfficial = false, string distFeedsFile = DistFeedsFile)
     {
-        string script = OpkgFeedConfig.BuildBlockEnableScript(feeds.Select((LocalRepoFeed feed) => FeedLine(feed, port)), configFile);
+        string script = OpkgFeedConfig.BuildBlockEnableScript(feeds.Select((LocalRepoFeed feed) => FeedLine(feed, port)), configFile) + " && " +
+            (disableOfficial ? OpkgFeedConfig.BuildOfficialOffScript(distFeedsFile) : OpkgFeedConfig.BuildOfficialRestoreScript(distFeedsFile));
         string quotedKeyFile = RemotePathUtils.ShellQuote(keyFile);
         if (string.IsNullOrEmpty(publicKey))
         {
@@ -56,9 +60,9 @@ public static class ApkFeedConfig
     }
 
     /// <summary>Removes the block of local repositories and the key; succeeds if there are none.</summary>
-    public static string BuildDisableScript(string configFile = DefaultConfigFile, string keyFile = TrustedKeyFile)
+    public static string BuildDisableScript(string configFile = DefaultConfigFile, string keyFile = TrustedKeyFile, string distFeedsFile = DistFeedsFile)
     {
-        return OpkgFeedConfig.BuildBlockDisableScript(configFile) + "; rm -f " + RemotePathUtils.ShellQuote(keyFile);
+        return OpkgFeedConfig.BuildBlockDisableScript(configFile) + "; " + OpkgFeedConfig.BuildOfficialRestoreScript(distFeedsFile) + "; rm -f " + RemotePathUtils.ShellQuote(keyFile);
     }
 
     /// <summary>
