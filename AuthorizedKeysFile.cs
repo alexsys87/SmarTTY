@@ -44,6 +44,30 @@ internal static class AuthorizedKeysFile
         return false;
     }
 
+    /// <summary>The key blob of an authorized_keys line ("[options] keytype base64 [comment]"), or null if it has none.</summary>
+    public static byte[] ParseKeyBlob(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return null;
+        }
+        foreach (string token in line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (token.Length < 16)
+            {
+                continue;
+            }
+            try
+            {
+                return Convert.FromBase64String(token);
+            }
+            catch (FormatException)
+            {
+            }
+        }
+        return null;
+    }
+
     public static bool ContainsKey(IEnumerable<string> lines, byte[] keyBlob)
     {
         return lines.Any(line => LineHoldsKey(line, keyBlob));

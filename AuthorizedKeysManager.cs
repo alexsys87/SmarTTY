@@ -20,23 +20,12 @@ internal static class AuthorizedKeysManager
             {
                 return false;
             }
-            using (ScpDownloadStream stream = sshSession.OpenDownload(homeDir + "/.ssh/authorized_keys"))
+            if (!FileHoldsKey(sshSession, homeDir + "/.ssh/authorized_keys", keyBlob))
             {
-                using StreamReader streamReader = new StreamReader(stream);
-                while (!streamReader.EndOfStream)
-                {
-                    string line = streamReader.ReadLine();
-                    if (line == null)
-                    {
-                        break;
-                    }
-                    if (AuthorizedKeysFile.LineHoldsKey(line, keyBlob))
-                    {
-                        return true;
-                    }
-                }
+                return false;
             }
-            return false;
+            // Dropbear reads the keys of root from another file: a key that is only in ~/.ssh is not accepted there.
+            return GetDropbearRootKeyFiles(sshSession).All(path => FileHoldsKey(sshSession, path, keyBlob));
         }
         catch
         {
@@ -44,15 +33,77 @@ internal static class AuthorizedKeysManager
         }
     }
 
+    private static bool FileHoldsKey(SshSession sshSession, string path, byte[] keyBlob)
+    {
+        try
+        {
+            using ScpDownloadStream stream = sshSession.OpenDownload(path);
+            using StreamReader streamReader = new StreamReader(stream);
+            while (!streamReader.EndOfStream)
+            {
+                string line = streamReader.ReadLine();
+                if (line == null)
+                {
+                    break;
+                }
+                if (AuthorizedKeysFile.LineHoldsKey(line, keyBlob))
+                {
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Dropbear (OpenWrt and other embedded systems) takes the authorized keys of root from /etc/dropbear/authorized_keys and
+    /// ignores ~/.ssh/authorized_keys, so a key that was set up only in the home directory is rejected on the next connection.
+    /// </summary>
+    private static List<string> GetDropbearRootKeyFiles(SshSession sshSession)
+    {
+        List<string> files = new List<string>();
+        try
+        {
+            if (sshSession.ServerVersion?.IndexOf("dropbear", StringComparison.OrdinalIgnoreCase) >= 0
+                && sshSession.RunCommandChecked("id -u", requireSuccess: true)?.Any(line => line.Trim() == "0") == true
+                && sshSession.RunCommandChecked("test -d /etc/dropbear", requireSuccess: true) != null)
+            {
+                files.Add("/etc/dropbear/authorized_keys");
+            }
+        }
+        catch
+        {
+        }
+        return files;
+    }
+
     public static void RemoveAuthorizedKey(SshSession sshSession, byte[] keyBlob)
     {
         string homeDir = AuthorizedKeysFile.PickHomeDirectory(sshSession.RunCommandChecked("pwd", requireSuccess: true))
             ?? throw new Exception("Failed to detect home directory");
+        foreach (string path in GetDropbearRootKeyFiles(sshSession))
+        {
+            try
+            {
+                RemoveKeyFromFile(sshSession, path, keyBlob);
+            }
+            catch
+            {
+                // The file of the home directory below is the one the user asked about.
+            }
+        }
         if (sshSession.RunCommandChecked("test -d " + ScpChannelStream.QuotePath(homeDir + "/.ssh"), requireSuccess: true) == null)
         {
             return;
         }
-        string authKeysPath = homeDir + "/.ssh/authorized_keys";
+        RemoveKeyFromFile(sshSession, homeDir + "/.ssh/authorized_keys", keyBlob);
+    }
+
+    private static void RemoveKeyFromFile(SshSession sshSession, string authKeysPath, byte[] keyBlob)
+    {
         List<string> lines = new List<string>();
         using (ScpDownloadStream stream = sshSession.OpenDownload(authKeysPath))
         {
@@ -114,5 +165,33 @@ internal static class AuthorizedKeysManager
         }
         sshSession.RunCommandChecked("chmod 700 " + sshDir, requireSuccess: true);
         sshSession.RunCommandChecked("chmod 600 " + quotedAuthKeysPath, requireSuccess: true);
+        byte[] keyBlob = AuthorizedKeysFile.ParseKeyBlob(keyString);
+        foreach (string path in GetDropbearRootKeyFiles(sshSession))
+        {
+            if (keyBlob != null && FileHoldsKey(sshSession, path, keyBlob))
+            {
+                continue;
+            }
+            try
+            {
+                AppendLine(sshSession, path, keyString);
+                sshSession.RunCommandChecked("chmod 600 " + ScpChannelStream.QuotePath(path), requireSuccess: true);
+            }
+            catch
+            {
+                // Best effort: the key is in the home directory, which is all that other servers read.
+            }
+        }
+    }
+
+    private static void AppendLine(SshSession sshSession, string path, string line)
+    {
+        string appendCommand = "sh -c " + ScpChannelStream.QuotePath(AuthorizedKeysFile.AppendScript) + " sh " + ScpChannelStream.QuotePath(path);
+        using SshShellChannel sshShellChannel = sshSession.OpenShellChannel(appendCommand);
+        using (StreamWriter streamWriter = new StreamWriter(sshShellChannel.Input))
+        {
+            streamWriter.Write(line + "\n");
+        }
+        sshShellChannel.SendEof();
     }
 }

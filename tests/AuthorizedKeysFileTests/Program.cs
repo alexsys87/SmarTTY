@@ -46,6 +46,9 @@ internal static class Program
         byte[] third = Blob("ssh-rsa", 3);
 
         Check(AuthorizedKeysFile.LineHoldsKey("ssh-ed25519 " + B64(mine) + " me@host", mine), "find: key with a comment");
+        Check(AuthorizedKeysFile.ParseKeyBlob("ssh-ed25519 " + B64(mine) + " me@host").SequenceEqual(mine), "parse: blob of a line with a comment");
+        Check(AuthorizedKeysFile.ParseKeyBlob("command=\"x y\" ssh-ed25519 " + B64(mine)).SequenceEqual(mine), "parse: blob of a line with options");
+        Check(AuthorizedKeysFile.ParseKeyBlob("# just a comment") == null && AuthorizedKeysFile.ParseKeyBlob("") == null, "parse: no key, no blob");
         Check(AuthorizedKeysFile.LineHoldsKey("ssh-ed25519 " + B64(mine), mine), "find: key without a comment");
         Check(AuthorizedKeysFile.LineHoldsKey("ssh-ed25519 " + B64(mine) + " a comment with blanks", mine), "find: comment with blanks");
         Check(AuthorizedKeysFile.LineHoldsKey("from=\"10.0.0.0/8\",no-pty ssh-ed25519 " + B64(mine) + " me@host", mine), "find: key with options");
