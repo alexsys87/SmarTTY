@@ -247,7 +247,9 @@ public partial class SshConnector : Component
                         }
                         if (!authSuccess)
                         {
-                            if (Confirm(PromptKind.YesNoWarning, "Cannot authenticate using public key. Enter a password instead?"))
+                            // Some devices (embedded Linux with a volatile or unsupported authorized_keys) do not keep the key. With a saved
+                            // password there is nothing to ask: fall back to it and set the key up again, as after a "yes" below.
+                            if (sshConnectionSettings.EncryptedSavedPassword != null || Confirm(PromptKind.YesNoWarning, "Cannot authenticate using public key. Enter a password instead?"))
                             {
                                 sshConnectionSettings.AuthenticationType = AuthType.Password;
                                 forcePasswordAuth = true;
