@@ -238,7 +238,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public bool TelnetSendAutomaticValues { get; set; } = true;
 
-        private int _TelnetKeepAliveSeconds = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultKeepAliveSeconds;
+        private int _TelnetKeepAliveSeconds = DeviceTerminalSettings.ConnectionSettings.Tcp.DefaultKeepAliveSeconds;
 
         public int TelnetKeepAliveSeconds
         {
@@ -252,7 +252,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             }
         }
 
-        private int _TcpKeepAliveSeconds;
+        private int _TcpKeepAliveSeconds = DeviceTerminalSettings.ConnectionSettings.Tcp.DefaultKeepAliveSeconds;
 
         // Keep-alive of a raw TCP connection (the telnet one lives in the "Telnet options" box). It is hidden for
         // telnet so the two keep-alive inputs never both apply to the same connection.

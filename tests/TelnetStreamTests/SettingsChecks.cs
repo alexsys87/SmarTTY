@@ -93,7 +93,7 @@ internal static class SettingsChecks
 
         // telnet options: defaults, round trip, files written before they existed
         check(telnet.TerminalType == "xterm" && telnet.LocalEcho == DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Auto
-            && !telnet.ActiveNegotiation && telnet.KeepAliveSeconds == DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultKeepAliveSeconds, "telnet options: defaults");
+            && !telnet.ActiveNegotiation && telnet.KeepAliveSeconds == DeviceTerminalSettings.ConnectionSettings.Tcp.DefaultKeepAliveSeconds, "telnet options: defaults");
         check(((DeviceTerminalSettings.ConnectionSettings.Telnet)loaded.Settings.Connection).LocalEcho == DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode.Auto,
             "telnet options: a file saved before they existed gets the defaults");
         DeviceTerminalSettings.ConnectionSettings.Telnet custom = new DeviceTerminalSettings.ConnectionSettings.Telnet

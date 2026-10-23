@@ -86,7 +86,14 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
             /// How often an idle connection is kept alive: a raw TCP connection enables the operating system's TCP
             /// keep-alive, a telnet connection additionally sends a harmless NOP command. 0 switches the keep-alive off.
             /// </summary>
-            public int KeepAliveSeconds { get; set; }
+            public int KeepAliveSeconds { get; set; } = DefaultKeepAliveSeconds;
+
+            /// <summary>
+            /// The keep-alive interval of a new TCP or telnet connection. Without it a pulled cable is not noticed until
+            /// something is typed. For raw TCP only the operating system's probes are used, which write nothing into the data
+            /// stream. 0 still switches it off.
+            /// </summary>
+            public const int DefaultKeepAliveSeconds = 15;
 
             [XmlIgnore]
             public override string FileNameBase => Host + "_" + Port;
@@ -138,18 +145,7 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
             public const int DefaultPort = 23;
 
-            /// <summary>
-            /// The keep-alive interval of a new telnet connection. Without it a pulled cable is not noticed until something
-            /// is typed. A raw TCP connection keeps 0 (off) unless the user sets it; 0 still switches it off for telnet.
-            /// </summary>
-            public const int DefaultKeepAliveSeconds = 15;
-
             public const string DefaultTerminalType = "xterm";
-
-            public Telnet()
-            {
-                KeepAliveSeconds = DefaultKeepAliveSeconds;
-            }
 
             /// <summary>The port of telnet over TLS (telnets).</summary>
             public const int DefaultTlsPort = 992;

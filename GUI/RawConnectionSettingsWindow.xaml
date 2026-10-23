@@ -43,7 +43,7 @@
               </StackPanel>
             </Button>
             <TextBlock Text="Keep-alive, s:" Grid.Row="1" Grid.Column="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" Visibility="{Binding TcpKeepAliveSettingsVisibility}" />
-            <TextBox Grid.Column="3" Grid.Row="1" Margin="2" Width="50" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding TcpKeepAliveSettingsVisibility}" ToolTip="Seconds (0 = off). After this many idle seconds the operating system probes the connection every few seconds, so a dropped link (power loss, pulled cable, NAT timeout) is noticed soon after; nothing is written into the data stream, so the device protocol is not disturbed." />
+            <TextBox Grid.Column="3" Grid.Row="1" Margin="2" Width="50" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding TcpKeepAliveSettingsVisibility}" ToolTip="Seconds (0 = off, default 15). After this many idle seconds the operating system probes the connection every few seconds, so a dropped link (power loss, pulled cable, NAT timeout) is noticed soon after; nothing is written into the data stream, so the device protocol is not disturbed." />
           </Grid>
         </local:SettingsGroupBox>
         <local:SettingsGroupBox ImageSource="../icons/com16.png" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">
