@@ -159,6 +159,8 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 // The certificate is checked against the name the user typed, not against the resolved address.
                 wire = TelnetTls.Authenticate(wire, _telnet.Host, _telnet.TlsAllowInvalidCertificate, clientCertificate: clientCertificate);
             }
+            // A diagnostic record of the traffic, only when SMARTTY_TELNET_TRACE names a file.
+            wire = TelnetTraceStream.WrapIfRequested(wire, _telnet.Host + ":" + _telnet.Port);
             stream = new TelnetStream(wire, new TelnetOptions
             {
                 TerminalType = _telnet.TerminalType,
