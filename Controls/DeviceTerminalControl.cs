@@ -234,9 +234,34 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private SerialTerminalControl _serialTerminalControl;
 
+    // The menu items of the designer have no images in the designer file: they are given here (the check items
+    // show their state with a check mark instead).
+    private void ApplyMenuIcons()
+    {
+        foreach (ToolStripMenuItem item in new[]
+        {
+            sendBinaryFileToolStripMenuItem, sendFileViaXMODEMToolStripMenuItem, sendFileViaXMODEM1KToolStripMenuItem,
+            sendFilesViaYMODEMToolStripMenuItem, sendFilesViaZModemToolStripMenuItem, sendFilesViaKermitToolStripMenuItem
+        })
+        {
+            MenuIcons.Apply(item, "upload");
+        }
+        foreach (ToolStripMenuItem item in new[]
+        {
+            receiveFileViaXMODEMToolStripMenuItem, receiveFilesViaYMODEMToolStripMenuItem, receiveFilesViaYMODEMGToolStripMenuItem,
+            receiveFilesViaZModemToolStripMenuItem, receiveFilesViaKermitToolStripMenuItem
+        })
+        {
+            MenuIcons.Apply(item, "download");
+        }
+        MenuIcons.Apply(terminalTypeToolStripMenuItem, "terminal");
+        MenuIcons.Apply(changeSettingsToolStripMenuItem, "settings");
+    }
+
     public DeviceTerminalControl()
     {
         InitializeComponent();
+        ApplyMenuIcons();
         DpiAwareForm.ConfigureToolStrip(toolStrip1);
         Disposed += DeviceTerminalControl_Disposed;
         pnlConnectionInProgress.BringToFront();
@@ -354,6 +379,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             ToolTipText = "Show the input line again if the keys keep going to a program that has already ended (mc, htop ...)"
         };
+        MenuIcons.Apply(_returnToInputLineMenuItem, "go");
         contextMenuStrip1.Items.Add(_returnToInputLineMenuItem);
     }
 
@@ -377,6 +403,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             ToolTipText = "Types \"export COLUMNS=N LINES=M; stty cols N rows M\" for the shell on the device (available at the input line when nothing is typed in it)."
         };
+        MenuIcons.Apply(_sendRemoteSizeMenuItem, "refresh");
         contextMenuStrip1.Items.Add(_syncRemoteSizeMenuItem);
         contextMenuStrip1.Items.Add(_sendRemoteSizeMenuItem);
     }
@@ -475,14 +502,19 @@ public partial class DeviceTerminalControl : DpiAwareControl
         if (_telnetMenu == null)
         {
             _telnetMenu = new ToolStripMenuItem("Telnet");
+            MenuIcons.Apply(_telnetMenu, "network");
             AddTelnetCommand("Send Break", TelnetStream.Break);
             AddTelnetCommand("Send Interrupt Process (IP)", TelnetStream.InterruptProcess);
             AddTelnetCommand("Send Are You There (AYT)", TelnetStream.AreYouThere);
             AddTelnetCommand("Send Erase Line", TelnetStream.EraseLine);
             AddTelnetCommand("Send NOP", TelnetStream.NOP);
             _telnetMenu.DropDownItems.Add(new ToolStripSeparator());
-            _telnetMenu.DropDownItems.Add(new ToolStripMenuItem("Show negotiated options", null, (sender, args) => ShowTelnetOptions()));
-            _telnetMenu.DropDownItems.Add(new ToolStripMenuItem("Ask server for its option status (STATUS)", null, (sender, args) => RequestTelnetStatus()));
+            ToolStripMenuItem showOptions = new ToolStripMenuItem("Show negotiated options", null, (sender, args) => ShowTelnetOptions());
+            MenuIcons.Apply(showOptions, "question");
+            _telnetMenu.DropDownItems.Add(showOptions);
+            ToolStripMenuItem askStatus = new ToolStripMenuItem("Ask server for its option status (STATUS)", null, (sender, args) => RequestTelnetStatus());
+            MenuIcons.Apply(askStatus, "refresh");
+            _telnetMenu.DropDownItems.Add(askStatus);
             _telnetMenu.DropDownOpening += (sender, args) =>
             {
                 bool connected = _connectionState == ConnectionStateEnum.Connected && _telnetTransport != null;
@@ -551,7 +583,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void AddTelnetCommand(string text, byte command)
     {
-        _telnetMenu.DropDownItems.Add(new ToolStripMenuItem(text, null, (sender, args) =>
+        ToolStripMenuItem item = new ToolStripMenuItem(text, null, (sender, args) =>
         {
             try
             {
@@ -561,7 +593,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
             {
                 // The connection is gone; the status line says so.
             }
-        }));
+        });
+        MenuIcons.Apply(item, "upload");
+        _telnetMenu.DropDownItems.Add(item);
     }
 
     private void ReplaceTerminalControl()

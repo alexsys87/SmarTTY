@@ -52,6 +52,18 @@
     <!-- Window icons of the WinForms dialogs, loaded by Forms/FormIcons.cs. -->
     <EmbeddedResource Include="icons\forms\*.ico" LogicalName="SmarTTY.FormIcons.%(Filename).ico" />
     <EmbeddedResource Include="app.ico" LogicalName="SmarTTY.FormIcons.app.ico" />
+    <!-- Images of the menu items of the WinForms controls, loaded by Controls/MenuIcons.cs. -->
+    <EmbeddedResource Include="icons\MainWindow\upload.png" LogicalName="SmarTTY.MenuIcons.upload.png" />
+    <EmbeddedResource Include="icons\MainWindow\download.png" LogicalName="SmarTTY.MenuIcons.download.png" />
+    <EmbeddedResource Include="icons\term16.png" LogicalName="SmarTTY.MenuIcons.terminal.png" />
+    <EmbeddedResource Include="icons\gear16.png" LogicalName="SmarTTY.MenuIcons.settings.png" />
+    <EmbeddedResource Include="icons\edit16.png" LogicalName="SmarTTY.MenuIcons.edit.png" />
+    <EmbeddedResource Include="icons\delete16.png" LogicalName="SmarTTY.MenuIcons.delete.png" />
+    <EmbeddedResource Include="icons\net16.png" LogicalName="SmarTTY.MenuIcons.network.png" />
+    <EmbeddedResource Include="icons\MainWindow\refresh16.png" LogicalName="SmarTTY.MenuIcons.refresh.png" />
+    <EmbeddedResource Include="icons\question16.png" LogicalName="SmarTTY.MenuIcons.question.png" />
+    <EmbeddedResource Include="icons\MainWindow\go16.png" LogicalName="SmarTTY.MenuIcons.go.png" />
+    <EmbeddedResource Include="icons\event16.png" LogicalName="SmarTTY.MenuIcons.event.png" />
     <Resource Include="icons\**\*.png" />
   </ItemGroup>
 

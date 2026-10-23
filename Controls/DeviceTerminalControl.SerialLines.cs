@@ -50,7 +50,9 @@ public partial class DeviceTerminalControl
         _rtsItem.Click += (sender, e) => ToggleLine(dtr: false);
         _breakItem = new ToolStripMenuItem("Send break (" + BreakDurationMs + " ms)");
         _breakItem.Click += OnSendBreakClick;
+        MenuIcons.Apply(_breakItem, "event");
         _resetErrorsItem = new ToolStripMenuItem("Clear notices and error counters");
+        MenuIcons.Apply(_resetErrorsItem, "delete");
         _resetErrorsItem.Click += (sender, e) =>
         {
             _lineErrors.Reset();

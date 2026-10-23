@@ -34,19 +34,59 @@
       <ListView Name="TransferList" ItemsSource="{Binding FilteredItems}" SelectionMode="Extended" AllowDrop="True" DragEnter="TransferList_DragOver" DragOver="TransferList_DragOver" Drop="TransferList_Drop" KeyDown="ListView_KeyDown" MouseDoubleClick="TransferList_MouseDoubleClick" SelectionChanged="TransferList_SelectionChanged">
         <FrameworkElement.ContextMenu>
           <ContextMenu Name="xferMenu" Opened="XferMenu_Opened">
-            <MenuItem Name="cmdEdit" Header="Edit..." Click="OpenFile_Click" />
-            <MenuItem Name="cmdDownload" Header="Download..." Click="DownloadFile_Click" />
-            <MenuItem Name="cmdNavigate" Header="Go to subdirectory.." Click="Navigate_Click" />
+            <MenuItem Name="cmdEdit" Header="Edit..." Click="OpenFile_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/edit16.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Name="cmdDownload" Header="Download..." Click="DownloadFile_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/MainWindow/download.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Name="cmdNavigate" Header="Go to subdirectory.." Click="Navigate_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/MainWindow/go16.png" />
+              </MenuItem.Icon>
+            </MenuItem>
             <Separator />
-            <MenuItem Name="cmdCut" Header="Cut" InputGestureText="Ctrl+X" Click="Cut_Click" />
-            <MenuItem Name="cmdCopy" Header="Copy" InputGestureText="Ctrl+C" Click="Copy_Click" />
-            <MenuItem Name="cmdPaste" Header="Paste" InputGestureText="Ctrl+V" Click="Paste_Click" />
+            <MenuItem Name="cmdCut" Header="Cut" InputGestureText="Ctrl+X" Click="Cut_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/menu/cut.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Name="cmdCopy" Header="Copy" InputGestureText="Ctrl+C" Click="Copy_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/MainWindow/copy.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Name="cmdPaste" Header="Paste" InputGestureText="Ctrl+V" Click="Paste_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/MainWindow/paste.png" />
+              </MenuItem.Icon>
+            </MenuItem>
             <Separator />
-            <MenuItem Name="cmdRename" Header="Rename..." InputGestureText="F2" Click="Rename_Click" />
-            <MenuItem Name="cmdDelete" Header="Delete..." InputGestureText="Del" Click="Delete_Click" />
+            <MenuItem Name="cmdRename" Header="Rename..." InputGestureText="F2" Click="Rename_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/menu/rename.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Name="cmdDelete" Header="Delete..." InputGestureText="Del" Click="Delete_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/delete16.png" />
+              </MenuItem.Icon>
+            </MenuItem>
             <Separator />
-            <MenuItem Name="cmdNewFolder" Header="New folder..." InputGestureText="Ctrl+Shift+N" Click="NewFolder_Click" />
-            <MenuItem Name="cmdNewFile" Header="New empty file..." Click="NewFile_Click" />
+            <MenuItem Name="cmdNewFolder" Header="New folder..." InputGestureText="Ctrl+Shift+N" Click="NewFolder_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/menu/newfolder.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Name="cmdNewFile" Header="New empty file..." Click="NewFile_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/menu/newfile.png" />
+              </MenuItem.Icon>
+            </MenuItem>
           </ContextMenu>
         </FrameworkElement.ContextMenu>
         <ListView.View>

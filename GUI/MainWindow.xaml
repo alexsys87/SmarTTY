@@ -128,9 +128,21 @@
             <Image Source="../icons/MainWindow/closetab.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="_Replay log" Visibility="{Binding ReplayVisibility}" Click="ReplayLog_Click" />
-        <MenuItem Header="_Log all terminal output to a file" Visibility="{Binding DebugVisibility}" Click="MakeLog_Click" />
-        <MenuItem Header="E_xit" Click="Exit_Click" />
+        <MenuItem Header="_Replay log" Visibility="{Binding ReplayVisibility}" Click="ReplayLog_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/PlayHS.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="_Log all terminal output to a file" Visibility="{Binding DebugVisibility}" Click="MakeLog_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/document_flat.png" />
+          </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="E_xit" Click="Exit_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/delete16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="_Edit">
         <MenuItem Header="_Copy" Click="Copy_Click">
@@ -148,7 +160,11 @@
             <Image Source="../icons/MainWindow/FindHS.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Copy _All" Click="CopyAll_Click" />
+        <MenuItem Header="Copy _All" Click="CopyAll_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/copy.png" />
+          </MenuItem.Icon>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="_View">
         <MenuItem Header="_SCP Transfers" Click="SCPTransfers_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
@@ -205,7 +221,11 @@
             <Image Source="../icons/MainWindow/pubkey.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Check _X11 forwarding..." Click="CheckX11_Click" ToolTip="Shows whether X11 forwarding works for this connection: the server's answer, xauth and libX11 on the remote host, and VcXsrv on this computer" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}" />
+        <MenuItem Header="Check _X11 forwarding..." Click="CheckX11_Click" ToolTip="Shows whether X11 forwarding works for this connection: the server's answer, xauth and libX11 on the remote host, and VcXsrv on this computer" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/x11.png" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="_TFTP server / U-Boot upload..." Click="TftpFirmware_Click" Visibility="{Binding Path=ActiveSession.DeviceOnlyVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/upload.png" />
@@ -494,17 +514,53 @@
           <ListView Name="TransferList" Grid.Row="1" ItemsSource="{Binding ActiveTransfers}" KeyDown="ListView_KeyDown" SelectionChanged="TransferList_SelectionChanged">
             <FrameworkElement.ContextMenu>
               <ContextMenu Name="xferMenu" Visibility="Collapsed">
-                <MenuItem Name="cmdCancel" Header="_Cancel transfer(s)" Click="SelectedXfers_Cancel" />
-                <MenuItem Name="cmdRetry" Header="_Retry transfer(s)" Click="SelectedXfers_Retry" />
-                <MenuItem Name="cmdRetryAgain" Header="Retry _again (also if completed)" Click="SelectedXfers_RetryAgain" />
-                <MenuItem Header="Retry all _failed" Click="RetryFailed_Click" />
+                <MenuItem Name="cmdCancel" Header="_Cancel transfer(s)" Click="SelectedXfers_Cancel">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/delete16.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="cmdRetry" Header="_Retry transfer(s)" Click="SelectedXfers_Retry">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/MainWindow/refresh16.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="cmdRetryAgain" Header="Retry _again (also if completed)" Click="SelectedXfers_RetryAgain">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/MainWindow/refresh16.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Retry all _failed" Click="RetryFailed_Click">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/transfers/retryall.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
                 <Separator />
-                <MenuItem Header="Open local file" Click="SelectedXfers_OpenLocal" />
-                <MenuItem Header="Open containing folder" Click="SelectedXfers_OpenFolder" />
-                <MenuItem Header="Copy local file path" Click="SelectedXfers_CopyLocalPath" />
-                <MenuItem Header="Copy remote _path" Click="SelectedXfers_CopyRemotePath" />
+                <MenuItem Header="Open local file" Click="SelectedXfers_OpenLocal">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/MainWindow/document_flat.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Open containing folder" Click="SelectedXfers_OpenFolder">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/MainWindow/folder_flat.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Copy local file path" Click="SelectedXfers_CopyLocalPath">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/MainWindow/copy.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Copy remote _path" Click="SelectedXfers_CopyRemotePath">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/MainWindow/copy.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
                 <Separator Name="sepDeleteUploaded" />
-                <MenuItem Name="cmdDeleteUploaded" Header="_Delete uploaded file(s) from the server..." Click="SelectedXfers_DeleteUploaded" />
+                <MenuItem Name="cmdDeleteUploaded" Header="_Delete uploaded file(s) from the server..." Click="SelectedXfers_DeleteUploaded">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/delete16.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
               </ContextMenu>
             </FrameworkElement.ContextMenu>
             <ListView.View>
