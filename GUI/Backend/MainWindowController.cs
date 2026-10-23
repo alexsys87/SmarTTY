@@ -5,7 +5,6 @@ using SmarTTY.Controls;
 using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using SmarTTY.IO;
-using SmarTTY.Properties;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using SmarTTY.Utilities;
@@ -1365,11 +1364,11 @@ public class MainWindowController : INotifyPropertyChanged
         ToolStrip = new ToolStripImpl(this, ((DispatcherObject)wnd).Dispatcher);
         Dispatcher = ((DispatcherObject)wnd).Dispatcher;
         _TerminalContextMenu = new ContextMenuStrip();
-        _TerminalContextMenu.Items.Add("Copy", Resources.CopyHS, (object sender, EventArgs e) =>
+        _TerminalContextMenu.Items.Add("Copy", Icons.Load("copy"), (object sender, EventArgs e) =>
         {
             ActiveSession?.ActiveTab?.EditorControl?.CopySelection();
         });
-        _TerminalContextMenu.Items.Add("Paste", Resources.PasteHS, (object _, EventArgs e) =>
+        _TerminalContextMenu.Items.Add("Paste", Icons.Load("paste"), (object _, EventArgs e) =>
         {
             ActiveSession?.ActiveTab?.EditorControl?.Paste();
         });
@@ -1377,11 +1376,11 @@ public class MainWindowController : INotifyPropertyChanged
         {
             CopyAll();
         });
-        _TerminalContextMenu.Items.Add("New Tab", Resources.add16, (object _, EventArgs e) =>
+        _TerminalContextMenu.Items.Add("New Tab", Icons.Load("add"), (object _, EventArgs e) =>
         {
             ActiveSession?.CreateNewTerminalPage();
         });
-        _TerminalContextMenu.Items.Add("Close Tab", Resources.delete16, (object _, EventArgs e) =>
+        _TerminalContextMenu.Items.Add("Close Tab", Icons.Load("delete"), (object _, EventArgs e) =>
         {
             CloseActivePage();
         });

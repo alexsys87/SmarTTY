@@ -1,5 +1,4 @@
-﻿using CodeEditPP.Properties;
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -220,7 +219,7 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
         if (_activeZone != AutoScrollZone.None)
         {
             bool isFastScrollDown = _activeZone == AutoScrollZone.Down;
-            Image fastScrollImage = (isFastScrollDown ? Resources.fastDown : Resources.fastUp);
+            Image fastScrollImage = Icons.Load(isFastScrollDown ? "scroll-fast-down" : "scroll-fast-up");
             GraphicsPath path = CreateRoundedRectangle(_fastScrollButton, _fastScrollButton.Width / 8);
             e.Graphics.FillPath(new SolidBrush(Color.FromArgb(200, SystemColors.ButtonFace)), path);
             e.Graphics.DrawPath(Pens.Black, path);
@@ -228,8 +227,8 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
             return;
         }
         bool isHotZoneDown = _hotZone == AutoScrollZone.Down;
-        Image scrollDirectionImage = (isHotZoneDown ? Resources.fastDown : Resources.fastUp);
-        Image arrowImage = (isHotZoneDown ? Resources.down : Resources.up);
+        Image scrollDirectionImage = Icons.Load(isHotZoneDown ? "scroll-fast-down" : "scroll-fast-up");
+        Image arrowImage = Icons.Load(isHotZoneDown ? "scroll-down" : "scroll-up");
         if (_hotZone != AutoScrollZone.None)
         {
             int value = ((_hotZone == AutoScrollZone.Up) ? _sliderRect.Top : _sliderRect.Bottom);
