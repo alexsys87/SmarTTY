@@ -322,6 +322,9 @@ internal static class Program
 
     private static string _dir;
 
+    // The copies the servers of these tests make go here, so that they can be counted without other programs getting in.
+    private static string TempFolder => Path.Combine(_dir, "copies");
+
     private static string MakeFile(string name, int length, int seed = 1)
     {
         byte[] data = new byte[length];
@@ -333,7 +336,7 @@ internal static class Program
 
     private static TftpServer StartServer(params string[] files)
     {
-        TftpServer server = new TftpServer(IPAddress.Loopback, 0) { DefaultTimeoutMs = 300, MaxRetries = 4, WindowPacingMicroseconds = 0 };
+        TftpServer server = new TftpServer(IPAddress.Loopback, 0) { DefaultTimeoutMs = 300, MaxRetries = 4, WindowPacingMicroseconds = 0, TempDirectory = TempFolder };
         foreach (string path in files)
         {
             server.AddFile(Path.GetFileName(path), path);
@@ -628,7 +631,7 @@ internal static class Program
         Check("a second server on the same port does not start", failed && !second.IsRunning);
 
         // A bound-to-everything server answers from the address the request was sent to.
-        using TftpServer any = new TftpServer(IPAddress.Any, 0) { DefaultTimeoutMs = 300 };
+        using TftpServer any = new TftpServer(IPAddress.Any, 0) { DefaultTimeoutMs = 300, TempDirectory = TempFolder };
         any.AddFile("c.bin", c);
         any.Start();
         DownloadResult rd = Download(new IPEndPoint(IPAddress.Loopback, any.LocalEndPoint.Port), Request(1, "c.bin", "octet"));
@@ -639,7 +642,7 @@ internal static class Program
 
     private static TftpServer StartServerWith(int timeoutMs, int retries, params string[] files)
     {
-        TftpServer server = new TftpServer(IPAddress.Loopback, 0) { DefaultTimeoutMs = timeoutMs, MaxRetries = retries, WindowPacingMicroseconds = 0 };
+        TftpServer server = new TftpServer(IPAddress.Loopback, 0) { DefaultTimeoutMs = timeoutMs, MaxRetries = retries, WindowPacingMicroseconds = 0, TempDirectory = TempFolder };
         foreach (string path in files)
         {
             server.AddFile(Path.GetFileName(path), path);
@@ -855,8 +858,7 @@ internal static class Program
     {
         // The file is served from a copy: a firmware rebuilt while it is being sent reaches the board as it was when the
         // board asked, and the program that rebuilds it is not kept out of the file.
-        int tempBefore = Directory.GetFiles(Path.GetTempPath(), "smartty-tftp-*.tmp").Length;
-        byte[] original = new byte[20 * 512];
+                byte[] original = new byte[20 * 512];
         new Random(18).NextBytes(original);
         string f = Path.Combine(_dir, "changed.bin");
         File.WriteAllBytes(f, original);
@@ -908,7 +910,8 @@ internal static class Program
             Check("changed file: it is a good transfer", ended.Count == 1 && ended[0].Succeeded, ended.Count == 1 ? ended[0].State + " " + ended[0].Error : "no event");
             Check("changed file: the board gets the content the file had when it asked", received.SequenceEqual(original), received.Count + " bytes");
         }
-        Check("changed file: no copy is left behind", Directory.GetFiles(Path.GetTempPath(), "smartty-tftp-*.tmp").Length <= tempBefore);
+        Check("changed file: no copy is left behind", !Directory.Exists(TempFolder) || Directory.GetFiles(TempFolder).Length == 0);
+        Check("changed file: the copy was made in the folder asked for", Directory.Exists(TempFolder));
 
         // The next request gets the new content.
         using (TftpServer server = StartServer(f))

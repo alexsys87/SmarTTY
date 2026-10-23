@@ -145,6 +145,12 @@ public sealed class TftpServer : IDisposable
     /// </summary>
     public int WindowPacingMicroseconds { get; set; } = 80;
 
+    /// <summary>
+    /// The folder for the temporary copies the files are served from (see <see cref="OpenSnapshot"/>); it is created when
+    /// missing. Null or empty is the temporary folder of the system.
+    /// </summary>
+    public string TempDirectory { get; set; }
+
     public bool IsRunning => _running;
 
     /// <summary>The address and port the server listens on; valid while it is running (the real port when 0 was asked for).</summary>
@@ -711,7 +717,7 @@ public sealed class TftpServer : IDisposable
         try
         {
             // The file is served from a copy made now (see OpenSnapshot).
-            stream = OpenSnapshot(transfer);
+            stream = OpenSnapshot(transfer, TempDirectory);
             transfer.Length = stream.Length;
             NegotiateOptions(options, transfer, out oack, out timeoutMs);
         }
@@ -811,13 +817,15 @@ public sealed class TftpServer : IDisposable
     /// read lock. The price is the copy before the first packet. What is not told is a rewrite of the same size during
     /// the copy itself (a second or so); a change in the size or in the time of the last write is.
     /// </summary>
-    private static FileStream OpenSnapshot(TftpTransfer transfer)
+    private static FileStream OpenSnapshot(TftpTransfer transfer, string tempDirectory)
     {
+        string folder = string.IsNullOrEmpty(tempDirectory) ? Path.GetTempPath() : tempDirectory;
+        Directory.CreateDirectory(folder);
         DateTime writtenBefore = File.GetLastWriteTimeUtc(transfer.FilePath);
         using (FileStream source = new FileStream(transfer.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
         {
             long length = source.Length;
-            FileStream copy = new FileStream(Path.Combine(Path.GetTempPath(), "smartty-tftp-" + Guid.NewGuid().ToString("N") + ".tmp"),
+            FileStream copy = new FileStream(Path.Combine(folder, "smartty-tftp-" + Guid.NewGuid().ToString("N") + ".tmp"),
                 FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 4096, FileOptions.DeleteOnClose);
             try
             {
