@@ -238,7 +238,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public bool TelnetSendAutomaticValues { get; set; } = true;
 
-        private int _TelnetKeepAliveSeconds;
+        private int _TelnetKeepAliveSeconds = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultKeepAliveSeconds;
 
         public int TelnetKeepAliveSeconds
         {

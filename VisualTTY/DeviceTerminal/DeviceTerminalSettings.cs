@@ -138,7 +138,18 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
             public const int DefaultPort = 23;
 
+            /// <summary>
+            /// The keep-alive interval of a new telnet connection. Without it a pulled cable is not noticed until something
+            /// is typed. A raw TCP connection keeps 0 (off) unless the user sets it; 0 still switches it off for telnet.
+            /// </summary>
+            public const int DefaultKeepAliveSeconds = 15;
+
             public const string DefaultTerminalType = "xterm";
+
+            public Telnet()
+            {
+                KeepAliveSeconds = DefaultKeepAliveSeconds;
+            }
 
             /// <summary>The port of telnet over TLS (telnets).</summary>
             public const int DefaultTlsPort = 992;
