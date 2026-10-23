@@ -1064,7 +1064,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void ApplyConnectionState(ConnectionStateEnum connectionStateEnum, string value)
     {
-        if (connectionStateEnum == ConnectionStateEnum.Connecting || connectionStateEnum == ConnectionStateEnum.Failed)
+        // A connection that broke (a pulled cable, a reset) offers the same "try again" panel as a failed attempt; one that was
+        // closed on purpose, by the user or by the server, keeps the last output visible with the toolbar's reconnect button.
+        bool broke = connectionStateEnum == ConnectionStateEnum.Disconnected && !_manualDisconnect && !string.IsNullOrEmpty(value);
+        if (connectionStateEnum == ConnectionStateEnum.Connecting || connectionStateEnum == ConnectionStateEnum.Failed || broke)
         {
             pnlConnectionInProgress.Visible = true;
             toolStrip1.Visible = false;
