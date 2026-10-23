@@ -172,6 +172,47 @@ internal static class SettingsChecks
         check(Parse("host:65535").Port == 65535 && Parse("host:1").Port == 1, "quick telnet: the port range limits are accepted");
         check(Parse("h").IsValid(), "quick telnet: a parsed endpoint is valid");
 
+        // a login in front of the host: user:password@host:port
+        DeviceTerminalSettings.ConnectionSettings.Telnet ParseLogin(string text) => DeviceTerminalSettings.ConnectionSettings.Telnet.ParseWithLogin(text);
+        bool RejectsLogin(string text)
+        {
+            try
+            {
+                ParseLogin(text);
+                return false;
+            }
+            catch (FormatException)
+            {
+                return true;
+            }
+        }
+        DeviceTerminalSettings.ConnectionSettings.Telnet pmac = ParseLogin("root:deltatau@192.168.10.202:23");
+        check(pmac.Host == "192.168.10.202" && pmac.Port == 23 && pmac.AutoLoginUserName == "root" && pmac.AutoLoginPassword == "deltatau" && pmac.HasAutoLogin,
+            "quick telnet login: user:password@host:port");
+        check(ParseLogin("root:pw@host").Port == 23 && ParseLogin("root:pw@host").Host == "host", "quick telnet login: without a port it is 23");
+        check(ParseLogin("root@host:2323").AutoLoginUserName == "root" && ParseLogin("root@host:2323").AutoLoginPassword == null && ParseLogin("root@host:2323").Port == 2323,
+            "quick telnet login: a user name alone");
+        check(ParseLogin("a:b@c:d@host").AutoLoginUserName == "a" && ParseLogin("a:b@c:d@host").AutoLoginPassword == "b@c:d" && ParseLogin("a:b@c:d@host").Host == "host",
+            "quick telnet login: the last @ ends the login, the password may hold @ and :");
+        check(ParseLogin(":secret@host").AutoLoginUserName == null && ParseLogin(":secret@host").AutoLoginPassword == "secret",
+            "quick telnet login: an empty user name, for a device that asks only for a password");
+        check(ParseLogin("telnet://u:p@host:2000/").Host == "host" && ParseLogin("telnet://u:p@host:2000/").Port == 2000 && ParseLogin("telnet://u:p@host:2000/").AutoLoginUserName == "u",
+            "quick telnet login: telnet:// in front");
+        check(ParseLogin("telnets://u:p@dev.local").Tls && ParseLogin("telnets://u:p@dev.local").Port == 992 && ParseLogin("telnets://u:p@dev.local").AutoLoginPassword == "p",
+            "quick telnet login: telnets:// in front");
+        check(ParseLogin("u:p@[::1]:2323").Host == "::1" && ParseLogin("u:p@[::1]:2323").Port == 2323 && ParseLogin("u:p@[::1]:2323").AutoLoginPassword == "p",
+            "quick telnet login: [ipv6]:port after the login");
+        check(ParseLogin("router").Host == "router" && ParseLogin("router").AutoLoginUserName == null && ParseLogin("router").AutoLoginPassword == null && !ParseLogin("router").HasAutoLogin,
+            "quick telnet login: the old forms without a login work as before");
+        check(ParseLogin("10.1.2.3:2000").Port == 2000 && ParseLogin("fe80::1:2").Host == "fe80::1:2" && ParseLogin("[::1]").Host == "::1" && ParseLogin("telnets://dev.local").Tls,
+            "quick telnet login: host:port, bare ipv6, [ipv6] and telnets:// still parse");
+        check(RejectsLogin("@host") && RejectsLogin("u:p@") && RejectsLogin("u:p@host:abc") && RejectsLogin("u:p@:23") && RejectsLogin(""),
+            "quick telnet login: a missing login or host and a wrong port are rejected");
+        RawConnectionSettings pmacLoaded = RoundTrip(new RawConnectionSettings { Settings = new DeviceTerminalSettings { Connection = pmac } }, out string pmacXml);
+        check(!pmacXml.Contains("deltatau") && ((DeviceTerminalSettings.ConnectionSettings.Telnet)pmacLoaded.Settings.Connection).AutoLoginPassword == null
+            && ((DeviceTerminalSettings.ConnectionSettings.Telnet)pmacLoaded.Settings.Connection).AutoLoginUserName == "root",
+            "quick telnet login: the typed password is never written to a settings file, the user name is");
+
         // telnet over TLS and the data handed to the server
         check(Parse("telnets://dev.local").Tls && Parse("telnets://dev.local").Port == 992 && Parse("telnets://dev.local").Host == "dev.local", "quick telnet: telnets:// means TLS on port 992");
         check(Parse("TELNETS://dev.local:2992/").Port == 2992 && Parse("TELNETS://dev.local:2992/").Tls, "quick telnet: telnets:// with a port, in any case");

@@ -317,6 +317,13 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
             /// </summary>
             public byte[] EncryptedSavedPassword;
 
+            /// <summary>
+            /// A password typed in a quick connection ("user:password@host"). It lives only in memory: it is never written to
+            /// a settings file (the saved connections keep <see cref="EncryptedSavedPassword"/> instead).
+            /// </summary>
+            [XmlIgnore]
+            public string AutoLoginPassword { get; set; }
+
             /// <summary>Texts a login prompt ends with, separated by ';'. Empty: login:, username:, user name:, user:.</summary>
             public string LoginPrompts { get; set; }
 
@@ -325,7 +332,7 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
             /// <summary>True when there is something to type at a prompt.</summary>
             [XmlIgnore]
-            public bool HasAutoLogin => !string.IsNullOrEmpty(AutoLoginUserName) || EncryptedSavedPassword != null;
+            public bool HasAutoLogin => !string.IsNullOrEmpty(AutoLoginUserName) || EncryptedSavedPassword != null || !string.IsNullOrEmpty(AutoLoginPassword);
 
             /// <summary>
             /// Saved telnet and raw TCP connections to the same host and port are different connections,
@@ -394,6 +401,44 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
                     Tls = tls,
                     TerminalSpeed = DefaultTerminalSpeed
                 };
+            }
+
+            /// <summary>
+            /// Reads what a user types for a quick telnet connection: everything <see cref="Parse"/> takes, optionally with
+            /// the login in front of the host, "user@host", "user:password@host:port" or "telnets://user:password@host".
+            /// The last '@' ends the login, so a password may contain '@' and ':'; the user name ends at the first ':'.
+            /// The login is typed when the server asks for it (see TelnetAutoLogin) and is not saved anywhere.
+            /// </summary>
+            public static Telnet ParseWithLogin(string text)
+            {
+                text = (text ?? "").Trim();
+                string scheme = "";
+                foreach (string candidate in new[] { "telnets://", "telnet://" })
+                {
+                    if (text.StartsWith(candidate, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        scheme = text.Substring(0, candidate.Length);
+                        text = text.Substring(candidate.Length);
+                        break;
+                    }
+                }
+                int at = text.LastIndexOf('@');
+                if (at == -1)
+                {
+                    return Parse(scheme + text);
+                }
+                string login = text.Substring(0, at);
+                if (login.Length == 0)
+                {
+                    throw new System.FormatException("Expected: user[:password]@hostname[:port]");
+                }
+                Telnet telnet = Parse(scheme + text.Substring(at + 1));
+                int colon = login.IndexOf(':');
+                string userName = colon == -1 ? login : login.Substring(0, colon);
+                string password = colon == -1 ? null : login.Substring(colon + 1);
+                telnet.AutoLoginUserName = userName.Length > 0 ? userName : null;
+                telnet.AutoLoginPassword = string.IsNullOrEmpty(password) ? null : password;
+                return telnet;
             }
 
             private static int ParsePort(string text)

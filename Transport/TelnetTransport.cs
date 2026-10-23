@@ -324,8 +324,9 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
         {
             return null;
         }
-        string password = null;
-        if (_telnet.EncryptedSavedPassword != null)
+        // A password typed in a quick connection is kept in memory only; a saved one is stored encrypted.
+        string password = _telnet.AutoLoginPassword;
+        if (password == null && _telnet.EncryptedSavedPassword != null)
         {
             try
             {
