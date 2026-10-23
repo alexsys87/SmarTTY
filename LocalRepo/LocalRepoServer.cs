@@ -29,6 +29,16 @@ public sealed class LocalRepoServer : IDisposable
     /// <summary>Raised (on a worker thread) for every request, e.g. "GET /r0/base/Packages.gz - 200, 1234 bytes".</summary>
     public event Action<string> RequestLogged;
 
+    /// <summary>
+    /// Signs a generated index: gets the URL path of its Packages file ("/r0/base/Packages") and returns the content of the
+    /// matching Packages.sig, or null when it cannot be signed. Without it a generated index has no signature (404).
+    /// </summary>
+    public Func<string, byte[]> IndexSigner { get; set; }
+
+    private readonly object _SignLock = new object();
+
+    private readonly Dictionary<string, KeyValuePair<IpkIndexBuilder.Index, byte[]>> _Signatures = new Dictionary<string, KeyValuePair<IpkIndexBuilder.Index, byte[]>>(StringComparer.Ordinal);
+
     /// <summary>The TCP port; after Start it is the port that is really in use (it differs from the requested one only for port 0).</summary>
     public int Port { get; private set; }
 
@@ -237,9 +247,17 @@ public sealed class LocalRepoServer : IDisposable
         {
             if (isSignature)
             {
-                // The signature of an older index does not match the generated one.
+                // The signature of an older index does not match the generated one; only a signature made for it will do.
+                byte[] signature = SignGeneratedIndex(directory, path);
+                if (signature != null)
+                {
+                    status = 200;
+                    length = signature.Length;
+                    SendBytes(stream, 200, "OK", "application/octet-stream", signature, head);
+                    return "signed with the temporary key of this session";
+                }
                 SendText(stream, 404, "Not Found", "Not found", head);
-                return "the index is generated, so there is no signature";
+                return IndexSigner == null ? "the index is generated, so there is no signature" : "the index is generated and could not be signed";
             }
             IpkIndexBuilder.Index index = IpkIndexBuilder.GetIndex(directory);
             byte[] body = fileName == "Packages" ? index.Packages : index.PackagesGz;
@@ -280,6 +298,51 @@ public sealed class LocalRepoServer : IDisposable
             }
         }
         return fileNote;
+    }
+
+    /// <summary>
+    /// The signature of the generated index of <paramref name="directory"/>, made by <see cref="IndexSigner"/> once for each
+    /// version of the index; null without a signer or when signing failed. <paramref name="signaturePath"/> is the URL path of
+    /// the Packages.sig that was asked for.
+    /// </summary>
+    private byte[] SignGeneratedIndex(string directory, string signaturePath)
+    {
+        Func<string, byte[]> signer = IndexSigner;
+        if (signer == null)
+        {
+            return null;
+        }
+        try
+        {
+            lock (_SignLock)
+            {
+                IpkIndexBuilder.Index index = IpkIndexBuilder.GetIndex(directory);
+                if (_Signatures.TryGetValue(directory, out KeyValuePair<IpkIndexBuilder.Index, byte[]> known) && ReferenceEquals(known.Key, index))
+                {
+                    return known.Value;
+                }
+                byte[] signature = signer(signaturePath.Substring(0, signaturePath.Length - "Packages.sig".Length) + "Packages");
+                if (signature != null)
+                {
+                    _Signatures[directory] = new KeyValuePair<IpkIndexBuilder.Index, byte[]>(index, signature);
+                }
+                return signature;
+            }
+        }
+        catch (Exception exception) when (!(exception is OutOfMemoryException))
+        {
+            Log("signing the index failed: " + exception.Message);
+            return null;
+        }
+    }
+
+    /// <summary>Forgets the signatures made so far (the key was replaced).</summary>
+    public void ForgetSignatures()
+    {
+        lock (_SignLock)
+        {
+            _Signatures.Clear();
+        }
     }
 
     /// <summary>Maps "/r0/base/foo.ipk" to a file of the first root folder; returns null for anything that is not inside a root folder.</summary>

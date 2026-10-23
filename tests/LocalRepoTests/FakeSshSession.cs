@@ -41,6 +41,14 @@ namespace SmarTTY.Ssh
         /// <summary>Runs the check whether the device reaches the server: here the "device" is this computer, the tunnel the identity.</summary>
         public bool RunFetchCheck;
 
+        /// <summary>When set, the keys of the temporary signing key and its work directory on the "device" are these folders.</summary>
+        public string OpkgKeysDir;
+
+        public string SignWorkDir;
+
+        /// <summary>A folder with a stand-in "usign" that is put first in the PATH of the signing commands.</summary>
+        public string UsignPathDir;
+
         public Func<string, string> RunShell;
 
         public List<string> RunCommandChecked(string command, bool requireSuccess, string terminalType = null)
@@ -64,6 +72,10 @@ namespace SmarTTY.Ssh
             if (command.Contains("SMARTTY_SIGCHECK") && OpkgConfFile != null)
             {
                 return RunMapped(command);
+            }
+            if (command.Contains("smartty-local-sign"))
+            {
+                return SignWorkDir == null ? new List<string>() : RunMapped(command);
             }
             if (command.Contains("SMARTTY_FETCH"))
             {
@@ -102,6 +114,18 @@ namespace SmarTTY.Ssh
             if (OpkgConfFile != null)
             {
                 mapped = mapped.Replace("/etc/opkg.conf", OpkgConfFile);
+            }
+            if (OpkgKeysDir != null)
+            {
+                mapped = mapped.Replace("/etc/opkg/keys", OpkgKeysDir);
+            }
+            if (SignWorkDir != null)
+            {
+                mapped = mapped.Replace("/tmp/smartty-local-sign", SignWorkDir);
+            }
+            if (UsignPathDir != null)
+            {
+                mapped = "PATH=" + UsignPathDir + ":$PATH; export PATH; " + mapped;
             }
             string output = RunShell(mapped);
             return output == null ? null : new List<string>(output.Split('\n', StringSplitOptions.RemoveEmptyEntries));

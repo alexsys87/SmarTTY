@@ -93,7 +93,10 @@ public static class IpkIndexBuilder
 
     /// <summary>
     /// True when the index of the directory has to be generated: there are packages but no "Packages" or "Packages.gz",
-    /// or some package is newer than the index. A fresh index written by the OpenWrt build is served as is.
+    /// or some package is newer than the index and the index does not list the packages as they are (a package was added,
+    /// removed or has another size). A fresh index written by the OpenWrt build is served as is, and so is an older one that
+    /// still describes exactly the files of the directory (a file that was only copied or touched later): the index of the
+    /// build is signed, a generated one is not, and opkg with the signature check on drops a feed without a valid signature.
     /// </summary>
     public static bool NeedsGeneratedIndex(string directory)
     {
@@ -124,7 +127,82 @@ public static class IpkIndexBuilder
                 }
             }
         }
-        return indexTime == null || newestPackage > indexTime.Value;
+        if (indexTime == null)
+        {
+            return true;
+        }
+        return newestPackage > indexTime.Value && !IndexDescribesFiles(directory, files);
+    }
+
+    /// <summary>
+    /// True when the index of the build in the directory ("Packages", or "Packages.gz" without it) lists exactly the given
+    /// .ipk files, each with the size it has: the index is still right although the files are newer than it.
+    /// </summary>
+    internal static bool IndexDescribesFiles(string directory, string[] files)
+    {
+        string text;
+        try
+        {
+            string plain = Path.Combine(directory, "Packages");
+            if (File.Exists(plain))
+            {
+                text = File.ReadAllText(plain, Encoding.UTF8);
+            }
+            else
+            {
+                using (FileStream stream = File.OpenRead(Path.Combine(directory, "Packages.gz")))
+                using (GZipStream gzip = new GZipStream(stream, CompressionMode.Decompress))
+                using (StreamReader reader = new StreamReader(gzip, Encoding.UTF8))
+                {
+                    text = reader.ReadToEnd();
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException)
+        {
+            return false;
+        }
+        Dictionary<string, long> listed = new Dictionary<string, long>(StringComparer.Ordinal);
+        string fileName = null;
+        long? size = null;
+        foreach (string rawLine in (text + "\n").Split('\n'))
+        {
+            string line = rawLine.TrimEnd('\r');
+            if (line.Length == 0)
+            {
+                if (fileName != null && size.HasValue)
+                {
+                    listed[fileName] = size.Value;
+                }
+                else if (fileName != null || size.HasValue)
+                {
+                    // A stanza without both fields is not one of a build's index.
+                    return false;
+                }
+                fileName = null;
+                size = null;
+            }
+            else if (line.StartsWith("Filename:", StringComparison.Ordinal))
+            {
+                fileName = Path.GetFileName(line.Substring("Filename:".Length).Trim());
+            }
+            else if (line.StartsWith("Size:", StringComparison.Ordinal) && long.TryParse(line.Substring("Size:".Length).Trim(), out long parsed))
+            {
+                size = parsed;
+            }
+        }
+        if (listed.Count != files.Length)
+        {
+            return false;
+        }
+        foreach (string file in files)
+        {
+            if (!listed.TryGetValue(Path.GetFileName(file), out long listedSize) || listedSize != new FileInfo(file).Length)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>Returns the generated index of the directory; it is rebuilt only when the set of .ipk files changed.</summary>

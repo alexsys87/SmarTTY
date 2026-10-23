@@ -235,10 +235,62 @@ internal static class Program
         Check(!IpkIndexBuilder.NeedsGeneratedIndex(dir), "a fresh index of the build is kept");
         File.SetLastWriteTimeUtc(ipk, File.GetLastWriteTimeUtc(Path.Combine(dir, "Packages")).AddMinutes(5));
         Check(IpkIndexBuilder.NeedsGeneratedIndex(dir), "a package newer than the index makes it stale");
+
+        // An index of the build that is older than the files only because they were copied or touched later still describes
+        // them: it is served (with the signature of the build) instead of a generated, unsigned one.
+        string touched = Path.Combine(_work, "touched");
+        string first = MakeIpk(touched, "alpha", "1.0", "First");
+        string second = MakeIpk(touched, "beta", "2.0", "Second");
+        string Entry(string file) => "Package: " + Path.GetFileNameWithoutExtension(file).Split('_')[0] + "\nFilename: " + Path.GetFileName(file) + "\nSize: " + new FileInfo(file).Length + "\nSHA256sum: 00\n\n";
+        string touchedIndex = Path.Combine(touched, "Packages");
+        File.WriteAllText(touchedIndex, Entry(first) + Entry(second));
+        File.SetLastWriteTimeUtc(touchedIndex, DateTime.UtcNow.AddHours(-2));
+        Check(!IpkIndexBuilder.NeedsGeneratedIndex(touched), "files newer than the index that it still lists with the same sizes: the index of the build is kept");
+        File.WriteAllText(touchedIndex, Entry(first) + Entry(second).Replace("Size: " + new FileInfo(second).Length, "Size: 1"));
+        File.SetLastWriteTimeUtc(touchedIndex, DateTime.UtcNow.AddHours(-2));
+        Check(IpkIndexBuilder.NeedsGeneratedIndex(touched), "a package of another size than the index says: generated");
+        File.WriteAllText(touchedIndex, Entry(first));
+        File.SetLastWriteTimeUtc(touchedIndex, DateTime.UtcNow.AddHours(-2));
+        Check(IpkIndexBuilder.NeedsGeneratedIndex(touched), "a package that the index does not list: generated");
+        File.WriteAllText(touchedIndex, Entry(first) + Entry(second) + "Package: gone\nFilename: gone_1.0_all.ipk\nSize: 5\n\n");
+        File.SetLastWriteTimeUtc(touchedIndex, DateTime.UtcNow.AddHours(-2));
+        Check(IpkIndexBuilder.NeedsGeneratedIndex(touched), "a package in the index that is no longer there: generated");
+        File.Delete(touchedIndex);
+        using (FileStream gz = File.Create(touchedIndex + ".gz"))
+        using (GZipStream zip = new GZipStream(gz, CompressionMode.Compress))
+        {
+            byte[] text = new UTF8Encoding(false).GetBytes(Entry(first) + Entry(second));
+            zip.Write(text, 0, text.Length);
+        }
+        File.SetLastWriteTimeUtc(touchedIndex + ".gz", DateTime.UtcNow.AddHours(-2));
+        Check(!IpkIndexBuilder.NeedsGeneratedIndex(touched), "the same holds when only Packages.gz is there");
+
         string onlyIndex = Path.Combine(_work, "onlyindex");
         Directory.CreateDirectory(onlyIndex);
         File.WriteAllText(Path.Combine(onlyIndex, "Packages"), "x");
         Check(!IpkIndexBuilder.NeedsGeneratedIndex(onlyIndex), "an index without .ipk files is never regenerated");
+    }
+
+    private static string Sha256Hex(byte[] data)
+    {
+        using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+        {
+            return string.Concat(sha.ComputeHash(data).Select(b => b.ToString("x2")));
+        }
+    }
+
+    /// <summary>The scripts and parsers of the temporary signing key (see OpkgSigning).</summary>
+    private static void SigningScriptTests()
+    {
+        Check(OpkgSigning.ParseSetup(new[] { "noise", "SMARTTY_SIGN=0123456789abcdef" }) == "0123456789abcdef", "setup: the fingerprint is read");
+        Check(OpkgSigning.ParseSetup(new[] { "SMARTTY_SIGN=nousign" }) == OpkgSigning.NoUsign, "setup: a device without usign is told apart");
+        Check(OpkgSigning.ParseSetup(new[] { "SMARTTY_SIGN=../../etc" }) == null && OpkgSigning.ParseSetup(new string[0]) == null && OpkgSigning.ParseSetup(null) == null, "setup: anything that is not a hex fingerprint is refused (it becomes a file name)");
+        byte[] signature = OpkgSigning.ParseSignature(new[] { "untrusted comment: signed by key 0123", "RWQ8mSig==", "" });
+        Check(signature != null && Encoding.UTF8.GetString(signature) == "untrusted comment: signed by key 0123\nRWQ8mSig==\n", "signature: the two lines of the signature file are taken");
+        Check(OpkgSigning.ParseSignature(new[] { "wget: server returned error" }) == null && OpkgSigning.ParseSignature(new[] { "untrusted comment: x" }) == null && OpkgSigning.ParseSignature(null) == null, "signature: an error message is no signature");
+        string sign = OpkgSigning.BuildSignScript("http://127.0.0.1:8765/r0/base/Packages");
+        Check(sign.Contains("uclient-fetch") && sign.Contains("'http://127.0.0.1:8765/r0/base/Packages'") && sign.Contains("usign -S"), "sign script: the device fetches the index itself and signs it");
+        Check(OpkgSigning.BuildSetupScript().Contains("usign -G") && OpkgSigning.BuildSetupScript().Contains("umask 077"), "setup script: the key pair is made by usign, owner-only");
     }
 
     private static void ScannerTests()
@@ -530,6 +582,197 @@ internal static class Program
             Exec(OpkgFeedConfig.BuildDisableScript(conf, missing), out int exit7);
             Check(exit6 == 0 && exit7 == 0 && !File.Exists(missing), name + ": no opkg.conf: enable and disable succeed without creating it");
         }
+    }
+
+    /// <summary>A stand-in for the usign of the device: -G makes the pair, -F prints a fingerprint, -S writes a signature that holds the SHA-256 of the message.</summary>
+    private static string MakeFakeUsign(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        string path = Path.Combine(directory, "usign");
+        File.WriteAllText(path,
+            "#!/bin/sh\n" +
+            "mode=; while getopts 'FGSVc:m:P:p:qs:x:' o; do case $o in F|G|S|V) mode=$o;; c) comment=$OPTARG;; m) msg=$OPTARG;; p) pub=$OPTARG;; s) sec=$OPTARG;; x) sigf=$OPTARG;; esac; done\n" +
+            "case $mode in\n" +
+            "G) printf 'untrusted comment: %s\\nRWTESTKEY\\n' \"$comment\" > \"$pub\"; echo secret > \"$sec\";;\n" +
+            "F) sha256sum \"$pub\" | cut -c1-16;;\n" +
+            "S) h=$(sha256sum \"$msg\" | cut -d' ' -f1); printf 'untrusted comment: signed by key test\\nRWS%s\\n' \"$h\" > \"$sigf\";;\n" +
+            "*) exit 1;;\n" +
+            "esac\n");
+        Run("chmod", "+x " + path, null, out _, out _);
+        return directory;
+    }
+
+    /// <summary>The setup, sign and remove scripts of the temporary key under sh and BusyBox ash (the shell of OpenWrt), with stand-ins for usign and uclient-fetch.</summary>
+    private static void SigningShellTests()
+    {
+        foreach ((string name, string shell, string[] args) in Shells())
+        {
+            string dir = Path.Combine(_work, "signshell-" + name.Replace(' ', '-'));
+            string keys = Path.Combine(dir, "keys");
+            string work = Path.Combine(dir, "work");
+            string bin = MakeFakeUsign(Path.Combine(dir, "bin"));
+            // The device fetches with uclient-fetch -q -T 30 -O <file> <url>: here the "index" is made of the URL.
+            File.WriteAllText(Path.Combine(bin, "uclient-fetch"), "#!/bin/sh\nprintf 'index of %s' \"$6\" > \"$5\"\n");
+            Run("chmod", "+x " + Path.Combine(bin, "uclient-fetch"), null, out _, out _);
+            Directory.CreateDirectory(keys);
+            File.WriteAllText(Path.Combine(keys, "stale"), "untrusted comment: " + OpkgSigning.KeyComment + "\nRWOLD\n");
+            File.WriteAllText(Path.Combine(keys, "vendor"), "untrusted comment: vendor\nRWV\n");
+            string Exec(string script, out int exit)
+            {
+                string mapped = "PATH=" + bin + ":$PATH; export PATH; " + script.Replace("/etc/opkg/keys", keys).Replace("/tmp/smartty-local-sign", work);
+                exit = RunArgs(shell, args.Concat(new[] { mapped }).ToArray(), out string output, out string error);
+                return output + error;
+            }
+
+            string setup = Exec(OpkgSigning.BuildSetupScript(), out int setupExit);
+            string fingerprint = OpkgSigning.ParseSetup(setup.Split('\n'));
+            Check(setupExit == 0 && fingerprint != null && fingerprint != OpkgSigning.NoUsign && File.Exists(Path.Combine(keys, fingerprint)) && File.Exists(Path.Combine(work, "key.sec")), name + ": the setup makes and trusts the key (" + setup.Trim() + ")");
+            Check(!File.Exists(Path.Combine(keys, "stale")) && File.Exists(Path.Combine(keys, "vendor")), name + ": the setup removes the key of an earlier run and keeps the other one");
+            string signed = Exec(OpkgSigning.BuildSignScript("http://127.0.0.1:1/r0/base/Packages"), out int signExit);
+            byte[] signature = OpkgSigning.ParseSignature(signed.Split('\n'));
+            Check(signExit == 0 && signature != null && Encoding.UTF8.GetString(signature) == "untrusted comment: signed by key test\nRWS" + Sha256Hex(Encoding.UTF8.GetBytes("index of http://127.0.0.1:1/r0/base/Packages")) + "\n", name + ": the sign script has the device fetch and sign the index (" + signed.Trim() + ")");
+            Exec(OpkgSigning.BuildRemoveScript(), out int removeExit);
+            Check(removeExit == 0 && !File.Exists(Path.Combine(keys, fingerprint)) && File.Exists(Path.Combine(keys, "vendor")) && !Directory.Exists(work), name + ": the remove script takes the key and the work directory away, nothing else");
+            Exec(OpkgSigning.BuildRemoveScript(), out int again);
+            Check(again == 0, name + ": removing when there is nothing to remove succeeds");
+            string noTool = Exec(OpkgSigning.BuildSetupScript().Replace("command -v usign", "command -v no-such-usign"), out _);
+            Check(OpkgSigning.ParseSetup(noTool.Split('\n')) == OpkgSigning.NoUsign, name + ": without usign the setup says so");
+        }
+    }
+
+    /// <summary>The server signs a generated index through its signer, once for each version of the index.</summary>
+    private static async Task SignedIndexServerTests()
+    {
+        string root = Path.Combine(_work, "signed", "bin", "packages", "arm");
+        string feed = Path.Combine(root, "base");
+        MakeIpk(feed, "one", "1.0", "First");
+        List<string> asked = new List<string>();
+        using (LocalRepoServer server = new LocalRepoServer(new[] { root }, 0))
+        using (HttpClient client = new HttpClient())
+        {
+            server.Feeds = LocalRepoFeedScanner.Scan(new[] { root });
+            server.Start();
+            string baseUrl = "http://127.0.0.1:" + server.Port;
+            Check((await GetAsync(client, baseUrl + "/r0/base/Packages.sig")).status == 404, "without a signer a generated index has no signature");
+            server.IndexSigner = (string path) =>
+            {
+                asked.Add(path);
+                return Encoding.UTF8.GetBytes("untrusted comment: test\nRWSIG" + asked.Count + "\n");
+            };
+            (int status, byte[] body) sig = await GetAsync(client, baseUrl + "/r0/base/Packages.sig");
+            Check(sig.status == 200 && Encoding.UTF8.GetString(sig.body) == "untrusted comment: test\nRWSIG1\n", "with a signer the generated index gets its signature");
+            Check(asked.Count == 1 && asked[0] == "/r0/base/Packages", "the signer is asked for the Packages file of the feed");
+            Check(Encoding.UTF8.GetString((await GetAsync(client, baseUrl + "/r0/base/Packages.sig")).body).Contains("RWSIG1") && asked.Count == 1, "the same index is signed once");
+            MakeIpk(feed, "two", "1.0", "Second");
+            Check(Encoding.UTF8.GetString((await GetAsync(client, baseUrl + "/r0/base/Packages.sig")).body).Contains("RWSIG2") && asked.Count == 2, "a changed index is signed again");
+            server.ForgetSignatures();
+            await GetAsync(client, baseUrl + "/r0/base/Packages.sig");
+            Check(asked.Count == 3, "after the key was replaced the index is signed again");
+            server.IndexSigner = (string path) => null;
+            server.ForgetSignatures();
+            Check((await GetAsync(client, baseUrl + "/r0/base/Packages.sig")).status == 404, "a signer that cannot sign leaves the 404");
+            server.IndexSigner = (string path) => throw new InvalidOperationException("device gone");
+            Check((await GetAsync(client, baseUrl + "/r0/base/Packages.sig")).status == 404, "a signer that throws leaves the 404");
+            // A fresh index of the build keeps its own signature; the signer is not used for it.
+            string built = Path.Combine(_work, "signed", "bin", "packages", "arm", "luci");
+            string builtIpk = MakeIpk(built, "ui", "1.0", "Built");
+            File.WriteAllText(Path.Combine(built, "Packages"), "Package: ui\n\n");
+            File.WriteAllText(Path.Combine(built, "Packages.sig"), "build signature");
+            File.SetLastWriteTimeUtc(Path.Combine(built, "Packages"), File.GetLastWriteTimeUtc(builtIpk).AddMinutes(5));
+            asked.Clear();
+            server.IndexSigner = (string path) => { asked.Add(path); return new byte[] { 1 }; };
+            (int status, byte[] body) own = await GetAsync(client, baseUrl + "/r0/luci/Packages.sig");
+            Check(own.status == 200 && Encoding.UTF8.GetString(own.body) == "build signature" && asked.Count == 0, "the signature of the build is served as it is, not replaced");
+        }
+    }
+
+    /// <summary>The host with a device that has usign: the temporary key is made and trusted, the generated index is signed by the device, Stop takes the key away.</summary>
+    private static async Task SigningHostTests()
+    {
+        if (!Has("wget") && !Has("curl"))
+        {
+            Skip("signing through the device", "neither wget nor curl is installed");
+            return;
+        }
+        string root = Path.Combine(_work, "signhost", "bin", "packages", "arm");
+        string feed = Path.Combine(root, "base");
+        MakeIpk(feed, "generated", "1.0", "Generated here");
+        string dir = Path.Combine(_work, "signhost", "device");
+        string keys = Path.Combine(dir, "keys");
+        string work = Path.Combine(dir, "sign");
+        Directory.CreateDirectory(keys);
+        File.WriteAllText(Path.Combine(keys, "0000000000000001"), "untrusted comment: the vendor key\nRWVENDOR\n");
+        File.WriteAllText(Path.Combine(keys, "stale"), "untrusted comment: " + OpkgSigning.KeyComment + "\nRWOLD\n");
+        string opkgConf = Path.Combine(dir, "opkg.conf");
+        File.WriteAllText(opkgConf, "dest root /\noption check_signature\n");
+        SshSession NewDevice()
+        {
+            SshSession s = NewFakeSession(Path.Combine(dir, "customfeeds.conf"));
+            s.OpkgConfFile = opkgConf;
+            s.OpkgKeysDir = keys;
+            s.SignWorkDir = work;
+            s.UsignPathDir = MakeFakeUsign(Path.Combine(dir, "bin"));
+            s.RunFetchCheck = true;
+            return s;
+        }
+
+        LocalRepoHost host = new LocalRepoHost();
+        SshSession session = NewDevice();
+        host.Start(session, new[] { root }, 0, LocalRepoPackageManager.Opkg, signGenerated: true);
+        string[] trusted = Directory.GetFiles(keys).Select(Path.GetFileName).OrderBy(n => n).ToArray();
+        Check(trusted.Length == 2 && trusted.Contains("0000000000000001") && !trusted.Contains("stale"), "the temporary key is trusted, a key of an earlier run is gone, the vendor key stays");
+        string ourKey = trusted.First(n => n != "0000000000000001");
+        Check(File.ReadAllText(Path.Combine(keys, ourKey)).Contains(OpkgSigning.KeyComment) && ourKey.Length == 16, "the key file is named by the fingerprint and carries the comment of SmarTTY");
+        Check(File.Exists(Path.Combine(work, "key.sec")), "the secret half stays in the work directory of the device");
+        Check(host.GetHistory().Any(l => l.Contains("is generated here and has no signature of the build") && l.Contains("temporary key (" + ourKey + ")")) && !host.GetHistory().Any(l => l.Contains("Warning: opkg checks signatures")), "the log says the index is signed with the temporary key, and gives no warning about unsigned feeds");
+        using (HttpClient client = new HttpClient())
+        {
+            string baseUrl = "http://127.0.0.1:" + host.Port;
+            (int status, byte[] body) index = await GetAsync(client, baseUrl + "/r0/base/Packages");
+            (int status, byte[] body) sig = await GetAsync(client, baseUrl + "/r0/base/Packages.sig");
+            Check(sig.status == 200 && Encoding.UTF8.GetString(sig.body) == "untrusted comment: signed by key test\nRWS" + Sha256Hex(index.body) + "\n", "Packages.sig is what the device signed: its own copy of exactly the served Packages");
+        }
+        host.Stop(session);
+        Check(Directory.GetFiles(keys).Select(Path.GetFileName).SequenceEqual(new[] { "0000000000000001" }) && !Directory.Exists(work), "Stop removes the temporary key and the work directory and leaves the other keys");
+
+        // The check is off for opkg, or unsigned feeds are allowed: no key is made.
+        host.Start(session, new[] { root }, 0, LocalRepoPackageManager.Opkg, allowUnsigned: true, signGenerated: true);
+        Check(Directory.GetFiles(keys).Length == 1 && !Directory.Exists(work), "with unsigned feeds allowed no key is made");
+        host.Stop(session);
+
+        // No usign on the device: the old warning, and the index stays unsigned.
+        SshSession bare = NewDevice();
+        bare.UsignPathDir = Path.Combine(dir, "empty");
+        Directory.CreateDirectory(bare.UsignPathDir);
+        bare.RunShell = (string script) =>
+        {
+            int exit = RunArgs("sh", new[] { "-c", script.Replace("command -v usign", "command -v no-such-usign") }, out string output, out string error);
+            return exit == 0 ? output : null;
+        };
+        LocalRepoHost without = new LocalRepoHost();
+        without.Start(bare, new[] { root }, 0, LocalRepoPackageManager.Opkg, signGenerated: true);
+        Check(without.GetHistory().Any(l => l.Contains("no usign")) && without.GetHistory().Any(l => l.Contains("Warning: opkg checks signatures") && l.Contains("smartty_arm_base")), "a device without usign: the reason and the warning about the unsigned feed");
+        using (HttpClient client = new HttpClient())
+        {
+            Check((await GetAsync(client, "http://127.0.0.1:" + without.Port + "/r0/base/Packages.sig")).status == 404, "and the generated index has no signature");
+        }
+        without.Stop(bare);
+
+        // Reattach after the device restarted (its /tmp is empty): a new pair is made and the index is signed with it.
+        LocalRepoHost again = new LocalRepoHost();
+        SshSession before = NewDevice();
+        again.Start(before, new[] { root }, 0, LocalRepoPackageManager.Opkg, signGenerated: true);
+        string firstKey = Directory.GetFiles(keys).Select(Path.GetFileName).First(n => n != "0000000000000001");
+        Directory.Delete(work, true);
+        SshSession after = NewDevice();
+        again.Reattach(after);
+        Check(Directory.Exists(work) && File.Exists(Path.Combine(work, "key.sec")) && Directory.GetFiles(keys).Length == 2, "Reattach makes the key pair again on the restarted device");
+        using (HttpClient client = new HttpClient())
+        {
+            Check((await GetAsync(client, "http://127.0.0.1:" + again.Port + "/r0/base/Packages.sig")).status == 200, "and the index is signed again");
+        }
+        again.Stop(after);
+        Check(Directory.GetFiles(keys).Length == 1, "the last Stop leaves only the vendor key");
     }
 
     /// <summary>The host with the signature check of opkg on the device, and the check that the device reaches the server.</summary>
@@ -1367,6 +1610,10 @@ internal static class Program
             ArIpkTests();
             await HostTests();
             SignatureHostTests();
+            SigningScriptTests();
+            SigningShellTests();
+            await SignedIndexServerTests();
+            await SigningHostTests();
             ApkDetectorAndScannerTests();
             ApkConfigTests();
             await ApkServerAndHostTests();

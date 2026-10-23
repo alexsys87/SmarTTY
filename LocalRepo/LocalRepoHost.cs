@@ -33,6 +33,11 @@ public sealed class LocalRepoHost
     // The signature check of opkg was on and is commented out while the server runs.
     private bool _SignatureCheckOff;
 
+    // Generated indexes are signed with a temporary key made on the device (see OpkgSigning); null when they are not.
+    private string _SigningFingerprint;
+
+    private bool _SignGenerated;
+
     private readonly List<string> _History = new List<string>();
 
     private const int MaxHistoryLines = 500;
@@ -144,8 +149,10 @@ public sealed class LocalRepoHost
     /// <paramref name="manager"/> is the package manager of the device: only the feeds for it are served.
     /// <paramref name="trustBuildKey"/> (apk only) also makes the device trust public-key.pem of the build tree.
     /// <paramref name="allowUnsigned"/> (opkg only) turns the signature check of opkg off while the server runs.
+    /// <paramref name="signGenerated"/> (opkg only, when the check is on and unsigned feeds are not allowed) signs the indexes that
+    /// are generated here with a temporary key of the device (<see cref="OpkgSigning"/>), so that the check passes for them.
     /// </summary>
-    public void Start(SshSession session, IList<string> folders, int port, LocalRepoPackageManager manager = LocalRepoPackageManager.Opkg, bool trustBuildKey = false, bool allowUnsigned = false)
+    public void Start(SshSession session, IList<string> folders, int port, LocalRepoPackageManager manager = LocalRepoPackageManager.Opkg, bool trustBuildKey = false, bool allowUnsigned = false, bool signGenerated = false)
     {
         bool apk = manager == LocalRepoPackageManager.Apk;
         allowUnsigned = allowUnsigned && !apk;
@@ -254,8 +261,23 @@ public sealed class LocalRepoHost
             _PublicKey = publicKey;
             _AllowUnsigned = allowUnsigned;
             _SignatureCheckOff = allowUnsigned && signatureCheckOn;
+            _SignGenerated = false;
+            _SigningFingerprint = null;
         }
         Report("Server started on port " + server.Port + ", " + feeds.Count + (feeds.Count == 1 ? " feed" : " feeds") + " added to " + (apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile) + " on the device" + (publicKey != null ? "; the key of the build is trusted by apk" : "") + ".");
+        // The feeds whose index has no signature of the build: with the check on, opkg drops them unless the generated index is signed.
+        List<string> unsignedFeeds = feeds.Where((LocalRepoFeed feed) => !HasUsableSignature(feed.Directory)).Select((LocalRepoFeed feed) => feed.Name).ToList();
+        if (signatureCheckOn && !allowUnsigned && signGenerated && unsignedFeeds.Count > 0)
+        {
+            lock (_Sync)
+            {
+                _SignGenerated = true;
+            }
+            if (SetUpSigning(session, server, isRoot, unsignedFeeds))
+            {
+                signatureNote = null;
+            }
+        }
         if (signatureNote != null)
         {
             Report(signatureNote);
@@ -277,6 +299,80 @@ public sealed class LocalRepoHost
         return "Warning: opkg checks signatures on the device (\"option check_signature\" in " + OpkgFeedConfig.OpkgConfFile + "), and " +
             (unsigned.Count == 1 ? "this feed has" : "these feeds have") + " no signature, so \"opkg update\" drops " + (unsigned.Count == 1 ? "it" : "them") + ": " + string.Join(", ", unsigned.ToArray()) +
             ". Restart the server with \"Allow unsigned feeds (opkg)\", or serve a fresh index of the build with its Packages.sig (make package/index) to a firmware built from the same tree.";
+    }
+
+    /// <summary>
+    /// Makes the temporary key on the device and lets the server sign generated indexes with it. Reports what happened and
+    /// returns false (the feeds then stay unsigned, with the warning of <see cref="DescribeUnsignedFeeds"/>) when it cannot.
+    /// </summary>
+    private bool SetUpSigning(SshSession session, LocalRepoServer server, bool isRoot, IList<string> feedNames)
+    {
+        string problem;
+        if (!isRoot)
+        {
+            problem = "The temporary signing key can be set up only when logged in as root.";
+        }
+        else
+        {
+            problem = null;
+            string fingerprint = null;
+            try
+            {
+                fingerprint = OpkgSigning.ParseSetup(session.RunCommandChecked(OpkgSigning.BuildSetupScript(), requireSuccess: true));
+            }
+            catch (Exception exception)
+            {
+                problem = "The temporary signing key could not be set up: " + exception.Message;
+            }
+            if (problem == null && fingerprint == OpkgSigning.NoUsign)
+            {
+                problem = "The device has no usign (the program opkg checks signatures with), so the generated index cannot be signed.";
+            }
+            else if (problem == null && fingerprint == null)
+            {
+                problem = "The temporary signing key could not be set up on the device (usign -G failed or " + OpkgSigning.KeysDirectory + " is not writable).";
+            }
+            else if (problem == null)
+            {
+                lock (_Sync)
+                {
+                    _SigningFingerprint = fingerprint;
+                }
+                server.ForgetSignatures();
+                server.IndexSigner = SignIndex;
+                Report("The index of " + string.Join(", ", feedNames.ToArray()) + (feedNames.Count == 1 ? " is" : " are") + " generated here and has no signature of the build: it is signed with a temporary key (" + fingerprint + ") that opkg on the device trusts until the server is stopped.");
+                return true;
+            }
+        }
+        Report(problem);
+        return false;
+    }
+
+    /// <summary>Has the device sign the index served at <paramref name="indexUrlPath"/>; null when it cannot.</summary>
+    private byte[] SignIndex(string indexUrlPath)
+    {
+        SshSession session;
+        LocalRepoServer server;
+        lock (_Sync)
+        {
+            session = _TunnelSession;
+            server = _Server;
+            if (_SigningFingerprint == null)
+            {
+                return null;
+            }
+        }
+        if (session == null || server == null)
+        {
+            return null;
+        }
+        List<string> output = session.RunCommandChecked(OpkgSigning.BuildSignScript(OpkgFeedConfig.BaseUrl(server.Port) + indexUrlPath), requireSuccess: true);
+        byte[] signature = OpkgSigning.ParseSignature(output);
+        if (signature == null)
+        {
+            Report("The device could not sign " + indexUrlPath + (output == null || output.Count == 0 ? "." : ": " + string.Join(" ", output.Take(3).ToArray())));
+        }
+        return signature;
     }
 
     private static bool HasUsableSignature(string directory)
@@ -347,11 +443,14 @@ public sealed class LocalRepoHost
             _Server = null;
             _TunnelSession = null;
             _Feeds = new LocalRepoFeed[0];
+            _SigningFingerprint = null;
+            _SignGenerated = false;
         }
         if (server == null)
         {
             return;
         }
+        server.IndexSigner = null;
         string failure = RemoveFeeds(session, manager);
         TryStopTunnel(tunnel);
         server.Stop();
@@ -378,6 +477,11 @@ public sealed class LocalRepoHost
             {
                 return "The feeds could not be removed from " + configFile + " on the device. Remove the lines between \"" + OpkgFeedConfig.BeginMarker + "\" and \"" + OpkgFeedConfig.EndMarker + "\" by hand.";
             }
+            if (!apk)
+            {
+                // The temporary signing key (if one was made), trusted and secret half; nothing to remove is not an error.
+                session.RunCommandChecked(OpkgFeedConfig.WrapForPrivileges(OpkgSigning.BuildRemoveScript(), isRoot), requireSuccess: false);
+            }
             return null;
         }
         catch (Exception exception)
@@ -397,6 +501,7 @@ public sealed class LocalRepoHost
         LocalRepoPackageManager manager;
         string publicKey;
         bool allowUnsigned;
+        bool signGenerated;
         lock (_Sync)
         {
             server = _Server;
@@ -404,6 +509,7 @@ public sealed class LocalRepoHost
             manager = _Manager;
             publicKey = _PublicKey;
             allowUnsigned = _AllowUnsigned;
+            signGenerated = _SignGenerated;
             if (server == null || ReferenceEquals(_TunnelSession, session))
             {
                 return;
@@ -420,6 +526,11 @@ public sealed class LocalRepoHost
                 {
                     _TunnelSession = session;
                 }
+            }
+            if (signGenerated)
+            {
+                // The device may have been restarted: its /tmp is empty, so the secret key is gone; a new pair is made.
+                SetUpSigning(session, server, isRoot, feeds.Where((LocalRepoFeed feed) => !HasUsableSignature(feed.Directory)).Select((LocalRepoFeed feed) => feed.Name).ToList());
             }
             Report("The SSH connection was re-established: the tunnel and the feeds are restored.");
         }

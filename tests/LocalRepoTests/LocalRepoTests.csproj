@@ -11,6 +11,7 @@
     <Compile Include="../../LocalRepo/LocalRepoFeed.cs" Link="LocalRepoFeed.cs" />
     <Compile Include="../../LocalRepo/LocalRepoServer.cs" Link="LocalRepoServer.cs" />
     <Compile Include="../../LocalRepo/OpkgFeedConfig.cs" Link="OpkgFeedConfig.cs" />
+    <Compile Include="../../LocalRepo/OpkgSigning.cs" Link="OpkgSigning.cs" />
     <Compile Include="../../LocalRepo/ApkFeedConfig.cs" Link="ApkFeedConfig.cs" />
     <Compile Include="../../LocalRepo/ApkFeedInfo.cs" Link="ApkFeedInfo.cs" />
     <Compile Include="../../LocalRepo/LocalRepoPackageManager.cs" Link="LocalRepoPackageManager.cs" />
