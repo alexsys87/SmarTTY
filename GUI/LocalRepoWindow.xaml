@@ -27,18 +27,21 @@
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
-      <TextBox x:Name="FolderBox" Grid.Column="0" Margin="3" VerticalContentAlignment="Center" KeyDown="FolderBox_KeyDown" />
-      <Button x:Name="BrowseButton" Grid.Column="1" Content="Browse..." Click="Browse_Click" />
-      <Button x:Name="AddButton" Grid.Column="2" Content="Add" Click="Add_Click" />
-      <Button x:Name="RemoveButton" Grid.Column="3" Content="Remove selected" Click="Remove_Click" />
+      <TextBox x:Name="FolderBox" Grid.Column="0" Margin="3" VerticalContentAlignment="Center" KeyDown="FolderBox_KeyDown" ToolTip="Type or paste a folder, then press Add (Enter), e.g. D:\openwrt\bin\packages\arm_cortex-a9_neon or \\wsl.localhost\Ubuntu-24.04\home\alex\openwrt\bin\targets\zynq\generic\packages. Quotes around the path (Explorer's Copy as path) are fine. Esc stops editing an entry of the list." />
+      <Button x:Name="BrowseButton" Grid.Column="1" Content="Browse..." Click="Browse_Click" ToolTip="Pick a folder in the tree. The tree does not show WSL distributions: type that path into the box instead." />
+      <Button x:Name="AddButton" Grid.Column="2" Content="Add" Click="Add_Click" ToolTip="Add the folder in the box to the list; while an entry is being edited this replaces it" />
+      <Button x:Name="EditButton" Grid.Column="3" Content="Edit selected" Click="Edit_Click" ToolTip="Put the selected folder into the box to change it (double click or F2 in the list); Add then replaces it" />
+      <Button x:Name="RemoveButton" Grid.Column="4" Content="Remove selected" Click="Remove_Click" />
     </Grid>
-    <ListBox x:Name="FoldersList" Grid.Row="3" Height="90" Margin="3" SelectionMode="Extended" />
+    <ListBox x:Name="FoldersList" Grid.Row="3" Height="90" Margin="3" SelectionMode="Extended" MouseDoubleClick="FoldersList_MouseDoubleClick" KeyDown="FoldersList_KeyDown" SelectionChanged="FoldersList_SelectionChanged" />
     <WrapPanel Grid.Row="4" Orientation="Horizontal" Margin="0 4 0 0">
       <TextBlock Text="TCP port:" VerticalAlignment="Center" Margin="3 0 6 0" />
       <TextBox x:Name="PortBox" Width="70" VerticalContentAlignment="Center" Margin="3" MaxLength="5" />
       <Button x:Name="StartButton" Content="Start" Click="Start_Click" Margin="14 3 3 3" MinWidth="70" />
       <Button x:Name="StopButton" Content="Stop" Click="Stop_Click" MinWidth="70" />
+      <Button x:Name="ApplyButton" Content="Restart with these folders" Click="Apply_Click" Visibility="Collapsed" ToolTip="The list of folders was changed while the server runs: stop it and start it again with the new list (the same port and options)" />
       <Button x:Name="CleanButton" Content="Remove feeds from device" Click="Clean_Click" ToolTip="Takes the lines of this server out of the repository list of the device (customfeeds.conf / customfeeds.list), e.g. if SmarTTY was closed while the server was running" />
       <CheckBox x:Name="AllowUnsignedBox" Content="Allow unsigned feeds (opkg)" VerticalAlignment="Center" Margin="10 0 0 0" ToolTip="When opkg on the device checks signatures (option check_signature in /etc/opkg.conf), it drops every feed without a trusted Packages.sig, and an index that SmarTTY generates has none. This comments the option out for the time the server runs; Stop and Remove feeds from device turn the check on again." />
       <CheckBox x:Name="SignGeneratedBox" Content="Sign generated indexes (opkg)" VerticalAlignment="Center" Margin="10 0 0 0" ToolTip="When opkg on the device checks signatures (option check_signature in /etc/opkg.conf), a package index that SmarTTY generates (new or changed .ipk files that the index of the build does not describe) has no Packages.sig, and opkg update fails with &quot;Signature file download failed&quot;. This has the device make a temporary key with its own usign, trust it in /etc/opkg/keys and sign the generated indexes with it; Stop and Remove feeds from device delete the key again. Needs root and usign on the device; not used when unsigned feeds are allowed." />
