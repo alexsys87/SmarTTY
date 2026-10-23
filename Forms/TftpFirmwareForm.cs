@@ -401,11 +401,14 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         {
             return;
         }
-        _server.ClearFiles();
+        // In one step: a request from the board between a clearing and the adding would get "File not found", and U-Boot
+        // does not ask again after that.
+        List<KeyValuePair<string, string>> served = new List<KeyValuePair<string, string>>();
         foreach (ServedFile file in _files)
         {
-            _server.AddFile(file.Name, file.FullPath);
+            served.Add(new KeyValuePair<string, string>(file.Name, file.FullPath));
         }
+        _server.SetFiles(served);
     }
 
     // ---------- the server ----------
