@@ -68,6 +68,7 @@ internal static class FileTransferManagerTests
                 DisposeFailsQueuedTransfers();
             }
             RunScriptOnServer();
+            RunScriptInPlace();
             Test.Section("Folder download as .tar.gz");
             using (FileTransferManager archiveManager = NewManager())
             {
@@ -247,11 +248,25 @@ internal static class FileTransferManagerTests
             upload.Write(script, 0, script.Length);
         }
         Test.Equal("700", RemoteStat(path).Split(' ')[0], "the script is uploaded owner-only and executable");
-        string home = _session.RunCommandChecked("pwd", requireSuccess: true)?.Find((string line) => line.StartsWith("/")) ?? "/";
-        List<string> output = _session.RunCommand(RemoteScript.BuildCommand(path, RemoteScript.HasShebang(script), home), out int? exitStatus);
+        List<string> output = _session.RunCommand(RemoteScript.BuildCommand(path, RemoteScript.HasShebang(script)), out int? exitStatus);
         Test.Equal(3, exitStatus ?? -1, "the exit status of the script comes back");
         Test.Check(output != null && output.Contains("hello from smartty-") && output.Contains("oops"), "its output and error output are received (got: " + string.Join(" | ", output ?? new List<string>()) + ")");
         Test.Equal(1, _session.RunCommand("test -e " + RemotePathUtils.ShellQuote(path), out int? testStatus) != null ? testStatus ?? -1 : -1, "the script is removed after it has run");
+    }
+
+    // The file list's "Run": a script that is already on the server runs from its own folder, executable or not.
+    private static void RunScriptInPlace()
+    {
+        Test.Section("Run a script on the server in place");
+        string folder = Remote("run in place");
+        string script = RemoteFileOperations.Join(folder, "it's.sh");
+        RunRemote("mkdir -p " + RemotePathUtils.ShellQuote(folder) + " && printf '#!/bin/sh\\necho \"in $(basename \"$(pwd)\")\"\\nexit 4\\n' > " + RemotePathUtils.ShellQuote(script) + " && chmod 644 " + RemotePathUtils.ShellQuote(script));
+        List<string> probe = _session.RunCommand(RemoteScript.ProbeCommand(script), out _);
+        Test.Equal("#!/bin/sh", probe.Count > 0 ? probe[0] : "", "the probe returns the shebang line of a script that is not executable");
+        List<string> output = _session.RunCommand(RemoteScript.BuildRunInPlaceCommand(script, probe), out int? exitStatus);
+        Test.Equal(4, exitStatus ?? -1, "a script that is not executable runs through the interpreter of its shebang; its exit status comes back");
+        Test.Check(output != null && output.Contains("in run in place"), "it runs in the folder it is in (got: " + string.Join(" | ", output ?? new List<string>()) + ")");
+        Test.Equal("644", RemoteStat(script).Split(' ')[0], "the file's permissions are not changed");
     }
 
     private static void ArchiveDownload(FileTransferManager manager)
