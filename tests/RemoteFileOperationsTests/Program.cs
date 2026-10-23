@@ -123,8 +123,22 @@ internal static class Program
         Equal(System.Text.Encoding.UTF8.GetString(normalized), "#!/bin/sh\necho one\nif true; then\n  echo \"a\rb\"\nfi\n", "CR LF becomes LF, a lone CR stays, the byte order mark is dropped");
         Check(RemoteScript.HasShebang(normalized) && !RemoteScript.HasShebang(System.Text.Encoding.UTF8.GetBytes("echo hi")), "a shebang is recognized after the byte order mark is dropped");
 
-        Equal(RemoteScript.BuildCommand("/tmp/s 1.sh", true, "/home/u"), "cd '/home/u' && '/tmp/s 1.sh'; rc=$?; rm -f '/tmp/s 1.sh'; exit $rc", "a script with a shebang is run as a program in the working directory");
-        Equal(RemoteScript.BuildCommand("/tmp/s.sh", false, null), "sh '/tmp/s.sh'; rc=$?; rm -f '/tmp/s.sh'; exit $rc", "a script without one is given to sh");
+        Equal(RemoteScript.BuildCommand("/tmp/s 1.sh", true), "('/tmp/s 1.sh'; rc=$?; rm -f '/tmp/s 1.sh'; exit $rc)", "a script with a shebang is run as a program, in a subshell");
+        Equal(RemoteScript.BuildCommand("/tmp/s.sh", false), "(sh '/tmp/s.sh'; rc=$?; rm -f '/tmp/s.sh'; exit $rc)", "a script without one is given to sh");
+
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a b/x.sh", new[] { RemoteScript.ExecutableMarker }), "(cd '/a b' && './x.sh')", "an executable script is run as it is, from its folder");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.sh", new[] { "#!/bin/bash" }), "(cd '/a' && '/bin/bash' './x.sh')", "a script that is not executable is given to the interpreter of its shebang");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/x.sh", new[] { "#!/usr/bin/env  bash -e " }), "(cd '/' && '/usr/bin/env' 'bash' '-e' './x.sh')", "the words of a shebang line are kept apart");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.sh", new[] { "echo hi" }), "(cd '/a' && sh './x.sh')", "a script without a shebang is given to sh");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.sh", null), "(cd '/a' && sh './x.sh')", "without an answer from the server sh is used");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/-x's.sh", new[] { "#!/bin/sh; rm -rf ~" }), "(cd '/a' && '/bin/sh;' 'rm' '-rf' '~' './-x'\\''s.sh')", "text of the shebang line is quoted, it is never shell syntax");
+    }
+
+    // The two steps of "Run" in the file list: ask the server about the file, then build the command from the answer.
+    private static string InPlaceCommand(string path)
+    {
+        string probe = RunOutput(RemoteScript.ProbeCommand(path));
+        return RemoteScript.BuildRunInPlaceCommand(path, probe.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static void RunInPlaceChecks(string root)
@@ -150,12 +164,14 @@ internal static class Program
             string path = Path.Combine(folder, testCase.Name);
             File.WriteAllText(path, testCase.Content);
             Equal(Run("chmod " + (testCase.Executable ? "700" : "600") + " " + RemotePathUtils.ShellQuote(path), out _), 0, "set the mode of " + testCase.Name);
-            string text = RunOutput(RemoteScript.BuildRunInPlaceCommand(path));
+            string inPlace = InPlaceCommand(path);
+            string text = RunOutput(inPlace);
             Check(text.Contains(testCase.Expect) && text.Contains("from-stderr"), _shell + ": " + testCase.Name + " runs from its own folder (got: " + text.Trim().Replace("\n", " | ") + ")");
-            Equal(Run(RemoteScript.BuildRunInPlaceCommand(path), out _), 5, testCase.Name + ": the exit status of the script is kept");
+            Equal(Run(inPlace, out _), 5, testCase.Name + ": the exit status of the script is kept");
+            Check(RunOutput(inPlace + "; echo still-here").Contains("still-here"), testCase.Name + ": the shell that typed the command goes on afterwards");
             Check(File.Exists(path) && File.ReadAllText(path) == testCase.Content, testCase.Name + ": the script is left unchanged");
         }
-        Check(Run(RemoteScript.BuildRunInPlaceCommand(Path.Combine(folder, "missing.sh")), out string errors) != 0 && errors.Length > 0, "a script that does not exist fails with a message");
+        Check(Run(InPlaceCommand(Path.Combine(folder, "missing.sh")), out string errors) != 0 && errors.Length > 0, "a script that does not exist fails with a message");
     }
 
     private static void ScriptRunChecks(string root)
@@ -171,13 +187,15 @@ internal static class Program
             {
                 Equal(Run("chmod 700 " + RemotePathUtils.ShellQuote(path), out _), 0, "make the script executable");
             }
-            int exit = Run(RemoteScript.BuildCommand(path, shebang, work), out string errors);
+            // The command is typed into a terminal that is in the directory the script is to run in.
+            string typed = RemoteScript.BuildCommand(path, shebang);
+            int exit = Run("cd " + RemotePathUtils.ShellQuote(work) + " && " + typed, out string errors);
             Equal(exit, 7, _shell + ": the exit status of the script is the exit status of the command (" + (shebang ? "shebang" : "no shebang") + ")");
             Check(errors.Contains("to-stderr"), "the script's error output comes through");
             Check(!File.Exists(path), "the script is removed after it has run");
         }
-        string output = RunOutput(RemoteScript.BuildCommand(Path.Combine(root, "missing.sh"), true, work));
-        Check(output.Length >= 0 && !File.Exists(Path.Combine(root, "missing.sh")), "a missing script fails without leaving anything behind");
+        string output = RunOutput(RemoteScript.BuildCommand(Path.Combine(root, "missing.sh"), true) + "; echo still-here");
+        Check(output.Contains("still-here") && !File.Exists(Path.Combine(root, "missing.sh")), "a missing script fails, the shell that typed the command goes on, nothing is left behind");
     }
 
     private static void CommandChecks(string root)

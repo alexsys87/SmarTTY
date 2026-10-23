@@ -1311,18 +1311,80 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     }
 
     /// <summary>
-    /// Runs a shell script that is on the server in a new terminal tab, from the folder it is in (see
-    /// <see cref="RemoteScript.BuildRunInPlaceCommand"/>): everything it prints and asks is in that tab.
+    /// Runs a shell script that is on the server from the folder it is in (see <see cref="RemoteScript.BuildRunInPlaceCommand"/>),
+    /// in the terminal tab that is active now: the command is typed there and everything the script prints and asks is in
+    /// that terminal.
     /// </summary>
     public void RunRemoteScript(string remotePath)
     {
-        CreateNewTerminalPage(virtualMode: false, new InitialCommand(RemoteScript.BuildRunInPlaceCommand(remotePath), echoInitialCommand: false));
+        ITabContext origin = ActiveTab;
+        SshSession session = Session;
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            // Whether the file can be executed and what its shebang says; without an answer sh is used.
+            List<string> probe = null;
+            try
+            {
+                probe = session.RunCommand(RemoteScript.ProbeCommand(remotePath), out _);
+            }
+            catch (Exception)
+            {
+            }
+            string command = RemoteScript.BuildRunInPlaceCommand(remotePath, probe);
+            _Controller.BeginInvoke(() => RunInTerminal(command, origin));
+        });
     }
 
     /// <summary>
-    /// Runs a local shell script on the server: it is uploaded to /tmp (owner-only, executable), run in a new terminal
-    /// tab of this session, so that everything it prints (and what it asks for) is in the terminal, and removed again when it
-    /// has ended. A script with a shebang uses the interpreter it names (bash, ash, ...), one without runs under sh.
+    /// Types <paramref name="commandLine"/> into the terminal of <paramref name="origin"/> (the active tab when it is not
+    /// a terminal: the terminal used last) and shows that tab. A Smart Terminal runs it as the next command; a classic
+    /// terminal gets it as typed text for its shell. The line starts with a blank, so that shells that skip such lines
+    /// do not keep it in their history. Without a terminal tab a new one is opened for the command.
+    /// </summary>
+    private void RunInTerminal(string commandLine, ITabContext origin)
+    {
+        try
+        {
+            NormalTabContext tab = origin as NormalTabContext ?? ActiveTab as NormalTabContext ?? _PagesInLastUsedOrder.OfType<NormalTabContext>().FirstOrDefault();
+            if (tab == null)
+            {
+                CreateNewTerminalPage(virtualMode: false, new InitialCommand(commandLine, echoInitialCommand: false));
+                return;
+            }
+            int index = Tabs.IndexOf(tab);
+            if (index >= 0 && ActiveTabIndex != index)
+            {
+                ActiveTabIndex = index;
+            }
+            if (tab.Terminal is SshTerminalControl smartTerminal)
+            {
+                if (!smartTerminal.Submit(" " + commandLine))
+                {
+                    MessageBoxes.Info("The terminal is busy with another command. Wait until it ends and try again.");
+                }
+                return;
+            }
+            SshShellChannel channel = (tab.Terminal.Tag as TerminalTag)?.Channel;
+            if (channel == null || channel.IsDisposed)
+            {
+                MessageBoxes.Error("The terminal is not connected.");
+                return;
+            }
+            byte[] input = System.Text.Encoding.UTF8.GetBytes(" " + commandLine + "\r");
+            channel.Input.Write(input, 0, input.Length);
+            tab.Terminal.Focus();
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    /// <summary>
+    /// Runs a local shell script on the server: it is uploaded to /tmp (owner-only, executable), run in the terminal tab
+    /// that is active now, so that everything it prints (and what it asks for) is in that terminal, and removed again when it
+    /// has ended. A script with a shebang uses the interpreter it names (bash, ash, ...), one without runs under sh. It runs in
+    /// the directory the terminal is in.
     /// </summary>
     public void RunScript(string localPath)
     {
@@ -1344,7 +1406,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         byte[] data = RemoteScript.Normalize(content);
         string remotePath = RemoteScript.MakeRemotePath(Path.GetFileName(localPath), Guid.NewGuid().ToString("N").Substring(0, 8));
-        string command = RemoteScript.BuildCommand(remotePath, RemoteScript.HasShebang(data), TryExtractCurrentDir());
+        string command = RemoteScript.BuildCommand(remotePath, RemoteScript.HasShebang(data));
+        ITabContext origin = ActiveTab;
         SshSession session = Session;
         ThreadPool.QueueUserWorkItem(delegate
         {
@@ -1358,7 +1421,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 _Controller.BeginInvoke(() => MessageBoxes.Error("Cannot upload the script to " + remotePath + ": " + exception.Message));
                 return;
             }
-            _Controller.BeginInvoke(() => CreateNewTerminalPage(virtualMode: false, new InitialCommand(command, echoInitialCommand: false)));
+            _Controller.BeginInvoke(() => RunInTerminal(command, origin));
         });
     }
 

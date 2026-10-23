@@ -694,7 +694,7 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
-        /// <summary>Runs a shell script that is on the server, from the folder it is in, in a new terminal tab.</summary>
+        /// <summary>Runs a shell script that is on the server, from the folder it is in, in the active terminal.</summary>
         public void RunRemoteScript(string remotePath)
         {
             try
@@ -707,7 +707,7 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
-        /// <summary>Asks for a local shell script and runs it on the server in a new terminal tab.</summary>
+        /// <summary>Asks for a local shell script and runs it on the server in the active terminal.</summary>
         internal void RunScript()
         {
             try
