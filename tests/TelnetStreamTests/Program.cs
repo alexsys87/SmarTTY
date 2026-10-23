@@ -510,6 +510,14 @@ internal static class Program
             CheckBytes(connection.TakeWritten(), Cat(Text("a"), B(0xC3, 0xBF), Text("b\r\n")), "auto login: the answer is UTF-8");
         }
         {
+            // The lines end like the terminal's Enter key does: servers that take CR and LF for two line ends would
+            // read the second one as an empty answer to the next prompt.
+            FakeConnection connection = new FakeConnection(Text("login: "), Text("Password: "));
+            TelnetStream stream = new TelnetStream(connection, new TelnetOptions { AutoLogin = new TelnetAutoLogin("alice", "s3cret", null, null, 0, null, "\n") });
+            ReadAll(stream);
+            CheckBytes(connection.TakeWritten(), Text("alice\ns3cret\n"), "auto login: the line end is the one given (LF)");
+        }
+        {
             // too late: after the timeout nothing is typed any more
             long now = 0;
             TelnetAutoLogin login = new TelnetAutoLogin("u", "p", null, null, 10, () => now);

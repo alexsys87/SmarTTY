@@ -85,9 +85,13 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
     /// <summary>True while the server echoes what is typed (it announced the ECHO option).</summary>
     public bool RemoteEcho => _stream?.RemoteEcho ?? false;
 
-    public TelnetTransport(DeviceTerminalSettings.ConnectionSettings.Telnet telnet)
+    // What ends the lines of the automatic login: the Enter key of the terminal (null: CR LF).
+    private readonly string _lineEnding;
+
+    public TelnetTransport(DeviceTerminalSettings.ConnectionSettings.Telnet telnet, string lineEnding = null)
     {
         _telnet = telnet;
+        _lineEnding = lineEnding;
     }
 
     public void Open(IHostNameResolver hostNameResolver)
@@ -333,7 +337,7 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 // (the user name, if there is one, is still sent).
             }
         }
-        return new TelnetAutoLogin(_telnet.AutoLoginUserName, password, _telnet.LoginPrompts, _telnet.PasswordPrompts);
+        return new TelnetAutoLogin(_telnet.AutoLoginUserName, password, _telnet.LoginPrompts, _telnet.PasswordPrompts, lineEnding: _lineEnding);
     }
 
     private void OnStreamRemoteEchoChanged(object sender, EventArgs e)

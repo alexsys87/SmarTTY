@@ -53,6 +53,8 @@ internal sealed class TelnetAutoLogin
 
     private readonly Func<long> _nowMs;
 
+    private readonly string _lineEnding;
+
     private readonly long _startedMs;
 
     private readonly StringBuilder _tail = new StringBuilder();
@@ -65,8 +67,12 @@ internal sealed class TelnetAutoLogin
     /// <param name="passwordPrompts">Texts a password prompt ends with, separated by ';' (empty: the default list).</param>
     /// <param name="timeoutSeconds">How long after the start the prompts are watched; 0 is the default.</param>
     /// <param name="nowMs">A clock in milliseconds; only the tests replace it.</param>
-    public TelnetAutoLogin(string userName, string password, string loginPrompts, string passwordPrompts, int timeoutSeconds = 0, Func<long> nowMs = null)
+    /// <param name="lineEnding">What ends the user name and the password: the same as the Enter key of the terminal sends,
+    /// because many servers take CR and LF for two line ends and would read the extra one as an empty answer to the
+    /// next prompt (null: CR LF).</param>
+    public TelnetAutoLogin(string userName, string password, string loginPrompts, string passwordPrompts, int timeoutSeconds = 0, Func<long> nowMs = null, string lineEnding = null)
     {
+        _lineEnding = string.IsNullOrEmpty(lineEnding) ? "\r\n" : lineEnding;
         _userName = userName ?? "";
         _password = password ?? "";
         _loginPrompts = SplitPrompts(loginPrompts, DefaultLoginPrompts);
@@ -116,13 +122,13 @@ internal sealed class TelnetAutoLogin
         {
             _tail.Clear();
             _stage = _password.Length > 0 ? Stage.WaitingForPassword : Stage.Finished;
-            return new[] { _userName + "\r\n" };
+            return new[] { _userName + _lineEnding };
         }
         if (_stage == Stage.WaitingForPassword && EndsWithAny(visible, _passwordPrompts))
         {
             _tail.Clear();
             _stage = Stage.Finished;
-            return new[] { _password + "\r\n" };
+            return new[] { _password + _lineEnding };
         }
         return Array.Empty<string>();
     }
