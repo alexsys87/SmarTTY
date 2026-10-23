@@ -20,9 +20,9 @@ public sealed class SocksProxyHost
 
     private bool _Running;
 
-    private string _BindAddress = SocksProxySettings.DefaultBindAddress;
+    private string _BindAddress = "127.0.0.1";
 
-    private int _Port = SocksProxySettings.DefaultPort;
+    private int _Port = 1080;
 
     private int _KeepAliveSeconds;
 
