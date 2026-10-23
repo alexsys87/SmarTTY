@@ -36,6 +36,9 @@ public partial class DeviceTerminalControl
         editCommon.Click += (sender, e) => EditCommandList(forThisDevice: false);
         ToolStripMenuItem clearHistory = new ToolStripMenuItem("Clear saved command history");
         clearHistory.Click += (sender, e) => ClearSavedHistory();
+        MenuIcons.Apply(_editDeviceCommandsMenuItem, "edit");
+        MenuIcons.Apply(editCommon, "edit");
+        MenuIcons.Apply(clearHistory, "delete");
         toolStripDropDownButton1.DropDownItems.Add(new ToolStripSeparator());
         toolStripDropDownButton1.DropDownItems.Add(_editDeviceCommandsMenuItem);
         toolStripDropDownButton1.DropDownItems.Add(editCommon);
