@@ -1044,14 +1044,20 @@ internal static class Program
             rt.Wait(5000);
         });
 
-        Run("line errors: a very noisy line (about one damaged byte in 600, both ways) still gets the file through", () =>
+        // The receiver gives up after 20 damaged subpackets in a row (a documented limit). At one damaged byte in 600 a
+        // 1 KB subpacket gets through clean only about one time in five, so a run of 20 failures at some position of a
+        // 60 KB file turned up in roughly a quarter of the runs; at one in 1500 it is a matter of one in many thousands.
+        Run("line errors: a noisy line (about one damaged byte in 1500, both ways) still gets the file through", () =>
         {
             byte[] data = RandomData(60000, 34);
-            Random noise = new Random(35);
+            // One generator per direction: the two pipes are written by different threads, and Random is not thread safe
+            // (a race can corrupt its state, after which it keeps returning the same value).
+            Random noiseToReceiver = new Random(35);
+            Random noiseToSender = new Random(36);
             Outcome o = Transfer(new[] { Item("noisy.bin", data) }, null, null, Fast(), (toReceiver, toSender) =>
             {
-                toReceiver.Tamper = (i, b) => noise.Next(600) == 0 ? (byte)(b ^ 0x10) : b;
-                toSender.Tamper = (i, b) => noise.Next(600) == 0 ? (byte)(b ^ 0x10) : b;
+                toReceiver.Tamper = (i, b) => { lock (noiseToReceiver) { return noiseToReceiver.Next(1500) == 0 ? (byte)(b ^ 0x10) : b; } };
+                toSender.Tamper = (i, b) => { lock (noiseToSender) { return noiseToSender.Next(1500) == 0 ? (byte)(b ^ 0x10) : b; } };
             });
             Check(o.SenderOk && o.ReceiverOk, "transfer ok: " + o.SenderProgress.Last + " / " + o.ReceiverProgress.Last);
             Check(o.Rx.Streams[0].ToArray().SequenceEqual(data), "content identical");
