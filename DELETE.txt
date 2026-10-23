@@ -1,1 +1,0 @@
-Delete Ssh/SocksProxySettings.cs (moved to GUI/Backend/SocksProxySettings.cs)
