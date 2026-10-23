@@ -246,6 +246,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// <summary>The local OpenWrt repository served to this session's device (Tools > Local OpenWrt repository server).</summary>
     public LocalRepoHost LocalRepo { get; } = new LocalRepoHost();
 
+    /// <summary>The SOCKS5 proxy through this session's SSH connection (Tools > SOCKS5 proxy over SSH).</summary>
+    public SocksProxyHost SocksProxy { get; } = new SocksProxyHost();
+
     public FileTransferManager TransferManager { get; private set; }
 
     public bool HideHeaders => _Controller.HideTabHeaders;
@@ -520,10 +523,19 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         Session?.Dispose();
         Session = session;
         EnableX11Forwarding(session);
+        if (firstConnection)
+        {
+            AutoStartSocksProxy(session);
+        }
         if (!firstConnection && LocalRepo.IsRunning)
         {
             // The reverse tunnel belonged to the old connection: restore it (and the feeds) on the new one, off the UI thread.
             ThreadPool.QueueUserWorkItem((object state) => LocalRepo.Reattach((SshSession)state), session);
+        }
+        if (!firstConnection && SocksProxy.IsRunning)
+        {
+            // The listener belonged to the old connection: open it again on the new one, off the UI thread.
+            ThreadPool.QueueUserWorkItem((object state) => SocksProxy.Reattach((SshSession)state), session);
         }
         TransferManager?.Dispose();
         TransferManager = new FileTransferManager
@@ -873,6 +885,33 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     // The refusal of X11 forwarding is explained once per session, not after every reconnection.
     private int _X11RefusalReported;
+
+    /// <summary>
+    /// Starts the SOCKS5 proxy of a connection whose profile asks for it (address, port and keepalive are the ones saved by
+    /// Tools > SOCKS5 proxy over SSH). Runs off the UI thread; a failure (usually a port that another connection uses) is
+    /// reported and does not affect the connection. After a reconnect <see cref="SocksProxyHost.Reattach"/> restores it.
+    /// </summary>
+    private void AutoStartSocksProxy(SshSession session)
+    {
+        if (Settings == null || !Settings.AutoStartSocksProxy)
+        {
+            return;
+        }
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            try
+            {
+                SocksProxySettings proxySettings = SocksProxySettings.Load();
+                SocksProxy.Start(session, proxySettings.BindAddress, proxySettings.Port, proxySettings.KeepAliveSeconds);
+            }
+            catch (Exception exception)
+            {
+                string message = exception.Message.Replace('\r', ' ').Replace('\n', ' ');
+                SocksProxy.Report("Automatic start failed: " + message);
+                _Controller.BeginInvoke(() => MessageBoxes.Error("The SOCKS5 proxy could not be started automatically: " + message + "\r\n\r\nThe connection works as usual. Change the port in Tools > SOCKS5 proxy over SSH (it is used by every connection that starts the proxy) or turn the option off in the connection settings."));
+            }
+        });
+    }
 
     /// <summary>
     /// Requests X11 forwarding on the terminal channels of a connection whose settings ask for it. Remote programs then
@@ -1558,6 +1597,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         catch
         {
         }
+        SocksProxy.Stop();
         Session?.Dispose();
         foreach (DeviceTabContext deviceTab in Tabs.OfType<DeviceTabContext>().ToList())
         {

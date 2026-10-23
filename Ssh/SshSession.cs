@@ -1146,6 +1146,96 @@ public class SshSession : IDisposable
 
     #endregion
 
+    #region Dynamic port forwarding (SOCKS)
+
+    private ForwardedPortDynamic _dynamicForward;
+
+    /// <summary>True while the SOCKS listener started by <see cref="StartDynamicForward"/> is listening on this connection.</summary>
+    public bool IsDynamicForwardActive
+    {
+        get
+        {
+            lock (_forwardLock)
+            {
+                return _dynamicForward != null && _dynamicForward.IsStarted;
+            }
+        }
+    }
+
+    /// <summary>Raised from any thread with the message of a failure of one proxied connection (the target refused it, the server denied the channel ...).</summary>
+    public event Action<string> DynamicForwardError;
+
+    /// <summary>
+    /// Listens on <paramref name="bindAddress"/>:<paramref name="port"/> of this computer as a SOCKS4/4a/5 proxy and carries every
+    /// connection through the SSH server (the equivalent of "ssh -D"). There is one such proxy per session; starting another
+    /// replaces it. Throws if the address cannot be bound or the connection is closed.
+    /// </summary>
+    public void StartDynamicForward(string bindAddress, uint port)
+    {
+        EnsureAuthenticated();
+        StopDynamicForward();
+        ForwardedPortDynamic forward = new ForwardedPortDynamic(bindAddress, port);
+        forward.Exception += (object sender, ExceptionEventArgs e) => DynamicForwardError?.Invoke(e.Exception.Message);
+        _client.AddForwardedPort(forward);
+        try
+        {
+            forward.Start();
+        }
+        catch
+        {
+            try
+            {
+                _client.RemoveForwardedPort(forward);
+            }
+            catch
+            {
+            }
+            forward.Dispose();
+            throw;
+        }
+        lock (_forwardLock)
+        {
+            _dynamicForward = forward;
+        }
+    }
+
+    public void StopDynamicForward()
+    {
+        ForwardedPortDynamic forward;
+        lock (_forwardLock)
+        {
+            forward = _dynamicForward;
+            _dynamicForward = null;
+        }
+        if (forward == null)
+        {
+            return;
+        }
+        try
+        {
+            forward.Stop();
+        }
+        catch
+        {
+        }
+        try
+        {
+            _client.RemoveForwardedPort(forward);
+        }
+        catch
+        {
+        }
+        try
+        {
+            forward.Dispose();
+        }
+        catch
+        {
+        }
+    }
+
+    #endregion
+
     public void Disconnect()
     {
         _client.Disconnect();

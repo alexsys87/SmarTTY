@@ -190,6 +190,18 @@ public class NewConnectionController : INotifyPropertyChanged
         }
     }
 
+    public bool AutoStartSocksProxy
+    {
+        get
+        {
+            return _Settings.AutoStartSocksProxy;
+        }
+        set
+        {
+            _Settings.AutoStartSocksProxy = value;
+        }
+    }
+
     public bool EmulateSCPWithCat
     {
         get

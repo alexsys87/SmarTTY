@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.SocksProxyWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="SOCKS5 Proxy over SSH" Width="620" Height="520" MinWidth="500" MinHeight="420" WindowStartupLocation="CenterOwner">
+  <Grid Margin="8">
+    <FrameworkElement.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
+          <Setter Property="Margin" Value="3" />
+          <Setter Property="Padding" Value="8 3 8 3" />
+        </Style>
+      </ResourceDictionary>
+    </FrameworkElement.Resources>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0 0 0 8" Text="Starts a SOCKS5 proxy on this computer that works through the SSH connection of this tab, like &quot;ssh -N -D 127.0.0.1:1080 -o ServerAliveInterval=30 user@server&quot;. Other programs set it as their SOCKS5 proxy: their connections go through the SSH server and leave from it. The proxy works while this connection is open and is restored after a reconnect. TCP only (no UDP, no authentication); with socks5h:// the server resolves the host names." />
+    <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0 4 0 0">
+      <TextBlock Text="Listen on:" VerticalAlignment="Center" Margin="3 0 6 0" />
+      <TextBox x:Name="AddressBox" Width="130" VerticalContentAlignment="Center" Margin="3" MaxLength="45" ToolTip="The local address of the proxy. 127.0.0.1 (the default) lets only programs of this computer use it. 0.0.0.0 opens it to the whole network: the proxy has no password, so anybody who reaches the port can use the SSH server through your account." />
+      <TextBlock Text="Port:" VerticalAlignment="Center" Margin="10 0 6 0" />
+      <TextBox x:Name="PortBox" Width="60" VerticalContentAlignment="Center" Margin="3" MaxLength="5" ToolTip="The local TCP port of the proxy (1080 is the usual SOCKS port). Every SSH connection needs its own port." />
+      <TextBlock Text="Keepalive (s):" VerticalAlignment="Center" Margin="10 0 6 0" />
+      <TextBox x:Name="KeepAliveBox" Width="50" VerticalContentAlignment="Center" Margin="3" MaxLength="5" ToolTip="Seconds between keepalive messages of the SSH connection (like ServerAliveInterval=30), so that an idle tunnel is not dropped by the server or a firewall. 0 leaves the keepalive of the connection as it is. The setting stays on the connection after the proxy is stopped." />
+      <Button x:Name="StartButton" Content="Start" Click="Start_Click" Margin="14 3 3 3" MinWidth="70" />
+      <Button x:Name="StopButton" Content="Stop" Click="Stop_Click" MinWidth="70" />
+    </WrapPanel>
+    <TextBlock x:Name="StatusText" Grid.Row="2" TextWrapping="Wrap" Margin="3 6 3 3" />
+    <Grid Grid.Row="3" Margin="0 2 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBox x:Name="UsageBox" Grid.Column="0" Margin="3" IsReadOnly="True" VerticalContentAlignment="Center" FontFamily="Consolas" ToolTip="Proxy address for other programs. In a browser or an application choose &quot;SOCKS5&quot; (or &quot;SOCKS v5&quot;) with this host and port, and tick &quot;Proxy DNS when using SOCKS v5&quot; where it exists. For curl: curl --proxy socks5h://127.0.0.1:1080 https://example.com" />
+      <Button x:Name="CopyButton" Grid.Column="1" Content="Copy address" Click="Copy_Click" />
+    </Grid>
+    <TextBox x:Name="LogBox" Grid.Row="4" Margin="3" IsReadOnly="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap" />
+    <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 4 0 0">
+      <Button Content="Close" MinWidth="70" IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>

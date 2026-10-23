@@ -50,6 +50,9 @@ public class SSHConnectionSettings
     /// <summary>Requests X11 forwarding, so that graphical programs started on the server open their windows here (VcXsrv).</summary>
     public bool EnableX11Forwarding { get; set; }
 
+    /// <summary>Starts the SOCKS5 proxy through the SSH connection as soon as it is established (see Tools > SOCKS5 proxy over SSH for its address and port).</summary>
+    public bool AutoStartSocksProxy { get; set; }
+
     public bool EnableOnTheFlyTAR { get; set; } = true;
 
     public string ConnectionAlias { get; set; }
@@ -112,6 +115,10 @@ public class SSHConnectionSettings
             return false;
         }
         if (settings.EnableX11Forwarding != EnableX11Forwarding)
+        {
+            return false;
+        }
+        if (settings.AutoStartSocksProxy != AutoStartSocksProxy)
         {
             return false;
         }

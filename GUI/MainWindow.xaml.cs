@@ -804,6 +804,26 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
     }
 
+    private void SocksProxy_Click(object sender, RoutedEventArgs e)
+    {
+        SessionWrapper activeSession = Controller.ActiveSession;
+        if (activeSession == null || activeSession.IsDevice || activeSession.Session == null)
+        {
+            return;
+        }
+        try
+        {
+            new SocksProxyWindow(activeSession)
+            {
+                Owner = this
+            }.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     private void LocalRepo_Click(object sender, RoutedEventArgs e)
     {
         SessionWrapper activeSession = Controller.ActiveSession;
