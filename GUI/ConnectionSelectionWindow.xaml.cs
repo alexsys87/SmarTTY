@@ -1269,7 +1269,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
         }
 
-        /// <summary>Telnet to "host" or "host:port" without saving anything (port 23 when none is given).</summary>
+        /// <summary>
+        /// Telnet to "host" or "host:port" without saving anything (port 23 when none is given). A login can come first:
+        /// "user@host", "user:password@host:port" (typed when the server asks for it, never saved).
+        /// </summary>
         internal void CreateQuickTelnetConnection(Window parent)
         {
             QuickConnectionWindow quickConnectionWindow = new QuickConnectionWindow(telnet: true);
@@ -1280,7 +1283,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
             try
             {
-                PendingRawConnectionSettings = NewTelnetSettings(DeviceTerminalSettings.ConnectionSettings.Telnet.Parse(quickConnectionWindow.txtMachine.Text));
+                PendingRawConnectionSettings = NewTelnetSettings(DeviceTerminalSettings.ConnectionSettings.Telnet.ParseWithLogin(quickConnectionWindow.txtMachine.Text));
                 SessionCreated?.Invoke();
             }
             catch (Exception exception)

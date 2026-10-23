@@ -12,7 +12,7 @@ public partial class QuickConnectionWindow : Window, IComponentConnector
 
     /// <summary>
     /// The same window serves "Quick SSH connection" (username@hostname and a password) and
-    /// "Quick telnet connection" (hostname or hostname:port, no password).
+    /// "Quick telnet connection" (hostname, hostname:port, or with a login in front: user:password@hostname:port).
     /// </summary>
     public QuickConnectionWindow(bool telnet)
     {
@@ -24,7 +24,7 @@ public partial class QuickConnectionWindow : Window, IComponentConnector
             lblPassword.Visibility = Visibility.Collapsed;
             txtPassword.Visibility = Visibility.Collapsed;
             // The hint shown while the box is empty (see the TextBox style).
-            txtMachine.Tag = "hostname[:port] or telnets://hostname";
+            txtMachine.Tag = "[user[:password]@]hostname[:port], telnets://hostname";
         }
     }
 
