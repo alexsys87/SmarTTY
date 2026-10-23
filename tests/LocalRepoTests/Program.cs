@@ -293,6 +293,39 @@ internal static class Program
         Check(OpkgSigning.BuildSetupScript().Contains("usign -G") && OpkgSigning.BuildSetupScript().Contains("umask 077"), "setup script: the key pair is made by usign, owner-only");
     }
 
+    /// <summary>Typed folder paths: cleaning, the spellings of a WSL path, and the description of a path that was not found.</summary>
+    private static void FolderPathTests()
+    {
+        const string wsl = "\\\\wsl.localhost\\Ubuntu-24.04\\home\\alex\\openwrt\\bin\\targets\\zynq\\generic\\packages";
+        Check(LocalRepoFolders.Clean("  " + wsl + "  ") == wsl, "clean: blanks around a WSL path are taken away");
+        Check(LocalRepoFolders.Clean("\"" + wsl + "\\\"") == wsl, "clean: quotes (Copy as path) and a trailing backslash are taken away");
+        Check(LocalRepoFolders.Clean("//wsl.localhost/Ubuntu-24.04/home/alex/") == "\\\\wsl.localhost\\Ubuntu-24.04\\home\\alex", "clean: a path with forward slashes that starts with two of them becomes a network path");
+        Check(LocalRepoFolders.Clean("C:") == "C:\\" && LocalRepoFolders.Clean("C:\\") == "C:\\", "clean: the root of a drive keeps its backslash");
+        Check(LocalRepoFolders.Clean("\\\\server\\share\\") == "\\\\server\\share" && LocalRepoFolders.Clean("\\\\server") == "\\\\server", "clean: a share is not shortened to the server");
+        Check(LocalRepoFolders.Clean(null) == "" && LocalRepoFolders.Clean("   ") == "" && LocalRepoFolders.Clean("\"\"") == "", "clean: nothing typed is nothing");
+        Check(LocalRepoFolders.Clean("/home/alex/openwrt/") == "/home/alex/openwrt", "clean: a Unix path loses only the trailing slash");
+
+        Check(LocalRepoFolders.Candidates(wsl).SequenceEqual(new[] { wsl, "\\\\wsl$\\Ubuntu-24.04\\home\\alex\\openwrt\\bin\\targets\\zynq\\generic\\packages" }), "candidates: \\wsl.localhost\\ has the older \\wsl$\\ spelling");
+        Check(LocalRepoFolders.Candidates("\\\\WSL$\\Debian\\x").Last() == "\\\\wsl.localhost\\Debian\\x", "candidates: and the other way round, whatever the case");
+        Check(LocalRepoFolders.Candidates("D:\\build").Count() == 1, "candidates: another path has one spelling");
+        Check(LocalRepoFolders.FindExisting(wsl, p => p.StartsWith("\\\\wsl$\\")) == "\\\\wsl$\\Ubuntu-24.04\\home\\alex\\openwrt\\bin\\targets\\zynq\\generic\\packages", "find: the spelling that exists is the one that is used");
+        Check(LocalRepoFolders.FindExisting(wsl, p => false) == null, "find: nothing exists");
+
+        HashSet<string> existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "\\\\wsl.localhost\\Ubuntu-24.04", "\\\\wsl.localhost\\Ubuntu-24.04\\home", "\\\\wsl.localhost\\Ubuntu-24.04\\home\\alex", "\\\\wsl.localhost\\Ubuntu-24.04\\home\\alex\\openwrt" };
+        string Describe(string path) => LocalRepoFolders.DescribeMissing(path, existing.Contains, folder => folder.EndsWith("openwrt") ? new List<string> { "bin", "feeds", "package" } : new List<string>());
+        string misspelled = Describe(wsl);
+        Check(misspelled.Contains("exists up to \\\\wsl.localhost\\Ubuntu-24.04\\home\\alex\\openwrt") && misspelled.Contains("no \"bin\"") && misspelled.Contains("It holds: bin, feeds, package."), "describe: the part that exists, the name that is missing and what the folder holds");
+        string nothing = LocalRepoFolders.DescribeMissing(wsl, p => false, f => new List<string>());
+        Check(nothing.Contains("Nothing of this WSL path can be reached") && nothing.Contains("wsl -d") && nothing.Contains("wsl -l -v"), "describe: an unreachable WSL path says to start the distribution");
+        string share = LocalRepoFolders.DescribeMissing("\\\\nas\\share\\packages", p => false, f => new List<string>());
+        Check(share.Contains("\\\\nas\\share cannot be reached"), "describe: an unreachable share is named");
+        string local = LocalRepoFolders.DescribeMissing("D:\\build\\bin\\packages", p => p == "D:\\build" || p == "D:", f => new List<string> { "bin2" });
+        Check(local.Contains("exists up to D:\\build") && local.Contains("no \"bin\"") && local.Contains("bin2"), "describe: a local path");
+        string many = LocalRepoFolders.DescribeMissing("\\\\h\\s\\a\\b", p => p == "\\\\h\\s\\a", f => Enumerable.Range(1, 30).Select(i => "d" + i).ToList());
+        Check(many.Contains("d12, ...") && !many.Contains("d13"), "describe: a long list of folders is cut");
+        Check(!LocalRepoFolders.DescribeMissing("\\\\h\\s\\a", p => p == "\\\\h\\s", f => throw new System.IO.IOException("denied")).Contains("holds"), "describe: a folder that cannot be listed adds nothing");
+    }
+
     private static void ScannerTests()
     {
         string root = Path.Combine(_work, "bin", "packages", "arm_cortex-a9_neon");
@@ -1610,6 +1643,7 @@ internal static class Program
             ArIpkTests();
             await HostTests();
             SignatureHostTests();
+            FolderPathTests();
             SigningScriptTests();
             SigningShellTests();
             await SignedIndexServerTests();
