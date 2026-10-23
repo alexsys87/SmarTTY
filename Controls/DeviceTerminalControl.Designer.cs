@@ -656,6 +656,44 @@ public partial class DeviceTerminalControl
             this.terminalEmulatorControl1.TopLine = 0;
             this.terminalEmulatorControl1.UnusedValue = 0;
             this.terminalEmulatorControl1.VerticalScrollBarVisible = true;
+            //
+            // Event handlers (YMODEM, ZMODEM and Kermit items are wired in their own partial files)
+            //
+            this.linkLabel1.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel1_LinkClicked);
+            this.btnDisconnect.Click += new System.EventHandler(this.btnDisconnect_Click);
+            this.btnReconnect.Click += new System.EventHandler(this.btnReconnect_Click);
+            this.btnSend.ButtonClick += new System.EventHandler(this.btnSend_ButtonClick);
+            this.sendAsHEXToolStripMenuItem.Click += new System.EventHandler(this.sendAsHEXToolStripMenuItem_Click);
+            this.sendImmediatelyToolStripMenuItem.Click += new System.EventHandler(this.sendImmediatelyToolStripMenuItem_Click);
+            this.txtHexInput.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtHexInput_KeyDown);
+            this.txtHexInput.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.txtHexInput_KeyPress);
+            this.txtHexInput.TextChanged += new System.EventHandler(this.txtHexInput_TextChanged);
+            this.toolStripButton1.Click += new System.EventHandler(this.toolStripButton1_Click);
+            this.toolStripButton3.ButtonClick += new System.EventHandler(this.toolStripButton3_Click);
+            this.sendBinaryFileToolStripMenuItem.Click += new System.EventHandler(this.toolStripButton3_Click);
+            this.sendFileViaXMODEMToolStripMenuItem.Click += new System.EventHandler(this.sendFileViaXMODEMToolStripMenuItem_Click);
+            this.sendFileViaXMODEM1KToolStripMenuItem.Click += new System.EventHandler(this.sendFileViaXMODEM1KToolStripMenuItem_Click);
+            this.receiveFileViaXMODEMToolStripMenuItem.Click += new System.EventHandler(this.receiveFileViaXMODEMToolStripMenuItem_Click);
+            this.toolStripButton2.Click += new System.EventHandler(this.toolStripButton2_Click);
+            this.btnLog.Click += new System.EventHandler(this.btnLog_Click);
+            this.btnReplay.Click += new System.EventHandler(this.btnReplay_Click);
+            this.cbASCII.Click += new System.EventHandler(this.cbASCII_Click);
+            this.cbHEX.Click += new System.EventHandler(this.cbHEX_Click);
+            this.cbBoth.Click += new System.EventHandler(this.cbBoth_Click);
+            this.echoTypedCharactersToolStripMenuItem.Click += new System.EventHandler(this.echoTypedCharactersToolStripMenuItem_Click);
+            this.changeSettingsToolStripMenuItem.Click += new System.EventHandler(this.changeSettingsToolStripMenuItem_Click);
+            this.cbBaudRate.SelectedIndexChanged += new System.EventHandler(this.cbBaudRate_SelectedIndexChanged);
+            this.cbBaudRate.Leave += new System.EventHandler(this.cbBaudRate_Leave);
+            this.cbBaudRate.KeyDown += new System.Windows.Forms.KeyEventHandler(this.cbBaudRate_KeyDown);
+            this.cbEncoding.SelectedIndexChanged += new System.EventHandler(this.cbEncoding_SelectedIndexChanged);
+            this.contextMenuStrip1.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuStrip1_Opening);
+            this.copyToolStripMenuItem.Click += new System.EventHandler(this.copyToolStripMenuItem_Click);
+            this.copyAllToolStripMenuItem.Click += new System.EventHandler(this.copyAllToolStripMenuItem_Click);
+            this.pasteToolStripMenuItem.Click += new System.EventHandler(this.pasteToolStripMenuItem_Click);
+            this.hexTerminalControl1.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.hexTerminalControl1_KeyPress);
+            this.hexTerminalControl1.KeyDown += new System.Windows.Forms.KeyEventHandler(this.OnTerminalKeyDown);
+            this.terminalEmulatorControl1.DataEntered += new SmarTTY.Controls.TerminalEmulatorControl.TerminalDataHandler(this.OnTerminalDataEntered);
+            this.terminalEmulatorControl1.KeyDown += new System.Windows.Forms.KeyEventHandler(this.OnTerminalKeyDown);
             // 
             // DeviceTerminalControl
             // 
