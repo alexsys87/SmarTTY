@@ -822,6 +822,10 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             {
                 ShowPackageManager(activeSession);
             }
+            else if (localRepoWindow.FileToEdit != null)
+            {
+                Controller.MenuCommandHandlers.CreateNewEditorTab(activeSession, localRepoWindow.FileToEdit);
+            }
         }
         catch (Exception exception)
         {
