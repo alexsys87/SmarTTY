@@ -228,7 +228,7 @@ public partial class SshConnector : Component
         return confirmed;
     }
 
-    private void Authenticate(SshSession session, SSHConnectionSettings sshConnectionSettings, string password, ref bool forcePasswordAuth, System.Runtime.CompilerServices.StrongBox<string> acceptedPassword)
+    private void Authenticate(SshSession session, SSHConnectionSettings sshConnectionSettings, string password, ref bool forcePasswordAuth)
     {
         bool passwordConfirmed = false;
         while (true)
@@ -247,9 +247,7 @@ public partial class SshConnector : Component
                         }
                         if (!authSuccess)
                         {
-                            // Some devices (embedded Linux with a volatile or unsupported authorized_keys) do not keep the key. With a saved
-                            // password there is nothing to ask: fall back to it and set the key up again, as after a "yes" below.
-                            if (sshConnectionSettings.EncryptedSavedPassword != null || Confirm(PromptKind.YesNoWarning, "Cannot authenticate using public key. Enter a password instead?"))
+                            if (Confirm(PromptKind.YesNoWarning, "Cannot authenticate using public key. Enter a password instead?"))
                             {
                                 sshConnectionSettings.AuthenticationType = AuthType.Password;
                                 forcePasswordAuth = true;
@@ -305,7 +303,6 @@ public partial class SshConnector : Component
                     }
                     if (session.Authenticate(sshConnectionSettings.UserName, password ?? ""))
                     {
-                        acceptedPassword.Value = password;
                         if (passwordConfirmed && sshConnectionSettings.EncryptedSavedPassword != null && password != null)
                         {
                             sshConnectionSettings.EncryptedSavedPassword = PasswordProtector.Encrypt(password, "com.sysprogs.smartty.passwords");
@@ -465,21 +462,8 @@ public partial class SshConnector : Component
                 }
             }
             ReportStatus(connectionAttempt, "Authenticating...");
-            System.Runtime.CompilerServices.StrongBox<string> acceptedPassword = new System.Runtime.CompilerServices.StrongBox<string>();
-            Authenticate(sshSession, sshConnectionSettings, password, ref forcePasswordAuth, acceptedPassword);
-            if (forcePasswordAuth && sshConnectionSettings.AuthenticationType == AuthType.Password && AuthorizedKeysManager.IsHomeDirectoryWritableByOthers(sshSession))
-            {
-                // The server (StrictModes) would refuse authorized_keys in a home directory others can write to, e.g. a world-writable
-                // /root on tmpfs: a key set up here could never be used, and every connection would fall back to the password.
-                bool savePassword = sshConnectionSettings.EncryptedSavedPassword == null && acceptedPassword.Value != null && Confirm(PromptKind.YesNoWarning,
-                    "Public key authentication cannot work on this device: its home directory can be written by other users, so the SSH server will refuse the key.\n\nSave the password for this connection instead?");
-                if (savePassword)
-                {
-                    sshConnectionSettings.EncryptedSavedPassword = PasswordProtector.Encrypt(acceptedPassword.Value, "com.sysprogs.smartty.passwords");
-                    sshConnectionSettings.Save();
-                }
-            }
-            else if (forcePasswordAuth)
+            Authenticate(sshSession, sshConnectionSettings, password, ref forcePasswordAuth);
+            if (forcePasswordAuth)
             {
                 ISshKeyPair sshKeyPair = AppEnvironment.KeyFactory.CreateKey(sshConnectionSettings.KeyType.ResolveAuto(PublicKeyType.RSA));
                 ReportStatus(connectionAttempt, "Configuring...");
