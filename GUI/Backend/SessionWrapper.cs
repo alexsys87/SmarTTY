@@ -1278,6 +1278,38 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    /// <summary>
+    /// Downloads the remote directory <paramref name="remoteDir"/> as "&lt;name&gt;.tar.gz" in <paramref name="localDir"/>.
+    /// </summary>
+    public void DoDownloadArchive(string remoteDir, string localDir, bool openWhenDone, bool confirmOverwrite = true)
+    {
+        // The remote name may contain characters that Windows does not allow in file names (':', '?', '*', ...).
+        string fileName = RemotePathUtils.GetFileName(remoteDir.TrimEnd('/'));
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+        {
+            fileName = fileName.Replace(invalid, '_');
+        }
+        string text = Path.Combine(localDir, fileName + ".tar.gz");
+        if (Directory.Exists(text))
+        {
+            MessageBoxes.Error("Cannot download " + remoteDir + ": " + text + " is a directory.");
+            return;
+        }
+        if (confirmOverwrite && File.Exists(text) && !MessageBoxes.AskWarn(text + " already exists. Overwrite it?"))
+        {
+            return;
+        }
+        try
+        {
+            FileTransferManager.TransferJob transferJob = TransferManager.EnqueueDirectoryArchiveDownload(remoteDir, text, null, openWhenDone);
+            SCPController.AddTransfer(transferJob);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot download a folder: " + exception.Message);
+        }
+    }
+
     public void CloseFirstMatchingPage(Predicate<ITabContext> pred, bool closeSessionIfEmpty)
     {
         for (int tabIndex = 0; tabIndex < Tabs.Count; tabIndex++)

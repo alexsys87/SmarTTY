@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Threading;
 
 namespace SmarTTY.Transport;
@@ -59,6 +60,13 @@ public class FileTransferManager : IDisposable
         public volatile bool CancelRequested;
 
         public bool OpenFolderWhenDone;
+
+        /// <summary>
+        /// A download of a remote directory as a .tar.gz archive made by "tar" on the server: <see cref="RemotePath"/>
+        /// is the directory, <see cref="LocalPath"/> the archive, and <see cref="TotalBytes"/> stays 0 (the size of the
+        /// archive is not known in advance). It is neither resumed nor verified.
+        /// </summary>
+        public bool IsArchive;
 
         /// <summary>
         /// Why the transfer failed; null unless <see cref="State"/> is <see cref="TransferState.Failed"/>.
@@ -303,6 +311,34 @@ public class FileTransferManager : IDisposable
     }
 
     /// <summary>
+    /// Queues the download of a remote directory as a .tar.gz archive; throws if the path is not a directory.
+    /// </summary>
+    public TransferJob EnqueueDirectoryArchiveDownload(string remoteDirectory, string localPath, object tag = null, bool openFolderWhenDone = false)
+    {
+        SplitArchivePath(remoteDirectory);
+        RemotePathKind kind = Session.GetRemotePathKind(remoteDirectory);
+        if (kind == RemotePathKind.File)
+        {
+            throw new IOException(remoteDirectory + " is not a directory");
+        }
+        if (kind == RemotePathKind.Missing)
+        {
+            throw new IOException(remoteDirectory + " does not exist");
+        }
+        TransferJob transferJob = new TransferJob
+        {
+            IsDownload = true,
+            IsArchive = true,
+            RemotePath = remoteDirectory,
+            LocalPath = localPath,
+            Tag = tag,
+            OpenFolderWhenDone = openFolderWhenDone
+        };
+        Enqueue(transferJob);
+        return transferJob;
+    }
+
+    /// <summary>
     /// Queues an upload; throws if the local file cannot be read or the remote path is a directory.
     /// Returns null if <paramref name="checkOverwrite"/> is set and the user declined to overwrite an existing remote file.
     /// </summary>
@@ -443,8 +479,14 @@ public class FileTransferManager : IDisposable
                 throw new OperationCanceledException();
             }
             job.State = TransferState.InProgress;
-            using (ITransferBackend backend = CreateBackend())
+            if (job.IsArchive)
             {
+                job.Protocol = "tar";
+                RunArchiveDownload(job);
+            }
+            else
+            {
+                using ITransferBackend backend = CreateBackend();
                 job.Protocol = backend.Name;
                 if (job.IsDownload)
                 {
@@ -574,6 +616,128 @@ public class FileTransferManager : IDisposable
         }
         catch
         {
+        }
+    }
+
+    /// <summary>
+    /// The directory that holds <paramref name="remoteDirectory"/> and its name, for "tar -C parent name".
+    /// Throws for the root directory, which has no name to archive.
+    /// </summary>
+    internal static void SplitArchivePath(string remoteDirectory, out string parent, out string name)
+    {
+        string path = (remoteDirectory ?? "").TrimEnd('/');
+        int slash = path.LastIndexOf('/');
+        name = path.Substring(slash + 1);
+        if (name.Length == 0 || name == "." || name == "..")
+        {
+            throw new IOException("Cannot make an archive of " + remoteDirectory + ": select a folder by its name.");
+        }
+        parent = slash < 0 ? "." : slash == 0 ? "/" : path.Substring(0, slash);
+    }
+
+    private static void SplitArchivePath(string remoteDirectory)
+    {
+        SplitArchivePath(remoteDirectory, out _, out _);
+    }
+
+    private void RunArchiveDownload(TransferJob job)
+    {
+        SplitArchivePath(job.RemotePath, out string parent, out string name);
+        // A name that starts with '-' must not be read as an option of tar.
+        string member = RemoteFileTools.Quote(name.StartsWith("-", StringComparison.Ordinal) ? "./" + name : name);
+        string TarCommand(string compression) => "tar -c" + compression + "f - -C " + RemoteFileTools.Quote(parent) + " " + member;
+        job.TotalBytes = 0;
+        job.TransferredBytes = 0;
+        string partPath = job.LocalPath + PartialDownloadSuffix;
+        try
+        {
+            string failure = DownloadArchive(job, TarCommand("z"), partPath, compressLocally: false, out long received);
+            if (failure != null && received == 0)
+            {
+                // A tar without gzip support (a small BusyBox build): the archive is made plain and compressed here.
+                string plainFailure = DownloadArchive(job, TarCommand(""), partPath, compressLocally: true, out _);
+                failure = plainFailure == null ? null : failure;
+            }
+            if (failure != null)
+            {
+                throw new IOException(failure);
+            }
+            if (File.Exists(job.LocalPath))
+            {
+                File.Delete(job.LocalPath);
+            }
+            File.Move(partPath, job.LocalPath);
+        }
+        catch
+        {
+            TryDeleteLocal(partPath);
+            throw;
+        }
+        if (job.OpenFolderWhenDone)
+        {
+            try
+            {
+                Process.Start(Path.GetDirectoryName(job.LocalPath));
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    /// <summary>
+    /// Runs <paramref name="command"/> and writes its output to <paramref name="partPath"/> (through gzip when
+    /// <paramref name="compressLocally"/> is set). Returns null on success, otherwise what tar said.
+    /// </summary>
+    private string DownloadArchive(TransferJob job, string command, string partPath, bool compressLocally, out long received)
+    {
+        received = 0;
+        job.TransferredBytes = 0;
+        Session.PtyGate.BeginPlainHelper();
+        try
+        {
+            using SshShellChannel channel = Session.OpenShellChannel(command, null, ExtendedDataMode.Normal);
+            using (FileStream fileStream = File.Open(partPath, FileMode.Create, FileAccess.Write, FileShare.Read))
+            {
+                Stream destination = fileStream;
+                GZipStream gzip = null;
+                try
+                {
+                    if (compressLocally)
+                    {
+                        destination = gzip = new GZipStream(fileStream, CompressionMode.Compress, leaveOpen: true);
+                    }
+                    try
+                    {
+                        CopyStream(channel.Output, destination, -1, job, 0);
+                    }
+                    finally
+                    {
+                        received = job.TransferredBytes;
+                    }
+                }
+                finally
+                {
+                    gzip?.Dispose();
+                }
+            }
+            channel.WaitClosed();
+            int exitStatus = channel.ExitStatus;
+            // 1 is GNU tar's "some files changed while they were read": the archive is complete enough to keep.
+            if (exitStatus == 0 || exitStatus == 1)
+            {
+                if (exitStatus == 1)
+                {
+                    job.Checksum = "some files changed while they were read";
+                }
+                return null;
+            }
+            string error = new StreamReader(channel.Error).ReadToEnd().Trim();
+            return string.IsNullOrEmpty(error) ? "tar failed on the server (exit status " + exitStatus + ")." : error;
+        }
+        finally
+        {
+            Session.PtyGate.EndPlainHelper();
         }
     }
 
@@ -716,7 +880,9 @@ public class FileTransferManager : IDisposable
         // The rate is measured over short intervals of active transfer, so that a pause does not drag it down.
         Stopwatch rateClock = Stopwatch.StartNew();
         long rateBytes = 0L;
-        while (totalRead < length)
+        // A negative length is a stream of unknown size, read to its end.
+        bool untilEnd = length < 0;
+        while (untilEnd || totalRead < length)
         {
             CheckCancelled(job);
             if (_paused)
@@ -726,7 +892,7 @@ public class FileTransferManager : IDisposable
                 rateClock.Restart();
                 rateBytes = totalRead;
             }
-            int chunk = (int)Math.Min(_limiter.ChunkSize(buffer.Length), length - totalRead);
+            int chunk = untilEnd ? _limiter.ChunkSize(buffer.Length) : (int)Math.Min(_limiter.ChunkSize(buffer.Length), length - totalRead);
             int bytesRead = sourceStream.Read(buffer, 0, chunk);
             if (bytesRead <= 0)
             {
@@ -751,7 +917,7 @@ public class FileTransferManager : IDisposable
             // A transfer shorter than one measuring interval.
             job.BytesPerSecond = totalRead * 1000 / Math.Max(1L, rateClock.ElapsedMilliseconds);
         }
-        if (totalRead != length)
+        if (!untilEnd && totalRead != length)
         {
             throw new IOException(job.IsDownload
                 ? "The transfer ended after " + (startOffset + totalRead) + " of " + (startOffset + length) + " bytes."

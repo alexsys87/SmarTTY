@@ -79,7 +79,8 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
                                 return "Paused";
                             }
                             long total = _Context.TotalBytes;
-                            string text = (total > 0) ? $"{_Context.TransferredBytes * 100 / total}%" : "In progress";
+                            // An archive made on the fly has no size known in advance: what has arrived is shown instead.
+                            string text = (total > 0) ? $"{_Context.TransferredBytes * 100 / total}%" : (_Context.IsArchive && _Context.TransferredBytes > 0) ? StringUtils.FormatSize(_Context.TransferredBytes) + "B received" : "In progress";
                             TimeSpan? remaining = _Context.Remaining;
                             if (remaining.HasValue)
                             {

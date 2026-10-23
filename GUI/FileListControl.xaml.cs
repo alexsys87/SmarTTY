@@ -19,6 +19,7 @@ public partial class FileListControl : UserControl, IComponentConnector
     {
         Open,
         Download,
+        DownloadArchive,
         Upload
     }
 
@@ -111,18 +112,36 @@ public partial class FileListControl : UserControl, IComponentConnector
         }
     }
 
+    private void DownloadArchive_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (FileExplorer.ItemWrapper item in ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>())
+        {
+            if (item.Entry.IsDirectory && item.Name != "..")
+            {
+                FileActionRequested?.Invoke(this, new FileEventArgs
+                {
+                    FullPath = item.FullPath,
+                    Event = FileEvent.DownloadArchive
+                });
+            }
+        }
+    }
+
     private void TransferList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         try
         {
             _SelDepth++;
             bool directorySelectionChanged = false;
+            bool archivableSelected = false;
             bool fileSelectionChanged = false;
             foreach (FileExplorer.ItemWrapper item in ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>())
             {
                 if (item.Entry.IsDirectory)
                 {
                     directorySelectionChanged = true;
+                    // ".." is the parent directory, not a folder to download.
+                    archivableSelected |= item.Name != "..";
                 }
                 else
                 {
@@ -131,6 +150,7 @@ public partial class FileListControl : UserControl, IComponentConnector
             }
             cmdDownload.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             cmdEdit.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
+            cmdDownloadArchive.Visibility = archivableSelected ? Visibility.Visible : Visibility.Collapsed;
             cmdNavigate.Visibility = ((!directorySelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             if (((ListBox)TransferList).SelectedItems.Count == 0 && ((CollectionView)TransferList.Items).Count > 0 && _SelDepth < 5)
             {
