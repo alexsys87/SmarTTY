@@ -32,6 +32,9 @@ public sealed class LocalRepoHost
 
     private bool _DisableOfficial;
 
+    // The port the tunnel listens on at the device: the port of the server, or the next free one when the device still holds that one.
+    private int _DevicePort;
+
     // The signature check of opkg was on and is commented out while the server runs.
     private bool _SignatureCheckOff;
 
@@ -95,7 +98,7 @@ public sealed class LocalRepoHost
     {
         lock (_Sync)
         {
-            return _Manager == LocalRepoPackageManager.Apk ? ApkFeedConfig.FeedLine(feed, _Server?.Port ?? 0) : OpkgFeedConfig.FeedLine(feed, _Server?.Port ?? 0);
+            return _Manager == LocalRepoPackageManager.Apk ? ApkFeedConfig.FeedLine(feed, _DevicePort) : OpkgFeedConfig.FeedLine(feed, _DevicePort);
         }
     }
 
@@ -232,18 +235,12 @@ public sealed class LocalRepoHost
         }
 
         bool tunnelStarted = false;
+        int devicePort = server.Port;
         try
         {
-            try
-            {
-                session.StartRemoteForward((uint)server.Port, "127.0.0.1", (uint)server.Port);
-                tunnelStarted = true;
-            }
-            catch (Exception exception)
-            {
-                throw new InvalidOperationException("The SSH server of the device did not accept the reverse tunnel for port " + server.Port + " (the port may be busy on the device, or TCP forwarding is disabled in its SSH server): " + exception.Message, exception);
-            }
-            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey, allowUnsigned, disableOfficial);
+            devicePort = OpenTunnel(session, server.Port);
+            tunnelStarted = true;
+            ConfigureDevice(session, manager, feeds, devicePort, isRoot, publicKey, allowUnsigned, disableOfficial);
         }
         catch
         {
@@ -264,6 +261,7 @@ public sealed class LocalRepoHost
             _PublicKey = publicKey;
             _AllowUnsigned = allowUnsigned;
             _DisableOfficial = disableOfficial;
+            _DevicePort = devicePort;
             _SignatureCheckOff = allowUnsigned && signatureCheckOn;
             _SignGenerated = false;
             _SigningFingerprint = null;
@@ -286,7 +284,7 @@ public sealed class LocalRepoHost
         {
             Report(signatureNote);
         }
-        CheckDeviceReachesServer(session, server.Port);
+        CheckDeviceReachesServer(session, devicePort);
     }
 
     /// <summary>
@@ -357,10 +355,12 @@ public sealed class LocalRepoHost
     {
         SshSession session;
         LocalRepoServer server;
+        int devicePort;
         lock (_Sync)
         {
             session = _TunnelSession;
             server = _Server;
+            devicePort = _DevicePort;
             if (_SigningFingerprint == null)
             {
                 return null;
@@ -370,7 +370,7 @@ public sealed class LocalRepoHost
         {
             return null;
         }
-        List<string> output = session.RunCommandChecked(OpkgSigning.BuildSignScript(OpkgFeedConfig.BaseUrl(server.Port) + indexUrlPath), requireSuccess: true);
+        List<string> output = session.RunCommandChecked(OpkgSigning.BuildSignScript(OpkgFeedConfig.BaseUrl(devicePort) + indexUrlPath), requireSuccess: true);
         byte[] signature = OpkgSigning.ParseSignature(output);
         if (signature == null)
         {
@@ -524,12 +524,13 @@ public sealed class LocalRepoHost
         try
         {
             bool isRoot = IsRoot(session);
-            session.StartRemoteForward((uint)server.Port, "127.0.0.1", (uint)server.Port);
-            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey, allowUnsigned, disableOfficial);
+            int devicePort = OpenTunnel(session, server.Port);
+            ConfigureDevice(session, manager, feeds, devicePort, isRoot, publicKey, allowUnsigned, disableOfficial);
             lock (_Sync)
             {
                 if (_Server == server)
                 {
+                    _DevicePort = devicePort;
                     _TunnelSession = session;
                 }
             }
@@ -544,6 +545,40 @@ public sealed class LocalRepoHost
         {
             Report("Could not restore the tunnel after reconnecting: " + exception.Message + " Stop the server and start it again.");
         }
+    }
+
+    private const int TunnelPortAttempts = 6;
+
+    /// <summary>
+    /// Opens the reverse tunnel for <paramref name="port"/> and returns the port it listens on at the device. A device that
+    /// still holds the port of an earlier run (its SSH server may not release the listener when the tunnel is cancelled) refuses
+    /// it, so a few of the following ports are tried; the feeds then name the port that worked.
+    /// </summary>
+    private int OpenTunnel(SshSession session, int port)
+    {
+        Exception first = null;
+        for (int attempt = 0; attempt < TunnelPortAttempts; attempt++)
+        {
+            int devicePort = port + attempt;
+            if (devicePort > 65535)
+            {
+                break;
+            }
+            try
+            {
+                session.StartRemoteForward((uint)devicePort, "127.0.0.1", (uint)port);
+                if (attempt > 0)
+                {
+                    Report("Port " + port + " is still held on the device; the tunnel listens on port " + devicePort + " there instead.");
+                }
+                return devicePort;
+            }
+            catch (Exception exception)
+            {
+                first = first ?? exception;
+            }
+        }
+        throw new InvalidOperationException("The SSH server of the device did not accept the reverse tunnel for port " + port + " (the port may be busy on the device, or TCP forwarding is disabled in its SSH server): " + first?.Message, first);
     }
 
     private static void ConfigureDevice(SshSession session, LocalRepoPackageManager manager, IList<LocalRepoFeed> feeds, int port, bool isRoot, string publicKey, bool allowUnsigned, bool disableOfficial)
