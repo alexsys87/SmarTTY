@@ -93,6 +93,7 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
     private readonly DeviceTerminalControl _terminal;
     private readonly ConsoleOutputWatcher _watcher = new ConsoleOutputWatcher();
     private readonly List<ServedFile> _files = new List<ServedFile>();
+    private TftpTransfer _currentTransfer; // the transfer the progress bar shows: the latest one that started
     private readonly Dictionary<string, int> _completedTransfers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
     private readonly ListBox _fileList;
@@ -464,6 +465,8 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
             server.AddFile(file.Name, file.FullPath);
         }
         server.Log += message => OnUi(() => Log(message));
+        _currentTransfer = null;
+        server.TransferStarted += transfer => OnUi(() => _currentTransfer = transfer);
         server.TransferProgress += transfer => OnUi(() => ShowTransferProgress(transfer));
         server.TransferEnded += transfer => OnUi(() => TransferEnded(transfer));
         try
@@ -500,8 +503,19 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         }
     }
 
+    // A transfer that a newer one of the same client replaced (the board started over) still reports its end; the bar
+    // is the new transfer's by then.
+    private bool IsReplaced(TftpTransfer transfer)
+    {
+        return _currentTransfer != null && !ReferenceEquals(_currentTransfer, transfer);
+    }
+
     private void ShowTransferProgress(TftpTransfer transfer)
     {
+        if (IsReplaced(transfer))
+        {
+            return;
+        }
         if (transfer.Length > 0)
         {
             _progress.Value = (int)Math.Min(100, transfer.BytesAcknowledged * 100 / transfer.Length);
@@ -516,7 +530,7 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
             _progress.Value = 100;
             _completedTransfers[transfer.FileName] = CompletedCount(transfer.FileName) + 1;
         }
-        else
+        else if (!IsReplaced(transfer))
         {
             _progress.Value = 0;
         }

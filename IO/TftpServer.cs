@@ -710,12 +710,25 @@ public sealed class TftpServer : IDisposable
         int timeoutMs;
         try
         {
-            // Not shared for writing: a firmware rebuilt in place while it is being sent would reach the board half old,
-            // half new. Replacing the file (rename, delete and create) is still possible; the transfer goes on with the
-            // content it opened.
-            stream = new FileStream(transfer.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            // The file is served from a copy made now (see OpenSnapshot).
+            stream = OpenSnapshot(transfer);
             transfer.Length = stream.Length;
             NegotiateOptions(options, transfer, out oack, out timeoutMs);
+        }
+        catch (OperationCanceledException)
+        {
+            // Stop(), or the board starting over from the same port, came while the copy was made. The transfer never
+            // started and the client is told nothing: it may already be talking to the transfer that replaced this one.
+            stream?.Dispose();
+            try
+            {
+                socket.Close();
+            }
+            catch (Exception)
+            {
+            }
+            RemoveActive(transfer);
+            return;
         }
         catch (Exception ex)
         {
@@ -788,6 +801,47 @@ public sealed class TftpServer : IDisposable
         finally
         {
             RemoveActive(transfer);
+        }
+    }
+
+    /// <summary>
+    /// Copies the file to a temporary one and gives that back, opened for reading and deleted when closed. The transfer is
+    /// served from the copy: a firmware rebuilt in place while it is being sent cannot reach the board half old, half new,
+    /// and the program that writes it is not kept out of the file for the length of the transfer, as it would be by a
+    /// read lock. The price is the copy before the first packet. What is not told is a rewrite of the same size during
+    /// the copy itself (a second or so); a change in the size or in the time of the last write is.
+    /// </summary>
+    private static FileStream OpenSnapshot(TftpTransfer transfer)
+    {
+        DateTime writtenBefore = File.GetLastWriteTimeUtc(transfer.FilePath);
+        using (FileStream source = new FileStream(transfer.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+        {
+            long length = source.Length;
+            FileStream copy = new FileStream(Path.Combine(Path.GetTempPath(), "smartty-tftp-" + Guid.NewGuid().ToString("N") + ".tmp"),
+                FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 4096, FileOptions.DeleteOnClose);
+            try
+            {
+                byte[] buffer = new byte[256 * 1024];
+                int read;
+                while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    ThrowIfCancelled(transfer);
+                    copy.Write(buffer, 0, read);
+                }
+                ThrowIfCancelled(transfer);
+                if (copy.Length != length || source.Length != length || File.GetLastWriteTimeUtc(transfer.FilePath) != writtenBefore)
+                {
+                    // An error that makes U-Boot ask again: by then the program that writes the file may be done.
+                    throw new IOException("The file is being changed.");
+                }
+                copy.Position = 0;
+                return copy;
+            }
+            catch
+            {
+                copy.Dispose();
+                throw;
+            }
         }
     }
 
@@ -987,12 +1041,6 @@ public sealed class TftpServer : IDisposable
                 gapResendFor = acked;
                 next = acked + 1;
             }
-        }
-
-        if (stream.Length != transfer.Length)
-        {
-            // The sharing mode keeps writers out where the system enforces it; this is for where it does not.
-            throw new TransferFailure("The file changed while it was being sent: the client may have a mixture of the old and the new content.");
         }
 
         transfer.BytesAcknowledged = transfer.Length;

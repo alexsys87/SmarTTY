@@ -853,54 +853,68 @@ internal static class Program
 
     private static void ChangedFileTests()
     {
-        // A firmware rebuilt while it is being sent must not pass as a good transfer.
-        string f = MakeFile("changed.bin", 20 * 512, 18);
-        using TftpServer server = StartServer(f);
-        List<TftpTransfer> ended = new List<TftpTransfer>();
-        server.TransferEnded += t => { lock (ended) ended.Add(t); };
+        // The file is served from a copy: a firmware rebuilt while it is being sent reaches the board as it was when the
+        // board asked, and the program that rebuilds it is not kept out of the file.
+        int tempBefore = Directory.GetFiles(Path.GetTempPath(), "smartty-tftp-*.tmp").Length;
+        byte[] original = new byte[20 * 512];
+        new Random(18).NextBytes(original);
+        string f = Path.Combine(_dir, "changed.bin");
+        File.WriteAllBytes(f, original);
+        using (TftpServer server = StartServer(f))
+        {
+            List<TftpTransfer> ended = new List<TftpTransfer>();
+            server.TransferEnded += t => { lock (ended) ended.Add(t); };
 
-        using Socket socket = BeginTransfer(server, Request(1, "changed.bin", "octet"), out IPEndPoint tid, out byte[] firstPacket);
-        bool written = false;
-        try
-        {
-            using FileStream writer = new FileStream(f, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
-            writer.Seek(0, SeekOrigin.End);
-            writer.Write(new byte[100], 0, 100);
-            written = true;
-        }
-        catch (IOException)
-        {
-            // The server holds the file so that nobody can change it: the best outcome.
-        }
-
-        byte[] buffer = new byte[2048];
-        long block = firstPacket[3];
-        bool last = firstPacket.Length - 4 < 512;
-        while (true)
-        {
-            socket.SendTo(Ack(block), tid);
-            if (last || !socket.Poll(2000000, SelectMode.SelectRead))
+            using Socket socket = BeginTransfer(server, Request(1, "changed.bin", "octet"), out IPEndPoint tid, out byte[] firstPacket);
+            Check("changed file: the first block arrives", tid != null && firstPacket[3] == 1);
+            bool written = false;
+            try
             {
-                break;
+                using FileStream writer = new FileStream(f, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                writer.Write(new byte[100], 0, 100); // rewritten in place, the same size
+                writer.Seek(0, SeekOrigin.End);
+                writer.Write(new byte[100], 0, 100); // and grown
+                written = true;
             }
-            EndPoint from = new IPEndPoint(IPAddress.Any, 0);
-            int n = socket.ReceiveFrom(buffer, ref from);
-            if (buffer[1] != 3)
+            catch (IOException)
             {
-                break;
             }
-            block = (buffer[2] << 8) | buffer[3];
-            last = n - 4 < 512;
-        }
+            Check("changed file: the program that writes the file is not kept out of it", written);
 
-        Check("changed file: the transfer ends", WaitFor(() => { lock (ended) return ended.Count == 1; }));
-        if (written)
-        {
-            Check("changed file: a file that grew while it was sent is reported as failed", ended.Count == 1 && ended[0].State == TftpTransferState.Failed && ended[0].Error.Contains("changed"), ended.Count == 1 ? ended[0].State + " " + ended[0].Error : "no event");
+            List<byte> received = new List<byte>();
+            received.AddRange(firstPacket.Skip(4));
+            byte[] buffer = new byte[2048];
+            long block = firstPacket[3];
+            bool last = firstPacket.Length - 4 < 512;
+            while (true)
+            {
+                socket.SendTo(Ack(block), tid);
+                if (last || !socket.Poll(2000000, SelectMode.SelectRead))
+                {
+                    break;
+                }
+                EndPoint from = new IPEndPoint(IPAddress.Any, 0);
+                int n = socket.ReceiveFrom(buffer, ref from);
+                if (buffer[1] != 3)
+                {
+                    break;
+                }
+                block = (buffer[2] << 8) | buffer[3];
+                received.AddRange(buffer.Skip(4).Take(n - 4));
+                last = n - 4 < 512;
+            }
+
+            Check("changed file: the transfer ends", WaitFor(() => { lock (ended) return ended.Count == 1; }));
+            Check("changed file: it is a good transfer", ended.Count == 1 && ended[0].Succeeded, ended.Count == 1 ? ended[0].State + " " + ended[0].Error : "no event");
+            Check("changed file: the board gets the content the file had when it asked", received.SequenceEqual(original), received.Count + " bytes");
         }
-        else
+        Check("changed file: no copy is left behind", Directory.GetFiles(Path.GetTempPath(), "smartty-tftp-*.tmp").Length <= tempBefore);
+
+        // The next request gets the new content.
+        using (TftpServer server = StartServer(f))
         {
-            Check("changed file: the file could not be written to while it was sent", ended.Count == 1 && ended[0].Succeeded);
+            DownloadResult r = Download(server.LocalEndPoint, Request(1, "changed.bin", "octet"));
+            Check("changed file: the next transfer sends the new content", r.Completed && Same(r.Data, f) && r.Data.Length == original.Length + 100, r.Data == null ? "no data" : r.Data.Length.ToString());
         }
     }
 
