@@ -1310,6 +1310,49 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    /// <summary>
+    /// Runs a local shell script on the server: it is uploaded to /tmp (owner-only, executable), run in a new terminal
+    /// tab of this session, so that everything it prints (and what it asks for) is in the terminal, and removed again when it
+    /// has ended. A script with a shebang uses the interpreter it names (bash, ash, ...), one without runs under sh.
+    /// </summary>
+    public void RunScript(string localPath)
+    {
+        byte[] content;
+        try
+        {
+            content = File.ReadAllBytes(localPath);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot read " + localPath + ": " + exception.Message);
+            return;
+        }
+        string problem = RemoteScript.Validate(content);
+        if (problem != null)
+        {
+            MessageBoxes.Error(Path.GetFileName(localPath) + ": " + problem);
+            return;
+        }
+        byte[] data = RemoteScript.Normalize(content);
+        string remotePath = RemoteScript.MakeRemotePath(Path.GetFileName(localPath), Guid.NewGuid().ToString("N").Substring(0, 8));
+        string command = RemoteScript.BuildCommand(remotePath, RemoteScript.HasShebang(data), TryExtractCurrentDir());
+        SshSession session = Session;
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            try
+            {
+                using ScpChannelStream upload = session.OpenUpload(remotePath, data.Length, DateTime.Now, RemoteScript.FileMode);
+                upload.Write(data, 0, data.Length);
+            }
+            catch (Exception exception)
+            {
+                _Controller.BeginInvoke(() => MessageBoxes.Error("Cannot upload the script to " + remotePath + ": " + exception.Message));
+                return;
+            }
+            _Controller.BeginInvoke(() => CreateNewTerminalPage(virtualMode: false, new InitialCommand(command, echoInitialCommand: false)));
+        });
+    }
+
     public void CloseFirstMatchingPage(Predicate<ITabContext> pred, bool closeSessionIfEmpty)
     {
         for (int tabIndex = 0; tabIndex < Tabs.Count; tabIndex++)

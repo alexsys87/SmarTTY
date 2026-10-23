@@ -67,6 +67,7 @@ internal static class FileTransferManagerTests
                 ResumeUpload();
                 DisposeFailsQueuedTransfers();
             }
+            RunScriptOnServer();
             Test.Section("Folder download as .tar.gz");
             using (FileTransferManager archiveManager = NewManager())
             {
@@ -233,6 +234,24 @@ internal static class FileTransferManagerTests
         Test.Check(!File.Exists(Local("hello.txt") + FileTransferManager.PartialDownloadSuffix), Label("no partial file is left after a download"));
         Test.Equal(5L, job.TransferredBytes, Label("the progress reaches the file size"));
         Test.Equal("SHA-256 verified", job.Checksum, Label("the download is verified with SHA-256"));
+    }
+
+    // "Tools > Run script": the script is uploaded to /tmp owner-only and executable, run, removed, and its exit status survives.
+    private static void RunScriptOnServer()
+    {
+        Test.Section("Run script");
+        byte[] script = RemoteScript.Normalize(System.Text.Encoding.UTF8.GetBytes("\uFEFF#!/bin/sh\r\necho \"hello from $(basename \"$0\" | cut -c1-8)\"\r\necho oops >&2\r\nexit 3\r\n"));
+        string path = RemoteScript.MakeRemotePath("my script.sh", "it" + Guid.NewGuid().ToString("N").Substring(0, 6));
+        using (ScpChannelStream upload = _session.OpenUpload(path, script.Length, DateTime.Now, RemoteScript.FileMode))
+        {
+            upload.Write(script, 0, script.Length);
+        }
+        Test.Equal("700", RemoteStat(path).Split(' ')[0], "the script is uploaded owner-only and executable");
+        string home = _session.RunCommandChecked("pwd", requireSuccess: true)?.Find((string line) => line.StartsWith("/")) ?? "/";
+        List<string> output = _session.RunCommand(RemoteScript.BuildCommand(path, RemoteScript.HasShebang(script), home), out int? exitStatus);
+        Test.Equal(3, exitStatus ?? -1, "the exit status of the script comes back");
+        Test.Check(output != null && output.Contains("hello from smartty-") && output.Contains("oops"), "its output and error output are received (got: " + string.Join(" | ", output ?? new List<string>()) + ")");
+        Test.Equal(1, _session.RunCommand("test -e " + RemotePathUtils.ShellQuote(path), out int? testStatus) != null ? testStatus ?? -1 : -1, "the script is removed after it has run");
     }
 
     private static void ArchiveDownload(FileTransferManager manager)
