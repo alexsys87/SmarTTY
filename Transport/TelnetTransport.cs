@@ -161,6 +161,17 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
             }
             // A diagnostic record of the traffic, only when SMARTTY_TELNET_TRACE names a file.
             wire = TelnetTraceStream.WrapIfRequested(wire, _telnet.Host + ":" + _telnet.Port);
+            TelnetAutoLogin autoLogin = CreateAutoLogin();
+            if (wire is TelnetTraceStream trace)
+            {
+                trace.Annotate(autoLogin == null
+                    ? "automatic login: not configured (no user name, no password)"
+                    : "automatic login: configured (" + autoLogin.Describe() + ")");
+                if (autoLogin != null)
+                {
+                    autoLogin.Log = trace.Annotate;
+                }
+            }
             stream = new TelnetStream(wire, new TelnetOptions
             {
                 TerminalType = _telnet.TerminalType,
@@ -168,7 +179,7 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 Rows = rows,
                 ActiveNegotiation = _telnet.ActiveNegotiation,
                 AllowLineMode = _telnet.LineMode,
-                AutoLogin = CreateAutoLogin(),
+                AutoLogin = autoLogin,
                 TerminalSpeed = _telnet.EffectiveTerminalSpeed(),
                 XDisplayLocation = _telnet.EffectiveXDisplayLocation(System.Environment.GetEnvironmentVariable("DISPLAY")),
                 Environment = TelnetEnvironment.Parse(_telnet.EffectiveEnvironmentVariables()),

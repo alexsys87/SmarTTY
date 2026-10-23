@@ -61,6 +61,15 @@ internal sealed class TelnetAutoLogin
 
     private Stage _stage;
 
+    /// <summary>Told what the automatic login does (for the trace of a connection); never the user name or the password.</summary>
+    public Action<string> Log { get; set; }
+
+    /// <summary>What is configured, without the values: "user name yes, password yes".</summary>
+    public string Describe()
+    {
+        return "user name " + (_userName.Length > 0 ? "yes" : "no") + ", password " + (_password.Length > 0 ? "yes" : "no");
+    }
+
     /// <param name="userName">Empty: the server is not asked for a user name.</param>
     /// <param name="password">Empty: no password is sent.</param>
     /// <param name="loginPrompts">Texts a login prompt ends with, separated by ';' (empty: the default list).</param>
@@ -106,6 +115,7 @@ internal sealed class TelnetAutoLogin
         {
             _stage = Stage.Finished;
             _tail.Clear();
+            Log?.Invoke("automatic login: gave up, no prompt was recognised within " + (_timeoutMs / 1000) + " s");
             return Array.Empty<string>();
         }
         for (int i = offset; i < offset + count; i++)
@@ -122,12 +132,14 @@ internal sealed class TelnetAutoLogin
         {
             _tail.Clear();
             _stage = _password.Length > 0 ? Stage.WaitingForPassword : Stage.Finished;
+            Log?.Invoke("automatic login: login prompt recognised, user name sent");
             return new[] { _userName + _lineEnding };
         }
         if (_stage == Stage.WaitingForPassword && EndsWithAny(visible, _passwordPrompts))
         {
             _tail.Clear();
             _stage = Stage.Finished;
+            Log?.Invoke("automatic login: password prompt recognised, password sent");
             return new[] { _password + _lineEnding };
         }
         return Array.Empty<string>();

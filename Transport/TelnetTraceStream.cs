@@ -62,6 +62,12 @@ internal sealed class TelnetTraceStream : Stream
         }
     }
 
+    /// <summary>Adds a remark of this program to the record (what the automatic login did, for example).</summary>
+    public void Annotate(string text)
+    {
+        Note(text);
+    }
+
     public override bool CanRead => _inner.CanRead;
 
     public override bool CanSeek => false;
