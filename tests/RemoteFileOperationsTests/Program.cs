@@ -127,6 +127,37 @@ internal static class Program
         Equal(RemoteScript.BuildCommand("/tmp/s.sh", false, null), "sh '/tmp/s.sh'; rc=$?; rm -f '/tmp/s.sh'; exit $rc", "a script without one is given to sh");
     }
 
+    private static void RunInPlaceChecks(string root)
+    {
+        Check(RemoteScript.IsScriptFileName("run.sh") && RemoteScript.IsScriptFileName("RUN.SH") && RemoteScript.IsScriptFileName("a.bash") && RemoteScript.IsScriptFileName("a.ash") && RemoteScript.IsScriptFileName("a b.ksh") && RemoteScript.IsScriptFileName("x.zsh") && RemoteScript.IsScriptFileName("x.dash"), "shell script extensions are recognized");
+        Check(!RemoteScript.IsScriptFileName("sh") && !RemoteScript.IsScriptFileName(".sh") && !RemoteScript.IsScriptFileName("notes.txt") && !RemoteScript.IsScriptFileName("a.sh.bak") && !RemoteScript.IsScriptFileName("") && !RemoteScript.IsScriptFileName(null), "other names are not offered");
+
+        string folder = Path.Combine(root, "it's a folder");
+        Directory.CreateDirectory(folder);
+        // The scripts print the folder they run in and what they were given as $0, and exit with 5.
+        string body = "echo \"dir=$(pwd | sed 's|.*/||') name=$0\"\necho from-stderr >&2\nexit 5\n";
+        (string Name, string Content, bool Executable, string Expect)[] cases =
+        {
+            ("exec shebang.sh", "#!/bin/sh\n" + body, true, "dir=it's a folder name=./exec shebang.sh"),
+            ("plain shebang.sh", "#!/bin/sh\n" + body, false, "dir=it's a folder name=./plain shebang.sh"),
+            ("env shebang.sh", "#!/usr/bin/env sh\n" + body, false, "dir=it's a folder name=./env shebang.sh"),
+            ("crlf shebang.sh", "#!/bin/sh\r\n" + body, false, "dir=it's a folder name=./crlf shebang.sh"),
+            ("no shebang.sh", body, false, "dir=it's a folder name=./no shebang.sh"),
+            ("-dash.sh", body, false, "dir=it's a folder name=./-dash.sh"),
+        };
+        foreach (var testCase in cases)
+        {
+            string path = Path.Combine(folder, testCase.Name);
+            File.WriteAllText(path, testCase.Content);
+            Equal(Run("chmod " + (testCase.Executable ? "700" : "600") + " " + RemotePathUtils.ShellQuote(path), out _), 0, "set the mode of " + testCase.Name);
+            string text = RunOutput(RemoteScript.BuildRunInPlaceCommand(path));
+            Check(text.Contains(testCase.Expect) && text.Contains("from-stderr"), _shell + ": " + testCase.Name + " runs from its own folder (got: " + text.Trim().Replace("\n", " | ") + ")");
+            Equal(Run(RemoteScript.BuildRunInPlaceCommand(path), out _), 5, testCase.Name + ": the exit status of the script is kept");
+            Check(File.Exists(path) && File.ReadAllText(path) == testCase.Content, testCase.Name + ": the script is left unchanged");
+        }
+        Check(Run(RemoteScript.BuildRunInPlaceCommand(Path.Combine(folder, "missing.sh")), out string errors) != 0 && errors.Length > 0, "a script that does not exist fails with a message");
+    }
+
     private static void ScriptRunChecks(string root)
     {
         string work = Path.Combine(root, "work dir");
@@ -254,6 +285,7 @@ internal static class Program
                 Directory.CreateDirectory(shellRoot);
                 CommandChecks(shellRoot);
                 ScriptRunChecks(shellRoot);
+                RunInPlaceChecks(shellRoot);
             }
         }
         catch (Exception exception)

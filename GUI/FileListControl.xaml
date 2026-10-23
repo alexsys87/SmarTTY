@@ -44,6 +44,11 @@
                 <Image Source="../icons/MainWindow/download.png" />
               </MenuItem.Icon>
             </MenuItem>
+            <MenuItem Name="cmdRun" Header="Run" ToolTip="Runs the selected shell script in a new terminal tab, in the folder it is in" Click="Run_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/PlayHS.png" />
+              </MenuItem.Icon>
+            </MenuItem>
             <MenuItem Name="cmdNavigate" Header="Go to subdirectory.." Click="Navigate_Click">
               <MenuItem.Icon>
                 <Image Source="../icons/MainWindow/go16.png" />

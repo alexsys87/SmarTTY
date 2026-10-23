@@ -16,6 +16,42 @@ public static class RemoteScript
 
     private const int MaxNameLength = 40;
 
+    private static readonly string[] ScriptExtensions = { ".sh", ".bash", ".ash", ".dash", ".ksh", ".zsh" };
+
+    /// <summary>True for the names of shell scripts the file list offers to run: .sh, .bash, .ash, .dash, .ksh and .zsh.</summary>
+    public static bool IsScriptFileName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+        foreach (string extension in ScriptExtensions)
+        {
+            if (name.Length > extension.Length && name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The command that runs a script that is already on the server, from the folder it is in. An executable file is run
+    /// as it is (its own shebang decides); one that is not executable is given to the interpreter its shebang names
+    /// ("#!/bin/bash", "#!/usr/bin/env bash"), or to sh when it has none, so that the file is never changed. The whole
+    /// line runs in sh, whatever the login shell of the user is.
+    /// </summary>
+    public static string BuildRunInPlaceCommand(string remotePath)
+    {
+        int slash = remotePath.LastIndexOf('/');
+        string directory = slash < 0 ? "." : slash == 0 ? "/" : remotePath.Substring(0, slash);
+        string name = remotePath.Substring(slash + 1);
+        // "./" in front of the name: a name that starts with '-' is not an option of the interpreter.
+        string script = "cd " + RemotePathUtils.ShellQuote(directory) + " && f=" + RemotePathUtils.ShellQuote("./" + name)
+            + " && if [ -x \"$f\" ]; then \"$f\"; else l=$(head -n 1 \"$f\" | tr -d '\\r'); case \"$l\" in '#!'*) ${l#??} \"$f\";; *) sh \"$f\";; esac; fi";
+        return "sh -c " + RemotePathUtils.ShellQuote(script);
+    }
+
     /// <summary>Returns null if <paramref name="content"/> can be run as a script, otherwise why it cannot.</summary>
     public static string Validate(byte[] content)
     {

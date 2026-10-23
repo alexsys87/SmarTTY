@@ -1311,6 +1311,15 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     }
 
     /// <summary>
+    /// Runs a shell script that is on the server in a new terminal tab, from the folder it is in (see
+    /// <see cref="RemoteScript.BuildRunInPlaceCommand"/>): everything it prints and asks is in that tab.
+    /// </summary>
+    public void RunRemoteScript(string remotePath)
+    {
+        CreateNewTerminalPage(virtualMode: false, new InitialCommand(RemoteScript.BuildRunInPlaceCommand(remotePath), echoInitialCommand: false));
+    }
+
+    /// <summary>
     /// Runs a local shell script on the server: it is uploaded to /tmp (owner-only, executable), run in a new terminal
     /// tab of this session, so that everything it prints (and what it asks for) is in the terminal, and removed again when it
     /// has ended. A script with a shebang uses the interpreter it names (bash, ash, ...), one without runs under sh.

@@ -736,6 +736,9 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                 case FileListControl.FileEvent.Download:
                     Controller.MenuCommandHandlers.QuickDownload(e.FullPath);
                     break;
+                case FileListControl.FileEvent.Run:
+                    Controller.MenuCommandHandlers.RunRemoteScript(e.FullPath);
+                    break;
                 case FileListControl.FileEvent.DownloadArchive:
                     Controller.MenuCommandHandlers.QuickDownloadArchive(e.FullPath);
                     break;

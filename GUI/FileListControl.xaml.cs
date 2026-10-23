@@ -21,6 +21,7 @@ public partial class FileListControl : UserControl, IComponentConnector
         Open,
         Download,
         DownloadArchive,
+        Run,
         Upload
     }
 
@@ -113,6 +114,26 @@ public partial class FileListControl : UserControl, IComponentConnector
         }
     }
 
+    private void Run_Click(object sender, RoutedEventArgs e)
+    {
+        FileExplorer.ItemWrapper script = SelectedScript();
+        if (script != null)
+        {
+            FileActionRequested?.Invoke(this, new FileEventArgs
+            {
+                FullPath = script.FullPath,
+                Event = FileEvent.Run
+            });
+        }
+    }
+
+    /// <summary>The selected file if it is the only selected item and a shell script, otherwise null.</summary>
+    private FileExplorer.ItemWrapper SelectedScript()
+    {
+        FileExplorer.ItemWrapper[] selected = ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>().ToArray();
+        return selected.Length == 1 && !selected[0].Entry.IsDirectory && RemoteScript.IsScriptFileName(selected[0].Name) ? selected[0] : null;
+    }
+
     private void Extract_Click(object sender, RoutedEventArgs e)
     {
         Explorer?.Extract(SelectedEntries());
@@ -158,6 +179,7 @@ public partial class FileListControl : UserControl, IComponentConnector
             }
             cmdDownload.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             cmdEdit.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
+            cmdRun.Visibility = SelectedScript() != null ? Visibility.Visible : Visibility.Collapsed;
             cmdExtract.Visibility = extractableSelected ? Visibility.Visible : Visibility.Collapsed;
             cmdDownloadArchive.Visibility = archivableSelected ? Visibility.Visible : Visibility.Collapsed;
             cmdNavigate.Visibility = ((!directorySelectionChanged) ? Visibility.Collapsed : Visibility.Visible);

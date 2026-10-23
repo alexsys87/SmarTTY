@@ -694,6 +694,19 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
+        /// <summary>Runs a shell script that is on the server, from the folder it is in, in a new terminal tab.</summary>
+        public void RunRemoteScript(string remotePath)
+        {
+            try
+            {
+                RequireSshSession("Running scripts").RunRemoteScript(remotePath);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
         /// <summary>Asks for a local shell script and runs it on the server in a new terminal tab.</summary>
         internal void RunScript()
         {
