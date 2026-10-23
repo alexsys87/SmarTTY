@@ -26,6 +26,12 @@ public static class OpkgFeedConfig
     /// </summary>
     public const string SignatureOffMarker = "# smartty-local-off: ";
 
+    /// <summary>The list of the official feeds of OpenWrt (opkg); apk has <see cref="ApkFeedConfig.DistFeedsFile"/>.</summary>
+    public const string DistFeedsFile = "/etc/opkg/distfeeds.conf";
+
+    /// <summary>Put in front of an official feed line while the server runs with the official feeds turned off.</summary>
+    public const string OfficialOffMarker = "# smartty-local-off-feed: ";
+
     public const string SignatureCheckOnMarker = "SMARTTY_SIGCHECK=on";
 
     // "option check_signature" (as OpenWrt writes it) or with a value other than 0.
@@ -50,12 +56,29 @@ public static class OpkgFeedConfig
     /// <summary>
     /// Replaces the block of local feeds in the configuration file (creating the file if needed). With
     /// <paramref name="allowUnsigned"/> the signature check of opkg is turned off until the feeds are removed, otherwise
-    /// a check turned off by an earlier run is turned on again.
+    /// a check turned off by an earlier run is turned on again. With <paramref name="disableOfficial"/> the official feeds of
+    /// <paramref name="distFeedsFile"/> are commented out until the feeds are removed, otherwise they are given back.
     /// </summary>
-    public static string BuildEnableScript(IList<LocalRepoFeed> feeds, int port, string configFile = DefaultConfigFile, bool allowUnsigned = false, string opkgConf = OpkgConfFile)
+    public static string BuildEnableScript(IList<LocalRepoFeed> feeds, int port, string configFile = DefaultConfigFile, bool allowUnsigned = false, string opkgConf = OpkgConfFile, bool disableOfficial = false, string distFeedsFile = DistFeedsFile)
     {
         return BuildBlockEnableScript(feeds.Select((LocalRepoFeed feed) => FeedLine(feed, port)), configFile) + " && " +
-            (allowUnsigned ? BuildSignatureOffScript(opkgConf) : BuildSignatureRestoreScript(opkgConf));
+            (allowUnsigned ? BuildSignatureOffScript(opkgConf) : BuildSignatureRestoreScript(opkgConf)) + " && " +
+            (disableOfficial ? BuildOfficialOffScript(distFeedsFile) : BuildOfficialRestoreScript(distFeedsFile));
+    }
+
+    /// <summary>
+    /// Comments out the feed lines of the list of the official feeds (those not yet commented) with the marker of SmarTTY in front,
+    /// so that the restore gives back the very same lines; does nothing when the file does not exist.
+    /// </summary>
+    public static string BuildOfficialOffScript(string distFeedsFile)
+    {
+        return "{ d=" + RemotePathUtils.ShellQuote(distFeedsFile) + "; [ ! -f \"$d\" ] || sed -i '/^[[:space:]]*$/!{/^[[:space:]]*#/!s/^/" + OfficialOffMarker + "/}' \"$d\"; }";
+    }
+
+    /// <summary>Takes the marker away from the official feed lines, so that they are used again; does nothing when there is none.</summary>
+    public static string BuildOfficialRestoreScript(string distFeedsFile)
+    {
+        return "{ d=" + RemotePathUtils.ShellQuote(distFeedsFile) + "; ! grep -qs '^" + OfficialOffMarker + "' \"$d\" || sed -i 's/^" + OfficialOffMarker + "//' \"$d\"; }";
     }
 
     /// <summary>Prints <see cref="SignatureCheckOnMarker"/> when opkg checks the signatures of the package lists.</summary>
@@ -98,9 +121,9 @@ public static class OpkgFeedConfig
     }
 
     /// <summary>Removes the block of local feeds and turns the signature check on again if SmarTTY turned it off; succeeds if there is none.</summary>
-    public static string BuildDisableScript(string configFile = DefaultConfigFile, string opkgConf = OpkgConfFile)
+    public static string BuildDisableScript(string configFile = DefaultConfigFile, string opkgConf = OpkgConfFile, string distFeedsFile = DistFeedsFile)
     {
-        return BuildBlockDisableScript(configFile) + " && " + BuildSignatureRestoreScript(opkgConf);
+        return BuildBlockDisableScript(configFile) + " && " + BuildSignatureRestoreScript(opkgConf) + " && " + BuildOfficialRestoreScript(distFeedsFile);
     }
 
     public static string BuildBlockDisableScript(string configFile)

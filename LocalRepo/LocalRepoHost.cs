@@ -30,6 +30,8 @@ public sealed class LocalRepoHost
 
     private bool _AllowUnsigned;
 
+    private bool _DisableOfficial;
+
     // The signature check of opkg was on and is commented out while the server runs.
     private bool _SignatureCheckOff;
 
@@ -149,10 +151,11 @@ public sealed class LocalRepoHost
     /// <paramref name="manager"/> is the package manager of the device: only the feeds for it are served.
     /// <paramref name="trustBuildKey"/> (apk only) also makes the device trust public-key.pem of the build tree.
     /// <paramref name="allowUnsigned"/> (opkg only) turns the signature check of opkg off while the server runs.
+    /// <paramref name="disableOfficial"/> comments out the official feeds of OpenWrt (distfeeds) on the device while the server runs.
     /// <paramref name="signGenerated"/> (opkg only, when the check is on and unsigned feeds are not allowed) signs the indexes that
     /// are generated here with a temporary key of the device (<see cref="OpkgSigning"/>), so that the check passes for them.
     /// </summary>
-    public void Start(SshSession session, IList<string> folders, int port, LocalRepoPackageManager manager = LocalRepoPackageManager.Opkg, bool trustBuildKey = false, bool allowUnsigned = false, bool signGenerated = false)
+    public void Start(SshSession session, IList<string> folders, int port, LocalRepoPackageManager manager = LocalRepoPackageManager.Opkg, bool trustBuildKey = false, bool allowUnsigned = false, bool signGenerated = false, bool disableOfficial = false)
     {
         bool apk = manager == LocalRepoPackageManager.Apk;
         allowUnsigned = allowUnsigned && !apk;
@@ -240,7 +243,7 @@ public sealed class LocalRepoHost
             {
                 throw new InvalidOperationException("The SSH server of the device did not accept the reverse tunnel for port " + server.Port + " (the port may be busy on the device, or TCP forwarding is disabled in its SSH server): " + exception.Message, exception);
             }
-            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey, allowUnsigned);
+            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey, allowUnsigned, disableOfficial);
         }
         catch
         {
@@ -260,6 +263,7 @@ public sealed class LocalRepoHost
             _Manager = manager;
             _PublicKey = publicKey;
             _AllowUnsigned = allowUnsigned;
+            _DisableOfficial = disableOfficial;
             _SignatureCheckOff = allowUnsigned && signatureCheckOn;
             _SignGenerated = false;
             _SigningFingerprint = null;
@@ -501,6 +505,7 @@ public sealed class LocalRepoHost
         LocalRepoPackageManager manager;
         string publicKey;
         bool allowUnsigned;
+        bool disableOfficial;
         bool signGenerated;
         lock (_Sync)
         {
@@ -509,6 +514,7 @@ public sealed class LocalRepoHost
             manager = _Manager;
             publicKey = _PublicKey;
             allowUnsigned = _AllowUnsigned;
+            disableOfficial = _DisableOfficial;
             signGenerated = _SignGenerated;
             if (server == null || ReferenceEquals(_TunnelSession, session))
             {
@@ -519,7 +525,7 @@ public sealed class LocalRepoHost
         {
             bool isRoot = IsRoot(session);
             session.StartRemoteForward((uint)server.Port, "127.0.0.1", (uint)server.Port);
-            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey, allowUnsigned);
+            ConfigureDevice(session, manager, feeds, server.Port, isRoot, publicKey, allowUnsigned, disableOfficial);
             lock (_Sync)
             {
                 if (_Server == server)
@@ -540,10 +546,10 @@ public sealed class LocalRepoHost
         }
     }
 
-    private static void ConfigureDevice(SshSession session, LocalRepoPackageManager manager, IList<LocalRepoFeed> feeds, int port, bool isRoot, string publicKey, bool allowUnsigned)
+    private static void ConfigureDevice(SshSession session, LocalRepoPackageManager manager, IList<LocalRepoFeed> feeds, int port, bool isRoot, string publicKey, bool allowUnsigned, bool disableOfficial)
     {
         bool apk = manager == LocalRepoPackageManager.Apk;
-        string script = apk ? ApkFeedConfig.BuildEnableScript(feeds, port, publicKey) : OpkgFeedConfig.BuildEnableScript(feeds, port, allowUnsigned: allowUnsigned);
+        string script = apk ? ApkFeedConfig.BuildEnableScript(feeds, port, publicKey, disableOfficial: disableOfficial) : OpkgFeedConfig.BuildEnableScript(feeds, port, allowUnsigned: allowUnsigned, disableOfficial: disableOfficial);
         if (session.RunCommandChecked(OpkgFeedConfig.WrapForPrivileges(script, isRoot), requireSuccess: true) == null)
         {
             throw new InvalidOperationException("Could not add the feeds to " + (apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile) + " on the device." + (isRoot ? "" : " Non-root users need passwordless sudo: log in as root or allow sudo for this user."));
