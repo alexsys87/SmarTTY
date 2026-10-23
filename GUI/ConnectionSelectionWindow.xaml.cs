@@ -968,14 +968,17 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private void _Initiator_ConnectionProgress(SshConnector sender, string text, Exception exception)
         {
-            ProgressText = text ?? "Connecting...";
-            if (exception != null)
+            if (exception == null)
             {
-                if (!(exception is OperationCanceledException))
-                {
-                    MessageBoxes.Exception(exception);
-                }
-                ProgressText = null;
+                ProgressText = text ?? "Connecting...";
+                return;
+            }
+            // Hide the progress first and show the (modal) message after the current layout/render pass: a modal loop
+            // started from inside a binding update re-enters WPF's layout while the progress animation is running.
+            ProgressText = null;
+            if (!(exception is OperationCanceledException))
+            {
+                _Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, (Action)(() => MessageBoxes.Exception(exception)));
             }
         }
 
