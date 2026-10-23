@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 
 namespace SmarTTY.Transport;
 
@@ -160,18 +161,21 @@ internal sealed class TcpConnector
         // The probes after the first unanswered one: often enough to find a dead link soon, rarely enough to be harmless.
         int intervalSeconds = Math.Max(1, Math.Min(seconds, 5));
         socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-        try
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            // struct tcp_keepalive { u_long onoff; u_long keepalivetime; u_long keepaliveinterval; }, in milliseconds.
-            byte[] values = new byte[12];
-            BitConverter.GetBytes(1u).CopyTo(values, 0);
-            BitConverter.GetBytes((uint)seconds * 1000u).CopyTo(values, 4);
-            BitConverter.GetBytes((uint)intervalSeconds * 1000u).CopyTo(values, 8);
-            socket.IOControl(IOControlCode.KeepAliveValues, values, null);
-            return;
-        }
-        catch (Exception ex) when (ex is SocketException || ex is PlatformNotSupportedException || ex is NotSupportedException)
-        {
+            try
+            {
+                // struct tcp_keepalive { u_long onoff; u_long keepalivetime; u_long keepaliveinterval; }, in milliseconds.
+                byte[] values = new byte[12];
+                BitConverter.GetBytes(1u).CopyTo(values, 0);
+                BitConverter.GetBytes((uint)seconds * 1000u).CopyTo(values, 4);
+                BitConverter.GetBytes((uint)intervalSeconds * 1000u).CopyTo(values, 8);
+                socket.IOControl(IOControlCode.KeepAliveValues, values, null);
+                return;
+            }
+            catch (Exception ex) when (ex is SocketException || ex is PlatformNotSupportedException || ex is NotSupportedException)
+            {
+            }
         }
         try
         {

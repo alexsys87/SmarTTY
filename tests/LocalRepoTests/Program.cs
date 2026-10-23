@@ -604,7 +604,7 @@ internal static class Program
             Directory.CreateDirectory(fakeBin);
             Directory.CreateDirectory(emptyBin);
             File.WriteAllText(Path.Combine(fakeBin, "opkg"), "#!/bin/sh\nexit 0\n");
-            File.SetUnixFileMode(Path.Combine(fakeBin, "opkg"), UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            MakeExecutable(Path.Combine(fakeBin, "opkg"));
             Exec("PATH=" + fakeBin + "; " + OpkgFeedConfig.BuildCheckScript(), out int foundExit);
             Exec("PATH=" + emptyBin + "; " + OpkgFeedConfig.BuildCheckScript(), out int missingExit);
             Check(foundExit == 0 && missingExit != 0, name + ": the check script tells whether opkg exists");
@@ -1074,7 +1074,7 @@ internal static class Program
         if (opkgOnPath)
         {
             File.WriteAllText(Path.Combine(fakeBin, "opkg"), "#!/bin/sh\nexit 0\n");
-            File.SetUnixFileMode(Path.Combine(fakeBin, "opkg"), UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            MakeExecutable(Path.Combine(fakeBin, "opkg"));
         }
         LinkGrep(fakeBin);
         string script = "PATH=" + fakeBin + "; " + OpenWrtDetector.ProbeCommand.Replace("/etc/", etcDir + "/");
@@ -1093,6 +1093,18 @@ internal static class Program
         if (grep != null)
         {
             File.CreateSymbolicLink(Path.Combine(fakeBin, "grep"), grep);
+        }
+    }
+
+    /// <summary>
+    /// Makes a fake program executable so the shell can run it. The file mode is a POSIX concept, so Windows, where the
+    /// shell scripts under test do not run, is left out.
+    /// </summary>
+    private static void MakeExecutable(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
     }
 
@@ -1341,7 +1353,7 @@ internal static class Program
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, name);
         File.WriteAllText(path, "#!/bin/sh\nexit 0\n");
-        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        MakeExecutable(path);
     }
 
     private static LocalRepoPackageManager? RunProbeDetect(string shell, string[] args, string etcDir, bool opkgOnPath, bool apkOnPath)
