@@ -808,8 +808,14 @@ public class DirectoryCopier
                     totalTransferred += bytesRead;
                 }
                 destChannel.SendEof();
+                // Let the extracting tar finish and look at how it ended; dropping the channel right after the EOF
+                // would also drop its result (a lost connection, a failed extraction).
+                destChannel.WaitEof();
+                hasError |= destChannel.ClosedByConnectionLoss || destChannel.ExitStatus != 0;
             }
-            hasError |= sourceChannel.ExitStatus != 0;
+            // A source lost with the connection reads as the end of the tar stream (the data is cut short), but its
+            // exit status is not 0 then.
+            hasError |= sourceChannel.ClosedByConnectionLoss || sourceChannel.ExitStatus != 0;
         }
         if (logCallback != null)
         {

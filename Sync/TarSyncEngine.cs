@@ -101,6 +101,13 @@ internal class TarSyncEngine : CommandSyncEngine
             sshShellChannel.Input.Write(new byte[1024], 0, 1024);
             sshShellChannel.SendEof();
             sshShellChannel.WaitEof();
+            if (sshShellChannel.ClosedByConnectionLoss)
+            {
+                // On a channel closed by the lost connection SendEof returns silently and WaitEof returns at once, so
+                // this would look like a finished upload. The archive may not have reached the device: no file stamp
+                // may be cached as uploaded, or the next synchronization would skip those files.
+                throw new IOException("The connection to the server was lost while uploading to " + _settings.RemotePath);
+            }
             if (!stderrMonitor.HasOutput && sshShellChannel.ExitStatus == 0 && _cache != null)
             {
                 for (int i = 0; i < localPaths.Count; i++)

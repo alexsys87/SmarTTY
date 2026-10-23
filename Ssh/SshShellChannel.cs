@@ -236,7 +236,9 @@ public class SshShellChannel : IAsyncChannel, IDisposable
     public bool ReadStderrOnRead { get; set; }
 
     /// <summary>
-    /// Exit code of the remote command; -1 if it was terminated by a signal, 0 if the server reported nothing.
+    /// Exit code of the remote command; -1 if it was terminated by a signal or the channel was still open when the
+    /// SSH connection went away (see <see cref="ClosedByConnectionLoss"/>: the command did not finish, so "no exit
+    /// status" must not read as success), 0 if the server reported nothing.
     /// </summary>
     public int ExitStatus
     {
@@ -259,7 +261,7 @@ public class SshShellChannel : IAsyncChannel, IDisposable
                 {
                     return _exitStatus.Value;
                 }
-                return (_exitSignal != null) ? (-1) : 0;
+                return (_exitSignal != null || _closedByConnectionLoss) ? (-1) : 0;
             }
         }
     }

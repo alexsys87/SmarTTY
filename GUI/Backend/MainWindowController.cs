@@ -1755,12 +1755,39 @@ public class MainWindowController : INotifyPropertyChanged
 
     private void terminalEmulatorControl1_TerminalSizeChanged(TerminalEmulatorControl sender, int newWidth, int newHeight)
     {
-        (sender.Tag as TerminalTag).Channel.ResizePty(newWidth, newHeight);
+        TerminalTag tag = sender.Tag as TerminalTag;
+        if (tag?.Channel == null || tag.ShellOpenFailed)
+        {
+            return;
+        }
+        try
+        {
+            tag.Channel.ResizePty(newWidth, newHeight);
+        }
+        catch (Exception) when (tag.Channel.IsDisposed || tag.Channel.ClosedByConnectionLoss || tag.Channel.IsEof)
+        {
+            // The channel is gone with a lost connection: the reconnect prompt deals with it, a resize must not crash the window.
+        }
     }
 
     private void terminalEmulatorControl1_HandleTerminalInput(object sender, byte[] input, TerminalEmulatorControl.InputKind type)
     {
-        ((TerminalTag)(sender as TerminalEmulatorControl).Tag).Channel.Input.Write(input, 0, input.Length);
+        TerminalEmulatorControl terminal = (TerminalEmulatorControl)sender;
+        TerminalTag tag = (TerminalTag)terminal.Tag;
+        if (tag.ShellOpenFailed)
+        {
+            // The shell could not be reopened after a reconnect: this key press is the retry.
+            tag.Session?.RetryShell(terminal);
+            return;
+        }
+        try
+        {
+            tag.Channel.Input.Write(input, 0, input.Length);
+        }
+        catch (IOException) when (tag.Channel.IsDisposed || tag.Channel.ClosedByConnectionLoss || tag.Channel.IsEof)
+        {
+            // Typing into a tab whose connection is gone (the reconnect prompt is showing): the input is dropped.
+        }
     }
 
     private void anyctl_MouseMove(object sender, MouseEventArgs e)
