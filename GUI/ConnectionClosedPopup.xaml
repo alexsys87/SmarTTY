@@ -45,7 +45,6 @@
         </Style>
       </FrameworkElement.Style>
       <TextBlock VerticalAlignment="Center" Text="{Binding Path=Reconnector.ProgressText}" />
-      <ProgressBar IsIndeterminate="{Binding Path=IsVisible, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Grid}}}" Height="16" Margin="5 0 0 0" Grid.Column="1" />
     </Grid>
   </Grid>
 </UserControl>
