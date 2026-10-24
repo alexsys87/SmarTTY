@@ -65,8 +65,11 @@ internal static class Program
             Send(data, 0, data.Length);
         }
 
+        public Action BeforeRead;   // lets a test look at the link on the reading thread, where the order is well defined
+
         public byte? Read(int timeoutMs)
         {
+            BeforeRead?.Invoke();
             return In.Read(timeoutMs);
         }
 
@@ -609,13 +612,15 @@ internal static class Program
                     }
                     return chunk;
                 };
-                rcvr.Filter = chunk =>
+                // The count is taken on the sender's own thread when it first waits for an answer, so it does not depend
+                // on how quickly the test thread sees the answer travel back: a snapshot taken while reading the link
+                // could otherwise be a single packet although many were already on their way.
+                sndr.BeforeRead = () =>
                 {
-                    if (counting && dataPacketsBeforeFirstAck < 0 && chunk.Length > 3 && chunk[3] == (byte)'Y')
+                    if (counting && dataPacketsBeforeFirstAck < 0)
                     {
                         dataPacketsBeforeFirstAck = Volatile.Read(ref seenD);
                     }
-                    return chunk;
                 };
             });
             Check(o.SendOk && o.ReceiveOk && o.Get("w.bin").SequenceEqual(data), "transfer ok");

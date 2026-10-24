@@ -1783,9 +1783,23 @@ public class KermitTransfer
                         : "Damaged packet " + expected + ", asking again");
                     if (status == ReadStatus.Damaged && session.Window > 1)
                     {
-                        afterDamage = true;
-                        // Which packet it was is unknown: the packets that follow show the gap, and each missing one is
-                        // asked for then. A NAK for the oldest one here would make the sender repeat the wrong packet.
+                        // Which packet was damaged cannot be told. While good packets keep coming, the ones that follow
+                        // show the gap and each missing one is asked for then. When the damage repeats with nothing good
+                        // in between, nothing follows: the sender's window is full and it is repeating the very packet
+                        // this side is waiting for, so the two sides would wait for each other until the sender gives up.
+                        // Asking for the oldest missing packet breaks that, and a repeat of a packet already taken is
+                        // simply acknowledged again.
+                        if (afterDamage)
+                        {
+                            afterDamage = false;
+                            asked.Clear();
+                            link.Send(Frame(expected, TypeNak));
+                            asked.Add(expected);
+                        }
+                        else
+                        {
+                            afterDamage = true;
+                        }
                         continue;
                     }
                     if (status == ReadStatus.Damaged)
