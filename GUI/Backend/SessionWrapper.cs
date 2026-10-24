@@ -735,6 +735,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     {
                         return;
                     }
+                    ReportChannelFailure(chn);
                     if (MessageBoxes.Ask("The command has exited. Close tab?"))
                     {
                         CloseTabPageForControl(ctl);
@@ -754,6 +755,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 {
                     if (IsRemoteExit(ctl, chn))
                     {
+                        ReportChannelFailure(chn);
                         CloseTabPageForControl(ctl, autoInvoked: true);
                     }
                 });
@@ -841,6 +843,16 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// connection went away. Only a real exit may close the tab or ask about it; a lost connection is handled by
     /// the reconnect prompt (<see cref="SessionFixer"/>), and closing the tabs here would close the session with it.
     /// </summary>
+    /// <summary>A channel that failed while the connection is alive is not a shell exit: say why the tab closes.</summary>
+    private static void ReportChannelFailure(SshShellChannel chn)
+    {
+        Exception failure = chn.Failure;
+        if (failure != null)
+        {
+            MessageBoxes.Error("The terminal channel failed: " + failure.Message);
+        }
+    }
+
     private static bool IsRemoteExit(TerminalEmulatorControl ctl, SshShellChannel chn)
     {
         return IsChannelAttached(ctl, chn) && !chn.IsDisposed && !chn.ClosedByConnectionLoss;
