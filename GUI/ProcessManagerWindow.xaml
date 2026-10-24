@@ -28,7 +28,10 @@
         </StackPanel>
       </Button>
       <Button Name="KillButton" Padding="8 2 8 2" IsEnabled="False" ToolTip="Stop the selected process at once (SIGKILL, kill -9): use it when ending does not help (Shift+Del)" Click="Kill_Click">
-        <TextBlock Text="Force kill" />
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/err16.png" />
+          <TextBlock Margin="4 0 0 0" Text="Force kill" />
+        </StackPanel>
       </Button>
     </ToolBar>
     <!-- The load of the whole server: each meter has the value on the right of its name, the bar, and a line of detail. -->
@@ -82,7 +85,11 @@
               <Image Source="../icons/delete16.png" />
             </MenuItem.Icon>
           </MenuItem>
-          <MenuItem Name="KillMenuItem" Header="Force kill" Click="Kill_Click" />
+          <MenuItem Name="KillMenuItem" Header="Force kill" Click="Kill_Click">
+            <MenuItem.Icon>
+              <Image Source="../icons/err16.png" />
+            </MenuItem.Icon>
+          </MenuItem>
           <Separator />
           <MenuItem Name="CopyMenuItem" Header="Copy command line" Click="CopyCommand_Click">
             <MenuItem.Icon>
