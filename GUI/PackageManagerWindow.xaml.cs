@@ -264,6 +264,8 @@ public partial class PackageManagerWindow : Window
                 }
                 if (bestClient == null)
                 {
+                    // Every probe failed because the connection went away: say so instead of "no package manager".
+                    _Session.Session?.ThrowIfConnectionLost();
                     throw new Exception("Could not detect the package manager on the remote host");
                 }
                 _Client = bestClient;
