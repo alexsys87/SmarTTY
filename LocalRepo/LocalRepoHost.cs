@@ -539,12 +539,41 @@ public sealed class LocalRepoHost
                 // The device may have been restarted: its /tmp is empty, so the secret key is gone; a new pair is made.
                 SetUpSigning(session, server, isRoot, feeds.Where((LocalRepoFeed feed) => !HasUsableSignature(feed.Directory)).Select((LocalRepoFeed feed) => feed.Name).ToList());
             }
+            if (RollBackIfStopped(session, server, manager))
+            {
+                return;
+            }
             Report("The SSH connection was re-established: the tunnel and the feeds are restored.");
         }
         catch (Exception exception)
         {
+            if (RollBackIfStopped(session, server, manager))
+            {
+                return;
+            }
             Report("Could not restore the tunnel after reconnecting: " + exception.Message + " Stop the server and start it again.");
         }
+    }
+
+    /// <summary>
+    /// Stop can run while <see cref="Reattach"/> is still working on the new connection: Stop removes what it knows (the
+    /// old tunnel, the feeds as they were), and then Reattach adds the tunnel and the feeds again, with nobody left to
+    /// remove them. When the server it worked for was stopped meanwhile (not replaced by a newer start, which owns the
+    /// device now), Reattach takes back what it did on the new connection. Returns true in that case.
+    /// </summary>
+    private bool RollBackIfStopped(SshSession session, LocalRepoServer server, LocalRepoPackageManager manager)
+    {
+        lock (_Sync)
+        {
+            if (_Server != null || _TunnelSession != null)
+            {
+                return false;
+            }
+        }
+        string failure = RemoveFeeds(session, manager);
+        TryStopTunnel(session);
+        Report(failure == null ? "The server was stopped while the connection was being restored: the feeds and the tunnel were removed again." : "The server was stopped while the connection was being restored. " + failure);
+        return true;
     }
 
     private const int TunnelPortAttempts = 6;
