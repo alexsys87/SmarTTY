@@ -523,14 +523,35 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             return;
         }
         bool firstConnection = Session == null;
-        Session?.Dispose();
+        SshSession oldSession = Session;
         Session = session;
+        if (oldSession != null)
+        {
+            if (SocksProxy.IsRunning)
+            {
+                // Closing a connection that carries the SOCKS proxy waits (up to the connection timeout, 30 s) for the programs
+                // that still use it to close their connections, so it must not block the UI thread. The listener is released
+                // at once, and SocksProxy.Reattach below retries until the new connection can take its port.
+                ThreadPool.QueueUserWorkItem((object state) =>
+                {
+                    try
+                    {
+                        ((SshSession)state).Dispose();
+                    }
+                    catch
+                    {
+                    }
+                }, oldSession);
+            }
+            else
+            {
+                oldSession.Dispose();
+            }
+        }
         DiskSpace.Attach(session);
         EnableX11Forwarding(session);
-        if (firstConnection)
-        {
-            AutoStartSocksProxy(session);
-        }
+        // Not only on the first connection: when the start failed because the connection was lost, it is repeated after reconnecting.
+        AutoStartSocksProxy(session);
         if (!firstConnection && LocalRepo.IsRunning)
         {
             // The reverse tunnel belonged to the old connection: restore it (and the feeds) on the new one, off the UI thread.
@@ -890,29 +911,59 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // The refusal of X11 forwarding is explained once per session, not after every reconnection.
     private int _X11RefusalReported;
 
+    private readonly object _SocksAutoStartLock = new object();
+
+    // True once the profile's automatic start of the SOCKS5 proxy has worked; it is not repeated then, so that a proxy stopped by hand stays stopped.
+    private volatile bool _SocksAutoStartDone;
+
+    private volatile bool _SocksAutoStartErrorShown;
+
     /// <summary>
     /// Starts the SOCKS5 proxy of a connection whose profile asks for it (address, port and keepalive are the ones saved by
     /// Tools > SOCKS5 proxy over SSH). Runs off the UI thread; a failure (usually a port that another connection uses) is
-    /// reported and does not affect the connection. After a reconnect <see cref="SocksProxyHost.Reattach"/> restores it.
+    /// reported and does not affect the connection. It is tried on every new connection until it has worked once (a start that
+    /// failed because the connection was lost is repeated after reconnecting); after that <see cref="SocksProxyHost.Reattach"/>
+    /// restores a running proxy after a reconnect, and a proxy that the user stopped stays stopped.
     /// </summary>
     private void AutoStartSocksProxy(SshSession session)
     {
-        if (Settings == null || !Settings.AutoStartSocksProxy)
+        if (Settings == null || !Settings.AutoStartSocksProxy || _SocksAutoStartDone || SocksProxy.IsRunning)
         {
             return;
         }
         ThreadPool.QueueUserWorkItem(delegate
         {
-            try
+            lock (_SocksAutoStartLock)
             {
-                SocksProxySettings proxySettings = SocksProxySettings.Load();
-                SocksProxy.Start(session, proxySettings.BindAddress, proxySettings.Port, proxySettings.KeepAliveSeconds);
+                // Rechecked: another start (an earlier connection's, or one by hand) may have finished while this one waited.
+                if (_SocksAutoStartDone || SocksProxy.IsRunning)
+                {
+                    return;
+                }
+                try
+                {
+                    SocksProxySettings proxySettings = SocksProxySettings.Load();
+                    SocksProxy.Start(session, proxySettings.BindAddress, proxySettings.Port, proxySettings.KeepAliveSeconds);
+                    _SocksAutoStartDone = true;
+                }
+                catch (Exception exception)
+                {
+                    string message = exception.Message.Replace('\r', ' ').Replace('\n', ' ');
+                    bool connectionLost = session.IsConnectionClosed || !ReferenceEquals(Session, session);
+                    SocksProxy.Report("Automatic start failed: " + message + (connectionLost ? " The connection was lost, the start is repeated after reconnecting." : ""));
+                    if (!connectionLost && !_SocksAutoStartErrorShown)
+                    {
+                        // Shown once; the start is still repeated after a reconnect, but only logged then.
+                        _SocksAutoStartErrorShown = true;
+                        _Controller.BeginInvoke(() => MessageBoxes.Error("The SOCKS5 proxy could not be started automatically: " + message + "\r\n\r\nThe connection works as usual. Change the port in Tools > SOCKS5 proxy over SSH (it is used by every connection that starts the proxy) or turn the option off in the connection settings."));
+                    }
+                    return;
+                }
             }
-            catch (Exception exception)
+            if (!ReferenceEquals(Session, session))
             {
-                string message = exception.Message.Replace('\r', ' ').Replace('\n', ' ');
-                SocksProxy.Report("Automatic start failed: " + message);
-                _Controller.BeginInvoke(() => MessageBoxes.Error("The SOCKS5 proxy could not be started automatically: " + message + "\r\n\r\nThe connection works as usual. Change the port in Tools > SOCKS5 proxy over SSH (it is used by every connection that starts the proxy) or turn the option off in the connection settings."));
+                // The connection was replaced while the proxy was starting on it: move the proxy to the current one.
+                SocksProxy.Reattach(Session);
             }
         });
     }
@@ -1601,9 +1652,33 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         catch
         {
         }
-        SocksProxy.Stop();
+        SshSession sessionToClose = Session;
         DiskSpace.Dispose();
-        Session?.Dispose();
+        if (SocksProxy.IsRunning)
+        {
+            // Stopping the proxy waits (up to 30 s) for the programs that still use it to close their connections: not on the UI thread.
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    SocksProxy.Stop();
+                }
+                catch
+                {
+                }
+                try
+                {
+                    sessionToClose?.Dispose();
+                }
+                catch
+                {
+                }
+            });
+        }
+        else
+        {
+            sessionToClose?.Dispose();
+        }
         foreach (DeviceTabContext deviceTab in Tabs.OfType<DeviceTabContext>().ToList())
         {
             deviceTab.Dispose();

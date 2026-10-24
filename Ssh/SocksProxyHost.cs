@@ -34,7 +34,8 @@ public sealed class SocksProxyHost
 
     private const int MaxHistoryLines = 500;
 
-    private const int ReattachAttempts = 4;
+    // The old connection is closed in the background and may need a few seconds to release the port.
+    private const int ReattachAttempts = 8;
 
     /// <summary>Raised from any thread with a time-stamped line: what the host does and the connections that failed.</summary>
     public event Action<string> Log;
