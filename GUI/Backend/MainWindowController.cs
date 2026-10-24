@@ -706,6 +706,19 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
+        /// <summary>Installs .ipk or .apk packages that are on the OpenWrt device, with its package manager, in the active terminal.</summary>
+        public void InstallRemotePackages(string[] remotePaths)
+        {
+            try
+            {
+                RequireSshSession("Installing packages").InstallRemotePackages(remotePaths);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
         /// <summary>Asks for a local shell script and runs it on the server in the active terminal.</summary>
         internal void RunScript()
         {

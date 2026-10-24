@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using SmarTTY.IO;
+using SmarTTY.LocalRepo;
 
 // Regression harness for the file list operations (IO/RemoteFileOperations.cs): name rules, copy names and the
 // shell commands, which are run by /bin/sh on a temporary directory (busybox sh as well when it is installed, the
@@ -103,6 +104,29 @@ internal static class Program
         Check(!RemoteFileOperations.IsExtractableArchive("backup.gz") && !RemoteFileOperations.IsExtractableArchive("backup.zip") && !RemoteFileOperations.IsExtractableArchive("tar") && !RemoteFileOperations.IsExtractableArchive("backup.tar.bz2") && !RemoteFileOperations.IsExtractableArchive(null), "other files are not offered");
         Equal(RemoteFileOperations.ExtractCommand("/a b/it's.tar.gz", "/a b"), "tar -xzf '/a b/it'\\''s.tar.gz' -C '/a b'", "the extract command quotes both paths and asks for gzip");
         Equal(RemoteFileOperations.ExtractCommand("/a/plain.tar", "/a"), "tar -xf '/a/plain.tar' -C '/a'", "a plain tar is not decompressed");
+    }
+
+    private static void PackageInstallChecks()
+    {
+        Check(RemotePackageInstall.IsIpk("luci-app-x_1.0_all.ipk") && RemotePackageInstall.IsIpk("A.IPK") && !RemotePackageInstall.IsIpk("a.apk") && !RemotePackageInstall.IsIpk("ipk") && !RemotePackageInstall.IsIpk(null), ".ipk is recognized, case-insensitively");
+        Check(RemotePackageInstall.IsApk("curl-8.apk") && RemotePackageInstall.IsApk("A.Apk") && !RemotePackageInstall.IsApk("a.ipk") && !RemotePackageInstall.IsApk("a.apk.bak") && !RemotePackageInstall.IsApk(null), ".apk is recognized, case-insensitively");
+        Check(RemotePackageInstall.IsPackageFile("a.ipk") && RemotePackageInstall.IsPackageFile("a.apk") && !RemotePackageInstall.IsPackageFile("a.tar.gz"), "both kinds get the package icon");
+        Check(RemotePackageInstall.CanInstall("a.ipk", LocalRepoPackageManager.Opkg) && RemotePackageInstall.CanInstall("a.apk", LocalRepoPackageManager.Apk), "each package manager installs its own files");
+        Check(!RemotePackageInstall.CanInstall("a.apk", LocalRepoPackageManager.Opkg) && !RemotePackageInstall.CanInstall("a.ipk", LocalRepoPackageManager.Apk), "opkg does not offer .apk and apk does not offer .ipk");
+        Check(!RemotePackageInstall.CanInstall("a.ipk", null) && !RemotePackageInstall.CanInstall("a.apk", null), "nothing is offered on a host that is not OpenWrt");
+        Equal(RemotePackageInstall.BuildInstallCommand(LocalRepoPackageManager.Opkg, new[] { "/tmp/a b.ipk", "/tmp/it's.ipk" }), "opkg install '/tmp/a b.ipk' '/tmp/it'\\''s.ipk'", "opkg installs all files in one run, with quoted paths");
+        Equal(RemotePackageInstall.BuildInstallCommand(LocalRepoPackageManager.Apk, new[] { "/tmp/a.apk" }), "apk add --allow-untrusted '/tmp/a.apk'", "apk adds a local file without a signature check");
+        Equal(RemotePackageInstall.BuildInstallCommand(LocalRepoPackageManager.Apk, new[] { "a.apk" }), "apk add --allow-untrusted './a.apk'", "a relative path is not taken for a package name");
+        bool threw = false;
+        try
+        {
+            RemotePackageInstall.BuildInstallCommand(LocalRepoPackageManager.Opkg, new string[0]);
+        }
+        catch (ArgumentException)
+        {
+            threw = true;
+        }
+        Check(threw, "no files, no command");
     }
 
     private static void ScriptNameChecks()
@@ -381,6 +405,7 @@ internal static class Program
         {
             NameChecks();
             ScriptNameChecks();
+            PackageInstallChecks();
             List<string> shells = new List<string> { "/bin/sh" };
             foreach (string busybox in new[] { "/bin/busybox", "/usr/bin/busybox" })
             {

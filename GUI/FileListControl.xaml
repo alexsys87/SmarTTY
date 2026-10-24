@@ -31,7 +31,7 @@
           </Style.Triggers>
         </Style>
       </FrameworkElement.Style>
-      <ListView Name="TransferList" ItemsSource="{Binding FilteredItems}" SelectionMode="Extended" AllowDrop="True" DragEnter="TransferList_DragOver" DragOver="TransferList_DragOver" Drop="TransferList_Drop" KeyDown="ListView_KeyDown" MouseDoubleClick="TransferList_MouseDoubleClick" SelectionChanged="TransferList_SelectionChanged">
+      <ListView Name="TransferList" ItemsSource="{Binding FilteredItems}" SelectionMode="Extended" AllowDrop="True" DragEnter="TransferList_DragOver" DragOver="TransferList_DragOver" Drop="TransferList_Drop" KeyDown="ListView_KeyDown" MouseDoubleClick="TransferList_MouseDoubleClick" SelectionChanged="TransferList_SelectionChanged" ContextMenuOpening="TransferList_ContextMenuOpening">
         <FrameworkElement.ContextMenu>
           <ContextMenu Name="xferMenu" Opened="XferMenu_Opened">
             <MenuItem Name="cmdEdit" Header="Edit..." Click="OpenFile_Click">
@@ -62,6 +62,16 @@
             <MenuItem Name="cmdExtract" Header="Extract here" ToolTip="Unpacks the selected .tar.gz, .tgz or .tar archive into this folder (existing files of the same name are overwritten)" Click="Extract_Click">
               <MenuItem.Icon>
                 <Image Source="../icons/menu/extract.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Name="cmdInstallIpk" Header="Install package (opkg)" ToolTip="Installs the selected .ipk packages on this OpenWrt device with opkg; the command runs in the terminal" Click="InstallPackage_Click" Visibility="Collapsed">
+              <MenuItem.Icon>
+                <Image Source="../icons/menu/package-install.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Name="cmdInstallApk" Header="Install package (apk)" ToolTip="Installs the selected .apk packages on this OpenWrt device with apk add; the command runs in the terminal" Click="InstallPackage_Click" Visibility="Collapsed">
+              <MenuItem.Icon>
+                <Image Source="../icons/menu/package-install.png" />
               </MenuItem.Icon>
             </MenuItem>
             <Separator />
@@ -124,6 +134,12 @@
                               </DataTrigger>
                               <DataTrigger Value="Folder" Binding="{Binding Path=Icon}">
                                 <Setter Property="Source" Value="../icons/MainWindow/folder_flat.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="PackageIpk" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/MainWindow/package_ipk.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="PackageApk" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/MainWindow/package_apk.png" />
                               </DataTrigger>
                             </Style.Triggers>
                           </Style>

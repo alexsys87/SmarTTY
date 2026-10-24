@@ -742,6 +742,9 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                 case FileListControl.FileEvent.DownloadArchive:
                     Controller.MenuCommandHandlers.QuickDownloadArchive(e.FullPath);
                     break;
+                case FileListControl.FileEvent.InstallPackage:
+                    Controller.MenuCommandHandlers.InstallRemotePackages(e.FullPaths);
+                    break;
                 case FileListControl.FileEvent.Upload:
                     {
                         SessionWrapper dropSession = Controller.ActiveSession;

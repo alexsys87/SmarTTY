@@ -1,6 +1,7 @@
 ﻿using SmarTTY.Forms;
 using SmarTTY.GUI.Backend;
 using SmarTTY.IO;
+using SmarTTY.LocalRepo;
 using System;
 using System.Collections;
 using System.Linq;
@@ -22,7 +23,8 @@ public partial class FileListControl : UserControl, IComponentConnector
         Download,
         DownloadArchive,
         Run,
-        Upload
+        Upload,
+        InstallPackage
     }
 
     public class FileEventArgs : EventArgs
@@ -38,6 +40,11 @@ public partial class FileListControl : UserControl, IComponentConnector
         /// The local files and folders to upload (<see cref="FileEvent.Upload"/> only).
         /// </summary>
         public string[] LocalFiles;
+
+        /// <summary>
+        /// The remote package files to install (<see cref="FileEvent.InstallPackage"/> only).
+        /// </summary>
+        public string[] FullPaths;
     }
 
     private int _SelDepth;
@@ -134,6 +141,51 @@ public partial class FileListControl : UserControl, IComponentConnector
         return selected.Length == 1 && !selected[0].Entry.IsDirectory && RemoteScript.IsScriptFileName(selected[0].Name) ? selected[0] : null;
     }
 
+    /// <summary>
+    /// The selected files that the package manager of the OpenWrt host installs (.ipk for opkg, .apk for apk); none when the
+    /// host is not OpenWrt.
+    /// </summary>
+    private FileExplorer.ItemWrapper[] InstallablePackages(LocalRepoPackageManager? manager)
+    {
+        if (manager == null)
+        {
+            return new FileExplorer.ItemWrapper[0];
+        }
+        return SelectedEntries().Where((FileExplorer.ItemWrapper item) => !item.Entry.IsDirectory && RemotePackageInstall.CanInstall(item.Name, manager)).ToArray();
+    }
+
+    /// <summary>
+    /// Shows "Install package (opkg)" or "Install package (apk)" when the selection holds packages that the OpenWrt host can
+    /// install. The package manager is known only after the probe of the session has answered, so this runs again when the
+    /// menu opens.
+    /// </summary>
+    private void UpdatePackageMenu()
+    {
+        LocalRepoPackageManager? manager = Explorer?.PackageManager;
+        bool any = InstallablePackages(manager).Length > 0;
+        cmdInstallIpk.Visibility = any && manager == LocalRepoPackageManager.Opkg ? Visibility.Visible : Visibility.Collapsed;
+        cmdInstallApk.Visibility = any && manager == LocalRepoPackageManager.Apk ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void InstallPackage_Click(object sender, RoutedEventArgs e)
+    {
+        string[] packages = InstallablePackages(Explorer?.PackageManager).Select((FileExplorer.ItemWrapper item) => item.FullPath).ToArray();
+        if (packages.Length == 0)
+        {
+            return;
+        }
+        FileActionRequested?.Invoke(this, new FileEventArgs
+        {
+            Event = FileEvent.InstallPackage,
+            FullPaths = packages
+        });
+    }
+
+    private void TransferList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        UpdatePackageMenu();
+    }
+
     private void Extract_Click(object sender, RoutedEventArgs e)
     {
         Explorer?.Extract(SelectedEntries());
@@ -181,6 +233,7 @@ public partial class FileListControl : UserControl, IComponentConnector
             cmdEdit.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             cmdRun.Visibility = SelectedScript() != null ? Visibility.Visible : Visibility.Collapsed;
             cmdExtract.Visibility = extractableSelected ? Visibility.Visible : Visibility.Collapsed;
+            UpdatePackageMenu();
             cmdDownloadArchive.Visibility = archivableSelected ? Visibility.Visible : Visibility.Collapsed;
             cmdNavigate.Visibility = ((!directorySelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             if (((ListBox)TransferList).SelectedItems.Count == 0 && ((CollectionView)TransferList.Items).Count > 0 && _SelDepth < 5)
@@ -358,6 +411,7 @@ public partial class FileListControl : UserControl, IComponentConnector
         cmdPaste.IsEnabled = explorer != null && explorer.CanPaste;
         cmdNewFolder.IsEnabled = explorer != null;
         cmdNewFile.IsEnabled = explorer != null;
+        UpdatePackageMenu();
     }
 
     private void Cut_Click(object sender, RoutedEventArgs e)

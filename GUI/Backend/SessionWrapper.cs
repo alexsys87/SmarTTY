@@ -1136,7 +1136,76 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             {
                 RefreshFileExplorers(RemotePathUtils.GetDirectoryName(job.RemotePath));
             }
+            if (!job.IsDownload)
+            {
+                OnPackageUploadFinished(job);
+            }
         });
+    }
+
+    // Dropped package files whose installation is offered when all of them have been uploaded (one offer per drop).
+    private class PackageInstallOffer
+    {
+        public ITabContext Origin;
+
+        public int Pending;
+
+        public readonly List<string> Uploaded = new List<string>();
+    }
+
+    // Upload transfers of dropped packages, by job id; used on the UI thread only.
+    private readonly Dictionary<Guid, PackageInstallOffer> _PackageInstallOffers = new Dictionary<Guid, PackageInstallOffer>();
+
+    /// <summary>
+    /// Remembers the uploads of the dropped files that the OpenWrt package manager installs (.ipk for opkg, .apk for apk), so
+    /// that their installation is offered when the whole drop has been uploaded. Does nothing on a host that is not OpenWrt.
+    /// </summary>
+    private void RegisterPackageInstallOffer(IEnumerable<FileTransferManager.TransferJob> jobs, ITabContext origin)
+    {
+        LocalRepoPackageManager? manager = _LocalRepoManager;
+        if (manager == null || jobs == null)
+        {
+            return;
+        }
+        FileTransferManager.TransferJob[] packages = jobs.Where((FileTransferManager.TransferJob job) => job != null && RemotePackageInstall.CanInstall(RemotePathUtils.GetFileName(job.RemotePath), manager)).ToArray();
+        if (packages.Length == 0)
+        {
+            return;
+        }
+        PackageInstallOffer offer = new PackageInstallOffer
+        {
+            Origin = origin ?? ActiveTab,
+            Pending = packages.Length
+        };
+        foreach (FileTransferManager.TransferJob job in packages)
+        {
+            _PackageInstallOffers[job.Id] = offer;
+        }
+    }
+
+    /// <summary>
+    /// A transfer has ended (UI thread): when it was the last upload of a dropped set of packages and at least one arrived, asks
+    /// whether to install them. Failed and cancelled uploads are left out.
+    /// </summary>
+    private void OnPackageUploadFinished(FileTransferManager.TransferJob job)
+    {
+        if (!_PackageInstallOffers.TryGetValue(job.Id, out PackageInstallOffer offer))
+        {
+            return;
+        }
+        _PackageInstallOffers.Remove(job.Id);
+        if (job.State == FileTransferManager.TransferState.Completed)
+        {
+            offer.Uploaded.Add(job.RemotePath);
+        }
+        offer.Pending--;
+        if (offer.Pending > 0 || offer.Uploaded.Count == 0)
+        {
+            return;
+        }
+        // The tab the files were dropped on may have been closed meanwhile: the active terminal is used then.
+        ITabContext origin = offer.Origin != null && Tabs.Contains(offer.Origin) ? offer.Origin : null;
+        InstallRemotePackages(offer.Uploaded.ToArray(), origin, afterUpload: true);
     }
 
     /// <summary>
@@ -1163,15 +1232,17 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     #endregion
 
-    public void DoUploadFile(string file, string remoteDir, bool checkOverwrite = true)
+    /// <summary>Queues the upload of a file; returns the queued transfer, or null if nothing was queued.</summary>
+    public FileTransferManager.TransferJob DoUploadFile(string file, string remoteDir, bool checkOverwrite = true)
     {
         // This directory is the remote one offered next time a remote file is picked, so it must not be the local one.
         LastDownloadDir = remoteDir;
         string fileName = Path.GetFileName(file);
         string text = remoteDir.TrimEnd('/') + "/" + fileName;
+        FileTransferManager.TransferJob transferJob = null;
         try
         {
-            FileTransferManager.TransferJob transferJob = TransferManager.EnqueueUpload(file, text, null, checkOverwrite);
+            transferJob = TransferManager.EnqueueUpload(file, text, null, checkOverwrite);
             if (transferJob != null)
             {
                 SCPController.AddTransfer(transferJob);
@@ -1181,6 +1252,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             MessageBoxes.Error("Cannot upload " + file + ": " + exception.Message);
         }
+        return transferJob;
     }
 
     public void ExecuteAsyncCommand(string command, string args, ref IRemoteCommand job)
@@ -1233,7 +1305,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         if (regularFiles.Length != 0)
         {
-            UploadFilesToDirectory(regularFiles, remoteDir);
+            // A dropped .ipk or .apk is offered for installation when its upload is complete (OpenWrt only).
+            RegisterPackageInstallOffer(UploadFilesToDirectory(regularFiles, remoteDir), targetTab);
         }
         foreach (string folder in folders)
         {
@@ -1244,10 +1317,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     }
 
     /// <summary>
-    /// Queues several uploads into one remote directory, asking once about all the files that already exist there.
+    /// Queues several uploads into one remote directory, asking once about all the files that already exist there. Returns the
+    /// queued transfers (none when the user cancelled or the directory is not usable).
     /// </summary>
-    public void UploadFilesToDirectory(IList<string> files, string remoteDir)
+    public List<FileTransferManager.TransferJob> UploadFilesToDirectory(IList<string> files, string remoteDir)
     {
+        List<FileTransferManager.TransferJob> queued = new List<FileTransferManager.TransferJob>();
         string[] remotePaths = files.Select((string file) => remoteDir.TrimEnd('/') + "/" + Path.GetFileName(file)).ToArray();
         RemotePathKind[] kinds;
         try
@@ -1258,16 +1333,16 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             {
                 case RemotePathKind.File:
                     MessageBoxes.Error("Cannot upload files to " + remoteDir + ": it is a file, not a directory.");
-                    return;
+                    return queued;
                 case RemotePathKind.Missing:
                     if (!MessageBoxes.Ask(remoteDir + " does not exist on the server. Create it?"))
                     {
-                        return;
+                        return queued;
                     }
                     if (Session.RunCommandChecked("mkdir -p " + RemotePathUtils.ShellQuote(remoteDir), requireSuccess: true) == null)
                     {
                         MessageBoxes.Error("Cannot create " + remoteDir + ".");
-                        return;
+                        return queued;
                     }
                     break;
             }
@@ -1275,7 +1350,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         catch (Exception exception)
         {
             MessageBoxes.Error("Cannot upload files: " + exception.Message);
-            return;
+            return queued;
         }
         List<string> directories = Enumerable.Range(0, files.Count).Where((int i) => kinds[i] == RemotePathKind.Directory).Select((int i) => remotePaths[i]).ToList();
         if (directories.Count != 0)
@@ -1288,7 +1363,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             if (!MessageBoxes.AskWarn(remotePaths[0] + " already exists. Overwrite it?"))
             {
-                return;
+                return queued;
             }
         }
         else if (existing.Count != 0)
@@ -1303,7 +1378,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     overwrite = false;
                     break;
                 default:
-                    return;
+                    return queued;
             }
         }
         for (int i = 0; i < files.Count; i++)
@@ -1313,8 +1388,13 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 continue;
             }
             // Unknown (the check could not run) is left to the transfer itself, which reports what goes wrong.
-            DoUploadFile(files[i], remoteDir, checkOverwrite: false);
+            FileTransferManager.TransferJob job = DoUploadFile(files[i], remoteDir, checkOverwrite: false);
+            if (job != null)
+            {
+                queued.Add(job);
+            }
         }
+        return queued;
     }
 
     private static string FormatFileList(IList<string> names)
@@ -1516,6 +1596,40 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             string command = RemoteScript.BuildRunInPlaceCommand(remotePath, probe);
             _Controller.BeginInvoke(() => RunInTerminal(command, origin));
         });
+    }
+
+    /// <summary>
+    /// Installs package files that are on the OpenWrt device (the file list's "Install package" items): .ipk files with opkg,
+    /// .apk files with apk, after the user has confirmed. Only an OpenWrt host (see <see cref="LocalRepoManager"/>) is
+    /// accepted, and only the files its package manager installs. The command is typed in the terminal tab that is active now,
+    /// so that its output, questions and errors (a user that is not root, missing dependencies) are there to read. After an
+    /// upload (a package dropped on the terminal) it is typed in the tab the file was dropped on, <paramref name="origin"/>.
+    /// </summary>
+    public void InstallRemotePackages(string[] remotePaths, ITabContext origin = null, bool afterUpload = false)
+    {
+        LocalRepoPackageManager? manager = _LocalRepoManager;
+        if (manager == null)
+        {
+            MessageBoxes.Error("Packages can be installed only on an OpenWrt device with opkg or apk.");
+            return;
+        }
+        string[] packages = (remotePaths ?? new string[0]).Where((string path) => RemotePackageInstall.CanInstall(RemotePathUtils.GetFileName(path), manager)).ToArray();
+        if (packages.Length == 0)
+        {
+            MessageBoxes.Error("This device uses " + RemotePackageInstall.ToolName(manager.Value) + ", which installs " + (manager == LocalRepoPackageManager.Apk ? ".apk" : ".ipk") + " packages.");
+            return;
+        }
+        string list = string.Join("\n", packages.Take(10).Select((string path) => RemotePathUtils.GetFileName(path)));
+        if (packages.Length > 10)
+        {
+            list += "\n... and " + (packages.Length - 10) + " more";
+        }
+        string note = manager == LocalRepoPackageManager.Apk ? "\n\nThe packages are installed without a signature check (apk add --allow-untrusted)." : "";
+        if (!MessageBoxes.Ask((afterUpload ? "The upload is complete.\n\n" : "") + "Install " + (packages.Length == 1 ? "this package" : packages.Length + " packages") + " with " + RemotePackageInstall.ToolName(manager.Value) + "?\n\n" + list + note))
+        {
+            return;
+        }
+        RunInTerminal(RemotePackageInstall.BuildInstallCommand(manager.Value, packages), origin ?? ActiveTab);
     }
 
     /// <summary>
