@@ -1777,10 +1777,24 @@ public class MainWindowController : INotifyPropertyChanged
         {
             tag.Channel.ResizePty(newWidth, newHeight);
         }
-        catch (Exception) when (tag.Channel.IsDisposed || tag.Channel.ClosedByConnectionLoss || tag.Channel.IsEof)
+        catch (Exception exception) when (IsConnectionGoneError(tag, exception))
         {
             // The channel is gone with a lost connection: the reconnect prompt deals with it, a resize must not crash the window.
         }
+    }
+
+    /// <summary>
+    /// Whether an exception from writing to the terminal channel only says that the connection is gone. SSH.NET throws
+    /// SshConnectionException (not an IOException) in the short window between the real break and the moment the
+    /// channels are marked closed, so the channel flags cannot be relied on alone.
+    /// </summary>
+    private static bool IsConnectionGoneError(TerminalTag tag, Exception exception)
+    {
+        if (exception is Renci.SshNet.Common.SshConnectionException || exception is ObjectDisposedException)
+        {
+            return true;
+        }
+        return tag.Channel.IsDisposed || tag.Channel.ClosedByConnectionLoss || tag.Channel.IsEof || (tag.Session?.Session?.IsConnectionClosed ?? false);
     }
 
     private void terminalEmulatorControl1_HandleTerminalInput(object sender, byte[] input, TerminalEmulatorControl.InputKind type)
@@ -1797,7 +1811,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             tag.Channel.Input.Write(input, 0, input.Length);
         }
-        catch (IOException) when (tag.Channel.IsDisposed || tag.Channel.ClosedByConnectionLoss || tag.Channel.IsEof)
+        catch (Exception exception) when (IsConnectionGoneError(tag, exception))
         {
             // Typing into a tab whose connection is gone (the reconnect prompt is showing): the input is dropped.
         }
