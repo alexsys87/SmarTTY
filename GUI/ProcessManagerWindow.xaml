@@ -3,6 +3,7 @@
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
@@ -30,7 +31,50 @@
         <TextBlock Text="Force kill" />
       </Button>
     </ToolBar>
-    <ListView Name="ProcessList" Grid.Row="1" SelectionMode="Single" VirtualizingStackPanel.IsVirtualizing="True" GridViewColumnHeader.Click="Header_Click" SelectionChanged="ProcessList_SelectionChanged" PreviewKeyDown="ProcessList_PreviewKeyDown">
+    <!-- The load of the whole server: each meter has the value on the right of its name, the bar, and a line of detail. -->
+    <Border Grid.Row="1" Padding="10 8 10 8" Background="{DynamicResource Theme.SurfaceBackground}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="0 0 0 1">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" Margin="0 0 12 0" ToolTip="How busy all processor cores together were since the previous reading">
+          <DockPanel>
+            <TextBlock Name="CpuValueText" DockPanel.Dock="Right" FontWeight="SemiBold" Text="..." />
+            <TextBlock Text="CPU" FontWeight="SemiBold" />
+          </DockPanel>
+          <ProgressBar Name="CpuMeter" Height="14" Margin="0 4 0 0" Maximum="100" />
+          <TextBlock Name="CpuDetailText" Margin="0 3 0 0" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Margin="0 0 12 0" ToolTip="Memory in use (without the cache that programs can take back) of all the memory of the server">
+          <DockPanel>
+            <TextBlock Name="MemoryValueText" DockPanel.Dock="Right" FontWeight="SemiBold" Text="..." />
+            <TextBlock Text="Memory" FontWeight="SemiBold" />
+          </DockPanel>
+          <ProgressBar Name="MemoryMeter" Height="14" Margin="0 4 0 0" Maximum="100" />
+          <TextBlock Name="MemoryDetailText" Margin="0 3 0 0" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Margin="0 0 12 0" ToolTip="How much of the time the busiest disk had requests to work on since the previous reading (like util in iostat)">
+          <DockPanel>
+            <TextBlock Name="DiskValueText" DockPanel.Dock="Right" FontWeight="SemiBold" Text="..." />
+            <TextBlock Text="Disk activity" FontWeight="SemiBold" />
+          </DockPanel>
+          <ProgressBar Name="DiskMeter" Height="14" Margin="0 4 0 0" Maximum="100" />
+          <TextBlock Name="DiskDetailText" Margin="0 3 0 0" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <StackPanel Grid.Column="3" ToolTip="Used space of the file system that holds /">
+          <DockPanel>
+            <TextBlock Name="StorageValueText" DockPanel.Dock="Right" FontWeight="SemiBold" Text="..." />
+            <TextBlock Text="Disk space" FontWeight="SemiBold" />
+          </DockPanel>
+          <ProgressBar Name="StorageMeter" Height="14" Margin="0 4 0 0" Maximum="100" />
+          <TextBlock Name="StorageDetailText" Margin="0 3 0 0" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Grid>
+    </Border>
+    <ListView Name="ProcessList" Grid.Row="2" SelectionMode="Single" VirtualizingStackPanel.IsVirtualizing="True" GridViewColumnHeader.Click="Header_Click" SelectionChanged="ProcessList_SelectionChanged" PreviewKeyDown="ProcessList_PreviewKeyDown">
       <FrameworkElement.ContextMenu>
         <ContextMenu Opened="ContextMenu_Opened">
           <MenuItem Name="EndMenuItem" Header="End process" Click="End_Click">
@@ -58,17 +102,23 @@
               </GridViewColumn.CellTemplate>
             </GridViewColumn>
             <GridViewColumn Header="User" Width="90" DisplayMemberBinding="{Binding User}" />
-            <GridViewColumn Header="CPU %" Width="64">
+            <GridViewColumn Header="CPU %" Width="110">
               <GridViewColumn.CellTemplate>
                 <DataTemplate>
-                  <TextBlock TextAlignment="Right" Text="{Binding CpuText}" />
+                  <Grid MinHeight="16" ToolTip="{Binding CpuToolTip}">
+                    <ProgressBar Maximum="100" Height="16" BorderThickness="0" Opacity="0.7" Value="{Binding CpuBar, Mode=OneWay}" Foreground="{Binding CpuBrush, Mode=OneWay}" />
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding CpuText}" />
+                  </Grid>
                 </DataTemplate>
               </GridViewColumn.CellTemplate>
             </GridViewColumn>
-            <GridViewColumn Header="Memory" Width="80">
+            <GridViewColumn Header="Memory" Width="110">
               <GridViewColumn.CellTemplate>
                 <DataTemplate>
-                  <TextBlock TextAlignment="Right" Text="{Binding MemoryText}" />
+                  <Grid MinHeight="16" ToolTip="{Binding MemoryToolTip}">
+                    <ProgressBar Maximum="100" Height="16" BorderThickness="0" Opacity="0.7" Value="{Binding MemoryPercent, Mode=OneWay}" Foreground="{Binding MemoryBrush, Mode=OneWay}" />
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding MemoryText}" />
+                  </Grid>
                 </DataTemplate>
               </GridViewColumn.CellTemplate>
             </GridViewColumn>
@@ -91,6 +141,6 @@
         </GridView>
       </ListView.View>
     </ListView>
-    <TextBlock Name="StatusText" Grid.Row="2" Margin="8 4 8 4" TextTrimming="CharacterEllipsis" />
+    <TextBlock Name="StatusText" Grid.Row="3" Margin="8 4 8 4" TextTrimming="CharacterEllipsis" />
   </Grid>
 </Window>

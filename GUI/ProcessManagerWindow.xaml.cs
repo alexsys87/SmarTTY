@@ -13,18 +13,44 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace SmarTTY.GUI;
 
 /// <summary>
 /// Tools > Process manager: the processes of the server of the active SSH session (see <see cref="RemoteProcessList"/>), with
-/// the processor share and the memory of each, a filter, and commands to end or kill the selected one. The list is read in
+/// the processor share and the memory of each shown as bars, the load of the whole server (processor, memory, disk activity
+/// and disk space) above the list, a filter, and commands to end or kill the selected one. The list is read in
 /// the background every few seconds while the window is open; the rows are updated in place, so the selection and the scroll
 /// position stay where they are.
 /// </summary>
 public partial class ProcessManagerWindow : Window
 {
+    /// <summary>The colours of the bars: green while there is room, amber when it gets full, red when it is nearly all used.</summary>
+    private static class MeterBrushes
+    {
+        public static readonly Brush Low = Make(0x3F, 0xA3, 0x5B);
+
+        public static readonly Brush Mid = Make(0xE0, 0xA1, 0x1B);
+
+        public static readonly Brush High = Make(0xD9, 0x4F, 0x4A);
+
+        public static readonly Brush Memory = Make(0x4A, 0x90, 0xD9);
+
+        public static Brush ForLoad(double percent)
+        {
+            return percent >= 85 ? High : percent >= 60 ? Mid : Low;
+        }
+
+        private static Brush Make(byte red, byte green, byte blue)
+        {
+            SolidColorBrush brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
+            brush.Freeze();
+            return brush;
+        }
+    }
+
     /// <summary>A row of the list; the numbers are separate properties so that the list sorts by them, not by their text.</summary>
     public class ProcessRow : INotifyPropertyChanged
     {
@@ -37,6 +63,8 @@ public partial class ProcessManagerWindow : Window
         private double? _Cpu;
 
         private long _MemoryKb;
+
+        private long _MemoryTotalKb;
 
         public int Pid { get; }
 
@@ -55,27 +83,44 @@ public partial class ProcessManagerWindow : Window
 
         public string CpuText => _Cpu.HasValue ? _Cpu.Value.ToString("0.0", CultureInfo.InvariantCulture) : "";
 
+        /// <summary>The length of the bar: 100 is one whole core (a process that uses several cores shows a full bar, the text has the number).</summary>
+        public double CpuBar => Math.Min(100.0, _Cpu ?? 0);
+
+        public Brush CpuBrush => MeterBrushes.ForLoad(CpuBar);
+
+        public string CpuToolTip => _Cpu.HasValue ? CpuText + " % of one processor core (100 is one whole core)" : "Measured at the next reading";
+
         public long MemoryKb => _MemoryKb;
 
         public string MemoryText => _MemoryKb > 0 ? RemoteProcessList.FormatKb(_MemoryKb) : "";
 
+        /// <summary>The share of all the memory of the server that the process holds, 0 to 100.</summary>
+        public double MemoryPercent => _MemoryTotalKb > 0 ? Math.Min(100.0, _MemoryKb * 100.0 / _MemoryTotalKb) : 0;
+
+        public Brush MemoryBrush => MeterBrushes.Memory;
+
+        public string MemoryToolTip => _MemoryKb > 0 && _MemoryTotalKb > 0
+            ? RemoteProcessList.FormatKb(_MemoryKb) + " in memory, " + MemoryPercent.ToString("0.0", CultureInfo.InvariantCulture) + " % of " + RemoteProcessList.FormatKb(_MemoryTotalKb)
+            : "";
+
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public ProcessRow(RemoteProcess process)
+        public ProcessRow(RemoteProcess process, long? memoryTotalKb)
         {
             Pid = process.Pid;
-            Update(process);
+            Update(process, memoryTotalKb);
         }
 
-        public void Update(RemoteProcess process)
+        public void Update(RemoteProcess process, long? memoryTotalKb)
         {
+            _MemoryTotalKb = memoryTotalKb ?? 0;
             Name = process.Name;
             _User = process.User;
             _State = process.State;
             _Command = process.Command;
             _Cpu = process.CpuPercent;
             _MemoryKb = process.MemoryKb;
-            foreach (string property in new[] { "Name", "User", "State", "StateDescription", "Command", "CpuPercent", "CpuText", "MemoryKb", "MemoryText" })
+            foreach (string property in new[] { "Name", "User", "State", "StateDescription", "Command", "CpuPercent", "CpuText", "CpuBar", "CpuBrush", "CpuToolTip", "MemoryKb", "MemoryText", "MemoryPercent", "MemoryToolTip" })
             {
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
             }
@@ -227,6 +272,7 @@ public partial class ProcessManagerWindow : Window
 
     private void Apply(ProcessSnapshot snapshot)
     {
+        bool first = _Snapshot == null;
         _Snapshot = snapshot;
         HashSet<int> alive = new HashSet<int>();
         foreach (RemoteProcess process in snapshot.Processes)
@@ -234,11 +280,11 @@ public partial class ProcessManagerWindow : Window
             alive.Add(process.Pid);
             if (_ByPid.TryGetValue(process.Pid, out ProcessRow row))
             {
-                row.Update(process);
+                row.Update(process, snapshot.MemTotalKb);
             }
             else
             {
-                row = new ProcessRow(process);
+                row = new ProcessRow(process, snapshot.MemTotalKb);
                 _ByPid[process.Pid] = row;
                 _Rows.Add(row);
             }
@@ -248,7 +294,91 @@ public partial class ProcessManagerWindow : Window
             _Rows.Remove(_ByPid[gone]);
             _ByPid.Remove(gone);
         }
+        UpdateMeters();
         UpdateStatus();
+        if (first)
+        {
+            // The shares are a difference of two readings: take the second soon instead of leaving the bars empty for the whole interval.
+            DispatcherTimer soon = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            soon.Tick += (sender, e) =>
+            {
+                soon.Stop();
+                Refresh();
+            };
+            soon.Start();
+        }
+    }
+
+    /// <summary>Fills the meters of the whole server above the list from the last reading.</summary>
+    private void UpdateMeters()
+    {
+        ProcessSnapshot s = _Snapshot;
+        if (s == null)
+        {
+            return;
+        }
+        string measuring = "measuring...";
+
+        if (s.CpuTotalPercent.HasValue)
+        {
+            SetMeter(CpuMeter, CpuValueText, s.CpuTotalPercent.Value, MeterBrushes.ForLoad(s.CpuTotalPercent.Value));
+        }
+        else
+        {
+            SetMeter(CpuMeter, CpuValueText, null, MeterBrushes.Low);
+        }
+        CpuDetailText.Text = s.CpuCount + (s.CpuCount == 1 ? " core" : " cores") + (s.LoadAverage != null ? "  |  load " + s.LoadAverage : "");
+
+        if (s.MemTotalKb.HasValue && s.MemTotalKb.Value > 0)
+        {
+            long used = Math.Max(0, s.MemTotalKb.Value - (s.MemFreeKb ?? 0));
+            double percent = used * 100.0 / s.MemTotalKb.Value;
+            SetMeter(MemoryMeter, MemoryValueText, percent, MeterBrushes.ForLoad(percent));
+            MemoryDetailText.Text = RemoteProcessList.FormatKb(used) + " of " + RemoteProcessList.FormatKb(s.MemTotalKb.Value)
+                + (s.MemCachedKb.HasValue ? "  |  cache " + RemoteProcessList.FormatKb(s.MemCachedKb.Value) : "");
+        }
+        else
+        {
+            SetMeter(MemoryMeter, MemoryValueText, null, MeterBrushes.Low, "n/a");
+            MemoryDetailText.Text = "the server does not tell";
+        }
+
+        if (s.DiskBusyPercent.HasValue)
+        {
+            SetMeter(DiskMeter, DiskValueText, s.DiskBusyPercent.Value, MeterBrushes.ForLoad(s.DiskBusyPercent.Value));
+            DiskDetailText.Text = "read " + RemoteProcessList.FormatRate(s.DiskReadBytesPerSecond ?? 0) + "  |  write " + RemoteProcessList.FormatRate(s.DiskWriteBytesPerSecond ?? 0)
+                + (s.BusiestDisk != null ? "  (" + s.BusiestDisk + ")" : "");
+        }
+        else if (s.Disks.Count == 0)
+        {
+            SetMeter(DiskMeter, DiskValueText, null, MeterBrushes.Low, "n/a");
+            DiskDetailText.Text = "no disks reported";
+        }
+        else
+        {
+            SetMeter(DiskMeter, DiskValueText, null, MeterBrushes.Low);
+            DiskDetailText.Text = measuring;
+        }
+
+        if (s.StorageTotalKb.HasValue && s.StorageTotalKb.Value > 0 && s.StorageUsedKb.HasValue)
+        {
+            double percent = Math.Min(100.0, s.StorageUsedKb.Value * 100.0 / s.StorageTotalKb.Value);
+            SetMeter(StorageMeter, StorageValueText, percent, MeterBrushes.ForLoad(percent));
+            StorageDetailText.Text = "/  |  " + RemoteProcessList.FormatKb(s.StorageUsedKb.Value) + " of " + RemoteProcessList.FormatKb(s.StorageTotalKb.Value);
+        }
+        else
+        {
+            SetMeter(StorageMeter, StorageValueText, null, MeterBrushes.Low, "n/a");
+            StorageDetailText.Text = "df did not answer";
+        }
+    }
+
+    /// <summary>Sets a bar and the value above it; no value (the first reading) shows an empty bar and the placeholder.</summary>
+    private static void SetMeter(ProgressBar bar, TextBlock valueText, double? percent, Brush brush, string placeholder = "...")
+    {
+        bar.Value = percent ?? 0;
+        bar.Foreground = brush;
+        valueText.Text = percent.HasValue ? percent.Value.ToString("0.0", CultureInfo.InvariantCulture) + " %" : placeholder;
     }
 
     private void UpdateStatus()
@@ -264,11 +394,6 @@ public partial class ProcessManagerWindow : Window
         if (_Snapshot.LoadAverage != null)
         {
             parts.Add("load " + _Snapshot.LoadAverage);
-        }
-        if (_Snapshot.MemTotalKb.HasValue && _Snapshot.MemTotalKb.Value > 0)
-        {
-            long free = _Snapshot.MemFreeKb ?? 0;
-            parts.Add("memory " + RemoteProcessList.FormatKb(_Snapshot.MemTotalKb.Value - free) + " of " + RemoteProcessList.FormatKb(_Snapshot.MemTotalKb.Value) + " used");
         }
         if (_Snapshot.UptimeSeconds.HasValue)
         {
