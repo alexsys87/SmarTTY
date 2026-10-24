@@ -558,6 +558,9 @@ public class SshSession : IDisposable
         {
             channel.OnConnectionClosed();
         }
+        // The X11 connections are not shell channels and SSH.NET's Disconnected does not fire for a dropped TCP
+        // connection: without this the remote X programs' windows stay frozen and their reader threads wait.
+        X11?.CloseConnections();
     }
 
     private void RaiseConnectionLost()

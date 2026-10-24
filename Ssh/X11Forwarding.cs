@@ -266,6 +266,15 @@ public sealed class X11Forwarding : IDisposable
         CloseAllChannels();
     }
 
+    /// <summary>
+    /// Closes the connections to the local X server. SSH.NET raises Disconnected only for a DISCONNECT from the
+    /// server; a dropped TCP connection comes as an error, so <see cref="SshSession"/> calls this when it notices the loss.
+    /// </summary>
+    internal void CloseConnections()
+    {
+        CloseAllChannels();
+    }
+
     private void CloseAllChannels()
     {
         foreach (uint localChannel in _channels.Keys)
