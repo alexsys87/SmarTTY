@@ -148,7 +148,13 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private bool RemotePathExists(string path)
     {
-        return _context.Session.RunCommandChecked("test -e " + RemotePathUtils.ShellQuote(path), requireSuccess: true) != null;
+        if (_context.Session.RunCommandChecked("test -e " + RemotePathUtils.ShellQuote(path), requireSuccess: true) != null)
+        {
+            return true;
+        }
+        // No answer is not "does not exist": without a connection the file may be there.
+        _context.Session.ThrowIfConnectionLost();
+        return false;
     }
 
     /// <summary>Shows the downloaded text (UI thread) and makes the editor editable.</summary>
@@ -391,7 +397,13 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             scpChannelStream.Write(job.Bytes, 0, job.Bytes.Length);
         }
-        return _context.Session.RunCommandChecked(job.ReplaceCommand, requireSuccess: true) != null;
+        if (_context.Session.RunCommandChecked(job.ReplaceCommand, requireSuccess: true) != null)
+        {
+            return true;
+        }
+        // A lost connection is not a refused write: do not offer sudo for it.
+        _context.Session.ThrowIfConnectionLost();
+        return false;
     }
 
     /// <summary>Asks whether to retry with sudo and does so (UI thread).</summary>

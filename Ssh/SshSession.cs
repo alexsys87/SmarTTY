@@ -916,7 +916,21 @@ public class SshSession : IDisposable
     }
 
     /// <summary>
+    /// Throws when the connection is gone. A null from <see cref="RunCommand"/> / <see cref="RunCommandChecked"/> means
+    /// "the command failed" and also "there is no connection": callers that act on the first meaning (offer sudo,
+    /// say that a directory is missing, say that no package manager exists) call this first.
+    /// </summary>
+    public void ThrowIfConnectionLost()
+    {
+        if (IsConnectionClosed)
+        {
+            throw new IOException("The connection to the server was lost.");
+        }
+    }
+
+    /// <summary>
     /// Runs a command and returns its output; if <paramref name="requireSuccess"/> is set, returns null when the command fails.
+    /// A null result is also returned when the connection is lost (see <see cref="ThrowIfConnectionLost"/>).
     /// </summary>
     public List<string> RunCommandChecked(string command, bool requireSuccess, string terminalType = null)
     {

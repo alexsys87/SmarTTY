@@ -1670,6 +1670,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public string[] RunCommand(string command)
     {
-        return Session.RunCommandChecked(command, requireSuccess: true)?.ToArray();
+        string[] output = Session.RunCommandChecked(command, requireSuccess: true)?.ToArray();
+        if (output == null)
+        {
+            // null means "the command failed" for the callers (a package manager that is not there); not so for a dropped connection.
+            Session.ThrowIfConnectionLost();
+        }
+        return output;
     }
 }

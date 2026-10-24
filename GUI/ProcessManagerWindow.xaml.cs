@@ -240,6 +240,7 @@ public partial class ProcessManagerWindow : Window
                 lines = session.RunCommand(RemoteProcessList.ListCommand, out int? exitStatus);
                 if (lines == null)
                 {
+                    session.ThrowIfConnectionLost();
                     error = "The command could not be run on the server.";
                 }
             }
@@ -539,6 +540,8 @@ public partial class ProcessManagerWindow : Window
                 List<string> output = session.RunCommand(RemoteProcessList.SignalCommand(pid, force), out int? exitStatus);
                 if (exitStatus != 0)
                 {
+                    // No exit status because the connection went away: the signal may or may not have been sent.
+                    session.ThrowIfConnectionLost();
                     string text = string.Join("\n", (output ?? new List<string>()).Where(line => line.Trim().Length > 0));
                     error = text.Length > 0 ? text : "The server refused (exit status " + (exitStatus?.ToString(CultureInfo.InvariantCulture) ?? "unknown") + ").";
                     if (text.IndexOf("not permitted", StringComparison.OrdinalIgnoreCase) >= 0)
