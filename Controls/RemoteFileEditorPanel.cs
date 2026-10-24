@@ -1,4 +1,3 @@
-using SmarTTY.GUI;
 using SmarTTY.GUI.Styles;
 using System;
 using System.Collections.Generic;
@@ -219,7 +218,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         }
         catch (Exception exception)
         {
-            MessageBoxes.Exception(exception);
+            MessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
         if (focusEditor)
         {
