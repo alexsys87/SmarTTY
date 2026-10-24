@@ -112,6 +112,16 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
+    /// <summary>Removes the selected text; does nothing without a selection (unlike Cut, it leaves the clipboard alone).</summary>
+    public void DeleteSelection()
+    {
+        if (IsEditable && _hasSelection)
+        {
+            ReplaceText(SelectionEnd, SelectionStart, select: false, "");
+            UpdateMaxLineWidth(CaretPosition.Line);
+        }
+    }
+
     public string GetPaddingToColumn(int column, int columnIndex, int columnNumber)
     {
         int lineLength = IndexToColumn(column, columnIndex);
