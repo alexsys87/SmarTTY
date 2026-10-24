@@ -152,9 +152,12 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                 streamWriter.WriteLine($"echo ---link#{i}");
                 streamWriter.WriteLine(statCommandBuilder.GetStatCommand(pendingLinks[i].ResolvedPath, followSymlinks: true) + $" || echo badlink:{i}");
             }
+            string endMarker = marker + "-end";
+            streamWriter.WriteLine("echo " + endMarker);
             streamWriter.Flush();
             List<string> scriptOutput = this._engine.RunScript(marker, memoryStream.ToArray());
             bool markerSeen = false;
+            bool endSeen = false;
             int currentLinkIndex = -1;
             foreach (string line in scriptOutput)
             {
@@ -164,6 +167,10 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                     {
                         markerSeen = true;
                     }
+                }
+                else if (line == endMarker)
+                {
+                    endSeen = true;
                 }
                 else if (line.StartsWith("---link#"))
                 {
@@ -270,6 +277,10 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                     }
                 }
             }
+            if (!endSeen)
+            {
+                throw new IOException("The list of symbolic links of the server is incomplete: the command stopped before its end. Nothing was changed.");
+            }
         }
 
         private List<ScanDirectory> ScanDirectories(StatCommandBuilder statCommandBuilder, List<ScanDirectory> dirsToScan, List<PendingSymlink> pendingLinks)
@@ -289,9 +300,14 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                 streamWriter.WriteLine("echo --dir:" + dirPath);
                 streamWriter.WriteLine(statCommandBuilder.GetListCommand(dirPath));
             }
+            // The last line of the output: without it the list may be cut short (the script was stopped, the output was
+            // lost), and a cut list must not pass for the whole one.
+            string endMarker = marker + "-end";
+            streamWriter.WriteLine("echo " + endMarker);
             streamWriter.Flush();
             List<string> scriptOutput = this._engine.RunScript(marker, memoryStream.ToArray());
             bool markerSeen = false;
+            bool endSeen = false;
             ScanDirectory currentDir = null;
             foreach (string line in scriptOutput)
             {
@@ -301,6 +317,10 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                     {
                         markerSeen = true;
                     }
+                }
+                else if (line == endMarker)
+                {
+                    endSeen = true;
                 }
                 else if (line.StartsWith("--dir:"))
                 {
@@ -380,6 +400,10 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                             }
                     }
                 }
+            }
+            if (!endSeen)
+            {
+                throw new IOException("The list of files of the server is incomplete: the listing stopped before its end (the connection was interrupted or the command was stopped). Nothing was changed.");
             }
             return nextDirsToScan;
         }
@@ -469,15 +493,27 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                 }
             }
             sshShellChannel.WaitClosed();
+            if (sshShellChannel.ClosedByConnectionLoss)
+            {
+                // What was read so far is a part of the output, and the missing exit status is not a success: the callers take
+                // "no lines" for an empty folder and an incomplete list for the whole one, and a download with "Delete extraneous"
+                // would then remove local files that the server still has. The whole synchronization stops instead.
+                throw new IOException("The connection to the server was lost while running a command for the synchronization.");
+            }
             if ((sshShellChannel.ExitStatus != 0) & requireSuccess)
             {
                 return null;
             }
             return lines;
         }
+        catch (Exception) when (_session.IsConnectionClosed)
+        {
+            // No connection: not a warning of one command (null), the run cannot go on.
+            throw;
+        }
         catch (Exception exception)
         {
-            _events.OnWarning(new SyncWarning
+            _events?.OnWarning(new SyncWarning
             {
                 Warning = new QuickSyncWarning(QuickSyncWarningType.RemoteCommandFailed, command, 0),
                 Exception = exception
@@ -516,7 +552,14 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
         {
             if (!Tuning.KeepTempScripts)
             {
-                RunCommand("rm " + RemotePathUtils.ShellQuote(remoteTempPath));
+                try
+                {
+                    RunCommand("rm " + RemotePathUtils.ShellQuote(remoteTempPath));
+                }
+                catch (IOException) when (_session.IsConnectionClosed)
+                {
+                    // The connection is gone (the exception that got us here is the one to report); the script stays in the temp folder.
+                }
             }
         }
     }

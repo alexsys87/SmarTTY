@@ -303,6 +303,12 @@ public class QuickSyncRunner
                     linkOptions |= LocalFileSystem.LinkOptions.DeleteExtraneous;
                 }
                 using IRemoteFileSource remoteFileSource = syncEngine.BeginDownload(syncPlan.Actions);
+                if (sshSession.IsConnectionClosed)
+                {
+                    // The plan was made from a complete list, but without a connection nothing can be copied; do not start
+                    // with the deletions and the replaced files only.
+                    throw new IOException("The connection to the server was lost before the files were copied. Nothing was changed.");
+                }
                 this.ExecuteLocalActions(LocalPath.FromUserPath(syncSettings.LocalPath), syncPlan, remoteFileSource, syncEvents, ref statistics);
                 CreateLinks(syncPlan, linkOptions, syncEvents);
             }
