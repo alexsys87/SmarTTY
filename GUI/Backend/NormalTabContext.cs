@@ -137,6 +137,7 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public void OnSessionReconnected(SshSession session)
     {
+        FileExplorer?.OnSessionReconnected();
         // Only a classic terminal owns a shell channel. A Smart Terminal tab runs every command in a channel of its
         // own through the session context, so it picks the new session up by itself and must not get a shell.
         if (Terminal.Tag is TerminalTag terminalTag && terminalTag.Channel != null)
