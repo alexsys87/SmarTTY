@@ -707,6 +707,11 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             if (tab is NormalTabContext normalTab && ReferenceEquals(normalTab.Terminal, ctl))
             {
+                if (normalTab.IsOpeningShell)
+                {
+                    // The shell is already being opened: every further key press would start another one.
+                    return;
+                }
                 normalTab.OnSessionReconnected(session);
                 return;
             }

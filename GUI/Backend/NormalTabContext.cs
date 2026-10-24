@@ -144,23 +144,77 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             SshShellChannel previousChannel = terminalTag.Channel;
             Terminal.BeginNewSession();
             Terminal.HideCaret = false;
-            try
+            // Opening a shell waits for the server (and, in PtySetupGate, up to 5 s for the helper commands that run in
+            // the background after a reconnect), once for every tab: it must not run on the UI thread. The tab keeps its
+            // old, closed channel until the new one is there; input meanwhile is dropped by the input handler.
+            int generation = ++_ReopenGeneration;
+            _OpeningShell = true;
+            bool utf8Tty = !Terminal.ByteOrientedLineEditing;
+            ThreadPool.QueueUserWorkItem((object state) =>
             {
-                SshShellChannel sshShellChannel = session.OpenShellChannel(null, "xterm", ExtendedDataMode.Normal, utf8Tty: !Terminal.ByteOrientedLineEditing);
-                sshShellChannel.ExtendedDataMode = ExtendedDataMode.Merge;
-                terminalTag.Channel = sshShellChannel;
-                terminalTag.ShellOpenFailed = false;
-                _Session.AttachChannelToControl(Terminal, sshShellChannel, isAutoLaunchedCommand: false);
-            }
-            catch (Exception exception)
-            {
-                // Keep the other tabs reconnecting; this one shows why it has no shell. Its channel is the old, closed
-                // one, and the session counts as healthy, so nothing else would ever try again: a key press does.
-                terminalTag.ShellOpenFailed = true;
-                Terminal.ProcessOutput(TerminalEmulatorControl.Colorize("Failed to open a shell: " + exception.Message + ". Press any key to try again.", 1) + "\r\n");
-            }
-            DisposeChannel(previousChannel);
+                SshShellChannel opened = null;
+                Exception error = null;
+                try
+                {
+                    opened = session.OpenShellChannel(null, "xterm", ExtendedDataMode.Normal, utf8Tty: utf8Tty);
+                    opened.ExtendedDataMode = ExtendedDataMode.Merge;
+                }
+                catch (Exception exception)
+                {
+                    error = exception;
+                }
+                try
+                {
+                    // The WPF dispatcher, not Terminal.BeginInvoke: the WinForms control of a tab that was never shown has
+                    // no window handle yet, and its shell must be reopened all the same.
+                    Application.Current.Dispatcher.BeginInvoke((Action)(() => CompleteShellReopen(session, terminalTag, previousChannel, opened, error, generation)));
+                }
+                catch (Exception)
+                {
+                    // The application is shutting down: nobody will use the new shell.
+                    DisposeChannel(opened);
+                }
+            });
         }
+    }
+
+    /// <summary>True while the shell of this tab is being opened after a reconnect (the key press retry must not start a second one).</summary>
+    public bool IsOpeningShell => _OpeningShell;
+
+    private int _ReopenGeneration;
+
+    private bool _OpeningShell;
+
+    /// <summary>The end of <see cref="OnSessionReconnected"/> on the UI thread.</summary>
+    private void CompleteShellReopen(SshSession session, TerminalTag terminalTag, SshShellChannel previousChannel, SshShellChannel opened, Exception error, int generation)
+    {
+        if (generation != _ReopenGeneration || Terminal.IsDisposed)
+        {
+            // A newer reconnect (or retry) took over this tab, or the tab is gone: this result is of no use.
+            DisposeChannel(opened);
+            DisposeChannel(previousChannel);
+            return;
+        }
+        _OpeningShell = false;
+        try
+        {
+            if (error != null)
+            {
+                throw error;
+            }
+            terminalTag.Channel = opened;
+            terminalTag.ShellOpenFailed = false;
+            _Session.AttachChannelToControl(Terminal, opened, isAutoLaunchedCommand: false);
+        }
+        catch (Exception exception)
+        {
+            // Keep the other tabs reconnecting; this one shows why it has no shell. Its channel is the old, closed
+            // one, and the session counts as healthy, so nothing else would ever try again: a key press does.
+            terminalTag.ShellOpenFailed = true;
+            DisposeChannel(opened);
+            Terminal.ProcessOutput(TerminalEmulatorControl.Colorize("Failed to open a shell: " + exception.Message + ". Press any key to try again.", 1) + "\r\n");
+        }
+        DisposeChannel(previousChannel);
     }
 
     public void Dispose()
