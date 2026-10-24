@@ -371,7 +371,11 @@ public class MainWindowController : INotifyPropertyChanged
                 }
             };
             _Controller.ApplyEditorSettings(editor);
-            editor.Tag = session.AddNewFileEditorOrThrow(editor, fn);
+            EditorTabContext newTab = session.AddNewFileEditorOrThrow(editor, fn);
+            editor.Tag = newTab;
+            // The tool bar and the context menu of the editor.
+            newTab.EditorPanel.SaveRequested += (object sender, EventArgs e) => SaveFile();
+            newTab.EditorPanel.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
         }
 
         internal void Search()

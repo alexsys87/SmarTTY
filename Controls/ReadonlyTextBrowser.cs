@@ -2179,6 +2179,12 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    /// <summary>Selects the whole text (Ctrl+A); nothing happens in terminal mode.</summary>
+    public void SelectAllText()
+    {
+        SelectAll();
+    }
+
     protected virtual void SelectAll()
     {
         if (!TerminalMode)

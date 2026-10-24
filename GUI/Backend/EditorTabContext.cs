@@ -27,6 +27,9 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public TextEditorControl EditorControl => Editor;
 
+    /// <summary>The editor together with its tool bar and context menu (what the tab shows).</summary>
+    internal RemoteFileEditorPanel EditorPanel { get; }
+
     public string Title
     {
         get
@@ -65,12 +68,19 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         Editor = editor;
         _Session = sessionWrapper;
         WinFormsHostWrapper winFormsHostWrapper = new WinFormsHostWrapper();
-        ((WindowsFormsHost)winFormsHostWrapper).Child = editor;
+        EditorPanel = new RemoteFileEditorPanel(editor);
+        ((WindowsFormsHost)winFormsHostWrapper).Child = EditorPanel;
         Control = (FrameworkElement)winFormsHostWrapper;
         Searcher = new TextSearcher(editor)
         {
             CanReplace = true
         };
+        EditorPanel.FindRequested += (object sender, EventArgs e) =>
+        {
+            Searcher.IsReplaceVisible = false;
+            Searcher.Activate();
+        };
+        EditorPanel.ReplaceRequested += (object sender, EventArgs e) => Searcher.ActivateReplace();
         editor.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
         Title = RemotePathUtils.GetFileName(filePath);
         FilePath = filePath;
@@ -97,6 +107,8 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public void Dispose()
     {
+        // The panel owns the editor; disposing the editor again is harmless.
+        EditorPanel.Dispose();
         Editor.Dispose();
     }
 

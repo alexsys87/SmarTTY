@@ -646,6 +646,12 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
         return count;
     }
 
+    /// <summary>There is an edit that <see cref="Undo"/> would revert.</summary>
+    public bool CanUndo => !_readOnly && _undoStack.Count > 0;
+
+    /// <summary>There is an undone edit that <see cref="Redo"/> would repeat.</summary>
+    public bool CanRedo => !_readOnly && _redoStack.Count > 0;
+
     public void Undo()
     {
         if (!_readOnly && _undoStack.Count > 0)
