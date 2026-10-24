@@ -167,14 +167,6 @@ public class ShellCompletionAnalyzer : IDisposable
         {
             unprocessedDirs = items.Where((string dir) => !this._executablesByDir.ContainsKey(dir)).ToArray();
         }
-        lock (this._executablesByDir)
-        {
-            // Other threads read this dictionary under the same lock.
-            foreach (string dir in unprocessedDirs)
-            {
-                this._executablesByDir[dir] = new HashSet<string>();
-            }
-        }
         List<string> findOutput = new List<string>();
         if (unprocessedDirs.Length != 0)
         {
@@ -187,6 +179,15 @@ public class ShellCompletionAnalyzer : IDisposable
         }
         lock (this._executablesByDir)
         {
+            // Other threads read this dictionary under the same lock. The directories count as processed only now: a
+            // failed find (a lost connection) must leave them to be listed on the next call, not cached as empty.
+            foreach (string dir in unprocessedDirs)
+            {
+                if (!this._executablesByDir.ContainsKey(dir))
+                {
+                    this._executablesByDir[dir] = new HashSet<string>();
+                }
+            }
             string[] sortedDirs = items.OrderBy((string dir) => -dir.Length).ToArray();
             foreach (string filePath in findOutput)
             {

@@ -248,7 +248,19 @@ public partial class ProcessManagerWindow : Window
             {
                 error = exception.Message;
             }
-            ProcessSnapshot snapshot = error == null ? RemoteProcessList.Parse(lines, previous) : null;
+            ProcessSnapshot snapshot = null;
+            if (error == null)
+            {
+                try
+                {
+                    snapshot = RemoteProcessList.Parse(lines, previous);
+                }
+                catch (Exception exception)
+                {
+                    // _Busy is reset below in any case; a parse that fails once must not stop the auto refresh for good.
+                    error = "The list of processes could not be read: " + exception.Message;
+                }
+            }
             if (snapshot != null && snapshot.Processes.Count == 0)
             {
                 snapshot = null;
