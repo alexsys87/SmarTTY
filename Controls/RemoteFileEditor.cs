@@ -3,7 +3,10 @@ using SmarTTY.Forms;
 using SmarTTY.IO;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
+using SmarTTY.Utilities;
 using System;
+using System.Globalization;
+using System.IO;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -38,6 +41,46 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// <summary>The file did not exist when the editor was opened: it is created by the first save.</summary>
     public bool IsNewFile { get; private set; }
 
+    /// <summary>
+    /// The text cannot be changed: the user chose to read a file that is big or that he has no right to write, or only
+    /// the beginning of a huge file is shown (<see cref="IsPreview"/>).
+    /// </summary>
+    public bool IsReadOnlyMode { get; private set; }
+
+    /// <summary>Only the first <see cref="EditorFilePolicy.PreviewBytes"/> of a file that is too big to edit are shown.</summary>
+    public bool IsPreview { get; private set; }
+
+    // The user agreed to write the file with sudo (asked when the file was opened): a save does not try the plain write first.
+    private bool _sudoOnSave;
+
+    // Unsaved changes are written to a draft on this computer every few seconds (see EditorDraftStore), so that they
+    // survive a lost connection and a closed program. The drafts of all editors live in one folder.
+    private static readonly EditorDraftStore Drafts = new EditorDraftStore(Path.Combine(GlobalSettings.DataDirectory, "Drafts"));
+
+    private const int DraftIntervalMs = 10000;
+
+    // Drafts older than this are removed when an editor starts.
+    private static readonly TimeSpan DraftMaxAge = TimeSpan.FromDays(30);
+
+    private static int _draftCleanupDone;
+
+    private readonly string _draftKey;
+
+    private string _baseHash = "";
+
+    private System.Windows.Forms.Timer _draftTimer;
+
+    // The text version the draft on disk holds (null version = the text as opened is not a draft).
+    private bool _draftWritten;
+
+    private object _draftVersion;
+
+    // Every draft write or removal takes a number; one that is no longer the latest by the time it runs is skipped, so
+    // a late write cannot bring back the draft of a text that has been saved meanwhile.
+    private int _draftSequence;
+
+    private readonly object _draftLock = new object();
+
     public event EventHandler LoadFailed;
 
     /// <summary>Raised on the UI thread once the whole file has been downloaded and the editor became editable.</summary>
@@ -53,6 +96,12 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         this._context = terminalSessionContext;
         RemotePath = text;
+        _draftKey = EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text);
+        if (Interlocked.Exchange(ref _draftCleanupDone, 1) == 0)
+        {
+            ThreadPool.QueueUserWorkItem((object state) => Drafts.DeleteOlderThan(DraftMaxAge));
+        }
+        Disposed += (object sender, EventArgs e) => _draftTimer?.Dispose();
         ((EditableTextBrowser)this).ReadOnly = true;
         _initialCaret = textPosition;
         _loadThread = new Thread(LoadFile);
@@ -85,13 +134,18 @@ public partial class RemoteFileEditor : CodeEditorPP
                 {
                     throw new RemoteOperationException("Cannot create " + RemotePath + ": the directory " + directory + " does not exist.");
                 }
+                CheckWriteAccess(string.IsNullOrEmpty(directory) ? "/" : directory, forNewFile: true);
                 IsNewFile = true;
                 BeginInvoke((ThreadStart)(() => FinishLoading("")));
                 return;
             }
+            CheckWriteAccess(RemotePath, forNewFile: false);
             StringBuilder content = new StringBuilder();
             using (ScpDownloadStream scpDownloadStream = _context.Session.OpenDownload(RemotePath))
             {
+                // The size is known from the first SCP header, before any data is read.
+                long limit = ChooseLoadLimit(scpDownloadStream.Length);
+                long received = 0;
                 Utf8StreamDecoder utf8StreamDecoder = new Utf8StreamDecoder();
                 byte[] bytes = new byte[65536];
                 DateTime lastPreview = DateTime.Now;
@@ -102,7 +156,20 @@ public partial class RemoteFileEditor : CodeEditorPP
                     {
                         break;
                     }
-                    content.Append(utf8StreamDecoder.Decode(bytes, 0, value));
+                    if (limit > 0 && received + value > limit)
+                    {
+                        // A preview of a huge file ends at the limit; the rest is not downloaded.
+                        value = (int)(limit - received);
+                    }
+                    received += value;
+                    if (value > 0)
+                    {
+                        content.Append(utf8StreamDecoder.Decode(bytes, 0, value));
+                    }
+                    if (limit > 0 && received >= limit)
+                    {
+                        break;
+                    }
                     // Show the partially downloaded text now and then. Re-parsing and re-highlighting the
                     // whole document after every 64 KB block made opening large files quadratic.
                     if ((DateTime.Now - lastPreview).TotalMilliseconds >= PreviewIntervalMs)
@@ -130,6 +197,17 @@ public partial class RemoteFileEditor : CodeEditorPP
             string text = content.ToString();
             BeginInvoke((ThreadStart)(() => FinishLoading(text)));
         }
+        catch (OperationCanceledException)
+        {
+            // The user chose not to open the file: the tab closes without an error message.
+            try
+            {
+                BeginInvoke((ThreadStart)(() => LoadFailed?.Invoke(this, EventArgs.Empty)));
+            }
+            catch
+            {
+            }
+        }
         catch (Exception exception)
         {
             BeginInvoke((ThreadStart)(() =>
@@ -143,6 +221,89 @@ public partial class RemoteFileEditor : CodeEditorPP
                 {
                 }
             }));
+        }
+    }
+
+    /// <summary>Shows a question from the loading thread; the answer of a closed editor is "cancel".</summary>
+    private DialogResult Ask(string text, MessageBoxButtons buttons)
+    {
+        if (IsDisposed)
+        {
+            return DialogResult.Cancel;
+        }
+        return (DialogResult)Invoke((Func<DialogResult>)(() => MessageBox.Show(this, text, "SmarTTY", buttons, MessageBoxIcon.Warning)));
+    }
+
+    /// <summary>
+    /// Warns when the user cannot write the file (or, for a new file, its directory) before he types anything: he may
+    /// choose to save with sudo (asked for at the save), to read only, or not to open the file. Loading thread.
+    /// </summary>
+    private void CheckWriteAccess(string target, bool forNewFile)
+    {
+        if (_context.Session.RunCommandChecked("test -w " + RemotePathUtils.ShellQuote(target), requireSuccess: true) != null)
+        {
+            return;
+        }
+        // No answer is not "not writable": without a connection nothing is known.
+        _context.Session.ThrowIfConnectionLost();
+        string what = forNewFile ? "the directory " + target + ", where this new file would be created" : target;
+        switch (Ask("You do not have permission to write to " + what + ".\n\n"
+            + "Yes: edit the text and save it with sudo (the password is asked when you save).\n"
+            + "No: open the file read-only.\n"
+            + "Cancel: do not open the file.", MessageBoxButtons.YesNoCancel))
+        {
+            case DialogResult.Yes:
+                _sudoOnSave = true;
+                break;
+            case DialogResult.No:
+                IsReadOnlyMode = true;
+                break;
+            default:
+                throw new OperationCanceledException();
+        }
+    }
+
+    /// <summary>
+    /// Decides how much of a file of <paramref name="length"/> bytes is loaded: 0 for all of it, otherwise the number of
+    /// bytes of a read-only preview. A big file is opened only after a question. Loading thread.
+    /// </summary>
+    private long ChooseLoadLimit(long length)
+    {
+        string size = StringUtils.FormatSize(length, appendUnit: true);
+        switch (EditorFilePolicy.Classify(length))
+        {
+            case LargeFileAction.Warn:
+                if (IsReadOnlyMode)
+                {
+                    if (Ask(RemotePath + " is " + size + ". A large file makes the editor slow and takes a lot of memory.\n\nOpen it read-only?", MessageBoxButtons.OKCancel) != DialogResult.OK)
+                    {
+                        throw new OperationCanceledException();
+                    }
+                    return 0;
+                }
+                switch (Ask(RemotePath + " is " + size + ". A large file makes the editor slow and takes a lot of memory.\n\n"
+                    + "Yes: open it for editing.\n"
+                    + "No: open it read-only (safer).\n"
+                    + "Cancel: do not open it.", MessageBoxButtons.YesNoCancel))
+                {
+                    case DialogResult.Yes:
+                        return 0;
+                    case DialogResult.No:
+                        IsReadOnlyMode = true;
+                        return 0;
+                    default:
+                        throw new OperationCanceledException();
+                }
+            case LargeFileAction.PreviewOnly:
+                if (Ask(RemotePath + " is " + size + ", too large to edit here.\n\nOpen the first " + StringUtils.FormatSize(EditorFilePolicy.PreviewBytes, appendUnit: true) + " read-only?", MessageBoxButtons.YesNo) != DialogResult.Yes)
+                {
+                    throw new OperationCanceledException();
+                }
+                IsReadOnlyMode = true;
+                IsPreview = true;
+                return EditorFilePolicy.PreviewBytes;
+            default:
+                return 0;
         }
     }
 
@@ -162,13 +323,33 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         try
         {
+            _baseHash = EditorDraftStore.HashText(text);
+            bool restored = false;
+            if (!IsReadOnlyMode)
+            {
+                string restoredText = AskToRestoreDraft(text);
+                if (restoredText != null)
+                {
+                    text = restoredText;
+                    restored = true;
+                }
+            }
             EditableTextDocument document = new EditableTextDocument
             {
                 DefaultLineEnding = TextDocument.LineEnding.Lf
             };
             document.SetText(text);
             SetDocument(document);
-            ((EditableTextBrowser)this).ReadOnly = false;
+            ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
+            if (restored)
+            {
+                // The restored text differs from the file: it is an unsaved change, and the draft timer keeps it safe again.
+                ((EditableTextBrowser)this).IsModified = true;
+            }
+            if (!IsReadOnlyMode)
+            {
+                StartDraftTimer();
+            }
             LoadCompleted?.Invoke(this, EventArgs.Empty);
             try
             {
@@ -184,6 +365,121 @@ public partial class RemoteFileEditor : CodeEditorPP
         catch
         {
         }
+    }
+
+    /// <summary>
+    /// Offers the draft of unsaved changes left by an earlier editor of this file (the connection was lost or the program
+    /// ended before they were saved). Returns the text to restore, or null to open the file as it is on the server.
+    /// </summary>
+    private string AskToRestoreDraft(string serverText)
+    {
+        EditorDraft draft = Drafts.TryLoad(_draftKey);
+        if (draft == null)
+        {
+            return null;
+        }
+        if (draft.Text == serverText)
+        {
+            // Nothing to restore: the changes were saved after all.
+            QueueDraft(null);
+            return null;
+        }
+        string changed = (!draft.IsNewFile && draft.BaseHash != _baseHash)
+            ? "The file on the server has changed since then; saving the draft would overwrite those changes.\n\n"
+            : "";
+        string when = draft.SavedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+        if (MessageBox.Show(this, "Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
+            + changed
+            + "Yes: restore the draft.\n"
+            + "No: discard it and open the file from the server.", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+        {
+            return draft.Text;
+        }
+        QueueDraft(null);
+        return null;
+    }
+
+    private void StartDraftTimer()
+    {
+        if (_draftTimer != null)
+        {
+            return;
+        }
+        _draftTimer = new System.Windows.Forms.Timer { Interval = DraftIntervalMs };
+        _draftTimer.Tick += (object sender, EventArgs e) => WriteDraftIfChanged();
+        _draftTimer.Start();
+    }
+
+    /// <summary>Writes the draft if the text changed since the last one (UI thread; the file is written on another thread).</summary>
+    private void WriteDraftIfChanged()
+    {
+        try
+        {
+            if (IsDisposed || IsReadOnlyMode || !((EditableTextBrowser)this).IsModified)
+            {
+                return;
+            }
+            object version = CurrentVersion;
+            if (_draftWritten && ReferenceEquals(version, _draftVersion))
+            {
+                return;
+            }
+            _draftWritten = true;
+            _draftVersion = version;
+            QueueDraft(new EditorDraft
+            {
+                RemotePath = RemotePath,
+                SavedUtc = DateTime.UtcNow,
+                BaseHash = _baseHash,
+                IsNewFile = IsNewFile,
+                Text = base.EditableDocument.GetText()
+            });
+        }
+        catch
+        {
+            // A draft is a convenience: a failure to take it must not disturb the editing.
+        }
+    }
+
+    /// <summary>Writes <paramref name="draft"/>, or removes the draft when it is null; the latest request wins.</summary>
+    private void QueueDraft(EditorDraft draft)
+    {
+        int sequence = Interlocked.Increment(ref _draftSequence);
+        ThreadPool.QueueUserWorkItem((object state) =>
+        {
+            lock (_draftLock)
+            {
+                if (sequence != Volatile.Read(ref _draftSequence))
+                {
+                    return;
+                }
+                try
+                {
+                    if (draft == null)
+                    {
+                        Drafts.Delete(_draftKey);
+                    }
+                    else
+                    {
+                        Drafts.Save(_draftKey, draft);
+                    }
+                }
+                catch
+                {
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// The user chose not to save the changes (closing the tab or the program): the draft is removed, otherwise the next
+    /// opening of the file would offer them again.
+    /// </summary>
+    public void DiscardDraft()
+    {
+        _draftWritten = false;
+        _draftVersion = null;
+        QueueDraft(null);
     }
 
     public bool TrySave()
@@ -236,6 +532,10 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// <summary>Saves the file and returns when it is written (used when a tab or the window closes).</summary>
     public void Save()
     {
+        if (IsReadOnlyMode)
+        {
+            return;
+        }
         // A background save of an older version must not overwrite this one afterwards.
         _backgroundUploadDone?.WaitOne();
         SaveJob job = PrepareSave();
@@ -259,6 +559,10 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// </summary>
     public void SaveInBackground()
     {
+        if (IsReadOnlyMode)
+        {
+            return;
+        }
         if (IsSaving)
         {
             _saveRequestedWhileSaving = true;
@@ -397,6 +701,11 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             scpChannelStream.Write(job.Bytes, 0, job.Bytes.Length);
         }
+        if (_sudoOnSave)
+        {
+            // The user said at opening that this file is written with sudo: no failing plain attempt first.
+            return false;
+        }
         if (_context.Session.RunCommandChecked(job.ReplaceCommand, requireSuccess: true) != null)
         {
             return true;
@@ -409,7 +718,7 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// <summary>Asks whether to retry with sudo and does so (UI thread).</summary>
     private void SaveWithSudo(SaveJob job)
     {
-        if (MessageBox.Show("Failed to " + (IsNewFile ? "create " : "overwrite ") + RemotePath + ". Try again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        if (!_sudoOnSave && MessageBox.Show("Failed to " + (IsNewFile ? "create " : "overwrite ") + RemotePath + ". Try again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
         {
             throw new OperationCanceledException();
         }
@@ -437,6 +746,11 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         IsNewFile = false;
         MarkSaved(job.Version);
+        if (!((EditableTextBrowser)this).IsModified)
+        {
+            // Everything is on the server: the draft is of no use (a later change makes a new one).
+            DiscardDraft();
+        }
     }
 
     private void RemoveTemporaryFile(SaveJob job)

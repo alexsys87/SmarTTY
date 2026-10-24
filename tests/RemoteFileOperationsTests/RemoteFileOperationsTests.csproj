@@ -13,5 +13,7 @@
     <Compile Include="../../IO/RemoteFileTypes.cs" Link="RemoteFileTypes.cs" />
     <Compile Include="../../LocalRepo/LocalRepoPackageManager.cs" Link="LocalRepoPackageManager.cs" />
     <Compile Include="../../IO/RemoteProcessList.cs" Link="RemoteProcessList.cs" />
+    <Compile Include="../../IO/EditorDraftStore.cs" Link="EditorDraftStore.cs" />
+    <Compile Include="../../IO/EditorFilePolicy.cs" Link="EditorFilePolicy.cs" />
   </ItemGroup>
 </Project>
