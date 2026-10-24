@@ -26,8 +26,30 @@ public enum ItemIcon
     /// <summary>An RPM package (.rpm).</summary>
     PackageRpm,
 
-    /// <summary>tar, gz, xz, zip, 7z and other archives and compressed files.</summary>
+    /// <summary>Archives and compressed files that have no icon of their own (cpio, cab, lz4, lzo...).</summary>
     Archive,
+
+    /// <summary>tar.</summary>
+    ArchiveTar,
+
+    /// <summary>gz, tgz, z (also tar.gz).</summary>
+    ArchiveGzip,
+
+    /// <summary>zip, jar, war.</summary>
+    ArchiveZip,
+
+    /// <summary>7z.</summary>
+    Archive7z,
+    ArchiveRar,
+
+    /// <summary>xz, txz, lzma (also tar.xz).</summary>
+    ArchiveXz,
+
+    /// <summary>bz2, tbz, tbz2 (also tar.bz2).</summary>
+    ArchiveBzip2,
+
+    /// <summary>zst, tzst (also tar.zst).</summary>
+    ArchiveZstd,
     Image,
     Audio,
     Video,
@@ -82,11 +104,17 @@ public enum ItemIcon
     Data,
     Database,
 
-    /// <summary>Compiled and binary files: bin, elf, o, ko, pcap.</summary>
+    /// <summary>Compiled and binary files: elf, o, ko, pcap.</summary>
     Binary,
+
+    /// <summary>Raw binary files: bin.</summary>
+    Bin,
 
     /// <summary>Shared and static libraries: so (also libc.so.6), a, dll.</summary>
     Library,
+
+    /// <summary>libtool library descriptions: la.</summary>
+    Libtool,
 
     /// <summary>Firmware and boot images: trx, itb, dtb, squashfs, hex, vmlinuz, initrd.</summary>
     Firmware,
@@ -219,7 +247,15 @@ public static class RemoteFileTypes
         Dictionary<string, ItemIcon> t = new Dictionary<string, ItemIcon>();
         Add(t, ItemIcon.PackageDeb, "deb udeb");
         Add(t, ItemIcon.PackageRpm, "rpm");
-        Add(t, ItemIcon.Archive, "tar gz tgz bz2 tbz tbz2 xz txz zst tzst lz lz4 lzma lzo z zip zipx 7z rar cpio jar war cab arj");
+        Add(t, ItemIcon.Archive, "lz lz4 lzo cpio cab arj");
+        Add(t, ItemIcon.ArchiveTar, "tar");
+        Add(t, ItemIcon.ArchiveGzip, "gz tgz z");
+        Add(t, ItemIcon.ArchiveZip, "zip zipx jar war");
+        Add(t, ItemIcon.Archive7z, "7z");
+        Add(t, ItemIcon.ArchiveRar, "rar");
+        Add(t, ItemIcon.ArchiveXz, "xz txz lzma");
+        Add(t, ItemIcon.ArchiveBzip2, "bz2 tbz tbz2");
+        Add(t, ItemIcon.ArchiveZstd, "zst tzst");
         Add(t, ItemIcon.Image, "png jpg jpeg jpe gif bmp svg svgz webp ico tif tiff xcf psd heic heif avif pnm pbm pgm ppm xpm xbm tga");
         Add(t, ItemIcon.Audio, "mp3 wav flac ogg oga opus m4a aac wma mid midi aif aiff ape amr mka");
         Add(t, ItemIcon.Video, "mp4 mkv avi mov webm flv wmv mpg mpeg m4v 3gp ogv vob m2ts mts");
@@ -249,8 +285,10 @@ public static class RemoteFileTypes
         Add(t, ItemIcon.Css, "css scss sass less");
         Add(t, ItemIcon.Data, "json jsonl ndjson geojson xml xsd xsl xslt rss atom kml gpx ics vcf");
         Add(t, ItemIcon.Database, "db db3 sqlite sqlite3 sdb sql mdb accdb mdf rdb dbf frm myd myi ibd");
-        Add(t, ItemIcon.Binary, "bin elf out o ko wasm pcap pcapng");
+        Add(t, ItemIcon.Binary, "elf out o ko wasm pcap pcapng");
+        Add(t, ItemIcon.Bin, "bin");
         Add(t, ItemIcon.Library, "a dll dylib lib");
+        Add(t, ItemIcon.Libtool, "la lo");
         Add(t, ItemIcon.Firmware, "trx fw rom itb dtb dtbo hex srec squashfs ubi jffs2 sysupgrade");
         Add(t, ItemIcon.Executable, "exe msi appimage run");
         Add(t, ItemIcon.Service, "service timer socket mount automount target path swap slice scope");

@@ -279,6 +279,36 @@
                               <DataTrigger Value="Man" Binding="{Binding Path=Icon}">
                                 <Setter Property="Source" Value="../icons/filetypes/man.png" />
                               </DataTrigger>
+                              <DataTrigger Value="ArchiveTar" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/archive_tar.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="ArchiveGzip" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/archive_gzip.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="ArchiveZip" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/archive_zip.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Archive7z" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/archive_7z.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="ArchiveRar" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/archive_rar.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="ArchiveXz" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/archive_xz.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="ArchiveBzip2" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/archive_bzip2.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="ArchiveZstd" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/archive_zstd.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Bin" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/bin.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Libtool" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/libtool.png" />
+                              </DataTrigger>
                             </Style.Triggers>
                           </Style>
                         </FrameworkElement.Style>
