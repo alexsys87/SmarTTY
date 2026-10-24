@@ -71,6 +71,9 @@ jobs:
       - name: Run ls output parser checks
         run: dotnet run --project tests/LsOutputParserTests -c Release
 
+      - name: Run df output parser checks (free disk space bar; GNU and BusyBox)
+        run: dotnet run --project tests/DfOutputParserTests -c Release
+
       - name: Run file list operation checks (copy, move, delete, new; /bin/sh and BusyBox)
         run: dotnet run --project tests/RemoteFileOperationsTests -c Release
 

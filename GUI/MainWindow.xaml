@@ -511,6 +511,7 @@
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
           <ToolBar>
             <ToggleButton ToolTip="Pause All" Style="{DynamicResource DynamicToggleButtonStyle}" IsChecked="{Binding IsPaused}">
@@ -526,6 +527,36 @@
               <Image Width="16" Height="16" Source="../icons/transfers/retryall.png" />
             </Button>
           </ToolBar>
+          <!-- Free disk space of the SSH host (df -h every 10 s), hidden until the first reading arrives. -->
+          <Border Grid.Row="2" Padding="4 2 4 2" DataContext="{Binding Path=DataContext.ActiveSession.DiskSpace, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" ToolTip="{Binding ToolTipText}" TextBlock.Foreground="{Binding Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}">
+            <FrameworkElement.Style>
+              <Style TargetType="{x:Type Border}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsAvailable}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding IsStale}" Value="True">
+                    <Setter Property="Opacity" Value="0.5" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </FrameworkElement.Style>
+            <StackPanel Orientation="Horizontal">
+              <ProgressBar Width="200" Height="12" Minimum="0" Maximum="100" VerticalAlignment="Center" Value="{Binding UsedPercent, Mode=OneWay}">
+                <FrameworkElement.Style>
+                  <Style TargetType="{x:Type ProgressBar}">
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsLow}" Value="True">
+                        <Setter Property="Foreground" Value="Firebrick" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </FrameworkElement.Style>
+              </ProgressBar>
+              <TextBlock Margin="8 0 0 0" VerticalAlignment="Center" Text="{Binding Text}" />
+            </StackPanel>
+          </Border>
           <ListView Name="TransferList" Grid.Row="1" ItemsSource="{Binding ActiveTransfers}" KeyDown="ListView_KeyDown" SelectionChanged="TransferList_SelectionChanged">
             <FrameworkElement.ContextMenu>
               <ContextMenu Name="xferMenu" Visibility="Collapsed">

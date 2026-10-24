@@ -249,6 +249,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// <summary>The SOCKS5 proxy through this session's SSH connection (Tools > SOCKS5 proxy over SSH).</summary>
     public SocksProxyHost SocksProxy { get; } = new SocksProxyHost();
 
+    /// <summary>The free disk space of this session's SSH host (<c>df -h</c> every 10 seconds), shown below the terminal.</summary>
+    public DiskSpaceMonitor DiskSpace { get; } = new DiskSpaceMonitor();
+
     public FileTransferManager TransferManager { get; private set; }
 
     public bool HideHeaders => _Controller.HideTabHeaders;
@@ -522,6 +525,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         bool firstConnection = Session == null;
         Session?.Dispose();
         Session = session;
+        DiskSpace.Attach(session);
         EnableX11Forwarding(session);
         if (firstConnection)
         {
@@ -1598,6 +1602,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
         }
         SocksProxy.Stop();
+        DiskSpace.Dispose();
         Session?.Dispose();
         foreach (DeviceTabContext deviceTab in Tabs.OfType<DeviceTabContext>().ToList())
         {
