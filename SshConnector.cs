@@ -473,8 +473,10 @@ public partial class SshConnector : Component
                 }
                 sshConnectionSettings.AuthenticationType = AuthType.PublicKey;
             }
-            // Without periodic traffic a pulled cable is only noticed once the user types something, so a default is used when none is set.
-            sshSession.ConfigureKeepAlive(sshConnectionSettings.KeepaliveInterval != 0 ? sshConnectionSettings.KeepaliveInterval : DefaultKeepAliveSeconds);
+            // Without periodic traffic a pulled cable is only noticed once the user types something, so a default is used
+            // when none is set (0); a profile that switched the keep-alive off (negative) keeps it off.
+            int keepAliveSeconds = sshConnectionSettings.KeepaliveInterval < 0 ? 0 : (sshConnectionSettings.KeepaliveInterval != 0 ? sshConnectionSettings.KeepaliveInterval : DefaultKeepAliveSeconds);
+            sshSession.ConfigureKeepAlive(keepAliveSeconds);
             RaiseConnected(sshSession, sshConnectionSettings);
         }
         catch (Exception exception)
