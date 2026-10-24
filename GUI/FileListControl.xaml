@@ -141,6 +141,84 @@
                               <DataTrigger Value="PackageApk" Binding="{Binding Path=Icon}">
                                 <Setter Property="Source" Value="../icons/MainWindow/package_apk.png" />
                               </DataTrigger>
+                              <DataTrigger Value="PackageDeb" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/package_deb.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="PackageRpm" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/package_rpm.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Archive" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/archive.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Image" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/image.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Audio" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/audio.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Video" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/video.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Text" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/text.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Document" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/document.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Pdf" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/pdf.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Spreadsheet" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/spreadsheet.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Presentation" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/presentation.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Config" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/config.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Log" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/log.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Shell" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/shell.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Python" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/python.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="CSource" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/csource.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Code" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/code.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Web" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/web.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Data" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/data.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Database" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/database.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Binary" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/binary.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="DiskImage" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/diskimage.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Certificate" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/certificate.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Font" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/font.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Backup" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/backup.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Patch" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/patch.png" />
+                              </DataTrigger>
                             </Style.Triggers>
                           </Style>
                         </FrameworkElement.Style>

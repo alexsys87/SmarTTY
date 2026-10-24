@@ -126,18 +126,6 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
 
     private static RemoteClipboard _Clipboard;
 
-    public enum ItemIcon
-    {
-        File,
-        Folder,
-
-        /// <summary>An opkg package (.ipk).</summary>
-        PackageIpk,
-
-        /// <summary>An apk package (.apk).</summary>
-        PackageApk
-    }
-
     public class ItemWrapper
     {
         public readonly LsOutputParser.LsEntry Entry;
@@ -150,15 +138,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         {
             get
             {
-                if (Entry.IsDirectory)
-                {
-                    return ItemIcon.Folder;
-                }
-                if (RemotePackageInstall.IsIpk(Entry.Name))
-                {
-                    return ItemIcon.PackageIpk;
-                }
-                return RemotePackageInstall.IsApk(Entry.Name) ? ItemIcon.PackageApk : ItemIcon.File;
+                return Entry.IsDirectory ? ItemIcon.Folder : RemoteFileTypes.IconFor(Entry.Name);
             }
         }
 
