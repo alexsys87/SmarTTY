@@ -1,6 +1,7 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.IO;
+using SmarTTY.LocalRepo;
 using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
@@ -128,7 +129,13 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     public enum ItemIcon
     {
         File,
-        Folder
+        Folder,
+
+        /// <summary>An opkg package (.ipk).</summary>
+        PackageIpk,
+
+        /// <summary>An apk package (.apk).</summary>
+        PackageApk
     }
 
     public class ItemWrapper
@@ -143,11 +150,15 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         {
             get
             {
-                if (!Entry.IsDirectory)
+                if (Entry.IsDirectory)
                 {
-                    return ItemIcon.File;
+                    return ItemIcon.Folder;
                 }
-                return ItemIcon.Folder;
+                if (RemotePackageInstall.IsIpk(Entry.Name))
+                {
+                    return ItemIcon.PackageIpk;
+                }
+                return RemotePackageInstall.IsApk(Entry.Name) ? ItemIcon.PackageApk : ItemIcon.File;
             }
         }
 
@@ -198,6 +209,15 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     public string Title => "File List";
 
     public string WorkingDirectory => _WorkingDirectory;
+
+    /// <summary>
+    /// Tells the package manager of the host when it is OpenWrt (null otherwise or while the probe has not answered yet): the
+    /// "Install package" items are offered only then. Set by the tab, which knows the session.
+    /// </summary>
+    public Func<LocalRepoPackageManager?> PackageManagerProvider { get; set; }
+
+    /// <summary>The package manager of the OpenWrt host (null if the host is not OpenWrt or has not answered the probe yet).</summary>
+    public LocalRepoPackageManager? PackageManager => PackageManagerProvider?.Invoke();
 
     /// <summary>True if files copied or cut in this session can be pasted here.</summary>
     public bool CanPaste => _Clipboard != null && _Clipboard.Session == _Control.Session;

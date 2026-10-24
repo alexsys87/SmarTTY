@@ -74,7 +74,8 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         {
             FileExplorer = new FileExplorer(vtc)
             {
-                IsVisible = sessionWrapper.VTSettings.ShowFileExplorer
+                IsVisible = sessionWrapper.VTSettings.ShowFileExplorer,
+                PackageManagerProvider = () => sessionWrapper.LocalRepoManager
             };
         }
         _Session = sessionWrapper;
