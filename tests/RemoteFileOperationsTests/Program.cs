@@ -185,7 +185,10 @@ internal static class Program
     {
         (string Name, ItemIcon Icon)[] cases =
         {
-            ("backup.tar.gz", ItemIcon.Archive), ("a.TGZ", ItemIcon.Archive), ("site.zip", ItemIcon.Archive), ("data.7z", ItemIcon.Archive), ("kernel.xz", ItemIcon.Archive),
+            ("backup.tar.gz", ItemIcon.ArchiveGzip), ("a.TGZ", ItemIcon.ArchiveGzip), ("site.zip", ItemIcon.ArchiveZip), ("data.7z", ItemIcon.Archive7z), ("kernel.xz", ItemIcon.ArchiveXz),
+            ("a.tar", ItemIcon.ArchiveTar), ("a.rar", ItemIcon.ArchiveRar), ("a.tar.bz2", ItemIcon.ArchiveBzip2), ("a.tbz2", ItemIcon.ArchiveBzip2), ("a.tar.zst", ItemIcon.ArchiveZstd), ("a.txz", ItemIcon.ArchiveXz),
+            ("app.jar", ItemIcon.ArchiveZip), ("a.cpio", ItemIcon.Archive), ("a.lz4", ItemIcon.Archive),
+            ("libfoo.la", ItemIcon.Libtool), ("raw.bin", ItemIcon.Bin),
             ("photo.JPG", ItemIcon.Image), ("logo.svg", ItemIcon.Image), ("pic.png", ItemIcon.Image),
             ("song.mp3", ItemIcon.Audio), ("rec.flac", ItemIcon.Audio), ("film.mkv", ItemIcon.Video), ("clip.mp4", ItemIcon.Video),
             ("notes.txt", ItemIcon.Text), ("README.md", ItemIcon.Markdown), ("README", ItemIcon.Text), ("LICENSE", ItemIcon.Text),
@@ -199,11 +202,11 @@ internal static class Program
             ("Main.java", ItemIcon.Java), ("init.lua", ItemIcon.Lua), ("Makefile", ItemIcon.Make), ("CMakeLists.txt", ItemIcon.Make), ("rules.mk", ItemIcon.Make), ("Dockerfile", ItemIcon.Docker), ("docker-compose.yml", ItemIcon.Docker), ("board.dts", ItemIcon.Code), ("Program.kt", ItemIcon.Code),
             ("index.html", ItemIcon.Web), ("site.css", ItemIcon.Css), ("theme.scss", ItemIcon.Css), ("package.json", ItemIcon.Data), ("feed.xml", ItemIcon.Data),
             ("app.sqlite3", ItemIcon.Database), ("dump.sql", ItemIcon.Database),
-            ("busybox.elf", ItemIcon.Binary), ("libc.so.6", ItemIcon.Library), ("libfoo.so", ItemIcon.Library), ("libz.a", ItemIcon.Library), ("mac80211.ko", ItemIcon.Binary), ("firmware.bin", ItemIcon.Binary),
+            ("busybox.elf", ItemIcon.Binary), ("libc.so.6", ItemIcon.Library), ("libfoo.so", ItemIcon.Library), ("libz.a", ItemIcon.Library), ("mac80211.ko", ItemIcon.Binary), ("firmware.bin", ItemIcon.Bin),
             ("vmlinuz", ItemIcon.Firmware), ("openwrt.itb", ItemIcon.Firmware), ("root.squashfs", ItemIcon.Firmware), ("board.dtb", ItemIcon.Firmware),
             ("setup.exe", ItemIcon.Executable), ("App.AppImage", ItemIcon.Executable), ("sshd.service", ItemIcon.Service), ("backup.timer", ItemIcon.Service),
             (".gitignore", ItemIcon.Git), (".gitattributes", ItemIcon.Git), ("repo.bundle", ItemIcon.Git), ("inbox.mbox", ItemIcon.Mail), ("letter.eml", ItemIcon.Mail),
-            ("ls.1", ItemIcon.Man), ("sshd_config.5", ItemIcon.Man), ("ls.1.gz", ItemIcon.Man), ("tcp.7", ItemIcon.Man), ("a.7z", ItemIcon.Archive), ("v.3gp", ItemIcon.Video), ("config.1", ItemIcon.Man),
+            ("ls.1", ItemIcon.Man), ("sshd_config.5", ItemIcon.Man), ("ls.1.gz", ItemIcon.Man), ("tcp.7", ItemIcon.Man), ("a.7z", ItemIcon.Archive7z), ("v.3gp", ItemIcon.Video), ("config.1", ItemIcon.Man),
             ("ubuntu.iso", ItemIcon.DiskImage), ("disk.qcow2", ItemIcon.DiskImage), ("sd.img", ItemIcon.DiskImage),
             ("server.pem", ItemIcon.Certificate), ("id_rsa", ItemIcon.Certificate), ("id_rsa.pub", ItemIcon.Certificate), ("authorized_keys", ItemIcon.Certificate), ("a.crt", ItemIcon.Certificate),
             ("DejaVuSans.ttf", ItemIcon.Font), ("x.woff2", ItemIcon.Font),
