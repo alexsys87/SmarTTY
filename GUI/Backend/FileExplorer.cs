@@ -20,6 +20,9 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     {
         public string Directory;
 
+        /// <summary>The request and the session this result belongs to (a result of an older one must not be taken for the current).</summary>
+        public ListOperation Operation;
+
         public LsOutputParser.LsEntry[] Result;
 
         public Exception Exception;
@@ -61,7 +64,8 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
                     _Explorer.ProcessListResult(new ListResult
                     {
                         Result = list.ToArray(),
-                        Directory = _Directory
+                        Directory = _Directory,
+                        Operation = this
                     });
                 }
                 catch (Exception exception)
@@ -69,7 +73,8 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
                     _Explorer.ProcessListResult(new ListResult
                     {
                         Exception = exception,
-                        Directory = _Directory
+                        Directory = _Directory,
+                        Operation = this
                     });
                 }
             })
@@ -315,26 +320,57 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     private void ProcessListResult(ListResult listResult)
     {
         bool isCurrentDirectory;
+        bool stale;
         lock (_PendingListLock)
         {
-            _PendingList = null;
-            isCurrentDirectory = listResult?.Directory == _WorkingDirectory;
-            _LastListResult = listResult;
+            // Only the request that is pending now may end it; a late answer of an older one (before a reconnect, or
+            // of another directory) says nothing about the present state.
+            bool isPending = ReferenceEquals(_PendingList, listResult?.Operation);
+            if (isPending)
+            {
+                _PendingList = null;
+            }
+            stale = !isPending || !ReferenceEquals(listResult?.Operation?.Session, _Control.Session);
+            isCurrentDirectory = !stale && listResult?.Directory == _WorkingDirectory;
+            if (!stale)
+            {
+                _LastListResult = listResult;
+            }
+        }
+        if (stale)
+        {
+            ProvideFileList();
+            return;
         }
         if (isCurrentDirectory)
         {
-            ProgressText = null;
+            // A failed listing is shown, not an empty list that looks like an empty directory.
+            ProgressText = listResult.Exception == null ? null : "Cannot list " + listResult.Directory + ": " + listResult.Exception.Message + " (Refresh to try again)";
             UpdateFilteredItems();
         }
         else
         {
+            // The directory changed while this one was listed: list the new one.
+            ProgressText = null;
             ProvideFileList();
         }
-        ProgressText = null;
     }
 
     internal void Refresh()
     {
+        ProvideFileList(forceRefresh: true);
+    }
+
+    /// <summary>
+    /// The connection was replaced (UI thread): what was listed on the old one may be gone or changed, and a listing
+    /// that was under way will never answer.
+    /// </summary>
+    internal void OnSessionReconnected()
+    {
+        lock (_PendingListLock)
+        {
+            _PendingList = null;
+        }
         ProvideFileList(forceRefresh: true);
     }
 
@@ -350,7 +386,9 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             ListOperation listOperation;
             lock (_PendingListLock)
             {
-                if ((!forceRefresh && (_LastListResult?.Directory == _WorkingDirectory || !_IsActive)) || (_PendingList != null && _PendingList?.Session == _Control.Session))
+                // A failed listing of the directory does not count as a listing: it is tried again.
+                bool listed = _LastListResult?.Directory == _WorkingDirectory && _LastListResult.Exception == null;
+                if ((!forceRefresh && (listed || !_IsActive)) || (_PendingList != null && _PendingList?.Session == _Control.Session))
                 {
                     return;
                 }
