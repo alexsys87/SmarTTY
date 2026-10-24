@@ -59,6 +59,17 @@ public class SSHConnectionSettings
 
     public bool SuppressKeyMismatchWarning { get; set; }
 
+    /// <summary>Keep-alive default of a connection whose profile does not say (0), in seconds.</summary>
+    public const int DefaultKeepaliveSeconds = 15;
+
+    /// <summary>The value of <see cref="KeepaliveInterval"/> that was chosen by switching the keep-alive off.</summary>
+    public const int KeepaliveOff = -1;
+
+    /// <summary>
+    /// Seconds between keep-alive packets. 0 is "not set" (profiles saved before the option could be told apart, new
+    /// profiles): <see cref="DefaultKeepaliveSeconds"/> applies, because without periodic traffic a pulled cable is only
+    /// noticed on the next key press. A negative value (<see cref="KeepaliveOff"/>) is an explicit "off".
+    /// </summary>
     public int KeepaliveInterval { get; set; }
 
     public bool SuppressAutoProbing { get; set; }

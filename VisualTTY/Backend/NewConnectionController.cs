@@ -284,8 +284,9 @@ public class NewConnectionController : INotifyPropertyChanged
         HasAlias = !string.IsNullOrEmpty(_Settings.ConnectionAlias);
         HasCustomSSHKeyFile = !string.IsNullOrEmpty(_Settings.ExplicitKeyFile);
         CustomSSHKeyFile = _Settings.ExplicitKeyFile;
-        HasKeepaliveInterval = _Settings.KeepaliveInterval > 0;
-        KeepAliveInterval = _Settings.KeepaliveInterval;
+        // 0 is "not set" and means the default interval (see SSHConnectionSettings.KeepaliveInterval); only a negative value is "off".
+        HasKeepaliveInterval = _Settings.KeepaliveInterval >= 0;
+        KeepAliveInterval = _Settings.KeepaliveInterval > 0 ? _Settings.KeepaliveInterval : SSHConnectionSettings.DefaultKeepaliveSeconds;
         if (AuthenticationType == AuthType.Password)
         {
             try
@@ -356,11 +357,12 @@ public class NewConnectionController : INotifyPropertyChanged
         }
         if (HasKeepaliveInterval)
         {
-            _Settings.KeepaliveInterval = KeepAliveInterval;
+            _Settings.KeepaliveInterval = KeepAliveInterval > 0 ? KeepAliveInterval : SSHConnectionSettings.DefaultKeepaliveSeconds;
         }
         else
         {
-            _Settings.KeepaliveInterval = 0;
+            // An unchecked box must stay off: 0 would read as "not set" and bring the default back.
+            _Settings.KeepaliveInterval = SSHConnectionSettings.KeepaliveOff;
         }
         if (AuthenticationType == AuthType.Password && Customization.AllowSavingPassword && !SetupPublicKey)
         {
