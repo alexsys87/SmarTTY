@@ -1385,7 +1385,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             ActiveSession?.ActiveTab?.EditorControl?.Paste();
         });
-        _TerminalContextMenu.Items.Add("Copy All", null, (object _, EventArgs e) =>
+        _TerminalContextMenu.Items.Add("Copy All", Icons.Load("copy"), (object _, EventArgs e) =>
         {
             CopyAll();
         });
