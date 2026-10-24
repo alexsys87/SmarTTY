@@ -13,12 +13,14 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 using DataFormats = System.Windows.DataFormats;
 using DragDropEffects = System.Windows.DragDropEffects;
 using DragEventArgs = System.Windows.DragEventArgs;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using ListBox = System.Windows.Controls.ListBox;
 using ListView = System.Windows.Controls.ListView;
+using MenuItem = System.Windows.Controls.MenuItem;
 using TextBox = System.Windows.Controls.TextBox;
 using TextBoxBase = System.Windows.Controls.Primitives.TextBoxBase;
 
@@ -476,6 +478,120 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         {
             object sourceElement = ((sender is FrameworkElement) ? sender : null);
             (((sourceElement != null) ? ((FrameworkElement)sourceElement).DataContext : null) as ICloseableElement)?.Close();
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    /// <summary>Shows the tab menu only for real tabs and enables what applies to the clicked one.</summary>
+    private void TabHeader_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        try
+        {
+            FrameworkElement header = sender as FrameworkElement;
+            ITabContext tab = header?.DataContext as ITabContext;
+            ContextMenu menu = header?.ContextMenu;
+            SessionWrapper session = Controller.ActiveSession;
+            if (tab == null || tab is PseudoTabContext || menu == null)
+            {
+                e.Handled = true;
+                return;
+            }
+            // The menu is outside the visual tree, so its data context is set explicitly.
+            menu.DataContext = tab;
+            foreach (MenuItem item in menu.Items.OfType<MenuItem>())
+            {
+                switch (item.Tag as string)
+                {
+                    case "CopyPath":
+                        item.IsEnabled = tab is EditorTabContext;
+                        break;
+                    case "CloseOthers":
+                        item.IsEnabled = tab is ICloseableElement && session != null && session.Tabs.Any(other => other != tab && other is ICloseableElement);
+                        break;
+                    case "SaveAll":
+                        item.IsEnabled = session != null && session.Tabs.OfType<EditorTabContext>().Any(editorTab => editorTab.Editor.IsModified || editorTab.Editor.IsNewFile);
+                        break;
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            e.Handled = true;
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void TabContextMenu_CopyPath(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.DataContext is EditorTabContext editorTab && !string.IsNullOrEmpty(editorTab.FilePath))
+            {
+                System.Windows.Clipboard.SetText(editorTab.FilePath);
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void TabContextMenu_CloseOthers(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            SessionWrapper session = Controller.ActiveSession;
+            ITabContext tab = (sender as FrameworkElement)?.DataContext as ITabContext;
+            if (session == null || tab == null || !session.Tabs.Contains(tab))
+            {
+                return;
+            }
+            // Keep the clicked tab active while the others ask their questions and go away.
+            foreach (ITabContext other in session.Tabs.ToList())
+            {
+                if (other == tab || !(other is ICloseableElement closeable))
+                {
+                    continue;
+                }
+                session.ActiveTabIndex = session.Tabs.IndexOf(tab);
+                closeable.Close();
+                if (session.Tabs.Contains(other))
+                {
+                    // The user cancelled the close, or the file could not be saved.
+                    break;
+                }
+            }
+            int index = session.Tabs.IndexOf(tab);
+            if (index >= 0)
+            {
+                session.ActiveTabIndex = index;
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void TabContextMenu_SaveAll(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            SessionWrapper session = Controller.ActiveSession;
+            if (session == null)
+            {
+                return;
+            }
+            foreach (EditorTabContext editorTab in session.Tabs.OfType<EditorTabContext>().ToList())
+            {
+                if (editorTab.Editor.IsModified || editorTab.Editor.IsNewFile)
+                {
+                    editorTab.Editor.SaveInBackground();
+                }
+            }
         }
         catch (Exception exception)
         {

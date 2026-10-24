@@ -1,3 +1,5 @@
+using System;
+
 namespace SmarTTY.Controls;
 
 /// <summary>The commands of the file editor tool bar and context menu.</summary>
@@ -68,6 +70,108 @@ internal struct EditorCommandState
                 return true;
             default:
                 return false;
+        }
+    }
+}
+
+/// <summary>The label, icon and shortcut of an editor command, shared by the WPF tool bar and the WinForms menu.</summary>
+internal readonly struct EditorCommandDescription
+{
+    public EditorCommandDescription(string text, string iconName, string iconPath, string shortcut)
+    {
+        Text = text;
+        IconName = iconName;
+        IconPath = iconPath;
+        Shortcut = shortcut;
+    }
+
+    public string Text { get; }
+
+    /// <summary>The embedded image name that Icons loads for the WinForms menu.</summary>
+    public string IconName { get; }
+
+    /// <summary>The path under icons/ that the WPF tool bar loads as a resource.</summary>
+    public string IconPath { get; }
+
+    /// <summary>Shown next to the menu item; the editor itself handles the key.</summary>
+    public string Shortcut { get; }
+
+    public string ToolTip => Text.TrimEnd('.') + " (" + Shortcut + ")";
+}
+
+/// <summary>
+/// The commands in the order of the WPF tool bar and of the WinForms context menu. Kept apart from both so that the
+/// two stay in step and the rules can be tested without a window.
+/// </summary>
+internal static class EditorCommandCatalog
+{
+    // null is a separator.
+    public static readonly EditorToolbarCommand?[] ToolBarLayout =
+    {
+        EditorToolbarCommand.Save,
+        null,
+        EditorToolbarCommand.Undo,
+        EditorToolbarCommand.Redo,
+        null,
+        EditorToolbarCommand.Cut,
+        EditorToolbarCommand.Copy,
+        EditorToolbarCommand.Paste,
+        EditorToolbarCommand.Delete,
+        null,
+        EditorToolbarCommand.SelectAll,
+        null,
+        EditorToolbarCommand.Find,
+        EditorToolbarCommand.Replace,
+        EditorToolbarCommand.GoToLine
+    };
+
+    public static readonly EditorToolbarCommand?[] ContextMenuLayout =
+    {
+        EditorToolbarCommand.Undo,
+        EditorToolbarCommand.Redo,
+        null,
+        EditorToolbarCommand.Cut,
+        EditorToolbarCommand.Copy,
+        EditorToolbarCommand.Paste,
+        EditorToolbarCommand.Delete,
+        null,
+        EditorToolbarCommand.SelectAll,
+        null,
+        EditorToolbarCommand.Find,
+        EditorToolbarCommand.Replace,
+        EditorToolbarCommand.GoToLine,
+        null,
+        EditorToolbarCommand.Save
+    };
+
+    public static EditorCommandDescription Describe(EditorToolbarCommand command)
+    {
+        switch (command)
+        {
+            case EditorToolbarCommand.Save:
+                return new EditorCommandDescription("Save", "save", "MainWindow/save16.png", "Ctrl+S");
+            case EditorToolbarCommand.Undo:
+                return new EditorCommandDescription("Undo", "undo", "editor/undo.png", "Ctrl+Z");
+            case EditorToolbarCommand.Redo:
+                return new EditorCommandDescription("Redo", "redo", "editor/redo.png", "Ctrl+Y");
+            case EditorToolbarCommand.Cut:
+                return new EditorCommandDescription("Cut", "cut", "menu/cut.png", "Ctrl+X");
+            case EditorToolbarCommand.Copy:
+                return new EditorCommandDescription("Copy", "copy", "MainWindow/copy.png", "Ctrl+C");
+            case EditorToolbarCommand.Paste:
+                return new EditorCommandDescription("Paste", "paste", "MainWindow/paste.png", "Ctrl+V");
+            case EditorToolbarCommand.Delete:
+                return new EditorCommandDescription("Delete", "delete", "delete16.png", "Del");
+            case EditorToolbarCommand.SelectAll:
+                return new EditorCommandDescription("Select All", "select-all", "editor/select-all.png", "Ctrl+A");
+            case EditorToolbarCommand.Find:
+                return new EditorCommandDescription("Find", "find", "MainWindow/FindHS.png", "Ctrl+F");
+            case EditorToolbarCommand.Replace:
+                return new EditorCommandDescription("Replace", "replace", "editor/replace.png", "Ctrl+H");
+            case EditorToolbarCommand.GoToLine:
+                return new EditorCommandDescription("Go to Line...", "goto-line", "editor/goto-line.png", "Ctrl+G");
+            default:
+                throw new ArgumentOutOfRangeException(nameof(command));
         }
     }
 }

@@ -22,6 +22,8 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public FrameworkElement Control { get; }
 
+    public FrameworkElement ToolBar => null;
+
     public string Title
     {
         get

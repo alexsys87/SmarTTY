@@ -1,76 +1,37 @@
+using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace SmarTTY.Controls;
 
 /// <summary>
-/// A remote file editor with a tool bar above it and a context menu in it. Both offer the same commands: Save, Undo, Redo,
-/// Cut, Copy, Paste, Delete, Select All, Find, Replace and Go to Line. The commands that need the main window (saving,
-/// the search bar, the Go to Line dialog) are raised as events; the others act on the editor directly.
+/// A remote file editor with its context menu. The WPF tool bar above the editor offers the same commands, and both
+/// run them through <see cref="RunCommand"/>. The commands that need the main window (saving, the search bar, the Go
+/// to Line dialog) are raised as events; the others act on the editor directly.
 /// </summary>
 internal sealed class RemoteFileEditorPanel : UserControl
 {
-    private sealed class CommandItems
-    {
-        public ToolStripButton Button;
-
-        public ToolStripMenuItem MenuItem;
-    }
-
-    // null is a separator.
-    private static readonly EditorToolbarCommand?[] ToolbarLayout =
-    {
-        EditorToolbarCommand.Save,
-        null,
-        EditorToolbarCommand.Undo,
-        EditorToolbarCommand.Redo,
-        null,
-        EditorToolbarCommand.Cut,
-        EditorToolbarCommand.Copy,
-        EditorToolbarCommand.Paste,
-        EditorToolbarCommand.Delete,
-        null,
-        EditorToolbarCommand.SelectAll,
-        null,
-        EditorToolbarCommand.Find,
-        EditorToolbarCommand.Replace,
-        EditorToolbarCommand.GoToLine
-    };
-
-    private static readonly EditorToolbarCommand?[] MenuLayout =
-    {
-        EditorToolbarCommand.Undo,
-        EditorToolbarCommand.Redo,
-        null,
-        EditorToolbarCommand.Cut,
-        EditorToolbarCommand.Copy,
-        EditorToolbarCommand.Paste,
-        EditorToolbarCommand.Delete,
-        null,
-        EditorToolbarCommand.SelectAll,
-        null,
-        EditorToolbarCommand.Find,
-        EditorToolbarCommand.Replace,
-        EditorToolbarCommand.GoToLine,
-        null,
-        EditorToolbarCommand.Save
-    };
-
     private readonly RemoteFileEditor _editor;
-
-    private readonly ToolStrip _toolStrip;
 
     private readonly ContextMenuStrip _contextMenu;
 
-    private readonly Dictionary<EditorToolbarCommand, CommandItems> _commands = new Dictionary<EditorToolbarCommand, CommandItems>();
+    private readonly Dictionary<EditorToolbarCommand, ToolStripMenuItem> _menuItems = new Dictionary<EditorToolbarCommand, ToolStripMenuItem>();
+
+    // The unscaled menu font, and the font for the current monitor (null until the menu is opened).
+    private readonly Font _menuFont;
+
+    private Font _scaledMenuFont;
 
     private ToolbarPalette _palette;
 
     private ToolStripRenderer _renderer;
 
     private bool _refreshPending;
+
+    private int _contextMenuDpi;
 
     /// <summary>The Save button or menu item was used.</summary>
     public event EventHandler SaveRequested;
@@ -81,55 +42,36 @@ internal sealed class RemoteFileEditorPanel : UserControl
 
     public event EventHandler GoToLineRequested;
 
+    /// <summary>The enabled state of the commands changed (for the WPF tool bar).</summary>
+    internal event EventHandler StateChanged;
+
+    internal EditorCommandState CommandState { get; private set; }
+
     public RemoteFileEditorPanel(RemoteFileEditor editor)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         SuspendLayout();
-        CreateCommand(EditorToolbarCommand.Save, "Save", "save", "Ctrl+S");
-        CreateCommand(EditorToolbarCommand.Undo, "Undo", "undo", "Ctrl+Z");
-        CreateCommand(EditorToolbarCommand.Redo, "Redo", "redo", "Ctrl+Y");
-        CreateCommand(EditorToolbarCommand.Cut, "Cut", "cut", "Ctrl+X");
-        CreateCommand(EditorToolbarCommand.Copy, "Copy", "copy", "Ctrl+C");
-        CreateCommand(EditorToolbarCommand.Paste, "Paste", "paste", "Ctrl+V");
-        CreateCommand(EditorToolbarCommand.Delete, "Delete", "delete", "Del");
-        CreateCommand(EditorToolbarCommand.SelectAll, "Select All", "select-all", "Ctrl+A");
-        CreateCommand(EditorToolbarCommand.Find, "Find", "find", "Ctrl+F");
-        CreateCommand(EditorToolbarCommand.Replace, "Replace", "replace", "Ctrl+H");
-        CreateCommand(EditorToolbarCommand.GoToLine, "Go to Line...", "goto-line", "Ctrl+G");
-
-        _toolStrip = new ToolStrip
-        {
-            Dock = DockStyle.Top,
-            GripStyle = ToolStripGripStyle.Hidden,
-            CanOverflow = true,
-            ShowItemToolTips = true,
-            TabStop = false
-        };
-        foreach (EditorToolbarCommand? command in ToolbarLayout)
-        {
-            _toolStrip.Items.Add(command.HasValue ? (ToolStripItem)_commands[command.Value].Button : new ToolStripSeparator());
-        }
 
         _contextMenu = new ContextMenuStrip();
-        foreach (EditorToolbarCommand? command in MenuLayout)
+        foreach (EditorToolbarCommand? command in EditorCommandCatalog.ContextMenuLayout)
         {
-            _contextMenu.Items.Add(command.HasValue ? (ToolStripItem)_commands[command.Value].MenuItem : new ToolStripSeparator());
+            _contextMenu.Items.Add(command.HasValue ? (ToolStripItem)CreateMenuItem(command.Value) : new ToolStripSeparator());
         }
+        _menuFont = _contextMenu.Font;
         _contextMenu.Opening += (sender, e) =>
         {
+            ScaleContextMenu();
             ApplyMenuTheme(_contextMenu);
             RefreshState();
         };
         _editor.ContextMenuStrip = _contextMenu;
 
-        // The docked editor fills what the tool bar leaves; it is added first so that the tool bar is laid out first.
         _editor.Dock = DockStyle.Fill;
         Controls.Add(_editor);
-        Controls.Add(_toolStrip);
         ActiveControl = _editor;
         ResumeLayout(performLayout: true);
 
-        // What the buttons depend on: the selection, the text and its undo history, the saved state and the load.
+        // What the commands depend on: the selection, the text and its undo history, the saved state and the load.
         _editor.SelectionChanged += (editorControl, previousCaret, currentCaret, hasSelection) => ScheduleRefresh();
         _editor.ModifiedChanged += (editorControl, modified) => ScheduleRefresh();
         _editor.RangeChanged += (editorControl, start, oldEnd, newEnd) => ScheduleRefresh();
@@ -139,32 +81,26 @@ internal sealed class RemoteFileEditorPanel : UserControl
         _editor.LoadCompleted += (sender, e) => ScheduleRefresh();
 
         ThemeManager.ThemeChanged += OnThemeChanged;
-        ApplyToolbarTheme();
+        ApplyTheme();
         RefreshState();
     }
 
-    private void CreateCommand(EditorToolbarCommand command, string text, string iconName, string shortcut)
+    private ToolStripMenuItem CreateMenuItem(EditorToolbarCommand command)
     {
-        string toolTip = text.TrimEnd('.') + " (" + shortcut + ")";
-        ToolStripButton button = new ToolStripButton(text)
-        {
-            DisplayStyle = ToolStripItemDisplayStyle.Image,
-            AutoToolTip = false,
-            ToolTipText = toolTip
-        };
+        EditorCommandDescription description = EditorCommandCatalog.Describe(command);
         // The key is shown only: the editor handles the key itself, a menu shortcut would run the command twice.
-        ToolStripMenuItem menuItem = new ToolStripMenuItem(text)
+        ToolStripMenuItem menuItem = new ToolStripMenuItem(description.Text)
         {
-            ShortcutKeyDisplayString = shortcut
+            ShortcutKeyDisplayString = description.Shortcut
         };
-        Icons.Apply(button, iconName);
-        Icons.Apply(menuItem, iconName);
-        button.Click += (sender, e) => Run(command);
-        menuItem.Click += (sender, e) => Run(command);
-        _commands[command] = new CommandItems { Button = button, MenuItem = menuItem };
+        Icons.Apply(menuItem, description.IconName);
+        menuItem.Click += (sender, e) => RunCommand(command);
+        _menuItems[command] = menuItem;
+        return menuItem;
     }
 
-    private void Run(EditorToolbarCommand command)
+    /// <summary>Runs a command from the tool bar or the context menu.</summary>
+    internal void RunCommand(EditorToolbarCommand command)
     {
         // A command that enabled state is stale could slip through between a change and its refresh.
         if (!CaptureState().IsEnabled(command))
@@ -227,7 +163,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         RefreshState();
     }
 
-    private EditorCommandState CaptureState()
+    internal EditorCommandState CaptureState()
     {
         int lineCount = _editor.LineCount;
         return new EditorCommandState
@@ -242,19 +178,18 @@ internal sealed class RemoteFileEditorPanel : UserControl
         };
     }
 
-    private void RefreshState()
+    internal void RefreshState()
     {
-        EditorCommandState state = CaptureState();
-        foreach (KeyValuePair<EditorToolbarCommand, CommandItems> pair in _commands)
+        CommandState = CaptureState();
+        foreach (KeyValuePair<EditorToolbarCommand, ToolStripMenuItem> pair in _menuItems)
         {
-            bool enabled = state.IsEnabled(pair.Key);
-            pair.Value.Button.Enabled = enabled;
-            pair.Value.MenuItem.Enabled = enabled;
+            pair.Value.Enabled = CommandState.IsEnabled(pair.Key);
         }
+        StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
-    /// Updates the buttons after the editor has finished what it is doing: the events arrive in the middle of an edit,
+    /// Updates the commands after the editor has finished what it is doing: the events arrive in the middle of an edit,
     /// before the undo history is complete, and many of them (a mouse drag) come in a row.
     /// </summary>
     private void ScheduleRefresh()
@@ -283,32 +218,50 @@ internal sealed class RemoteFileEditorPanel : UserControl
     protected override void OnGotFocus(EventArgs e)
     {
         base.OnGotFocus(e);
-        // The host focuses its child: the keys are for the editor, not for the tool bar.
+        // The host focuses its child: the keys are for the editor, not for the menu.
         if (!_editor.Focused)
         {
             _editor.Focus();
         }
     }
 
-    private void OnThemeChanged(object sender, EventArgs e)
+    /// <summary>
+    /// The menu is a WinForms window of its own and is not scaled with this control, so its images and font are
+    /// scaled for the monitor it opens on.
+    /// </summary>
+    private void ScaleContextMenu()
     {
-        ApplyToolbarTheme();
+        if (!_editor.IsHandleCreated)
+        {
+            return;
+        }
+        int dpi = DpiScaling.GetWindowDpi(_editor.Handle);
+        if (dpi == _contextMenuDpi)
+        {
+            return;
+        }
+        _contextMenuDpi = dpi;
+        float imageScale = (float)dpi / DpiScaling.DesignDpi;
+        int imageSize = Math.Max(1, (int)Math.Round(16f * imageScale));
+        _contextMenu.ImageScalingSize = new Size(imageSize, imageSize);
+        Font font = DpiScaling.ScaleFont(_menuFont, (float)dpi / DpiScaling.SystemDpi);
+        Font previousFont = _scaledMenuFont;
+        _scaledMenuFont = font;
+        _contextMenu.Font = font;
+        previousFont?.Dispose();
     }
 
-    /// <summary>Paints the tool bar and the context menu in the colours of the application theme.</summary>
-    private void ApplyToolbarTheme()
+    private void OnThemeChanged(object sender, EventArgs e)
+    {
+        ApplyTheme();
+    }
+
+    /// <summary>Paints the context menu in the colours of the application theme.</summary>
+    private void ApplyTheme()
     {
         _palette = ToolbarPalette.FromCurrentTheme();
         _renderer = new ThemedToolStripRenderer(_palette);
-        _toolStrip.Renderer = _renderer;
-        _toolStrip.BackColor = _palette.Background;
-        _toolStrip.ForeColor = _palette.Text;
-        foreach (ToolStripItem item in _toolStrip.Items)
-        {
-            item.ForeColor = _palette.Text;
-        }
         ApplyMenuTheme(_contextMenu);
-        _toolStrip.Invalidate();
     }
 
     private void ApplyMenuTheme(ToolStripDropDown menu)
@@ -328,6 +281,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         {
             ThemeManager.ThemeChanged -= OnThemeChanged;
             _contextMenu.Dispose();
+            _scaledMenuFont?.Dispose();
         }
         base.Dispose(disposing);
     }

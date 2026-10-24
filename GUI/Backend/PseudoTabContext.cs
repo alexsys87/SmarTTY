@@ -13,6 +13,8 @@ public class PseudoTabContext : ITabContext, IDisposable
 
     public FrameworkElement Control { get; }
 
+    public FrameworkElement ToolBar => null;
+
     public string Title => null;
 
     public TextEditorControl EditorControl => null;

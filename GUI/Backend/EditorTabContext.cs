@@ -23,11 +23,13 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public FrameworkElement Control { get; }
 
+    public FrameworkElement ToolBar { get; }
+
     public FileExplorer FileExplorer => null;
 
     public TextEditorControl EditorControl => Editor;
 
-    /// <summary>The editor together with its tool bar and context menu (what the tab shows).</summary>
+    /// <summary>The editor together with its context menu (the WinForms part of the tab).</summary>
     internal RemoteFileEditorPanel EditorPanel { get; }
 
     public string Title
@@ -71,6 +73,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         EditorPanel = new RemoteFileEditorPanel(editor);
         ((WindowsFormsHost)winFormsHostWrapper).Child = EditorPanel;
         Control = (FrameworkElement)winFormsHostWrapper;
+        ToolBar = (FrameworkElement)new RemoteFileEditorToolBar(EditorPanel);
         Searcher = new TextSearcher(editor)
         {
             CanReplace = true
