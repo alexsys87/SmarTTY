@@ -30,6 +30,8 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public FrameworkElement ToolBar => null;
 
+    public FrameworkElement StatusBar => null;
+
     public TextEditorControl EditorControl => null;
 
     public string Title => DeviceTerminalControl.GetConnectionTitle(Settings.Connection);

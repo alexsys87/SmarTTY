@@ -84,6 +84,9 @@ public class GlobalSettings : INotifyPropertyChanged
         // Tab and indentation insert TabSize spaces instead of a tab character.
         public bool InsertSpaces;
 
+        // The first save of a file copies the old one to file~ on the server.
+        public bool BackupBeforeSave;
+
         public EditorColors DarkColors;
 
         public EditorColors LightColors;

@@ -364,6 +364,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -400,6 +401,7 @@
             <TextBlock Text="Temporary directory for uploaded files:" Grid.Row="8" />
             <TextBox Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding EditorWrapper.TemporaryDirectory}" />
             <CheckBox Content="Enable syntax highlighting" Grid.Row="9" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.SyntaxHighlighting}" />
+            <CheckBox Content="Keep a backup copy (file~) when saving" Grid.Row="10" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.BackupBeforeSave}" ToolTip="The first save of a file after it was opened copies the old file to the same name with a ~ added, on the server." />
           </Grid>
         </GroupBox>
       </TabItem>

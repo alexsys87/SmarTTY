@@ -110,6 +110,9 @@ jobs:
       - name: Run editor tool bar command state checks
         run: dotnet run --project tests/EditorCommandStateTests -c Release
 
+      - name: Run editor search, encoding and line ending checks
+        run: dotnet run --project tests/EditorTextFormatTests -c Release
+
       - name: Run local OpenWrt repository checks (opkg and apk feeds, HTTP server, feed scripts, signature check, tunnel host)
         run: dotnet run --project tests/LocalRepoTests -c Release
 

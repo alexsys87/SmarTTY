@@ -73,6 +73,39 @@ internal static class Program
         Check(newFile.IsEnabled(EditorToolbarCommand.Save), "new empty file: Save creates it");
         Check(!new EditorCommandState { IsNewFile = true, ReadOnly = true }.IsEnabled(EditorToolbarCommand.Save), "new file still loading: Save is off");
 
+        // Reload needs a file on the server and no save in progress.
+        Check(clean.IsEnabled(EditorToolbarCommand.Reload), "opened file: Reload is on");
+        Check(!new EditorCommandState { IsNewFile = true }.IsEnabled(EditorToolbarCommand.Reload), "new file: nothing to reload");
+        Check(!new EditorCommandState { IsSaving = true }.IsEnabled(EditorToolbarCommand.Reload), "saving: Reload is off");
+        Check(!loading.IsEnabled(EditorToolbarCommand.Reload), "loading: Reload is off");
+        Check(new EditorCommandState { IsModified = true }.IsEnabled(EditorToolbarCommand.Reload), "modified file: Reload is on (the window asks before it drops the changes)");
+
+        // The tool bar and the context menu list every command once, and each has a label and an icon.
+        foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
+        {
+            Check(Array.IndexOf(EditorCommandCatalog.ToolBarLayout, (EditorToolbarCommand?)command) >= 0, "tool bar: " + command + " is listed");
+            Check(Array.IndexOf(EditorCommandCatalog.ContextMenuLayout, (EditorToolbarCommand?)command) >= 0, "context menu: " + command + " is listed");
+            EditorCommandDescription description = EditorCommandCatalog.Describe(command);
+            Check(description.Text.Length > 0 && description.IconName.Length > 0 && description.IconPath.Length > 0, "catalog: " + command + " has a label and icons");
+        }
+        Check(EditorCommandCatalog.Describe(EditorToolbarCommand.Reload).ToolTip == "Reload from Server", "catalog: a command without a key has a plain tool tip");
+        Check(EditorCommandCatalog.Describe(EditorToolbarCommand.Save).ToolTip == "Save (Ctrl+S)", "catalog: a command with a key shows it in the tool tip");
+
+        // The status bar texts.
+        Check(EditorStatusText.Position(0, 0) == "Ln 1, Col 1", "status: the first position is Ln 1, Col 1");
+        Check(EditorStatusText.Position(11, 4) == "Ln 12, Col 5", "status: positions are counted from 1");
+        Check(EditorStatusText.Selection(1, 1) == "1 char", "status: one character");
+        Check(EditorStatusText.Selection(25, 1) == "25 chars", "status: a selection in one line");
+        Check(EditorStatusText.Selection(40, 3) == "40 chars, 3 lines", "status: a selection over several lines");
+        Check(EditorStatusText.State(true, false, false, true, false) == "Loading...", "status: loading wins");
+        Check(EditorStatusText.State(false, false, true, true, false) == "Saving...", "status: saving before modified");
+        Check(EditorStatusText.State(false, false, false, true, false) == "Modified", "status: modified");
+        Check(EditorStatusText.State(false, true, false, true, false) == "Read-only", "status: a file opened read-only says so");
+        Check(EditorStatusText.State(true, true, false, false, false) == "Loading...", "status: loading wins over read-only");
+        Check(EditorStatusText.State(false, false, false, true, true) == "New file, modified", "status: a new file that was typed in");
+        Check(EditorStatusText.State(false, false, false, false, true) == "New file", "status: a new empty file");
+        Check(EditorStatusText.State(false, false, false, false, false) == "Saved", "status: nothing to save");
+
         // Every command has a rule (an unknown value is off).
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {

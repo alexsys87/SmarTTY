@@ -2597,6 +2597,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             PaintSelection(e.Graphics, value.Start, value.End, value.Style, backgroundBrushes);
         }
+        PaintMatches(e.Graphics);
         if (_hasSelection)
         {
             PaintSelection(e.Graphics, _selectionStart, SelectionEnd, _selectionStyle, backgroundBrushes);
@@ -3075,33 +3076,54 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public TextDocument.TextPosition Find(TextDocument.TextPosition textPosition, string searchText, bool searchBackward, bool ignoreCase, bool wrapAround, FindSelectMode findSelectMode = FindSelectMode.None)
     {
-        if (_document == null || _document.LineCount == 0 || string.IsNullOrEmpty(searchText))
+        if (string.IsNullOrEmpty(searchText))
         {
             return new TextDocument.TextPosition(-1, -1);
         }
+        return Find(textPosition, TextMatcher.Literal(searchText, ignoreCase), searchBackward, wrapAround, findSelectMode, TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid);
+    }
+
+    /// <summary>
+    /// Finds the next match of <paramref name="matcher"/> (plain text, whole word or regular expression), line by line.
+    /// A valid <paramref name="scopeStart"/> and <paramref name="scopeEnd"/> limit the search to that range (the search
+    /// wraps around inside it). Returns where the match begins, or an invalid position when there is none.
+    /// </summary>
+    public TextDocument.TextPosition Find(TextDocument.TextPosition textPosition, TextMatcher matcher, bool searchBackward, bool wrapAround, FindSelectMode findSelectMode, TextDocument.TextPosition scopeStart, TextDocument.TextPosition scopeEnd)
+    {
+        if (_document == null || _document.LineCount == 0 || matcher == null)
+        {
+            return new TextDocument.TextPosition(-1, -1);
+        }
+        bool scoped = scopeStart.IsValid && scopeEnd.IsValid;
+        int firstLine = scoped ? Math.Max(0, scopeStart.Line) : 0;
+        int lastLine = scoped ? Math.Min(scopeEnd.Line, _document.LineCount - 1) : (_document.LineCount - 1);
         int direction = ((!searchBackward) ? 1 : (-1));
         int startColumn = textPosition.Column;
         for (int pass = 0; pass < 2; pass++)
         {
-            for (int line = textPosition.Line; line >= 0 && line < _document.LineCount; line += direction)
+            for (int line = textPosition.Line; line >= firstLine && line <= lastLine; line += direction)
             {
                 string text = _document.GetLineText(line);
                 if (text == null)
                 {
                     continue;
                 }
-                int matchIndex;
+                // The part of the line that may hold a match: the whole line, or what the scope leaves of it.
+                int lower = (scoped && line == firstLine) ? scopeStart.Column : 0;
+                int upper = (scoped && line == lastLine) ? Math.Min(scopeEnd.Column, text.Length) : text.Length;
+                int from;
+                int to;
                 if (searchBackward)
                 {
-                    int searchStart = ((startColumn == -1) ? text.Length : startColumn);
-                    matchIndex = text.LastIndexOf(searchText, searchStart, searchStart + 1, ignoreCase ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture);
+                    from = lower;
+                    to = (startColumn == -1) ? upper : Math.Min(startColumn, upper);
                 }
                 else
                 {
-                    int startIndex = ((startColumn != -1) ? startColumn : 0);
-                    matchIndex = text.IndexOf(searchText, startIndex, ignoreCase ? StringComparison.InvariantCultureIgnoreCase : StringComparison.InvariantCulture);
+                    from = (startColumn == -1) ? lower : Math.Max(startColumn, lower);
+                    to = upper;
                 }
-                if (matchIndex != -1)
+                if (matcher.Match(text, from, to, searchBackward, allowEmpty: false, out int matchIndex, out int matchLength))
                 {
                     TextDocument.TextPosition position = new TextDocument.TextPosition
                     {
@@ -3116,7 +3138,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                             SetSelectionCore(select: true, new TextDocument.TextPosition
                             {
                                 Line = line,
-                                Column = matchIndex + searchText.Length
+                                Column = matchIndex + matchLength
                             }, SelectionChangeSource.FindResult);
                             EnsureCaretVisible(position);
                         }
@@ -3126,10 +3148,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                             SetSelectionCore(select: true, new TextDocument.TextPosition
                             {
                                 Line = line,
-                                Column = matchIndex + searchText.Length
+                                Column = matchIndex + matchLength
                             }, SelectionChangeSource.FindResult);
                         }
-                        int matchEnd = matchIndex + searchText.Length;
+                        int matchEnd = matchIndex + matchLength;
                         if (matchEnd <= _visibleColumns)
                         {
                             ScrollColumn = 0;
@@ -3138,7 +3160,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                         {
                             ScrollColumn = text.Length - _visibleColumns;
                         }
-                        else if (searchText.Length < _visibleColumns)
+                        else if (matchLength < _visibleColumns)
                         {
                             int centerColumn = (matchIndex + matchEnd) / 2;
                             ScrollColumn = centerColumn - _visibleColumns / 2;
@@ -3156,7 +3178,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             {
                 break;
             }
-            textPosition.Line = (searchBackward ? (_document.LineCount - 1) : 0);
+            textPosition.Line = (searchBackward ? lastLine : firstLine);
             startColumn = -1;
         }
         if (findSelectMode == FindSelectMode.SelectOrClear)
@@ -3176,6 +3198,65 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             }
         }
         return new TextDocument.TextPosition(-1, -1);
+    }
+
+    // Marks every match of the search bar's query in the visible lines (not saved anywhere: it follows the text).
+    private TextMatcher _matchHighlighter;
+
+    private readonly Brush _matchHighlightBrush = new SolidBrush(Color.FromArgb(95, 255, 190, 0));
+
+    /// <summary>Highlights all matches of <paramref name="matcher"/> in the text; null removes the highlight.</summary>
+    public void SetMatchHighlight(TextMatcher matcher)
+    {
+        _matchHighlighter = matcher;
+        Redraw();
+    }
+
+    private void PaintMatches(Graphics graphics)
+    {
+        TextMatcher matcher = _matchHighlighter;
+        if (matcher == null || TerminalMode)
+        {
+            return;
+        }
+        try
+        {
+            for (int row = 0; row < _visibleRows; row++)
+            {
+                if (_displayRows[row].VirtualLine != null)
+                {
+                    continue;
+                }
+                int line = _displayRows[row].Line;
+                if (line < 0 || line >= _document.LineCount)
+                {
+                    continue;
+                }
+                string text = _document.GetLineText(line);
+                if (string.IsNullOrEmpty(text))
+                {
+                    continue;
+                }
+                int y = Round(RowToY(row));
+                int from = 0;
+                // A line of a minified file may hold thousands of matches; the first ones are enough to show.
+                for (int shown = 0; shown < 500 && from <= text.Length && matcher.Match(text, from, text.Length, backward: false, allowEmpty: false, out int index, out int length); shown++)
+                {
+                    int startX = Round(ColumnToX(_document.IndexToColumn(line, index, TabSize)));
+                    int endX = Round(ColumnToX(_document.IndexToColumn(line, index + length, TabSize)));
+                    if (endX > startX)
+                    {
+                        graphics.FillRectangle(_matchHighlightBrush, startX, y, endX - startX, _charSize.Height);
+                    }
+                    from = index + length;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // A painting error must not break the editor (a regular expression that times out, say): stop highlighting.
+            _matchHighlighter = null;
+        }
     }
 
     public TextDocument.TextPosition OffsetToPosition(int offset)

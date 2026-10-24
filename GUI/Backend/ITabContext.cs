@@ -12,6 +12,9 @@ public interface ITabContext : IDisposable
     /// <summary>The WPF tool bar above the tab content, or null for tabs without one.</summary>
     FrameworkElement ToolBar { get; }
 
+    /// <summary>The WPF status bar below the tab content, or null for tabs without one.</summary>
+    FrameworkElement StatusBar { get; }
+
     TextEditorControl EditorControl { get; }
 
     string Title { get; }
