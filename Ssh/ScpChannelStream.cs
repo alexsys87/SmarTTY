@@ -205,6 +205,10 @@ public class ScpChannelStream : Stream
             case 2:
                 throw new RemoteOperationException(ReadLine(channel).Trim());
             case -1:
+                if (channel.ClosedByConnectionLoss)
+                {
+                    throw new IOException("The connection to the server was lost during the transfer.");
+                }
                 throw new IOException("The remote scp command exited unexpectedly. Please check that scp is installed on the target.");
             default:
                 throw new IOException("Unexpected SCP reply: " + ((char)status + ReadLine(channel)).Trim());

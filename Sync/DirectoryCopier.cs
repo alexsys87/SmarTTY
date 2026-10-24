@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Serialization;
@@ -75,6 +76,23 @@ public class DirectoryCopier
         internal void Clear()
         {
             _data = new byte[0];
+        }
+
+        /// <summary>The non-empty lines collected so far.</summary>
+        internal List<string> GetLines()
+        {
+            List<string> lines = new List<string>();
+            if (_data.Length != 0)
+            {
+                foreach (string line in Encoding.UTF8.GetString(_data).Split('\n'))
+                {
+                    if (line.Trim().Length > 0)
+                    {
+                        lines.Add(line.Trim());
+                    }
+                }
+            }
+            return lines;
         }
     }
 
@@ -523,6 +541,13 @@ public class DirectoryCopier
         }
     }
 
+    /// <summary>A tar message about file attributes that could not be set (owner, time stamp, mode), not about missing data.</summary>
+    private static bool IsHarmlessTarMessage(string message)
+    {
+        string[] harmless = { "change ownership", "chown", "utime", "time stamp", "timestamp", "change mode", "chmod", "set permissions", "implausibly old" };
+        return harmless.Any((string part) => message.IndexOf(part, StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
     private void CheckErrors(OutputCollector outputCollector)
     {
         if (Log != null)
@@ -720,13 +745,20 @@ public class DirectoryCopier
             // SendEof does nothing and Dispose swallows everything, so without this the upload would end as a success
             // with data that never reached the device (or that tar could not unpack).
             sshShellChannel.WaitEof();
+            List<string> tarMessages = outputCollector.GetLines();
             CheckErrors(outputCollector);
             if (sshShellChannel.ClosedByConnectionLoss)
             {
                 throw new IOException("The connection to the server was lost while uploading to " + remotePath + ". The files may be incomplete.");
             }
             int tarStatus = sshShellChannel.ExitStatus;
-            if (tarStatus != 0)
+            if (tarStatus != 0 && tarMessages.Count > 0 && tarMessages.All(IsHarmlessTarMessage))
+            {
+                // tar reports what it could not set on the extracted files (owner, time stamp, mode) with a non-zero
+                // status too, but the data is there: the messages are in the log (CheckErrors), the upload succeeded.
+                Log?.Invoke(this, "tar finished with exit status " + tarStatus.ToString(System.Globalization.CultureInfo.InvariantCulture) + " after warnings only; the files were unpacked.");
+            }
+            else if (tarStatus != 0)
             {
                 throw new IOException("The device could not unpack the uploaded files into " + remotePath + " (tar exit status " + tarStatus.ToString(System.Globalization.CultureInfo.InvariantCulture) + "). The files may be incomplete.");
             }
