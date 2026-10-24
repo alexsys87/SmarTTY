@@ -34,6 +34,58 @@ internal static class Program
         Check(equal, name + (equal ? "" : $" (expected '{expected}', got '{actual}')"));
     }
 
+    // The drafts of the remote file editor (IO/EditorDraftStore.cs) and the limits for big files (IO/EditorFilePolicy.cs).
+    private static void EditorChecks(string root)
+    {
+        string directory = Path.Combine(root, "drafts");
+        EditorDraftStore store = new EditorDraftStore(directory);
+        string key = EditorDraftStore.KeyFor("root@host", "/etc/my config.conf");
+        Equal(key, EditorDraftStore.KeyFor("root@host", "/etc/my config.conf"), "draft key: the same file gives the same key");
+        Check(key != EditorDraftStore.KeyFor("root@other", "/etc/my config.conf"), "draft key: another session gives another key");
+        Check(key != EditorDraftStore.KeyFor("root@host", "/etc/other.conf"), "draft key: another path gives another key");
+        Check(key.Length == 32 && key.IndexOfAny(Path.GetInvalidFileNameChars()) < 0, "draft key is a file name");
+        Check(store.TryLoad(key) == null, "no draft: nothing is loaded");
+
+        string text = "\n\nline 1\r\nline 2 \u0431\u0443\u043a\u0432\u044b\n\nlast";
+        DateTime saved = new DateTime(2026, 10, 24, 12, 0, 0, DateTimeKind.Utc);
+        store.Save(key, new EditorDraft { RemotePath = "/etc/my config.conf", SavedUtc = saved, BaseHash = EditorDraftStore.HashText("old"), IsNewFile = false, Text = text });
+        EditorDraft loaded = store.TryLoad(key);
+        Check(loaded != null, "draft is loaded");
+        Equal(loaded.Text, text, "draft text is kept byte for byte (empty lines, CR LF, Cyrillic)");
+        Equal(loaded.RemotePath, "/etc/my config.conf", "draft path");
+        Equal(loaded.SavedUtc, saved, "draft time");
+        Equal(loaded.BaseHash, EditorDraftStore.HashText("old"), "draft base hash");
+        Equal(loaded.IsNewFile, false, "draft is not a new file");
+
+        store.Save(key, new EditorDraft { RemotePath = "/etc/my config.conf", SavedUtc = saved, BaseHash = "", IsNewFile = true, Text = "" });
+        loaded = store.TryLoad(key);
+        Check(loaded != null && loaded.IsNewFile && loaded.Text == "", "a second save replaces the draft (new file, empty text)");
+        Equal(Directory.GetFiles(directory).Length, 1, "no temporary files are left behind");
+
+        File.WriteAllText(Path.Combine(directory, key + ".draft"), "not a draft");
+        Check(store.TryLoad(key) == null, "a damaged draft is ignored");
+        store.Delete(key);
+        Check(!File.Exists(Path.Combine(directory, key + ".draft")), "a draft is deleted");
+        store.Delete(key);
+
+        string oldKey = EditorDraftStore.KeyFor("a", "/old");
+        string newKey = EditorDraftStore.KeyFor("a", "/new");
+        store.Save(oldKey, new EditorDraft { RemotePath = "/old", SavedUtc = saved, BaseHash = "", Text = "x" });
+        store.Save(newKey, new EditorDraft { RemotePath = "/new", SavedUtc = saved, BaseHash = "", Text = "y" });
+        File.SetLastWriteTimeUtc(Path.Combine(directory, oldKey + ".draft"), DateTime.UtcNow - TimeSpan.FromDays(40));
+        Equal(store.DeleteOlderThan(TimeSpan.FromDays(30)), 1, "old drafts are removed");
+        Check(store.TryLoad(oldKey) == null && store.TryLoad(newKey) != null, "only the old draft is gone");
+        Equal(new EditorDraftStore(Path.Combine(root, "missing")).DeleteOlderThan(TimeSpan.FromDays(1)), 0, "cleaning a missing directory is not an error");
+
+        Equal(EditorFilePolicy.Classify(0), LargeFileAction.Normal, "an empty file is opened");
+        Equal(EditorFilePolicy.Classify(EditorFilePolicy.WarnBytes - 1), LargeFileAction.Normal, "below the warning limit");
+        Equal(EditorFilePolicy.Classify(EditorFilePolicy.WarnBytes), LargeFileAction.Warn, "at the warning limit");
+        Equal(EditorFilePolicy.Classify(EditorFilePolicy.PreviewOnlyBytes - 1), LargeFileAction.Warn, "below the preview-only limit");
+        Equal(EditorFilePolicy.Classify(EditorFilePolicy.PreviewOnlyBytes), LargeFileAction.PreviewOnly, "at the preview-only limit");
+        Equal(EditorFilePolicy.Classify(long.MaxValue), LargeFileAction.PreviewOnly, "a huge file is a preview");
+        Check(EditorFilePolicy.PreviewBytes <= EditorFilePolicy.PreviewOnlyBytes, "the preview is smaller than the limit");
+    }
+
     private static string RunOutput(string command)
     {
         ProcessStartInfo startInfo = new ProcessStartInfo(_shell.Split(' ')[0]) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
@@ -509,6 +561,7 @@ internal static class Program
                     ProcessChecks();
                 }
             }
+            EditorChecks(root);
         }
         catch (Exception exception)
         {

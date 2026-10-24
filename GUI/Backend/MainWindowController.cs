@@ -420,6 +420,14 @@ public class MainWindowController : INotifyPropertyChanged
                 {
                     title += " (new)";
                 }
+                if (editor.IsPreview)
+                {
+                    title += " (preview, read-only)";
+                }
+                else if (editor.IsReadOnlyMode)
+                {
+                    title += " (read-only)";
+                }
                 if (editor.IsSaving)
                 {
                     title += " (saving)";
@@ -1281,6 +1289,10 @@ public class MainWindowController : INotifyPropertyChanged
                         {
                             return false;
                         }
+                        break;
+                    case DialogResult.No:
+                        // The changes are given up on purpose: no draft of them is kept.
+                        editorTab.Editor.DiscardDraft();
                         break;
                     case DialogResult.Cancel:
                         return false;

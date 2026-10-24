@@ -101,6 +101,10 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                         return;
                     }
                     break;
+                case DialogResult.No:
+                    // The changes are given up on purpose: no draft of them is kept.
+                    Editor.DiscardDraft();
+                    break;
                 case DialogResult.Cancel:
                     return;
             }
