@@ -10,6 +10,7 @@
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
     <Compile Include="../../IO/RemoteScript.cs" Link="RemoteScript.cs" />
     <Compile Include="../../IO/RemotePackageInstall.cs" Link="RemotePackageInstall.cs" />
+    <Compile Include="../../IO/RemoteFileTypes.cs" Link="RemoteFileTypes.cs" />
     <Compile Include="../../LocalRepo/LocalRepoPackageManager.cs" Link="LocalRepoPackageManager.cs" />
     <Compile Include="../../IO/RemoteProcessList.cs" Link="RemoteProcessList.cs" />
   </ItemGroup>

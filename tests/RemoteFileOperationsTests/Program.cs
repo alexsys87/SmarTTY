@@ -129,6 +129,75 @@ internal static class Program
         Check(threw, "no files, no command");
     }
 
+    private static void FileIconChecks()
+    {
+        (string Name, ItemIcon Icon)[] cases =
+        {
+            ("backup.tar.gz", ItemIcon.Archive), ("a.TGZ", ItemIcon.Archive), ("site.zip", ItemIcon.Archive), ("data.7z", ItemIcon.Archive), ("kernel.xz", ItemIcon.Archive),
+            ("photo.JPG", ItemIcon.Image), ("logo.svg", ItemIcon.Image), ("pic.png", ItemIcon.Image),
+            ("song.mp3", ItemIcon.Audio), ("rec.flac", ItemIcon.Audio), ("film.mkv", ItemIcon.Video), ("clip.mp4", ItemIcon.Video),
+            ("notes.txt", ItemIcon.Text), ("README.md", ItemIcon.Text), ("README", ItemIcon.Text), ("LICENSE", ItemIcon.Text),
+            ("report.docx", ItemIcon.Document), ("book.epub", ItemIcon.Document), ("manual.pdf", ItemIcon.Pdf),
+            ("table.xlsx", ItemIcon.Spreadsheet), ("export.csv", ItemIcon.Spreadsheet), ("slides.pptx", ItemIcon.Presentation),
+            ("nginx.conf", ItemIcon.Config), ("network.yaml", ItemIcon.Config), ("sshd.service", ItemIcon.Config),
+            ("fstab", ItemIcon.Config), ("passwd", ItemIcon.Config), (".bashrc", ItemIcon.Config), (".vimrc", ItemIcon.Config), (".profile", ItemIcon.Config),
+            ("boot.log", ItemIcon.Log), ("boot.log.1", ItemIcon.Log), ("boot.log.2.gz", ItemIcon.Log), ("syslog", ItemIcon.Log), (".bash_history", ItemIcon.Log),
+            ("install.sh", ItemIcon.Shell), ("run.BASH", ItemIcon.Shell), ("tool.py", ItemIcon.Python), ("main.c", ItemIcon.CSource), ("util.hpp", ItemIcon.CSource),
+            ("app.js", ItemIcon.Code), ("index.php", ItemIcon.Code), ("Makefile", ItemIcon.Code), ("Dockerfile", ItemIcon.Code), ("main.go", ItemIcon.Code), ("board.dts", ItemIcon.Code),
+            ("index.html", ItemIcon.Web), ("site.css", ItemIcon.Web), ("package.json", ItemIcon.Data), ("feed.xml", ItemIcon.Data),
+            ("app.sqlite3", ItemIcon.Database), ("dump.sql", ItemIcon.Database),
+            ("busybox.elf", ItemIcon.Binary), ("libc.so.6", ItemIcon.Binary), ("libfoo.so", ItemIcon.Binary), ("mac80211.ko", ItemIcon.Binary), ("firmware.bin", ItemIcon.Binary), ("vmlinuz", ItemIcon.Binary),
+            ("ubuntu.iso", ItemIcon.DiskImage), ("disk.qcow2", ItemIcon.DiskImage), ("sd.img", ItemIcon.DiskImage),
+            ("server.pem", ItemIcon.Certificate), ("id_rsa", ItemIcon.Certificate), ("id_rsa.pub", ItemIcon.Certificate), ("authorized_keys", ItemIcon.Certificate), ("a.crt", ItemIcon.Certificate),
+            ("DejaVuSans.ttf", ItemIcon.Font), ("x.woff2", ItemIcon.Font),
+            ("a.conf.bak", ItemIcon.Backup), ("notes.txt~", ItemIcon.Backup), ("a.old", ItemIcon.Backup), ("sshd_config.dpkg-dist", ItemIcon.Backup), ("x.swp", ItemIcon.Backup),
+            ("fix.patch", ItemIcon.Patch), ("a.diff", ItemIcon.Patch),
+            ("tool_1.0_amd64.deb", ItemIcon.PackageDeb), ("tool-1.0.x86_64.rpm", ItemIcon.PackageRpm),
+            ("luci-app-x_1.0_all.ipk", ItemIcon.PackageIpk), ("curl-8.apk", ItemIcon.PackageApk), ("A.IPK", ItemIcon.PackageIpk),
+            ("noextension", ItemIcon.File), ("sshd_config", ItemIcon.File), ("weird.unknownext", ItemIcon.File), ("trailingdot.", ItemIcon.File), (".hidden", ItemIcon.File), (".", ItemIcon.File), ("", ItemIcon.File)
+        };
+        foreach ((string name, ItemIcon icon) in cases)
+        {
+            Equal(RemoteFileTypes.IconFor(name), icon, $"icon of '{name}'");
+        }
+        Equal(RemoteFileTypes.IconFor(null), ItemIcon.File, "no name, plain file icon");
+    }
+
+    // Every icon value must have a trigger in the XAML of the file list and a 16x16 picture: otherwise the list shows an empty slot.
+    private static void FileIconResourceChecks()
+    {
+        string root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Combine(root, "SmarTTY.csproj")))
+        {
+            root = Path.GetDirectoryName(root);
+        }
+        if (root == null)
+        {
+            Console.WriteLine("SKIP: repository root not found, icon resources are not checked");
+            return;
+        }
+        string xaml = File.ReadAllText(Path.Combine(root, "GUI", "FileListControl.xaml"));
+        foreach (ItemIcon icon in Enum.GetValues(typeof(ItemIcon)))
+        {
+            string trigger = $"<DataTrigger Value=\"{icon}\" Binding=\"{{Binding Path=Icon}}\">";
+            int at = xaml.IndexOf(trigger, StringComparison.Ordinal);
+            Check(at >= 0, $"the file list has a trigger for the {icon} icon");
+            int sourceAt = xaml.IndexOf("Value=\"../icons/", at, StringComparison.Ordinal);
+            int end = xaml.IndexOf('"', sourceAt + 7);
+            string relative = xaml.Substring(sourceAt + 7, end - sourceAt - 7).Replace("../", "");
+            string path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+            Check(File.Exists(path), $"the picture of the {icon} icon exists ({relative})");
+            byte[] header = new byte[24];
+            using (FileStream stream = File.OpenRead(path))
+            {
+                stream.Read(header, 0, header.Length);
+            }
+            int width = (header[16] << 24) | (header[17] << 16) | (header[18] << 8) | header[19];
+            int height = (header[20] << 24) | (header[21] << 16) | (header[22] << 8) | header[23];
+            Check(header[1] == (byte)'P' && header[2] == (byte)'N' && header[3] == (byte)'G' && width == 16 && height == 16, $"the picture of the {icon} icon is a 16x16 PNG");
+        }
+    }
+
     private static void ScriptNameChecks()
     {
         Equal(RemoteScript.MakeRemotePath("backup.sh", "ab12cd34"), "/tmp/smartty-ab12cd34-backup.sh", "a script goes to /tmp with a token in its name");
@@ -406,6 +475,8 @@ internal static class Program
             NameChecks();
             ScriptNameChecks();
             PackageInstallChecks();
+            FileIconChecks();
+            FileIconResourceChecks();
             List<string> shells = new List<string> { "/bin/sh" };
             foreach (string busybox in new[] { "/bin/busybox", "/usr/bin/busybox" })
             {
