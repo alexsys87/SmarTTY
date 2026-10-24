@@ -154,7 +154,7 @@ public static class RemoteFileTypes
 
     private static void Add(Dictionary<string, ItemIcon> table, ItemIcon icon, string names)
     {
-        foreach (string name in names.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        foreach (string name in names.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
         {
             table[name] = icon;
         }
