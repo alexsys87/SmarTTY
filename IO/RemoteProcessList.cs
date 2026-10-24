@@ -33,6 +33,20 @@ public sealed class RemoteProcess
     public double? CpuPercent;
 }
 
+/// <summary>The counters of one disk from /proc/diskstats (only whole disks are listed, not their partitions).</summary>
+public sealed class DiskDevice
+{
+    public string Name;
+
+    /// <summary>Milliseconds the disk had requests in progress; it grows by 1000 per second of a busy disk.</summary>
+    public long IoMs;
+
+    /// <summary>Sectors (512 bytes each, whatever the disk's own sector size) read and written so far.</summary>
+    public long SectorsRead;
+
+    public long SectorsWritten;
+}
+
 /// <summary>The process list and the numbers around it, as read by <see cref="RemoteProcessList.ListCommand"/>.</summary>
 public sealed class ProcessSnapshot
 {
@@ -40,6 +54,9 @@ public sealed class ProcessSnapshot
 
     /// <summary>Processor time of all cores together in clock ticks (the "cpu" line of /proc/stat) and the number of cores.</summary>
     public long TotalTicks;
+
+    /// <summary>The part of <see cref="TotalTicks"/> in which the cores did nothing (idle and waiting for input/output); null if unknown.</summary>
+    public long? IdleTicks;
 
     public int CpuCount = 1;
 
@@ -52,6 +69,30 @@ public sealed class ProcessSnapshot
 
     /// <summary>MemAvailable, or MemFree on a kernel that does not have it.</summary>
     public long? MemFreeKb;
+
+    /// <summary>Buffers and page cache: memory that holds copies of disk data and is given back to programs when they need it; null if unknown.</summary>
+    public long? MemCachedKb;
+
+    public readonly List<DiskDevice> Disks = new List<DiskDevice>();
+
+    /// <summary>The file system of "/" (df): size and used space in kilobytes, null if df is not there or says nothing.</summary>
+    public long? StorageTotalKb;
+
+    public long? StorageUsedKb;
+
+    /// <summary>How busy all cores together were since the previous list, 0 to 100; null in the first list.</summary>
+    public double? CpuTotalPercent;
+
+    /// <summary>How busy the busiest disk was since the previous list (the "util" of iostat), 0 to 100; null in the first list or without disks.</summary>
+    public double? DiskBusyPercent;
+
+    /// <summary>What the real disks together read and wrote per second since the previous list; null like <see cref="DiskBusyPercent"/>.</summary>
+    public double? DiskReadBytesPerSecond;
+
+    public double? DiskWriteBytesPerSecond;
+
+    /// <summary>The name of the busiest disk of the interval, for a tooltip.</summary>
+    public string BusiestDisk;
 }
 
 /// <summary>
@@ -66,11 +107,16 @@ public static class RemoteProcessList
     // ends while it is read) are inside braces that send their messages to /dev/null. Fields after "(name) " in /proc/N/stat:
     // $1 state, $2 parent, $12 utime, $13 stime.
     private const string Script =
-        "while read -r k u n s i w q f t r; do case $k in cpu) tt=$((u+n+s+i+w+q+f+t));; cpu[0-9]*) nc=$((nc+1));; esac; done < /proc/stat; "
-        + "echo \"T|$tt|$nc\"; "
+        "while read -r k u n s i w q f t r; do case $k in cpu) tt=$((u+n+s+i+w+q+f+t)); ti=$((i+w));; cpu[0-9]*) nc=$((nc+1));; esac; done < /proc/stat; "
+        + "echo \"T|$tt|$nc|$ti\"; "
         + "{ read -r up r < /proc/uptime; } 2>/dev/null; echo \"U|$up\"; "
         + "{ read -r l1 l2 l3 r < /proc/loadavg; } 2>/dev/null; echo \"L|$l1 $l2 $l3\"; "
-        + "while read -r k v r; do case $k in MemTotal:) mt=$v;; MemFree:) mf=$v;; MemAvailable:) ma=$v;; esac; done < /proc/meminfo; echo \"M|$mt|$mf|$ma\"; "
+        + "while read -r k v r; do case $k in MemTotal:) mt=$v;; MemFree:) mf=$v;; MemAvailable:) ma=$v;; Buffers:) mb=$v;; Cached:) mc=$v;; esac; done < /proc/meminfo; echo \"M|$mt|$mf|$ma|$mb|$mc\"; "
+        // Whole disks only: a name that is a directory of /sys/block is a disk, its partitions are one level deeper. The sixth
+        // and tenth numbers of a line are the sectors read and written, the thirteenth the milliseconds with a request pending.
+        + "{ while read -r mj mn dn rc rm rs rt wc wm ws wt fl io wq r; do [ -e \"/sys/block/$dn\" ] && echo \"D|$dn|$io|$rs|$ws\"; done < /proc/diskstats; } 2>/dev/null; "
+        // POSIX output keeps a long device name on one line; the header line is skipped.
+        + "df -P -k / 2>/dev/null | { read -r h; read -r fs dt du da dp dm; echo \"S|$dt|$du|$dm\"; }; "
         + "{ while IFS=: read -r n x u r; do echo \"N|$u|$n\"; done < /etc/passwd; } 2>/dev/null; "
         + "for d in /proc/[0-9]*; do "
         + "p=${d#/proc/}; "
@@ -111,12 +157,13 @@ public static class RemoteProcessList
             {
                 continue;
             }
-            string[] parts = line.Split(new[] { '|' }, line[0] == 'P' ? 9 : 4);
+            string[] parts = line.Split(new[] { '|' }, line[0] == 'P' ? 9 : line[0] == 'D' ? 5 : line[0] == 'M' ? 6 : 4);
             switch (line[0])
             {
                 case 'T':
                     snapshot.TotalTicks = ParseLong(Part(parts, 1)) ?? 0;
                     snapshot.CpuCount = (int)Math.Max(1, ParseLong(Part(parts, 2)) ?? 1);
+                    snapshot.IdleTicks = ParseLong(Part(parts, 3));
                     break;
                 case 'U':
                     if (double.TryParse(Part(parts, 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double uptime))
@@ -130,6 +177,25 @@ public static class RemoteProcessList
                 case 'M':
                     snapshot.MemTotalKb = ParseLong(Part(parts, 1));
                     snapshot.MemFreeKb = ParseLong(Part(parts, 3)) ?? ParseLong(Part(parts, 2));
+                    long? buffers = ParseLong(Part(parts, 4));
+                    long? cached = ParseLong(Part(parts, 5));
+                    snapshot.MemCachedKb = (buffers.HasValue || cached.HasValue) ? (buffers ?? 0) + (cached ?? 0) : (long?)null;
+                    break;
+                case 'D':
+                    if (Part(parts, 1).Length > 0 && ParseLong(Part(parts, 2)) != null)
+                    {
+                        snapshot.Disks.Add(new DiskDevice
+                        {
+                            Name = Part(parts, 1),
+                            IoMs = ParseLong(Part(parts, 2)).Value,
+                            SectorsRead = ParseLong(Part(parts, 3)) ?? 0,
+                            SectorsWritten = ParseLong(Part(parts, 4)) ?? 0
+                        });
+                    }
+                    break;
+                case 'S':
+                    snapshot.StorageTotalKb = ParseLong(Part(parts, 1));
+                    snapshot.StorageUsedKb = ParseLong(Part(parts, 2));
                     break;
                 case 'N':
                     // The first entry of a number wins, as it does for the system.
@@ -185,8 +251,76 @@ public static class RemoteProcessList
                     process.CpuPercent = Math.Round((process.Ticks - oldTicks) / total * 100.0 * snapshot.CpuCount, 1);
                 }
             }
+            if (snapshot.IdleTicks.HasValue && previous.IdleTicks.HasValue && snapshot.IdleTicks.Value >= previous.IdleTicks.Value)
+            {
+                double idle = snapshot.IdleTicks.Value - previous.IdleTicks.Value;
+                snapshot.CpuTotalPercent = Math.Round(Math.Max(0.0, Math.Min(100.0, (1.0 - idle / total) * 100.0)), 1);
+            }
+        }
+        if (previous != null)
+        {
+            WorkOutDiskLoad(snapshot, previous);
         }
         return snapshot;
+    }
+
+    // Disks that are not hardware: their work is the work of the disk below them, which is listed itself.
+    private static bool IsVirtualDisk(string name)
+    {
+        return name.StartsWith("loop", StringComparison.Ordinal) || name.StartsWith("ram", StringComparison.Ordinal)
+            || name.StartsWith("zram", StringComparison.Ordinal) || name.StartsWith("dm-", StringComparison.Ordinal)
+            || name.StartsWith("md", StringComparison.Ordinal) || name.StartsWith("nbd", StringComparison.Ordinal);
+    }
+
+    // The time of the interval is the uptime difference (the server's own clock, whatever the delay of the network was).
+    private static void WorkOutDiskLoad(ProcessSnapshot snapshot, ProcessSnapshot previous)
+    {
+        if (!snapshot.UptimeSeconds.HasValue || !previous.UptimeSeconds.HasValue)
+        {
+            return;
+        }
+        double seconds = snapshot.UptimeSeconds.Value - previous.UptimeSeconds.Value;
+        if (seconds <= 0)
+        {
+            return;
+        }
+        Dictionary<string, DiskDevice> before = new Dictionary<string, DiskDevice>();
+        foreach (DiskDevice old in previous.Disks)
+        {
+            before[old.Name] = old;
+        }
+        double busiest = -1;
+        double read = 0;
+        double written = 0;
+        foreach (DiskDevice disk in snapshot.Disks)
+        {
+            // A counter that went down (a disk that was removed and came back) says nothing about the interval.
+            if (IsVirtualDisk(disk.Name) || !before.TryGetValue(disk.Name, out DiskDevice old)
+                || disk.IoMs < old.IoMs || disk.SectorsRead < old.SectorsRead || disk.SectorsWritten < old.SectorsWritten)
+            {
+                continue;
+            }
+            double busy = Math.Min(100.0, (disk.IoMs - old.IoMs) / (seconds * 1000.0) * 100.0);
+            if (busy > busiest)
+            {
+                busiest = busy;
+                snapshot.BusiestDisk = disk.Name;
+            }
+            read += (disk.SectorsRead - old.SectorsRead) * 512.0;
+            written += (disk.SectorsWritten - old.SectorsWritten) * 512.0;
+        }
+        if (busiest >= 0)
+        {
+            snapshot.DiskBusyPercent = Math.Round(busiest, 1);
+            snapshot.DiskReadBytesPerSecond = read / seconds;
+            snapshot.DiskWriteBytesPerSecond = written / seconds;
+        }
+    }
+
+    /// <summary>"1.2 MB/s", "300 kB/s", "0 kB/s": a speed in bytes per second for people.</summary>
+    public static string FormatRate(double bytesPerSecond)
+    {
+        return FormatKb((long)Math.Round(Math.Max(0.0, bytesPerSecond) / 1024.0)) + "/s";
     }
 
     /// <summary>"1.5 GB", "320 MB", "12 kB": a size in kilobytes for people.</summary>

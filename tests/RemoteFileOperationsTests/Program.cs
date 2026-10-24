@@ -164,6 +164,11 @@ internal static class Program
             ProcessSnapshot second = RemoteProcessList.Parse(RunLines(RemoteProcessList.ListCommand), first);
             string shell = _shell + ": ";
             Check(second.Processes.Count >= 4, shell + "the list has the processes (" + second.Processes.Count + ")");
+            Check(second.CpuTotalPercent.HasValue && second.CpuTotalPercent >= 0 && second.CpuTotalPercent <= 100, shell + "the load of all cores is worked out (" + second.CpuTotalPercent + " %)");
+            Check(first.CpuTotalPercent == null && first.DiskBusyPercent == null, shell + "the first list has no load of the processor and the disks yet");
+            Check(second.MemCachedKb.HasValue && second.MemCachedKb >= 0, shell + "buffers and cache are read (" + second.MemCachedKb + " kB)");
+            Check(second.StorageTotalKb > 0 && second.StorageUsedKb >= 0 && second.StorageUsedKb <= second.StorageTotalKb, shell + "the space of / is read from df (" + second.StorageUsedKb + " of " + second.StorageTotalKb + " kB)");
+            Check(second.DiskBusyPercent == null || (second.DiskBusyPercent >= 0 && second.DiskBusyPercent <= 100), shell + "the disk activity is a percentage (" + second.DiskBusyPercent + " % on " + second.BusiestDisk + ")");
             Check(second.TotalTicks > first.TotalTicks && second.CpuCount >= 1, shell + "the processor time of all cores grows and the cores are counted (" + second.CpuCount + ")");
             Check(second.UptimeSeconds > 0 && second.MemTotalKb > 0 && second.MemFreeKb.HasValue && second.LoadAverage != null && second.LoadAverage.Split(' ').Length == 3, shell + "uptime, memory and load are read");
 
@@ -217,6 +222,24 @@ internal static class Program
         Check(parsed.MemTotalKb == 2048000 && parsed.MemFreeKb == 1500000 && parsed.CpuCount == 4 && parsed.UptimeSeconds == 3600.5, "the numbers around the list are read (available memory is preferred to free)");
         ProcessSnapshot later = RemoteProcessList.Parse(new[] { "T|1400|4", "P|1|0|S|10|1200|0|init|init", "P|20|1|R|150|0|1000|worker|worker", "P|30|1|S|5|0|0|new|new" }, parsed);
         Check(later.Processes[0].CpuPercent == 0 && later.Processes[1].CpuPercent == 100 && later.Processes[2].CpuPercent == null, "the share is the process time of the interval in the time of all cores, 4 cores x 100 ticks of 400 is 100 %, a new process has none yet");
+        // The load of the whole server: processor, disks, cache and the space of / (made-up numbers).
+        ProcessSnapshot load1 = RemoteProcessList.Parse(new[]
+        {
+            "T|1000|4|800", "U|100.0", "M|2048000|100000|1500000|50000|250000", "D|sda|1000|2000|4000", "D|loop0|0|0|0", "D|dm-0|500|10|10", "S|1000000|250000|/",
+            "P|1|0|S|10|1200|0|init|init"
+        }, null);
+        Check(load1.IdleTicks == 800 && load1.MemCachedKb == 300000 && load1.StorageTotalKb == 1000000 && load1.StorageUsedKb == 250000 && load1.Disks.Count == 3, "idle time, buffers + cache, the space of / and the disks are read");
+        Check(load1.CpuTotalPercent == null && load1.DiskBusyPercent == null, "nothing to compare with in the first list");
+        ProcessSnapshot load2 = RemoteProcessList.Parse(new[]
+        {
+            "T|1400|4|1100", "U|102.0", "D|sda|1500|2000|6000", "D|loop0|0|0|0", "D|dm-0|900|10|10", "P|1|0|S|10|1200|0|init|init"
+        }, load1);
+        Check(load2.CpuTotalPercent == 25.0, "100 busy ticks of 400 is 25 % of the processor (" + load2.CpuTotalPercent + ")");
+        Check(load2.DiskBusyPercent == 25.0 && load2.BusiestDisk == "sda", "500 ms of 2000 ms is 25 % busy, the disk below dm-0 counts and not dm-0 itself (" + load2.DiskBusyPercent + " on " + load2.BusiestDisk + ")");
+        Check(load2.DiskReadBytesPerSecond == 0 && load2.DiskWriteBytesPerSecond == 512000.0, "2000 sectors of 512 bytes in 2 s are 512000 bytes a second (" + load2.DiskWriteBytesPerSecond + ")");
+        ProcessSnapshot load3 = RemoteProcessList.Parse(new[] { "T|1800|4|1400", "U|104.0", "D|sda|10|2000|6000", "P|1|0|S|10|1200|0|init|init" }, load2);
+        Check(load3.CpuTotalPercent == 25.0 && load3.DiskBusyPercent == null, "a disk counter that went down is not used");
+        Check(RemoteProcessList.FormatRate(300 * 1024) == "300 kB/s" && RemoteProcessList.FormatRate(-5) == "0 kB/s", "rates are in kB/s for small numbers and never negative");
         Equal(RemoteProcessList.FormatKb(512), "512 kB", "small sizes are in kilobytes");
         Equal(RemoteProcessList.FormatKb(100 * 1024), "100 MB", "larger sizes are in megabytes");
         Equal(RemoteProcessList.FormatKb(3L * 1024 * 1024 * 10), "30 GB", "the largest in gigabytes");
