@@ -219,6 +219,66 @@
                               <DataTrigger Value="Patch" Binding="{Binding Path=Icon}">
                                 <Setter Property="Source" Value="../icons/filetypes/patch.png" />
                               </DataTrigger>
+                              <DataTrigger Value="JavaScript" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/javascript.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="TypeScript" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/typescript.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Php" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/php.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Perl" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/perl.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Ruby" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/ruby.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Go" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/go.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Rust" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/rust.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Java" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/java.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Lua" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/lua.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Make" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/make.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Markdown" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/markdown.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Css" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/css.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Library" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/library.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Firmware" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/firmware.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Executable" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/executable.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Service" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/service.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Git" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/git.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Docker" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/docker.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Mail" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/mail.png" />
+                              </DataTrigger>
+                              <DataTrigger Value="Man" Binding="{Binding Path=Icon}">
+                                <Setter Property="Source" Value="../icons/filetypes/man.png" />
+                              </DataTrigger>
                             </Style.Triggers>
                           </Style>
                         </FrameworkElement.Style>
