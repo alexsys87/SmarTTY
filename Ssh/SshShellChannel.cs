@@ -163,6 +163,8 @@ public class SshShellChannel : IAsyncChannel, IDisposable
 
     private string _exitSignal;
 
+    private Exception _failure;
+
     public readonly ChannelStream Input;
 
     public readonly ChannelStream Output;
@@ -285,9 +287,26 @@ public class SshShellChannel : IAsyncChannel, IDisposable
     {
         get
         {
+            bool sessionClosed = _session.IsConnectionClosed;
             lock (_sync)
             {
-                return _closedByConnectionLoss;
+                // A channel error that came just before the session noticed the break is part of the same loss.
+                return _closedByConnectionLoss || (_failure != null && sessionClosed);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The error that closed this channel while the connection itself stayed alive (null for a normal end or a lost
+    /// connection).
+    /// </summary>
+    public Exception Failure
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _failure;
             }
         }
     }
@@ -465,13 +484,23 @@ public class SshShellChannel : IAsyncChannel, IDisposable
 
     private void OnChannelException(Exception exception)
     {
-        // An error on a channel that was still open is not the shell exiting: it is handled like a lost connection
-        // (reconnect prompt) instead of closing the tab as a normal exit.
+        // SSH.NET raises Channel.Exception only when handling a message of this channel failed; errors of the session
+        // arrive as ErrorOccurred/Disconnected of the session. So the connection is lost only if the session says so
+        // (the reconnect prompt follows from its ConnectionLost event); otherwise the channel alone has failed, the
+        // connection is alive and no prompt will come: remember the error (see Failure) and close like an exit.
+        bool sessionClosed = _session.IsConnectionClosed;
         lock (_sync)
         {
             if (!_closed)
             {
-                _closedByConnectionLoss = true;
+                if (sessionClosed)
+                {
+                    _closedByConnectionLoss = true;
+                }
+                else
+                {
+                    _failure = exception;
+                }
             }
         }
         MarkClosed();
