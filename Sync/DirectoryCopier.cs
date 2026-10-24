@@ -215,6 +215,7 @@ public class DirectoryCopier
             tarExtractor.CreateSymlinks(out symlinkList, remotePath);
             tarExtractor.AddStatisticsTo(directoryStatistics);
             CheckErrors(outputCollector);
+            ThrowIfTarSourceLost(sshShellChannel, remotePath);
         }
         if (symlinkList != null && symlinkList.Count != 0 && UseTempFileList)
         {
@@ -246,6 +247,7 @@ public class DirectoryCopier
                     tarExtractor.CreateSymlinks(out symlinkList, remotePath);
                     tarExtractor.AddStatisticsTo(directoryStatistics);
                     CheckErrors(outputCollector);
+                    ThrowIfTarSourceLost(shellChannel, remotePath);
                 }
                 if (symlinkList.Count == 0)
                 {
@@ -502,6 +504,25 @@ public class DirectoryCopier
         return false;
     }
 
+    /// <summary>
+    /// A connection lost between two tar records reads as a normal end of the archive (TarExtractor takes 0 bytes at a
+    /// record boundary for the end), so the channel is asked how it ended. A non-zero exit status alone is only
+    /// logged: tar also uses it for files it skipped, which the download tolerates.
+    /// </summary>
+    private void ThrowIfTarSourceLost(SshShellChannel channel, string remotePath)
+    {
+        channel.WaitEof();
+        if (channel.ClosedByConnectionLoss)
+        {
+            throw new IOException("The connection to the server was lost while downloading " + remotePath + ". The files may be incomplete.");
+        }
+        int status = channel.ExitStatus;
+        if (status != 0)
+        {
+            Log?.Invoke(this, "tar finished with exit status " + status.ToString(System.Globalization.CultureInfo.InvariantCulture) + " while reading " + remotePath + ": some files may be missing.");
+        }
+    }
+
     private void CheckErrors(OutputCollector outputCollector)
     {
         if (Log != null)
@@ -695,8 +716,21 @@ public class DirectoryCopier
             WriteDirectoryTree(new TarWriter(excludeItems), sshShellChannel.Output, localPath, "", ref filesDone, ref totalBytesDone, filter, paddingBuffer);
             sshShellChannel.Input.Write(paddingBuffer, 0, 1024);
             sshShellChannel.SendEof();
+            // Let the extracting tar finish and look at how it ended: on a channel closed by a lost connection
+            // SendEof does nothing and Dispose swallows everything, so without this the upload would end as a success
+            // with data that never reached the device (or that tar could not unpack).
+            sshShellChannel.WaitEof();
+            CheckErrors(outputCollector);
+            if (sshShellChannel.ClosedByConnectionLoss)
+            {
+                throw new IOException("The connection to the server was lost while uploading to " + remotePath + ". The files may be incomplete.");
+            }
+            int tarStatus = sshShellChannel.ExitStatus;
+            if (tarStatus != 0)
+            {
+                throw new IOException("The device could not unpack the uploaded files into " + remotePath + " (tar exit status " + tarStatus.ToString(System.Globalization.CultureInfo.InvariantCulture) + "). The files may be incomplete.");
+            }
         }
-        CheckErrors(outputCollector);
     }
 
     private void WriteDirectoryTree(TarWriter tarWriter, Stream destinationStream, string localDirPath, string relativePath, ref int filesDone, ref long bytesDone, PathFilter filter, byte[] paddingBuffer)
@@ -730,6 +764,7 @@ public class DirectoryCopier
                 {
                     continue;
                 }
+                bool headerWritten = false;
                 try
                 {
                     using FileStream fileStream = File.Open(localFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
@@ -743,6 +778,7 @@ public class DirectoryCopier
                     long length = fileStream.Length;
                     byte[] headerBytes = tarWriter.CreateHeader(tarEntryPath, isDirectory: false, length, modifiedTime, out paddingBytes);
                     destinationStream.Write(headerBytes, 0, headerBytes.Length);
+                    headerWritten = true;
                     CopyStream(fileStream, destinationStream, ref filesDone, ref bytesDone, localFilePath, length);
                     destinationStream.Write(paddingBuffer, 0, paddingBytes);
                 }
@@ -750,8 +786,10 @@ public class DirectoryCopier
                 {
                     throw;
                 }
-                catch (Exception exception)
+                catch (Exception exception) when (!headerWritten)
                 {
+                    // Only a file that failed before its tar header was written can be skipped; after that the
+                    // stream holds a half entry and anything written next would be read as garbage.
                     if (this.Log != null)
                     {
                         this.Log(this, "Cannot upload " + localFilePath + ": " + exception.Message);
