@@ -1321,6 +1321,39 @@ public partial class TerminalEmulatorBase : TextEditorControl
         return list?.ToArray();
     }
 
+    /// <summary>
+    /// "Clear" of the context menu: removes the scrollback and everything on the screen above the line of the cursor, which
+    /// moves to the top together with its prompt. Nothing is sent to the remote side, so it works whatever is running there.
+    /// The alternate screen (vi, mc, htop ...) belongs to the program and is left alone.
+    /// </summary>
+    public virtual void ClearOutput()
+    {
+        if (_activeBufferIndex != 0)
+        {
+            return;
+        }
+        ScreenBuffer screenBuffer = ActiveBuffer;
+        int cursorLine = screenBuffer.FirstRow + CursorPosition.Y;
+        // A command line that wrapped over several rows is one line for the shell, which redraws it as a whole.
+        while (cursorLine > 0 && screenBuffer.Lines.GetLine(cursorLine - 1)?.IsWrapped == true)
+        {
+            cursorLine--;
+        }
+        int linesToRemove = Math.Min(cursorLine, screenBuffer.Document.LineCount);
+        if (linesToRemove <= 0)
+        {
+            return;
+        }
+        int cursorRow = screenBuffer.FirstRow + CursorPosition.Y - linesToRemove;
+        screenBuffer.Document.RemoveLines(0, linesToRemove);
+        screenBuffer.Lines.RemoveLines(0, linesToRemove);
+        screenBuffer.FirstRow = 0;
+        SetSelection(select: false, SelectionStart);
+        CursorPosition = new Point(CursorPosition.X, Math.Max(cursorRow, 0));
+        TopLine = 0;
+        OnTextReplaced();
+    }
+
     private void TrimScrollback()
     {
         ScreenBuffer screenBuffer = ActiveBuffer;

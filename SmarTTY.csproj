@@ -67,6 +67,7 @@
     <EmbeddedResource Include="icons\MainWindow\copy.png" LogicalName="SmarTTY.Icons.copy.png" />
     <EmbeddedResource Include="icons\MainWindow\paste.png" LogicalName="SmarTTY.Icons.paste.png" />
     <EmbeddedResource Include="icons\MainWindow\add16.png" LogicalName="SmarTTY.Icons.add.png" />
+    <EmbeddedResource Include="icons\transfers\removeall.png" LogicalName="SmarTTY.Icons.clear.png" />
     <!-- Existing images that the file editor tool bar and context menu reuse. -->
     <EmbeddedResource Include="icons\MainWindow\save16.png" LogicalName="SmarTTY.Icons.save.png" />
     <EmbeddedResource Include="icons\menu\cut.png" LogicalName="SmarTTY.Icons.cut.png" />

@@ -1435,6 +1435,12 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         return count;
     }
 
+    public override void ClearOutput()
+    {
+        DropPrediction();
+        base.ClearOutput();
+    }
+
     // A key the copy of the command line cannot follow (Enter, Tab, history, Ctrl+..., a paste).
     private void DropPrediction()
     {
