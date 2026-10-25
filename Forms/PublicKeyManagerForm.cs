@@ -189,26 +189,53 @@ public partial class PublicKeyManagerForm : DpiAwareForm
 
     private void AcceptKey()
     {
+        Exception error = null;
         try
         {
             AuthorizedKeysManager.AppendAuthorizedKey(_session, _authorizedKeyLine);
         }
-        catch
+        catch (Exception exception)
         {
+            error = exception;
         }
         CheckKeyStatus(true);
+        ReportFailure("Cannot accept the key", error);
     }
 
     private void StopAcceptingKey()
     {
+        Exception error = null;
         try
         {
             AuthorizedKeysManager.RemoveAuthorizedKey(_session, _keyPair.GetPublicKeyBlob());
         }
-        catch
+        catch (Exception exception)
         {
+            error = exception;
         }
         CheckKeyStatus(true);
+        ReportFailure("Cannot stop accepting the key", error);
+    }
+
+    // The status field only says "not accepted"; the reason (full flash, no permission, lost connection) is shown here.
+    // Called from the worker thread after CheckKeyStatus, so the message follows the status update.
+    private void ReportFailure(string title, Exception error)
+    {
+        if (error == null || IsDisposed || !IsHandleCreated)
+        {
+            return;
+        }
+        try
+        {
+            BeginInvoke((ThreadStart)(() =>
+            {
+                MessageBox.Show(this, error.Message, title, MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            }));
+        }
+        catch (InvalidOperationException)
+        {
+            // The form was closed meanwhile.
+        }
     }
 
     private void picRemoteSettings_Click(object sender, EventArgs e)
