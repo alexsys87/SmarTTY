@@ -360,12 +360,13 @@ public class MainWindowController : INotifyPropertyChanged
                 session.CloseFirstMatchingPage((ITabContext tabContext) => tabContext.EditorControl == editor, closeSessionIfEmpty: false);
             };
             editor.SavingChanged += (object sender, EventArgs e) => UpdateEditorTitle(editor);
+            editor.SyntaxChoiceChanged += (object sender, EventArgs e) => _Controller.ApplySyntaxHighlighting(editor);
             editor.LoadCompleted += (object sender, EventArgs e) =>
             {
                 UpdateEditorTitle(editor);
                 // A file whose name tells nothing (e.g. a script without an extension) may still be
                 // recognized by its "#!" line now that the content is known.
-                if (_Controller.Settings.Editor.SyntaxHighlighting && SyntaxHighlighting.DetectLanguage(editor.RemotePath) == SyntaxHighlighting.Language.Plain)
+                if (editor.SyntaxOverride == null && _Controller.Settings.Editor.SyntaxHighlighting && SyntaxHighlighting.DetectLanguage(editor.RemotePath) == SyntaxHighlighting.Language.Plain)
                 {
                     _Controller.ApplySyntaxHighlighting(editor);
                 }
@@ -1343,14 +1344,17 @@ public class MainWindowController : INotifyPropertyChanged
     {
         GlobalSettings.EditorColors effectiveColors = Settings.Editor.GetEffectiveColors(Settings.Theme);
         TokenCache.LineTokenizer tokenizer = null;
-        if (Settings.Editor.SyntaxHighlighting)
+        SyntaxHighlighting.Language language = SyntaxHighlighting.Language.Plain;
+        // A syntax chosen by hand works even when the automatic highlighting is switched off in the settings.
+        if (Settings.Editor.SyntaxHighlighting || edit.SyntaxOverride != null)
         {
             // The first line is only known once the file is loaded (see the LoadCompleted handler): it lets
             // scripts without an extension be recognized by their "#!" line.
-            SyntaxHighlighting.Language lang = SyntaxHighlighting.DetectLanguage(edit.RemotePath, edit.EditableDocument?.GetLineText(0));
-            tokenizer = SyntaxHighlighting.GetTokenizer(lang);
+            language = edit.DetectSyntax();
+            tokenizer = SyntaxHighlighting.GetTokenizer(language);
         }
 
+        edit.ReportLanguage(language);
         edit.SetTokenizer(tokenizer);
         if (tokenizer != null)
         {

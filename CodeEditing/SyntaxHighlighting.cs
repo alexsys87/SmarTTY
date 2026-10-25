@@ -44,11 +44,44 @@ namespace SmarTTY.CodeEditing
             Python,
             Bash,
             Config,  // INI / .conf / .properties / YAML / TOML / systemd units
-            CLike,   // C, C++, C#, Java, JavaScript, Go, Rust, CSS, JSON, ...: // and /* */ comments
-            Script,  // Makefile, Dockerfile, Ruby, Perl, ...: # comments
-            Sql,     // SQL, Lua: -- comments
+            CLike,   // C, C++, C#, Java, JavaScript, Go, Rust, CSS, ...: // and /* */ comments
+            Script,  // Dockerfile, CMake, Ruby, Perl, ...: # comments
+            Sql,     // SQL: -- comments
             Markup,  // HTML, XML: <!-- --> comments and tag names
-            Diff     // unified diffs
+            Diff,    // unified diffs
+            Lua,     // Lua: -- comments, [[long strings]], foldable function/if/for/while/do/repeat blocks
+            Json,    // JSON: keys, strings, numbers, foldable { } and [ ] blocks
+            Makefile,// Makefile: variables, targets, foldable ifeq/define blocks
+            Uci      // OpenWrt UCI (/etc/config/*): config/option/list, foldable config blocks
+        }
+
+        /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
+        public static readonly Language[] SelectableLanguages =
+        {
+            Language.Plain, Language.Bash, Language.Uci, Language.Lua, Language.Makefile, Language.Json, Language.Config,
+            Language.Python, Language.CLike, Language.Script, Language.Sql, Language.Markup, Language.Diff
+        };
+
+        /// <summary>The name of a language in the syntax menu and the status bar.</summary>
+        public static string GetDisplayName(Language language)
+        {
+            switch (language)
+            {
+                case Language.Plain: return "Plain text";
+                case Language.Bash: return "Shell (sh, bash)";
+                case Language.Uci: return "UCI (OpenWrt config)";
+                case Language.Lua: return "Lua";
+                case Language.Makefile: return "Makefile";
+                case Language.Json: return "JSON";
+                case Language.Config: return "Config (INI, YAML, conf)";
+                case Language.Python: return "Python";
+                case Language.CLike: return "C, C++, C#, Java, JavaScript";
+                case Language.Script: return "Script (Perl, Ruby, Dockerfile)";
+                case Language.Sql: return "SQL";
+                case Language.Markup: return "HTML, XML";
+                case Language.Diff: return "Diff, patch";
+                default: return language.ToString();
+            }
         }
 
         /// <summary>Detects the language from the file name (path). Extensions are case insensitive.</summary>
@@ -90,10 +123,38 @@ namespace SmarTTY.CodeEditing
             }
             name = name.ToLowerInvariant();
 
+            // OpenWrt keeps UCI configuration files without an extension in /etc/config.
+            string directory = remotePath.Replace('\\', '/').ToLowerInvariant();
+            if (directory.Contains("/etc/config/") && !name.Contains(".") )
+            {
+                return Language.Uci;
+            }
+
+            Language byName = DetectLanguageFromNameOnly(name);
+            if (byName == Language.Plain && IsOpenWrtShellDirectory(directory))
+            {
+                return Language.Bash;
+            }
+            return byName;
+        }
+
+        /// <summary>OpenWrt scripts that have no extension: init scripts, hotplug handlers, uci-defaults.</summary>
+        private static bool IsOpenWrtShellDirectory(string lowerCasePath)
+        {
+            return lowerCasePath.Contains("/etc/init.d/") || lowerCasePath.Contains("/etc/hotplug.d/") ||
+                lowerCasePath.Contains("/etc/uci-defaults/") || lowerCasePath.Contains("/lib/functions/") ||
+                lowerCasePath.Contains("/lib/netifd/") || lowerCasePath.Contains("/lib/upgrade/");
+        }
+
+        private static Language DetectLanguageFromNameOnly(string name)
+        {
             // Well-known file names without a meaningful extension.
             switch (name)
             {
                 case ".bashrc":
+                case "profile":
+                case "rc.local":
+                case "rc.common":
                 case ".bash_profile":
                 case ".bash_login":
                 case ".bash_logout":
@@ -110,6 +171,9 @@ namespace SmarTTY.CodeEditing
 
                 case "makefile":
                 case "gnumakefile":
+                case "bsdmakefile":
+                    return Language.Makefile;
+
                 case "dockerfile":
                 case "containerfile":
                 case "cmakelists.txt":
@@ -216,7 +280,6 @@ namespace SmarTTY.CodeEditing
                 case "css":
                 case "scss":
                 case "less":
-                case "json":
                 case "proto":
                 case "dts":
                 case "dtsi":
@@ -229,15 +292,29 @@ namespace SmarTTY.CodeEditing
                 case "tcl":
                 case "awk":
                 case "cmake":
-                case "mk":
-                case "make":
                 case "dockerfile":
                 case "nix":
                     return Language.Script;
 
                 case "sql":
-                case "lua":
                     return Language.Sql;
+
+                case "lua":
+                    return Language.Lua;
+
+                case "json":
+                case "jsonc":
+                case "json5":
+                case "geojson":
+                case "webmanifest":
+                    return Language.Json;
+
+                case "mk":
+                case "make":
+                    return Language.Makefile;
+
+                case "uci":
+                    return Language.Uci;
 
                 case "html":
                 case "htm":
@@ -299,10 +376,18 @@ namespace SmarTTY.CodeEditing
                 case "ash":
                     return Language.Bash;
             }
+            if (program == "make" || program == "gmake")
+            {
+                return Language.Makefile;
+            }
+            if (program.StartsWith("lua", StringComparison.Ordinal) || program == "luajit")
+            {
+                return Language.Lua;
+            }
             if (program.StartsWith("perl", StringComparison.Ordinal) ||
                 program.StartsWith("ruby", StringComparison.Ordinal) ||
                 program.EndsWith("awk", StringComparison.Ordinal) ||
-                program == "make" || program == "tclsh")
+                program == "tclsh")
             {
                 return Language.Script;
             }
@@ -328,6 +413,10 @@ namespace SmarTTY.CodeEditing
                 case Language.Sql: return SqlTokenizer;
                 case Language.Markup: return MarkupTokenizer;
                 case Language.Diff: return TokenizeDiff;
+                case Language.Lua: return TokenizeLua;
+                case Language.Json: return TokenizeJson;
+                case Language.Makefile: return TokenizeMakefile;
+                case Language.Uci: return TokenizeUci;
                 default: return null;
             }
         }
@@ -427,16 +516,16 @@ namespace SmarTTY.CodeEditing
 
         /// <summary>
         /// Emits text[index] as a paired bracket token when it is a bracket. With <paramref name="foldCurlyBraces"/>
-        /// a { } pair spanning lines can be folded; other pairs are only used for matching-bracket highlighting.
+        /// a { } pair (and a [ ] pair with <paramref name="foldSquareBrackets"/>) spanning lines can be folded; other pairs are only used for matching-bracket highlighting.
         /// </summary>
-        private static bool TryAddBracket(string text, int index, ref int last, TokenCache.ITokenSink sink, bool foldCurlyBraces = false)
+        private static bool TryAddBracket(string text, int index, ref int last, TokenCache.ITokenSink sink, bool foldCurlyBraces = false, bool foldSquareBrackets = false)
         {
             if (!TryGetBracketPair(text[index], out int pairId, out bool isOpening))
             {
                 return false;
             }
             Normal(ref last, last, index, sink);
-            TokenCache.RegionStyle regionStyle = (foldCurlyBraces && pairId == PairCurlyBrace) ? CurlyBraceRegion : null;
+            TokenCache.RegionStyle regionStyle = ((foldCurlyBraces && pairId == PairCurlyBrace) || (foldSquareBrackets && pairId == PairSquareBracket)) ? CurlyBraceRegion : null;
             sink.AddPairedToken(TypeNormal, index, index + 1, pairId, isOpening, regionStyle);
             last = index + 1;
             return true;
@@ -656,7 +745,18 @@ namespace SmarTTY.CodeEditing
 
         private static bool TokenizeBash(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
+            LineBuffer buffer = new LineBuffer(sink);
+            bool result = TokenizeBashLine(startState, text, buffer, out endState);
+            // "(" and "[" count only when closed on the same line: case patterns "a)" and globs "[a-z" are not brackets.
+            buffer.Flush(PairParenthesis, PairSquareBracket);
+            return result;
+        }
+
+        private static bool TokenizeBashLine(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
             int len = text.Length;
+            bool seenCase = false;
+            bool seenElif = false;
             int i = 0;
             int last = 0;
 
@@ -817,10 +917,69 @@ namespace SmarTTY.CodeEditing
                     }
                     if ((i == len || IsBashWordBreak(text[i])) && BashKeywords.Contains(text.Substring(s, i - s)))
                     {
+                        string word = text.Substring(s, i - s);
+                        switch (word)
+                        {
+                            case "elif":
+                                seenElif = true;
+                                break;
+                            case "then":
+                                // "elif ...; then" continues the block that "if" opened.
+                                if (!seenElif)
+                                {
+                                    AddKeywordPair(text, s, i, PairThenBlock, true, ref last, sink);
+                                    continue;
+                                }
+                                seenElif = false;
+                                break;
+                            case "fi":
+                                AddKeywordPair(text, s, i, PairThenBlock, false, ref last, sink);
+                                continue;
+                            case "do":
+                                AddKeywordPair(text, s, i, PairLoopBlock, true, ref last, sink);
+                                continue;
+                            case "done":
+                                AddKeywordPair(text, s, i, PairLoopBlock, false, ref last, sink);
+                                continue;
+                            case "case":
+                                seenCase = true;
+                                break;
+                            case "in":
+                                if (seenCase)
+                                {
+                                    seenCase = false;
+                                    AddKeywordPair(text, s, i, PairCaseBlock, true, ref last, sink);
+                                    continue;
+                                }
+                                break;
+                            case "esac":
+                                AddKeywordPair(text, s, i, PairCaseBlock, false, ref last, sink);
+                                continue;
+                        }
                         Normal(ref last, last, s, sink);
                         sink.AddToken(TypeKeyword, s, i);
                         last = i;
                     }
+                    continue;
+                }
+
+                // Brackets. A "{" / "}" that stands alone is a brace group or a function body; "{a,b}" and "{}" are not.
+                if (c == '{' && (i + 1 == len || IsBlank(text[i + 1])) && (i == 0 || IsBashWordBreak(text[i - 1])))
+                {
+                    TryAddBracket(text, i, ref last, sink, foldCurlyBraces: true);
+                    i++;
+                    continue;
+                }
+                if (c == '}' && (i == 0 || IsBlank(text[i - 1]) || text[i - 1] == ';') && (i + 1 == len || IsBashWordBreak(text[i + 1])))
+                {
+                    TryAddBracket(text, i, ref last, sink, foldCurlyBraces: true);
+                    i++;
+                    continue;
+                }
+                if (c == '(' || c == ')' || c == '[' || c == ']')
+                {
+                    TryAddBracket(text, i, ref last, sink);
+                    i++;
                     continue;
                 }
 
@@ -1303,5 +1462,772 @@ namespace SmarTTY.CodeEditing
             BlockCommentStart = "<!--",
             BlockCommentEnd = "-->"
         }.Tokenize;
+
+        // ==================================================================
+        // Block keywords: fold regions of "then ... fi", "do ... done", "function ... end"
+        // ==================================================================
+
+        // Pair ids of keyword blocks (bracket ids are 1..3).
+        private const int PairThenBlock = 4;     // Bash then...fi, Lua then/do/function...end
+        private const int PairCaseBlock = 5;     // Bash case ... in ... esac
+        private const int PairRepeatBlock = 6;   // Lua repeat...until
+        private const int PairLoopBlock = 7;     // Bash do...done
+        private const int PairConditional = 8;   // Makefile ifeq...endif
+        private const int PairDefineBlock = 9;   // Makefile define...endef
+        private const int PairConfigBlock = 10;  // UCI "config" block up to the blank line
+
+        /// <summary>The fold of a keyword block: "if x; then...fi". The text after the closing keyword stays visible.</summary>
+        private static readonly TokenCache.RegionStyle KeywordBlockRegion = new TokenCache.RegionStyle(
+            TokenCache.RegionStyle.FoldBoundary.TokenEnd, TokenCache.RegionStyle.FoldBoundary.TokenEnd, unusedFlag: false,
+            TokenCache.RegionStyle.LabelSource.FixedText, "...", openingOnNextLine: false, trailingBlankLines: 0);
+
+        private static void AddKeywordPair(string text, int start, int end, int pairId, bool isOpening, ref int last, TokenCache.ITokenSink sink)
+        {
+            Normal(ref last, last, start, sink);
+            sink.AddPairedToken(TypeKeyword, start, end, pairId, isOpening, isOpening ? KeywordBlockRegion : null);
+            last = end;
+        }
+
+        /// <summary>Opens a block at the end of the code on the line (a zero-width token): "function f(a)" ... "end".</summary>
+        private static void AddEndOfLineOpener(string text, int codeEnd, int pairId, TokenCache.ITokenSink sink)
+        {
+            int end = codeEnd;
+            while (end > 0 && IsBlank(text[end - 1]))
+            {
+                end--;
+            }
+            sink.AddPairedToken(TypeNormal, end, end, pairId, true, KeywordBlockRegion);
+        }
+
+        /// <summary>
+        /// Collects the tokens of one line so that brackets that are not closed on the same line can be dropped:
+        /// shell code is full of unbalanced ")" (case patterns) and "[" (globs) that would break the pairing
+        /// of the enclosing blocks.
+        /// </summary>
+        private sealed class LineBuffer : TokenCache.ITokenSink
+        {
+            private struct Item
+            {
+                public int Type, Start, End, PairId;
+                public bool IsPaired, IsOpening, Keep;
+                public TokenCache.RegionStyle Style;
+            }
+
+            private readonly TokenCache.ITokenSink _target;
+            private readonly List<Item> _items = new List<Item>();
+
+            public LineBuffer(TokenCache.ITokenSink target)
+            {
+                _target = target;
+            }
+
+            public int CurrentLine => _target.CurrentLine;
+
+            public void AddToken(int type, int start, int end)
+            {
+                _items.Add(new Item { Type = type, Start = start, End = end, Keep = true });
+            }
+
+            public void AddPairedToken(int type, int start, int end, int pairId, bool isOpening, TokenCache.RegionStyle regionStyle)
+            {
+                _items.Add(new Item { Type = type, Start = start, End = end, PairId = pairId, IsPaired = true, IsOpening = isOpening, Style = regionStyle, Keep = true });
+            }
+
+            /// <summary>Sends the tokens to the target; brackets with a "local" pair id need a partner on this line.</summary>
+            public void Flush(int localPairIdA, int localPairIdB)
+            {
+                List<int> stackA = new List<int>();
+                List<int> stackB = new List<int>();
+                for (int n = 0; n < _items.Count; n++)
+                {
+                    Item item = _items[n];
+                    if (!item.IsPaired || (item.PairId != localPairIdA && item.PairId != localPairIdB))
+                    {
+                        continue;
+                    }
+                    List<int> stack = (item.PairId == localPairIdA) ? stackA : stackB;
+                    if (item.IsOpening)
+                    {
+                        item.Keep = false;
+                        _items[n] = item;
+                        stack.Add(n);
+                    }
+                    else if (stack.Count > 0)
+                    {
+                        int open = stack[stack.Count - 1];
+                        stack.RemoveAt(stack.Count - 1);
+                        Item opening = _items[open];
+                        opening.Keep = true;
+                        _items[open] = opening;
+                    }
+                    else
+                    {
+                        item.Keep = false;
+                        _items[n] = item;
+                    }
+                }
+                foreach (Item item in _items)
+                {
+                    if (!item.Keep)
+                    {
+                        continue;
+                    }
+                    if (item.IsPaired)
+                    {
+                        _target.AddPairedToken(item.Type, item.Start, item.End, item.PairId, item.IsOpening, item.Style);
+                    }
+                    else
+                    {
+                        _target.AddToken(item.Type, item.Start, item.End);
+                    }
+                }
+            }
+        }
+
+        // ==================================================================
+        // Lua
+        // ==================================================================
+
+        // Line state: 0x10 - inside a long comment --[==[ ... ]==], 0x20 - inside a long string [==[ ... ]==];
+        // the level (number of "=") is stored in bits 8 and up.
+        private const int StLuaComment = 0x10;
+        private const int StLuaString = 0x20;
+
+        private static readonly HashSet<string> LuaKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in",
+            "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"
+        };
+
+        /// <summary>Level of the long bracket "[==[" that starts at index, or -1.</summary>
+        private static int LuaLongBracketLevel(string text, int index)
+        {
+            if (index >= text.Length || text[index] != '[')
+            {
+                return -1;
+            }
+            int j = index + 1;
+            int level = 0;
+            while (j < text.Length && text[j] == '=')
+            {
+                level++;
+                j++;
+            }
+            return (j < text.Length && text[j] == '[') ? level : -1;
+        }
+
+        /// <summary>Index after the closing "]==]" of the given level, or -1.</summary>
+        private static int FindLuaLongClose(string text, int from, int level)
+        {
+            string close = "]" + new string('=', level) + "]";
+            int position = text.IndexOf(close, from, StringComparison.Ordinal);
+            return (position < 0) ? -1 : (position + close.Length);
+        }
+
+        private static bool TokenizeLua(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int len = text.Length;
+            int i = 0;
+            int last = 0;
+            int openFunctions = 0;   // "function" keywords on this line that still wait for their "end"
+            bool afterElseif = false;
+
+            if ((startState & (StLuaComment | StLuaString)) != 0)
+            {
+                int level = startState >> 8;
+                int type = ((startState & StLuaComment) != 0) ? TypeComment : TypeString;
+                int close = FindLuaLongClose(text, 0, level);
+                if (close < 0)
+                {
+                    if (len > 0)
+                    {
+                        sink.AddToken(type, 0, len);
+                    }
+                    endState = startState;
+                    return true;
+                }
+                sink.AddToken(type, 0, close);
+                i = close;
+                last = i;
+            }
+            else if (TryAddShebang(text, sink))
+            {
+                endState = 0;
+                return true;
+            }
+
+            while (i < len)
+            {
+                char c = text[i];
+
+                // Comments: "-- text" and "--[==[ long ]==]".
+                if (c == '-' && i + 1 < len && text[i + 1] == '-')
+                {
+                    for (; openFunctions > 0; openFunctions--)
+                    {
+                        AddEndOfLineOpener(text, i, PairThenBlock, sink);
+                    }
+                    Normal(ref last, last, i, sink);
+                    int level = LuaLongBracketLevel(text, i + 2);
+                    if (level >= 0)
+                    {
+                        int close = FindLuaLongClose(text, i + level + 4, level);
+                        if (close < 0)
+                        {
+                            sink.AddToken(TypeComment, i, len);
+                            endState = StLuaComment | (level << 8);
+                            return true;
+                        }
+                        sink.AddToken(TypeComment, i, close);
+                        i = close;
+                        last = i;
+                        continue;
+                    }
+                    sink.AddToken(TypeComment, i, len);
+                    endState = 0;
+                    return true;
+                }
+
+                // Long strings [[ ... ]] and [==[ ... ]==].
+                if (c == '[')
+                {
+                    int level = LuaLongBracketLevel(text, i);
+                    if (level >= 0)
+                    {
+                        Normal(ref last, last, i, sink);
+                        int close = FindLuaLongClose(text, i + level + 2, level);
+                        if (close < 0)
+                        {
+                            sink.AddToken(TypeString, i, len);
+                            endState = StLuaString | (level << 8);
+                            return true;
+                        }
+                        sink.AddToken(TypeString, i, close);
+                        i = close;
+                        last = i;
+                        continue;
+                    }
+                }
+
+                if (c == '"' || c == '\'')
+                {
+                    int end = FindQuoteEnd(text, i, c);
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeString, i, (end < 0) ? len : end);
+                    i = (end < 0) ? len : end;
+                    last = i;
+                    continue;
+                }
+
+                if (IsDigit(c) || (c == '.' && i + 1 < len && IsDigit(text[i + 1])))
+                {
+                    int s = i;
+                    while (i < len && (IsIdChar(text[i]) || (text[i] == '.' && !(i + 1 < len && text[i + 1] == '.')) ||
+                        ((text[i] == '+' || text[i] == '-') && i > s && "eEpP".IndexOf(text[i - 1]) >= 0)))
+                    {
+                        i++;
+                    }
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(TypeNumber, s, i);
+                    last = i;
+                    continue;
+                }
+
+                if (IsIdStart(c))
+                {
+                    int s = i;
+                    while (i < len && IsIdChar(text[i]))
+                    {
+                        i++;
+                    }
+                    string word = text.Substring(s, i - s);
+                    // "t.end" and "obj:then" are fields, not keywords.
+                    if (!LuaKeywords.Contains(word) || (s > 0 && (text[s - 1] == '.' || text[s - 1] == ':')))
+                    {
+                        continue;
+                    }
+                    switch (word)
+                    {
+                        case "function":
+                            openFunctions++;
+                            break;
+                        case "elseif":
+                            afterElseif = true;
+                            break;
+                        case "then":
+                            if (afterElseif)
+                            {
+                                afterElseif = false;
+                                break;
+                            }
+                            AddKeywordPair(text, s, i, PairThenBlock, true, ref last, sink);
+                            continue;
+                        case "do":
+                            AddKeywordPair(text, s, i, PairThenBlock, true, ref last, sink);
+                            continue;
+                        case "repeat":
+                            AddKeywordPair(text, s, i, PairRepeatBlock, true, ref last, sink);
+                            continue;
+                        case "until":
+                            AddKeywordPair(text, s, i, PairRepeatBlock, false, ref last, sink);
+                            continue;
+                        case "end":
+                            if (openFunctions > 0)
+                            {
+                                // "function() ... end" on one line: the block is closed where it was opened.
+                                openFunctions--;
+                                break;
+                            }
+                            AddKeywordPair(text, s, i, PairThenBlock, false, ref last, sink);
+                            continue;
+                    }
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(TypeKeyword, s, i);
+                    last = i;
+                    continue;
+                }
+
+                if (TryAddBracket(text, i, ref last, sink, foldCurlyBraces: true))
+                {
+                    i++;
+                    continue;
+                }
+
+                i++;
+            }
+
+            for (; openFunctions > 0; openFunctions--)
+            {
+                AddEndOfLineOpener(text, len, PairThenBlock, sink);
+            }
+            Normal(ref last, last, len, sink);
+            endState = 0;
+            return true;
+        }
+
+        // ==================================================================
+        // JSON (comments are tolerated, so .jsonc files work too)
+        // ==================================================================
+
+        private static bool TokenizeJson(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int len = text.Length;
+            int i = 0;
+            int last = 0;
+
+            if (startState == StBlockComment)
+            {
+                int close = text.IndexOf("*/", StringComparison.Ordinal);
+                if (close < 0)
+                {
+                    if (len > 0)
+                    {
+                        sink.AddToken(TypeComment, 0, len);
+                    }
+                    endState = StBlockComment;
+                    return true;
+                }
+                i = close + 2;
+                sink.AddToken(TypeComment, 0, i);
+                last = i;
+            }
+
+            while (i < len)
+            {
+                char c = text[i];
+
+                if (c == '/' && i + 1 < len && text[i + 1] == '/')
+                {
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeComment, i, len);
+                    endState = 0;
+                    return true;
+                }
+
+                if (c == '/' && i + 1 < len && text[i + 1] == '*')
+                {
+                    Normal(ref last, last, i, sink);
+                    int close = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                    if (close < 0)
+                    {
+                        sink.AddToken(TypeComment, i, len);
+                        endState = StBlockComment;
+                        return true;
+                    }
+                    sink.AddToken(TypeComment, i, close + 2);
+                    i = close + 2;
+                    last = i;
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    int end = FindQuoteEnd(text, i, '"');
+                    int stop = (end < 0) ? len : end;
+                    // A string followed by ':' is an object key.
+                    bool isKey = SkipBlanks(text, stop) < len && text[SkipBlanks(text, stop)] == ':';
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(isKey ? TypeVariable : TypeString, i, stop);
+                    i = stop;
+                    last = i;
+                    continue;
+                }
+
+                if (IsDigit(c) || (c == '-' && i + 1 < len && IsDigit(text[i + 1])))
+                {
+                    int s = i;
+                    i++;
+                    while (i < len && (IsIdChar(text[i]) || text[i] == '.' ||
+                        ((text[i] == '+' || text[i] == '-') && (text[i - 1] == 'e' || text[i - 1] == 'E'))))
+                    {
+                        i++;
+                    }
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(TypeNumber, s, i);
+                    last = i;
+                    continue;
+                }
+
+                if (IsIdStart(c))
+                {
+                    int s = i;
+                    while (i < len && IsIdChar(text[i]))
+                    {
+                        i++;
+                    }
+                    string word = text.Substring(s, i - s);
+                    if (word == "true" || word == "false" || word == "null")
+                    {
+                        Normal(ref last, last, s, sink);
+                        sink.AddToken(TypeKeyword, s, i);
+                        last = i;
+                    }
+                    continue;
+                }
+
+                if (TryAddBracket(text, i, ref last, sink, foldCurlyBraces: true, foldSquareBrackets: true))
+                {
+                    i++;
+                    continue;
+                }
+
+                i++;
+            }
+
+            Normal(ref last, last, len, sink);
+            endState = 0;
+            return true;
+        }
+
+        // ==================================================================
+        // Makefile
+        // ==================================================================
+
+        private static readonly HashSet<string> MakeDirectives = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "include", "-include", "sinclude", "export", "unexport", "override", "vpath", "undefine",
+            "else", "ifeq", "ifneq", "ifdef", "ifndef", "endif", "define", "endef"
+        };
+
+        /// <summary>Index after the closing bracket of "$(...)" / "${...}" that starts at index, or the end of the line.</summary>
+        private static int FindMakeReferenceEnd(string text, int index)
+        {
+            char open = text[index + 1];
+            char close = (open == '(') ? ')' : '}';
+            int depth = 0;
+            for (int j = index + 1; j < text.Length; j++)
+            {
+                if (text[j] == open)
+                {
+                    depth++;
+                }
+                else if (text[j] == close && --depth == 0)
+                {
+                    return j + 1;
+                }
+            }
+            return text.Length;
+        }
+
+        private static bool TokenizeMakefile(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int len = text.Length;
+            int last = 0;
+            int i = 0;
+            int pendingOpener = 0;  // pair id of a block that opens at the end of this line
+            endState = 0;
+
+            if (TryAddShebang(text, sink))
+            {
+                return true;
+            }
+
+            bool recipe = len > 0 && text[0] == '\t';
+            int first = SkipBlanks(text, 0);
+            if (!recipe && first < len)
+            {
+                if (text[first] == '#')
+                {
+                    sink.AddToken(TypeComment, first, len);
+                    return true;
+                }
+
+                int wordEnd = first;
+                while (wordEnd < len && (IsIdChar(text[wordEnd]) || (wordEnd == first && text[wordEnd] == '-')))
+                {
+                    wordEnd++;
+                }
+                string word = text.Substring(first, wordEnd - first);
+                bool isDirective = MakeDirectives.Contains(word) && (wordEnd == len || IsBlank(text[wordEnd]) || text[wordEnd] == '(');
+                if (isDirective)
+                {
+                    switch (word)
+                    {
+                        case "ifeq":
+                        case "ifneq":
+                        case "ifdef":
+                        case "ifndef":
+                            pendingOpener = PairConditional;
+                            Normal(ref last, last, first, sink);
+                            sink.AddToken(TypeKeyword, first, wordEnd);
+                            break;
+                        case "define":
+                            pendingOpener = PairDefineBlock;
+                            Normal(ref last, last, first, sink);
+                            sink.AddToken(TypeKeyword, first, wordEnd);
+                            break;
+                        case "endif":
+                            AddKeywordPair(text, first, wordEnd, PairConditional, false, ref last, sink);
+                            break;
+                        case "endef":
+                            AddKeywordPair(text, first, wordEnd, PairDefineBlock, false, ref last, sink);
+                            break;
+                        default:
+                            Normal(ref last, last, first, sink);
+                            sink.AddToken(TypeKeyword, first, wordEnd);
+                            break;
+                    }
+                    last = wordEnd;
+                    i = wordEnd;
+                }
+                else
+                {
+                    // "VAR = value", "VAR := value", "VAR ?= value" and "target: deps".
+                    int j = first;
+                    int depth = 0;
+                    while (j < len)
+                    {
+                        char c = text[j];
+                        if (c == '$' && j + 1 < len && (text[j + 1] == '(' || text[j + 1] == '{'))
+                        {
+                            j = FindMakeReferenceEnd(text, j);
+                            continue;
+                        }
+                        if (c == '#' || c == '"' || c == '\'')
+                        {
+                            j = len;
+                            break;
+                        }
+                        if (depth == 0 && (c == '=' || c == ':'))
+                        {
+                            break;
+                        }
+                        j++;
+                    }
+                    if (j < len)
+                    {
+                        int keyEnd = j;
+                        bool assignment = text[j] == '=';
+                        if (text[j] == ':' && j + 1 < len && (text[j + 1] == '=' || (text[j + 1] == ':' && j + 2 < len && text[j + 2] == '=')))
+                        {
+                            assignment = true;
+                        }
+                        if (assignment)
+                        {
+                            while (keyEnd > first && ("+?!:".IndexOf(text[keyEnd - 1]) >= 0 || IsBlank(text[keyEnd - 1])))
+                            {
+                                keyEnd--;
+                            }
+                        }
+                        else
+                        {
+                            while (keyEnd > first && IsBlank(text[keyEnd - 1]))
+                            {
+                                keyEnd--;
+                            }
+                        }
+                        string name = text.Substring(first, keyEnd - first);
+                        if (keyEnd > first && name.IndexOf('$') < 0)
+                        {
+                            Normal(ref last, last, first, sink);
+                            sink.AddToken(assignment ? TypeVariable : TypeSection, first, keyEnd);
+                            last = keyEnd;
+                            i = keyEnd;
+                        }
+                    }
+                }
+            }
+
+            while (i < len)
+            {
+                char c = text[i];
+
+                if (c == '#' && (i == 0 || IsBlank(text[i - 1]) || recipe))
+                {
+                    if (pendingOpener != 0)
+                    {
+                        AddEndOfLineOpener(text, i, pendingOpener, sink);
+                        pendingOpener = 0;
+                    }
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeComment, i, len);
+                    return true;
+                }
+
+                if (c == '$' && i + 1 < len)
+                {
+                    int e;
+                    if (text[i + 1] == '(' || text[i + 1] == '{')
+                    {
+                        e = FindMakeReferenceEnd(text, i);
+                    }
+                    else
+                    {
+                        e = i + 2;   // $@ $< $^ $* $? $$ $1
+                    }
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeVariable, i, e);
+                    i = e;
+                    last = i;
+                    continue;
+                }
+
+                if (c == '"' || c == '\'')
+                {
+                    int end = FindQuoteEnd(text, i, c);
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeString, i, (end < 0) ? len : end);
+                    i = (end < 0) ? len : end;
+                    last = i;
+                    continue;
+                }
+
+                i++;
+            }
+
+            if (pendingOpener != 0)
+            {
+                AddEndOfLineOpener(text, len, pendingOpener, sink);
+            }
+            Normal(ref last, last, len, sink);
+            return true;
+        }
+
+        // ==================================================================
+        // UCI (OpenWrt /etc/config/*)
+        // ==================================================================
+
+        // Line state: 0x01 - inside a "config" block, which ends at the first blank line.
+        private const int StUciInBlock = 0x01;
+
+        private static bool TokenizeUci(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int len = text.Length;
+            int first = SkipBlanks(text, 0);
+            endState = startState & StUciInBlock;
+
+            if (first == len)
+            {
+                if (endState != 0)
+                {
+                    // A blank line closes the block: "config interface 'lan'...".
+                    sink.AddPairedToken(TypeNormal, 0, 0, PairConfigBlock, false, null);
+                    endState = 0;
+                }
+                return true;
+            }
+
+            if (text[first] == '#')
+            {
+                sink.AddToken(TypeComment, first, len);
+                return true;
+            }
+
+            int wordEnd = first;
+            while (wordEnd < len && !IsBlank(text[wordEnd]))
+            {
+                wordEnd++;
+            }
+            string word = text.Substring(first, wordEnd - first);
+            bool isConfig = word == "config";
+            if (!isConfig && word != "option" && word != "list" && word != "package")
+            {
+                return true;    // not UCI: leave the line plain
+            }
+
+            int last = 0;
+            Normal(ref last, last, first, sink);
+            sink.AddToken(TypeKeyword, first, wordEnd);
+            last = wordEnd;
+
+            // Arguments: "config <type> [name]", "option <name> <value>", "list <name> <value>".
+            int i = SkipBlanks(text, wordEnd);
+            int argument = 0;
+            while (i < len)
+            {
+                char c = text[i];
+                if (c == '#')
+                {
+                    break;
+                }
+                int s = i;
+                int e;
+                if (c == '"' || c == '\'')
+                {
+                    int close = FindQuoteEnd(text, i, c);
+                    e = (close < 0) ? len : close;
+                }
+                else
+                {
+                    e = i;
+                    while (e < len && !IsBlank(text[e]))
+                    {
+                        e++;
+                    }
+                }
+                string value = text.Substring(s, e - s);
+                int type;
+                if (argument == 0 && word != "package")
+                {
+                    type = isConfig ? TypeSection : TypeVariable;
+                }
+                else if (c == '"' || c == '\'')
+                {
+                    type = TypeString;
+                }
+                else
+                {
+                    long number;
+                    type = long.TryParse(value, out number) ? TypeNumber : TypeString;
+                }
+                Normal(ref last, last, s, sink);
+                sink.AddToken(type, s, e);
+                last = e;
+                argument++;
+                i = SkipBlanks(text, e);
+            }
+
+            if (isConfig)
+            {
+                // The block starts here; an earlier block without a blank line in between stays unfoldable.
+                AddEndOfLineOpener(text, (i < len) ? i : len, PairConfigBlock, sink);
+                endState = StUciInBlock;
+            }
+            if (i < len)
+            {
+                sink.AddToken(TypeComment, i, len);
+            }
+            return true;
+        }
     }
 }

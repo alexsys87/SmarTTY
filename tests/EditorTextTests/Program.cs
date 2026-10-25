@@ -100,7 +100,7 @@ internal static class Program
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Main.PY"), L.Python, "extensions are case insensitive");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Dockerfile"), L.Script, "Dockerfile (capitalized) is recognized");
-        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Makefile"), L.Script, "Makefile (capitalized) is recognized");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Makefile"), L.Makefile, "Makefile (capitalized) is recognized");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/.bashrc"), L.Bash, ".bashrc is bash");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/sshd_config"), L.Config, "sshd_config is a config file");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service"), L.Config, "systemd units are config files");
@@ -134,7 +134,7 @@ internal static class Program
         public List<string> Tokens(int line, int type)
         {
             string text = Doc.GetLineText(line);
-            return Cache.GetLineTokens(line).Where(t => t.Type == type && t.Kind == TokenCache.Token.TokenKind.Normal)
+            return Cache.GetLineTokens(line).Where(t => t.Type == type)
                 .Select(t => text.Substring(t.Start, t.End - t.Start)).ToList();
         }
 
@@ -255,7 +255,7 @@ internal static class Program
         {
             "", " ", "\t#", "'", "\"", "\\", "$", "${", "$(", "#!", "@", "@x", "/*", "*/", "<!--", "<", "</", "<?", "--", "---",
             "[", "]", "[a", "a = [1, {2: (3)}]", "x = \"unterminated", "y = 'a\\'b' # c", "0x1F + 1e-5 - .5j",
-            "echo \"$HOME\" 'x' # y", "key: \"v\" # c", "#include <a.h> // x /* y", "}{)(][", "a\\", "\"\\", "'''", "\"\"\"x\"\"\""
+            "echo \"$HOME\" 'x' # y", "key: \"v\" # c", "#include <a.h> // x /* y", "}{)(][", "function f() end", "then do end", "[==[", "--[[", "config a", "ifeq (a,b)", "$(", "a\\", "\"\\", "'''", "\"\"\"x\"\"\""
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -264,7 +264,7 @@ internal static class Program
             {
                 continue;
             }
-            foreach (int state in new[] { 0, 1, 2, 4 })
+            foreach (int state in new[] { 0, 1, 2, 4, 0x10, 0x20, 0x110, 0x220 })
             {
                 foreach (string sample in samples)
                 {
@@ -300,6 +300,107 @@ internal static class Program
         {
             Tokens.Add(Tuple.Create(start, end));
         }
+    }
+
+    /// <summary>The foldable regions of a document: "line:partnerLine" for every opening token with a fold style.</summary>
+    private static string Folds(Highlighted h)
+    {
+        List<string> folds = new List<string>();
+        for (int line = 0; line < h.Doc.LineCount; line++)
+        {
+            foreach (TokenCache.Token token in h.Cache.GetLineTokens(line))
+            {
+                if (token.Kind == TokenCache.Token.TokenKind.Paired && token.IsOpening && token.Style != null &&
+                    token.Partner != null && token.Partner.LineNumber != line)
+                {
+                    folds.Add(line + ":" + token.Partner.LineNumber);
+                }
+            }
+        }
+        return string.Join(",", folds);
+    }
+
+    private static void OpenWrtDetectionChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/config/network"), L.Uci, "/etc/config files are UCI");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/config/firewall", "config defaults"), L.Uci, "the path wins over the content");
+        Equal(SyntaxHighlighting.DetectLanguage("/tmp/network.uci"), L.Uci, ".uci is UCI");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/init.d/dropbear"), L.Bash, "init scripts are shell scripts");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/hotplug.d/iface/20-ntp"), L.Bash, "hotplug handlers are shell scripts");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/uci-defaults/90-setup"), L.Bash, "uci-defaults are shell scripts");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/init.d/boot", "#!/bin/sh /etc/rc.common"), L.Bash, "#!/bin/sh /etc/rc.common is shell");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/profile"), L.Bash, "/etc/profile is shell");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/lua/luci/model/cbi/x.lua"), L.Lua, ".lua is Lua");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/lua"), L.Lua, "#!/usr/bin/lua is Lua");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/env luajit"), L.Lua, "env luajit is Lua");
+        Equal(SyntaxHighlighting.DetectLanguage("/build/package/foo/Makefile"), L.Makefile, "Makefile");
+        Equal(SyntaxHighlighting.DetectLanguage("/build/rules.mk"), L.Makefile, ".mk is a Makefile");
+        Equal(SyntaxHighlighting.DetectLanguage("/build/tool", "#!/usr/bin/make -f"), L.Makefile, "#!/usr/bin/make is a Makefile");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/board.json"), L.Json, ".json is JSON");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/tsconfig.jsonc"), L.Json, ".jsonc is JSON");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/config.d/x"), L.Plain, "only /etc/config/ is UCI");
+        foreach (L language in Enum.GetValues(typeof(L)))
+        {
+            Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is offered in the syntax menu");
+            Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString() || language == L.Lua || language == L.Json || language == L.Makefile || language == L.Python || language == L.Sql || language == L.Diff || language == L.Plain, language + " has a display name");
+        }
+    }
+
+    private static void FoldChecks()
+    {
+        // Bash: then...fi, do...done, case...esac, function bodies.
+        Highlighted sh = new Highlighted(L.Bash,
+            "#!/bin/sh\nstart() {\n  if [ -f /x ]; then\n    for i in 1 2; do\n      echo $i\n    done\n  elif [ -d /y ]; then\n    case $a in\n      a) echo a ;;\n      *) echo b ;;\n    esac\n  else\n    echo no\n  fi\n}");
+        Equal(Folds(sh), "1:14,2:13,3:5,7:10", "bash functions, if, for and case blocks fold (elif does not open a block)");
+        TokenCache.Token cond = sh.Cache.GetLineTokens(2).First(t => t.Kind == TokenCache.Token.TokenKind.Paired && t.IsOpening && t.Style != null);
+        Equal(sh.Doc.GetLineText(2).Substring(cond.Start, cond.End - cond.Start), "then", "an if block folds at its then");
+        Highlighted shLine = new Highlighted(L.Bash, "if [ -z \"$x\" ]; then echo a; fi\nfind . -exec ls {} \\;\necho a{1,2}b\nx=${y:-z}");
+        Equal(Folds(shLine), "", "one-line blocks, {} and ${} do not fold");
+        Equal(shLine.At(0, 3).Partner?.Start, 13, "the [ ] of a test are paired");
+        Highlighted shCase = new Highlighted(L.Bash, "f() {\n  case $1 in\n    a) x ;;\n    b) y ;;\n  esac\n}");
+        Equal(Folds(shCase), "0:5,1:4", "case patterns ')' do not break the surrounding blocks");
+
+        // Lua.
+        Highlighted lua = new Highlighted(L.Lua,
+            "local M = {}\nfunction M.run(a)\n  if a then\n    return 1\n  elseif a == 2 then\n    return 2\n  end\n  for k, v in pairs(M) do\n    print(k)\n  end\n  repeat\n    a = a - 1\n  until a < 0\nend\nlocal t = {\n  x = 1,\n}\nlocal f = function(x) return x end\nlocal g = function(x)\n  return x -- c\nend");
+        Equal(Folds(lua), "1:13,2:6,7:9,10:12,14:16,18:20", "Lua function/if/for/repeat/table blocks fold; elseif and one-line function do not");
+        Highlighted luaStr = new Highlighted(L.Lua, "local s = [==[\nfunction end\n]==]\n--[[ end\nthen ]] local x = 1 -- end");
+        Equal(Folds(luaStr), "", "keywords inside long strings and comments do not open blocks");
+        Equal(luaStr.TypeAt(1, 0), SyntaxHighlighting.TypeString, "long string continues on the next line");
+        Equal(luaStr.TypeAt(4, 0), SyntaxHighlighting.TypeComment, "long comment continues on the next line");
+        Equal(luaStr.TypeAt(4, 8), SyntaxHighlighting.TypeKeyword, "code after a long comment is highlighted");
+        Equal(Join(new Highlighted(L.Lua, "x = 0x1F + 1e-3 .. 'a' -- c").Tokens(0, SyntaxHighlighting.TypeNumber)), "0x1F|1e-3", "Lua numbers");
+
+        // JSON.
+        Highlighted json = new Highlighted(L.Json, "{\n  \"a\": [\n    1, 2.5e3, true, null\n  ],\n  \"b\": {\"c\": \"x\"} // note\n}");
+        Equal(Folds(json), "0:5,1:3", "JSON objects and arrays fold");
+        Equal(Join(json.Tokens(1, SyntaxHighlighting.TypeVariable)), "\"a\"", "JSON keys");
+        Equal(Join(json.Tokens(4, SyntaxHighlighting.TypeString)), "\"x\"", "JSON string values");
+        Equal(Join(json.Tokens(2, SyntaxHighlighting.TypeNumber)), "1|2.5e3", "JSON numbers");
+        Equal(Join(json.Tokens(2, SyntaxHighlighting.TypeKeyword)), "true|null", "JSON constants");
+        Equal(Join(json.Tokens(4, SyntaxHighlighting.TypeComment)), "// note", "JSON comments are tolerated");
+
+        // Makefile.
+        Highlighted mk = new Highlighted(L.Makefile,
+            "include $(TOPDIR)/rules.mk\nPKG_NAME:=foo # name\nifeq ($(CONFIG_X),y)\n  EXTRA=1\nelse\n  EXTRA=0\nendif\ndefine Package/foo/install\n\t$(INSTALL_BIN) $(PKG_BUILD_DIR)/foo $(1)/bin/\nendef\nall: build\n\t@echo done $@ # c");
+        Equal(Folds(mk), "2:6,7:9", "Makefile ifeq and define blocks fold");
+        Equal(Join(mk.Tokens(0, SyntaxHighlighting.TypeKeyword)), "include", "include is a directive");
+        Equal(Join(mk.Tokens(1, SyntaxHighlighting.TypeVariable)), "PKG_NAME", "variable assignment");
+        Equal(Join(mk.Tokens(1, SyntaxHighlighting.TypeComment)), "# name", "trailing comment");
+        Equal(Join(mk.Tokens(8, SyntaxHighlighting.TypeVariable)), "$(INSTALL_BIN)|$(PKG_BUILD_DIR)|$(1)", "make references in recipes");
+        Equal(Join(mk.Tokens(10, SyntaxHighlighting.TypeSection)), "all", "rule target");
+        Equal(Join(mk.Tokens(11, SyntaxHighlighting.TypeVariable)), "$@", "automatic variable");
+
+        // UCI.
+        Highlighted uci = new Highlighted(L.Uci,
+            "package network\n\nconfig interface 'lan'\n\toption proto 'static'\n\toption mtu 1500\n\tlist dns '8.8.8.8' # google\n\nconfig device\n\toption name 'br-lan'\n\nconfig interface 'wan'\n\toption proto 'dhcp'");
+        Equal(Folds(uci), "2:6,7:9", "UCI config blocks fold up to the blank line");
+        Equal(Join(uci.Tokens(2, SyntaxHighlighting.TypeKeyword)), "config", "config keyword");
+        Equal(Join(uci.Tokens(2, SyntaxHighlighting.TypeSection)), "interface", "config type");
+        Equal(Join(uci.Tokens(2, SyntaxHighlighting.TypeString)), "'lan'", "config name");
+        Equal(Join(uci.Tokens(3, SyntaxHighlighting.TypeVariable)), "proto", "option name");
+        Equal(Join(uci.Tokens(4, SyntaxHighlighting.TypeNumber)), "1500", "numeric option value");
+        Equal(Join(uci.Tokens(5, SyntaxHighlighting.TypeComment)), "# google", "comment after a value");
     }
 
     private static void PairEditingChecks()
@@ -369,6 +470,8 @@ internal static class Program
             LanguageDetectionChecks();
             ConfigChecks();
             BashChecks();
+            OpenWrtDetectionChecks();
+            FoldChecks();
             PythonChecks();
             GenericChecks();
             TokenOrderChecks();
