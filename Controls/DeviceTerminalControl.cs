@@ -141,6 +141,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// </summary>
     public static Func<string, bool, ITransferProgressWindow> TransferProgressWindowFactory;
 
+    /// <summary>
+    /// Edits a user command list of the line-input mode (the window title, the explanation, the commands to edit).
+    /// Returns the edited commands, or null when the user cancelled. Injected by <c>App</c>, like the hooks above.
+    /// </summary>
+    public static Func<string, string, IEnumerable<string>, List<string>> CommandListEditor;
+
     private static ITransferProgressWindow CreateTransferProgressWindow(string title, bool showErrorCount)
     {
         Func<string, bool, ITransferProgressWindow> factory = TransferProgressWindowFactory;

@@ -39,6 +39,9 @@ public partial class App : Application
         DeviceTerminalControl.SerialSettingsPrompt = (settings, portName) =>
             SerialPortSettingsWindow.Prompt(WindowOwnership.ActiveWindow(), settings, portName);
         DeviceTerminalControl.TransferProgressWindowFactory = (title, showErrorCount) => XModemTransferWindow.Create(title, showErrorCount);
+        DeviceTerminalControl.CommandListEditor = (title, description, commands) =>
+            DeviceCommandListWindow.Edit(WindowOwnership.ActiveWindow(), title, description, commands);
+        DeviceTerminalControl.TftpFirmwareWindowFactory = (terminal, title) => new TftpFirmwareWindow(terminal, title);
         RemoteFileEditor.SudoConfirmationPrompt = (channel, promptText) =>
             SudoConfirmationWindow.Show(WindowOwnership.ActiveWindow(), channel, promptText);
 

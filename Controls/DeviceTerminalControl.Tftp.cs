@@ -1,7 +1,5 @@
-using SmarTTY.Forms;
 using System;
 using System.Text;
-using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Controls;
@@ -9,9 +7,18 @@ namespace SmarTTY.Controls;
 // The TFTP server window (Tools menu): it serves a firmware file to a board that waits at the U-Boot prompt on this COM/TCP
 // connection and types the U-Boot commands that fetch it. The window belongs to one terminal; it reads what the board prints
 // through a tap on the received data and writes its commands through the connection like typed text.
+//
+// The window is the themed WPF GUI/TftpFirmwareWindow, which this harness-compiled control cannot reference: App injects it
+// through TftpFirmwareWindowFactory.
 public partial class DeviceTerminalControl
 {
-    private TftpFirmwareForm _tftpForm;
+    /// <summary>
+    /// Creates the TFTP/U-Boot window of this terminal (this terminal, its title). Injected by <c>App</c>: this control
+    /// is compiled by the Mono test harness, which cannot reference the WPF dialogs. Null when the window is unavailable.
+    /// </summary>
+    public static Func<DeviceTerminalControl, string, ITftpFirmwareWindow> TftpFirmwareWindowFactory;
+
+    private ITftpFirmwareWindow _tftpWindow;
 
     // Set while the TFTP window listens; called with every block of received bytes, before the terminal handles it.
     private Action<byte[], int> _consoleTap;
@@ -40,41 +47,30 @@ public partial class DeviceTerminalControl
     }
 
     /// <summary>Opens the TFTP server window of this terminal, or brings it forward when it is open already. Call on the UI thread.</summary>
-    public void ShowTftpFirmwareWindow(IntPtr ownerHandle)
+    public void ShowTftpFirmwareWindow()
     {
-        TftpFirmwareForm existing = _tftpForm;
-        if (existing != null && !existing.IsDisposed)
+        Func<DeviceTerminalControl, string, ITftpFirmwareWindow> factory = TftpFirmwareWindowFactory;
+        if (factory == null)
         {
-            if (existing.WindowState == FormWindowState.Minimized)
-            {
-                existing.WindowState = FormWindowState.Normal;
-            }
+            return;
+        }
+        ITftpFirmwareWindow existing = _tftpWindow;
+        if (existing != null && existing.IsOpen)
+        {
             existing.Activate();
             return;
         }
-
-        // The window is a modeless Windows Forms form inside a WPF application: without this its text boxes would not get keys.
-        System.Windows.Forms.Integration.WindowsFormsHost.EnableWindowsFormsInterop();
-
-        TftpFirmwareForm form = new TftpFirmwareForm(this, GetConnectionTitle(_deviceTerminalSettings.Connection));
-        form.FormClosed += (sender, e) =>
-        {
-            if (ReferenceEquals(_tftpForm, form))
-            {
-                _tftpForm = null;
-            }
-        };
-        _tftpForm = form;
-        form.Show(ownerHandle == IntPtr.Zero ? null : new WindowHandleOwner(ownerHandle));
+        _tftpWindow = factory(this, GetConnectionTitle(_deviceTerminalSettings.Connection));
+        _tftpWindow.Show();
     }
 
     private void CloseTftpWindow()
     {
-        TftpFirmwareForm form = _tftpForm;
-        _tftpForm = null;
-        if (form != null && !form.IsDisposed)
+        ITftpFirmwareWindow window = _tftpWindow;
+        _tftpWindow = null;
+        if (window != null && window.IsOpen)
         {
-            form.CloseWithTerminal();
+            window.CloseWithTerminal();
         }
     }
 

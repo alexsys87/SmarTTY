@@ -100,12 +100,11 @@ public partial class DeviceTerminalControl
             ? "Commands offered by Tab for " + ConnectionTitle + ".\r\n"
             : "Commands offered by Tab for every COM and TCP device.\r\n")
             + "One command per line, lines starting with # are comments. Press Tab while typing the first word of a line.";
-        using DeviceCommandListDialog dialog = new DeviceCommandListDialog(title, description, forThisDevice ? _deviceCommands : _commonCommands);
-        if (dialog.ShowDialog() != DialogResult.OK)
+        List<string> commands = EditCommandList(title, description, forThisDevice ? _deviceCommands : _commonCommands);
+        if (commands == null)
         {
             return;
         }
-        List<string> commands = dialog.Commands;
         if (!_commandStorage.SaveCommands(key, commands))
         {
             MessageBox.Show("The command list could not be saved.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -119,6 +118,16 @@ public partial class DeviceTerminalControl
             _commonCommands = commands;
         }
         RefreshCommandSuggestions();
+    }
+
+    /// <summary>
+    /// Shows the command-list editor through <see cref="CommandListEditor"/>, which <c>App</c> wires to the themed WPF
+    /// window. Returns null when the editor is unavailable (the Mono test harness) or the user cancelled.
+    /// </summary>
+    private static List<string> EditCommandList(string title, string description, List<string> commands)
+    {
+        Func<string, string, IEnumerable<string>, List<string>> editor = CommandListEditor;
+        return editor != null ? editor(title, description, commands) : null;
     }
 
     private void ClearSavedHistory()

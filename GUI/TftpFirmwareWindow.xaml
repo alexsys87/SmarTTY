@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.TftpFirmwareWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Width="620" Height="700" MinWidth="480" MinHeight="420" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <!-- Files the server gives out -->
+    <GroupBox Grid.Row="0" Header="Files the server gives out">
+      <Grid Margin="4">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <ListBox Grid.Row="0" Grid.Column="0" Name="FileList" Height="76" ScrollViewer.HorizontalScrollBarVisibility="Auto" SelectionChanged="FileList_SelectionChanged" />
+        <StackPanel Grid.Row="0" Grid.Column="1" Margin="6 0 0 0">
+          <Button Name="AddFileButton" Content="Add..." MinWidth="76" Click="AddFile_Click" />
+          <Button Name="RemoveFileButton" Content="Remove" MinWidth="76" Margin="0 6 0 0" Click="RemoveFile_Click" />
+        </StackPanel>
+        <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0 6 0 0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="Download this one:" VerticalAlignment="Center" Margin="0 0 6 0" />
+          <ComboBox Grid.Column="1" Name="FileToSendBox" />
+        </Grid>
+      </Grid>
+    </GroupBox>
+
+    <!-- Network -->
+    <GroupBox Grid.Row="1" Header="Network">
+      <Grid Margin="4">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="This computer:" VerticalAlignment="Center" Margin="0 0 6 0" />
+        <ComboBox Grid.Row="0" Grid.Column="1" Name="ServerIpBox" IsEditable="True" Margin="0 0 12 0" />
+        <TextBlock Grid.Row="0" Grid.Column="2" Text="Board (ipaddr):" VerticalAlignment="Center" Margin="0 0 6 0" />
+        <TextBox Grid.Row="0" Grid.Column="3" Name="DeviceIpBox" />
+        <CheckBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Name="RestrictClientBox" Content="Answer only the board's address" Margin="0 6 0 0" HorizontalAlignment="Left" />
+      </Grid>
+    </GroupBox>
+
+    <!-- U-Boot -->
+    <GroupBox Grid.Row="2" Header="U-Boot">
+      <Grid Margin="4">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Load address:" VerticalAlignment="Center" Margin="0 0 6 0" />
+        <TextBox Grid.Row="0" Grid.Column="1" Name="LoadAddressBox" Margin="0 0 12 0" />
+        <TextBlock Grid.Row="0" Grid.Column="2" Text="Prompt ends with:" VerticalAlignment="Center" Margin="0 0 6 0" />
+        <ComboBox Grid.Row="0" Grid.Column="3" Name="PromptBox" IsEditable="True" />
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="After the download:" VerticalAlignment="Center" Margin="0 6 6 0" />
+        <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Name="PresetBox" Margin="0 6 0 0" SelectionChanged="Preset_SelectionChanged" />
+        <TextBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4" Name="AfterBox" Height="90" Margin="0 6 0 0" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Courier New" TextChanged="After_TextChanged" />
+        <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="4" Margin="0 6 0 0" TextWrapping="Wrap" Foreground="{DynamicResource Theme.TextSecondary}" Text="One command per line. {file} {addr} {serverip} {ipaddr} are filled in; replace every &lt;...&gt; yourself. Each command is sent after the previous one has returned to the prompt, and nothing more is sent after a failure." />
+      </Grid>
+    </GroupBox>
+
+    <!-- Server buttons -->
+    <Grid Grid.Row="3" Margin="0 8 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Button Grid.Column="0" Name="StartServerButton" Content="Start server" MinWidth="100" Click="StartServer_Click" />
+      <Button Grid.Column="1" Name="StopServerButton" Content="Stop server" MinWidth="100" Margin="6 0 0 0" Click="StopServer_Click" />
+      <TextBlock Grid.Column="2" Name="ServerStatusText" Margin="10 0 0 0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+    </Grid>
+
+    <!-- Send row -->
+    <Grid Grid.Row="4" Margin="0 8 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Button Grid.Column="0" Name="SendButton" Content="Send to the board" MinWidth="130" Click="Send_Click" />
+      <Button Grid.Column="1" Name="CancelButton" Content="Cancel" MinWidth="80" Margin="6 0 0 0" Click="Cancel_Click" />
+      <ProgressBar Grid.Column="2" Name="Progress" Height="18" Margin="10 0 0 0" Minimum="0" Maximum="100" VerticalAlignment="Center" />
+    </Grid>
+
+    <TextBlock Grid.Row="5" Name="StepText" Margin="0 8 0 0" TextTrimming="CharacterEllipsis" />
+
+    <TextBox Grid.Row="6" Name="LogBox" Margin="0 8 0 0" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas, Courier New" />
+  </Grid>
+</Window>
