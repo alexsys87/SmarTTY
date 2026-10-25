@@ -4,7 +4,6 @@ using SmarTTY.IO;
 using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -12,29 +11,18 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
+using System.Windows;
 
-namespace SmarTTY.Forms;
-
-/// <summary>An owner for a window shown from the WPF main window: only its handle is known.</summary>
-internal sealed class WindowHandleOwner : IWin32Window
-{
-    public WindowHandleOwner(IntPtr handle)
-    {
-        Handle = handle;
-    }
-
-    public IntPtr Handle { get; }
-}
+namespace SmarTTY.GUI;
 
 /// <summary>
-/// Tools -> TFTP server / U-Boot upload. Runs a TFTP server for the firmware file and, on request, types the U-Boot commands
-/// on the terminal's COM (or TCP) connection that make the board download it: it sets the network variables, runs tftpboot,
-/// waits for the prompt after every command, checks that the download really finished, and only then runs the commands the
-/// user chose for the image (boot it, write it to flash, ...). The window is built in code, like the other small dialogs.
-/// The server runs only while the window is open.
+/// Tools -&gt; TFTP server / U-Boot upload. Runs a TFTP server for the firmware file and, on request, types the U-Boot
+/// commands on the terminal's COM (or TCP) connection that make the board download it: it sets the network variables,
+/// runs tftpboot, waits for the prompt after every command, checks that the download really finished, and only then
+/// runs the commands the user chose for the image (boot it, write it to flash, ...). The server runs only while the
+/// window is open.
 /// </summary>
-internal sealed class TftpFirmwareForm : DpiAwareForm
+public partial class TftpFirmwareWindow : Window, ITftpFirmwareWindow
 {
     private sealed class ServedFile
     {
@@ -96,26 +84,6 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
     private TftpTransfer _currentTransfer; // the transfer the progress bar shows: the latest one that started
     private readonly Dictionary<string, int> _completedTransfers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-    private readonly ListBox _fileList;
-    private readonly Button _addFile;
-    private readonly Button _removeFile;
-    private readonly ComboBox _fileToSend;
-    private readonly ComboBox _serverIp;
-    private readonly TextBox _deviceIp;
-    private readonly CheckBox _restrictClient;
-    private readonly TextBox _loadAddress;
-    private readonly ComboBox _prompt;
-    private readonly ComboBox _preset;
-    private readonly TextBox _after;
-    private readonly Button _startServer;
-    private readonly Button _stopServer;
-    private readonly Label _serverStatus;
-    private readonly Button _send;
-    private readonly Button _cancel;
-    private readonly ProgressBar _progress;
-    private readonly Label _stepInfo;
-    private readonly TextBox _log;
-
     private IDisposable _consoleListener;
     private TftpServer _server;
     private CancellationTokenSource _cts;
@@ -123,107 +91,39 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
     private bool _commandInFlight;
     private bool _updatingPreset;
     private bool _closingWithTerminal;
+    private bool _closed;
 
-    public TftpFirmwareForm(DeviceTerminalControl terminal, string terminalTitle)
+    public TftpFirmwareWindow(DeviceTerminalControl terminal, string terminalTitle)
     {
         _terminal = terminal;
-
-        // Laid out for 96 DPI: DpiAwareForm scales it for the monitor it is on.
-        FormIcons.Apply(this, "firmware");
-        Text = "TFTP server / U-Boot upload - " + terminalTitle;
-        StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.Sizable;
-        MinimizeBox = true;
-        MaximizeBox = false;
-        ShowInTaskbar = true;
-        ClientSize = new Size(604, 668);
-        MinimumSize = new Size(Width, Height - 90);
-
-        // ---- files ----
-        GroupBox filesGroup = new GroupBox { Text = "Files the server gives out", Location = new Point(12, 8), Size = new Size(580, 134), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        _fileList = new ListBox { Location = new Point(10, 20), Size = new Size(474, 76), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, HorizontalScrollbar = true };
-        _addFile = new Button { Text = "Add...", Location = new Point(492, 20), Size = new Size(76, 26), Anchor = AnchorStyles.Top | AnchorStyles.Right };
-        _removeFile = new Button { Text = "Remove", Location = new Point(492, 52), Size = new Size(76, 26), Anchor = AnchorStyles.Top | AnchorStyles.Right };
-        Label downloadLabel = new Label { Text = "Download this one:", Location = new Point(10, 107), Size = new Size(116, 20), TextAlign = ContentAlignment.MiddleLeft };
-        _fileToSend = new ComboBox { Location = new Point(130, 105), Size = new Size(354, 24), DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        filesGroup.Controls.AddRange(new Control[] { _fileList, _addFile, _removeFile, downloadLabel, _fileToSend });
-
-        // ---- network ----
-        GroupBox networkGroup = new GroupBox { Text = "Network", Location = new Point(12, 148), Size = new Size(580, 84), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        Label serverLabel = new Label { Text = "This computer:", Location = new Point(10, 24), Size = new Size(116, 20), TextAlign = ContentAlignment.MiddleLeft };
-        _serverIp = new ComboBox { Location = new Point(130, 22), Size = new Size(170, 24), DropDownStyle = ComboBoxStyle.DropDown };
-        Label deviceLabel = new Label { Text = "Board (ipaddr):", Location = new Point(320, 24), Size = new Size(100, 20), TextAlign = ContentAlignment.MiddleLeft };
-        _deviceIp = new TextBox { Location = new Point(424, 22), Size = new Size(144, 24) };
-        _restrictClient = new CheckBox { Text = "Answer only the board's address", Location = new Point(130, 52), Size = new Size(300, 22), Checked = true };
-        networkGroup.Controls.AddRange(new Control[] { serverLabel, _serverIp, deviceLabel, _deviceIp, _restrictClient });
-
-        // ---- U-Boot ----
-        GroupBox bootGroup = new GroupBox { Text = "U-Boot", Location = new Point(12, 238), Size = new Size(580, 214), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        Label loadLabel = new Label { Text = "Load address:", Location = new Point(10, 26), Size = new Size(116, 20), TextAlign = ContentAlignment.MiddleLeft };
-        _loadAddress = new TextBox { Location = new Point(130, 24), Size = new Size(170, 24) };
-        Label promptLabel = new Label { Text = "Prompt ends with:", Location = new Point(320, 26), Size = new Size(100, 20), TextAlign = ContentAlignment.MiddleLeft };
-        _prompt = new ComboBox { Location = new Point(424, 24), Size = new Size(144, 24), DropDownStyle = ComboBoxStyle.DropDown };
-        _prompt.Items.AddRange(new object[] { AutoPrompt, "=>", ">", "#" });
-        Label afterLabel = new Label { Text = "After the download:", Location = new Point(10, 56), Size = new Size(116, 20), TextAlign = ContentAlignment.MiddleLeft };
-        _preset = new ComboBox { Location = new Point(130, 54), Size = new Size(438, 24), DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        _preset.Items.AddRange(Presets);
-        _after = new TextBox
-        {
-            Location = new Point(10, 84),
-            Size = new Size(558, 90),
-            Multiline = true,
-            AcceptsReturn = true,
-            ScrollBars = ScrollBars.Vertical,
-            WordWrap = false,
-            Font = new Font(FontFamily.GenericMonospace, 9f),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-        };
-        Label hint = new Label
-        {
-            Text = "One command per line. {file} {addr} {serverip} {ipaddr} are filled in; replace every <...> yourself. Each command is sent after the previous one has returned to the prompt, and nothing more is sent after a failure.",
-            Location = new Point(10, 176),
-            Size = new Size(558, 34),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            ForeColor = SystemColors.GrayText
-        };
-        bootGroup.Controls.AddRange(new Control[] { loadLabel, _loadAddress, promptLabel, _prompt, afterLabel, _preset, _after, hint });
-
-        // ---- run ----
-        _startServer = new Button { Text = "Start server", Location = new Point(12, 460), Size = new Size(100, 28) };
-        _stopServer = new Button { Text = "Stop server", Location = new Point(118, 460), Size = new Size(100, 28) };
-        _serverStatus = new Label { Text = "Server stopped.", Location = new Point(228, 464), Size = new Size(364, 20), AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        _send = new Button { Text = "Send to the board", Location = new Point(12, 496), Size = new Size(130, 30) };
-        _cancel = new Button { Text = "Cancel", Location = new Point(148, 496), Size = new Size(80, 30), Enabled = false };
-        _progress = new ProgressBar { Location = new Point(238, 502), Size = new Size(354, 18), Minimum = 0, Maximum = 100, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        _stepInfo = new Label { Text = string.Empty, Location = new Point(12, 532), Size = new Size(580, 20), AutoEllipsis = true, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        _log = new TextBox
-        {
-            Location = new Point(12, 556),
-            Size = new Size(580, 100),
-            Multiline = true,
-            ReadOnly = true,
-            ScrollBars = ScrollBars.Vertical,
-            Font = new Font(FontFamily.GenericMonospace, 8.25f),
-            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-        };
-
-        Controls.AddRange(new Control[] { filesGroup, networkGroup, bootGroup, _startServer, _stopServer, _serverStatus, _send, _cancel, _progress, _stepInfo, _log });
-
-        _addFile.Click += (sender, e) => AddFile();
-        _removeFile.Click += (sender, e) => RemoveFile();
-        _fileList.SelectedIndexChanged += (sender, e) => UpdateUi();
-        _startServer.Click += (sender, e) => StartServerFromUi();
-        _stopServer.Click += (sender, e) => StopServer();
-        _send.Click += async (sender, e) => await SendToBoardAsync();
-        _cancel.Click += (sender, e) => CancelSend();
-        _preset.SelectedIndexChanged += (sender, e) => PresetChanged();
-        _after.TextChanged += (sender, e) => AfterTextChanged();
-        FormClosing += OnFormClosing;
-        FormClosed += OnFormClosed;
+        InitializeComponent();
+        Title = "TFTP server / U-Boot upload - " + terminalTitle;
+        PromptBox.ItemsSource = new[] { AutoPrompt, "=>", ">", "#" };
+        PresetBox.ItemsSource = Presets;
+        AfterBox.FontFamily = new System.Windows.Media.FontFamily("Consolas, Courier New");
 
         LoadSettings();
         _consoleListener = _terminal.ListenToConsole(text => _watcher.Append(text, Environment.TickCount));
         UpdateUi();
+    }
+
+    /// <summary>True while the window is open.</summary>
+    public bool IsOpen => !_closed;
+
+    // Show and Activate are implemented explicitly so they do not hide the identically named Window members.
+    void ITftpFirmwareWindow.Show()
+    {
+        WindowOwnership.Attach(this, WindowOwnership.ActiveWindow());
+        Show();
+    }
+
+    void ITftpFirmwareWindow.Activate()
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+        Activate();
     }
 
     /// <summary>Closes the window because the terminal it belongs to is gone: nobody is left to ask.</summary>
@@ -235,12 +135,21 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
 
     // ---------- the window ----------
 
-    private void OnFormClosing(object sender, FormClosingEventArgs e)
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        // The WinForms window had MaximizeBox off; a maximized window here would cover the terminal it types into.
+        if (WindowState == WindowState.Maximized)
+        {
+            WindowState = WindowState.Normal;
+        }
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
         if (_busy && !_closingWithTerminal)
         {
-            DialogResult answer = MessageBox.Show(this, "The board is being sent commands. Stop this and close the window?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (answer != DialogResult.Yes)
+            if (!MessageBoxes.AskWarn("The board is being sent commands. Stop this and close the window?"))
             {
                 e.Cancel = true;
                 return;
@@ -250,85 +159,83 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         {
             _cts?.Cancel();
         }
+        base.OnClosing(e);
     }
 
-    private void OnFormClosed(object sender, FormClosedEventArgs e)
+    protected override void OnClosed(EventArgs e)
     {
+        _closed = true;
         SaveSettings();
         StopServer();
         _consoleListener?.Dispose();
         _consoleListener = null;
+        base.OnClosed(e);
     }
 
     private void UpdateUi()
     {
         bool running = _server != null && _server.IsRunning;
-        _startServer.Enabled = !running && !_busy;
-        _stopServer.Enabled = running && !_busy;
-        _send.Enabled = !_busy;
-        _cancel.Enabled = _busy;
-        _serverIp.Enabled = !running && !_busy;
-        _deviceIp.Enabled = !running && !_busy;
-        _restrictClient.Enabled = !running && !_busy;
-        _loadAddress.Enabled = !_busy;
-        _prompt.Enabled = !_busy;
-        _preset.Enabled = !_busy;
-        _after.Enabled = !_busy;
-        _addFile.Enabled = !_busy;
-        _removeFile.Enabled = !_busy && _fileList.SelectedIndex >= 0;
-        _fileToSend.Enabled = !_busy && _files.Count > 0;
-        _serverStatus.Text = running ? "Listening on " + _server.LocalEndPoint + ", only while this window is open." : "Server stopped.";
+        StartServerButton.IsEnabled = !running && !_busy;
+        StopServerButton.IsEnabled = running && !_busy;
+        SendButton.IsEnabled = !_busy;
+        CancelButton.IsEnabled = _busy;
+        ServerIpBox.IsEnabled = !running && !_busy;
+        DeviceIpBox.IsEnabled = !running && !_busy;
+        RestrictClientBox.IsEnabled = !running && !_busy;
+        LoadAddressBox.IsEnabled = !_busy;
+        PromptBox.IsEnabled = !_busy;
+        PresetBox.IsEnabled = !_busy;
+        AfterBox.IsEnabled = !_busy;
+        AddFileButton.IsEnabled = !_busy;
+        RemoveFileButton.IsEnabled = !_busy && FileList.SelectedIndex >= 0;
+        FileToSendBox.IsEnabled = !_busy && _files.Count > 0;
+        ServerStatusText.Text = running ? "Listening on " + _server.LocalEndPoint + ", only while this window is open." : "Server stopped.";
     }
 
     private void Log(string message)
     {
-        if (IsDisposed || _log.IsDisposed)
+        if (_closed)
         {
             return;
         }
-        if (_log.TextLength > 100000)
+        if (LogBox.Text.Length > 100000)
         {
-            _log.Text = _log.Text.Substring(_log.TextLength - 50000);
+            LogBox.Text = LogBox.Text.Substring(LogBox.Text.Length - 50000);
+            LogBox.CaretIndex = LogBox.Text.Length;
         }
-        _log.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + message + "\r\n");
+        LogBox.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + message + "\r\n");
+        LogBox.ScrollToEnd();
     }
 
     private void SetStep(string text)
     {
-        if (!IsDisposed)
+        if (!_closed)
         {
-            _stepInfo.Text = text;
+            StepText.Text = text;
         }
     }
 
     /// <summary>Runs <paramref name="action"/> on the window's thread; the server's events come on its own threads.</summary>
     private void OnUi(Action action)
     {
-        if (IsDisposed || !IsHandleCreated)
+        if (_closed || !IsLoaded)
         {
             return;
         }
-        try
-        {
-            BeginInvoke(action);
-        }
-        catch (InvalidOperationException)
-        {
-            // The window is closing.
-        }
+        Dispatcher.BeginInvoke(action);
     }
 
     // ---------- files ----------
 
-    private void AddFile()
+    private void AddFile_Click(object sender, RoutedEventArgs e)
     {
-        using System.Windows.Forms.OpenFileDialog dialog = new System.Windows.Forms.OpenFileDialog
+        OpenFileDialog dialog = new OpenFileDialog
         {
             Title = "Select the firmware (or any file the board should fetch over TFTP)",
             Filter = "All files (*.*)|*.*",
             Multiselect = true
         };
-        if (dialog.ShowDialog(this) != DialogResult.OK)
+        if (dialog.ShowDialog(this) != true)
         {
             return;
         }
@@ -352,16 +259,21 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         RefreshFileViews(_files.Count > 0 ? _files[_files.Count - 1].Name : null);
     }
 
-    private void RemoveFile()
+    private void RemoveFile_Click(object sender, RoutedEventArgs e)
     {
-        int index = _fileList.SelectedIndex;
+        int index = FileList.SelectedIndex;
         if (index < 0 || index >= _files.Count)
         {
             return;
         }
-        string keep = _fileToSend.SelectedItem?.ToString();
+        string keep = FileToSendBox.SelectedItem?.ToString();
         _files.RemoveAt(index);
         RefreshFileViews(keep);
+    }
+
+    private void FileList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        UpdateUi();
     }
 
     /// <summary>Keeps letters, digits and . _ - + @ , only: the name goes onto a U-Boot command line.</summary>
@@ -379,19 +291,23 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
 
     private void RefreshFileViews(string selectName)
     {
-        _fileList.Items.Clear();
-        _fileToSend.Items.Clear();
+        FileList.Items.Clear();
         foreach (ServedFile file in _files)
         {
-            _fileList.Items.Add(file);
-            _fileToSend.Items.Add(file.Name);
+            FileList.Items.Add(file);
         }
-        int index = selectName == null ? -1 : _fileToSend.Items.IndexOf(selectName);
-        if (index < 0 && _fileToSend.Items.Count > 0)
+        List<string> names = new List<string>();
+        foreach (ServedFile file in _files)
+        {
+            names.Add(file.Name);
+        }
+        FileToSendBox.ItemsSource = names;
+        int index = selectName == null ? -1 : names.IndexOf(selectName);
+        if (index < 0 && names.Count > 0)
         {
             index = 0;
         }
-        _fileToSend.SelectedIndex = index;
+        FileToSendBox.SelectedIndex = index;
         ApplyFilesToRunningServer();
         UpdateUi();
     }
@@ -414,7 +330,7 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
 
     // ---------- the server ----------
 
-    private void StartServerFromUi()
+    private void StartServer_Click(object sender, RoutedEventArgs e)
     {
         try
         {
@@ -422,8 +338,13 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         }
         catch (SequenceFailure ex)
         {
-            MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBoxes.Warning(ex.Message);
         }
+    }
+
+    private void StopServer_Click(object sender, RoutedEventArgs e)
+    {
+        StopServer();
     }
 
     /// <summary>Starts the server if it is not running. Throws a <see cref="SequenceFailure"/> that says what is wrong.</summary>
@@ -444,19 +365,19 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
                 throw new SequenceFailure("The file " + file.FullPath + " does not exist any more.");
             }
         }
-        string serverText = _serverIp.Text.Trim();
+        string serverText = ServerIpBox.Text.Trim();
         if (!UBootFirmwareScript.IsValidIPv4(serverText))
         {
             throw new SequenceFailure("Enter the address of this computer on the network the board is connected to (for example 192.168.1.2).");
         }
         IPAddress allowed = null;
-        if (_restrictClient.Checked && !string.IsNullOrWhiteSpace(_deviceIp.Text))
+        if (RestrictClientBox.IsChecked == true && !string.IsNullOrWhiteSpace(DeviceIpBox.Text))
         {
-            if (!UBootFirmwareScript.IsValidIPv4(_deviceIp.Text))
+            if (!UBootFirmwareScript.IsValidIPv4(DeviceIpBox.Text))
             {
                 throw new SequenceFailure("The board's address is not a valid IPv4 address.");
             }
-            allowed = IPAddress.Parse(_deviceIp.Text.Trim());
+            allowed = IPAddress.Parse(DeviceIpBox.Text.Trim());
         }
 
         TftpServer server = new TftpServer(IPAddress.Parse(serverText), TftpPort) { AllowedClient = allowed };
@@ -497,7 +418,7 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
             {
             }
         }
-        if (!IsDisposed)
+        if (!_closed)
         {
             UpdateUi();
         }
@@ -518,7 +439,7 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         }
         if (transfer.Length > 0)
         {
-            _progress.Value = (int)Math.Min(100, transfer.BytesAcknowledged * 100 / transfer.Length);
+            Progress.Value = (int)Math.Min(100, transfer.BytesAcknowledged * 100 / transfer.Length);
         }
         SetStep("Sending " + transfer.FileName + ": " + StringUtils.FormatSize(transfer.BytesAcknowledged) + "B of " + StringUtils.FormatSize(transfer.Length) + "B");
     }
@@ -527,12 +448,12 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
     {
         if (transfer.Succeeded)
         {
-            _progress.Value = 100;
+            Progress.Value = 100;
             _completedTransfers[transfer.FileName] = CompletedCount(transfer.FileName) + 1;
         }
         else if (!IsReplaced(transfer))
         {
-            _progress.Value = 0;
+            Progress.Value = 0;
         }
     }
 
@@ -545,7 +466,7 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
 
     private string PromptText()
     {
-        string text = _prompt.Text.Trim();
+        string text = PromptBox.Text.Trim();
         return text == AutoPrompt ? string.Empty : text;
     }
 
@@ -553,20 +474,20 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
     {
         return new UBootFirmwareSettings
         {
-            ServerIp = _serverIp.Text.Trim(),
-            DeviceIp = _deviceIp.Text.Trim(),
-            LoadAddress = _loadAddress.Text.Trim(),
-            FileName = _fileToSend.SelectedItem?.ToString(),
-            AfterCommands = _after.Text
+            ServerIp = ServerIpBox.Text.Trim(),
+            DeviceIp = DeviceIpBox.Text.Trim(),
+            LoadAddress = LoadAddressBox.Text.Trim(),
+            FileName = FileToSendBox.SelectedItem?.ToString(),
+            AfterCommands = AfterBox.Text
         };
     }
 
-    private void CancelSend()
+    private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         _cts?.Cancel();
     }
 
-    private async Task SendToBoardAsync()
+    private async void Send_Click(object sender, RoutedEventArgs e)
     {
         if (_busy)
         {
@@ -589,13 +510,13 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         {
             Log("Stopped: " + ex.Message);
             SetStep("Stopped: " + ex.Message);
-            MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBoxes.Warning(ex.Message);
         }
         catch (Exception ex)
         {
             Log("Error: " + ex.Message);
             SetStep("Error: " + ex.Message);
-            MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBoxes.Error(ex.Message);
         }
         finally
         {
@@ -603,7 +524,7 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
             _busy = false;
             _cts?.Dispose();
             _cts = null;
-            if (!IsDisposed)
+            if (!_closed)
             {
                 UpdateUi();
             }
@@ -615,23 +536,23 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         UBootFirmwareSettings settings = ReadSettings();
         if (settings.FileName == null)
         {
-            MessageBox.Show(this, "Add the firmware file and choose the one to download.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBoxes.Info("Add the firmware file and choose the one to download.");
             return;
         }
         string problem = UBootFirmwareScript.Validate(settings);
         if (problem != null)
         {
-            MessageBox.Show(this, problem, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBoxes.Warning(problem);
             return;
         }
         if (!_terminal.IsDeviceConnected)
         {
-            MessageBox.Show(this, "The terminal is not connected to the board.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBoxes.Warning("The terminal is not connected to the board.");
             return;
         }
         if (_terminal.IsLineOwnedByTransfer)
         {
-            MessageBox.Show(this, "A file transfer is using the connection. Wait for it to finish or cancel it first.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBoxes.Info("A file transfer is using the connection. Wait for it to finish or cancel it first.");
             return;
         }
         EnsureServerRunning();
@@ -647,7 +568,7 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         _busy = true;
         _cts = new CancellationTokenSource();
         CancellationToken token = _cts.Token;
-        _progress.Value = 0;
+        Progress.Value = 0;
         UpdateUi();
         string prompt = PromptText();
 
@@ -742,7 +663,9 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         {
             text.Append("\r\nSome of them change what is stored on the board. A wrong address or offset can make it unable to start.");
         }
-        return MessageBox.Show(this, text.ToString(), Text, MessageBoxButtons.OKCancel, destructive ? MessageBoxIcon.Warning : MessageBoxIcon.Question) == DialogResult.OK;
+        return destructive
+            ? MessageDialog.Show(text.ToString(), "SmarTTY", MessageDialogIcon.Warning, MessageDialogButtons.OkCancel) == MessageBoxResult.OK
+            : MessageDialog.Show(text.ToString(), "SmarTTY", MessageDialogIcon.Question, MessageDialogButtons.OkCancel) == MessageBoxResult.OK;
     }
 
     private static int TimeoutFor(UBootStep step, long fileLength)
@@ -799,16 +722,16 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
 
     // ---------- the command list ----------
 
-    private void PresetChanged()
+    private void Preset_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
-        if (_updatingPreset || !(_preset.SelectedItem is Preset preset) || preset.Commands == null)
+        if (_updatingPreset || !(PresetBox.SelectedItem is Preset preset) || preset.Commands == null)
         {
             return;
         }
         _updatingPreset = true;
         try
         {
-            _after.Text = preset.Commands.Replace("\n", "\r\n");
+            AfterBox.Text = preset.Commands.Replace("\n", "\r\n");
         }
         finally
         {
@@ -816,14 +739,14 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         }
     }
 
-    private void AfterTextChanged()
+    private void After_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
     {
         if (_updatingPreset)
         {
             return;
         }
         // Typing in the box makes it a custom list, unless it still equals a preset.
-        string normalized = _after.Text.Replace("\r\n", "\n");
+        string normalized = AfterBox.Text.Replace("\r\n", "\n");
         Preset match = null;
         foreach (Preset preset in Presets)
         {
@@ -836,7 +759,7 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         _updatingPreset = true;
         try
         {
-            _preset.SelectedItem = match ?? Presets[Presets.Length - 1];
+            PresetBox.SelectedItem = match ?? Presets[Presets.Length - 1];
         }
         finally
         {
@@ -883,28 +806,30 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         bool restrict = true;
         try
         {
-            using RegistryKey root = AppEnvironment.OpenSettingsKey();
-            using RegistryKey key = root.OpenSubKey(RegistrySubKey);
-            if (key != null)
+            using (RegistryKey root = AppEnvironment.OpenSettingsKey())
+            using (RegistryKey key = root.OpenSubKey(RegistrySubKey))
             {
-                if (key.GetValue("Files") is string[] entries)
+                if (key != null)
                 {
-                    foreach (string entry in entries)
+                    if (key.GetValue("Files") is string[] entries)
                     {
-                        int tab = entry.IndexOf('\t');
-                        if (tab > 0 && File.Exists(entry.Substring(tab + 1)))
+                        foreach (string entry in entries)
                         {
-                            _files.Add(new ServedFile { Name = entry.Substring(0, tab), FullPath = entry.Substring(tab + 1) });
+                            int tab = entry.IndexOf('\t');
+                            if (tab > 0 && File.Exists(entry.Substring(tab + 1)))
+                            {
+                                _files.Add(new ServedFile { Name = entry.Substring(0, tab), FullPath = entry.Substring(tab + 1) });
+                            }
                         }
                     }
+                    savedServer = key.GetValue("ServerIp") as string;
+                    savedDevice = key.GetValue("DeviceIp") as string ?? savedDevice;
+                    savedLoad = key.GetValue("LoadAddress") as string ?? savedLoad;
+                    savedPrompt = key.GetValue("Prompt") as string ?? savedPrompt;
+                    savedAfter = key.GetValue("After") as string ?? savedAfter;
+                    savedFileToSend = key.GetValue("FileToSend") as string;
+                    restrict = !(key.GetValue("RestrictClient") is int flag) || flag != 0;
                 }
-                savedServer = key.GetValue("ServerIp") as string;
-                savedDevice = key.GetValue("DeviceIp") as string ?? savedDevice;
-                savedLoad = key.GetValue("LoadAddress") as string ?? savedLoad;
-                savedPrompt = key.GetValue("Prompt") as string ?? savedPrompt;
-                savedAfter = key.GetValue("After") as string ?? savedAfter;
-                savedFileToSend = key.GetValue("FileToSend") as string;
-                restrict = !(key.GetValue("RestrictClient") is int flag) || flag != 0;
             }
         }
         catch (Exception)
@@ -913,17 +838,14 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
         }
 
         List<string> local = LocalAddresses();
-        foreach (string address in local)
-        {
-            _serverIp.Items.Add(address);
-        }
-        _serverIp.Text = savedServer != null && local.Contains(savedServer) ? savedServer : (local.Count > 0 ? local[0] : savedServer ?? string.Empty);
-        _deviceIp.Text = savedDevice;
-        _restrictClient.Checked = restrict;
-        _loadAddress.Text = savedLoad;
-        _prompt.Text = string.IsNullOrEmpty(savedPrompt) ? AutoPrompt : savedPrompt;
-        _after.Text = savedAfter.Replace("\r\n", "\n").Replace("\n", "\r\n");
-        AfterTextChanged();
+        ServerIpBox.ItemsSource = local;
+        ServerIpBox.Text = savedServer != null && local.Contains(savedServer) ? savedServer : (local.Count > 0 ? local[0] : savedServer ?? string.Empty);
+        DeviceIpBox.Text = savedDevice;
+        RestrictClientBox.IsChecked = restrict;
+        LoadAddressBox.Text = savedLoad;
+        PromptBox.Text = string.IsNullOrEmpty(savedPrompt) ? AutoPrompt : savedPrompt;
+        AfterBox.Text = savedAfter.Replace("\r\n", "\n").Replace("\n", "\r\n");
+        After_TextChanged(null, null);
         RefreshFileViews(savedFileToSend);
     }
 
@@ -931,21 +853,23 @@ internal sealed class TftpFirmwareForm : DpiAwareForm
     {
         try
         {
-            using RegistryKey root = AppEnvironment.OpenSettingsKey();
-            using RegistryKey key = root.CreateSubKey(RegistrySubKey);
-            string[] entries = new string[_files.Count];
-            for (int i = 0; i < entries.Length; i++)
+            using (RegistryKey root = AppEnvironment.OpenSettingsKey())
+            using (RegistryKey key = root.CreateSubKey(RegistrySubKey))
             {
-                entries[i] = _files[i].Name + "\t" + _files[i].FullPath;
+                string[] entries = new string[_files.Count];
+                for (int i = 0; i < entries.Length; i++)
+                {
+                    entries[i] = _files[i].Name + "\t" + _files[i].FullPath;
+                }
+                key.SetValue("Files", entries, RegistryValueKind.MultiString);
+                key.SetValue("FileToSend", FileToSendBox.SelectedItem?.ToString() ?? string.Empty);
+                key.SetValue("ServerIp", ServerIpBox.Text.Trim());
+                key.SetValue("DeviceIp", DeviceIpBox.Text.Trim());
+                key.SetValue("LoadAddress", LoadAddressBox.Text.Trim());
+                key.SetValue("Prompt", PromptBox.Text.Trim());
+                key.SetValue("After", AfterBox.Text);
+                key.SetValue("RestrictClient", RestrictClientBox.IsChecked == true ? 1 : 0);
             }
-            key.SetValue("Files", entries, RegistryValueKind.MultiString);
-            key.SetValue("FileToSend", _fileToSend.SelectedItem?.ToString() ?? string.Empty);
-            key.SetValue("ServerIp", _serverIp.Text.Trim());
-            key.SetValue("DeviceIp", _deviceIp.Text.Trim());
-            key.SetValue("LoadAddress", _loadAddress.Text.Trim());
-            key.SetValue("Prompt", _prompt.Text.Trim());
-            key.SetValue("After", _after.Text);
-            key.SetValue("RestrictClient", _restrictClient.Checked ? 1 : 0);
         }
         catch (Exception)
         {

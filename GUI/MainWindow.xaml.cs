@@ -313,7 +313,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
         try
         {
-            terminal.ShowTftpFirmwareWindow(new System.Windows.Interop.WindowInteropHelper((Window)this).Handle);
+            terminal.ShowTftpFirmwareWindow();
         }
         catch (Exception exception)
         {
