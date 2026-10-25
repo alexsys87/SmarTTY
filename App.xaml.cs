@@ -4,6 +4,7 @@ using System.Windows;
 using SmarTTY.GUI;
 using SmarTTY.GUI.Styles;
 using VisualTTY;
+using VisualTTY.Backend;
 
 namespace SmarTTY;
 
@@ -21,6 +22,14 @@ public partial class App : Application
         ThemeManager.Apply(GlobalSettings.Load()?.Theme ?? SmarTTYTheme.Dark);
 
         EnsureCommandCompletionsFile();
+
+        // The proxy prompt is raised from the harness-compiled connection controller, which cannot reference the WPF
+        // dialog; the window is wired in here instead.
+        NewConnectionController.ProxyCredentialsPrompt = (string realm, string credentials) =>
+        {
+            string entered = credentials;
+            return ProxyAuthWindow.ShowPrompt(WindowOwnership.ActiveWindow(), realm, ref entered) ? entered : null;
+        };
 
         ConnectionSelectionWindow connectionSelectionWindow = new ConnectionSelectionWindow(showRawConnections: true, e.Args.FirstOrDefault());
         connectionSelectionWindow.Closed += OnSelectionWindowClosed;

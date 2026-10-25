@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.ProxyAuthWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Proxy authorization" SizeToContent="WidthAndHeight" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid Margin="12" Width="470">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <Image Grid.Row="0" Grid.RowSpan="4" Grid.Column="0" Source="pack://application:,,,/icons/dialog-credentials.png" Width="80" Height="80" VerticalAlignment="Top" Margin="0 8 16 0" />
+    <TextBlock Grid.Row="0" Grid.Column="1" Text="Proxy authorization required" FontSize="18" TextWrapping="Wrap" Margin="0 0 0 10" />
+    <Grid Grid.Row="1" Grid.Column="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Grid.Column="0" Text="Realm:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <TextBlock Grid.Column="1" Name="RealmText" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+    </Grid>
+    <Grid Grid.Row="2" Grid.Column="1" Margin="0 4 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Grid.Column="0" Text="User name:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <TextBox Grid.Column="1" Name="UserNameInput" MinWidth="314" />
+    </Grid>
+    <Grid Grid.Row="3" Grid.Column="1" Margin="0 4 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Grid.Column="0" Text="Password:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <PasswordBox Grid.Column="1" Name="PasswordInput" MinWidth="314" />
+    </Grid>
+    <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 14 0 0">
+      <Button Content="_Connect" IsDefault="True" MinWidth="80" Margin="0 0 5 0" Click="Connect_Click" />
+      <Button Content="Cancel" IsCancel="True" MinWidth="80" />
+    </StackPanel>
+  </Grid>
+</Window>

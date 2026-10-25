@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.PublicKeyManagerWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Manage Public Key" Width="660" Height="500" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <GroupBox Grid.Row="0" Header="SmarTTY public key">
+      <Grid Margin="6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Image Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Source="pack://application:,,,/icons/dialog-public-key.png" Width="128" Height="128" VerticalAlignment="Top" />
+        <TextBlock Grid.Row="0" Grid.Column="1" Margin="8 0 0 4" TextWrapping="Wrap" Text="SmarTTY has generated a keypair to automatically logon to SSH servers. Here is the public key in OpenSSH format:" />
+        <TextBox Grid.Row="1" Grid.Column="1" Name="PublicKeyText" Margin="8 4 0 4" MinHeight="120" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" />
+        <TextBlock Grid.Row="2" Grid.Column="1" Margin="8 4 0 0" TextWrapping="Wrap" Text="The key is stored in the following container under your user profile:" />
+        <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="KeyContainerText" Margin="0 2 0 0" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="8 6 0 0">
+          <Button Name="ExportButton" Content="_Export key" MinWidth="150" Margin="0 0 5 0" Click="Export_Click" />
+          <Button Name="ImportButton" Content="_Import key" MinWidth="150" Margin="0 0 5 0" Click="Import_Click" />
+          <Button Name="ResetButton" Content="_Reset key" MinWidth="150" Click="Reset_Click" />
+        </StackPanel>
+      </Grid>
+    </GroupBox>
+    <GroupBox Grid.Row="1" Header="Remote computer settings" Margin="0 8 0 0">
+      <Grid Margin="6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Image Grid.Row="0" Grid.RowSpan="4" Grid.Column="0" Name="RemoteSettingsImage" Source="pack://application:,,,/icons/keys/locked.png" Width="128" Height="128" VerticalAlignment="Top" Cursor="Hand" MouseLeftButtonDown="RemoteSettings_Click" />
+        <TextBlock Grid.Row="0" Grid.Column="1" Margin="8 0 0 0" TextWrapping="Wrap" Text="SmarTTY can automatically configure your remote computer to authenticate you with your public key instead of the usual password. Note that anyone with access to your Windows account will be able to logon with your public key." />
+        <Grid Grid.Row="1" Grid.Column="1" Margin="8 6 0 0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="Remote host:" Margin="0 0 8 0" />
+          <TextBlock Grid.Column="1" Name="RemoteHostText" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+        </Grid>
+        <Grid Grid.Row="2" Grid.Column="1" Margin="8 4 0 0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="User name:" Margin="0 0 8 0" />
+          <TextBlock Grid.Column="1" Name="RemoteUserText" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+        </Grid>
+        <Grid Grid.Row="3" Grid.Column="1" Margin="8 4 0 0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="Your public key is:" Margin="0 0 8 0" />
+          <TextBlock Grid.Column="1" Name="KeyStatusText" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+        </Grid>
+        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="8 8 0 0">
+          <Button Name="AcceptButton" Content="_Allow accepting your public key" MinWidth="200" Margin="0 0 5 0" Click="Accept_Click" />
+          <Button Name="StopAcceptingButton" Content="_Stop accepting your public key" MinWidth="200" Click="StopAccepting_Click" />
+        </StackPanel>
+      </Grid>
+    </GroupBox>
+    <Button Grid.Row="2" Content="Close" IsCancel="True" MinWidth="80" HorizontalAlignment="Right" Margin="0 10 0 0" />
+  </Grid>
+</Window>

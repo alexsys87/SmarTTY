@@ -1,7 +1,6 @@
 ﻿using SmarTTY.Ssh;
 using Microsoft.Win32;
 using SmarTTY;
-using SmarTTY.Forms;
 using SmarTTY.Utilities;
 using System;
 using System.ComponentModel;
@@ -255,6 +254,14 @@ public class NewConnectionController : INotifyPropertyChanged
 
     public event Action<Exception> ReportException;
 
+    /// <summary>
+    /// Asks the user for the credentials of an HTTP proxy: it receives the realm and the credentials entered so far
+    /// ("user:password", or null on the first attempt) and returns the new credentials, or null if the user cancelled.
+    /// The WPF window is injected here (by <c>App</c>) because this controller is compiled by the Mono test harness,
+    /// which cannot reference the WPF dialog.
+    /// </summary>
+    public static Func<string, string, string> ProxyCredentialsPrompt;
+
     public event Action<bool> CloseRequested;
 
     public event PropertyChangedEventHandler PropertyChanged;
@@ -450,7 +457,12 @@ public class NewConnectionController : INotifyPropertyChanged
     {
         try
         {
-            handled = ProxyAuthForm.ShowPrompt(realm, ref auth);
+            string credentials = ProxyCredentialsPrompt?.Invoke(realm, auth);
+            if (credentials != null)
+            {
+                auth = credentials;
+                handled = true;
+            }
         }
         catch (Exception progressException)
         {
