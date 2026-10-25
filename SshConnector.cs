@@ -467,11 +467,30 @@ public partial class SshConnector : Component
             {
                 ISshKeyPair sshKeyPair = AppEnvironment.KeyFactory.CreateKey(sshConnectionSettings.KeyType.ResolveAuto(PublicKeyType.RSA));
                 ReportStatus(connectionAttempt, "Configuring...");
-                if (!AuthorizedKeysManager.IsKeyAuthorized(sshSession, sshKeyPair.GetPublicKeyBlob()))
+                // The profile is switched to the key only when the server is known to accept it: otherwise the next
+                // connection would ask for a password the profile no longer remembers to use.
+                bool keyInstalled = false;
+                try
                 {
-                    AuthorizedKeysManager.AppendAuthorizedKey(sshSession, sshKeyPair.ToAuthorizedKeysLine(Environment.UserName + "@" + Environment.MachineName));
+                    if (!AuthorizedKeysManager.IsKeyAuthorized(sshSession, sshKeyPair.GetPublicKeyBlob()))
+                    {
+                        AuthorizedKeysManager.AppendAuthorizedKey(sshSession, sshKeyPair.ToAuthorizedKeysLine(Environment.UserName + "@" + Environment.MachineName));
+                    }
+                    keyInstalled = true;
                 }
-                sshConnectionSettings.AuthenticationType = AuthType.PublicKey;
+                catch (Exception exception) when (!(exception is OperationCanceledException) && !sshSession.IsConnectionClosed)
+                {
+                    // A lost connection is thrown on (the usual reconnect handling follows); a refusal of the server
+                    // (full flash, read-only home, no permission) leaves a working password connection.
+                    if (!Confirm(PromptKind.YesNoWarning, "Cannot set up the public key: " + exception.Message + Environment.NewLine + "Continue connecting with the password?"))
+                    {
+                        throw new OperationCanceledException();
+                    }
+                }
+                if (keyInstalled)
+                {
+                    sshConnectionSettings.AuthenticationType = AuthType.PublicKey;
+                }
             }
             // Without periodic traffic a pulled cable is only noticed once the user types something, so a default is used
             // when none is set (0); a profile that switched the keep-alive off (negative) keeps it off.

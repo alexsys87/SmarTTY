@@ -1,0 +1,139 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+using SmarTTY;
+using SmarTTY.Ssh;
+
+// Checks of the public key installation against a stand-in session: the append script must be waited for, its failure
+// must be reported, and the key must be read back, so that a profile is never switched to a key that is not on the server.
+// Run with: dotnet run --project tests/AuthorizedKeysManagerTests
+internal static class Program
+{
+    private static int _passed;
+
+    private static void Check(bool condition, string name)
+    {
+        if (!condition)
+        {
+            throw new Exception("FAIL: " + name);
+        }
+        _passed++;
+        Console.WriteLine("PASS: " + name);
+    }
+
+    private static Exception Catch(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+        return null;
+    }
+
+    private static byte[] Blob(int seed)
+    {
+        byte[] blob = new byte[4 + 11 + 32];
+        blob[3] = 11;
+        Encoding.ASCII.GetBytes("ssh-ed25519").CopyTo(blob, 4);
+        for (int i = 0; i < 32; i++)
+        {
+            blob[15 + i] = (byte)(seed * 31 + i);
+        }
+        return blob;
+    }
+
+    private static string KeyLine(byte[] blob)
+    {
+        return "ssh-ed25519 " + Convert.ToBase64String(blob) + " me@host";
+    }
+
+    private static int Main()
+    {
+        byte[] key = Blob(1);
+        byte[] other = Blob(2);
+        string line = KeyLine(key);
+        const string home = "/root/.ssh/authorized_keys";
+        const string dropbear = "/etc/dropbear/authorized_keys";
+
+        // A normal installation stores the key and verifies it.
+        SshSession session = new SshSession();
+        AuthorizedKeysManager.AppendAuthorizedKey(session, line);
+        Check(session.Files[home].Trim() == line, "install: the key is stored in authorized_keys");
+        Check(AuthorizedKeysManager.IsKeyAuthorized(session, key), "install: the key is reported as authorized");
+
+        // The other keys of the file stay, and a key already there is not added twice.
+        session = new SshSession();
+        session.Files[home] = KeyLine(other);
+        AuthorizedKeysManager.AppendAuthorizedKey(session, line);
+        Check(session.Files[home] == KeyLine(other) + "\n" + line + "\n", "install: another key stays, the new one follows");
+        session.AppendedPaths.Clear();
+        AuthorizedKeysManager.AppendAuthorizedKey(session, line);
+        Check(session.AppendedPaths.Count == 0, "install: a key that is already there is not appended again");
+
+        // Dropbear root: both files get the key.
+        session = new SshSession { IsDropbearRoot = true };
+        AuthorizedKeysManager.AppendAuthorizedKey(session, line);
+        Check(session.Files[home].Contains(line) && session.Files[dropbear].Contains(line), "dropbear: the key is in the home file and in /etc/dropbear");
+
+        // Full flash (the overlay of OpenWrt): the error is reported, with the reason from the server.
+        session = new SshSession { AppendOutcome = AppendOutcome.DiskFull };
+        Exception error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line));
+        Check(error != null && error.Message.Contains("No space left on device"), "full disk: installation fails with the message of the server");
+        Check(!AuthorizedKeysManager.IsKeyAuthorized(session, key), "full disk: the key is not reported as authorized");
+
+        // The server closes the channel without an exit status and without storing the key: only the read-back sees it.
+        session = new SshSession { AppendOutcome = AppendOutcome.ClosedSilently };
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line));
+        Check(error is RemoteOperationException && error.Message.Contains("not found"), "closed channel: the missing key is found by the read-back");
+
+        // No exit status reported, but the key is there: the read-back accepts it.
+        session = new SshSession { AppendOutcome = AppendOutcome.StoredWithoutStatus };
+        AuthorizedKeysManager.AppendAuthorizedKey(session, line);
+        Check(AuthorizedKeysManager.IsKeyAuthorized(session, key), "no exit status: a stored key is accepted after the read-back");
+
+        // The connection goes away during the script: a connection error, not a configuration error.
+        session = new SshSession { AppendOutcome = AppendOutcome.ConnectionLost };
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line));
+        Check(error is IOException && session.IsConnectionClosed, "lost connection: reported as a lost connection");
+
+        // The script never ends: the wait is bounded and the error says so.
+        session = new SshSession { AppendOutcome = AppendOutcome.Hangs };
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line));
+        Check(error is RemoteOperationException && error.Message.Contains("Timed out"), "hanging script: timeout is reported");
+
+        // A lost connection is not "no home directory" / "no .ssh directory" (the old messages).
+        session = new SshSession { IsConnectionClosed = true };
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line));
+        Check(error is IOException && error.Message.Contains("lost"), "install: lost connection before pwd is reported as such");
+        error = Catch(() => AuthorizedKeysManager.RemoveAuthorizedKey(session, key));
+        Check(error is IOException && error.Message.Contains("lost"), "remove: lost connection before pwd is reported as such");
+        error = Catch(() => AuthorizedKeysManager.IsKeyAuthorized(session, key));
+        Check(error is IOException, "check: a lost connection is thrown, not answered with 'not authorized'");
+        session = new SshSession { FailMkdir = true };
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line));
+        Check(error != null && error.Message.Contains(".ssh directory"), "install: a refused .ssh directory is reported");
+
+        // A missing file is simply "not authorized", with a working connection.
+        session = new SshSession();
+        Check(!AuthorizedKeysManager.IsKeyAuthorized(session, key), "check: no authorized_keys file means not authorized");
+
+        // chmod may fail (no modes on the file system): the key is there, so the installation stands.
+        session = new SshSession { FailChmod = true };
+        AuthorizedKeysManager.AppendAuthorizedKey(session, line);
+        Check(session.Files[home].Contains(line), "install: a failing chmod does not undo a stored key");
+
+        // Not a key at all: nothing is written.
+        session = new SshSession();
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, "not a key"));
+        Check(error is ArgumentException && session.Files.Count == 0, "install: a line that is not a key is refused");
+
+        Console.WriteLine();
+        Console.WriteLine(_passed + " checks passed");
+        return 0;
+    }
+}
