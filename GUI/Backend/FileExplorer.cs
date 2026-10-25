@@ -159,7 +159,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             }
         }
 
-        /// <summary>The permissions as "rwxr-xr-x (755)" for the tooltip of the name; null when the listing gave none.</summary>
+        /// <summary>The permissions as "rwxr-xr-x (755)" for the Permissions column and the tooltip of the name; null when the listing gave none.</summary>
         public string PermissionsText
         {
             get
