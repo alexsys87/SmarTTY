@@ -264,10 +264,10 @@ public partial class DeviceTerminalControl
     /// <summary>Runs the receive on a worker thread with a progress window. The caller has claimed the line.</summary>
     private void RunZModemReceive(string folder)
     {
-        XModemTransferForm transferForm = new XModemTransferForm("ZMODEM Receive");
+        ITransferProgressWindow transferForm = CreateTransferProgressWindow("ZMODEM Receive", showErrorCount: true);
         try
         {
-            transferForm.Show(this);
+            transferForm.Show();
         }
         catch (Exception)
         {
@@ -310,10 +310,7 @@ public partial class DeviceTerminalControl
                 {
                     bool cancelled = transferForm.IsCancelled;
                     string lastStatus = transferForm.LastStatus;
-                    if (!transferForm.IsDisposed)
-                    {
-                        transferForm.Close(); // a modeless window is disposed by closing it
-                    }
+                    transferForm.Dispose();
                     string title = "ZMODEM Receive";
                     if (success)
                     {
@@ -460,8 +457,8 @@ public partial class DeviceTerminalControl
             return;
         }
 
-        XModemTransferForm transferForm = new XModemTransferForm("ZMODEM Send");
-        transferForm.Show(this);
+        ITransferProgressWindow transferForm = CreateTransferProgressWindow("ZMODEM Send", showErrorCount: true);
+        transferForm.Show();
 
         while (_xmodemRxQueue.TryTake(out _)) { }
         _lineOwner = _asyncTransportConnection;
@@ -515,10 +512,7 @@ public partial class DeviceTerminalControl
                 {
                     bool cancelled = transferForm.IsCancelled;
                     string lastStatus = transferForm.LastStatus;
-                    if (!transferForm.IsDisposed)
-                    {
-                        transferForm.Close(); // a modeless window is disposed by closing it
-                    }
+                    transferForm.Dispose();
                     string title = "ZMODEM Send";
                     if (success)
                     {

@@ -250,7 +250,7 @@ public class MainWindowController : INotifyPropertyChanged
                 // Device terminals record raw bytes, SSH terminals record UTF-8 text.
                 if (activeTab is DeviceTabContext deviceTab)
                 {
-                    new LogReplayForm(bytes, deviceTab.Terminal).Show();
+                    LogReplayWindow.Replay(bytes, deviceTab.Terminal);
                     return;
                 }
                 TerminalEmulatorControl terminalEmulatorControl = (activeTab as NormalTabContext)?.Terminal;
@@ -258,7 +258,7 @@ public class MainWindowController : INotifyPropertyChanged
                 {
                     throw new Exception("No active terminal");
                 }
-                new LogReplayForm(Encoding.UTF8.GetString(bytes), terminalEmulatorControl).Show();
+                LogReplayWindow.Replay(Encoding.UTF8.GetString(bytes), terminalEmulatorControl);
             }
             catch (Exception exception)
             {

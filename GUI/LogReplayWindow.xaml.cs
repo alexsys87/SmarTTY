@@ -1,9 +1,14 @@
-using SmarTTY.Controls;
 using System;
+using System.Windows;
+using System.Windows.Threading;
+using SmarTTY.Controls;
 
-namespace SmarTTY.Forms;
+namespace SmarTTY.GUI;
 
-public partial class LogReplayForm : DpiAwareForm
+/// <summary>
+/// Replays a recorded log into the live terminal, step by step, with pause and speed controls.
+/// </summary>
+public partial class LogReplayWindow : Window
 {
     private readonly string _logText;
 
@@ -17,33 +22,56 @@ public partial class LogReplayForm : DpiAwareForm
 
     private readonly int _length;
 
+    private readonly DispatcherTimer _timer;
+
     private int _position;
 
     private bool _isPaused;
 
     private bool _finished;
 
-    public LogReplayForm(string logText, TerminalEmulatorControl terminalEmulatorControl)
-        : this(terminalEmulatorControl)
-    {
-        _logText = logText ?? throw new ArgumentNullException(nameof(logText));
-        _length = _logText.Length;
-    }
-
-    public LogReplayForm(byte[] rawBytes, DeviceTerminalControl deviceTerminal)
-        : this(null)
-    {
-        _rawBytes = rawBytes ?? throw new ArgumentNullException(nameof(rawBytes));
-        _deviceTerminal = deviceTerminal ?? throw new ArgumentNullException(nameof(deviceTerminal));
-        _length = _rawBytes.Length;
-    }
-
-    private LogReplayForm(TerminalEmulatorControl terminalEmulatorControl)
+    private LogReplayWindow(string logText, TerminalEmulatorControl terminalEmulatorControl)
     {
         InitializeComponent();
-        FormIcons.Apply(this, "replay");
         _terminalEmulatorControl = terminalEmulatorControl;
-        Text = "Replay log";
+        _logText = logText;
+        _length = logText.Length;
+        _timer = CreateTimer();
+    }
+
+    private LogReplayWindow(byte[] rawBytes, DeviceTerminalControl deviceTerminal)
+    {
+        InitializeComponent();
+        _rawBytes = rawBytes;
+        _deviceTerminal = deviceTerminal;
+        _length = rawBytes.Length;
+        _timer = CreateTimer();
+    }
+
+    /// <summary>Replays a recorded text log into <paramref name="terminal"/>.</summary>
+    public static void Replay(string logText, TerminalEmulatorControl terminal)
+    {
+        Show(new LogReplayWindow(logText ?? throw new ArgumentNullException(nameof(logText)), terminal));
+    }
+
+    /// <summary>Replays the raw byte log of a device terminal through that same terminal.</summary>
+    public static void Replay(byte[] rawBytes, DeviceTerminalControl deviceTerminal)
+    {
+        Show(new LogReplayWindow(rawBytes ?? throw new ArgumentNullException(nameof(rawBytes)), deviceTerminal ?? throw new ArgumentNullException(nameof(deviceTerminal))));
+    }
+
+    private static void Show(LogReplayWindow window)
+    {
+        WindowOwnership.Attach(window, WindowOwnership.ActiveWindow());
+        window.Show();
+    }
+
+    private DispatcherTimer CreateTimer()
+    {
+        DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
+        timer.Tick += OnTimerTick;
+        timer.Start();
+        return timer;
     }
 
     private void OnTimerTick(object sender, EventArgs e)
@@ -54,7 +82,7 @@ public partial class LogReplayForm : DpiAwareForm
             {
                 // Playback finished: let the next button click start it from the beginning.
                 _finished = true;
-                button1.Text = "Replay";
+                PauseButton.Content = "Replay";
             }
             return;
         }
@@ -62,7 +90,7 @@ public partial class LogReplayForm : DpiAwareForm
         {
             return;
         }
-        int chunkSize = Math.Min(_length - _position, Math.Max(1, trackBar1.Value));
+        int chunkSize = Math.Min(_length - _position, Math.Max(1, (int)SpeedSlider.Value));
         if (_deviceTerminal != null)
         {
             // Feed the exact bytes of this step as a brand-new slice (starting at offset 0), so the hex dump appends
@@ -87,7 +115,7 @@ public partial class LogReplayForm : DpiAwareForm
         _position += chunkSize;
     }
 
-    private void button1_Click(object sender, EventArgs e)
+    private void Pause_Click(object sender, RoutedEventArgs e)
     {
         if (_finished)
         {
@@ -95,10 +123,10 @@ public partial class LogReplayForm : DpiAwareForm
             return;
         }
         _isPaused = !_isPaused;
-        button1.Text = _isPaused ? "Resume" : "Pause";
+        PauseButton.Content = _isPaused ? "Resume" : "Pause";
     }
 
-    private void button2_Click(object sender, EventArgs e)
+    private void Reset_Click(object sender, RoutedEventArgs e)
     {
         ResetPlayback();
     }
@@ -110,6 +138,12 @@ public partial class LogReplayForm : DpiAwareForm
         _isPaused = false;
         // A multi-byte character split by the previous partial step must not corrupt the re-decoded first step.
         _deviceTerminal?.ResetReplayDecoder();
-        button1.Text = "Pause";
+        PauseButton.Content = "Pause";
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _timer.Stop();
+        base.OnClosed(e);
     }
 }

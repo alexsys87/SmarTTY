@@ -123,6 +123,30 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// <summary>Raised when the user clicks a path or an URL shown in the terminal text (a local file on this machine).</summary>
     public event EventHandler<OpenFileEventArgs> OpenFileRequested;
 
+    /// <summary>
+    /// Replays a recorded raw byte log (the bytes, this terminal). The themed WPF window is injected here by
+    /// <c>App</c>: this control is compiled by the Mono test harness, which cannot reference the WPF dialogs.
+    /// </summary>
+    public static Action<byte[], DeviceTerminalControl> LogReplayPrompt;
+
+    /// <summary>
+    /// Lets the user change the serial port settings (the settings to edit, or null to keep the driver's; the port name).
+    /// Returns whether the dialog was accepted and the chosen settings (null to keep the driver's settings).
+    /// </summary>
+    public static Func<DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings, string, (bool Accepted, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings Settings)> SerialSettingsPrompt;
+
+    /// <summary>
+    /// Creates the progress window of a file transfer (the window title, whether the error count is shown). Injected
+    /// by <c>App</c>, as above. Null when no progress window is available: a transfer then runs without one.
+    /// </summary>
+    public static Func<string, bool, ITransferProgressWindow> TransferProgressWindowFactory;
+
+    private static ITransferProgressWindow CreateTransferProgressWindow(string title, bool showErrorCount)
+    {
+        Func<string, bool, ITransferProgressWindow> factory = TransferProgressWindowFactory;
+        return factory != null ? factory(title, showErrorCount) : new HeadlessTransferProgressWindow();
+    }
+
     public long BytesSent => Interlocked.Read(ref _bytesSent);
 
     public long BytesReceived => Interlocked.Read(ref _bytesReceived);
@@ -1311,9 +1335,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
 
         // Not a "using": the window is modeless and outlives this method; it is closed (and disposed) when the transfer ends.
-        SmarTTY.Forms.XModemTransferForm transferForm = new SmarTTY.Forms.XModemTransferForm(title);
+        ITransferProgressWindow transferForm = CreateTransferProgressWindow(title, showErrorCount: true);
 
-        transferForm.Show(this);
+        transferForm.Show();
 
         // Claim the line only after the window is up (a failing Show must not leave the terminal locked). Stale bytes
         // (a prompt, echo) must not be mistaken for the peer's first answer.
@@ -1406,10 +1430,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 {
                     bool cancelled = transferForm.IsCancelled;
                     string lastStatus = transferForm.LastStatus;
-                    if (!transferForm.IsDisposed)
-                    {
-                        transferForm.Close(); // a modeless window is disposed by closing it
-                    }
+                    transferForm.Dispose();
                     if (success)
                     {
                         string note = successNote?.Invoke();
@@ -1529,7 +1550,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     }
 
     /// <summary>
-    /// Feeds previously recorded received data (see <see cref="SmarTTY.Forms.LogReplayForm"/>) back into this terminal exactly like
+    /// Feeds previously recorded received data (see the log replay window) back into this terminal exactly like
     /// live data: hex bytes into the hex dump in HEX mode, decoded text into the text terminal otherwise. Nothing is
     /// recorded and nothing is sent to the device.
     /// </summary>
@@ -1885,7 +1906,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             MessageBox.Show("The file is empty.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-        new SmarTTY.Forms.LogReplayForm(bytes, this).Show();
+        LogReplayPrompt?.Invoke(bytes, this);
     }
 
     private void btnLog_Click(object sender, EventArgs e)
@@ -2065,10 +2086,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             return;
         }
-        using SerialPortSettingsForm serialPortSettingsForm = new SerialPortSettingsForm(serial.AdvancedSettings, serial.ComPortName);
-        if (serialPortSettingsForm.ShowModal() == DialogResult.OK)
+        if (SerialSettingsPrompt == null)
         {
-            TryApplySerialSettings(serial, serialPortSettingsForm.AdvancedSettings);
+            return;
+        }
+        (bool accepted, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings chosen) =
+            SerialSettingsPrompt(serial.AdvancedSettings, serial.ComPortName);
+        if (accepted)
+        {
+            TryApplySerialSettings(serial, chosen);
             cbBaudRate.Text = (serial.AdvancedSettings?.BaudRate)?.ToString() ?? cbBaudRate.Text;
         }
     }

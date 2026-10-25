@@ -116,6 +116,19 @@ public partial class SshConnector : Component
 
     public event ConfirmationHandler ConfirmationRequested;
 
+    /// <summary>
+    /// Asks whether to save the host key of a server connected to for the first time (settings, key fingerprint).
+    /// The themed WPF window is injected here by <c>App</c>: this class is compiled by the Mono test harness, which
+    /// cannot reference the WPF dialogs. Without a hook the key is not trusted.
+    /// </summary>
+    public static Func<SSHConnectionSettings, string, bool> NewHostKeyPrompt;
+
+    /// <summary>
+    /// Asks whether to keep connecting after the host key of a server changed (settings, the reason, or null).
+    /// Without a hook the changed key is not accepted.
+    /// </summary>
+    public static Func<SSHConnectionSettings, string, bool> HostKeyMismatchPrompt;
+
     public SshConnector()
         : this(null)
     {
@@ -356,7 +369,7 @@ public partial class SshConnector : Component
         catch
         {
         }
-        return NewHostKeyForm.Confirm(sshConnectionSettings, fingerprint);
+        return NewHostKeyPrompt != null && NewHostKeyPrompt(sshConnectionSettings, fingerprint);
     }
 
     private bool ConfirmHostKeyMismatch(SSHConnectionSettings sshConnectionSettings, SshSession.HostKeyInfo hostKeyInfo, string mismatchReason)
@@ -369,7 +382,7 @@ public partial class SshConnector : Component
         {
             return (bool)InvokeOnUiWithResult((Func<bool>)(() => ConfirmHostKeyMismatch(sshConnectionSettings, hostKeyInfo, mismatchReason)));
         }
-        return HostKeyMismatchForm.Confirm(sshConnectionSettings, mismatchReason);
+        return HostKeyMismatchPrompt != null && HostKeyMismatchPrompt(sshConnectionSettings, mismatchReason);
     }
 
     private void ConnectWorker(SSHConnectionSettings sshConnectionSettings, string password, ConnectionAttempt connectionAttempt, bool forcePasswordAuth, bool autoAcceptHostKey)
