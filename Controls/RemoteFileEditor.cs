@@ -5,6 +5,7 @@ using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using SmarTTY.Utilities;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -55,7 +56,7 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     // Unsaved changes are written to a draft on this computer every few seconds (see EditorDraftStore), so that they
     // survive a lost connection and a closed program. The drafts of all editors live in one folder.
-    private static readonly EditorDraftStore Drafts = new EditorDraftStore(Path.Combine(GlobalSettings.DataDirectory, "Drafts"));
+    private static readonly EditorDraftStore Drafts = new EditorDraftStore(Path.Combine(GlobalSettings.DataDirectory, "Drafts"), new DpapiDraftProtector());
 
     private const int DraftIntervalMs = 10000;
 
@@ -66,12 +67,38 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private readonly string _draftKey;
 
+    // Two editors of the same file in one session must not share a draft: the save or the discard of one would remove the
+    // draft of the other, and neither would see the other's text. The first editor of a file has the plain key, the next ones
+    // the key with a number; the number is free again when the editor is closed.
+    private static readonly HashSet<string> ClaimedDraftKeys = new HashSet<string>();
+
+    private static string ClaimDraftKey(string baseKey)
+    {
+        lock (ClaimedDraftKeys)
+        {
+            string key = baseKey;
+            for (int number = 2; !ClaimedDraftKeys.Add(key); number++)
+            {
+                key = baseKey + "-" + number.ToString(CultureInfo.InvariantCulture);
+            }
+            return key;
+        }
+    }
+
+    private static void ReleaseDraftKey(string key)
+    {
+        lock (ClaimedDraftKeys)
+        {
+            ClaimedDraftKeys.Remove(key);
+        }
+    }
+
     private string _baseHash = "";
 
     private System.Windows.Forms.Timer _draftTimer;
 
     // The text version the draft on disk holds (null version = the text as opened is not a draft).
-    private bool _draftWritten;
+    private volatile bool _draftWritten;
 
     private object _draftVersion;
 
@@ -96,12 +123,16 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         this._context = terminalSessionContext;
         RemotePath = text;
-        _draftKey = EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text);
+        _draftKey = ClaimDraftKey(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
         if (Interlocked.Exchange(ref _draftCleanupDone, 1) == 0)
         {
             ThreadPool.QueueUserWorkItem((object state) => Drafts.DeleteOlderThan(DraftMaxAge));
         }
-        Disposed += (object sender, EventArgs e) => _draftTimer?.Dispose();
+        Disposed += (object sender, EventArgs e) =>
+        {
+            _draftTimer?.Dispose();
+            ReleaseDraftKey(_draftKey);
+        };
         ((EditableTextBrowser)this).ReadOnly = true;
         _initialCaret = textPosition;
         _loadThread = new Thread(LoadFile);
@@ -466,6 +497,12 @@ public partial class RemoteFileEditor : CodeEditorPP
                 }
                 catch
                 {
+                    // The text on disk is not the one that was meant to be written: let the next timer tick try again (the
+                    // version was marked as written before this ran). A newer request has its own outcome.
+                    if (draft != null && sequence == Volatile.Read(ref _draftSequence))
+                    {
+                        _draftWritten = false;
+                    }
                 }
             }
         });
