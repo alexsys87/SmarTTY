@@ -1653,9 +1653,10 @@ public class MainWindowController : INotifyPropertyChanged
         ApplyTerminalSettings(terminalEmulatorControl);
         try
         {
-            if (Settings.FontName != null && Settings.FontSize != 0f)
+            Font configuredFont = Settings.ConfiguredFont;
+            if (configuredFont != null)
             {
-                terminalEmulatorControl.Font = new Font(Settings.FontName, Settings.FontSize);
+                terminalEmulatorControl.Font = configuredFont;
             }
         }
         catch

@@ -849,10 +849,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         try
         {
             // Same rule as for SSH tabs: without a configured font the control keeps its own default.
-            if (!string.IsNullOrEmpty(settings.FontName) && settings.FontSize != 0f)
+            Font configuredFont = settings.ConfiguredFont;
+            if (configuredFont != null)
             {
-                hexTerminalControl1.Font = new Font(settings.FontName, settings.FontSize);
-                terminal.Font = new Font(settings.FontName, settings.FontSize);
+                hexTerminalControl1.Font = configuredFont;
+                terminal.Font = configuredFont;
             }
         }
         catch

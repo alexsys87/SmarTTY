@@ -143,6 +143,12 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public float FontSize;
 
+    /// <summary>Bold variant of the terminal font, chosen in the font picker.</summary>
+    public bool FontBold;
+
+    /// <summary>Italic variant of the terminal font, chosen in the font picker.</summary>
+    public bool FontItalic;
+
     public bool ShowMinimalisticModeWarning = true;
 
     public ConsolePalette PaletteOverride;
@@ -247,8 +253,19 @@ public class GlobalSettings : INotifyPropertyChanged
         }
     }
 
+    /// <summary>The bold/italic variant chosen in the font picker.</summary>
     [XmlIgnore]
-    public Font EffectiveFont => new Font(string.IsNullOrEmpty(FontName) ? "Courier New" : FontName, (FontSize == 0f) ? 12f : FontSize);
+    public FontStyle FontVariant => (FontBold ? FontStyle.Bold : FontStyle.Regular) | (FontItalic ? FontStyle.Italic : FontStyle.Regular);
+
+    [XmlIgnore]
+    public Font EffectiveFont => new Font(string.IsNullOrEmpty(FontName) ? "Courier New" : FontName, (FontSize == 0f) ? 12f : FontSize, FontVariant);
+
+    /// <summary>
+    /// The configured terminal font, or null when nothing is configured — the caller then keeps its own default
+    /// instead of overriding it with Courier New.
+    /// </summary>
+    [XmlIgnore]
+    public Font ConfiguredFont => (string.IsNullOrEmpty(FontName) || FontSize == 0f) ? null : new Font(FontName, FontSize, FontVariant);
 
     public bool ShowUnrecognizedCharactersAsHex { get; set; }
 
