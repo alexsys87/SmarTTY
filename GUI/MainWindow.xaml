@@ -246,6 +246,11 @@
             <Image Source="../icons/MainWindow/upload.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="Command _completions..." Click="CommandCompletionsEditor_Click" ToolTip="Edit or create the options that the Smart Terminal suggests for commands (CommandCompletions.xml); can store the file compressed">
+          <MenuItem.Icon>
+            <Image Source="../icons/edit16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="_Settings" Click="Settings_Click">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/settings.png" />

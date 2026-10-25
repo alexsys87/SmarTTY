@@ -34,6 +34,86 @@ internal static class Program
         }
     }
 
+    private static void RunEditorChecks(string root)
+    {
+        string directory = Path.Combine(root, "editor");
+        Directory.CreateDirectory(directory);
+        string xml = Path.Combine(directory, "CommandCompletions.xml");
+        string gz = xml + ".gz";
+
+        CommandCompletion ls = new CommandCompletion
+        {
+            Command = "ls",
+            Description = "list files",
+            SuppressAutoTriggers = true,
+            Options = new[]
+            {
+                new CommandCompletion.Option
+                {
+                    Value = "-a",
+                    Aliases = "--all",
+                    ShortDescription = "all files",
+                    LongDescription = new CommandCompletion.OptionDescription { Summary = "do not hide", Info = "line 1\nline 2" }
+                }
+            }
+        };
+        CommandCompletionDatabase original = new CommandCompletionDatabase { Completions = new[] { ls, new CommandCompletion { CommandLineRegex = "^git (status|diff) ", Options = new[] { new CommandCompletion.Option { Value = "-s" } } } } };
+
+        // saving as gzip replaces the plain file, and back
+        original.SaveTo(xml, false);
+        Check(File.Exists(xml) && !File.Exists(gz) && !CommandCompletionDatabase.IsStoredCompressed(xml), "SaveTo writes plain XML");
+        original.SaveTo(xml, true);
+        Check(!File.Exists(xml) && File.Exists(gz) && CommandCompletionDatabase.IsStoredCompressed(xml) && !File.Exists(gz + ".tmp"), "SaveTo compressed writes only the gzip file");
+        CommandCompletionDatabase fromGz = CommandCompletionDatabase.Load(xml);
+        Check(fromGz.LoadWarning == null && fromGz.Completions.Length == 2 && fromGz.LookupCommand("ls -").Options[0].LongDescription.Info == "line 1\nline 2" && fromGz.LookupCommand("git diff ") != null,
+            "the gzip file loads back with everything in it");
+        File.WriteAllText(xml, "<CommandCompletionDatabase />");
+        original.SaveTo(xml, true);
+        Check(!File.Exists(xml) && CommandCompletionDatabase.Load(xml).Completions.Length == 2, "a stale plain file cannot hide the saved gzip file");
+        original.SaveTo(xml, false);
+        Check(File.Exists(xml) && !File.Exists(gz) && CommandCompletionDatabase.Load(xml).Completions.Length == 2, "saving plain removes the stale gzip file");
+        int counter = CommandCompletionDatabase.ChangeCounter;
+        CommandCompletionDatabase.NotifyChanged();
+        Check(CommandCompletionDatabase.ChangeCounter == counter + 1, "NotifyChanged bumps the counter");
+
+        // edit model
+        CompletionEditModel model = CompletionEditModel.FromDatabase(original);
+        Check(model.Entries.Count == 2 && model.Entries[0].Command == "ls" && model.Entries[0].SuppressAutoTriggers && model.Entries[0].Options[0].Summary == "do not hide" && model.Entries[1].CommandLineRegex == "^git (status|diff) ",
+            "the model copies the database");
+        CommandCompletionDatabase roundTrip = model.ToDatabase();
+        roundTrip.SaveTo(xml, true);
+        CommandCompletionDatabase again = CommandCompletionDatabase.Load(xml);
+        Check(again.Completions.Length == 2 && again.LookupCommand("ls -").Options[0].Aliases == "--all" && again.LookupCommand("ls -").Options[0].LongDescription.Summary == "do not hide" && again.LookupCommand("ls -").SuppressAutoTriggers,
+            "database -> model -> gzip -> database keeps all fields");
+        Check(model.Validate(new System.Collections.Generic.List<string>()).Count == 0, "a valid model has no errors");
+        Check(model.Entries[0].Matches("ls -") && !model.Entries[0].Matches("ls") && model.Entries[1].Matches("git diff -") && !model.Entries[1].Matches("git log "), "Matches decides like the terminal");
+
+        CompletionEditModel messy = new CompletionEditModel();
+        messy.Entries.Add(new CommandEditItem());
+        messy.Entries.Add(new CommandEditItem { Command = "  cd  ", Description = "   " });
+        messy.Entries[1].Options.Add(new OptionEditItem { Value = " -P ", Aliases = "", Summary = "x" });
+        messy.Entries[1].Options.Add(new OptionEditItem { Value = "-P" });
+        messy.Entries.Add(new CommandEditItem { Command = "cd" });
+        messy.Entries.Add(new CommandEditItem { Command = "grep", CommandLineRegex = "[" });
+        messy.Entries[3].Options.Add(new OptionEditItem());
+        System.Collections.Generic.List<string> warnings = new System.Collections.Generic.List<string>();
+        System.Collections.Generic.List<string> errors = messy.Validate(warnings);
+        Check(errors.Count == 3 && errors.Any(e => e.Contains("#1")) && errors.Any(e => e.Contains("invalid regular expression")) && errors.Any(e => e.Contains("no value")), "empty command, invalid regex and empty option are errors");
+        Check(warnings.Count == 2 && warnings.Any(w => w.Contains("more than once") && w.Contains("'cd'")) && warnings.Any(w => w.Contains("option '-P'")), "duplicates are warnings");
+        CommandCompletion cleaned = messy.ToDatabase().Completions[1];
+        Check(cleaned.Command == "cd" && cleaned.Description == null && cleaned.Options[0].Value == "-P" && cleaned.Options[0].Aliases == null && cleaned.Options[0].LongDescription.Summary == "x", "values are trimmed and empty ones are left out");
+        Check(CommandEditItem.GetRegexError("[") != null && CommandEditItem.GetRegexError("^a+") == null && CommandEditItem.GetRegexError("  ") == null, "regex errors are reported");
+
+        CommandEditItem copy = model.Entries[0].Clone();
+        copy.Options[0].Value = "-A";
+        Check(model.Entries[0].Options[0].Value == "-a" && copy.Command == "ls", "a clone is independent");
+        int notifications = 0;
+        model.Entries[0].PropertyChanged += (s, e) => notifications++;
+        model.Entries[0].Command = "ls2";
+        model.Entries[0].Command = "ls2";
+        Check(notifications == 2 && model.Entries[0].DisplayName == "ls2", "setting a property notifies once and only when it changes (Command + DisplayName)");
+    }
+
     private static void Main()
     {
         string directory = Path.Combine(Path.GetTempPath(), "smartty-completions-" + Guid.NewGuid().ToString("N"));
@@ -118,6 +198,7 @@ internal static class Program
             File.Delete(path + ".gz");
             File.WriteAllText(path, "<CommandCompletionDatabase>" + new string(' ', 16 * 1024 * 1024) + "</CommandCompletionDatabase>");
             ExpectEmpty(path, "oversized XML is rejected");
+            RunEditorChecks(directory);
             Console.WriteLine("All " + _passed + " regression checks passed.");
         }
         finally

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.CommandCompletionsEditorWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Command completions" Width="980" Height="700" MinWidth="780" MinHeight="560" WindowStartupLocation="CenterOwner" Closing="Window_Closing">
+  <Grid Margin="8">
+    <FrameworkElement.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
+          <Setter Property="Margin" Value="3" />
+          <Setter Property="Padding" Value="8 3 8 3" />
+        </Style>
+        <Style x:Key="{x:Type TextBox}" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+          <Setter Property="Margin" Value="3" />
+          <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+      </ResourceDictionary>
+    </FrameworkElement.Resources>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="3 0 3 8" Text="These entries drive the suggestions of the Smart Terminal for the options of a command (for example the flags after &quot;ls -&quot;). An entry applies to the command lines that start with its command, or to the ones its regular expression matches. Changes are used by new suggestions right after saving." />
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="270" />
+        <ColumnDefinition Width="8" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Grid Grid.Column="0">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBox x:Name="SearchBox" Grid.Row="0" TextChanged="SearchBox_TextChanged" ToolTip="Shows only the commands whose name, description or options contain this text." />
+        <ListBox x:Name="CommandList" Grid.Row="1" Margin="3" DisplayMemberPath="DisplayName" SelectionMode="Single" SelectionChanged="CommandList_SelectionChanged" />
+        <WrapPanel Grid.Row="2">
+          <Button Content="New" Click="NewCommand_Click" ToolTip="Adds a new command" />
+          <Button x:Name="DuplicateCommandButton" Content="Duplicate" Click="DuplicateCommand_Click" ToolTip="Copies the selected command with all its options" />
+          <Button x:Name="DeleteCommandButton" Content="Delete" Click="DeleteCommand_Click" ToolTip="Removes the selected command" />
+        </WrapPanel>
+      </Grid>
+      <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="DetailsPanel" DataContext="{Binding SelectedItem, ElementName=CommandList}" IsEnabled="False">
+          <GroupBox Header="Command" Margin="3">
+            <Grid Margin="4">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="Command:" VerticalAlignment="Center" Margin="3 0 8 0" />
+              <TextBox x:Name="CommandBox" Grid.Row="0" Grid.Column="1" Text="{Binding Command, UpdateSourceTrigger=PropertyChanged}" ToolTip="The command word, for example ls or systemctl. The entry is used for command lines that start with it followed by a space." />
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="3 0 8 0" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" ToolTip="A short description of the command." />
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="Line regex:" VerticalAlignment="Center" Margin="3 0 8 0" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CommandLineRegex, UpdateSourceTrigger=PropertyChanged}" ToolTip="Optional. A regular expression for the whole command line, for example ^git (status|diff) . When it is set, it decides which command lines the entry applies to instead of the command word." />
+              <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding RegexError}" TextWrapping="Wrap" Margin="3 0 3 3" Foreground="{DynamicResource Theme.Error}" />
+              <CheckBox Grid.Row="4" Grid.Column="1" Margin="3 3 3 3" IsChecked="{Binding SuppressAutoTriggers}" Content="Do not offer the options automatically while typing" ToolTip="The list of options then opens only on request (the completion key), not by itself after a dash." />
+              <TextBlock Grid.Row="5" Grid.Column="0" Text="Try:" VerticalAlignment="Center" Margin="3 0 8 0" />
+              <Grid Grid.Row="5" Grid.Column="1">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="TestBox" Grid.Column="0" TextChanged="TestBox_TextChanged" ToolTip="Type a command line to check whether this entry would be used for it, for example: ls -" />
+                <TextBlock x:Name="TestResult" Grid.Column="1" VerticalAlignment="Center" Margin="6 0 3 0" />
+              </Grid>
+            </Grid>
+          </GroupBox>
+          <GroupBox Header="Options" Margin="3">
+            <Grid Margin="4" MinHeight="300">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="*" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <ListBox x:Name="OptionList" Grid.Row="0" Margin="3" Height="260" ItemsSource="{Binding Options}" DisplayMemberPath="DisplayName" SelectionMode="Single" SelectionChanged="OptionList_SelectionChanged" />
+                <WrapPanel Grid.Row="1">
+                  <Button Content="New" Click="NewOption_Click" ToolTip="Adds an option to this command" />
+                  <Button x:Name="DuplicateOptionButton" Content="Duplicate" Click="DuplicateOption_Click" />
+                  <Button x:Name="DeleteOptionButton" Content="Delete" Click="DeleteOption_Click" />
+                  <Button x:Name="OptionUpButton" Content="Up" Click="OptionUp_Click" ToolTip="Moves the option up in the list" />
+                  <Button x:Name="OptionDownButton" Content="Down" Click="OptionDown_Click" ToolTip="Moves the option down in the list" />
+                </WrapPanel>
+              </Grid>
+              <StackPanel x:Name="OptionPanel" Grid.Column="2" DataContext="{Binding SelectedItem, ElementName=OptionList}" IsEnabled="False">
+                <TextBlock Text="Option:" Margin="3 0 3 0" />
+                <TextBox x:Name="OptionValueBox" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" ToolTip="The text that is inserted, for example -a or --all or a sub command like status." />
+                <TextBlock Text="Other spellings (separated by |):" Margin="3 4 3 0" />
+                <TextBox Text="{Binding Aliases, UpdateSourceTrigger=PropertyChanged}" ToolTip="Alternative forms that are offered as well, for example --all|--almost-all" />
+                <TextBlock Text="Short description:" Margin="3 4 3 0" />
+                <TextBox Text="{Binding ShortDescription, UpdateSourceTrigger=PropertyChanged}" ToolTip="Shown next to the option in the list." />
+                <TextBlock Text="Details - summary:" Margin="3 4 3 0" />
+                <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" ToolTip="The first line of the details that are shown for the highlighted option." />
+                <TextBlock Text="Details - text:" Margin="3 4 3 0" />
+                <TextBox Text="{Binding Info, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Height="90" ToolTip="The longer explanation of the highlighted option." />
+              </StackPanel>
+            </Grid>
+          </GroupBox>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+    <Grid Grid.Row="2" Margin="0 8 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0" VerticalAlignment="Center">
+        <CheckBox x:Name="CompressBox" Margin="3" Content="Save compressed (CommandCompletions.xml.gz)" Checked="Compress_Changed" Unchecked="Compress_Changed" ToolTip="Stores the file as gzip, which SmarTTY reads as well; useful for a large dictionary. The other variant of the file is deleted when saving, because the plain XML file takes precedence." />
+        <TextBlock x:Name="PathText" Margin="3 0 3 0" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Theme.TextSecondary}" />
+        <TextBlock x:Name="StatusText" Margin="3 2 3 0" TextWrapping="Wrap" />
+      </StackPanel>
+      <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+        <Button Content="Reload" MinWidth="80" Click="Reload_Click" ToolTip="Discards the changes and reads the file again" />
+        <Button Content="Save" MinWidth="80" Click="Save_Click" />
+        <Button Content="Close" MinWidth="80" IsCancel="True" />
+      </WrapPanel>
+    </Grid>
+  </Grid>
+</Window>
