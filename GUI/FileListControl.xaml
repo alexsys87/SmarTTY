@@ -330,6 +330,13 @@
                 </GridViewColumn.CellTemplate>
               </GridViewColumn>
               <GridViewColumn Header="Size" DisplayMemberBinding="{Binding Size}" />
+              <GridViewColumn Header="Permissions">
+                <GridViewColumn.CellTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding PermissionsText}" FontFamily="Consolas, Courier New" />
+                  </DataTemplate>
+                </GridViewColumn.CellTemplate>
+              </GridViewColumn>
             </GridView.Columns>
           </GridView>
         </ListView.View>
