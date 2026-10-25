@@ -1062,9 +1062,14 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
         }
         sshShellChannel.WaitClosed();
-        if (sshShellChannel.ExitStatus != 0)
+        int sudoExitStatus = sshShellChannel.ExitStatus;
+        if (!sshShellChannel.HasExitStatus && sshShellChannel.ExitSignal == null)
         {
-            throw new Exception("Sudo exited with code " + sshShellChannel.ExitStatus);
+            throw new Exception("Sudo did not report an exit status");
+        }
+        if (sudoExitStatus != 0)
+        {
+            throw new Exception("Sudo exited with code " + sudoExitStatus);
         }
     }
 
