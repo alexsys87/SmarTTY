@@ -452,6 +452,8 @@
                           <RowDefinition Height="Auto" />
                           <RowDefinition Height="*" />
                           <RowDefinition Height="Auto" />
+                          <!-- Status bar below the horizontal scroll bar (file editor tabs). -->
+                          <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
@@ -475,6 +477,7 @@
                             <Grid.RowDefinitions>
                               <RowDefinition Height="Auto" />
                               <RowDefinition Height="Auto" />
+                              <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="Auto" />
@@ -483,32 +486,59 @@
                               <ColumnDefinition Width="Auto" />
                               <ColumnDefinition Width="Auto" />
                               <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Find: " VerticalAlignment="Center" />
-                            <TextBox Name="txtSearch" Grid.Column="1" VerticalContentAlignment="Center" VerticalAlignment="Center" Text="{Binding SearchedText, UpdateSourceTrigger=PropertyChanged}" KeyDown="txtSearch_KeyDown" />
+                            <TextBox Name="txtSearch" Grid.Column="1" VerticalContentAlignment="Center" VerticalAlignment="Center" Text="{Binding SearchedText, UpdateSourceTrigger=PropertyChanged}" KeyDown="txtSearch_KeyDown">
+                              <TextBox.Style>
+                                <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasQueryError}" Value="True">
+                                      <Setter Property="Background" Value="#FFFFC8C8" />
+                                      <Setter Property="Foreground" Value="Black" />
+                                      <Setter Property="ToolTip" Value="{Binding QueryError}" />
+                                    </DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </TextBox.Style>
+                            </TextBox>
                             <ToggleButton Grid.Column="2" ToolTip="Case-sensitive search" IsChecked="{Binding CaseSensitive}" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}">
                               <TextBlock Text="Aa" />
                             </ToggleButton>
-                            <Button Grid.Column="3" Click="SearchUp_Click">
+                            <ToggleButton Grid.Column="3" ToolTip="Whole word" IsChecked="{Binding WholeWord}" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}">
+                              <TextBlock Text="W" FontWeight="Bold" />
+                            </ToggleButton>
+                            <ToggleButton Grid.Column="4" ToolTip="Regular expression (the replacement may use $1, ${name})" IsChecked="{Binding UseRegex}" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}">
+                              <TextBlock Text=".*" />
+                            </ToggleButton>
+                            <ToggleButton Grid.Column="5" ToolTip="Search only in the text that is selected now (file editor tabs)" IsChecked="{Binding InSelection}" Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Window}}}" Visibility="{Binding CanReplace, Converter={StaticResource BoolToVisibility}}">
+                              <TextBlock Text="Sel" />
+                            </ToggleButton>
+                            <Button Grid.Column="6" Click="SearchUp_Click">
                               <Image Width="16" Height="16" Source="../icons/MainWindow/go-up-search.png" />
                             </Button>
-                            <Button Grid.Column="4" Click="SearchDown_Click">
+                            <Button Grid.Column="7" Click="SearchDown_Click">
                               <Image Width="16" Height="16" Source="../icons/MainWindow/go-down-search.png" />
                             </Button>
-                            <Button Grid.Column="5" Margin="5 0 0 0" Click="CloseSearch_Click">
+                            <Button Grid.Column="8" Margin="5 0 0 0" Click="CloseSearch_Click">
                               <Image Width="16" Height="16" Source="../icons/delete16.png" />
                             </Button>
                             <!-- Replace row: file editor tabs only, shown with Ctrl+H. -->
                             <TextBlock Grid.Row="1" Text="Replace: " VerticalAlignment="Center" Visibility="{Binding IsReplaceVisible, Converter={StaticResource BoolToVisibility}}" />
                             <TextBox Name="txtReplace" Grid.Row="1" Grid.Column="1" Margin="0 2 0 0" VerticalContentAlignment="Center" VerticalAlignment="Center" Text="{Binding ReplacementText, UpdateSourceTrigger=PropertyChanged}" KeyDown="txtReplace_KeyDown" Visibility="{Binding IsReplaceVisible, Converter={StaticResource BoolToVisibility}}" />
-                            <Button Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Margin="0 2 0 0" Padding="4 0" Content="Replace" ToolTip="Replace the current match and find the next one (Enter)" Click="Replace_Click" Visibility="{Binding IsReplaceVisible, Converter={StaticResource BoolToVisibility}}" />
-                            <Button Grid.Row="1" Grid.Column="4" Grid.ColumnSpan="2" Margin="2 2 0 0" Padding="4 0" Content="All" ToolTip="Replace all matches in the file (one undo step)" Click="ReplaceAll_Click" Visibility="{Binding IsReplaceVisible, Converter={StaticResource BoolToVisibility}}" />
+                            <Button Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="4" Margin="0 2 0 0" Padding="4 0" Content="Replace" ToolTip="Replace the current match and find the next one (Enter)" Click="Replace_Click" Visibility="{Binding IsReplaceVisible, Converter={StaticResource BoolToVisibility}}" />
+                            <Button Grid.Row="1" Grid.Column="6" Grid.ColumnSpan="3" Margin="2 2 0 0" Padding="4 0" Content="All" ToolTip="Replace all matches in the file (one undo step)" Click="ReplaceAll_Click" Visibility="{Binding IsReplaceVisible, Converter={StaticResource BoolToVisibility}}" />
+                            <!-- What the last search or replace found (replaces the "Cannot find" boxes in file editor tabs). -->
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="9" Margin="0 2 0 0" TextWrapping="Wrap" Text="{Binding ResultText}" Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
                           </Grid>
                         </Border>
                         <ContentControl Grid.Row="2" Content="{Binding Control}" />
                         <!-- The vertical scroll bar belongs to the editor row only, not to the tool bar above it. -->
                         <ContentControl Grid.Row="2" Grid.Column="1" Content="{Binding VerticalScrollBar}" />
                         <ContentControl Grid.Row="3" Grid.ColumnSpan="2" Content="{Binding HorizontalScrollBar}" />
+                        <ContentControl Grid.Row="4" Grid.ColumnSpan="2" HorizontalContentAlignment="Stretch" Content="{Binding StatusBar}" />
                       </Grid>
                     </DataTemplate>
                   </TabControl.ContentTemplate>

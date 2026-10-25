@@ -41,6 +41,18 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool BackupBeforeSave
+    {
+        get
+        {
+            return _Settings.Editor.BackupBeforeSave;
+        }
+        set
+        {
+            _Settings.Editor.BackupBeforeSave = value;
+        }
+    }
+
     public bool SyntaxHighlighting
     {
         get

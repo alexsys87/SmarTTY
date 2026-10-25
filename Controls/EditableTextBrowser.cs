@@ -598,21 +598,42 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
     /// </summary>
     public int ReplaceAll(string searchText, string replacement, bool ignoreCase)
     {
-        if (_readOnly || string.IsNullOrEmpty(searchText))
+        if (string.IsNullOrEmpty(searchText))
+        {
+            return 0;
+        }
+        return ReplaceAll(TextMatcher.Literal(searchText, ignoreCase), replacement, TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid, out _);
+    }
+
+    /// <summary>
+    /// Replaces every match of <paramref name="matcher"/> (a regular expression replacement may use $1, ${name}) as one
+    /// undo step and returns how many were replaced. A valid <paramref name="scopeStart"/> and <paramref name="scopeEnd"/>
+    /// limit it to that range, and <paramref name="newScopeEnd"/> is where the end of the range is afterwards.
+    /// The caret stays where it was (clamped to its line).
+    /// </summary>
+    public int ReplaceAll(TextMatcher matcher, string replacement, TextDocument.TextPosition scopeStart, TextDocument.TextPosition scopeEnd, out TextDocument.TextPosition newScopeEnd)
+    {
+        newScopeEnd = scopeEnd;
+        if (_readOnly || matcher == null)
         {
             return 0;
         }
         replacement = replacement ?? "";
-        StringComparison comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        bool scoped = scopeStart.IsValid && scopeEnd.IsValid;
         TextDocument.TextPosition caret = CaretPosition;
         int count = 0;
+        int firstLine = scoped ? Math.Max(0, scopeStart.Line) : 0;
+        int lastLine = scoped ? scopeEnd.Line : (Doc.LineCount - 1);
+        int endLine = scopeEnd.Line;
+        int endColumn = scopeEnd.Column;
         ExecuteAsSingleUndoStep(() =>
         {
-            for (int line = 0; line < Doc.LineCount; line++)
+            for (int line = firstLine; line <= lastLine && line < Doc.LineCount; line++)
             {
                 string text = Doc.GetLineText(line);
-                int lineCount = 0;
-                string replaced = TextDocument.ReplaceAll(text, searchText, replacement, comparison, ref lineCount);
+                int from = (scoped && line == scopeStart.Line) ? scopeStart.Column : 0;
+                int to = (scoped && line == scopeEnd.Line) ? Math.Min(scopeEnd.Column, text.Length) : text.Length;
+                string replaced = matcher.ReplaceAll(text, from, to, replacement, out int lineCount, out int newTo);
                 if (lineCount == 0)
                 {
                     continue;
@@ -620,9 +641,21 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
                 count += lineCount;
                 ReplaceText(new TextDocument.TextPosition(0, line), new TextDocument.TextPosition(text.Length, line), select: false, replaced);
                 // A replacement with line breaks adds lines: do not search the inserted text again.
-                line += CountLineBreaks(replaced);
+                int added = CountLineBreaks(replaced);
+                if (scoped && line == scopeEnd.Line)
+                {
+                    int lastBreak = replaced.LastIndexOfAny(new[] { '\r', '\n' });
+                    endLine = scopeEnd.Line + added;
+                    endColumn = (added == 0) ? newTo : Math.Max(0, newTo - (lastBreak + 1));
+                }
+                line += added;
+                lastLine += added;
             }
         });
+        if (scoped)
+        {
+            newScopeEnd = new TextDocument.TextPosition(endColumn, endLine);
+        }
         if (count > 0)
         {
             int caretLine = Math.Min(caret.Line, Math.Max(0, Doc.LineCount - 1));

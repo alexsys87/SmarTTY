@@ -15,7 +15,8 @@ internal enum EditorToolbarCommand
     SelectAll,
     Find,
     Replace,
-    GoToLine
+    GoToLine,
+    Reload
 }
 
 /// <summary>
@@ -42,6 +43,9 @@ internal struct EditorCommandState
     /// <summary>The file does not exist yet: saving creates it, even when nothing was typed.</summary>
     public bool IsNewFile { get; set; }
 
+    /// <summary>A save is running in the background.</summary>
+    public bool IsSaving { get; set; }
+
     public bool IsEnabled(EditorToolbarCommand command)
     {
         switch (command)
@@ -65,6 +69,9 @@ internal struct EditorCommandState
                 return HasText;
             case EditorToolbarCommand.Replace:
                 return !ReadOnly;
+            case EditorToolbarCommand.Reload:
+                // There is a file on the server to load again, and nothing is being written to it.
+                return !ReadOnly && !IsNewFile && !IsSaving;
             case EditorToolbarCommand.Find:
             case EditorToolbarCommand.GoToLine:
                 return true;
@@ -96,7 +103,7 @@ internal readonly struct EditorCommandDescription
     /// <summary>Shown next to the menu item; the editor itself handles the key.</summary>
     public string Shortcut { get; }
 
-    public string ToolTip => Text.TrimEnd('.') + " (" + Shortcut + ")";
+    public string ToolTip => (Shortcut.Length == 0) ? Text : (Text.TrimEnd('.') + " (" + Shortcut + ")");
 }
 
 /// <summary>
@@ -109,6 +116,7 @@ internal static class EditorCommandCatalog
     public static readonly EditorToolbarCommand?[] ToolBarLayout =
     {
         EditorToolbarCommand.Save,
+        EditorToolbarCommand.Reload,
         null,
         EditorToolbarCommand.Undo,
         EditorToolbarCommand.Redo,
@@ -141,7 +149,8 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.Replace,
         EditorToolbarCommand.GoToLine,
         null,
-        EditorToolbarCommand.Save
+        EditorToolbarCommand.Save,
+        EditorToolbarCommand.Reload
     };
 
     public static EditorCommandDescription Describe(EditorToolbarCommand command)
@@ -170,8 +179,49 @@ internal static class EditorCommandCatalog
                 return new EditorCommandDescription("Replace", "replace", "editor/replace.png", "Ctrl+H");
             case EditorToolbarCommand.GoToLine:
                 return new EditorCommandDescription("Go to Line...", "goto-line", "editor/goto-line.png", "Ctrl+G");
+            case EditorToolbarCommand.Reload:
+                return new EditorCommandDescription("Reload from Server", "refresh", "MainWindow/refresh16.png", "");
             default:
                 throw new ArgumentOutOfRangeException(nameof(command));
         }
+    }
+}
+
+/// <summary>The texts of the status bar below the editor.</summary>
+internal static class EditorStatusText
+{
+    /// <summary>The caret: lines and columns are counted from 1, the arguments from 0.</summary>
+    public static string Position(int line, int column)
+    {
+        return "Ln " + (line + 1) + ", Col " + (column + 1);
+    }
+
+    /// <summary>The selection: its length in characters (line breaks included), and its lines when it spans several.</summary>
+    public static string Selection(int characters, int lines)
+    {
+        string text = characters + ((characters == 1) ? " char" : " chars");
+        return (lines > 1) ? (text + ", " + lines + " lines") : text;
+    }
+
+    /// <summary>Whether the file on the server matches the text in the editor.</summary>
+    public static string State(bool loading, bool readOnlyMode, bool saving, bool modified, bool isNewFile)
+    {
+        if (loading)
+        {
+            return "Loading...";
+        }
+        if (readOnlyMode)
+        {
+            return "Read-only";
+        }
+        if (saving)
+        {
+            return "Saving...";
+        }
+        if (modified)
+        {
+            return isNewFile ? "New file, modified" : "Modified";
+        }
+        return isNewFile ? "New file" : "Saved";
     }
 }

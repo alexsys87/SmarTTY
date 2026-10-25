@@ -10,7 +10,8 @@ namespace SmarTTY.Controls;
 /// <summary>
 /// A remote file editor with its context menu. The WPF tool bar above the editor offers the same commands, and both
 /// run them through <see cref="RunCommand"/>. The commands that need the main window (saving, the search bar, the Go
-/// to Line dialog) are raised as events; the others act on the editor directly.
+/// to Line dialog) are raised as events; the others act on the editor directly. The WPF status bar below the editor
+/// reads the state of the editor when <see cref="StateChanged"/> is raised.
 /// </summary>
 internal sealed class RemoteFileEditorPanel : UserControl
 {
@@ -79,6 +80,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         _editor.KeyUp += (sender, e) => ScheduleRefresh();
         _editor.SavingChanged += (sender, e) => ScheduleRefresh();
         _editor.LoadCompleted += (sender, e) => ScheduleRefresh();
+        _editor.FormatChanged += (sender, e) => ScheduleRefresh();
 
         ThemeManager.ThemeChanged += OnThemeChanged;
         ApplyTheme();
@@ -138,6 +140,12 @@ internal sealed class RemoteFileEditorPanel : UserControl
                 case EditorToolbarCommand.SelectAll:
                     _editor.SelectAllText();
                     break;
+                case EditorToolbarCommand.Reload:
+                    if (ConfirmDiscardChanges("Drop your changes and load " + _editor.RemotePath + " from the server again?"))
+                    {
+                        _editor.Reload();
+                    }
+                    break;
                 case EditorToolbarCommand.Find:
                     focusEditor = false;
                     FindRequested?.Invoke(this, EventArgs.Empty);
@@ -174,8 +182,14 @@ internal sealed class RemoteFileEditorPanel : UserControl
             CanUndo = _editor.CanUndo,
             CanRedo = _editor.CanRedo,
             IsModified = _editor.IsModified,
-            IsNewFile = _editor.IsNewFile
+            IsNewFile = _editor.IsNewFile,
+            IsSaving = _editor.IsSaving
         };
+    }
+
+    private bool ConfirmDiscardChanges(string question)
+    {
+        return !_editor.IsModified || MessageBox.Show(question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
     }
 
     internal void RefreshState()

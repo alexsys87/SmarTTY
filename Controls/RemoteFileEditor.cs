@@ -39,6 +39,50 @@ public partial class RemoteFileEditor : CodeEditorPP
     // The user's answer to "Convert CRLF line endings to LF?", so that it is asked once per file.
     private bool? _convertCrLf;
 
+    // The bytes of the file as they are on the server (what was downloaded, then what was saved): "Reopen with
+    // encoding" decodes them again.
+    private byte[] _rawBytes;
+
+    // The file on the server as it was when it was opened or last saved (see FetchSignature): a save that finds
+    // something else there asks before it overwrites the changes of somebody else.
+    private string _remoteSignature;
+
+    // The conflict question was answered "overwrite": the next save does not check the server again.
+    private bool _forceOverwrite;
+
+    // The conflict question was answered "reload": the server version is loaded once the save has ended.
+    private bool _pendingReload;
+
+    // A reload of the opened file is running (the text stays on screen and the editor read-only until it is done).
+    private bool _reloading;
+
+    private bool _loaded;
+
+    private bool _restoreCaret;
+
+    private TextDocument.TextPosition _caretToRestore;
+
+    // The file~ copy of the original is made by the first save of the file after it was loaded.
+    private bool _backupDone;
+
+    // The question about a byte order mark before "#!" is asked once per file.
+    private bool _bomAnswered;
+
+    /// <summary>The encoding the file is read in and saved in.</summary>
+    public TextFileEncoding FileEncoding { get; private set; } = TextFileEncodings.Utf8;
+
+    /// <summary>The line breaks of the file as it was loaded, or as the user converted them.</summary>
+    public LineEndingKind LineEndings { get; private set; } = LineEndingKind.None;
+
+    /// <summary>Raised on the UI thread when the encoding or the line endings changed (or the file was loaded).</summary>
+    public event EventHandler FormatChanged;
+
+    /// <summary>
+    /// The encoding can be reinterpreted: the whole file has been loaded from the server (reading it again in another
+    /// encoding does not write anything, so a read-only file qualifies, a preview of a huge file does not).
+    /// </summary>
+    public bool CanReopenWithEncoding => _loaded && !_reloading && _rawBytes != null && !IsNewFile && !IsPreview;
+
     /// <summary>The file did not exist when the editor was opened: it is created by the first save.</summary>
     public bool IsNewFile { get; private set; }
 
@@ -167,15 +211,25 @@ public partial class RemoteFileEditor : CodeEditorPP
                 }
                 CheckWriteAccess(string.IsNullOrEmpty(directory) ? "/" : directory, forNewFile: true);
                 IsNewFile = true;
-                BeginInvoke((ThreadStart)(() => FinishLoading("")));
+                BeginInvoke((ThreadStart)(() => FinishLoading(null, null)));
                 return;
             }
-            CheckWriteAccess(RemotePath, forNewFile: false);
+            IsNewFile = false;
+            // A reload keeps the answers given when the file was opened (the permission and the size questions).
+            if (!_reloading)
+            {
+                CheckWriteAccess(RemotePath, forNewFile: false);
+            }
+            // Taken before the download: a change made while it runs is then noticed by the next save.
+            string signature = FetchSignature();
+            MemoryStream downloaded = new MemoryStream();
+            // Only the text of the preview is decoded as it arrives; the file is decoded once it is complete.
             StringBuilder content = new StringBuilder();
+            bool showPreview = !_reloading;
             using (ScpDownloadStream scpDownloadStream = _context.Session.OpenDownload(RemotePath))
             {
                 // The size is known from the first SCP header, before any data is read.
-                long limit = ChooseLoadLimit(scpDownloadStream.Length);
+                long limit = _reloading ? (IsPreview ? EditorFilePolicy.PreviewBytes : 0) : ChooseLoadLimit(scpDownloadStream.Length);
                 long received = 0;
                 Utf8StreamDecoder utf8StreamDecoder = new Utf8StreamDecoder();
                 byte[] bytes = new byte[65536];
@@ -195,7 +249,11 @@ public partial class RemoteFileEditor : CodeEditorPP
                     received += value;
                     if (value > 0)
                     {
-                        content.Append(utf8StreamDecoder.Decode(bytes, 0, value));
+                        downloaded.Write(bytes, 0, value);
+                        if (showPreview)
+                        {
+                            content.Append(utf8StreamDecoder.Decode(bytes, 0, value));
+                        }
                     }
                     if (limit > 0 && received >= limit)
                     {
@@ -203,10 +261,10 @@ public partial class RemoteFileEditor : CodeEditorPP
                     }
                     // Show the partially downloaded text now and then. Re-parsing and re-highlighting the
                     // whole document after every 64 KB block made opening large files quadratic.
-                    if ((DateTime.Now - lastPreview).TotalMilliseconds >= PreviewIntervalMs)
+                    if (showPreview && (DateTime.Now - lastPreview).TotalMilliseconds >= PreviewIntervalMs)
                     {
                         lastPreview = DateTime.Now;
-                        string preview = content.ToString();
+                        string preview = content.ToString().TrimStart('\uFEFF');
                         BeginInvoke((ThreadStart)(() =>
                         {
                             try
@@ -225,8 +283,8 @@ public partial class RemoteFileEditor : CodeEditorPP
                     }
                 }
             }
-            string text = content.ToString();
-            BeginInvoke((ThreadStart)(() => FinishLoading(text)));
+            byte[] file = downloaded.ToArray();
+            BeginInvoke((ThreadStart)(() => FinishLoading(file, signature)));
         }
         catch (OperationCanceledException)
         {
@@ -246,7 +304,17 @@ public partial class RemoteFileEditor : CodeEditorPP
                 try
                 {
                     ReportError(exception);
-                    LoadFailed?.Invoke(this, EventArgs.Empty);
+                    if (_reloading)
+                    {
+                        // The text on screen is still the user's: keep the tab.
+                        _reloading = false;
+                        ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
+                        FormatChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    else
+                    {
+                        LoadFailed?.Invoke(this, EventArgs.Empty);
+                    }
                 }
                 catch
                 {
@@ -349,14 +417,24 @@ public partial class RemoteFileEditor : CodeEditorPP
         return false;
     }
 
-    /// <summary>Shows the downloaded text (UI thread) and makes the editor editable.</summary>
-    private void FinishLoading(string text)
+    /// <summary>
+    /// Shows the downloaded file (UI thread) and makes the editor editable. <paramref name="file"/> is null for a
+    /// new file.
+    /// </summary>
+    private void FinishLoading(byte[] file, string signature)
     {
         try
         {
+            TextFileEncoding encoding = (file == null) ? TextFileEncodings.Utf8 : TextFileEncodings.Detect(file);
+            string text = (file == null) ? "" : TextFileEncodings.Decode(file, encoding);
             _baseHash = EditorDraftStore.HashText(text);
             bool restored = false;
-            if (!IsReadOnlyMode)
+            if (_reloading)
+            {
+                // The user dropped the changes to load the file again: their draft must not come back.
+                DiscardDraft();
+            }
+            else if (!IsReadOnlyMode)
             {
                 string restoredText = AskToRestoreDraft(text);
                 if (restoredText != null)
@@ -365,12 +443,11 @@ public partial class RemoteFileEditor : CodeEditorPP
                     restored = true;
                 }
             }
-            EditableTextDocument document = new EditableTextDocument
-            {
-                DefaultLineEnding = TextDocument.LineEnding.Lf
-            };
-            document.SetText(text);
-            SetDocument(document);
+            ApplyContent(file, encoding, text);
+            _remoteSignature = signature;
+            _backupDone = false;
+            _reloading = false;
+            _loaded = true;
             ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
             if (restored)
             {
@@ -384,7 +461,13 @@ public partial class RemoteFileEditor : CodeEditorPP
             LoadCompleted?.Invoke(this, EventArgs.Empty);
             try
             {
-                if (_initialCaret.IsValid)
+                if (_restoreCaret)
+                {
+                    _restoreCaret = false;
+                    int line = Math.Min(_caretToRestore.Line, Math.Max(0, base.EditableDocument.LineCount - 1));
+                    SetCaret(new TextDocument.TextPosition(Math.Min(_caretToRestore.Column, base.EditableDocument.GetLineText(line).Length), line));
+                }
+                else if (_initialCaret.IsValid)
                 {
                     SetCaret(_initialCaret);
                 }
@@ -396,6 +479,27 @@ public partial class RemoteFileEditor : CodeEditorPP
         catch
         {
         }
+    }
+
+    /// <summary>
+    /// Puts <paramref name="text"/> (the file <paramref name="file"/>, read as <paramref name="encoding"/>) in the editor
+    /// as unmodified.
+    /// </summary>
+    private void ApplyContent(byte[] file, TextFileEncoding encoding, string text)
+    {
+        _rawBytes = file;
+        FileEncoding = encoding;
+        LineEndings = LineEndingDetector.Detect(text);
+        EditableTextDocument document = new EditableTextDocument
+        {
+            DefaultLineEnding = (LineEndings == LineEndingKind.CrLf) ? TextDocument.LineEnding.CrLf : ((LineEndings == LineEndingKind.Cr) ? TextDocument.LineEnding.Cr : TextDocument.LineEnding.Lf)
+        };
+        document.SetText(text);
+        SetDocument(document);
+        ((EditableTextBrowser)this).IsModified = false;
+        _convertCrLf = null;
+        _bomAnswered = false;
+        FormatChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -519,6 +623,121 @@ public partial class RemoteFileEditor : CodeEditorPP
         QueueDraft(null);
     }
 
+    /// <summary>
+    /// Identifies the version of the file on the server (modification time and size, or a checksum where the system
+    /// has no stat) so that a change made by somebody else can be noticed. Null when it cannot be found out, or when
+    /// there is no such file. Runs a command: call it from any thread but not often.
+    /// </summary>
+    private string FetchSignature()
+    {
+        try
+        {
+            string path = RemotePathUtils.ShellQuote(RemotePath);
+            System.Collections.Generic.List<string> output = _context.Session.RunCommandChecked("stat -c '%Y %s' " + path + " 2>/dev/null || md5sum " + path, requireSuccess: true);
+            if (output == null || output.Count == 0)
+            {
+                return null;
+            }
+            string signature = string.Join("\n", output).Trim();
+            return (signature.Length == 0) ? null : signature;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The file on the server is not the one that was opened (or a new file has been created there meanwhile).
+    /// Runs a command (any thread). Without a signature of the opened file nothing can be said: not a conflict.
+    /// </summary>
+    private bool HasServerChanged()
+    {
+        string current = FetchSignature();
+        if (current == null)
+        {
+            return false;
+        }
+        if (IsNewFile)
+        {
+            return true;
+        }
+        return _remoteSignature != null && current != _remoteSignature;
+    }
+
+    private string ConflictDescription()
+    {
+        return IsNewFile
+            ? RemotePath + " has been created on the server since you started this new file."
+            : RemotePath + " has been changed on the server since it was opened in the editor.";
+    }
+
+    /// <summary>
+    /// Loads the file from the server again, dropping the text in the editor and its draft (the caller asks first when
+    /// there are unsaved changes). The caret stays where it was.
+    /// </summary>
+    public void Reload()
+    {
+        if (IsSaving || !_loaded || _reloading || IsNewFile || IsPreview)
+        {
+            return;
+        }
+        _reloading = true;
+        _restoreCaret = true;
+        _caretToRestore = CaretPosition;
+        ((EditableTextBrowser)this).ReadOnly = true;
+        FormatChanged?.Invoke(this, EventArgs.Empty);
+        _loadThread = new Thread(LoadFile);
+        _loadThread.Start();
+    }
+
+    /// <summary>
+    /// Saves the file in another encoding (the text stays as it is). The file counts as changed: it has to be saved.
+    /// </summary>
+    public void SetSaveEncoding(TextFileEncoding encoding)
+    {
+        if (encoding == null || encoding == FileEncoding || ((EditableTextBrowser)this).ReadOnly)
+        {
+            return;
+        }
+        FileEncoding = encoding;
+        ((EditableTextBrowser)this).IsModified = true;
+        FormatChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Reads the file again as <paramref name="encoding"/> (when the text came out as garbage): the bytes that are on
+    /// the server are decoded anew, the unsaved changes are dropped (the caller asks first).
+    /// </summary>
+    public void ReopenWithEncoding(TextFileEncoding encoding)
+    {
+        if (encoding == null || !CanReopenWithEncoding || IsSaving)
+        {
+            return;
+        }
+        DiscardDraft();
+        string text = TextFileEncodings.Decode(_rawBytes, encoding);
+        _baseHash = EditorDraftStore.HashText(text);
+        ApplyContent(_rawBytes, encoding, text);
+    }
+
+    /// <summary>
+    /// Converts every line break of the file to <paramref name="lineEnding"/>, and gives the lines typed later the same
+    /// one. The file counts as changed: it has to be saved.
+    /// </summary>
+    public void SetLineEnding(TextDocument.LineEnding lineEnding)
+    {
+        if (((EditableTextBrowser)this).ReadOnly)
+        {
+            return;
+        }
+        base.EditableDocument.SetLineEnding(lineEnding);
+        base.EditableDocument.DefaultLineEnding = lineEnding;
+        LineEndings = (lineEnding == TextDocument.LineEnding.CrLf) ? LineEndingKind.CrLf : ((lineEnding == TextDocument.LineEnding.Cr) ? LineEndingKind.Cr : LineEndingKind.Lf);
+        ((EditableTextBrowser)this).IsModified = true;
+        FormatChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public bool TrySave()
     {
         try
@@ -551,6 +770,15 @@ public partial class RemoteFileEditor : CodeEditorPP
 
         // Saves started later supersede this one (see _saveGeneration).
         public int Generation;
+
+        // The user already agreed to overwrite what changed on the server.
+        public bool SkipConflictCheck;
+
+        // The command also copies the old file to file~.
+        public bool IncludesBackup;
+
+        // The file on the server after the save (FetchSignature).
+        public string NewSignature;
     }
 
     private int _saveGeneration;
@@ -578,6 +806,11 @@ public partial class RemoteFileEditor : CodeEditorPP
         SaveJob job = PrepareSave();
         try
         {
+            if (!job.SkipConflictCheck && HasServerChanged()
+                && MessageBox.Show(ConflictDescription() + " Overwrite it with your version?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            {
+                throw new OperationCanceledException();
+            }
             if (!UploadAndReplace(job))
             {
                 SaveWithSudo(job);
@@ -612,10 +845,15 @@ public partial class RemoteFileEditor : CodeEditorPP
         Thread thread = new Thread(() =>
         {
             bool replaced = false;
+            bool conflict = false;
             Exception error = null;
             try
             {
-                replaced = UploadAndReplace(job);
+                conflict = !job.SkipConflictCheck && HasServerChanged();
+                if (!conflict)
+                {
+                    replaced = UploadAndReplace(job);
+                }
             }
             catch (Exception exception)
             {
@@ -627,7 +865,7 @@ public partial class RemoteFileEditor : CodeEditorPP
             }
             try
             {
-                BeginInvoke((ThreadStart)(() => FinishBackgroundSave(job, replaced, error, uploadDone)));
+                BeginInvoke((ThreadStart)(() => FinishBackgroundSave(job, replaced, conflict, error, uploadDone)));
             }
             catch
             {
@@ -642,7 +880,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         thread.Start();
     }
 
-    private void FinishBackgroundSave(SaveJob job, bool replaced, Exception error, ManualResetEvent uploadDone)
+    private void FinishBackgroundSave(SaveJob job, bool replaced, bool conflict, Exception error, ManualResetEvent uploadDone)
     {
         try
         {
@@ -652,6 +890,19 @@ public partial class RemoteFileEditor : CodeEditorPP
                 if (error != null)
                 {
                     ReportError(error);
+                }
+                else if (conflict)
+                {
+                    switch (MessageBox.Show(ConflictDescription() + "\n\nYes: overwrite it with your version.\nNo: load the version from the server (your changes are lost).\nCancel: do not save.", "SmarTTY", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning))
+                    {
+                        case DialogResult.Yes:
+                            _forceOverwrite = true;
+                            _saveRequestedWhileSaving = true;
+                            break;
+                        case DialogResult.No:
+                            _pendingReload = true;
+                            break;
+                    }
                 }
                 else
                 {
@@ -683,10 +934,22 @@ public partial class RemoteFileEditor : CodeEditorPP
             }
             uploadDone.Dispose();
             SetSaving(false);
-            if (_saveRequestedWhileSaving)
+            if (_pendingReload)
+            {
+                _pendingReload = false;
+                _saveRequestedWhileSaving = false;
+                _forceOverwrite = false;
+                if (IsNewFile)
+                {
+                    // Somebody created the file this new one was going to be: there is a version to load now.
+                    IsNewFile = false;
+                }
+                Reload();
+            }
+            else if (_saveRequestedWhileSaving)
             {
                 _saveRequestedWhileSaving = false;
-                if (((EditableTextBrowser)this).IsModified)
+                if (((EditableTextBrowser)this).IsModified || _forceOverwrite)
                 {
                     SaveInBackground();
                 }
@@ -700,32 +963,57 @@ public partial class RemoteFileEditor : CodeEditorPP
         SavingChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Takes the text to save (UI thread), asking once whether to convert CRLF line endings.</summary>
+    /// <summary>
+    /// Takes the text to save (UI thread), asking once whether to convert CRLF line endings that a file which did not
+    /// have them has got, and whether to drop a byte order mark that breaks a script.
+    /// </summary>
     private SaveJob PrepareSave()
     {
         string value = base.EditableDocument.GetText();
-        if (value.Contains("\r\n"))
+        if (value.Contains("\r\n") && LineEndings != LineEndingKind.CrLf)
         {
             if (!_convertCrLf.HasValue)
             {
-                _convertCrLf = MessageBox.Show("Convert CRLF line endings to LF endings?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+                _convertCrLf = MessageBox.Show("The text has CRLF line endings, which break shell scripts and OpenWrt configuration files. Convert them to LF endings?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
             }
             if (_convertCrLf.Value)
             {
-                base.EditableDocument.SetLineEnding(TextDocument.LineEnding.Lf);
+                SetLineEnding(TextDocument.LineEnding.Lf);
                 value = base.EditableDocument.GetText();
             }
         }
-        string temporaryPath = _settings.Editor.TemporaryDirectory + "/" + Guid.NewGuid().ToString() + ".txt";
-        return new SaveJob
+        if (FileEncoding == TextFileEncodings.Utf8Bom && value.StartsWith("#!", StringComparison.Ordinal) && !_bomAnswered)
         {
-            Bytes = Encoding.UTF8.GetBytes(value),
+            _bomAnswered = true;
+            if (MessageBox.Show("The file starts with #! and is saved with a UTF-8 byte order mark, which makes the system fail to run it as a script. Save it without the mark?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                SetSaveEncoding(TextFileEncodings.Utf8);
+            }
+        }
+        byte[] bytes = TextFileEncodings.Encode(value, FileEncoding);
+        string temporaryPath = _settings.Editor.TemporaryDirectory + "/" + Guid.NewGuid().ToString() + ".txt";
+        // Quote both paths: a file name with ", $ or ` must neither break the command nor expand.
+        string quotedTemporary = RemotePathUtils.ShellQuote(temporaryPath);
+        string quotedTarget = RemotePathUtils.ShellQuote(RemotePath);
+        string replaceCommand = "cat " + quotedTemporary + " > " + quotedTarget;
+        bool backup = _settings.Editor.BackupBeforeSave && !IsNewFile && !_backupDone;
+        if (backup)
+        {
+            // A failed copy does not stop the save (cat decides the result), as with the "~" files of other editors.
+            replaceCommand = "[ ! -e " + quotedTarget + " ] || cp -p " + quotedTarget + " " + RemotePathUtils.ShellQuote(RemotePath + "~") + "; " + replaceCommand;
+        }
+        SaveJob job = new SaveJob
+        {
+            Bytes = bytes,
             TemporaryPath = temporaryPath,
-            // Quote both paths: a file name with ", $ or ` must neither break the command nor expand.
-            ReplaceCommand = "cat " + RemotePathUtils.ShellQuote(temporaryPath) + " > " + RemotePathUtils.ShellQuote(RemotePath),
+            ReplaceCommand = replaceCommand,
             Version = CurrentVersion,
-            Generation = ++_saveGeneration
+            Generation = ++_saveGeneration,
+            SkipConflictCheck = _forceOverwrite,
+            IncludesBackup = backup
         };
+        _forceOverwrite = false;
+        return job;
     }
 
     /// <summary>
@@ -745,6 +1033,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
         if (_context.Session.RunCommandChecked(job.ReplaceCommand, requireSuccess: true) != null)
         {
+            job.NewSignature = FetchSignature();
             return true;
         }
         // A lost connection is not a refused write: do not offer sudo for it.
@@ -781,8 +1070,16 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private void CompleteSave(SaveJob job)
     {
+        // A save through sudo has no signature yet.
+        _remoteSignature = job.NewSignature ?? FetchSignature();
+        _rawBytes = job.Bytes;
+        if (job.IncludesBackup)
+        {
+            _backupDone = true;
+        }
         IsNewFile = false;
         MarkSaved(job.Version);
+        FormatChanged?.Invoke(this, EventArgs.Empty);
         if (!((EditableTextBrowser)this).IsModified)
         {
             // Everything is on the server: the draft is of no use (a later change makes a new one).
