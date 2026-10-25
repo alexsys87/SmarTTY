@@ -245,7 +245,7 @@ public partial class DeviceTerminalControl
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            MessageBox.Show("Please connect first before receiving files via ZMODEM.", "ZMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("Please connect first before receiving files via ZMODEM.", "ZMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         string folder = ChooseZModemFolder("Choose the folder to save the received files in." + Environment.NewLine
@@ -314,7 +314,7 @@ public partial class DeviceTerminalControl
                     string title = "ZMODEM Receive";
                     if (success)
                     {
-                        MessageBox.Show(DescribeSavedFiles(saved, folder), title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ThemedMessageBox.Show(DescribeSavedFiles(saved, folder), title, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else if (!cancelled)
                     {
@@ -324,7 +324,7 @@ public partial class DeviceTerminalControl
                         {
                             text += "\r\n\r\nFiles received completely before the failure:\r\n" + string.Join("\r\n", saved);
                         }
-                        MessageBox.Show(text, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        ThemedMessageBox.Show(text, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }));
             }
@@ -431,7 +431,7 @@ public partial class DeviceTerminalControl
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            MessageBox.Show("Please connect first before sending files via ZMODEM.", "ZMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("Please connect first before sending files via ZMODEM.", "ZMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -516,13 +516,13 @@ public partial class DeviceTerminalControl
                     string title = "ZMODEM Send";
                     if (success)
                     {
-                        MessageBox.Show(fileNames.Length == 1 ? "ZMODEM send completed successfully." : "ZMODEM send of " + fileNames.Length + " files completed successfully.",
+                        ThemedMessageBox.Show(fileNames.Length == 1 ? "ZMODEM send completed successfully." : "ZMODEM send of " + fileNames.Length + " files completed successfully.",
                             title, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else if (!cancelled)
                     {
                         string reason = error ?? lastStatus;
-                        MessageBox.Show("ZMODEM send failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason),
+                        ThemedMessageBox.Show("ZMODEM send failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason),
                             title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }));

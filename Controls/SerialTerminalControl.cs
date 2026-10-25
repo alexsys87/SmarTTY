@@ -1845,7 +1845,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 

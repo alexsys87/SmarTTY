@@ -107,7 +107,7 @@ public partial class DeviceTerminalControl
         }
         if (!_commandStorage.SaveCommands(key, commands))
         {
-            MessageBox.Show("The command list could not be saved.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("The command list could not be saved.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         if (forThisDevice)
         {
@@ -136,7 +136,7 @@ public partial class DeviceTerminalControl
         {
             return;
         }
-        if (MessageBox.Show("Delete the saved command history of " + ConnectionTitle + "?", "Command history", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        if (ThemedMessageBox.Show("Delete the saved command history of " + ConnectionTitle + "?", "Command history", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
         {
             return;
         }

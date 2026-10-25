@@ -24,6 +24,9 @@ public partial class App : Application
 
         EnsureCommandCompletionsFile();
 
+        // The message boxes of the harness-compiled controls become the themed WPF dialogs.
+        ThemedMessageBoxAdapter.Install();
+
         // The proxy prompt is raised from the harness-compiled connection controller, which cannot reference the WPF
         // dialog; the window is wired in here instead.
         NewConnectionController.ProxyCredentialsPrompt = (string realm, string credentials) =>

@@ -28,7 +28,7 @@ public partial class DeviceTerminalControl
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            MessageBox.Show("Please connect first before sending files via Kermit.", "Kermit Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("Please connect first before sending files via Kermit.", "Kermit Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -62,7 +62,7 @@ public partial class DeviceTerminalControl
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            MessageBox.Show("Please connect first before receiving files via Kermit.", "Kermit Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("Please connect first before receiving files via Kermit.", "Kermit Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 

@@ -162,7 +162,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
         if (focusEditor)
         {
@@ -189,7 +189,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
 
     private bool ConfirmDiscardChanges(string question)
     {
-        return !_editor.IsModified || MessageBox.Show(question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+        return !_editor.IsModified || ThemedMessageBox.Show(question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
     }
 
     internal void RefreshState()

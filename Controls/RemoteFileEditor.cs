@@ -249,7 +249,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
         else
         {
-            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -386,7 +386,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             return DialogResult.Cancel;
         }
-        return (DialogResult)Invoke((Func<DialogResult>)(() => MessageBox.Show(this, text, "SmarTTY", buttons, MessageBoxIcon.Warning)));
+        return (DialogResult)Invoke((Func<DialogResult>)(() => ThemedMessageBox.Show(this, text, "SmarTTY", buttons, MessageBoxIcon.Warning)));
     }
 
     /// <summary>
@@ -579,7 +579,7 @@ public partial class RemoteFileEditor : CodeEditorPP
             ? "The file on the server has changed since then; saving the draft would overwrite those changes.\n\n"
             : "";
         string when = draft.SavedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-        if (MessageBox.Show(this, "Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
+        if (ThemedMessageBox.Show(this, "Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
             + changed
             + "Yes: restore the draft.\n"
             + "No: discard it and open the file from the server.", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
@@ -863,7 +863,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         try
         {
             if (!job.SkipConflictCheck && HasServerChanged()
-                && MessageBox.Show(ConflictDescription() + " Overwrite it with your version?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                && ThemedMessageBox.Show(ConflictDescription() + " Overwrite it with your version?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
             {
                 throw new OperationCanceledException();
             }
@@ -949,7 +949,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                 }
                 else if (conflict)
                 {
-                    switch (MessageBox.Show(ConflictDescription() + "\n\nYes: overwrite it with your version.\nNo: load the version from the server (your changes are lost).\nCancel: do not save.", "SmarTTY", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning))
+                    switch (ThemedMessageBox.Show(ConflictDescription() + "\n\nYes: overwrite it with your version.\nNo: load the version from the server (your changes are lost).\nCancel: do not save.", "SmarTTY", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning))
                     {
                         case DialogResult.Yes:
                             _forceOverwrite = true;
@@ -1030,7 +1030,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             if (!_convertCrLf.HasValue)
             {
-                _convertCrLf = MessageBox.Show("The text has CRLF line endings, which break shell scripts and OpenWrt configuration files. Convert them to LF endings?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+                _convertCrLf = ThemedMessageBox.Show("The text has CRLF line endings, which break shell scripts and OpenWrt configuration files. Convert them to LF endings?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
             }
             if (_convertCrLf.Value)
             {
@@ -1041,7 +1041,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         if (FileEncoding == TextFileEncodings.Utf8Bom && value.StartsWith("#!", StringComparison.Ordinal) && !_bomAnswered)
         {
             _bomAnswered = true;
-            if (MessageBox.Show("The file starts with #! and is saved with a UTF-8 byte order mark, which makes the system fail to run it as a script. Save it without the mark?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (ThemedMessageBox.Show("The file starts with #! and is saved with a UTF-8 byte order mark, which makes the system fail to run it as a script. Save it without the mark?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 SetSaveEncoding(TextFileEncodings.Utf8);
             }
@@ -1100,7 +1100,7 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// <summary>Asks whether to retry with sudo and does so (UI thread).</summary>
     private void SaveWithSudo(SaveJob job)
     {
-        if (!_sudoOnSave && MessageBox.Show("Failed to " + (IsNewFile ? "create " : "overwrite ") + RemotePath + ". Try again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        if (!_sudoOnSave && ThemedMessageBox.Show("Failed to " + (IsNewFile ? "create " : "overwrite ") + RemotePath + ". Try again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
         {
             throw new OperationCanceledException();
         }
