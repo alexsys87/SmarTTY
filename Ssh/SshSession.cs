@@ -873,8 +873,10 @@ public class SshSession : IDisposable
 
     /// <summary>
     /// Runs a command and returns its output (stdout and stderr merged), or null if it could not be run.
+    /// With <paramref name="timeout"/> a command that has not finished by then (a hung <c>df</c> on a dead NFS mount) is
+    /// abandoned: its channel is closed and the result is null, so that it does not keep the <see cref="PtyGate"/> busy.
     /// </summary>
-    public List<string> RunCommand(string command, out int? exitStatus, string terminalType = null)
+    public List<string> RunCommand(string command, out int? exitStatus, string terminalType = null, TimeSpan? timeout = null)
     {
         bool plainHelper = terminalType == null;
         if (plainHelper)
@@ -884,6 +886,19 @@ public class SshSession : IDisposable
         try
         {
             using SshShellChannel channel = OpenShellChannel(command, terminalType, ExtendedDataMode.Merge);
+            int timedOut = 0;
+            // Disposing the channel ends the reading below (it reads as the end of the output) and WaitClosed.
+            using Timer watchdog = timeout == null ? null : new Timer((object _) =>
+            {
+                Interlocked.Exchange(ref timedOut, 1);
+                try
+                {
+                    channel.Dispose();
+                }
+                catch
+                {
+                }
+            }, null, timeout.Value, Timeout.InfiniteTimeSpan);
             List<string> lines = new List<string>();
             using (StreamReader reader = new StreamReader(channel.Output))
             {
@@ -894,6 +909,11 @@ public class SshSession : IDisposable
                 }
             }
             channel.WaitClosed();
+            if (Volatile.Read(ref timedOut) != 0)
+            {
+                exitStatus = null;
+                return null;
+            }
             if (channel.ClosedByConnectionLoss)
             {
                 // The connection went away while the command was running: the output is cut short and there is no
@@ -935,9 +955,9 @@ public class SshSession : IDisposable
     /// Runs a command and returns its output; if <paramref name="requireSuccess"/> is set, returns null when the command fails.
     /// A null result is also returned when the connection is lost (see <see cref="ThrowIfConnectionLost"/>).
     /// </summary>
-    public List<string> RunCommandChecked(string command, bool requireSuccess, string terminalType = null)
+    public List<string> RunCommandChecked(string command, bool requireSuccess, string terminalType = null, TimeSpan? timeout = null)
     {
-        List<string> output = RunCommand(command, out int? exitStatus, terminalType);
+        List<string> output = RunCommand(command, out int? exitStatus, terminalType, timeout);
         if (requireSuccess && exitStatus != 0)
         {
             return null;

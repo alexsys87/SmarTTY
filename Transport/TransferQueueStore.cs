@@ -29,7 +29,8 @@ public static class TransferQueueStore
         public bool IsArchive;
 
         /// <summary>
-        /// True if the transfer was queued or running (it continues by itself), false if it had failed.
+        /// True if the transfer was queued or running, or was cut short by a lost connection (it continues by itself),
+        /// false if it had failed.
         /// </summary>
         public bool WasActive;
 
@@ -86,7 +87,9 @@ public static class TransferQueueStore
                 LocalPath = job.LocalPath,
                 OpenFolderWhenDone = job.OpenFolderWhenDone,
                 IsArchive = job.IsArchive,
-                WasActive = state != FileTransferManager.TransferState.Failed,
+                // A transfer that failed only because the connection went away continues by itself, like a queued one: closing
+                // the application during the loss must not turn it into one that has to be started by hand.
+                WasActive = state != FileTransferManager.TransferState.Failed || job.InterruptedByConnectionLoss,
                 ErrorMessage = job.ErrorMessage,
                 TotalBytes = job.TotalBytes,
                 TransferredBytes = job.TransferredBytes,

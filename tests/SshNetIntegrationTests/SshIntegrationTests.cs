@@ -89,6 +89,12 @@ internal static class SshIntegrationTests
             Test.Equal(3, exitStatus, "a failing command reports its exit status");
             Test.Check(session.RunCommandChecked("exit 3", requireSuccess: true) == null, "RunCommandChecked hides a failing command");
             Test.Check(session.RunCommandChecked("echo ok", requireSuccess: true) != null, "RunCommandChecked keeps a successful command");
+
+            // A command that hangs (df on a dead NFS mount) is given up after the timeout and must not hold the PTY gate.
+            DateTime started = DateTime.UtcNow;
+            List<string> hung = session.RunCommand("sleep 30", out exitStatus, timeout: TimeSpan.FromSeconds(1));
+            Test.Check(hung == null && exitStatus == null && DateTime.UtcNow - started < TimeSpan.FromSeconds(10), "a command that outlasts its timeout is abandoned with a null result");
+            Test.Check(session.RunCommandChecked("echo again", requireSuccess: true) != null, "the session works after an abandoned command");
         }
     }
 

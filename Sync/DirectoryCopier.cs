@@ -102,7 +102,9 @@ public class DirectoryCopier
         CopyingFile,
         CopyingTarEntry,
         StreamingTar,
-        Completed
+        Completed,
+        /// <summary>Waiting for the remote tar to finish; sent about twice a second so that the Progress handler can cancel.</summary>
+        WaitingForTar
     }
 
     public struct CopyProgress(CopyStage copyStage, string path, int filesDone, int filesTotal, long bytesDone, long bytesTotal)
@@ -529,7 +531,7 @@ public class DirectoryCopier
     /// </summary>
     private void ThrowIfTarSourceLost(SshShellChannel channel, string remotePath)
     {
-        channel.WaitEof();
+        WaitEofCancellable(channel, bytesDone: 0L);
         if (channel.ClosedByConnectionLoss)
         {
             throw new IOException("The connection to the server was lost while downloading " + remotePath + ". The files may be incomplete.");
@@ -744,7 +746,7 @@ public class DirectoryCopier
             // Let the extracting tar finish and look at how it ended: on a channel closed by a lost connection
             // SendEof does nothing and Dispose swallows everything, so without this the upload would end as a success
             // with data that never reached the device (or that tar could not unpack).
-            sshShellChannel.WaitEof();
+            WaitEofCancellable(sshShellChannel, totalBytesDone);
             List<string> tarMessages = outputCollector.GetLines();
             CheckErrors(outputCollector);
             if (sshShellChannel.ClosedByConnectionLoss)
@@ -762,6 +764,20 @@ public class DirectoryCopier
             {
                 throw new IOException("The device could not unpack the uploaded files into " + remotePath + " (tar exit status " + tarStatus.ToString(System.Globalization.CultureInfo.InvariantCulture) + "). The files may be incomplete.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Waits for the remote tar to finish (the EOF of its channel). A tar that hangs (an unreachable mount, a half-open
+    /// connection that is not noticed yet) must not hold the transfer without a way out, so the wait is cut into slices and
+    /// the Progress handler is called between them: it throws OperationCanceledException when the user has cancelled.
+    /// The caller's <c>using</c> then closes the channel.
+    /// </summary>
+    private void WaitEofCancellable(SshShellChannel channel, long bytesDone)
+    {
+        while (!channel.WaitEof(TimeSpan.FromMilliseconds(500)))
+        {
+            Progress?.Invoke(new CopyProgress(CopyStage.WaitingForTar, null, 0, 0, bytesDone, 0L));
         }
     }
 

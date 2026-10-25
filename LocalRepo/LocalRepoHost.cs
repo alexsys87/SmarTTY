@@ -199,6 +199,8 @@ public sealed class LocalRepoHost
         }
         if (session.RunCommandChecked(apk ? ApkFeedConfig.BuildCheckScript() : OpkgFeedConfig.BuildCheckScript(), requireSuccess: true) == null)
         {
+            // null is also "no connection": that is not "the package manager is missing".
+            session.ThrowIfConnectionLost();
             throw new InvalidOperationException((apk ? "apk" : "opkg") + " was not found on the device. The local repository server works with the package manager of OpenWrt (opkg or apk).");
         }
         string publicKey = null;
@@ -479,6 +481,10 @@ public sealed class LocalRepoHost
             string script = apk ? ApkFeedConfig.BuildDisableScript() : OpkgFeedConfig.BuildDisableScript();
             if (session.RunCommandChecked(OpkgFeedConfig.WrapForPrivileges(script, isRoot), requireSuccess: true) == null)
             {
+                if (session.IsConnectionClosed)
+                {
+                    return "The feeds could not be removed from the device: the connection to the server was lost. Use \"Remove feeds from device\" after reconnecting.";
+                }
                 return "The feeds could not be removed from " + configFile + " on the device. Remove the lines between \"" + OpkgFeedConfig.BeginMarker + "\" and \"" + OpkgFeedConfig.EndMarker + "\" by hand.";
             }
             if (!apk)
@@ -616,6 +622,7 @@ public sealed class LocalRepoHost
         string script = apk ? ApkFeedConfig.BuildEnableScript(feeds, port, publicKey, disableOfficial: disableOfficial) : OpkgFeedConfig.BuildEnableScript(feeds, port, allowUnsigned: allowUnsigned, disableOfficial: disableOfficial);
         if (session.RunCommandChecked(OpkgFeedConfig.WrapForPrivileges(script, isRoot), requireSuccess: true) == null)
         {
+            session.ThrowIfConnectionLost();
             throw new InvalidOperationException("Could not add the feeds to " + (apk ? ApkFeedConfig.DefaultConfigFile : OpkgFeedConfig.DefaultConfigFile) + " on the device." + (isRoot ? "" : " Non-root users need passwordless sudo: log in as root or allow sudo for this user."));
         }
     }

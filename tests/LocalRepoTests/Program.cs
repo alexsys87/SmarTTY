@@ -1236,6 +1236,9 @@ internal static class Program
         SshSession noOpkg = NewFakeSession(conf);
         noOpkg.OpkgMissing = true;
         Check(Throws<InvalidOperationException>(() => refused.Start(noOpkg, new[] { root }, 0)) && noOpkg.TunnelStarts == 0 && File.ReadAllText(conf).Contains("smartty") == false, "no opkg on the device: refused before anything is changed");
+        SshSession lost = NewFakeSession(conf);
+        lost.IsConnectionClosed = true;
+        Check(Catch<IOException>(() => refused.Start(lost, new[] { root }, 0)) != null && lost.TunnelStarts == 0, "a lost connection is reported as such, not as a missing package manager");
 
         TcpListener busy = new TcpListener(System.Net.IPAddress.Loopback, 0);
         busy.Start();

@@ -84,6 +84,15 @@ internal static class AuthorizedKeysManager
             {
                 files.Add("/etc/dropbear/authorized_keys");
             }
+            else
+            {
+                // A null above also means "the connection is gone", which is not "this host has no such file".
+                sshSession.ThrowIfConnectionLost();
+            }
+        }
+        catch (IOException) when (sshSession.IsConnectionClosed)
+        {
+            throw;
         }
         catch
         {
@@ -108,6 +117,8 @@ internal static class AuthorizedKeysManager
         }
         if (sshSession.RunCommandChecked("test -d " + ScpChannelStream.QuotePath(homeDir + "/.ssh"), requireSuccess: true) == null)
         {
+            // No .ssh directory means there is no key to remove; a lost connection means the removal did not happen.
+            sshSession.ThrowIfConnectionLost();
             return;
         }
         RemoveKeyFromFile(sshSession, homeDir + "/.ssh/authorized_keys", keyBlob);
@@ -150,6 +161,7 @@ internal static class AuthorizedKeysManager
         {
             return;
         }
+        sshSession.ThrowIfConnectionLost();
         throw new Exception("Cannot rename authorized_keys file");
     }
 
@@ -160,6 +172,7 @@ internal static class AuthorizedKeysManager
         string sshDir = ScpChannelStream.QuotePath(homeDir + "/.ssh");
         if (sshSession.RunCommandChecked("test -d " + sshDir + " || mkdir -m 700 " + sshDir, requireSuccess: true) == null)
         {
+            sshSession.ThrowIfConnectionLost();
             throw new Exception("Cannot access .ssh directory");
         }
         string authKeysPath = homeDir + "/.ssh/authorized_keys";

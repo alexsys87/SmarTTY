@@ -17,6 +17,17 @@ public sealed class DiskSpaceMonitor : INotifyPropertyChanged, IDisposable
 {
     public static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// A <c>df -h</c> that has not answered by then is abandoned (a dead NFS/CIFS mount hangs it for good). It is shorter than
+    /// the wait of <see cref="PtySetupGate"/>, so a hung reading never delays a new tab by more than this.
+    /// </summary>
+    private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(3);
+
+    /// <summary>The longest pause between two readings while they keep failing: each hung df leaves a process on the host.</summary>
+    private static readonly TimeSpan MaxBackoffInterval = TimeSpan.FromMinutes(2);
+
+    private int _FailedReadings;
+
     /// <summary>The bar turns red when less than this share of the disk is free.</summary>
     public const int LowFreePercent = 10;
 
@@ -69,6 +80,7 @@ public sealed class DiskSpaceMonitor : INotifyPropertyChanged, IDisposable
             }
             _Session = session;
             _Generation++;
+            _FailedReadings = 0;
             _Timer?.Dispose();
             _Timer = session == null ? null : new Timer(OnTimer, _Generation, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
         }
@@ -116,7 +128,7 @@ public sealed class DiskSpaceMonitor : INotifyPropertyChanged, IDisposable
                 {
                     try
                     {
-                        _Timer?.Change(Interval, Timeout.InfiniteTimeSpan);
+                        _Timer?.Change(NextInterval(), Timeout.InfiniteTimeSpan);
                     }
                     catch (ObjectDisposedException)
                     {
@@ -126,6 +138,16 @@ public sealed class DiskSpaceMonitor : INotifyPropertyChanged, IDisposable
         }
     }
 
+    private TimeSpan NextInterval()
+    {
+        if (_FailedReadings == 0)
+        {
+            return Interval;
+        }
+        TimeSpan backoff = TimeSpan.FromTicks(Interval.Ticks << _FailedReadings);
+        return backoff < MaxBackoffInterval ? backoff : MaxBackoffInterval;
+    }
+
     private void Poll(SshSession session, int generation)
     {
         if (session == null || session.IsConnectionClosed)
@@ -133,7 +155,8 @@ public sealed class DiskSpaceMonitor : INotifyPropertyChanged, IDisposable
             Publish(generation, null, null);
             return;
         }
-        List<string> output = session.RunCommand("df -h", out _);
+        List<string> output = session.RunCommand("df -h", out _, timeout: CommandTimeout);
+        _FailedReadings = output == null ? Math.Min(_FailedReadings + 1, 5) : 0;
         List<DfOutputParser.DiskUsage> rows = DfOutputParser.Parse(output);
         Publish(generation, DfOutputParser.SelectMain(rows), output);
     }
