@@ -1,5 +1,40 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <UserControl x:Class="SmarTTY.GUI.FileListControl" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:SmarTTY.GUI" IsVisibleChanged="UserControl_IsVisibleChanged">
+  <UserControl.Resources>
+    <!-- Names and permissions coloured by access permissions; a selected row keeps the foreground of the selection -->
+    <Style x:Key="PermissionText" TargetType="{x:Type TextBlock}">
+      <Style.Triggers>
+        <MultiDataTrigger>
+          <MultiDataTrigger.Conditions>
+            <Condition Binding="{Binding Highlight}" Value="ReadOnly" />
+            <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type ListViewItem}}}" Value="False" />
+          </MultiDataTrigger.Conditions>
+          <Setter Property="Foreground" Value="{DynamicResource Theme.Permission.ReadOnly}" />
+        </MultiDataTrigger>
+        <MultiDataTrigger>
+          <MultiDataTrigger.Conditions>
+            <Condition Binding="{Binding Highlight}" Value="Executable" />
+            <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type ListViewItem}}}" Value="False" />
+          </MultiDataTrigger.Conditions>
+          <Setter Property="Foreground" Value="{DynamicResource Theme.Permission.Executable}" />
+        </MultiDataTrigger>
+        <MultiDataTrigger>
+          <MultiDataTrigger.Conditions>
+            <Condition Binding="{Binding Highlight}" Value="SetId" />
+            <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type ListViewItem}}}" Value="False" />
+          </MultiDataTrigger.Conditions>
+          <Setter Property="Foreground" Value="{DynamicResource Theme.Permission.SetId}" />
+        </MultiDataTrigger>
+        <MultiDataTrigger>
+          <MultiDataTrigger.Conditions>
+            <Condition Binding="{Binding Highlight}" Value="WorldWritable" />
+            <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type ListViewItem}}}" Value="False" />
+          </MultiDataTrigger.Conditions>
+          <Setter Property="Foreground" Value="{DynamicResource Theme.Permission.WorldWritable}" />
+        </MultiDataTrigger>
+      </Style.Triggers>
+    </Style>
+  </UserControl.Resources>
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -324,7 +359,7 @@
                           </Style>
                         </FrameworkElement.Style>
                       </Image>
-                      <TextBlock Grid.Column="1" Margin="2 0 0 0" Text="{Binding Name}" ToolTip="{Binding PermissionsText}" />
+                      <TextBlock Grid.Column="1" Margin="2 0 0 0" Text="{Binding Name}" ToolTip="{Binding PermissionsToolTip}" Style="{StaticResource PermissionText}" />
                     </Grid>
                   </DataTemplate>
                 </GridViewColumn.CellTemplate>
@@ -333,7 +368,7 @@
               <GridViewColumn Header="Permissions">
                 <GridViewColumn.CellTemplate>
                   <DataTemplate>
-                    <TextBlock Text="{Binding PermissionsText}" FontFamily="Consolas, Courier New" />
+                    <TextBlock Text="{Binding PermissionsText}" FontFamily="Consolas, Courier New" Style="{StaticResource PermissionText}" />
                   </DataTemplate>
                 </GridViewColumn.CellTemplate>
               </GridViewColumn>

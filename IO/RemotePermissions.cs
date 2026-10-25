@@ -131,6 +131,53 @@ public static class RemotePermissions
         return ToSymbolic(mode) + " (" + ToOctal(mode) + ")";
     }
 
+    /// <summary>
+    /// Classifies the mode column of ls ("-rwxr-xr-x") for the colour the file list draws a name in. The most telling
+    /// property wins: a world-writable entry, then setuid or setgid, then an executable file, then a read-only entry.
+    /// Symbolic links are never highlighted (ls always shows lrwxrwxrwx for them), neither is a world-writable folder with
+    /// the sticky bit like /tmp, where that is how it is meant to be.
+    /// </summary>
+    public static PermissionHighlight Classify(string lsMode)
+    {
+        int? parsed = ParseMode(lsMode);
+        if (!parsed.HasValue || lsMode[0] == 'l')
+        {
+            return PermissionHighlight.None;
+        }
+        int mode = parsed.Value;
+        bool directory = lsMode[0] == 'd';
+        if ((mode & OtherWrite) != 0 && !(directory && (mode & Sticky) != 0))
+        {
+            return PermissionHighlight.WorldWritable;
+        }
+        if ((mode & (SetUid | SetGid)) != 0)
+        {
+            return PermissionHighlight.SetId;
+        }
+        if (!directory && (mode & (OwnerExecute | GroupExecute | OtherExecute)) != 0)
+        {
+            return PermissionHighlight.Executable;
+        }
+        if ((mode & (OwnerWrite | GroupWrite | OtherWrite)) == 0)
+        {
+            return PermissionHighlight.ReadOnly;
+        }
+        return PermissionHighlight.None;
+    }
+
+    /// <summary>The short reason of the colour, for the tooltip; null for an entry that is not highlighted.</summary>
+    public static string DescribeHighlight(PermissionHighlight highlight)
+    {
+        switch (highlight)
+        {
+            case PermissionHighlight.WorldWritable: return "writable by everyone";
+            case PermissionHighlight.SetId: return "setuid or setgid";
+            case PermissionHighlight.Executable: return "executable";
+            case PermissionHighlight.ReadOnly: return "read-only";
+            default: return null;
+        }
+    }
+
     /// <summary>Reads one to four octal digits ("7", "644", "1777"); false for anything else.</summary>
     public static bool TryParseOctal(string text, out int mode)
     {
@@ -207,4 +254,14 @@ public sealed class RemotePermissionChange
     {
         return ((bits & read) != 0 ? "r" : "") + ((bits & write) != 0 ? "w" : "") + ((bits & execute) != 0 ? "x" : "") + (special != 0 && (bits & special) != 0 ? "s" : "");
     }
+}
+
+/// <summary>Why the file list draws a name in a colour of its own; see <see cref="RemotePermissions.Classify"/>.</summary>
+public enum PermissionHighlight
+{
+    None,
+    ReadOnly,
+    Executable,
+    SetId,
+    WorldWritable
 }
