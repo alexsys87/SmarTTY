@@ -135,6 +135,10 @@ public class SshShellChannel : IAsyncChannel, IDisposable
     // How long ExitStatus waits for the exit-status message once the remote side has sent EOF.
     private static readonly TimeSpan ExitStatusTimeout = TimeSpan.FromSeconds(10);
 
+    // How long a reader waits after EOF for the channel to close (or for a last chunk) before reporting the end
+    // of the stream. EOF normally arrives just before the close; this keeps a chunk delivered in that window.
+    private static readonly TimeSpan EofDrainTimeout = TimeSpan.FromMilliseconds(500);
+
     private readonly SshSession _session;
 
     private readonly SshNetChannel _channel;
@@ -238,9 +242,10 @@ public class SshShellChannel : IAsyncChannel, IDisposable
     public bool ReadStderrOnRead { get; set; }
 
     /// <summary>
-    /// Exit code of the remote command; -1 if it was terminated by a signal or the channel was still open when the
-    /// SSH connection went away (see <see cref="ClosedByConnectionLoss"/>: the command did not finish, so "no exit
-    /// status" must not read as success), 0 if the server reported nothing.
+    /// Exit code of the remote command; -1 if it was terminated by a signal, the connection went away while the
+    /// channel was open, or the server closed the channel without reporting an exit status (see
+    /// <see cref="HasExitStatus"/>: an unreported status must not read as success). Also -1 before the status has
+    /// arrived; callers wait for <see cref="Finished"/> or <see cref="WaitClosed"/> first.
     /// </summary>
     public int ExitStatus
     {
@@ -248,23 +253,50 @@ public class SshShellChannel : IAsyncChannel, IDisposable
         {
             lock (_sync)
             {
-                // exit-status may arrive slightly after EOF; give it a chance before reporting.
-                DateTime deadline = DateTime.UtcNow + ExitStatusTimeout;
-                while (_eofReceived && !_closed && _exitStatus == null && _exitSignal == null)
-                {
-                    TimeSpan remaining = deadline - DateTime.UtcNow;
-                    if (remaining <= TimeSpan.Zero)
-                    {
-                        break;
-                    }
-                    Monitor.Wait(_sync, remaining);
-                }
-                if (_exitStatus.HasValue)
-                {
-                    return _exitStatus.Value;
-                }
-                return (_exitSignal != null || _closedByConnectionLoss) ? (-1) : 0;
+                WaitForExitStatus();
+                return _exitStatus ?? -1;
             }
+        }
+    }
+
+    /// <summary>True when the server actually reported an exit status for the command.</summary>
+    public bool HasExitStatus
+    {
+        get
+        {
+            lock (_sync)
+            {
+                WaitForExitStatus();
+                return _exitStatus.HasValue;
+            }
+        }
+    }
+
+    /// <summary>The signal that terminated the command, or null when it exited normally or no signal was reported.</summary>
+    public string ExitSignal
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _exitSignal;
+            }
+        }
+    }
+
+    // The exit-status message may arrive slightly after EOF; give it a chance before reporting.
+    // Must be called under _sync.
+    private void WaitForExitStatus()
+    {
+        DateTime deadline = DateTime.UtcNow + ExitStatusTimeout;
+        while (_eofReceived && !_closed && _exitStatus == null && _exitSignal == null)
+        {
+            TimeSpan remaining = deadline - DateTime.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+            {
+                break;
+            }
+            Monitor.Wait(_sync, remaining);
         }
     }
 
@@ -548,6 +580,7 @@ public class SshShellChannel : IAsyncChannel, IDisposable
         {
             return 0;
         }
+        bool waitedForClose = false;
         while (true)
         {
             byte[] stderrChunk = null;
@@ -561,9 +594,21 @@ public class SshShellChannel : IAsyncChannel, IDisposable
                 {
                     return _queues[streamId].Read(buffer, offset, count);
                 }
-                else if (_eofReceived)
+                else if (_closed)
                 {
                     return 0;
+                }
+                else if (_eofReceived)
+                {
+                    // EOF says that no more data will be sent, but the channel is closed in a separate step and a
+                    // chunk delivered in between must not be dropped. Wait for that step once, then end the stream.
+                    if (waitedForClose)
+                    {
+                        return 0;
+                    }
+                    waitedForClose = true;
+                    Monitor.Wait(_sync, EofDrainTimeout);
+                    continue;
                 }
                 else
                 {

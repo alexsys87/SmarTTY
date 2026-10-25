@@ -599,7 +599,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
                 if (exitCode != 0)
                 {
                     string message = string.Join("\n", (output ?? new List<string>()).Where((string line) => line.Trim() != ""));
-                    errors.Add(message != "" ? message : (exitCode.HasValue ? "The command failed with exit code " + exitCode : "The connection is not available"));
+                    errors.Add(message != "" ? message : (exitCode.HasValue ? "The command failed with exit code " + exitCode : "The command did not report an exit status"));
                 }
             }
             dispatcher.BeginInvoke((Action)(() =>

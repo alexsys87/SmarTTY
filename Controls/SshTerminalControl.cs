@@ -455,7 +455,13 @@ public class SshTerminalControl : TerminalEmulatorControl
         if (exitCode != 0)
         {
             string message = string.Join(Environment.NewLine, (output ?? new List<string>()).Where((string line) => line.Trim() != ""));
-            throw new RemoteOperationException(message != "" ? message : $"Cannot change the directory to {target} (exit code {exitCode ?? (-1)})");
+            if (message == "")
+            {
+                message = exitCode.HasValue
+                    ? $"Cannot change the directory to {target} (exit code {exitCode.Value})"
+                    : $"Cannot change the directory to {target} (the server did not report an exit code)";
+            }
+            throw new RemoteOperationException(message);
         }
         SetCurrentDirectory(target);
         if (_inputLine != null)
@@ -501,7 +507,9 @@ public class SshTerminalControl : TerminalEmulatorControl
             List<string> errors = (output ?? new List<string>()).Where((string line) => line.Trim() != "").ToList();
             if (errors.Count == 0)
             {
-                errors.Add($"'cd {arguments}' exited with code {exitCode ?? (-1)}");
+                errors.Add(exitCode.HasValue
+                    ? $"'cd {arguments}' exited with code {exitCode.Value}"
+                    : $"'cd {arguments}' did not report an exit code");
             }
             PrintLines(errors.Select((string line) => TerminalEmulatorControl.Colorize(line, 1)));
             return;
@@ -1562,8 +1570,11 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             // Read on the session thread: the exit status may still be on its way when the channel reports EOF.
             bool connectionLost = sshShellChannel.ClosedByConnectionLoss;
-            int exitStatus = (connectionLost || sshShellChannel.IsDisposed) ? 0 : sshShellChannel.ExitStatus;
-            OnCommandFinished(commandChannel, connectionLost, exitStatus);
+            bool disposed = sshShellChannel.IsDisposed;
+            bool statusKnown = connectionLost || disposed ||
+                sshShellChannel.HasExitStatus || sshShellChannel.ExitSignal != null;
+            int exitStatus = (connectionLost || disposed) ? 0 : sshShellChannel.ExitStatus;
+            OnCommandFinished(commandChannel, connectionLost, exitStatus, statusKnown);
         };
         sshShellChannel.PollingEnabled = true;
         sshShellChannel.ResizePty(TerminalSize.Width, TerminalSize.Height);
@@ -1635,7 +1646,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
     }
 
-    private void OnCommandFinished(CommandChannel commandChannel, bool connectionLost, int exitStatus)
+    private void OnCommandFinished(CommandChannel commandChannel, bool connectionLost, int exitStatus, bool statusKnown)
     {
         PostToUi(() =>
         {
@@ -1655,6 +1666,10 @@ public class SshTerminalControl : TerminalEmulatorControl
             else if (!(_context.VTSettings?.ShowExitCodes ?? true))
             {
                 // Turned off in Smart Terminal Settings.
+            }
+            else if (!statusKnown)
+            {
+                message = TerminalEmulatorControl.Colorize("[exit status not reported]", 3);
             }
             else if (exitStatus > 0)
             {

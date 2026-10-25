@@ -873,6 +873,8 @@ public class SshSession : IDisposable
 
     /// <summary>
     /// Runs a command and returns its output (stdout and stderr merged), or null if it could not be run.
+    /// <paramref name="exitStatus"/> is null when the command was not run, timed out, the connection was lost, or
+    /// the server closed the channel without reporting an exit status; a command terminated by a signal reports -1.
     /// With <paramref name="timeout"/> a command that has not finished by then (a hung <c>df</c> on a dead NFS mount) is
     /// abandoned: its channel is closed and the result is null, so that it does not keep the <see cref="PtyGate"/> busy.
     /// </summary>
@@ -921,7 +923,21 @@ public class SshSession : IDisposable
                 exitStatus = null;
                 return null;
             }
-            exitStatus = channel.ExitStatus;
+            if (channel.HasExitStatus)
+            {
+                exitStatus = channel.ExitStatus;
+            }
+            else if (channel.ExitSignal != null)
+            {
+                // A signal is a failure, but the caller may still want to show which one ended the command.
+                exitStatus = -1;
+            }
+            else
+            {
+                // The server closed the channel without an exit status (or the channel failed on its side), so the
+                // command may not have run at all. Reporting 0 here used to turn "unknown" into "success".
+                exitStatus = null;
+            }
             return lines;
         }
         catch
