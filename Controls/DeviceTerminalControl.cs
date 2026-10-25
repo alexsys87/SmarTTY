@@ -309,6 +309,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         ReplaceTerminalControl();
         // A telnet server may ask for the terminal size (and wants to hear about changes); other transports ignore it.
         _serialTerminalControl.TerminalSizeChanged += OnTerminalSizeChanged;
+        AddClearCommand();
         AddReturnToInputLineCommand();
         AddRemoteSizeCommands();
         InitializeCommandLists();
@@ -404,6 +405,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 ApplyMenuTheme(subMenu.DropDown);
             }
         }
+    }
+
+    // The Clear button of the tool bar, also in the context menu of the terminal.
+    private void AddClearCommand()
+    {
+        contextMenuStrip1.Items.Add(new ToolStripMenuItem("Clear", toolStripButton1.Image, (sender, args) => ClearOutput()));
     }
 
     // While a command runs, the keys go to the device as they are (mc, htop, vi ...) and the local input line is

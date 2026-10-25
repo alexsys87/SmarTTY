@@ -1352,6 +1352,21 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
     }
 
+    /// <summary>
+    /// "Clear" of the context menu: the same as Ctrl+L. While a command runs nothing is cleared: the output of the command and
+    /// the record of its run refer to lines of the screen.
+    /// </summary>
+    public override void ClearOutput()
+    {
+        if (_inputLine == null)
+        {
+            return;
+        }
+        string text = _inputLine.Text;
+        ClearScreen();
+        _inputLine?.SetText(text);
+    }
+
     // Ctrl+L and "clear": an empty screen with the prompt at the top.
     private void ClearScreen()
     {

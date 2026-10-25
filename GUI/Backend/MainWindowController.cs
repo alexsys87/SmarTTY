@@ -1422,6 +1422,10 @@ public class MainWindowController : INotifyPropertyChanged
         {
             CopyAll();
         });
+        _TerminalContextMenu.Items.Add("Clear", Icons.Load("clear"), (object _, EventArgs e) =>
+        {
+            ((_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal)?.ClearOutput();
+        });
         _TerminalContextMenu.Items.Add("New Tab", Icons.Load("add"), (object _, EventArgs e) =>
         {
             ActiveSession?.CreateNewTerminalPage();
