@@ -1,5 +1,6 @@
 using SmarTTY.Ssh;
 using Renci.SshNet.Common;
+using SmarTTY.Controls;
 using SmarTTY.Forms;
 using System;
 using System.Collections.Generic;
@@ -227,7 +228,7 @@ public partial class SshConnector : Component
         }
         else
         {
-            confirmed = MessageBox.Show(message, appName, MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes;
+            confirmed = ThemedMessageBox.Show(message, appName, MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes;
         }
     }
 

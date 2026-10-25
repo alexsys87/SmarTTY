@@ -573,7 +573,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             return;
         }
-        MessageBox.Show(transport.DescribeOptions(), "Telnet options", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        ThemedMessageBox.Show(transport.DescribeOptions(), "Telnet options", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private void RequestTelnetStatus()
@@ -587,7 +587,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             if (!transport.RequestRemoteStatus())
             {
-                MessageBox.Show("The server did not offer to report its option status (the STATUS option).", "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ThemedMessageBox.Show("The server did not offer to report its option status (the STATUS option).", "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
         catch (Exception)
@@ -609,7 +609,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             {
                 if (!IsDisposed && ReferenceEquals(transport, _telnetTransport))
                 {
-                    MessageBox.Show("The server reports these options:\r\n\r\n" + transport.RemoteStatus, "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ThemedMessageBox.Show("The server reports these options:\r\n\r\n" + transport.RemoteStatus, "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }));
         }
@@ -1440,13 +1440,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     if (success)
                     {
                         string note = successNote?.Invoke();
-                        MessageBox.Show(protocolName + " " + verb + " completed successfully." + (string.IsNullOrEmpty(note) ? string.Empty : "\r\n\r\n" + note),
+                        ThemedMessageBox.Show(protocolName + " " + verb + " completed successfully." + (string.IsNullOrEmpty(note) ? string.Empty : "\r\n\r\n" + note),
                             title, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else if (!cancelled)
                     {
                         string reason = error ?? lastStatus;
-                        MessageBox.Show(protocolName + " " + verb + " failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason), title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        ThemedMessageBox.Show(protocolName + " " + verb + " failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason), title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }));
             }
@@ -1474,12 +1474,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         if (_isXModemActive)
         {
-            MessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM or Kermit) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ThemedMessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM or Kermit) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return true;
         }
         if (_isFileSendActive)
         {
-            MessageBox.Show("A file is being sent. Wait for it to finish or cancel it first.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ThemedMessageBox.Show("A file is being sent. Wait for it to finish or cancel it first.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return true;
         }
         return false;
@@ -1505,7 +1505,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            MessageBox.Show("Please connect first before sending a file via " + protocolName + ".", protocolName + " Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("Please connect first before sending a file via " + protocolName + ".", protocolName + " Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -1534,7 +1534,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            MessageBox.Show("Please connect first before receiving a file via XMODEM.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("Please connect first before receiving a file via XMODEM.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -1646,7 +1646,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -1741,7 +1741,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -1753,7 +1753,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            MessageBox.Show("Please connect first before sending a file.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("Please connect first before sending a file.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         if (_openFileDialog.ShowDialog() != DialogResult.OK)
@@ -1874,7 +1874,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -1882,7 +1882,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         if (_logWriter != null)
         {
-            MessageBox.Show("Stop recording first, then replay.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ThemedMessageBox.Show("Stop recording first, then replay.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         using OpenFileDialog dialog = new OpenFileDialog
@@ -1904,12 +1904,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             return;
         }
         if (bytes.Length == 0)
         {
-            MessageBox.Show("The file is empty.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ThemedMessageBox.Show("The file is empty.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         LogReplayPrompt?.Invoke(bytes, this);
@@ -1957,7 +1957,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             return;
         }
         UpdateLogButton();
@@ -2006,7 +2006,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 if (_logWriter != null && !_logWriter.IsActive)
                 {
                     StopLogging();
-                    MessageBox.Show("Logging stopped: " + exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ThemedMessageBox.Show("Logging stopped: " + exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }));
         }

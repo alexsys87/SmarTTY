@@ -59,7 +59,7 @@ public partial class DeviceTerminalControl
                     UpdateSerialLineUi();
                     if (error != null)
                     {
-                        MessageBox.Show("The file was not sent completely (" + FormatByteCount(Interlocked.Read(ref written[0])) + " went out).\r\n\r\n" + error,
+                        ThemedMessageBox.Show("The file was not sent completely (" + FormatByteCount(Interlocked.Read(ref written[0])) + " went out).\r\n\r\n" + error,
                             "Send file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }));

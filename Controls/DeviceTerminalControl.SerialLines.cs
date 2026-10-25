@@ -262,7 +262,7 @@ public partial class DeviceTerminalControl
         string details = PortAlertDetails();
         if (details.Length > 0)
         {
-            MessageBox.Show(this, details, "Serial port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show(this, details, "Serial port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -344,7 +344,7 @@ public partial class DeviceTerminalControl
             }
             catch (Exception exception)
             {
-                MessageBox.Show(this, "The port settings were not changed.\r\n\r\n" + exception.Message, "Serial port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ThemedMessageBox.Show(this, "The port settings were not changed.\r\n\r\n" + exception.Message, "Serial port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
             serial.AdvancedSettings = candidate;

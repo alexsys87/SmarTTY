@@ -1556,7 +1556,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             }
             if (!e.Shift && e.Control && e.KeyCode == Keys.Insert)
             {
-                if (AppSettings != null && AppSettings.ShowCtrlInsertWarnings && MessageBox.Show("The text is automatically copied to clipboard when you select it with your mouse. Ctrl-Insert will be now sent to remote computer.\nDo you want to keep being notified about this when you press Ctrl-Insert?", "Terminal", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.No)
+                if (AppSettings != null && AppSettings.ShowCtrlInsertWarnings && ThemedMessageBox.Show("The text is automatically copied to clipboard when you select it with your mouse. Ctrl-Insert will be now sent to remote computer.\nDo you want to keep being notified about this when you press Ctrl-Insert?", "Terminal", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.No)
                 {
                     AppSettings.ShowCtrlInsertWarnings = false;
                     AppSettings.Save();
@@ -1893,7 +1893,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 

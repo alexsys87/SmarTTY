@@ -49,7 +49,7 @@ public partial class TextEditorControl : EditableTextBrowser
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -81,7 +81,7 @@ public partial class TextEditorControl : EditableTextBrowser
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 
@@ -94,7 +94,7 @@ public partial class TextEditorControl : EditableTextBrowser
         }
         catch (Exception exception)
         {
-            MessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
     }
 

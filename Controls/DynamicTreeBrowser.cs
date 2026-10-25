@@ -548,11 +548,11 @@ public partial class DynamicTreeBrowser : UserControl
         {
             if (exception is TargetInvocationException)
             {
-                MessageBox.Show((exception as TargetInvocationException).InnerException.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+                ThemedMessageBox.Show((exception as TargetInvocationException).InnerException.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             }
             else
             {
-                MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+                ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             }
         }
     }
