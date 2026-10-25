@@ -393,6 +393,141 @@ internal static class Program
         Put(telnetData2, "SavedConnections/USB Serial Port_COM3.rawconnection", RawXml);
         SettingsArchive.Import(archive, telnetData2, telnetLocal2, null);
         Check(Read(telnetData2, "SavedConnections/USB Serial Port_COM3.rawconnection") == RawXml, "a raw profile without a password is imported unchanged");
+
+        RunSelectablePartsChecks();
+    }
+
+    private sealed class FakeKeyStore : ISettingsKeyStore
+    {
+        public byte[] SshKey;
+        public byte[] PasswordKey;
+        public bool FailSshExport;
+
+        public bool HasSshKey { get { return SshKey != null; } }
+        public bool HasPasswordKey { get { return PasswordKey != null; } }
+
+        public byte[] ExportSshKey()
+        {
+            if (FailSshExport)
+            {
+                throw new System.Security.Cryptography.CryptographicException("not exportable");
+            }
+            return SshKey;
+        }
+
+        public byte[] ExportPasswordKey() { return PasswordKey; }
+        public void ImportSshKey(byte[] data) { SshKey = data; }
+        public void ImportPasswordKey(byte[] data) { PasswordKey = data; }
+    }
+
+    private const string RsaKeyXml = "<?xml version=\"1.0\"?><RSAParameters><Exponent>AQAB</Exponent><Modulus>AAAA</Modulus><D>BBBB</D></RSAParameters>";
+    private const string CompletionsXml = "<?xml version=\"1.0\"?><CommandCompletionDatabase><Completions /></CommandCompletionDatabase>";
+    private const string OpenSshPrivate = "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----\n";
+    private const string OpenSshPublic = "ssh-ed25519 AAAAC3Nza user@host\n";
+
+    private static SettingsLocations MakeLocations(string data, string local, string completions, string sshDir, ISettingsKeyStore keys)
+    {
+        return new SettingsLocations { DataDirectory = data, LocalDataDirectory = local, CommandCompletionsPath = completions, UserSshDirectory = sshDir, KeyStore = keys };
+    }
+
+    private static void RunSelectablePartsChecks()
+    {
+        // Source computer: all settings, CommandCompletions.xml, both CSP keys and OpenSSH key files.
+        string srcData = NewDir("sel-srcdata"), srcLocal = NewDir("sel-srclocal"), srcApp = NewDir("sel-srcapp"), srcSsh = NewDir("sel-srcssh");
+        Populate(srcData, srcLocal);
+        Put(srcApp, "CommandCompletions.xml", CompletionsXml);
+        Put(srcSsh, "id_ed25519", OpenSshPrivate);
+        Put(srcSsh, "id_ed25519.pub", OpenSshPublic);
+        Put(srcSsh, "known_hosts", "not exported");
+        Put(srcSsh, "config", "not exported");
+        FakeKeyStore srcKeys = new FakeKeyStore { SshKey = Encoding.UTF8.GetBytes(RsaKeyXml), PasswordKey = Encoding.UTF8.GetBytes(RsaKeyXml.Replace("BBBB", "CCCC")) };
+        SettingsLocations src = MakeLocations(srcData, srcLocal, Path.Combine(srcApp, "CommandCompletions.xml"), srcSsh, srcKeys);
+
+        // ---- describe
+        SettingsContents described = SettingsArchive.Describe(src);
+        Check(described.Available == SettingsParts.All, "describe finds every part, including passwords, keys and command completions");
+        Check(described.SshProfiles == 2 && described.RawProfiles == 1 && described.OpenSshFiles.Count == 2, "describe counts profiles and OpenSSH key files");
+        SettingsContents bare = SettingsArchive.Describe(MakeLocations(NewDir("sel-empty"), NewDir("sel-empty2"), null, null, null));
+        Check(bare.Available == SettingsParts.None, "describe on a computer without settings finds nothing");
+
+        // ---- export of selected parts only
+        string onlyKeys = Path.Combine(NewDir("out"), "keys.tar.gz");
+        var keysExport = SettingsArchive.Export(onlyKeys, src, SettingsParts.Keys);
+        var keyNames = ReadArchive(onlyKeys).Select(e => e.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
+        Check(keysExport.FileCount == 4 && keyNames.SequenceEqual(new[] { "Keys/SmarTTY-password-key.xml", "Keys/SmarTTY-ssh-key.xml", "OpenSSH/id_ed25519", "OpenSSH/id_ed25519.pub" }, StringComparer.Ordinal),
+            "a keys-only export has the CSP keys and the default OpenSSH files, but not known_hosts or config");
+
+        string selective = Path.Combine(NewDir("out"), "selective.tar.gz");
+        SettingsArchive.Export(selective, src, SettingsParts.MainSettings | SettingsParts.CommandCompletions | SettingsParts.RawProfiles);
+        var selectiveNames = ReadArchive(selective).Select(e => e.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
+        Check(selectiveNames.SequenceEqual(new[] { "CommandCompletions.xml", "SavedConnections/USB Serial Port_COM3.rawconnection", "Settings.xml" }, StringComparer.Ordinal),
+            "only the selected parts are exported (no SSH profiles, no known hosts)");
+
+        string notFoundArchive = Path.Combine(NewDir("out"), "notfound.tar.gz");
+        var partial = SettingsArchive.Export(notFoundArchive, MakeLocations(srcData, srcLocal, null, null, null), SettingsParts.Legacy | SettingsParts.CommandCompletions | SettingsParts.SshKey | SettingsParts.OpenSshKeys);
+        Check(partial.NotFound.Contains("command completions") && partial.NotFound.Contains("SmarTTY SSH key") && partial.NotFound.Contains("OpenSSH keys") && partial.FileCount == 6,
+            "selected parts that do not exist are reported and the rest is still exported");
+        ExpectThrows<InvalidOperationException>(() => SettingsArchive.Export(Path.Combine(NewDir("out"), "none.tar.gz"), MakeLocations(NewDir("sel-e1"), NewDir("sel-e2"), null, null, null), SettingsParts.Keys), "exporting only parts that do not exist is an error");
+
+        FakeKeyStore failing = new FakeKeyStore { SshKey = Encoding.UTF8.GetBytes(RsaKeyXml), FailSshExport = true };
+        var failedKey = SettingsArchive.Export(Path.Combine(NewDir("out"), "failing.tar.gz"), MakeLocations(srcData, srcLocal, null, null, failing), SettingsParts.MainSettings | SettingsParts.SshKey);
+        Check(failedKey.Skipped.Contains("Keys/SmarTTY-ssh-key.xml") && failedKey.FileCount == 1, "a key that cannot be exported is skipped without failing the export");
+
+        // ---- inspect
+        string everything = Path.Combine(NewDir("out"), "everything.tar.gz");
+        SettingsArchive.Export(everything, src, SettingsParts.All);
+        SettingsContents inspected = SettingsArchive.Inspect(everything);
+        Check(inspected.Available == SettingsParts.All && inspected.SshProfiles == 2 && inspected.RawProfiles == 1 && inspected.OpenSshFiles.Count == 2, "inspect lists what an archive contains");
+        Check(SettingsArchive.Inspect(selective).Available == (SettingsParts.MainSettings | SettingsParts.CommandCompletions | SettingsParts.RawProfiles), "inspect of a partial archive offers only its parts");
+
+        // ---- import of selected parts only
+        string dstData = NewDir("sel-dstdata"), dstLocal = NewDir("sel-dstlocal"), dstApp = NewDir("sel-dstapp"), dstSsh = NewDir("sel-dstssh");
+        FakeKeyStore dstKeys = new FakeKeyStore { SshKey = Encoding.UTF8.GetBytes(RsaKeyXml.Replace("BBBB", "OLDOLD")) };
+        SettingsLocations dst = MakeLocations(dstData, dstLocal, Path.Combine(dstApp, "CommandCompletions.xml"), dstSsh, dstKeys);
+
+        var onlyCompletions = SettingsArchive.Import(everything, dst, SettingsParts.CommandCompletions, null);
+        Check(onlyCompletions.CommandCompletionsImported && onlyCompletions.FileCount == 1 && Read(dstApp, "CommandCompletions.xml") == CompletionsXml, "CommandCompletions.xml is restored on its own");
+        Check(!File.Exists(Path.Combine(dstData, "Settings.xml")) && !File.Exists(Path.Combine(dstSsh, "id_ed25519")) && Encoding.UTF8.GetString(dstKeys.SshKey).Contains("OLDOLD"),
+            "parts that are not selected are not touched");
+        Check(onlyCompletions.NotSelected.Count > 5, "unselected entries are counted, not ignored");
+
+        string backupPath = Path.Combine(dstData, "Backups", "keys-backup.tar.gz");
+        var keyImport = SettingsArchive.Import(everything, dst, SettingsParts.Keys, backupPath);
+        Check(keyImport.SshKeyImported && keyImport.PasswordKeyImported && keyImport.OpenSshKeyFiles == 2 && keyImport.FileCount == 4, "keys are imported into the key store and the .ssh folder");
+        Check(Encoding.UTF8.GetString(dstKeys.SshKey) == RsaKeyXml && Encoding.UTF8.GetString(dstKeys.PasswordKey).Contains("CCCC"), "the CSP keys are handed to the key store unchanged");
+        Check(Read(dstSsh, "id_ed25519") == OpenSshPrivate && Read(dstSsh, "id_ed25519.pub") == OpenSshPublic, "OpenSSH key files are restored verbatim");
+        Check(keyImport.BackupPath == backupPath && ReadArchive(backupPath).Any(e => e.Name == SettingsArchive.SshKeyEntryName && Encoding.UTF8.GetString(e.Data).Contains("OLDOLD")),
+            "the key that is replaced is saved in the backup first");
+
+        // saved passwords: only with the SavedPasswords part
+        string dstData2 = NewDir("sel-dstdata2"), dstLocal2 = NewDir("sel-dstlocal2");
+        Put(dstData2, "SavedConnections/root@192.168.1.1.sshconnection", Ssh("192.168.1.1", "LOCALPWD"));
+        string withPwd = Path.Combine(NewDir("out"), "with-pwd2.tar.gz");
+        SettingsArchive.Export(withPwd, src, SettingsParts.SshProfiles | SettingsParts.SavedPasswords);
+        SettingsLocations dst2 = MakeLocations(dstData2, dstLocal2, null, null, null);
+        SettingsArchive.Import(withPwd, dst2, SettingsParts.SshProfiles, null);
+        Check(Read(dstData2, "SavedConnections/root@192.168.1.1.sshconnection").Contains("LOCALPWD") && !Read(dstData2, "SavedConnections/root@192.168.1.1.sshconnection").Contains("SECRETPWD"),
+            "importing profiles without the passwords part keeps the local password and drops the archived one");
+        Check(!Read(dstData2, "SavedConnections/root@10.0.0.2.sshconnection").Contains("EncryptedSavedPassword"), "a new profile imported without passwords has none");
+        SettingsArchive.Import(withPwd, dst2, SettingsParts.SshProfiles | SettingsParts.SavedPasswords, null);
+        Check(Read(dstData2, "SavedConnections/root@192.168.1.1.sshconnection").Contains("SECRETPWD"), "with the passwords part the archived password is imported");
+
+        // ---- validation
+        string badKey = Path.Combine(NewDir("out"), "bad-key.tar.gz");
+        MakeArchive(badKey, E("OpenSSH/id_rsa", "this is not a key"));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(badKey, dst, SettingsParts.All, null), "an OpenSSH entry that is not a key is rejected");
+        string badName = Path.Combine(NewDir("out"), "bad-name.tar.gz");
+        MakeArchive(badName, E("Settings.xml", SettingsXml), E("OpenSSH/../evil", OpenSshPrivate), E("OpenSSH/authorized_keys", OpenSshPublic), E("Keys/other.xml", RsaKeyXml));
+        var badNameResult = SettingsArchive.Import(badName, dst, SettingsParts.All, null);
+        Check(badNameResult.Ignored.Count == 3 && badNameResult.FileCount == 1 && !File.Exists(Path.Combine(dstSsh, "authorized_keys")), "OpenSSH and Keys entries outside the fixed list are ignored");
+        string wrongRoot = Path.Combine(NewDir("out"), "wrong-root.tar.gz");
+        MakeArchive(wrongRoot, E("Keys/SmarTTY-ssh-key.xml", "<Something/>"));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(wrongRoot, dst, SettingsParts.All, null), "a key entry without <RSAParameters> is rejected");
+        string wrongCompletions = Path.Combine(NewDir("out"), "wrong-completions.tar.gz");
+        MakeArchive(wrongCompletions, E("CommandCompletions.xml", "<GlobalSettings/>"));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(wrongCompletions, dst, SettingsParts.All, null), "CommandCompletions.xml of another type is rejected");
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(selective, dst, SettingsParts.Keys, null), "importing parts that the archive does not hold is an error");
+        ExpectThrows<InvalidOperationException>(() => SettingsArchive.Import(everything, MakeLocations(NewDir("sel-n1"), NewDir("sel-n2"), null, null, null), SettingsParts.SshKey, null), "keys cannot be imported without a key store");
     }
 
     private static string Telnet(string host, string password)

@@ -18,9 +18,18 @@ public class CommandCompletionDatabase
     [XmlIgnore]
     public string LoadWarning { get; private set; }
 
+    /// <summary>CommandCompletions.xml next to the exe (also used by the settings export/import).</summary>
+    public static string DefaultPath
+    {
+        get
+        {
+            return Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "CommandCompletions.xml");
+        }
+    }
+
     public static CommandCompletionDatabase Load()
     {
-        return Load(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "CommandCompletions.xml"));
+        return Load(DefaultPath);
     }
 
     public static CommandCompletionDatabase Load(string path)

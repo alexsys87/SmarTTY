@@ -1,14 +1,18 @@
 ﻿using Microsoft.Win32;
+using SmarTTY.Ssh;
 using SmarTTY.Transport;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Windows;
 using VisualTTY;
 
 namespace SmarTTY.GUI;
 
 /// <summary>
-/// Message boxes and file dialogs for exporting/importing settings (see <see cref="SettingsArchive"/>).
+/// Windows, message boxes and file dialogs for exporting/importing settings (see <see cref="SettingsArchive"/>).
+/// What goes into the archive, or comes out of it, is chosen in <see cref="SettingsArchiveSelectionWindow"/>.
 /// </summary>
 internal static class SettingsArchiveDialogs
 {
@@ -21,20 +25,57 @@ internal static class SettingsArchiveDialogs
 
     private static bool IsExpected(Exception exception)
     {
-        return exception is IOException || exception is UnauthorizedAccessException || exception is InvalidDataException || exception is InvalidOperationException;
+        return exception is IOException || exception is UnauthorizedAccessException || exception is InvalidDataException || exception is InvalidOperationException || exception is CryptographicException;
+    }
+
+    private static SettingsLocations CreateLocations()
+    {
+        return new SettingsLocations
+        {
+            DataDirectory = GlobalSettings.DataDirectory,
+            LocalDataDirectory = LocalDataDirectory,
+            CommandCompletionsPath = CommandCompletionDatabase.DefaultPath,
+            UserSshDirectory = SshSession.UserSshDirectory,
+            KeyStore = new CspSettingsKeyStore()
+        };
+    }
+
+    private static bool HasSecrets(SettingsParts parts)
+    {
+        return (parts & (SettingsParts.SavedPasswords | SettingsParts.Keys)) != SettingsParts.None;
+    }
+
+    private static string Join(IEnumerable<string> names)
+    {
+        return string.Join("\n", names);
     }
 
     public static void Export(Window owner)
     {
-        MessageBoxResult includePasswords = MessageDialog.Show(
-            "Include saved passwords in the archive?\n\n" +
-            "Saved passwords are encrypted with a key that belongs to your Windows account, so they will not work on another computer. " +
-            "Choose No for an archive you want to move to another computer or share.",
-            Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNoCancel, MessageBoxResult.No, owner);
-        if (includePasswords == MessageBoxResult.Cancel)
+        SettingsLocations locations = CreateLocations();
+        SettingsContents available;
+        try
+        {
+            available = SettingsArchive.Describe(locations);
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            MessageDialog.Show("Could not look up the settings:\n" + ex.Message, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: owner);
+            return;
+        }
+        if (available.Available == SettingsParts.None)
+        {
+            MessageDialog.Show("There are no saved SmarTTY settings to export.", Caption, MessageDialogIcon.Information, MessageDialogButtons.Ok, owner: owner);
+            return;
+        }
+
+        SettingsArchiveSelectionWindow selection = new SettingsArchiveSelectionWindow(true, available);
+        WindowOwnership.Attach(selection, owner);
+        if (selection.ShowDialog() != true)
         {
             return;
         }
+        SettingsParts parts = selection.SelectedParts;
 
         SaveFileDialog dialog = new SaveFileDialog
         {
@@ -55,11 +96,19 @@ internal static class SettingsArchiveDialogs
 
         try
         {
-            SettingsArchive.ExportResult result = SettingsArchive.Export(path, GlobalSettings.DataDirectory, LocalDataDirectory, includePasswords == MessageBoxResult.Yes);
+            SettingsArchive.ExportResult result = SettingsArchive.Export(path, locations, parts);
             string text = "Exported " + result.FileCount + " file(s) to:\n" + path;
+            if (result.NotFound.Count > 0)
+            {
+                text += "\n\nNot found, so not exported:\n" + Join(result.NotFound);
+            }
             if (result.Skipped.Count > 0)
             {
-                text += "\n\nSkipped because they are not valid SmarTTY XML:\n" + string.Join("\n", result.Skipped);
+                text += "\n\nSkipped because they are damaged or could not be read:\n" + Join(result.Skipped);
+            }
+            if (HasSecrets(parts))
+            {
+                text += "\n\nThe archive holds saved passwords or private keys and is not encrypted: keep it secret and delete it when it is no longer needed.";
             }
             MessageDialog.Show(text, Caption, MessageDialogIcon.Information, MessageDialogButtons.Ok, owner: owner);
         }
@@ -83,14 +132,36 @@ internal static class SettingsArchiveDialogs
             return null;
         }
 
-        string dataDirectory = GlobalSettings.DataDirectory;
+        SettingsLocations locations = CreateLocations();
+        SettingsContents contents;
+        try
+        {
+            contents = SettingsArchive.Inspect(dialog.FileName);
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            MessageDialog.Show("Could not read the settings archive:\n" + ex.Message, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: owner);
+            return null;
+        }
+
+        SettingsArchiveSelectionWindow selection = new SettingsArchiveSelectionWindow(false, contents);
+        WindowOwnership.Attach(selection, owner);
+        if (selection.ShowDialog() != true)
+        {
+            return null;
+        }
+        SettingsParts parts = selection.SelectedParts;
+
+        string dataDirectory = locations.DataDirectory;
         string backupPath = SettingsArchive.DefaultBackupPath(dataDirectory);
-        MessageBoxResult confirmation = MessageDialog.Show(
-            "Import settings from:\n" + dialog.FileName + "\n\n" +
-            "Settings.xml, KnownHosts.xml, GUIPreferences.xml and saved connections with the same names will be replaced. " +
-            "Other saved connections are kept.\n\n" +
-            "A backup of the current settings will be saved to:\n" + backupPath,
-            Caption, MessageDialogIcon.Question, MessageDialogButtons.OkCancel, MessageBoxResult.Cancel, owner);
+        string question = "Import the selected settings from:\n" + dialog.FileName + "\n\n" +
+                          "Settings files, profiles and keys with the same names will be replaced. Other saved connections are kept.\n\n" +
+                          "A backup of what is replaced will be saved to:\n" + backupPath;
+        if ((parts & SettingsParts.Keys) != SettingsParts.None)
+        {
+            question += "\n\nThe backup also holds the current keys without encryption.";
+        }
+        MessageBoxResult confirmation = MessageDialog.Show(question, Caption, MessageDialogIcon.Question, MessageDialogButtons.OkCancel, MessageBoxResult.Cancel, owner);
         if (confirmation != MessageBoxResult.OK)
         {
             return null;
@@ -99,7 +170,7 @@ internal static class SettingsArchiveDialogs
         SettingsArchive.ImportResult result;
         try
         {
-            result = SettingsArchive.Import(dialog.FileName, dataDirectory, LocalDataDirectory, backupPath);
+            result = SettingsArchive.Import(dialog.FileName, locations, parts, backupPath);
         }
         catch (Exception ex) when (IsExpected(ex))
         {
@@ -107,27 +178,77 @@ internal static class SettingsArchiveDialogs
             return null;
         }
 
-        try
+        if (result.SshProfiles + result.RawProfiles > 0)
         {
-            // Make the saved connection list reload, and drop the cached GUI preferences.
-            SavedConnectionStore.TouchTimestamp(Path.Combine(dataDirectory, SettingsArchive.ConnectionsDirectoryName));
+            try
+            {
+                // Make the saved connection list reload.
+                SavedConnectionStore.TouchTimestamp(Path.Combine(dataDirectory, SettingsArchive.ConnectionsDirectoryName));
+            }
+            catch
+            {
+            }
         }
-        catch
-        {
-        }
-        GuiPreferencesStore.Reload();
-
-        string text = "Imported " + result.FileCount + " file(s): " + result.SshProfiles + " SSH profile(s), " + result.RawProfiles + " COM/TCP profile(s)" +
-                      (result.SettingsImported ? ", main settings" : "") + (result.KnownHostsImported ? ", trusted server keys" : "") +
-                      (result.GuiPreferencesImported ? ", interface preferences" : "") + ".";
-        text += "\n\nSaved passwords are normally not part of an archive; enter them again on the first connection.";
         if (result.GuiPreferencesImported)
         {
-            text += " Interface preferences are fully applied after SmarTTY is restarted.";
+            // Drop the cached GUI preferences.
+            GuiPreferencesStore.Reload();
+        }
+
+        List<string> done = new List<string>();
+        if (result.SshProfiles > 0)
+        {
+            done.Add(result.SshProfiles + " SSH profile(s)");
+        }
+        if (result.RawProfiles > 0)
+        {
+            done.Add(result.RawProfiles + " COM/TCP profile(s)");
+        }
+        if (result.SettingsImported)
+        {
+            done.Add("main settings");
+        }
+        if (result.KnownHostsImported)
+        {
+            done.Add("trusted server keys");
+        }
+        if (result.GuiPreferencesImported)
+        {
+            done.Add("interface preferences");
+        }
+        if (result.CommandCompletionsImported)
+        {
+            done.Add("command completions");
+        }
+        if (result.SshKeyImported)
+        {
+            done.Add("SmarTTY SSH key");
+        }
+        if (result.PasswordKeyImported)
+        {
+            done.Add("password protection key");
+        }
+        if (result.OpenSshKeyFiles > 0)
+        {
+            done.Add(result.OpenSshKeyFiles + " OpenSSH key file(s)");
+        }
+
+        string text = "Imported " + result.FileCount + " file(s): " + string.Join(", ", done) + ".";
+        if (result.SshProfiles + result.RawProfiles > 0 && (parts & SettingsParts.SavedPasswords) == SettingsParts.None)
+        {
+            text += "\n\nSaved passwords were not imported; enter them again on the first connection. Passwords saved on this computer were kept.";
+        }
+        if (result.GuiPreferencesImported || result.CommandCompletionsImported)
+        {
+            text += "\n\nInterface preferences and command completions are fully applied after SmarTTY is restarted.";
         }
         if (result.BackupPath != null)
         {
             text += "\n\nPrevious settings were backed up to:\n" + result.BackupPath;
+        }
+        if (result.NotSelected.Count > 0)
+        {
+            text += "\n\nNot imported (not selected): " + result.NotSelected.Count;
         }
         if (result.Ignored.Count > 0)
         {
