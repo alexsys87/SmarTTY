@@ -28,8 +28,8 @@ public partial class DeviceTerminalControl
         }
         string title = "Send file - " + Path.GetFileName(fileName);
         // Not a "using": the window is modeless and outlives this method; it is closed (and disposed) when the send ends.
-        SmarTTY.Forms.XModemTransferForm progressForm = new SmarTTY.Forms.XModemTransferForm(title, showErrorCount: false);
-        progressForm.Show(this);
+        ITransferProgressWindow progressForm = CreateTransferProgressWindow(title, showErrorCount: false);
+        progressForm.Show();
         _isFileSendActive = true;
         UpdateSerialLineUi();
         bool echo = HexMode && _deviceTerminalSettings.EchoTypedCharacters;
@@ -55,10 +55,7 @@ public partial class DeviceTerminalControl
             {
                 BeginInvoke((Action)(() =>
                 {
-                    if (!progressForm.IsDisposed)
-                    {
-                        progressForm.Close(); // a modeless window is disposed by closing it
-                    }
+                    progressForm.Dispose();
                     UpdateSerialLineUi();
                     if (error != null)
                     {
@@ -78,7 +75,7 @@ public partial class DeviceTerminalControl
     /// Runs on a worker thread. <paramref name="written"/>[0] counts the bytes that reached the device; Cancel ends the
     /// send without an error, a failed write or a closed connection throws.
     /// </summary>
-    private void SendFileThrough(AsyncTransportConnection connection, string fileName, SmarTTY.Forms.XModemTransferForm progressForm, bool echo, long[] written)
+    private void SendFileThrough(AsyncTransportConnection connection, string fileName, ITransferProgressWindow progressForm, bool echo, long[] written)
     {
         bool cancelled = false;
         long queuedBytes = 0;

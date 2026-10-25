@@ -144,15 +144,6 @@
     <Compile Update="Forms\FormBase.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="Forms\HostKeyMismatchForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\LogReplayForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\NewHostKeyForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Update="Forms\OKCancelFormBase.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -172,12 +163,6 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Forms\SCPUploadForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\SerialPortSettingsForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\SudoConfirmationForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Forms\SuggestionListForm.cs">
@@ -258,15 +243,6 @@
     <Compile Update="Forms\FormBase.Designer.cs">
       <DependentUpon>FormBase.cs</DependentUpon>
     </Compile>
-    <Compile Update="Forms\HostKeyMismatchForm.Designer.cs">
-      <DependentUpon>HostKeyMismatchForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\LogReplayForm.Designer.cs">
-      <DependentUpon>LogReplayForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\NewHostKeyForm.Designer.cs">
-      <DependentUpon>NewHostKeyForm.cs</DependentUpon>
-    </Compile>
     <Compile Update="Forms\OKCancelFormBase.Designer.cs">
       <DependentUpon>OKCancelFormBase.cs</DependentUpon>
     </Compile>
@@ -287,12 +263,6 @@
     </Compile>
     <Compile Update="Forms\SCPUploadForm.Designer.cs">
       <DependentUpon>SCPUploadForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\SerialPortSettingsForm.Designer.cs">
-      <DependentUpon>SerialPortSettingsForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\SudoConfirmationForm.Designer.cs">
-      <DependentUpon>SudoConfirmationForm.cs</DependentUpon>
     </Compile>
     <Compile Update="Forms\SuggestionListForm.Designer.cs">
       <DependentUpon>SuggestionListForm.cs</DependentUpon>
@@ -320,12 +290,6 @@
     </EmbeddedResource>
     <EmbeddedResource Update="Forms\DirectoryTransferForm.resx">
       <DependentUpon>DirectoryTransferForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\HostKeyMismatchForm.resx">
-      <DependentUpon>HostKeyMismatchForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\NewHostKeyForm.resx">
-      <DependentUpon>NewHostKeyForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Update="Forms\RemoteFolderBrowserForm.resx">
       <DependentUpon>RemoteFolderBrowserForm.cs</DependentUpon>

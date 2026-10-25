@@ -39,6 +39,13 @@ public partial class RemoteFileEditor : CodeEditorPP
     // The user's answer to "Convert CRLF line endings to LF?", so that it is asked once per file.
     private bool? _convertCrLf;
 
+    /// <summary>
+    /// Shows the prompt that a <c>sudo</c> command printed on its shell channel (the channel, the command line). The
+    /// themed WPF window is injected here by <c>App</c>: this editor is compiled by the Mono test harness, which
+    /// cannot reference the WPF dialogs.
+    /// </summary>
+    public static Action<SshShellChannel, string> SudoConfirmationPrompt;
+
     // The bytes of the file as they are on the server (what was downloaded, then what was saved): "Reopen with
     // encoding" decodes them again.
     private byte[] _rawBytes;
@@ -1099,10 +1106,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
         string sudoCommand = "sudo sh -c " + RemotePathUtils.ShellQuote(job.ReplaceCommand);
         SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(sudoCommand, "xterm");
-        using (SudoConfirmationForm sudoConfirmationForm = new SudoConfirmationForm(sshShellChannel, sudoCommand))
-        {
-            sudoConfirmationForm.ShowModal();
-        }
+        SudoConfirmationPrompt?.Invoke(sshShellChannel, sudoCommand);
         try
         {
             sshShellChannel.Input.Write(new byte[1] { 3 }, 0, 1);

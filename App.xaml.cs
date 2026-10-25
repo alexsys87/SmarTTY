@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Windows;
+using SmarTTY.Controls;
 using SmarTTY.GUI;
 using SmarTTY.GUI.Styles;
 using VisualTTY;
@@ -30,6 +31,16 @@ public partial class App : Application
             string entered = credentials;
             return ProxyAuthWindow.ShowPrompt(WindowOwnership.ActiveWindow(), realm, ref entered) ? entered : null;
         };
+        // The host-key prompts are raised from SshConnector, which is compiled by the Mono test harness too.
+        SshConnector.NewHostKeyPrompt = (settings, fingerprint) => NewHostKeyWindow.Confirm(settings, fingerprint);
+        SshConnector.HostKeyMismatchPrompt = (settings, reason) => HostKeyMismatchWindow.Confirm(settings, reason);
+        // The device terminal (COM/TCP/telnet) raises its dialogs from harness-compiled code as well.
+        DeviceTerminalControl.LogReplayPrompt = (bytes, terminal) => LogReplayWindow.Replay(bytes, terminal);
+        DeviceTerminalControl.SerialSettingsPrompt = (settings, portName) =>
+            SerialPortSettingsWindow.Prompt(WindowOwnership.ActiveWindow(), settings, portName);
+        DeviceTerminalControl.TransferProgressWindowFactory = (title, showErrorCount) => XModemTransferWindow.Create(title, showErrorCount);
+        RemoteFileEditor.SudoConfirmationPrompt = (channel, promptText) =>
+            SudoConfirmationWindow.Show(WindowOwnership.ActiveWindow(), channel, promptText);
 
         ConnectionSelectionWindow connectionSelectionWindow = new ConnectionSelectionWindow(showRawConnections: true, e.Args.FirstOrDefault());
         connectionSelectionWindow.Closed += OnSelectionWindowClosed;
