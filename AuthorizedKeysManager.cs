@@ -198,10 +198,33 @@ internal static class AuthorizedKeysManager
     /// and checks that the server will now accept it. Throws when the key could not be installed, so that the caller
     /// does not switch a profile to public key authentication that has no key on the server.
     /// </summary>
-    public static void AppendAuthorizedKey(SshSession sshSession, string keyString)
+    /// <param name="confirmCleanup">
+    /// Asked when a failed attempt left an incomplete copy of the key line at the end of a file (an append that ran out
+    /// of space): it gets the question for the user and returns whether the line may be removed. Without it nothing is
+    /// removed.
+    /// </param>
+    public static void AppendAuthorizedKey(SshSession sshSession, string keyString, Func<string, bool> confirmCleanup = null)
     {
         byte[] keyBlob = AuthorizedKeysFile.ParseKeyBlob(keyString)
             ?? throw new ArgumentException("The line is not a public key", nameof(keyString));
+        List<string> touchedFiles = new List<string>();
+        try
+        {
+            InstallKey(sshSession, keyString, keyBlob, touchedFiles);
+        }
+        catch (Exception exception) when (confirmCleanup != null && touchedFiles.Count > 0 && !sshSession.IsConnectionClosed)
+        {
+            string note = OfferCleanup(sshSession, touchedFiles, keyString, confirmCleanup);
+            if (note == null)
+            {
+                throw;
+            }
+            throw new RemoteOperationException(exception.Message + Environment.NewLine + note);
+        }
+    }
+
+    private static void InstallKey(SshSession sshSession, string keyString, byte[] keyBlob, List<string> touchedFiles)
+    {
         string homeDir = GetHomeDirectory(sshSession);
         string sshDir = ScpChannelStream.QuotePath(homeDir + "/.ssh");
         if (sshSession.RunCommandChecked("test -d " + sshDir + " || mkdir -m 700 " + sshDir, requireSuccess: true) == null)
@@ -214,6 +237,7 @@ internal static class AuthorizedKeysManager
         // The key may already be there when only the Dropbear file lacks it: do not add it twice.
         if (!FileHoldsKey(sshSession, authKeysPath, keyBlob))
         {
+            touchedFiles.Add(authKeysPath);
             AppendLine(sshSession, authKeysPath, keyString);
         }
         SetMode(sshSession, "700", sshDir);
@@ -225,6 +249,7 @@ internal static class AuthorizedKeysManager
                 continue;
             }
             // Dropbear does not read the home directory for root, so a key missing here is a key that does not work.
+            touchedFiles.Add(path);
             AppendLine(sshSession, path, keyString);
             SetMode(sshSession, "600", ScpChannelStream.QuotePath(path));
         }
@@ -234,6 +259,45 @@ internal static class AuthorizedKeysManager
         {
             throw new RemoteOperationException("The key was not found in authorized_keys after adding it");
         }
+    }
+
+    /// <summary>
+    /// After a failed installation: for every file that was appended to, looks for an incomplete copy of the key line at
+    /// its end and, if the user agrees, cuts it off. Returns a sentence for the error message, or null when there was
+    /// nothing to offer or the user declined. Never throws: the failure of the installation is what the caller reports.
+    /// </summary>
+    private static string OfferCleanup(SshSession sshSession, List<string> files, string keyString, Func<string, bool> confirmCleanup)
+    {
+        List<string> notes = new List<string>();
+        foreach (string path in files)
+        {
+            try
+            {
+                List<string> lines = sshSession.RunCommandChecked("cat " + ScpChannelStream.QuotePath(path), requireSuccess: true);
+                string fragment = lines?.LastOrDefault(line => !string.IsNullOrEmpty(line));
+                if (!AuthorizedKeysFile.IsIncompleteCopy(fragment, keyString))
+                {
+                    continue;
+                }
+                string preview = fragment.Length > 40 ? fragment.Substring(0, 40) + "..." : fragment;
+                if (!confirmCleanup("The failed attempt left an incomplete key line at the end of " + path + ":" + Environment.NewLine
+                    + preview + Environment.NewLine + "Remove this line?"))
+                {
+                    continue;
+                }
+                int byteCount = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetByteCount(fragment);
+                string command = "sh -c " + ScpChannelStream.QuotePath(AuthorizedKeysFile.RemoveTailScript) + " sh "
+                    + ScpChannelStream.QuotePath(path) + " " + byteCount + " " + ScpChannelStream.QuotePath(fragment);
+                notes.Add(sshSession.RunCommandChecked(command, requireSuccess: true) != null
+                    ? "The incomplete line was removed from " + path + "."
+                    : "The incomplete line could not be removed from " + path + " (the file has changed or is read-only).");
+            }
+            catch (Exception exception)
+            {
+                notes.Add("The incomplete line in " + path + " was not removed: " + exception.Message);
+            }
+        }
+        return notes.Count == 0 ? null : string.Join(Environment.NewLine, notes);
     }
 
     /// <summary>chmod is best effort (some file systems have no modes); the read-back of the key decides.</summary>

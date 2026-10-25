@@ -192,7 +192,7 @@ public partial class PublicKeyManagerForm : DpiAwareForm
         Exception error = null;
         try
         {
-            AuthorizedKeysManager.AppendAuthorizedKey(_session, _authorizedKeyLine);
+            AuthorizedKeysManager.AppendAuthorizedKey(_session, _authorizedKeyLine, ConfirmCleanup);
         }
         catch (Exception exception)
         {
@@ -215,6 +215,24 @@ public partial class PublicKeyManagerForm : DpiAwareForm
         }
         CheckKeyStatus(true);
         ReportFailure("Cannot stop accepting the key", error);
+    }
+
+    // Called on the worker thread: the answer of the user is awaited on the UI thread.
+    private bool ConfirmCleanup(string message)
+    {
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return false;
+        }
+        try
+        {
+            return (bool)Invoke((Func<bool>)(() => MessageBox.Show(this, message, "Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes));
+        }
+        catch (InvalidOperationException)
+        {
+            // The form was closed meanwhile.
+            return false;
+        }
     }
 
     // The status field only says "not accepted"; the reason (full flash, no permission, lost connection) is shown here.

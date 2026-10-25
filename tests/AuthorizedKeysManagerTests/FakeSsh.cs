@@ -23,6 +23,9 @@ namespace SmarTTY.Ssh
         /// <summary>The flash is full (OpenWrt overlay): the script fails with a message and exit status 1.</summary>
         DiskFull,
 
+        /// <summary>As <see cref="DiskFull"/>, but the first bytes of the line were written before the space ran out.</summary>
+        DiskFullPartial,
+
         /// <summary>The channel is closed by the server without exit status and without the line being stored.</summary>
         ClosedSilently,
 
@@ -127,8 +130,21 @@ namespace SmarTTY.Ssh
             {
                 return;
             }
-            switch (_session.AppendOutcome)
+            AppendOutcome outcome = _session.OutcomeOnlyFor == null || _path.Contains(_session.OutcomeOnlyFor) ? _session.AppendOutcome : AppendOutcome.Success;
+            switch (outcome)
             {
+                case AppendOutcome.DiskFullPartial:
+                    string written = Encoding.UTF8.GetString(((MemoryStream)Input).ToArray());
+                    string before = _session.Files.TryGetValue(_path, out string content) ? content : "";
+                    if (before.Length > 0 && !before.EndsWith("\n"))
+                    {
+                        before += "\n";
+                    }
+                    _session.Files[_path] = before + written.Substring(0, 25);
+                    _message = "cat: write error: No space left on device";
+                    _exitStatus = 1;
+                    _finished = true;
+                    break;
                 case AppendOutcome.Success:
                 case AppendOutcome.StoredWithoutStatus:
                     _session.AppendedPaths.Add(_path);
@@ -139,7 +155,7 @@ namespace SmarTTY.Ssh
                         existing += "\n";
                     }
                     _session.Files[_path] = existing + text;
-                    _exitStatus = _session.AppendOutcome == AppendOutcome.Success ? 0 : (int?)null;
+                    _exitStatus = outcome == AppendOutcome.Success ? 0 : (int?)null;
                     _finished = true;
                     break;
                 case AppendOutcome.DiskFull:
@@ -188,6 +204,12 @@ namespace SmarTTY.Ssh
 
         public AppendOutcome AppendOutcome = AppendOutcome.Success;
 
+        /// <summary>When set, the outcome above applies only to appends to paths that contain this text.</summary>
+        public string OutcomeOnlyFor;
+
+        /// <summary>The shell that runs the commands that need one (the removal of an incomplete line).</summary>
+        public string[] Shell = new[] { "sh" };
+
         public bool IsConnectionClosed { get; set; }
 
         public string ServerVersion => IsDropbearRoot ? "SSH-2.0-dropbear_2022.83" : "SSH-2.0-OpenSSH_9.6";
@@ -227,12 +249,44 @@ namespace SmarTTY.Ssh
             {
                 return FailChmod ? null : new List<string>();
             }
+            if (command.StartsWith("sh -c ") && command.Contains("truncate -s"))
+            {
+                return RunRemovalWithRealShell(command);
+            }
             if (command.StartsWith("cat '"))
             {
                 string path = command.Substring(5, command.Length - 6);
                 return Files.TryGetValue(path, out string content) ? content.Split('\n').ToList() : null;
             }
             throw new InvalidOperationException("Unexpected command: " + command);
+        }
+
+        // The path is the first quoted word after the script; the file of the stand-in is run through a real shell on a copy.
+        private List<string> RunRemovalWithRealShell(string command)
+        {
+            int start = command.IndexOf("' sh '") + 6;
+            string path = command.Substring(start, command.IndexOf("'", start) - start);
+            string temp = System.IO.Path.GetTempFileName();
+            try
+            {
+                File.WriteAllBytes(temp, new UTF8Encoding(false).GetBytes(Files[path]));
+                string local = command.Replace(ScpChannelStream.QuotePath(path), ScpChannelStream.QuotePath(temp));
+                System.Diagnostics.ProcessStartInfo info = new System.Diagnostics.ProcessStartInfo(Shell[0]) { UseShellExecute = false, RedirectStandardError = true };
+                foreach (string argument in Shell.Skip(1))
+                {
+                    info.ArgumentList.Add(argument);
+                }
+                info.ArgumentList.Add("-c");
+                info.ArgumentList.Add(local);
+                using System.Diagnostics.Process process = System.Diagnostics.Process.Start(info);
+                process.WaitForExit();
+                Files[path] = new UTF8Encoding(false).GetString(File.ReadAllBytes(temp));
+                return process.ExitCode == 0 ? new List<string>() : null;
+            }
+            finally
+            {
+                File.Delete(temp);
+            }
         }
 
         public ScpDownloadStream OpenDownload(string path)
