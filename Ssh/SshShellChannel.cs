@@ -621,6 +621,28 @@ public class SshShellChannel : IAsyncChannel, IDisposable
         }
     }
 
+    /// <summary>
+    /// Waits for the EOF from the remote side (or for the channel to be closed) for at most <paramref name="timeout"/>;
+    /// false if that time ran out first. Callers that must stay cancellable wait in short slices.
+    /// </summary>
+    public bool WaitEof(TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        lock (_sync)
+        {
+            while (!_eofReceived)
+            {
+                TimeSpan remaining = deadline - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    return false;
+                }
+                Monitor.Wait(_sync, remaining);
+            }
+            return true;
+        }
+    }
+
     public void WaitClosed()
     {
         lock (_sync)
