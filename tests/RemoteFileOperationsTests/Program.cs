@@ -564,12 +564,160 @@ internal static class Program
         Check(!File.Exists(newFile) && !Directory.Exists(Path.Combine(target, "my dir")), "both are gone");
     }
 
+    // One command after another, as the file list runs them (each is a command of its own; a command may end with exit).
+    private static int RunAll(List<string> commands, out string errors)
+    {
+        errors = "";
+        int result = 0;
+        foreach (string command in commands)
+        {
+            int exit = Run(command, out string commandErrors);
+            errors += commandErrors;
+            if (exit != 0 && result == 0)
+            {
+                result = exit;
+            }
+        }
+        return result;
+    }
+
+    private static int Mode(string path)
+    {
+        return (int)File.GetUnixFileMode(path);
+    }
+
+    private static int Octal(string digits)
+    {
+        return Convert.ToInt32(digits, 8);
+    }
+
+    // The permission bits as ls prints and chmod takes them (IO/RemotePermissions.cs), without a shell.
+    private static void PermissionChecks()
+    {
+        Equal(RemotePermissions.ParseMode("-rwxr-xr-x"), (int?)Octal("755"), "ls mode: rwxr-xr-x is 755");
+        Equal(RemotePermissions.ParseMode("drwxrwxrwt"), (int?)Octal("1777"), "ls mode: sticky folder");
+        Equal(RemotePermissions.ParseMode("-rwsr-xr-x"), (int?)Octal("4755"), "ls mode: setuid with execute");
+        Equal(RemotePermissions.ParseMode("-rwSr--r--"), (int?)Octal("4644"), "ls mode: setuid without execute (capital S)");
+        Equal(RemotePermissions.ParseMode("drwxr-sr-x+"), (int?)Octal("2755"), "ls mode: setgid, with the ACL mark");
+        Equal(RemotePermissions.ParseMode("----------"), (int?)0, "ls mode: no permissions");
+        Check(RemotePermissions.ParseMode(null) == null && RemotePermissions.ParseMode("") == null && RemotePermissions.ParseMode("total 20") == null, "ls mode: not a mode");
+        Check(RemotePermissions.ParseMode("-rwxr-xr-?") == null && RemotePermissions.ParseMode("-rwxr-xr-q") == null, "ls mode: an unknown character is not a mode");
+        Check(RemotePermissions.ParseMode("-rwtr-xr-x") == null, "ls mode: t is only valid in the last triplet");
+        Check(RemotePermissions.ParseMode("-rwxr-xr") == null, "ls mode: too short");
+        foreach (string digits in new[] { "000", "644", "755", "777", "1777", "2755", "4755", "7777" })
+        {
+            int mode = Octal(digits);
+            Equal(RemotePermissions.ParseMode("-" + RemotePermissions.ToSymbolic(mode)), (int?)mode, "symbolic form of " + digits + " reads back");
+            Equal(RemotePermissions.ToOctal(mode), digits, "octal form of " + digits);
+        }
+        Equal(RemotePermissions.ToSymbolic(Octal("4755")), "rwsr-xr-x", "symbolic setuid");
+        Equal(RemotePermissions.ToSymbolic(Octal("1644")), "rw-r--r-T", "symbolic sticky without execute");
+        Equal(RemotePermissions.Describe(Octal("750")), "rwxr-x--- (750)", "description");
+        Equal(RemotePermissions.ToOctal(Octal("5")), "005", "octal form is padded to three digits");
+
+        Check(RemotePermissions.TryParseOctal("7", out int parsed) && parsed == 7, "octal text: one digit");
+        Check(RemotePermissions.TryParseOctal(" 0644 ", out parsed) && parsed == Octal("644"), "octal text: spaces and a leading zero");
+        Check(RemotePermissions.TryParseOctal("7777", out parsed) && parsed == Octal("7777"), "octal text: four digits");
+        Check(!RemotePermissions.TryParseOctal("", out _) && !RemotePermissions.TryParseOctal("789", out _) && !RemotePermissions.TryParseOctal("12345", out _) && !RemotePermissions.TryParseOctal("rwx", out _), "octal text: rejects an empty text, 8 and 9, five digits and letters");
+
+        Check(new RemotePermissionChange().IsEmpty && new RemotePermissionChange().ToChmodMode() == null, "an empty change has no mode");
+        Equal(new RemotePermissionChange { SetBits = RemotePermissions.OwnerExecute | RemotePermissions.GroupExecute | RemotePermissions.OtherExecute }.ToChmodMode(), "u+x,g+x,o+x", "chmod mode: execute for all");
+        Equal(new RemotePermissionChange { SetBits = RemotePermissions.OwnerRead | RemotePermissions.OwnerWrite, ClearBits = RemotePermissions.OwnerExecute | RemotePermissions.OtherRead | RemotePermissions.OtherWrite }.ToChmodMode(), "u+rw,u-x,o-rw", "chmod mode: set and clear");
+        Equal(new RemotePermissionChange { SetBits = RemotePermissions.SetUid | RemotePermissions.Sticky, ClearBits = RemotePermissions.SetGid }.ToChmodMode(), "u+s,g-s,a+t", "chmod mode: special bits");
+        Equal(new RemotePermissionChange { ClearBits = RemotePermissions.Sticky }.ToChmodMode(), "a-t", "chmod mode: a mode that starts with a minus never reaches chmod");
+        Equal(new RemotePermissionChange { SetBits = RemotePermissions.OwnerRead, ClearBits = RemotePermissions.OwnerRead }.ToChmodMode(), "u+r", "chmod mode: a bit both set and cleared is set");
+    }
+
+    // chmod from the file list, run by this shell on a temporary tree (names with spaces, quotes and $).
+    private static void ChmodChecks(string root)
+    {
+        string name = "it's a $file";
+        string file = Path.Combine(root, name);
+        File.WriteAllText(file, "data");
+        File.SetUnixFileMode(file, (UnixFileMode)Octal("644"));
+        Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { file }, "+x", ChmodScope.Selected), out string errors), 0, _shell + ": chmod +x" + errors);
+        Check((Mode(file) & Octal("111")) != 0 && (Mode(file) & Octal("600")) == Octal("600"), "chmod +x makes the file executable and keeps the rest");
+
+        string tree = Path.Combine(root, "my tree");
+        string sub = Path.Combine(tree, "sub dir");
+        Directory.CreateDirectory(sub);
+        string top = Path.Combine(tree, "top.txt");
+        string inner = Path.Combine(sub, "inner $1.txt");
+        File.WriteAllText(top, "top");
+        File.WriteAllText(inner, "inner");
+        void Reset()
+        {
+            foreach (string path in new[] { tree, sub })
+            {
+                File.SetUnixFileMode(path, (UnixFileMode)Octal("775"));
+            }
+            foreach (string path in new[] { top, inner })
+            {
+                File.SetUnixFileMode(path, (UnixFileMode)Octal("664"));
+            }
+        }
+
+        Reset();
+        RemotePermissionChange change = new RemotePermissionChange { ClearBits = RemotePermissions.GroupWrite | RemotePermissions.OtherRead, SetBits = RemotePermissions.OwnerExecute };
+        string mode = change.ToChmodMode();
+        Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { tree }, mode, ChmodScope.Selected), out errors), 0, _shell + ": chmod of a folder" + errors);
+        Equal(Mode(tree), Octal("751"), "a symbolic change touches the named bits of the folder only");
+        Equal(Mode(top), Octal("664"), "the contents are not changed without a recursive scope");
+
+        Reset();
+        Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { tree }, mode, ChmodScope.Recursive), out errors), 0, _shell + ": chmod -R" + errors);
+        Check(Mode(tree) == Octal("751") && Mode(sub) == Octal("751"), "recursive: the folder and the folder inside are changed");
+        Check(Mode(top) == Octal("740") && Mode(inner) == Octal("740"), "recursive: the files get the same bits changed, the other bits stay");
+
+        Reset();
+        Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { tree }, mode, ChmodScope.RecursiveFiles), out errors), 0, _shell + ": files only" + errors);
+        Check(Mode(top) == Octal("740") && Mode(inner) == Octal("740"), "files only: the files inside are changed");
+        Check(Mode(tree) == Octal("775") && Mode(sub) == Octal("775"), "files only: the folders are not");
+
+        Reset();
+        Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { tree }, mode, ChmodScope.RecursiveFolders), out errors), 0, _shell + ": folders only" + errors);
+        Check(Mode(tree) == Octal("751") && Mode(sub) == Octal("751"), "folders only: the folder and the folder inside are changed");
+        Check(Mode(top) == Octal("664") && Mode(inner) == Octal("664"), "folders only: the files are not");
+
+        Reset();
+        Equal(RemoteFileOperations.ChmodCommands(new[] { top, inner }, mode, ChmodScope.RecursiveFiles).Count, 2, "one command per path when find filters");
+        Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { top, inner }, mode, ChmodScope.RecursiveFiles), out errors), 0, _shell + ": files only, on selected files" + errors);
+        Check(Mode(top) == Octal("740") && Mode(inner) == Octal("740"), "files only: a selected file is changed itself");
+        Reset();
+        Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { top }, mode, ChmodScope.RecursiveFolders), out errors), 0, _shell + ": folders only, on a selected file" + errors);
+        Equal(Mode(top), Octal("664"), "folders only: a selected file is left alone");
+
+        // The special bits, with the "a+t" and "g+s" spelling.
+        Reset();
+        change = new RemotePermissionChange { SetBits = RemotePermissions.Sticky | RemotePermissions.SetGid };
+        Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { sub }, change.ToChmodMode(), ChmodScope.Selected), out errors), 0, _shell + ": sticky and setgid" + errors);
+        Equal(Mode(sub), Octal("3775"), "sticky and setgid are set");
+        change = new RemotePermissionChange { ClearBits = RemotePermissions.Sticky | RemotePermissions.SetGid };
+        Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { sub }, change.ToChmodMode(), ChmodScope.Selected), out errors), 0, _shell + ": clear sticky and setgid" + errors);
+        Equal(Mode(sub), Octal("775"), "sticky and setgid are cleared");
+
+        // Failures reach the exit status, for chmod and for the find variants.
+        string missing = Path.Combine(root, "no such thing");
+        foreach (ChmodScope scope in new[] { ChmodScope.Selected, ChmodScope.Recursive, ChmodScope.RecursiveFiles, ChmodScope.RecursiveFolders })
+        {
+            int exit = RunAll(RemoteFileOperations.ChmodCommands(new[] { missing }, "u+x", scope), out errors);
+            Check(exit != 0 && errors.Length > 0, _shell + ": a missing path fails with a message (" + scope + ")");
+        }
+        // A chmod that fails inside find (here a mode chmod does not accept) is not lost: find itself exits with 0 after it.
+        foreach (ChmodScope scope in new[] { ChmodScope.Selected, ChmodScope.Recursive, ChmodScope.RecursiveFiles, ChmodScope.RecursiveFolders })
+        {
+            Check(RunAll(RemoteFileOperations.ChmodCommands(new[] { tree }, "zz+q", scope), out errors) != 0, _shell + ": a chmod that fails fails the command (" + scope + ")");
+        }
+        Check(RemoteFileOperations.ChmodCommands(new string[0], "u+x", ChmodScope.Selected).Count == 0 && RemoteFileOperations.ChmodCommands(new[] { top }, null, ChmodScope.Selected).Count == 0, "nothing to do gives no command");
+    }
+
     private static int Main()
     {
         string root = Path.Combine(Path.GetTempPath(), "smartty-fileops-" + Guid.NewGuid().ToString("N"));
         try
         {
             NameChecks();
+            PermissionChecks();
             ScriptNameChecks();
             PackageInstallChecks();
             FileIconChecks();
@@ -591,7 +739,7 @@ internal static class Program
                 {
                     _appletPath = Path.Combine(root, "applets");
                     Directory.CreateDirectory(_appletPath);
-                    foreach (string applet in new[] { "cp", "mv", "rm", "mkdir", "tar", "sh", "tr" })
+                    foreach (string applet in new[] { "cp", "mv", "rm", "mkdir", "tar", "sh", "tr", "chmod", "find" })
                     {
                         File.CreateSymbolicLink(Path.Combine(_appletPath, applet), shell.Split(' ')[0]);
                     }
@@ -599,6 +747,7 @@ internal static class Program
                 string shellRoot = Path.Combine(root, Path.GetFileName(shell.Replace(" ", "-")));
                 Directory.CreateDirectory(shellRoot);
                 CommandChecks(shellRoot);
+                ChmodChecks(shellRoot);
                 ScriptRunChecks(shellRoot);
                 RunInPlaceChecks(shellRoot);
                 if (Directory.Exists("/proc/self"))

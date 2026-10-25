@@ -159,6 +159,16 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             }
         }
 
+        /// <summary>The permissions as "rwxr-xr-x (755)" for the tooltip of the name; null when the listing gave none.</summary>
+        public string PermissionsText
+        {
+            get
+            {
+                int? mode = RemotePermissions.ParseMode(Entry.Mode);
+                return mode.HasValue ? RemotePermissions.Describe(mode.Value) : null;
+            }
+        }
+
         public ItemWrapper(LsOutputParser.LsEntry item, string baseDir)
         {
             Entry = item;
@@ -536,6 +546,40 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         }
         string destination = RemoteFileOperations.Join(RemotePathUtils.GetDirectoryName(item.FullPath), newName);
         RunOperations("Renaming...", new List<string> { RemoteFileOperations.MoveCommand(item.FullPath, destination, replace: false) }, null);
+    }
+
+    /// <summary>"Make executable": chmod +x on the selected files and folders (as chmod +x does, within the umask).</summary>
+    public void MakeExecutable(IEnumerable<ItemWrapper> items)
+    {
+        ItemWrapper[] selected = items.Where((ItemWrapper item) => item.Name != "..").ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+        RunOperations("Setting permissions...", RemoteFileOperations.ChmodCommands(selected.Select((ItemWrapper item) => item.FullPath), "+x", ChmodScope.Selected), null);
+    }
+
+    /// <summary>
+    /// Switches the permission bits of <paramref name="change"/> on or off for the selected files and folders, and for what
+    /// is inside the selected folders when <paramref name="scope"/> says so.
+    /// </summary>
+    public void ChangePermissions(IEnumerable<ItemWrapper> items, RemotePermissionChange change, ChmodScope scope)
+    {
+        ItemWrapper[] selected = items.Where((ItemWrapper item) => item.Name != "..").ToArray();
+        string mode = change?.ToChmodMode();
+        if (selected.Length == 0 || mode == null)
+        {
+            return;
+        }
+        // Without the owner's execute bit a folder cannot be entered, so its contents become unreachable, and a recursive
+        // change cannot descend into it either. RecursiveFiles only touches files, so folders keep their bits there.
+        bool foldersAffected = scope != ChmodScope.RecursiveFiles && selected.Any((ItemWrapper item) => item.Entry.IsDirectory);
+        if (foldersAffected && (change.ClearBits & ~change.SetBits & RemotePermissions.OwnerExecute) != 0
+            && !MessageBoxes.AskWarn("This removes the owner's execute permission from folders. A folder without it cannot be entered, so its contents become unreachable.\n\nContinue?"))
+        {
+            return;
+        }
+        RunOperations("Setting permissions...", RemoteFileOperations.ChmodCommands(selected.Select((ItemWrapper item) => item.FullPath), mode, scope), null);
     }
 
     public void CreateEntry(string name, bool folder)

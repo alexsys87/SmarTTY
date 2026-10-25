@@ -23,6 +23,9 @@ public static class LsOutputParser
 
         public LsEntryFlags Flags;
 
+        /// <summary>The mode column of ls as printed ("-rwxr-xr-x", "drwxrwsr-x"); see <see cref="RemotePermissions.ParseMode"/>.</summary>
+        public string Mode;
+
         public bool IsDirectory => (Flags & LsEntryFlags.Directory) == LsEntryFlags.Directory;
 
         public bool IsExecutable => (Flags & LsEntryFlags.Executable) == LsEntryFlags.Executable;
@@ -30,7 +33,7 @@ public static class LsOutputParser
 
     public static class LsParser
     {
-        private static readonly Regex _lineRegex = new Regex("^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +([0-9]+) +([0-9]{4})-([0-9]{2})-([0-9]{2}) +([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.[0-9]+)? +([0-9+\\-]+) +([^ ].*)$");
+        private static readonly Regex _lineRegex = new Regex("^(?<mode>[^ ]+) +[^ ]+ +[^ ]+ +[^ ]+ +([0-9]+) +([0-9]{4})-([0-9]{2})-([0-9]{2}) +([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.[0-9]+)? +([0-9+\\-]+) +([^ ].*)$");
 
         public static LsEntry ParseLine(string line)
         {
@@ -79,6 +82,7 @@ public static class LsOutputParser
                 Name = fileName,
                 Size = long.Parse(match.Groups[1].Value),
                 Flags = lsEntryFlags,
+                Mode = match.Groups["mode"].Value,
                 ModifiedTime = dateTime
             };
         }
