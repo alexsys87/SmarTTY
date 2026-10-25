@@ -68,6 +68,22 @@ internal static class Program
         Check(!File.Exists(Path.Combine(directory, key + ".draft")), "a draft is deleted");
         store.Delete(key);
 
+        // Encrypted at rest: the text is not in the file, a store with the protector reads it, one without does not.
+        string secretKey = EditorDraftStore.KeyFor("a", "/etc/secret.conf");
+        EditorDraftStore protectedStore = new EditorDraftStore(directory, new ReversingProtector());
+        protectedStore.Save(secretKey, new EditorDraft { RemotePath = "/etc/secret.conf", SavedUtc = saved, BaseHash = "h", Text = "password=hunter2\n" });
+        string raw = File.ReadAllText(Path.Combine(directory, secretKey + ".draft"));
+        Check(!raw.Contains("hunter2") && !raw.Contains("secret.conf"), "an encrypted draft holds no readable text or path");
+        EditorDraft secret = protectedStore.TryLoad(secretKey);
+        Check(secret != null && secret.Text == "password=hunter2\n" && secret.RemotePath == "/etc/secret.conf", "an encrypted draft is read back");
+        Check(store.TryLoad(secretKey) == null, "an encrypted draft is not read without the protector");
+        store.Save(oldKeyPlain(), new EditorDraft { RemotePath = "/plain", SavedUtc = saved, BaseHash = "", Text = "old format" });
+        Check(protectedStore.TryLoad(oldKeyPlain())?.Text == "old format", "a plain-text draft of the earlier format is still read");
+        protectedStore.Save(secretKey, new EditorDraft { RemotePath = "/etc/secret.conf", SavedUtc = saved, BaseHash = "h", Text = "second" });
+        Check(protectedStore.TryLoad(secretKey)?.Text == "second" && Directory.GetFiles(directory, "*.tmp").Length == 0, "a second save replaces the encrypted draft and leaves no temporary file");
+        protectedStore.Delete(secretKey);
+        store.Delete(oldKeyPlain());
+
         string oldKey = EditorDraftStore.KeyFor("a", "/old");
         string newKey = EditorDraftStore.KeyFor("a", "/new");
         store.Save(oldKey, new EditorDraft { RemotePath = "/old", SavedUtc = saved, BaseHash = "", Text = "x" });
@@ -84,6 +100,27 @@ internal static class Program
         Equal(EditorFilePolicy.Classify(EditorFilePolicy.PreviewOnlyBytes), LargeFileAction.PreviewOnly, "at the preview-only limit");
         Equal(EditorFilePolicy.Classify(long.MaxValue), LargeFileAction.PreviewOnly, "a huge file is a preview");
         Check(EditorFilePolicy.PreviewBytes <= EditorFilePolicy.PreviewOnlyBytes, "the preview is smaller than the limit");
+    }
+
+    private static string oldKeyPlain()
+    {
+        return EditorDraftStore.KeyFor("a", "/plain");
+    }
+
+    // A stand-in for the Windows data protection (the test runs anywhere): reverses the bytes.
+    private sealed class ReversingProtector : IDraftProtector
+    {
+        public byte[] Protect(byte[] data)
+        {
+            byte[] copy = (byte[])data.Clone();
+            Array.Reverse(copy);
+            return copy;
+        }
+
+        public byte[] Unprotect(byte[] data)
+        {
+            return Protect(data);
+        }
     }
 
     private static string RunOutput(string command)

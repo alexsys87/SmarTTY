@@ -26,23 +26,38 @@ public sealed class EditorDraft
     public string Text;
 }
 
+/// <summary>Encrypts the text of the drafts at rest (see <see cref="DpapiDraftProtector"/>).</summary>
+public interface IDraftProtector
+{
+    byte[] Protect(byte[] data);
+
+    byte[] Unprotect(byte[] data);
+}
+
 /// <summary>
 /// Drafts of the files that are being edited, one file per remote file. The editor writes a draft while the text has
 /// unsaved changes, so that they survive a lost connection or a closed program, and removes it once the text is saved or
-/// the user chose to discard it. A file is replaced as a whole (written next to it, then moved), so a program that ends
-/// in the middle of a write leaves the previous draft, not half of a new one.
+/// the user chose to discard it. A file is replaced as a whole (written next to it, then swapped in with File.Replace),
+/// so a program that ends in the middle of a write, or a swap that fails, leaves the previous draft, not half of a new
+/// one and not none. With a <see cref="IDraftProtector"/> the text is stored encrypted (format 2); drafts written without
+/// one (format 1, plain text) are still read.
 /// </summary>
 public sealed class EditorDraftStore
 {
     private const string Signature = "SmarTTY-draft 1";
 
+    private const string ProtectedSignature = "SmarTTY-draft 2";
+
     private const string Extension = ".draft";
 
     private readonly string _directory;
 
-    public EditorDraftStore(string directory)
+    private readonly IDraftProtector _protector;
+
+    public EditorDraftStore(string directory, IDraftProtector protector = null)
     {
         _directory = directory;
+        _protector = protector;
     }
 
     /// <summary>The name of a draft: the same session and remote path always give the same key.</summary>
@@ -80,16 +95,18 @@ public sealed class EditorDraftStore
         // An empty line ends the header; the text after it is kept byte for byte (it may start with an empty line).
         text.Append('\n');
         text.Append(draft.Text ?? "");
+        string content = text.ToString();
+        if (_protector != null)
+        {
+            // A failure to protect is an error, not a reason to write the text in the clear: the caller tries again.
+            content = ProtectedSignature + "\n" + Convert.ToBase64String(_protector.Protect(new UTF8Encoding(false).GetBytes(content))) + "\n";
+        }
         string target = PathFor(key);
         string temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            File.WriteAllText(temporary, text.ToString(), new UTF8Encoding(false));
-            if (File.Exists(target))
-            {
-                File.Delete(target);
-            }
-            File.Move(temporary, target);
+            File.WriteAllText(temporary, content, new UTF8Encoding(false));
+            ReplaceFile(temporary, target);
         }
         finally
         {
@@ -106,6 +123,39 @@ public sealed class EditorDraftStore
         }
     }
 
+    /// <summary>
+    /// Puts the finished temporary file in place of the draft without ever leaving a moment with no draft: File.Replace
+    /// swaps them in one step. A virus scanner or an indexer may hold either file for a moment, so a failure is tried
+    /// again a few times; if it stays, the old draft is still there.
+    /// </summary>
+    private static void ReplaceFile(string temporary, string target)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                if (File.Exists(target))
+                {
+                    try
+                    {
+                        File.Replace(temporary, target, null);
+                        return;
+                    }
+                    catch (FileNotFoundException) when (!File.Exists(target))
+                    {
+                        // The draft was removed between the check and the swap: there is nothing to replace.
+                    }
+                }
+                File.Move(temporary, target);
+                return;
+            }
+            catch (Exception exception) when (attempt < 5 && (exception is IOException || exception is UnauthorizedAccessException))
+            {
+                System.Threading.Thread.Sleep(50 * attempt);
+            }
+        }
+    }
+
     /// <summary>The draft, or null if there is none or it cannot be read (a damaged draft is not worth an error).</summary>
     public EditorDraft TryLoad(string key)
     {
@@ -117,6 +167,15 @@ public sealed class EditorDraftStore
                 return null;
             }
             string content = File.ReadAllText(path, new UTF8Encoding(false));
+            if (content.StartsWith(ProtectedSignature + "\n", StringComparison.Ordinal))
+            {
+                if (_protector == null)
+                {
+                    return null;
+                }
+                string body = content.Substring(ProtectedSignature.Length + 1).Trim();
+                content = new UTF8Encoding(false).GetString(_protector.Unprotect(Convert.FromBase64String(body)));
+            }
             int headerEnd = content.IndexOf("\n\n", StringComparison.Ordinal);
             if (headerEnd < 0)
             {
