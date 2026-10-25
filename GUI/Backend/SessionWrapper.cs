@@ -1156,6 +1156,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             if (!job.IsDownload)
             {
                 OnPackageUploadFinished(job);
+                OnScriptUploadFinished(job);
             }
         });
     }
@@ -1301,7 +1302,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// Uploads dropped files and folders into <paramref name="remoteDir"/> if given (a drop on the file panel), else into
     /// the current directory of <paramref name="targetTab"/> (or of the active tab), falling back to the default upload
     /// directory. Files go to the transfer queue after a single overwrite
-    /// question for all of them; each folder opens the directory upload window, ready to start.
+    /// question for all of them; each folder opens the directory upload window, ready to start. For dropped .sh files the user
+    /// is asked whether to convert their line endings to Unix and make them executable (chmod +x) once uploaded.
     /// </summary>
     public void UploadFiles(string[] files, ITabContext targetTab = null, string remoteDir = null)
     {
@@ -1330,8 +1332,28 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         if (regularFiles.Length != 0)
         {
-            // A dropped .ipk or .apk is offered for installation when its upload is complete (OpenWrt only).
-            RegisterPackageInstallOffer(UploadFilesToDirectory(regularFiles, remoteDir), targetTab);
+            string[] scripts = regularFiles.Where(IsDroppedShellScript).ToArray();
+            if (scripts.Length != 0)
+            {
+                switch (MessageBoxes.YesNoCancel(BuildShellScriptQuestion(scripts, remoteDir)))
+                {
+                    case System.Windows.MessageBoxResult.Yes:
+                        break;
+                    case System.Windows.MessageBoxResult.No:
+                        // Uploaded as they are, like any other file.
+                        scripts = new string[0];
+                        break;
+                    default:
+                        regularFiles = regularFiles.Except(scripts).ToArray();
+                        scripts = new string[0];
+                        break;
+                }
+            }
+            if (regularFiles.Length != 0)
+            {
+                // A dropped .ipk or .apk is offered for installation when its upload is complete (OpenWrt only).
+                RegisterPackageInstallOffer(UploadFilesAndPrepareScripts(regularFiles, scripts, remoteDir), targetTab);
+            }
         }
         foreach (string folder in folders)
         {
@@ -1339,6 +1361,165 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             string folderName = Path.GetFileName(folder.TrimEnd('\\', '/'));
             ShowDirectoryUploadForm(folder, string.IsNullOrEmpty(folderName) ? remoteDir : remoteDir.TrimEnd('/') + "/" + folderName);
         }
+    }
+
+    // Above this size a dropped script is uploaded unchanged: it is not a script written by hand, and it is read into memory to fix it.
+    private const long MaxScriptFixSize = 32L * 1024 * 1024;
+
+    private static bool IsDroppedShellScript(string file)
+    {
+        return file.EndsWith(".sh", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildShellScriptQuestion(string[] scripts, string remoteDir)
+    {
+        string what = scripts.Length == 1
+            ? "Upload the shell script " + Path.GetFileName(scripts[0]) + " to " + remoteDir + "?"
+            : "Upload these shell scripts to " + remoteDir + "?\n\n" + FormatFileList(scripts.Select((string script) => Path.GetFileName(script)).ToList());
+        return what + "\n\nMake " + (scripts.Length == 1 ? "it" : "them") + " executable (chmod +x) and convert the line endings to Unix (LF)?"
+            + "\n\nYes: do both. No: upload as is. Cancel: do not upload " + (scripts.Length == 1 ? "it." : "them.");
+    }
+
+    // Uploads of dropped shell scripts that are made executable once they have arrived, by job id; used on the UI thread only.
+    private class ScriptUpload
+    {
+        // The folder with the copy that has Unix line endings (null when the file needed no change); removed when the upload ends.
+        public string TempDirectory;
+    }
+
+    private readonly Dictionary<Guid, ScriptUpload> _ScriptUploads = new Dictionary<Guid, ScriptUpload>();
+
+    /// <summary>
+    /// Queues the upload of <paramref name="files"/>; the ones also in <paramref name="scripts"/> are sent with Unix line ends
+    /// (and without a UTF-8 byte order mark, which hides the "#!" from the system) and get chmod +x when their upload is complete.
+    /// The dropped file itself is never changed: a script with Windows line ends is sent from a corrected copy of it.
+    /// </summary>
+    private List<FileTransferManager.TransferJob> UploadFilesAndPrepareScripts(string[] files, string[] scripts, string remoteDir)
+    {
+        HashSet<string> scriptSet = new HashSet<string>(scripts.Select(Path.GetFullPath), StringComparer.OrdinalIgnoreCase);
+        // Full path of what is uploaded -> its folder when it is a corrected copy.
+        Dictionary<string, string> scriptPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        List<string> toUpload = new List<string>();
+        foreach (string file in files)
+        {
+            if (!scriptSet.Contains(Path.GetFullPath(file)))
+            {
+                toUpload.Add(file);
+                continue;
+            }
+            string upload = file;
+            string tempDirectory = null;
+            try
+            {
+                if (new FileInfo(file).Length <= MaxScriptFixSize)
+                {
+                    byte[] original = File.ReadAllBytes(file);
+                    byte[] fixedContent = RemoteScript.Normalize(original);
+                    // Normalize only ever removes bytes (CR of CR LF, the byte order mark).
+                    if (fixedContent.Length != original.Length)
+                    {
+                        tempDirectory = Path.Combine(Path.GetTempPath(), "SmarTTY-" + Guid.NewGuid().ToString("N"));
+                        Directory.CreateDirectory(tempDirectory);
+                        upload = Path.Combine(tempDirectory, Path.GetFileName(file));
+                        File.WriteAllBytes(upload, fixedContent);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                DeleteTempDirectory(tempDirectory);
+                tempDirectory = null;
+                upload = file;
+                MessageBoxes.Warning("Cannot convert the line endings of " + file + ": " + exception.Message + "\n\nIt is uploaded as it is.");
+            }
+            toUpload.Add(upload);
+            scriptPaths[Path.GetFullPath(upload)] = tempDirectory;
+        }
+        List<FileTransferManager.TransferJob> jobs = UploadFilesToDirectory(toUpload, remoteDir);
+        HashSet<string> queuedPaths = new HashSet<string>(jobs.Select((FileTransferManager.TransferJob job) => Path.GetFullPath(job.LocalPath)), StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, string> script in scriptPaths)
+        {
+            if (!queuedPaths.Contains(script.Key))
+            {
+                // Skipped (not overwritten) or cancelled: nothing will read the copy.
+                DeleteTempDirectory(script.Value);
+            }
+        }
+        foreach (FileTransferManager.TransferJob job in jobs)
+        {
+            if (scriptPaths.TryGetValue(Path.GetFullPath(job.LocalPath), out string directory))
+            {
+                _ScriptUploads[job.Id] = new ScriptUpload { TempDirectory = directory };
+            }
+        }
+        return jobs;
+    }
+
+    private static void DeleteTempDirectory(string directory)
+    {
+        if (string.IsNullOrEmpty(directory))
+        {
+            return;
+        }
+        try
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+        catch
+        {
+            // A leftover in the temp folder is harmless.
+        }
+    }
+
+    /// <summary>
+    /// A transfer has ended (UI thread): when it was the upload of a dropped shell script, removes the corrected copy and, if the
+    /// script arrived, makes it executable (chmod +x, within the umask) on a worker thread.
+    /// </summary>
+    private void OnScriptUploadFinished(FileTransferManager.TransferJob job)
+    {
+        if (!_ScriptUploads.TryGetValue(job.Id, out ScriptUpload upload))
+        {
+            return;
+        }
+        // An upload cut short by the loss of the connection is resumed after reconnecting (the same job): it is not over yet,
+        // and the copy it reads from must stay (see OnPackageUploadFinished).
+        if (job.State == FileTransferManager.TransferState.Queued || job.State == FileTransferManager.TransferState.InProgress || (job.State == FileTransferManager.TransferState.Failed && job.InterruptedByConnectionLoss))
+        {
+            return;
+        }
+        _ScriptUploads.Remove(job.Id);
+        DeleteTempDirectory(upload.TempDirectory);
+        if (job.State != FileTransferManager.TransferState.Completed)
+        {
+            return;
+        }
+        string remotePath = job.RemotePath;
+        SshSession session = Session;
+        ThreadPool.QueueUserWorkItem((object state) =>
+        {
+            string error = null;
+            try
+            {
+                string command = RemoteFileOperations.ChmodCommands(new[] { remotePath }, "+x", ChmodScope.Selected)[0];
+                if (session.RunCommandChecked(command, requireSuccess: true) == null)
+                {
+                    session.ThrowIfConnectionLost();
+                    error = "the chmod command failed";
+                }
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+            }
+            _Controller.BeginInvoke(() =>
+            {
+                if (error != null)
+                {
+                    MessageBoxes.Warning("The script " + remotePath + " was uploaded, but it could not be made executable: " + error + ".");
+                }
+                RefreshFileExplorers(RemotePathUtils.GetDirectoryName(remotePath));
+            });
+        });
     }
 
     /// <summary>
