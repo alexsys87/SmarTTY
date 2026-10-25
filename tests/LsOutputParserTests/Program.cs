@@ -41,6 +41,12 @@ internal static class Program
         LsOutputParser.LsEntry bbLink = LsOutputParser.LsParser.ParseLine("lrwxrwxrwx    1 root     root             5 2026-10-19 19:30:28 +0000 lnk -> a.txt*");
         Check(bbLink.Name == "lnk", "BusyBox symlink without -L");
 
+        // The mode column is kept, and the other columns still come out of the right groups.
+        Check(gnuExe.Mode == "-rwxr-xr-x" && RemotePermissions.ParseMode(gnuExe.Mode) == Convert.ToInt32("755", 8), "GNU mode column");
+        Check(bbFile.Mode == "-rw-r--r--" && RemotePermissions.ParseMode(bbFile.Mode) == Convert.ToInt32("644", 8) && bbFile.Size == 0, "BusyBox mode column");
+        LsOutputParser.LsEntry setgidDir = LsOutputParser.LsParser.ParseLine("drwxrwsr-x. 2 root staff 4096 2026-10-19 19:30:28.965886611 +0000 shared/");
+        Check(setgidDir.Name == "shared" && setgidDir.IsDirectory && RemotePermissions.ParseMode(setgidDir.Mode) == Convert.ToInt32("2775", 8), "mode with a setgid bit and an SELinux dot");
+
         Check(LsOutputParser.LsParser.ParseLine("total 20").Name == null, "total line ignored");
         Check(LsOutputParser.LsParser.ParseLine("").Name == null, "empty line ignored");
 

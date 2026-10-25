@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="../../IO/RemoteFileOperations.cs" Link="RemoteFileOperations.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+    <Compile Include="../../IO/RemotePermissions.cs" Link="RemotePermissions.cs" />
     <Compile Include="../../IO/RemoteScript.cs" Link="RemoteScript.cs" />
     <Compile Include="../../IO/RemotePackageInstall.cs" Link="RemotePackageInstall.cs" />
     <Compile Include="../../IO/RemoteFileTypes.cs" Link="RemoteFileTypes.cs" />

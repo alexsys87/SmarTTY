@@ -411,6 +411,8 @@ public partial class FileListControl : UserControl, IComponentConnector
         cmdPaste.IsEnabled = explorer != null && explorer.CanPaste;
         cmdNewFolder.IsEnabled = explorer != null;
         cmdNewFile.IsEnabled = explorer != null;
+        cmdMakeExecutable.IsEnabled = explorer != null && selected.Length > 0;
+        cmdPermissions.IsEnabled = explorer != null && selected.Length > 0;
         UpdatePackageMenu();
     }
 
@@ -432,6 +434,27 @@ public partial class FileListControl : UserControl, IComponentConnector
     private void Rename_Click(object sender, RoutedEventArgs e)
     {
         RenameSelection();
+    }
+
+    private void MakeExecutable_Click(object sender, RoutedEventArgs e)
+    {
+        Explorer?.MakeExecutable(SelectedEntries());
+    }
+
+    private void Permissions_Click(object sender, RoutedEventArgs e)
+    {
+        FileExplorer explorer = Explorer;
+        FileExplorer.ItemWrapper[] selected = SelectedEntries();
+        if (explorer == null || selected.Length == 0)
+        {
+            return;
+        }
+        string prompt = selected.Length == 1 ? "Permissions of '" + selected[0].Name + "':" : "Permissions of " + selected.Length + " selected items:";
+        RemotePermissionsDialog.Request request = RemotePermissionsDialog.Ask(prompt, selected.Select((FileExplorer.ItemWrapper item) => RemotePermissions.ParseMode(item.Entry.Mode)).ToArray(), selected.Any((FileExplorer.ItemWrapper item) => item.Entry.IsDirectory));
+        if (request != null)
+        {
+            explorer.ChangePermissions(selected, request.Change, request.Scope);
+        }
     }
 
     private void Delete_Click(object sender, RoutedEventArgs e)

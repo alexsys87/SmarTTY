@@ -4,6 +4,22 @@ using System.Linq;
 
 namespace SmarTTY.IO;
 
+/// <summary>What a chmod of the file list reaches (see <see cref="RemoteFileOperations.ChmodCommands"/>).</summary>
+public enum ChmodScope
+{
+    /// <summary>Only the selected files and folders themselves.</summary>
+    Selected,
+
+    /// <summary>The selected items and everything inside the selected folders.</summary>
+    Recursive,
+
+    /// <summary>The selected files and the files inside the selected folders (not the folders).</summary>
+    RecursiveFiles,
+
+    /// <summary>The selected folders and the folders inside them (not the files).</summary>
+    RecursiveFolders
+}
+
 /// <summary>
 /// Shell commands and naming rules for the file operations of the file list (copy, move, rename, delete, new file and
 /// folder). The commands use absolute, single-quoted paths and only POSIX tools (cp, mv, rm, mkdir, test), so they
@@ -109,6 +125,35 @@ public static class RemoteFileOperations
     {
         string flags = archive.EndsWith(".tar", StringComparison.OrdinalIgnoreCase) ? "-xf" : "-xzf";
         return "tar " + flags + " " + RemotePathUtils.ShellQuote(archive) + " -C " + RemotePathUtils.ShellQuote(directory);
+    }
+
+    /// <summary>
+    /// The commands that apply the chmod mode <paramref name="mode"/> ("+x", "u+rw,g-w") to the paths, for the scope. One
+    /// command for chmod and chmod -R, one per path for the scopes that filter with find: find is told to print the
+    /// items chmod could not change, because it does not fail by itself when the command it runs fails, and the file list
+    /// reports a command by its exit status. BusyBox has chmod -R, find -type and -exec as well (find -exec ... {} + is
+    /// not in every BusyBox build, so \;).
+    /// </summary>
+    public static List<string> ChmodCommands(IEnumerable<string> paths, string mode, ChmodScope scope)
+    {
+        string[] list = paths.ToArray();
+        List<string> commands = new List<string>();
+        if (list.Length == 0 || string.IsNullOrEmpty(mode))
+        {
+            return commands;
+        }
+        string quotedMode = RemotePathUtils.ShellQuote(mode);
+        if (scope == ChmodScope.Selected || scope == ChmodScope.Recursive)
+        {
+            commands.Add("chmod " + (scope == ChmodScope.Recursive ? "-R " : "") + quotedMode + " -- " + string.Join(" ", list.Select(RemotePathUtils.ShellQuote)));
+            return commands;
+        }
+        string type = scope == ChmodScope.RecursiveFiles ? "f" : "d";
+        foreach (string path in list)
+        {
+            commands.Add("failed=$(find " + RemotePathUtils.ShellQuote(path) + " -type " + type + " ! -exec chmod " + quotedMode + " {} \\; -print); status=$?; if [ -n \"$failed\" ]; then exit 1; fi; exit $status");
+        }
+        return commands;
     }
 
     public static string CreateDirectoryCommand(string path)

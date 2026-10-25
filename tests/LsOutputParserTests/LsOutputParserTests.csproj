@@ -8,5 +8,6 @@
   <ItemGroup>
     <Compile Include="../../IO/LsOutputParser.cs" Link="LsOutputParser.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+    <Compile Include="../../IO/RemotePermissions.cs" Link="RemotePermissions.cs" />
   </ItemGroup>
 </Project>

@@ -102,6 +102,17 @@
               </MenuItem.Icon>
             </MenuItem>
             <Separator />
+            <MenuItem Name="cmdMakeExecutable" Header="Make executable" ToolTip="Runs chmod +x on the selected files and folders" Click="MakeExecutable_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/menu/executable.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Name="cmdPermissions" Header="Permissions..." ToolTip="Sets the access permissions (chmod) of the selected files and folders, also for what is inside the folders" Click="Permissions_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/menu/permissions.png" />
+              </MenuItem.Icon>
+            </MenuItem>
+            <Separator />
             <MenuItem Name="cmdNewFolder" Header="New folder..." InputGestureText="Ctrl+Shift+N" Click="NewFolder_Click">
               <MenuItem.Icon>
                 <Image Source="../icons/menu/newfolder.png" />
@@ -313,7 +324,7 @@
                           </Style>
                         </FrameworkElement.Style>
                       </Image>
-                      <TextBlock Grid.Column="1" Margin="2 0 0 0" Text="{Binding Name}" />
+                      <TextBlock Grid.Column="1" Margin="2 0 0 0" Text="{Binding Name}" ToolTip="{Binding PermissionsText}" />
                     </Grid>
                   </DataTemplate>
                 </GridViewColumn.CellTemplate>
