@@ -587,7 +587,7 @@ public class MainWindowController : INotifyPropertyChanged
             try
             {
                 SessionWrapper activeSession = RequireSshSession("Public key authentication");
-                new PublicKeyManagerForm(activeSession.Session, activeSession.Settings).ShowModal();
+                PublicKeyManagerWindow.Show(_Controller._Window, activeSession.Session, activeSession.Settings);
             }
             catch (Exception exception)
             {

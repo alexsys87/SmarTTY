@@ -958,12 +958,12 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private void _Initiator_ProxyAuthRequest(SshConnector sender, string realm, ref string auth, ref bool handled)
         {
-            handled = ProxyAuthForm.ShowPrompt(realm, ref auth);
+            handled = ProxyAuthWindow.ShowPrompt(WindowOwnership.ActiveWindow(), realm, ref auth);
         }
 
         private void _Initiator_PasswordRequest(SshConnector sender, SSHConnectionSettings settings, ref string password, ref bool handled, bool requestingPassphrase)
         {
-            handled = PasswordRequestForm.ShowPrompt(settings, ref password, requestingPassphrase, isSudo: false);
+            handled = PasswordRequestWindow.ShowPrompt(WindowOwnership.ActiveWindow(), settings, ref password, requestingPassphrase, isSudo: false);
         }
 
         private void _Initiator_ConnectionProgress(SshConnector sender, string text, Exception exception)

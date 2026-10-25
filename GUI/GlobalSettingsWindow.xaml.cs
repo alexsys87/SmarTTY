@@ -313,10 +313,10 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
 
     private void EditPalette_Click(object sender, RoutedEventArgs e)
     {
-        using PaletteEditForm paletteEditForm = new PaletteEditForm(_ClonedSettings.PaletteOverride ?? ConsolePalette.PuTTY);
-        if (paletteEditForm.ShowModal() == System.Windows.Forms.DialogResult.OK)
+        ConsolePalette palette = PaletteEditWindow.Ask(this, _ClonedSettings.PaletteOverride ?? ConsolePalette.PuTTY);
+        if (palette != null)
         {
-            _ClonedSettings.PaletteOverride = paletteEditForm.Palette;
+            _ClonedSettings.PaletteOverride = palette;
         }
     }
 }

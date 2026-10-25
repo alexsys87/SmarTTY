@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <AssemblyName>SmarTTY</AssemblyName>
@@ -156,18 +156,6 @@
     <Compile Update="Forms\OKCancelFormBase.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="Forms\PaletteEditForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\PasswordRequestForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\ProxyAuthForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\PublicKeyManagerForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Update="Forms\RemoteFolderBrowserForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -282,18 +270,6 @@
     <Compile Update="Forms\OKCancelFormBase.Designer.cs">
       <DependentUpon>OKCancelFormBase.cs</DependentUpon>
     </Compile>
-    <Compile Update="Forms\PaletteEditForm.Designer.cs">
-      <DependentUpon>PaletteEditForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\PasswordRequestForm.Designer.cs">
-      <DependentUpon>PasswordRequestForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\ProxyAuthForm.Designer.cs">
-      <DependentUpon>ProxyAuthForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\PublicKeyManagerForm.Designer.cs">
-      <DependentUpon>PublicKeyManagerForm.cs</DependentUpon>
-    </Compile>
     <Compile Update="Forms\RemoteFolderBrowserForm.Designer.cs">
       <DependentUpon>RemoteFolderBrowserForm.cs</DependentUpon>
     </Compile>
@@ -350,15 +326,6 @@
     </EmbeddedResource>
     <EmbeddedResource Update="Forms\NewHostKeyForm.resx">
       <DependentUpon>NewHostKeyForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\PasswordRequestForm.resx">
-      <DependentUpon>PasswordRequestForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\ProxyAuthForm.resx">
-      <DependentUpon>ProxyAuthForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\PublicKeyManagerForm.resx">
-      <DependentUpon>PublicKeyManagerForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Update="Forms\RemoteFolderBrowserForm.resx">
       <DependentUpon>RemoteFolderBrowserForm.cs</DependentUpon>

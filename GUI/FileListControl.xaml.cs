@@ -450,7 +450,7 @@ public partial class FileListControl : UserControl, IComponentConnector
             return;
         }
         string prompt = selected.Length == 1 ? "Permissions of '" + selected[0].Name + "':" : "Permissions of " + selected.Length + " selected items:";
-        RemotePermissionsDialog.Request request = RemotePermissionsDialog.Ask(prompt, selected.Select((FileExplorer.ItemWrapper item) => RemotePermissions.ParseMode(item.Entry.Mode)).ToArray(), selected.Any((FileExplorer.ItemWrapper item) => item.Entry.IsDirectory));
+        RemotePermissionsWindow.Request request = RemotePermissionsWindow.Ask(Window.GetWindow(this), prompt, selected.Select((FileExplorer.ItemWrapper item) => RemotePermissions.ParseMode(item.Entry.Mode)).ToArray(), selected.Any((FileExplorer.ItemWrapper item) => item.Entry.IsDirectory));
         if (request != null)
         {
             explorer.ChangePermissions(selected, request.Change, request.Scope);
