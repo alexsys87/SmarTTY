@@ -323,6 +323,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         InitializeZModemMenu();
         InitializeYModemMenu();
         InitializeKermitMenu();
+        InitializeGzipBase64Menu();
         InitializeTftpSupport();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
         ThemeManager.ThemeChanged += OnThemeChanged;
@@ -1339,9 +1340,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// Runs one file transfer protocol (XMODEM, YMODEM, Kermit) on a worker thread with a progress window;
     /// <paramref name="run"/> is the protocol itself and gets the line (callbacks for sending bytes and reporting
     /// progress, the cancel token). <paramref name="successNote"/> (optional) is called on the UI thread after a
-    /// successful transfer and may return an extra paragraph for the final message. Must be called on the UI thread.
+    /// successful transfer and may return an extra paragraph for the final message. <paramref name="afterEnd"/> (optional)
+    /// is called on the UI thread when the transfer has ended, whatever its result, after the window has been closed.
+    /// Must be called on the UI thread.
     /// </summary>
-    private void StartLineTransfer(string title, string protocolName, string verb, LineTransferRun run, Func<string> successNote = null)
+    private void StartLineTransfer(string title, string protocolName, string verb, LineTransferRun run, Func<string> successNote = null, Action afterEnd = null)
     {
         if (IsLineClaimed)
         {
@@ -1445,6 +1448,17 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     bool cancelled = transferForm.IsCancelled;
                     string lastStatus = transferForm.LastStatus;
                     transferForm.Dispose();
+                    if (afterEnd != null)
+                    {
+                        try
+                        {
+                            afterEnd();
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            // The connection is gone: nothing to tell the device.
+                        }
+                    }
                     if (success)
                     {
                         string note = successNote?.Invoke();
@@ -1482,7 +1496,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         if (_isXModemActive)
         {
-            ThemedMessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM or Kermit) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ThemedMessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM, Kermit or gzip + base64) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return true;
         }
         if (_isFileSendActive)
