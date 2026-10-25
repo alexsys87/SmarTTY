@@ -173,7 +173,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
 
     private bool ConfirmDiscardChanges(string question)
     {
-        return !_editor.IsModified || MessageBox.Show(Window.GetWindow(this), question, "SmarTTY", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+        return !_editor.IsModified || MessageBoxes.AskWarn(question);
     }
 
     private static MenuItem CreateHeader(string text)

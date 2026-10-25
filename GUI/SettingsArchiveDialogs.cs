@@ -26,11 +26,11 @@ internal static class SettingsArchiveDialogs
 
     public static void Export(Window owner)
     {
-        MessageBoxResult includePasswords = MessageBox.Show(owner,
+        MessageBoxResult includePasswords = MessageDialog.Show(
             "Include saved passwords in the archive?\n\n" +
             "Saved passwords are encrypted with a key that belongs to your Windows account, so they will not work on another computer. " +
             "Choose No for an archive you want to move to another computer or share.",
-            Caption, MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.No);
+            Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNoCancel, MessageBoxResult.No, owner);
         if (includePasswords == MessageBoxResult.Cancel)
         {
             return;
@@ -61,11 +61,11 @@ internal static class SettingsArchiveDialogs
             {
                 text += "\n\nSkipped because they are not valid SmarTTY XML:\n" + string.Join("\n", result.Skipped);
             }
-            MessageBox.Show(owner, text, Caption, MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageDialog.Show(text, Caption, MessageDialogIcon.Information, MessageDialogButtons.Ok, owner: owner);
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            MessageBox.Show(owner, "Could not export the settings:\n" + ex.Message, Caption, MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageDialog.Show("Could not export the settings:\n" + ex.Message, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: owner);
         }
     }
 
@@ -85,12 +85,12 @@ internal static class SettingsArchiveDialogs
 
         string dataDirectory = GlobalSettings.DataDirectory;
         string backupPath = SettingsArchive.DefaultBackupPath(dataDirectory);
-        MessageBoxResult confirmation = MessageBox.Show(owner,
+        MessageBoxResult confirmation = MessageDialog.Show(
             "Import settings from:\n" + dialog.FileName + "\n\n" +
             "Settings.xml, KnownHosts.xml, GUIPreferences.xml and saved connections with the same names will be replaced. " +
             "Other saved connections are kept.\n\n" +
             "A backup of the current settings will be saved to:\n" + backupPath,
-            Caption, MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
+            Caption, MessageDialogIcon.Question, MessageDialogButtons.OkCancel, MessageBoxResult.Cancel, owner);
         if (confirmation != MessageBoxResult.OK)
         {
             return null;
@@ -103,7 +103,7 @@ internal static class SettingsArchiveDialogs
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            MessageBox.Show(owner, "Could not import the settings:\n" + ex.Message, Caption, MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageDialog.Show("Could not import the settings:\n" + ex.Message, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: owner);
             return null;
         }
 
@@ -133,7 +133,7 @@ internal static class SettingsArchiveDialogs
         {
             text += "\n\nIgnored entries that are not SmarTTY settings files: " + result.Ignored.Count;
         }
-        MessageBox.Show(owner, text, Caption, MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageDialog.Show(text, Caption, MessageDialogIcon.Information, MessageDialogButtons.Ok, owner: owner);
         return result;
     }
 }

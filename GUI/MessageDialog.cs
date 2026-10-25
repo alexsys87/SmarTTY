@@ -12,6 +12,7 @@ namespace SmarTTY.GUI;
 internal enum MessageDialogButtons
 {
     Ok,
+    OkCancel,
     YesNo,
     YesNoCancel
 }
@@ -39,13 +40,17 @@ internal sealed class MessageDialog : Window
 
     private readonly MessageDialogButtons _Buttons;
 
+    // The button Enter picks. Null means the first button, the one WinForms marks as default for the button set.
+    private readonly MessageBoxResult? _DefaultResult;
+
     private readonly string _Message;
 
     private MessageBoxResult _Result;
 
-    private MessageDialog(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons)
+    private MessageDialog(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons, MessageBoxResult? defaultResult)
     {
         _Buttons = buttons;
+        _DefaultResult = defaultResult;
         _Message = NormalizeLineEndings(text);
         // What dismissing the dialog (the close button of the title bar) reports: the same value the WinForms
         // MessageBox gives, so a closed prompt never counts as a "yes".
@@ -65,21 +70,28 @@ internal sealed class MessageDialog : Window
     /// created on the UI thread, because a WPF window belongs to the thread that created it (a WinForms message box
     /// could be shown from any thread, a WPF one cannot).
     /// </summary>
-    public static MessageBoxResult Show(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons)
+    /// <param name="defaultResult">
+    /// The button Enter picks, when it is not the first one. A prompt that defaults to the safe answer (for example
+    /// "No" for a question about including passwords) passes it so that a stray Enter does not choose the risky one.
+    /// </param>
+    /// <param name="owner">
+    /// The window to own the dialog. When it is null the dialog is owned by the active window.
+    /// </param>
+    public static MessageBoxResult Show(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons, MessageBoxResult? defaultResult = null, Window owner = null)
     {
         Application application = Application.Current;
         if (application != null && !application.Dispatcher.CheckAccess())
         {
-            return application.Dispatcher.Invoke(() => ShowOnUiThread(text, caption, icon, buttons));
+            return application.Dispatcher.Invoke(() => ShowOnUiThread(text, caption, icon, buttons, defaultResult, owner));
         }
-        return ShowOnUiThread(text, caption, icon, buttons);
+        return ShowOnUiThread(text, caption, icon, buttons, defaultResult, owner);
     }
 
-    private static MessageBoxResult ShowOnUiThread(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons)
+    private static MessageBoxResult ShowOnUiThread(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons, MessageBoxResult? defaultResult, Window owner)
     {
-        MessageDialog dialog = new MessageDialog(text, caption, icon, buttons);
+        MessageDialog dialog = new MessageDialog(text, caption, icon, buttons, defaultResult);
         // Owned by the window the user is working in, so the prompt stays above it and is centered on it.
-        WindowOwnership.Attach(dialog, WindowOwnership.ActiveWindow());
+        WindowOwnership.Attach(dialog, owner ?? WindowOwnership.ActiveWindow());
         dialog.ShowDialog();
         return dialog._Result;
     }
@@ -181,16 +193,20 @@ internal sealed class MessageDialog : Window
         switch (buttons)
         {
             case MessageDialogButtons.Ok:
-                bar.Children.Add(CreateButton(bar, "OK", MessageBoxResult.OK, isDefault: true));
+                bar.Children.Add(CreateButton(bar, "OK", MessageBoxResult.OK));
+                break;
+            case MessageDialogButtons.OkCancel:
+                bar.Children.Add(CreateButton(bar, "OK", MessageBoxResult.OK));
+                bar.Children.Add(CreateButton(bar, "Cancel", MessageBoxResult.Cancel));
                 break;
             case MessageDialogButtons.YesNo:
-                bar.Children.Add(CreateButton(bar, "Yes", MessageBoxResult.Yes, isDefault: true));
-                bar.Children.Add(CreateButton(bar, "No", MessageBoxResult.No, isDefault: false));
+                bar.Children.Add(CreateButton(bar, "Yes", MessageBoxResult.Yes));
+                bar.Children.Add(CreateButton(bar, "No", MessageBoxResult.No));
                 break;
             default:
-                bar.Children.Add(CreateButton(bar, "Yes", MessageBoxResult.Yes, isDefault: true));
-                bar.Children.Add(CreateButton(bar, "No", MessageBoxResult.No, isDefault: false));
-                bar.Children.Add(CreateButton(bar, "Cancel", MessageBoxResult.Cancel, isDefault: false));
+                bar.Children.Add(CreateButton(bar, "Yes", MessageBoxResult.Yes));
+                bar.Children.Add(CreateButton(bar, "No", MessageBoxResult.No));
+                bar.Children.Add(CreateButton(bar, "Cancel", MessageBoxResult.Cancel));
                 break;
         }
         Grid.SetRow(bar, 1);
@@ -200,8 +216,10 @@ internal sealed class MessageDialog : Window
         return root;
     }
 
-    private Button CreateButton(Panel bar, string text, MessageBoxResult result, bool isDefault)
+    private Button CreateButton(Panel bar, string text, MessageBoxResult result)
     {
+        // Enter picks the caller's default button, or the first one (OK, or Yes) when it named none.
+        bool isDefault = _DefaultResult.HasValue ? _DefaultResult.Value == result : bar.Children.Count == 0;
         Button button = new Button
         {
             Content = text,
