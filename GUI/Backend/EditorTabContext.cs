@@ -98,17 +98,17 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         {
             switch (MessageBoxes.YesNoCancel("Save " + FilePath + "?"))
             {
-                case DialogResult.Yes:
+                case MessageBoxResult.Yes:
                     if (!Editor.TrySave())
                     {
                         return;
                     }
                     break;
-                case DialogResult.No:
+                case MessageBoxResult.No:
                     // The changes are given up on purpose: no draft of them is kept.
                     Editor.DiscardDraft();
                     break;
-                case DialogResult.Cancel:
+                case MessageBoxResult.Cancel:
                     return;
             }
         }
