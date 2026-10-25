@@ -593,9 +593,17 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         new Thread(() =>
         {
             List<string> errors = new List<string>();
-            foreach (string command in commands)
+            for (int index = 0; index < commands.Count; index++)
             {
-                List<string> output = session.RunCommand(command, out int? exitCode);
+                List<string> output = session.RunCommand(commands[index], out int? exitCode);
+                if (exitCode == null && session.IsConnectionClosed)
+                {
+                    // No exit status because the connection is gone: that is not a failure of the command, and the commands
+                    // after it cannot run either, so say it once instead of once per item.
+                    int notRun = commands.Count - index - 1;
+                    errors.Add("The connection to the server was lost." + (notRun > 0 ? " " + Describe(notRun) + " not processed." : ""));
+                    break;
+                }
                 if (exitCode != 0)
                 {
                     string message = string.Join("\n", (output ?? new List<string>()).Where((string line) => line.Trim() != ""));
