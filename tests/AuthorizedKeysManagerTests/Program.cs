@@ -132,6 +132,60 @@ internal static class Program
         error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, "not a key"));
         Check(error is ArgumentException && session.Files.Count == 0, "install: a line that is not a key is refused");
 
+        // Out of space in the middle of the line: the user is asked, and the incomplete line goes only if they agree.
+        const string shortLine = "ssh-ed25519 AAAA other@host";
+        string frag = line.Substring(0, 25);
+        foreach (string[] shell in new[] { new[] { "sh" }, new[] { "/usr/bin/busybox", "sh" } })
+        {
+            if (shell[0] != "sh" && !File.Exists(shell[0]))
+            {
+                Console.WriteLine("SKIP: busybox is not installed");
+                continue;
+            }
+            string label = string.Join(" ", shell);
+            session = new SshSession { AppendOutcome = AppendOutcome.DiskFullPartial, Shell = shell };
+            session.Files[home] = shortLine + "\n";
+            string question = null;
+            error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line, message => { question = message; return true; }));
+            Check(question != null && question.Contains(home) && question.Contains(frag.Substring(0, 20)), "partial line (" + label + "): the user is asked, with the file and the line");
+            Check(session.Files[home] == shortLine + "\n", "partial line (" + label + "): removed after the user agreed, the other key is intact");
+            Check(error.Message.Contains("No space left on device") && error.Message.Contains("was removed"), "partial line (" + label + "): the error keeps the cause and says what was removed");
+        }
+
+        session = new SshSession { AppendOutcome = AppendOutcome.DiskFullPartial };
+        session.Files[home] = shortLine + "\n";
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line, message => false));
+        Check(session.Files[home] == shortLine + "\n" + frag && !error.Message.Contains("removed"), "partial line: nothing is removed when the user says no");
+
+        session = new SshSession { AppendOutcome = AppendOutcome.DiskFullPartial };
+        session.Files[home] = shortLine + "\n";
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line));
+        Check(session.Files[home] == shortLine + "\n" + frag, "partial line: without a question handler nothing is removed");
+
+        session = new SshSession { AppendOutcome = AppendOutcome.DiskFull };
+        session.Files[home] = shortLine + "\n";
+        bool asked = false;
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line, message => { asked = true; return true; }));
+        Check(!asked && error != null, "no partial line: the user is not asked");
+
+        session = new SshSession { AppendOutcome = AppendOutcome.ConnectionLost };
+        asked = false;
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line, message => { asked = true; return true; }));
+        Check(!asked && error is IOException, "lost connection: the user is not asked, the loss is reported");
+
+        // The file changed after the question: it is left alone and the message says so.
+        session = new SshSession { AppendOutcome = AppendOutcome.DiskFullPartial };
+        session.Files[home] = shortLine + "\n";
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line, message => { session.Files[home] += "\n"; return true; }));
+        Check(session.Files[home] == shortLine + "\n" + frag + "\n" && error.Message.Contains("could not be removed"), "partial line: a file that changed meanwhile is not touched");
+
+        // Dropbear root: the home file got the key, the space ran out in the Dropbear file: only that line is offered.
+        session = new SshSession { IsDropbearRoot = true, AppendOutcome = AppendOutcome.DiskFullPartial, OutcomeOnlyFor = "/etc/dropbear" };
+        session.Files[dropbear] = shortLine + "\n";
+        int questions = 0;
+        error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line, message => { questions++; return true; }));
+        Check(questions == 1 && session.Files[dropbear] == shortLine + "\n" && session.Files[home].Contains(line), "dropbear: only the incomplete line of /etc/dropbear is removed, the home file keeps the key");
+
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed");
         return 0;

@@ -60,6 +60,12 @@ internal static class Program
         Check(!AuthorizedKeysFile.LineHoldsKey("ssh-ed25519 not*base64*at*all==== x", mine), "find: garbage does not throw");
         Check(!AuthorizedKeysFile.LineHoldsKey("ssh-ed25519 " + B64(mine), null), "find: no blob given");
 
+        string keyLine = "ssh-ed25519 " + B64(mine) + " me@host";
+        Check(AuthorizedKeysFile.IsIncompleteCopy(keyLine.Substring(0, 30), keyLine), "incomplete copy: the beginning of the key line");
+        Check(!AuthorizedKeysFile.IsIncompleteCopy(keyLine, keyLine), "incomplete copy: the whole line is not one");
+        Check(!AuthorizedKeysFile.IsIncompleteCopy("ssh-ed25519 " + B64(other), keyLine), "incomplete copy: another key is not one");
+        Check(!AuthorizedKeysFile.IsIncompleteCopy("", keyLine) && !AuthorizedKeysFile.IsIncompleteCopy(null, keyLine) && !AuthorizedKeysFile.IsIncompleteCopy("ssh", null), "incomplete copy: empty input");
+
         List<string> file = new List<string>
         {
             "# keys of the build servers",

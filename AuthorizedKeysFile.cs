@@ -102,6 +102,23 @@ internal static class AuthorizedKeysFile
     }
 
     /// <summary>
+    /// True when the line is the beginning of the key line but not all of it: what an append that ran out of space
+    /// leaves at the end of the file. A line that is a complete key never matches.
+    /// </summary>
+    public static bool IsIncompleteCopy(string line, string keyLine)
+    {
+        return !string.IsNullOrEmpty(line) && !string.IsNullOrEmpty(keyLine)
+            && line.Length < keyLine.Length && keyLine.StartsWith(line, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Shell script that cuts the last bytes off a file in place, without a temporary copy (the disk is full when this
+    /// is needed). Arguments: file, number of bytes, the text those bytes must be. The file is left untouched (exit
+    /// status 2 or 3) unless its end is exactly that text, so a file that changed meanwhile is never damaged.
+    /// </summary>
+    public const string RemoveTailScript = "f=\"$1\"; n=\"$2\"; frag=\"$3\"; s=$(wc -c < \"$f\") || exit 1; [ \"$s\" -ge \"$n\" ] || exit 2; [ \"$(tail -c \"$n\" \"$f\")\" = \"$frag\" ] || exit 3; k=$((s-n)); truncate -s \"$k\" \"$f\" 2>/dev/null || dd if=/dev/null of=\"$f\" bs=1 seek=\"$k\" count=0 2>/dev/null";
+
+    /// <summary>
     /// Shell script that appends standard input to the file given as its first argument. If the file does not end with a
     /// line break one is added first, otherwise the new key would be glued to the last line.
     /// </summary>
