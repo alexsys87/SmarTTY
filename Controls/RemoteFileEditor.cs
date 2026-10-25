@@ -100,7 +100,9 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     // Unsaved changes are written to a draft on this computer every few seconds (see EditorDraftStore), so that they
     // survive a lost connection and a closed program. The drafts of all editors live in one folder.
-    private static readonly EditorDraftStore Drafts = new EditorDraftStore(Path.Combine(GlobalSettings.DataDirectory, "Drafts"), new DpapiDraftProtector());
+    private static readonly string DraftsDirectory = Path.Combine(GlobalSettings.DataDirectory, "Drafts");
+
+    private static readonly EditorDraftStore Drafts = new EditorDraftStore(DraftsDirectory, new DpapiDraftProtector());
 
     private const int DraftIntervalMs = 10000;
 
@@ -114,18 +116,55 @@ public partial class RemoteFileEditor : CodeEditorPP
     // Two editors of the same file in one session must not share a draft: the save or the discard of one would remove the
     // draft of the other, and neither would see the other's text. The first editor of a file has the plain key, the next ones
     // the key with a number; the number is free again when the editor is closed.
-    private static readonly HashSet<string> ClaimedDraftKeys = new HashSet<string>();
+    // This holds across programs too: SmarTTY may be started more than once, so a key is also claimed with a lock file that
+    // is kept open (and deleted by the system when it is closed, or when the program ends in any way) while the editor lives.
+    // The value is that lock (null when the Drafts folder cannot be used: then only this program's own editors are told apart).
+    private static readonly Dictionary<string, FileStream> ClaimedDraftKeys = new Dictionary<string, FileStream>();
 
     private static string ClaimDraftKey(string baseKey)
     {
         lock (ClaimedDraftKeys)
         {
             string key = baseKey;
-            for (int number = 2; !ClaimedDraftKeys.Add(key); number++)
+            for (int number = 1; ; number++)
             {
-                key = baseKey + "-" + number.ToString(CultureInfo.InvariantCulture);
+                key = number == 1 ? baseKey : baseKey + "-" + number.ToString(CultureInfo.InvariantCulture);
+                if (ClaimedDraftKeys.ContainsKey(key))
+                {
+                    continue;
+                }
+                FileStream claim = TryLockDraftKey(key, out bool heldElsewhere);
+                if (heldElsewhere && number < 1000)
+                {
+                    continue;
+                }
+                ClaimedDraftKeys[key] = claim;
+                return key;
             }
-            return key;
+        }
+    }
+
+    /// <summary>
+    /// Takes the lock file of the key. <paramref name="heldElsewhere"/> is true if another program has it; null with
+    /// false means the lock could not be made at all (the folder is not writable), which is no reason not to edit.
+    /// </summary>
+    private static FileStream TryLockDraftKey(string key, out bool heldElsewhere)
+    {
+        heldElsewhere = false;
+        try
+        {
+            Directory.CreateDirectory(DraftsDirectory);
+            return new FileStream(Path.Combine(DraftsDirectory, key + ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+        }
+        catch (IOException exception) when ((exception.HResult & 0xFFFF) == 32 || (exception.HResult & 0xFFFF) == 33)
+        {
+            // ERROR_SHARING_VIOLATION or ERROR_LOCK_VIOLATION: an editor of another program has the key.
+            heldElsewhere = true;
+            return null;
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -133,7 +172,17 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         lock (ClaimedDraftKeys)
         {
-            ClaimedDraftKeys.Remove(key);
+            if (ClaimedDraftKeys.TryGetValue(key, out FileStream claim))
+            {
+                ClaimedDraftKeys.Remove(key);
+                try
+                {
+                    claim?.Dispose();
+                }
+                catch
+                {
+                }
+            }
         }
     }
 
