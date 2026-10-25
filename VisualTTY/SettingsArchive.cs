@@ -3,14 +3,92 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 
 namespace VisualTTY;
 
+/// <summary>Parts of the SmarTTY configuration that can be exported to / imported from a settings archive.</summary>
+[Flags]
+public enum SettingsParts
+{
+    None = 0,
+    MainSettings = 1,
+    KnownHosts = 2,
+    GuiPreferences = 4,
+    SshProfiles = 8,
+    RawProfiles = 16,
+    /// <summary>Saved passwords inside SSH and COM/TCP/Telnet profiles (encrypted with the password key of the Windows user).</summary>
+    SavedPasswords = 32,
+    /// <summary>The SmarTTY public key authentication key (RSA, stored in a CSP key container of the Windows user).</summary>
+    SshKey = 64,
+    /// <summary>The key that encrypts saved passwords. Needed to make exported saved passwords usable on another computer.</summary>
+    PasswordKey = 128,
+    /// <summary>OpenSSH private and public keys (id_ed25519, id_ecdsa, id_rsa) from the .ssh folder of the user.</summary>
+    OpenSshKeys = 256,
+    CommandCompletions = 512,
+
+    /// <summary>What the archive held before the parts were selectable (passwords are chosen separately).</summary>
+    Legacy = MainSettings | KnownHosts | GuiPreferences | SshProfiles | RawProfiles,
+    /// <summary>Selected by default in the export/import window: everything except passwords and private keys.</summary>
+    Default = Legacy | CommandCompletions,
+    Keys = SshKey | PasswordKey | OpenSshKeys,
+    All = Default | SavedPasswords | Keys
+}
+
 /// <summary>
-/// Exports and imports SmarTTY's XML settings as a single .tar.gz archive.
+/// Access to the keys that live in Windows CSP key containers. It is an interface so that
+/// <see cref="SettingsArchive"/> stays free of platform-specific code and can be tested anywhere.
+/// A key is exchanged as the XML of <c>RSAParameters</c>, the same format as the .sshkey files of the key manager.
+/// </summary>
+public interface ISettingsKeyStore
+{
+    bool HasSshKey { get; }
+
+    bool HasPasswordKey { get; }
+
+    byte[] ExportSshKey();
+
+    byte[] ExportPasswordKey();
+
+    void ImportSshKey(byte[] data);
+
+    void ImportPasswordKey(byte[] data);
+}
+
+/// <summary>Where the exportable files live. Paths and the key store are passed in, which also covers portable mode.</summary>
+public sealed class SettingsLocations
+{
+    /// <summary>%APPDATA%\SmarTTY (or PortableSettings).</summary>
+    public string DataDirectory;
+
+    /// <summary>%LOCALAPPDATA%\SmarTTY.</summary>
+    public string LocalDataDirectory;
+
+    /// <summary>CommandCompletions.xml next to the exe. Null when command completions are not handled.</summary>
+    public string CommandCompletionsPath;
+
+    /// <summary>The .ssh folder of the user. Null when OpenSSH keys are not handled.</summary>
+    public string UserSshDirectory;
+
+    /// <summary>Null when keys from CSP containers are not handled.</summary>
+    public ISettingsKeyStore KeyStore;
+}
+
+/// <summary>What exists on this computer (<see cref="SettingsArchive.Describe"/>) or inside an archive (<see cref="SettingsArchive.Inspect"/>).</summary>
+public sealed class SettingsContents
+{
+    public SettingsParts Available;
+    public int SshProfiles;
+    public int RawProfiles;
+    public List<string> OpenSshFiles = new List<string>();
+    public List<string> Ignored = new List<string>();
+}
+
+/// <summary>
+/// Exports and imports SmarTTY's settings as a single .tar.gz archive. The caller chooses the parts (<see cref="SettingsParts"/>).
 ///
 /// Archive layout (only these entries are ever read or written):
 ///   Settings.xml                         &lt;- %APPDATA%\SmarTTY\Settings.xml
@@ -18,6 +96,12 @@ namespace VisualTTY;
 ///   SavedConnections/*.sshconnection     &lt;- %APPDATA%\SmarTTY\SavedConnections\
 ///   SavedConnections/*.rawconnection     &lt;- %APPDATA%\SmarTTY\SavedConnections\
 ///   Local/GUIPreferences.xml             &lt;- %LOCALAPPDATA%\SmarTTY\GUIPreferences.xml
+///   CommandCompletions.xml               &lt;- CommandCompletions.xml next to SmarTTY.exe
+///   Keys/SmarTTY-ssh-key.xml             &lt;- the SmarTTY public key authentication key (CSP container, RSAParameters XML)
+///   Keys/SmarTTY-password-key.xml        &lt;- the key that protects saved passwords (CSP container, RSAParameters XML)
+///   OpenSSH/id_ed25519[.pub], id_ecdsa[.pub], id_rsa[.pub]   &lt;- the .ssh folder of the user
+///
+/// Private keys are stored in the archive as they are (not encrypted), so an archive with keys must be kept secret.
 ///
 /// The class has no WPF/WinForms dependencies so it can be tested on any platform.
 /// Directories are passed in explicitly, which also covers portable mode (PortableSettings).
@@ -27,24 +111,40 @@ public static class SettingsArchive
     public const string SettingsFileName = "Settings.xml";
     public const string KnownHostsFileName = "KnownHosts.xml";
     public const string GuiPreferencesFileName = "GUIPreferences.xml";
+    public const string CommandCompletionsFileName = "CommandCompletions.xml";
     public const string ConnectionsDirectoryName = "SavedConnections";
     public const string SshConnectionExtension = ".sshconnection";
     public const string RawConnectionExtension = ".rawconnection";
+    public const string SshKeyEntryName = "Keys/SmarTTY-ssh-key.xml";
+    public const string PasswordKeyEntryName = "Keys/SmarTTY-password-key.xml";
 
     private const string LocalPrefix = "Local/";
     private const string ConnectionsPrefix = "SavedConnections/";
+    private const string KeysPrefix = "Keys/";
+    private const string OpenSshPrefix = "OpenSSH/";
     private const string PasswordElementName = "EncryptedSavedPassword";
+
+    private static readonly string[] OpenSshKeyFiles =
+    {
+        "id_ed25519", "id_ed25519.pub", "id_ecdsa", "id_ecdsa.pub", "id_rsa", "id_rsa.pub"
+    };
 
     // Limits that keep a malformed or malicious archive (for example a gzip bomb) from exhausting memory.
     internal const long MaxEntrySize = 16L * 1024 * 1024;
     internal const long MaxTotalSize = 64L * 1024 * 1024;
     internal const int MaxEntries = 10000;
+    internal const int MaxKeyFileSize = 256 * 1024;
 
     public sealed class ExportResult
     {
         public int FileCount;
         public bool PasswordsIncluded;
+
+        /// <summary>Entries that were left out because they are damaged or could not be read.</summary>
         public List<string> Skipped = new List<string>();
+
+        /// <summary>Selected parts of which nothing exists on this computer.</summary>
+        public List<string> NotFound = new List<string>();
     }
 
     public sealed class ImportResult
@@ -52,16 +152,25 @@ public static class SettingsArchive
         public bool SettingsImported;
         public bool KnownHostsImported;
         public bool GuiPreferencesImported;
+        public bool CommandCompletionsImported;
+        public bool SshKeyImported;
+        public bool PasswordKeyImported;
         public int SshProfiles;
         public int RawProfiles;
+        public int OpenSshKeyFiles;
         public string BackupPath;
         public List<string> Ignored = new List<string>();
+
+        /// <summary>Valid entries of the archive that were not imported because their part was not selected.</summary>
+        public List<string> NotSelected = new List<string>();
 
         public int FileCount
         {
             get
             {
-                return (SettingsImported ? 1 : 0) + (KnownHostsImported ? 1 : 0) + (GuiPreferencesImported ? 1 : 0) + SshProfiles + RawProfiles;
+                return (SettingsImported ? 1 : 0) + (KnownHostsImported ? 1 : 0) + (GuiPreferencesImported ? 1 : 0) +
+                       (CommandCompletionsImported ? 1 : 0) + (SshKeyImported ? 1 : 0) + (PasswordKeyImported ? 1 : 0) +
+                       SshProfiles + RawProfiles + OpenSshKeyFiles;
             }
         }
     }
@@ -72,20 +181,34 @@ public static class SettingsArchive
         KnownHosts,
         GuiPreferences,
         SshConnection,
-        RawConnection
+        RawConnection,
+        CommandCompletions,
+        SshKey,
+        PasswordKey,
+        OpenSshKey
     }
 
     private sealed class Target
     {
         public EntryKind Kind;
+        public SettingsParts Part;
         public string FileName;
+        /// <summary>Null for entries that are not XML (OpenSSH key files).</summary>
         public string RootElement;
     }
 
     private sealed class Planned
     {
+        public string EntryName;
         public Target Target;
         public XDocument Document;
+        public byte[] Data;
+    }
+
+    private sealed class ExportItem
+    {
+        public string Name;
+        public string Path;
         public byte[] Data;
     }
 
@@ -100,6 +223,86 @@ public static class SettingsArchive
         return Path.Combine(dataDirectory, "Backups", "before-import-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".tar.gz");
     }
 
+    private static bool Has(SettingsParts value, SettingsParts flag)
+    {
+        return (value & flag) != SettingsParts.None;
+    }
+
+    private static bool IsConnection(EntryKind kind)
+    {
+        return kind == EntryKind.SshConnection || kind == EntryKind.RawConnection;
+    }
+
+    private static bool IsKeyStoreKey(EntryKind kind)
+    {
+        return kind == EntryKind.SshKey || kind == EntryKind.PasswordKey;
+    }
+
+    private static SettingsLocations Locations(string dataDirectory, string localDataDirectory)
+    {
+        return new SettingsLocations { DataDirectory = dataDirectory, LocalDataDirectory = localDataDirectory };
+    }
+
+    // ------------------------------------------------------------------ describe
+
+    /// <summary>Finds out which of the parts exist on this computer, so that the export window only offers those.</summary>
+    public static SettingsContents Describe(SettingsLocations locations)
+    {
+        SettingsContents contents = new SettingsContents();
+        ExportResult unused = new ExportResult();
+        foreach (ExportItem item in CollectItems(locations, SettingsParts.All & ~SettingsParts.SavedPasswords & ~SettingsParts.SshKey & ~SettingsParts.PasswordKey, unused))
+        {
+            Target target;
+            if (!TryClassify(item.Name, out target))
+            {
+                continue;
+            }
+            contents.Available |= target.Part;
+            switch (target.Kind)
+            {
+                case EntryKind.SshConnection:
+                    contents.SshProfiles++;
+                    break;
+                case EntryKind.RawConnection:
+                    contents.RawProfiles++;
+                    break;
+                case EntryKind.OpenSshKey:
+                    contents.OpenSshFiles.Add(target.FileName);
+                    break;
+            }
+            if (IsConnection(target.Kind) && !Has(contents.Available, SettingsParts.SavedPasswords) && FileHoldsPassword(item.Path))
+            {
+                contents.Available |= SettingsParts.SavedPasswords;
+            }
+        }
+        // Asking whether a key exists does not read the private key.
+        if (locations.KeyStore != null)
+        {
+            if (locations.KeyStore.HasSshKey)
+            {
+                contents.Available |= SettingsParts.SshKey;
+            }
+            if (locations.KeyStore.HasPasswordKey)
+            {
+                contents.Available |= SettingsParts.PasswordKey;
+            }
+        }
+        return contents;
+    }
+
+    private static bool FileHoldsPassword(string path)
+    {
+        try
+        {
+            XElement password = FindPassword(LoadXml(ReadAllBytesShared(path)));
+            return password != null && !string.IsNullOrWhiteSpace(password.Value);
+        }
+        catch (Exception ex) when (ex is XmlException || ex is IOException || ex is UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     // ------------------------------------------------------------------ export
 
     /// <summary>
@@ -109,13 +312,28 @@ public static class SettingsArchive
     /// </summary>
     public static ExportResult Export(string archivePath, string dataDirectory, string localDataDirectory, bool includePasswords)
     {
+        return Export(archivePath, Locations(dataDirectory, localDataDirectory), SettingsParts.Legacy | (includePasswords ? SettingsParts.SavedPasswords : SettingsParts.None));
+    }
+
+    /// <summary>
+    /// Writes the selected <paramref name="parts"/> that exist into <paramref name="archivePath"/>.
+    /// Parts that do not exist are listed in <see cref="ExportResult.NotFound"/>.
+    /// <see cref="SettingsParts.SavedPasswords"/> keeps the saved passwords inside the profiles; without it they are removed.
+    /// </summary>
+    public static ExportResult Export(string archivePath, SettingsLocations locations, SettingsParts parts)
+    {
         if (string.IsNullOrEmpty(archivePath))
         {
             throw new ArgumentException("Archive path is empty.", "archivePath");
         }
+        if (locations == null)
+        {
+            throw new ArgumentNullException("locations");
+        }
 
-        List<KeyValuePair<string, string>> files = CollectFiles(dataDirectory, localDataDirectory);
-        if (files.Count == 0)
+        ExportResult result = new ExportResult { PasswordsIncluded = Has(parts, SettingsParts.SavedPasswords) };
+        List<ExportItem> items = CollectItems(locations, parts, result);
+        if (items.Count == 0)
         {
             throw new InvalidOperationException("There are no saved SmarTTY settings to export.");
         }
@@ -123,44 +341,51 @@ public static class SettingsArchive
         string fullPath = Path.GetFullPath(archivePath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
         string temp = fullPath + ".tmp";
-        ExportResult result = new ExportResult { PasswordsIncluded = includePasswords };
         try
         {
             using (FileStream output = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 using (GZipStream gzip = new GZipStream(output, CompressionMode.Compress))
                 {
-                    foreach (KeyValuePair<string, string> file in files)
+                    foreach (ExportItem item in items)
                     {
-                        byte[] data = ReadAllBytesShared(file.Value);
+                        byte[] data = item.Data ?? ReadAllBytesShared(item.Path);
                         if (data.Length > MaxEntrySize)
                         {
-                            throw new InvalidDataException("'" + file.Key + "' is too large to export.");
+                            throw new InvalidDataException("'" + item.Name + "' is too large to export.");
                         }
                         // Only well-formed files of the expected type go into the archive; otherwise the
                         // archive would be rejected on import.
                         Target target;
-                        TryClassify(file.Key, out target);
+                        TryClassify(item.Name, out target);
                         try
                         {
-                            XDocument document = LoadXml(data);
-                            if (document.Root == null || document.Root.Name.LocalName != target.RootElement)
+                            if (target.RootElement == null)
                             {
-                                result.Skipped.Add(file.Key);
-                                continue;
+                                ValidateKeyFile(item.Name, target.FileName, data);
                             }
-                            // Telnet profiles carry a saved password too (SSH profiles at the top, telnet in Connection).
-                            if (!includePasswords && (target.Kind == EntryKind.SshConnection || target.Kind == EntryKind.RawConnection))
+                            else
                             {
-                                data = RemovePassword(document, data);
+                                XDocument document = LoadXml(data);
+                                if (document.Root == null || document.Root.Name.LocalName != target.RootElement)
+                                {
+                                    result.Skipped.Add(item.Name);
+                                    continue;
+                                }
+                                // Telnet profiles carry a saved password too (SSH profiles at the top, telnet in Connection).
+                                if (!result.PasswordsIncluded && IsConnection(target.Kind))
+                                {
+                                    data = RemovePassword(document, data);
+                                }
                             }
                         }
-                        catch (XmlException)
+                        catch (Exception ex) when (ex is XmlException || ex is InvalidDataException)
                         {
-                            result.Skipped.Add(file.Key);
+                            result.Skipped.Add(item.Name);
                             continue;
                         }
-                        TarWriter.WriteFile(gzip, file.Key, data, File.GetLastWriteTimeUtc(file.Value));
+                        DateTime time = item.Path != null ? File.GetLastWriteTimeUtc(item.Path) : DateTime.UtcNow;
+                        TarWriter.WriteFile(gzip, item.Name, data, time);
                         result.FileCount++;
                     }
                     TarWriter.Finish(gzip);
@@ -180,49 +405,182 @@ public static class SettingsArchive
         return result;
     }
 
-    private static List<KeyValuePair<string, string>> CollectFiles(string dataDirectory, string localDataDirectory)
+    // Gathers what exists for the selected parts. Missing parts and keys that cannot be read go into the report.
+    private static List<ExportItem> CollectItems(SettingsLocations locations, SettingsParts parts, ExportResult report)
     {
-        List<KeyValuePair<string, string>> files = new List<KeyValuePair<string, string>>();
-        AddIfExists(files, SettingsFileName, Path.Combine(dataDirectory, SettingsFileName));
-        AddIfExists(files, KnownHostsFileName, Path.Combine(dataDirectory, KnownHostsFileName));
-        string connections = Path.Combine(dataDirectory, ConnectionsDirectoryName);
-        if (Directory.Exists(connections))
+        List<ExportItem> items = new List<ExportItem>();
+        string dataDirectory = locations.DataDirectory;
+        if (Has(parts, SettingsParts.MainSettings))
         {
-            // Enumerate everything and classify by name instead of using a "*.ext" search pattern,
-            // whose matching rules differ between runtimes.
-            string[] all = Directory.GetFiles(connections);
-            Array.Sort(all, StringComparer.Ordinal);
-            foreach (string path in all)
+            AddIfExists(items, report, "main settings", SettingsFileName, Path.Combine(dataDirectory, SettingsFileName));
+        }
+        if (Has(parts, SettingsParts.KnownHosts))
+        {
+            AddIfExists(items, report, "trusted server keys", KnownHostsFileName, Path.Combine(dataDirectory, KnownHostsFileName));
+        }
+
+        bool wantSsh = Has(parts, SettingsParts.SshProfiles);
+        bool wantRaw = Has(parts, SettingsParts.RawProfiles);
+        if (wantSsh || wantRaw)
+        {
+            bool foundSsh = false;
+            bool foundRaw = false;
+            string connections = Path.Combine(dataDirectory, ConnectionsDirectoryName);
+            if (Directory.Exists(connections))
             {
-                string entryName = ConnectionsPrefix + Path.GetFileName(path);
-                Target target;
-                if (TryClassify(entryName, out target))
+                // Enumerate everything and classify by name instead of using a "*.ext" search pattern,
+                // whose matching rules differ between runtimes.
+                string[] all = Directory.GetFiles(connections);
+                Array.Sort(all, StringComparer.Ordinal);
+                foreach (string path in all)
                 {
-                    files.Add(new KeyValuePair<string, string>(entryName, path));
+                    string entryName = ConnectionsPrefix + Path.GetFileName(path);
+                    Target target;
+                    if (!TryClassify(entryName, out target))
+                    {
+                        continue;
+                    }
+                    if ((target.Kind == EntryKind.SshConnection && wantSsh) || (target.Kind == EntryKind.RawConnection && wantRaw))
+                    {
+                        items.Add(new ExportItem { Name = entryName, Path = path });
+                        foundSsh |= target.Kind == EntryKind.SshConnection;
+                        foundRaw |= target.Kind == EntryKind.RawConnection;
+                    }
                 }
             }
+            if (wantSsh && !foundSsh)
+            {
+                report.NotFound.Add("SSH profiles");
+            }
+            if (wantRaw && !foundRaw)
+            {
+                report.NotFound.Add("COM/TCP/Telnet profiles");
+            }
         }
-        AddIfExists(files, LocalPrefix + GuiPreferencesFileName, Path.Combine(localDataDirectory, GuiPreferencesFileName));
-        return files;
+
+        if (Has(parts, SettingsParts.GuiPreferences))
+        {
+            AddIfExists(items, report, "interface preferences", LocalPrefix + GuiPreferencesFileName, Path.Combine(locations.LocalDataDirectory, GuiPreferencesFileName));
+        }
+        if (Has(parts, SettingsParts.CommandCompletions))
+        {
+            if (string.IsNullOrEmpty(locations.CommandCompletionsPath))
+            {
+                report.NotFound.Add("command completions");
+            }
+            else
+            {
+                AddIfExists(items, report, "command completions", CommandCompletionsFileName, locations.CommandCompletionsPath);
+            }
+        }
+
+        if (Has(parts, SettingsParts.SshKey))
+        {
+            AddKey(items, report, "SmarTTY SSH key", SshKeyEntryName, locations.KeyStore == null ? (Func<bool>)null : () => locations.KeyStore.HasSshKey, () => locations.KeyStore.ExportSshKey());
+        }
+        if (Has(parts, SettingsParts.PasswordKey))
+        {
+            AddKey(items, report, "password protection key", PasswordKeyEntryName, locations.KeyStore == null ? (Func<bool>)null : () => locations.KeyStore.HasPasswordKey, () => locations.KeyStore.ExportPasswordKey());
+        }
+        if (Has(parts, SettingsParts.OpenSshKeys))
+        {
+            bool found = false;
+            if (!string.IsNullOrEmpty(locations.UserSshDirectory))
+            {
+                foreach (string name in OpenSshKeyFiles)
+                {
+                    string path = Path.Combine(locations.UserSshDirectory, name);
+                    if (File.Exists(path))
+                    {
+                        items.Add(new ExportItem { Name = OpenSshPrefix + name, Path = path });
+                        found = true;
+                    }
+                }
+            }
+            if (!found)
+            {
+                report.NotFound.Add("OpenSSH keys");
+            }
+        }
+        return items;
     }
 
-    private static void AddIfExists(List<KeyValuePair<string, string>> files, string entryName, string path)
+    private static void AddIfExists(List<ExportItem> items, ExportResult report, string description, string entryName, string path)
     {
         if (File.Exists(path))
         {
-            files.Add(new KeyValuePair<string, string>(entryName, path));
+            items.Add(new ExportItem { Name = entryName, Path = path });
+        }
+        else
+        {
+            report.NotFound.Add(description);
+        }
+    }
+
+    private static void AddKey(List<ExportItem> items, ExportResult report, string description, string entryName, Func<bool> exists, Func<byte[]> export)
+    {
+        if (exists == null || !exists())
+        {
+            report.NotFound.Add(description);
+            return;
+        }
+        try
+        {
+            byte[] data = export();
+            if (data == null || data.Length == 0)
+            {
+                report.NotFound.Add(description);
+                return;
+            }
+            items.Add(new ExportItem { Name = entryName, Data = data });
+        }
+        catch (Exception ex) when (ex is CryptographicException || ex is IOException)
+        {
+            // For example a key container that was created as non-exportable.
+            report.Skipped.Add(entryName);
         }
     }
 
     // ------------------------------------------------------------------ import
 
     /// <summary>
-    /// Validates the archive completely, optionally backs up the current settings to
-    /// <paramref name="backupPath"/>, and then writes the files. Nothing is written when validation fails.
-    /// Files with the same name are replaced; saved connections that are not in the archive are kept.
-    /// A saved password already stored locally is kept when the archived profile carries none.
+    /// Reads the archive completely and tells what it contains, so that the import window only offers those parts.
+    /// Throws <see cref="InvalidDataException"/> when the archive is damaged or contains an invalid entry.
     /// </summary>
-    public static ImportResult Import(string archivePath, string dataDirectory, string localDataDirectory, string backupPath)
+    public static SettingsContents Inspect(string archivePath)
+    {
+        SettingsContents contents = new SettingsContents();
+        List<string> ignored;
+        foreach (Planned item in ReadPlan(archivePath, out ignored))
+        {
+            contents.Available |= item.Target.Part;
+            switch (item.Target.Kind)
+            {
+                case EntryKind.SshConnection:
+                    contents.SshProfiles++;
+                    break;
+                case EntryKind.RawConnection:
+                    contents.RawProfiles++;
+                    break;
+                case EntryKind.OpenSshKey:
+                    contents.OpenSshFiles.Add(item.Target.FileName);
+                    break;
+            }
+            if (IsConnection(item.Target.Kind) && !Has(contents.Available, SettingsParts.SavedPasswords))
+            {
+                XElement password = FindPassword(item.Document);
+                if (password != null && !string.IsNullOrWhiteSpace(password.Value))
+                {
+                    contents.Available |= SettingsParts.SavedPasswords;
+                }
+            }
+        }
+        contents.Ignored.AddRange(ignored);
+        return contents;
+    }
+
+    // Reads and validates every known entry of the archive. Nothing is written here.
+    private static List<Planned> ReadPlan(string archivePath, out List<string> ignored)
     {
         List<TarEntry> entries;
         using (FileStream input = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -233,7 +591,7 @@ public static class SettingsArchive
             }
         }
 
-        ImportResult result = new ImportResult();
+        ignored = new List<string>();
         List<Planned> planned = new List<Planned>();
         HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (TarEntry entry in entries)
@@ -241,89 +599,202 @@ public static class SettingsArchive
             Target target;
             if (!TryClassify(entry.Name, out target))
             {
-                result.Ignored.Add(entry.Name);
+                ignored.Add(entry.Name);
                 continue;
             }
             if (!seen.Add(target.Kind + "/" + target.FileName.ToUpperInvariant()))
             {
                 throw new InvalidDataException("The archive contains '" + entry.Name + "' more than once.");
             }
-            XDocument document;
-            try
+            XDocument document = null;
+            if (target.RootElement == null)
             {
-                document = LoadXml(entry.Data);
+                ValidateKeyFile(entry.Name, target.FileName, entry.Data);
             }
-            catch (XmlException ex)
+            else
             {
-                throw new InvalidDataException("'" + entry.Name + "' is not valid XML: " + ex.Message, ex);
+                try
+                {
+                    document = LoadXml(entry.Data);
+                }
+                catch (XmlException ex)
+                {
+                    throw new InvalidDataException("'" + entry.Name + "' is not valid XML: " + ex.Message, ex);
+                }
+                if (document.Root == null || document.Root.Name.LocalName != target.RootElement)
+                {
+                    throw new InvalidDataException("'" + entry.Name + "' does not look like a SmarTTY file (expected <" + target.RootElement + ">).");
+                }
             }
-            if (document.Root == null || document.Root.Name.LocalName != target.RootElement)
-            {
-                throw new InvalidDataException("'" + entry.Name + "' does not look like a SmarTTY file (expected <" + target.RootElement + ">).");
-            }
-            planned.Add(new Planned { Target = target, Document = document, Data = entry.Data });
+            planned.Add(new Planned { EntryName = entry.Name, Target = target, Document = document, Data = entry.Data });
         }
         if (planned.Count == 0)
         {
             throw new InvalidDataException("The archive does not contain any SmarTTY settings files.");
         }
+        return planned;
+    }
 
-        if (!string.IsNullOrEmpty(backupPath) && CollectFiles(dataDirectory, localDataDirectory).Count > 0)
+    /// <summary>
+    /// Validates the archive completely, optionally backs up the current settings to
+    /// <paramref name="backupPath"/>, and then writes the files. Nothing is written when validation fails.
+    /// Files with the same name are replaced; saved connections that are not in the archive are kept.
+    /// A saved password already stored locally is kept when the archived profile carries none.
+    /// </summary>
+    public static ImportResult Import(string archivePath, string dataDirectory, string localDataDirectory, string backupPath)
+    {
+        return Import(archivePath, Locations(dataDirectory, localDataDirectory), SettingsParts.Legacy | SettingsParts.SavedPasswords, backupPath);
+    }
+
+    /// <summary>
+    /// Like the other overload, but only imports the selected <paramref name="parts"/>.
+    /// Without <see cref="SettingsParts.SavedPasswords"/> the passwords of imported profiles are dropped and the local ones are kept.
+    /// Before anything is replaced, the current files and keys that the import overwrites are saved to <paramref name="backupPath"/>
+    /// (a backup that holds keys is as sensitive as the keys themselves).
+    /// </summary>
+    public static ImportResult Import(string archivePath, SettingsLocations locations, SettingsParts parts, string backupPath)
+    {
+        if (locations == null)
         {
+            throw new ArgumentNullException("locations");
+        }
+
+        List<string> ignored;
+        List<Planned> all = ReadPlan(archivePath, out ignored);
+        ImportResult result = new ImportResult();
+        result.Ignored.AddRange(ignored);
+
+        List<Planned> planned = new List<Planned>();
+        foreach (Planned item in all)
+        {
+            if (Has(parts, item.Target.Part))
+            {
+                planned.Add(item);
+            }
+            else
+            {
+                result.NotSelected.Add(item.EntryName);
+            }
+        }
+        if (planned.Count == 0)
+        {
+            throw new InvalidDataException("The archive does not contain any of the selected settings.");
+        }
+
+        SettingsParts backupParts = SettingsParts.Legacy | SettingsParts.SavedPasswords;
+        foreach (Planned item in planned)
+        {
+            if (IsKeyStoreKey(item.Target.Kind) && locations.KeyStore == null)
+            {
+                throw new InvalidOperationException("Importing keys is not available.");
+            }
+            if (item.Target.Kind == EntryKind.OpenSshKey && string.IsNullOrEmpty(locations.UserSshDirectory))
+            {
+                throw new InvalidOperationException("The .ssh folder of the user is not known.");
+            }
+            if (item.Target.Kind == EntryKind.CommandCompletions && string.IsNullOrEmpty(locations.CommandCompletionsPath))
+            {
+                throw new InvalidOperationException("The location of CommandCompletions.xml is not known.");
+            }
+            if (item.Target.Part == SettingsParts.SshKey || item.Target.Part == SettingsParts.PasswordKey ||
+                item.Target.Part == SettingsParts.OpenSshKeys || item.Target.Part == SettingsParts.CommandCompletions)
+            {
+                backupParts |= item.Target.Part;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(backupPath) && CollectItems(locations, backupParts, new ExportResult()).Count > 0)
+        {
+            ExportResult backup;
             try
             {
-                Export(backupPath, dataDirectory, localDataDirectory, true);
-                result.BackupPath = backupPath;
+                backup = Export(backupPath, locations, backupParts);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
                 // Importing without a safety copy would be irreversible, so stop here.
                 throw new IOException("Could not back up the current settings to '" + backupPath + "': " + ex.Message, ex);
             }
+            foreach (string skipped in backup.Skipped)
+            {
+                if (skipped.StartsWith(KeysPrefix, StringComparison.Ordinal))
+                {
+                    TryDelete(backupPath);
+                    throw new IOException("The current key '" + skipped + "' cannot be read, so it cannot be backed up before it is replaced.");
+                }
+            }
+            result.BackupPath = backupPath;
         }
 
-        foreach (Planned item in planned)
+        // Keys of the Windows key store go last: if one of them fails, the files are already consistent.
+        foreach (Planned item in planned.Where(p => !IsKeyStoreKey(p.Target.Kind)).Concat(planned.Where(p => IsKeyStoreKey(p.Target.Kind))))
         {
-            string path = Path.Combine(DirectoryFor(item.Target.Kind, dataDirectory, localDataDirectory), item.Target.FileName);
             byte[] data = item.Data;
-            if ((item.Target.Kind == EntryKind.SshConnection || item.Target.Kind == EntryKind.RawConnection) && File.Exists(path))
-            {
-                data = KeepExistingPassword(item.Document, data, path);
-            }
-            WriteFileReplacing(path, data);
             switch (item.Target.Kind)
             {
                 case EntryKind.Settings:
+                    WriteFileReplacing(Path.Combine(locations.DataDirectory, item.Target.FileName), data);
                     result.SettingsImported = true;
                     break;
                 case EntryKind.KnownHosts:
+                    WriteFileReplacing(Path.Combine(locations.DataDirectory, item.Target.FileName), data);
                     result.KnownHostsImported = true;
                     break;
                 case EntryKind.GuiPreferences:
+                    WriteFileReplacing(Path.Combine(locations.LocalDataDirectory, item.Target.FileName), data);
                     result.GuiPreferencesImported = true;
                     break;
                 case EntryKind.SshConnection:
-                    result.SshProfiles++;
-                    break;
                 case EntryKind.RawConnection:
-                    result.RawProfiles++;
+                    string path = Path.Combine(locations.DataDirectory, ConnectionsDirectoryName, item.Target.FileName);
+                    if (!Has(parts, SettingsParts.SavedPasswords))
+                    {
+                        data = RemovePassword(item.Document, data);
+                    }
+                    if (File.Exists(path))
+                    {
+                        data = KeepExistingPassword(item.Document, data, path);
+                    }
+                    WriteFileReplacing(path, data);
+                    if (item.Target.Kind == EntryKind.SshConnection)
+                    {
+                        result.SshProfiles++;
+                    }
+                    else
+                    {
+                        result.RawProfiles++;
+                    }
+                    break;
+                case EntryKind.CommandCompletions:
+                    WriteFileReplacing(locations.CommandCompletionsPath, data);
+                    result.CommandCompletionsImported = true;
+                    break;
+                case EntryKind.OpenSshKey:
+                    WriteFileReplacing(Path.Combine(locations.UserSshDirectory, item.Target.FileName), data);
+                    result.OpenSshKeyFiles++;
+                    break;
+                case EntryKind.SshKey:
+                    ImportKey(() => locations.KeyStore.ImportSshKey(data));
+                    result.SshKeyImported = true;
+                    break;
+                case EntryKind.PasswordKey:
+                    ImportKey(() => locations.KeyStore.ImportPasswordKey(data));
+                    result.PasswordKeyImported = true;
                     break;
             }
         }
         return result;
     }
 
-    private static string DirectoryFor(EntryKind kind, string dataDirectory, string localDataDirectory)
+    private static void ImportKey(Action import)
     {
-        switch (kind)
+        try
         {
-            case EntryKind.GuiPreferences:
-                return localDataDirectory;
-            case EntryKind.SshConnection:
-            case EntryKind.RawConnection:
-                return Path.Combine(dataDirectory, ConnectionsDirectoryName);
-            default:
-                return dataDirectory;
+            import();
+        }
+        catch (CryptographicException ex)
+        {
+            throw new IOException("The key could not be stored in the Windows key container: " + ex.Message, ex);
         }
     }
 
@@ -340,15 +811,36 @@ public static class SettingsArchive
 
         if (name == SettingsFileName)
         {
-            target = new Target { Kind = EntryKind.Settings, FileName = SettingsFileName, RootElement = "GlobalSettings" };
+            target = new Target { Kind = EntryKind.Settings, Part = SettingsParts.MainSettings, FileName = SettingsFileName, RootElement = "GlobalSettings" };
         }
         else if (name == KnownHostsFileName)
         {
-            target = new Target { Kind = EntryKind.KnownHosts, FileName = KnownHostsFileName, RootElement = "ArrayOfKnownHostKey" };
+            target = new Target { Kind = EntryKind.KnownHosts, Part = SettingsParts.KnownHosts, FileName = KnownHostsFileName, RootElement = "ArrayOfKnownHostKey" };
         }
         else if (name == LocalPrefix + GuiPreferencesFileName)
         {
-            target = new Target { Kind = EntryKind.GuiPreferences, FileName = GuiPreferencesFileName, RootElement = "CommonGUIPreferences" };
+            target = new Target { Kind = EntryKind.GuiPreferences, Part = SettingsParts.GuiPreferences, FileName = GuiPreferencesFileName, RootElement = "CommonGUIPreferences" };
+        }
+        else if (name == CommandCompletionsFileName)
+        {
+            target = new Target { Kind = EntryKind.CommandCompletions, Part = SettingsParts.CommandCompletions, FileName = CommandCompletionsFileName, RootElement = "CommandCompletionDatabase" };
+        }
+        else if (name == SshKeyEntryName)
+        {
+            target = new Target { Kind = EntryKind.SshKey, Part = SettingsParts.SshKey, FileName = name.Substring(KeysPrefix.Length), RootElement = "RSAParameters" };
+        }
+        else if (name == PasswordKeyEntryName)
+        {
+            target = new Target { Kind = EntryKind.PasswordKey, Part = SettingsParts.PasswordKey, FileName = name.Substring(KeysPrefix.Length), RootElement = "RSAParameters" };
+        }
+        else if (name.StartsWith(OpenSshPrefix, StringComparison.Ordinal))
+        {
+            // Only the fixed list of default key names, never an arbitrary file name.
+            string file = name.Substring(OpenSshPrefix.Length);
+            if (Array.IndexOf(OpenSshKeyFiles, file) >= 0)
+            {
+                target = new Target { Kind = EntryKind.OpenSshKey, Part = SettingsParts.OpenSshKeys, FileName = file, RootElement = null };
+            }
         }
         else if (name.StartsWith(ConnectionsPrefix, StringComparison.Ordinal))
         {
@@ -359,14 +851,37 @@ public static class SettingsArchive
             }
             if (file.EndsWith(SshConnectionExtension, StringComparison.OrdinalIgnoreCase) && file.Length > SshConnectionExtension.Length)
             {
-                target = new Target { Kind = EntryKind.SshConnection, FileName = file, RootElement = "SSHConnectionSettings" };
+                target = new Target { Kind = EntryKind.SshConnection, Part = SettingsParts.SshProfiles, FileName = file, RootElement = "SSHConnectionSettings" };
             }
             else if (file.EndsWith(RawConnectionExtension, StringComparison.OrdinalIgnoreCase) && file.Length > RawConnectionExtension.Length)
             {
-                target = new Target { Kind = EntryKind.RawConnection, FileName = file, RootElement = "RawConnectionSettings" };
+                target = new Target { Kind = EntryKind.RawConnection, Part = SettingsParts.RawProfiles, FileName = file, RootElement = "RawConnectionSettings" };
             }
         }
         return target != null;
+    }
+
+    // An OpenSSH key file is text: a PEM/OpenSSH private key, or a one-line public key. Anything else is not a key.
+    private static void ValidateKeyFile(string entryName, string fileName, byte[] data)
+    {
+        if (data.Length == 0 || data.Length > MaxKeyFileSize)
+        {
+            throw new InvalidDataException("'" + entryName + "' is empty or too large for a key file.");
+        }
+        string text = Encoding.UTF8.GetString(data).TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
+        bool valid;
+        if (fileName.EndsWith(".pub", StringComparison.Ordinal))
+        {
+            valid = text.StartsWith("ssh-", StringComparison.Ordinal) || text.StartsWith("ecdsa-", StringComparison.Ordinal);
+        }
+        else
+        {
+            valid = text.StartsWith("-----BEGIN ", StringComparison.Ordinal) && text.IndexOf("PRIVATE KEY-----", StringComparison.Ordinal) > 0;
+        }
+        if (!valid)
+        {
+            throw new InvalidDataException("'" + entryName + "' does not look like an OpenSSH key file.");
+        }
     }
 
     private static bool IsSafeFileName(string file)
