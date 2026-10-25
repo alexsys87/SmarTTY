@@ -123,6 +123,15 @@
             <Image Source="../icons/term16.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="_Back to launcher" ToolTip="Close this window and its sessions and return to the start window" Click="BackToLauncher_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/go16.png" RenderTransformOrigin="0.5,0.5">
+              <Image.RenderTransform>
+                <ScaleTransform ScaleX="-1" />
+              </Image.RenderTransform>
+            </Image>
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="_Close current tab" Click="CloseTab_Click">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/closetab.png" />
