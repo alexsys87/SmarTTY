@@ -54,11 +54,26 @@ namespace SmarTTY.Ssh
 
         public Func<string, string> RunShell;
 
-        public List<string> RunCommandChecked(string command, bool requireSuccess, string terminalType = null)
+        /// <summary>The connection is gone: every command returns null, as the real session does, and ThrowIfConnectionLost throws.</summary>
+        public bool IsConnectionClosed;
+
+        public void ThrowIfConnectionLost()
+        {
+            if (IsConnectionClosed)
+            {
+                throw new System.IO.IOException("The connection to the server was lost.");
+            }
+        }
+
+        public List<string> RunCommandChecked(string command, bool requireSuccess, string terminalType = null, TimeSpan? timeout = null)
         {
             lock (Commands)
             {
                 Commands.Add(command);
+            }
+            if (IsConnectionClosed)
+            {
+                return null;
             }
             if (command == "id -u")
             {

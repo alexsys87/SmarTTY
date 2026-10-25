@@ -1210,6 +1210,14 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             return;
         }
+        // An upload cut short by the loss of the connection is resumed after reconnecting (the same job, the same id) and
+        // reports again when it ends. Until then it is neither done nor failed: counting it as finished would offer the
+        // installation of an incomplete set now, and drop the offer for good before the resumed upload completes. By the
+        // time this runs on the UI thread the job may already have been requeued, hence the other two states.
+        if (job.State == FileTransferManager.TransferState.Queued || job.State == FileTransferManager.TransferState.InProgress || (job.State == FileTransferManager.TransferState.Failed && job.InterruptedByConnectionLoss))
+        {
+            return;
+        }
         _PackageInstallOffers.Remove(job.Id);
         if (job.State == FileTransferManager.TransferState.Completed)
         {
@@ -1358,6 +1366,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     }
                     if (Session.RunCommandChecked("mkdir -p " + RemotePathUtils.ShellQuote(remoteDir), requireSuccess: true) == null)
                     {
+                        // The outer catch reports a lost connection as such instead of "cannot create".
+                        Session.ThrowIfConnectionLost();
                         MessageBoxes.Error("Cannot create " + remoteDir + ".");
                         return queued;
                     }
