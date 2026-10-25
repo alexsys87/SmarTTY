@@ -32,6 +32,9 @@ public class ShellCompletionAnalyzer : IDisposable
 
     private CommandCompletionDatabase _completionDatabase;
 
+    // The ChangeCounter at which _completionDatabase was loaded: the editor of the database bumps it on save.
+    private int _completionDatabaseVersion;
+
     // What the host answered to ShellSelection.ProbeCommand (null if the probe failed), set before _shellProbed.
     private ShellSelection.ProbeResult _shellProbe;
 
@@ -47,8 +50,10 @@ public class ShellCompletionAnalyzer : IDisposable
     {
         get
         {
-            if (_completionDatabase == null)
+            int version = CommandCompletionDatabase.ChangeCounter;
+            if (_completionDatabase == null || _completionDatabaseVersion != version)
             {
+                _completionDatabaseVersion = version;
                 try
                 {
                     _completionDatabase = CommandCompletionDatabase.Load();

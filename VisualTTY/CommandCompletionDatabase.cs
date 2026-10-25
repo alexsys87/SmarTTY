@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Security;
+using System.Threading;
 using System.Xml;
 using System.Xml.Serialization;
 
@@ -25,6 +26,28 @@ public class CommandCompletionDatabase
         {
             return Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "CommandCompletions.xml");
         }
+    }
+
+    private static int _changeCounter;
+
+    /// <summary>
+    /// Grows every time the database was saved by the editor. Sessions that cached a database compare it with the value
+    /// they loaded theirs at and read the file again, so that an edit works without restarting the program.
+    /// </summary>
+    public static int ChangeCounter
+    {
+        get { return Volatile.Read(ref _changeCounter); }
+    }
+
+    public static void NotifyChanged()
+    {
+        Interlocked.Increment(ref _changeCounter);
+    }
+
+    /// <summary>True when only the gzip variant (CommandCompletions.xml.gz) exists, which is what <see cref="Load(string)"/> then reads.</summary>
+    public static bool IsStoredCompressed(string xmlPath)
+    {
+        return !File.Exists(xmlPath) && File.Exists(xmlPath + ".gz");
     }
 
     public static CommandCompletionDatabase Load()
@@ -126,6 +149,74 @@ public class CommandCompletionDatabase
     public CommandCompletion LookupCommand(string cmdLine)
     {
         return Completions?.FirstOrDefault(command => command != null && command.IsMatch(cmdLine));
+    }
+
+    /// <summary>
+    /// Saves the database either as plain XML (<paramref name="xmlPath"/>) or as gzip (<paramref name="xmlPath"/> + ".gz").
+    /// The file is written completely before it replaces the old one. The other variant is deleted afterwards:
+    /// <see cref="Load(string)"/> prefers the plain file, so a leftover would hide the new data or override it with old data.
+    /// </summary>
+    public void SaveTo(string xmlPath, bool compressed)
+    {
+        byte[] xml;
+        using (MemoryStream buffer = new MemoryStream())
+        {
+            using (XmlWriter writer = XmlWriter.Create(buffer, new XmlWriterSettings { Indent = true }))
+            {
+                new XmlSerializer(typeof(CommandCompletionDatabase)).Serialize(writer, this);
+            }
+            xml = buffer.ToArray();
+        }
+
+        string target = compressed ? xmlPath + ".gz" : xmlPath;
+        string other = compressed ? xmlPath : xmlPath + ".gz";
+        string directory = Path.GetDirectoryName(Path.GetFullPath(xmlPath));
+        if (!Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        string temp = target + ".tmp";
+        try
+        {
+            using (FileStream file = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                if (compressed)
+                {
+                    using (GZipStream gzip = new GZipStream(file, CompressionLevel.Optimal))
+                    {
+                        gzip.Write(xml, 0, xml.Length);
+                    }
+                }
+                else
+                {
+                    file.Write(xml, 0, xml.Length);
+                }
+            }
+            if (File.Exists(target))
+            {
+                File.Delete(target);
+            }
+            File.Move(temp, target);
+        }
+        catch
+        {
+            try
+            {
+                File.Delete(temp);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+            throw;
+        }
+        if (File.Exists(other))
+        {
+            File.Delete(other);
+        }
     }
 
     public void Save(string path)

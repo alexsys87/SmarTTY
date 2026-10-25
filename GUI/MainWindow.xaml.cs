@@ -321,6 +321,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
     }
 
+    private void CommandCompletionsEditor_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            CommandCompletionsEditorWindow.Open(this);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         Controller.MenuCommandHandlers.Settings();
