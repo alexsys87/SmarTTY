@@ -518,16 +518,19 @@ public class MainWindowController : INotifyPropertyChanged
             try
             {
                 SessionWrapper activeSession = RequireSshSession("File transfer");
-                SCPUploadForm scpUploadForm = new SCPUploadForm(activeSession.ExecuteAsyncCommand);
-                scpUploadForm.RemoteDirectory = _Controller.Settings.DefaultUploadDirectory;
-                if (scpUploadForm.ShowModal() == DialogResult.OK)
+                SCPUploadWindow scpUploadWindow = new SCPUploadWindow(activeSession.ExecuteAsyncCommand)
                 {
-                    _Controller.Settings.DefaultUploadDirectory = scpUploadForm.RemoteDirectory.Trim();
+                    RemoteDirectory = _Controller.Settings.DefaultUploadDirectory
+                };
+                WindowOwnership.Attach(scpUploadWindow, _Controller._Window);
+                if (scpUploadWindow.ShowDialog() == true)
+                {
+                    _Controller.Settings.DefaultUploadDirectory = scpUploadWindow.RemoteDirectory.Trim();
                     string dir = _Controller.Settings.DefaultUploadDirectory;
                     activeSession.ExpandHomeDirIfNeeded(ref dir);
                     _Controller.Settings.DefaultUploadDirectory = dir;
                     _Controller.Settings.Save();
-                    activeSession.UploadFilesToDirectory(scpUploadForm.LocalFiles, _Controller.Settings.DefaultUploadDirectory);
+                    activeSession.UploadFilesToDirectory(scpUploadWindow.LocalFiles, _Controller.Settings.DefaultUploadDirectory);
                 }
             }
             catch (Exception exception)
@@ -764,16 +767,17 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 SessionWrapper activeSession = RequireSshSession("File transfer");
                 string text = activeSession.TryExtractCurrentDir() ?? activeSession.LastDownloadDir;
-                SCPDownloadForm scpDownloadForm = new SCPDownloadForm(activeSession.ExecuteAsyncCommand, text, showCheckBox: true)
+                SCPDownloadWindow scpDownloadWindow = new SCPDownloadWindow(activeSession.ExecuteAsyncCommand, text, showCheckBox: true)
                 {
-                    OpenLocalDirAfterDownload = _Controller.Settings.OpenLocalDirAfterDownload
+                    OpenLocalDirAfterDownload = _Controller.Settings.OpenLocalDirAfterDownload,
+                    LocalDirectory = _Controller.Settings.DefaultDownloadDirectory
                 };
-                scpDownloadForm.LocalDirectory = _Controller.Settings.DefaultDownloadDirectory;
-                if (scpDownloadForm.ShowModal() == DialogResult.OK)
+                WindowOwnership.Attach(scpDownloadWindow, _Controller._Window);
+                if (scpDownloadWindow.ShowDialog() == true)
                 {
-                    _Controller.Settings.DefaultDownloadDirectory = scpDownloadForm.LocalDirectory;
+                    _Controller.Settings.DefaultDownloadDirectory = scpDownloadWindow.LocalDirectory;
                     _Controller.Settings.Save();
-                    DoDownloadFile(scpDownloadForm.RemoteFile, scpDownloadForm.LocalDirectory, scpDownloadForm.OpenLocalDirAfterDownload);
+                    DoDownloadFile(scpDownloadWindow.RemoteFile, scpDownloadWindow.LocalDirectory, scpDownloadWindow.OpenLocalDirAfterDownload);
                 }
             }
             catch (Exception exception)

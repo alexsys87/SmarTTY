@@ -159,12 +159,6 @@
     <Compile Update="Forms\RemoteOpenFileForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="Forms\SCPDownloadForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\SCPUploadForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Update="Forms\SuggestionListForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -258,12 +252,6 @@
     <Compile Update="Forms\RemoteOpenFileForm.Designer.cs">
       <DependentUpon>RemoteOpenFileForm.cs</DependentUpon>
     </Compile>
-    <Compile Update="Forms\SCPDownloadForm.Designer.cs">
-      <DependentUpon>SCPDownloadForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\SCPUploadForm.Designer.cs">
-      <DependentUpon>SCPUploadForm.cs</DependentUpon>
-    </Compile>
     <Compile Update="Forms\SuggestionListForm.Designer.cs">
       <DependentUpon>SuggestionListForm.cs</DependentUpon>
     </Compile>
@@ -296,12 +284,6 @@
     </EmbeddedResource>
     <EmbeddedResource Update="Forms\RemoteOpenFileForm.resx">
       <DependentUpon>RemoteOpenFileForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\SCPDownloadForm.resx">
-      <DependentUpon>SCPDownloadForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\SCPUploadForm.resx">
-      <DependentUpon>SCPUploadForm.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
 
