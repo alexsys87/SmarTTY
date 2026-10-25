@@ -37,6 +37,8 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
 
     private int _scrollRemainder;
 
+    private const int DragAutoScrollEdge = 2;
+
     public bool SmartAutoScroll
     {
         get
@@ -154,25 +156,48 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
                 SetHotZone(AutoScrollZone.None, resetActive: true);
             }
         }
-        else if (_hasSelection && e.Button == MouseButtons.Left)
+        else
         {
-            if (e.Y < 0)
+            // The drag itself starts the selection in the base class, so handle the auto-scroll after
+            // base.OnMouseMove. Otherwise a drag that reaches the bottom edge in one move does not scroll.
+            if (e.Button == MouseButtons.Left)
             {
-                _autoScrollDelta = -1 + e.Y / 10;
-                _timer.Enabled = true;
+                _lastMouse = e;
             }
-            else if (e.Y > Height)
-            {
-                _autoScrollDelta = 1 + (e.Y - Height) / 10;
-                _timer.Enabled = true;
-            }
-            else
-            {
-                _autoScrollDelta = 0;
-                _timer.Enabled = false;
-            }
+            base.OnMouseMove(e);
+            UpdateDragAutoScroll(e);
+            return;
         }
         base.OnMouseMove(e);
+    }
+
+    private void UpdateDragAutoScroll(MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left || !_hasSelection)
+        {
+            _autoScrollDelta = 0;
+            _timer.Enabled = false;
+            return;
+        }
+        int bottomEdge = TextArea.Bottom;
+        int topEdge = TextArea.Top;
+        if (e.Y >= bottomEdge - DragAutoScrollEdge)
+        {
+            int distance = e.Y - bottomEdge + DragAutoScrollEdge + 1;
+            _autoScrollDelta = Math.Max(1, 1 + distance / 10);
+            _timer.Enabled = true;
+        }
+        else if (e.Y <= topEdge + DragAutoScrollEdge)
+        {
+            int distance = topEdge + DragAutoScrollEdge - e.Y + 1;
+            _autoScrollDelta = -Math.Max(1, 1 + distance / 10);
+            _timer.Enabled = true;
+        }
+        else
+        {
+            _autoScrollDelta = 0;
+            _timer.Enabled = false;
+        }
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
@@ -192,6 +217,16 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
             _autoScrollDelta = 0;
         }
         base.OnMouseUp(e);
+    }
+
+    protected override void OnMouseCaptureChanged(EventArgs e)
+    {
+        base.OnMouseCaptureChanged(e);
+        if (!_smartScrollEnabled && !Capture)
+        {
+            _autoScrollDelta = 0;
+            _timer.Enabled = false;
+        }
     }
 
     internal static GraphicsPath CreateRoundedRectangle(Rectangle rectangle, int value)
@@ -265,7 +300,36 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
     {
         if (!_smartScrollEnabled)
         {
-            ScrollBy(_autoScrollDelta);
+            int previousTopLine = TopLine;
+            int targetTopLine = previousTopLine + _autoScrollDelta;
+            if (targetTopLine < 0)
+            {
+                targetTopLine = 0;
+            }
+            else
+            {
+                int lastTopLine = Math.Max(LineCount - _visibleRows, 0);
+                if (targetTopLine > lastTopLine)
+                {
+                    targetTopLine = lastTopLine;
+                }
+            }
+            if (targetTopLine != previousTopLine)
+            {
+                ScrollBy(targetTopLine - previousTopLine);
+            }
+            if (_lastMouse != null && _hasSelection)
+            {
+                // Keep the selection edge under the mouse while the viewport moves, so the
+                // selection grows with the scrolling instead of scrolling out of view.
+                base.OnMouseMove(_lastMouse);
+            }
+            if (TopLine == previousTopLine)
+            {
+                // The beginning or the end of the text has been reached.
+                _autoScrollDelta = 0;
+                _timer.Enabled = false;
+            }
         }
         else
         {
