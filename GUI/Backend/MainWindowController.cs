@@ -1285,17 +1285,17 @@ public class MainWindowController : INotifyPropertyChanged
                 }
                 switch (MessageBoxes.YesNoCancel("Save " + editorTab.FilePath + "?"))
                 {
-                    case DialogResult.Yes:
+                    case System.Windows.MessageBoxResult.Yes:
                         if (!editorTab.Editor.TrySave())
                         {
                             return false;
                         }
                         break;
-                    case DialogResult.No:
+                    case System.Windows.MessageBoxResult.No:
                         // The changes are given up on purpose: no draft of them is kept.
                         editorTab.Editor.DiscardDraft();
                         break;
-                    case DialogResult.Cancel:
+                    case System.Windows.MessageBoxResult.Cancel:
                         return false;
                 }
             }

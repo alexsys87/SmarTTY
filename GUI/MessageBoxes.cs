@@ -1,42 +1,48 @@
-﻿using System;
-using System.Windows.Forms;
+using System;
+using System.Windows;
 
 namespace SmarTTY.GUI;
 
+/// <summary>
+/// The application's message boxes. They are drawn by <see cref="MessageDialog"/> instead of the WinForms
+/// <c>MessageBox</c>, so they follow the light/dark theme like the rest of the interface.
+/// </summary>
 internal static class MessageBoxes
 {
+    private const string Caption = "SmarTTY";
+
     public static void Exception(Exception exception)
     {
-        MessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+        Error(exception.Message);
     }
 
     internal static bool Ask(string text)
     {
-        return MessageBox.Show(text, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+        return MessageDialog.Show(text, Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNo) == MessageBoxResult.Yes;
     }
 
     internal static void Info(string text)
     {
-        MessageBox.Show(text, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+        MessageDialog.Show(text, Caption, MessageDialogIcon.Information, MessageDialogButtons.Ok);
     }
 
     internal static bool AskWarn(string message)
     {
-        return MessageBox.Show(message, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes;
+        return MessageDialog.Show(message, Caption, MessageDialogIcon.Warning, MessageDialogButtons.YesNo) == MessageBoxResult.Yes;
     }
 
     internal static void Warning(string text)
     {
-        MessageBox.Show(text, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+        MessageDialog.Show(text, Caption, MessageDialogIcon.Warning, MessageDialogButtons.Ok);
     }
 
     internal static void Error(string text)
     {
-        MessageBox.Show(text, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+        MessageDialog.Show(text, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok);
     }
 
-    internal static DialogResult YesNoCancel(string text)
+    internal static MessageBoxResult YesNoCancel(string text)
     {
-        return MessageBox.Show(text, "SmarTTY", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+        return MessageDialog.Show(text, Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNoCancel);
     }
 }

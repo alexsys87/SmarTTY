@@ -1399,9 +1399,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 + "\n\nYes: overwrite them. No: skip them and upload the rest. Cancel: upload nothing.";
             switch (MessageBoxes.YesNoCancel(question))
             {
-                case System.Windows.Forms.DialogResult.Yes:
+                case System.Windows.MessageBoxResult.Yes:
                     break;
-                case System.Windows.Forms.DialogResult.No:
+                case System.Windows.MessageBoxResult.No:
                     overwrite = false;
                     break;
                 default:

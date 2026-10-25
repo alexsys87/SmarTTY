@@ -483,12 +483,12 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             }
             else if (names.Contains(name))
             {
-                System.Windows.Forms.DialogResult answer = MessageBoxes.YesNoCancel("'" + name + "' already exists in " + targetDirectory + ".\n\nReplace it" + (item.Entry.IsDirectory ? " (the existing folder and everything in it is deleted)" : "") + "?\n\nYes: replace, No: skip this item, Cancel: stop.");
-                if (answer == System.Windows.Forms.DialogResult.Cancel)
+                MessageBoxResult answer = MessageBoxes.YesNoCancel("'" + name + "' already exists in " + targetDirectory + ".\n\nReplace it" + (item.Entry.IsDirectory ? " (the existing folder and everything in it is deleted)" : "") + "?\n\nYes: replace, No: skip this item, Cancel: stop.");
+                if (answer == MessageBoxResult.Cancel)
                 {
                     return;
                 }
-                if (answer == System.Windows.Forms.DialogResult.No)
+                if (answer == MessageBoxResult.No)
                 {
                     continue;
                 }
