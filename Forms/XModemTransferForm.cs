@@ -119,6 +119,12 @@ public partial class XModemTransferForm : DpiAwareForm
         base.OnFormClosing(e);
     }
 
+    /// <summary>Stops the transfer (as the Cancel button does), e.g. when its connection is replaced.</summary>
+    public void Cancel()
+    {
+        _cts.Cancel();
+    }
+
     private void btnCancel_Click(object sender, EventArgs e)
     {
         _cts.Cancel();
