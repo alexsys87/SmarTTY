@@ -1,5 +1,4 @@
 using Microsoft.Win32;
-using SmarTTY.Forms;
 using SmarTTY.IO;
 using System;
 using System.IO;
@@ -19,7 +18,7 @@ public partial class SCPUploadWindow : Window
 
     private string _selectionSummary;
 
-    private readonly RemoteFolderDialog _remoteFolderDialog;
+    private readonly RemoteCommandStarter _callback;
 
     /// <summary>The files to upload: those picked in the open dialog, or the single path typed into the text box.</summary>
     public string[] LocalFiles
@@ -50,10 +49,7 @@ public partial class SCPUploadWindow : Window
     public SCPUploadWindow(RemoteCommandStarter callback)
     {
         InitializeComponent();
-        // The remote folder picker is still the WinForms one; it is migrated with the directory-transfer cluster.
-        _remoteFolderDialog = new RemoteFolderDialog();
-        _remoteFolderDialog.CommandRequested += callback;
-        Closed += (object sender, EventArgs e) => _remoteFolderDialog.Dispose();
+        _callback = callback;
     }
 
     private void Open_Click(object sender, RoutedEventArgs e)
@@ -84,8 +80,7 @@ public partial class SCPUploadWindow : Window
 
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
-        _remoteFolderDialog.InitialFolder = RemoteDirectoryBox.Text;
-        string selected = _remoteFolderDialog.ShowDialog();
+        string selected = RemoteFolderBrowserWindow.Browse(_callback, usePrefixedListing: false, RemoteDirectoryBox.Text);
         if (selected != null)
         {
             RemoteDirectoryBox.Text = selected;

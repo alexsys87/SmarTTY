@@ -135,9 +135,6 @@
     <Compile Update="Controls\TextHintControl.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Update="Forms\DirectoryTransferForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Update="Forms\DpiAwareForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -147,25 +144,10 @@
     <Compile Update="Forms\OKCancelFormBase.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="Forms\RemoteFolderBrowserForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\RemoteFolderDialog.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Update="Forms\RemoteOpenFileDialog.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Update="Forms\RemoteOpenFileForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Update="Forms\SuggestionListForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Forms\TextHintForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\TransferErrorForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="SshConnector.cs">
@@ -228,9 +210,6 @@
     <Compile Update="Controls\TextHintControl.Designer.cs">
       <DependentUpon>TextHintControl.cs</DependentUpon>
     </Compile>
-    <Compile Update="Forms\DirectoryTransferForm.Designer.cs">
-      <DependentUpon>DirectoryTransferForm.cs</DependentUpon>
-    </Compile>
     <Compile Update="Forms\DpiAwareForm.Designer.cs">
       <DependentUpon>DpiAwareForm.cs</DependentUpon>
     </Compile>
@@ -240,26 +219,11 @@
     <Compile Update="Forms\OKCancelFormBase.Designer.cs">
       <DependentUpon>OKCancelFormBase.cs</DependentUpon>
     </Compile>
-    <Compile Update="Forms\RemoteFolderBrowserForm.Designer.cs">
-      <DependentUpon>RemoteFolderBrowserForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\RemoteFolderDialog.Designer.cs">
-      <DependentUpon>RemoteFolderDialog.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\RemoteOpenFileDialog.Designer.cs">
-      <DependentUpon>RemoteOpenFileDialog.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\RemoteOpenFileForm.Designer.cs">
-      <DependentUpon>RemoteOpenFileForm.cs</DependentUpon>
-    </Compile>
     <Compile Update="Forms\SuggestionListForm.Designer.cs">
       <DependentUpon>SuggestionListForm.cs</DependentUpon>
     </Compile>
     <Compile Update="Forms\TextHintForm.Designer.cs">
       <DependentUpon>TextHintForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\TransferErrorForm.Designer.cs">
-      <DependentUpon>TransferErrorForm.cs</DependentUpon>
     </Compile>
     <Compile Update="SshConnector.Designer.cs">
       <DependentUpon>SshConnector.cs</DependentUpon>
@@ -275,15 +239,6 @@
     </EmbeddedResource>
     <EmbeddedResource Update="Controls\IndefiniteWaitControl.resx">
       <DependentUpon>IndefiniteWaitControl.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\DirectoryTransferForm.resx">
-      <DependentUpon>DirectoryTransferForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\RemoteFolderBrowserForm.resx">
-      <DependentUpon>RemoteFolderBrowserForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Forms\RemoteOpenFileForm.resx">
-      <DependentUpon>RemoteOpenFileForm.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
 
