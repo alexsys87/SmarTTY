@@ -74,12 +74,21 @@ public class TokenCache
 
         public readonly int TrailingBlankLines = 1;
 
+        /// <summary>
+        /// The closing token marks the line AFTER the block (the next block, a blank line, the end of the document):
+        /// the region hides the lines between the opening and the closing token, and that line stays visible.
+        /// Blank lines right before the closing token stay visible too. Used by indentation-based and
+        /// "ends at the next header" blocks (Python, YAML, UCI, Makefile rules).
+        /// </summary>
+        public readonly bool EndsBeforeClosingLine;
+
         public static RegionStyle Ellipsis = new RegionStyle(FoldBoundary.TokenEnd, FoldBoundary.TokenEnd, unusedFlag: false, LabelSource.FixedText, "...", openingOnNextLine: true);
 
         public static RegionStyle Plain = new RegionStyle(FoldBoundary.LineStart, FoldBoundary.LineStart, unusedFlag: false, LabelSource.NextToken, null, openingOnNextLine: false);
 
-        public RegionStyle(FoldBoundary startBoundary, FoldBoundary endBoundary, bool unusedFlag, LabelSource labelSource, string text, bool openingOnNextLine, int trailingBlankLines = 1)
+        public RegionStyle(FoldBoundary startBoundary, FoldBoundary endBoundary, bool unusedFlag, LabelSource labelSource, string text, bool openingOnNextLine, int trailingBlankLines = 1, bool endsBeforeClosingLine = false)
         {
+            EndsBeforeClosingLine = endsBeforeClosingLine;
             TrailingBlankLines = trailingBlankLines;
             StartBoundary = startBoundary;
             this.EndBoundary = endBoundary;
@@ -105,6 +114,8 @@ public class TokenCache
         private int LineIndex => Line;
 
         int ITokenSink.CurrentLine => LineIndex;
+
+        public bool IsLastLine { get; set; }
 
         public LineTokens(int lineIndex, int startState)
         {
@@ -270,6 +281,9 @@ public class TokenCache
     {
         int CurrentLine { get; }
 
+        /// <summary>The line is the last one of the document (tokenizers close the blocks that are still open).</summary>
+        bool IsLastLine { get; }
+
         void AddToken(int type, int start, int end);
 
         void AddPairedToken(int type, int start, int end, int pairId, bool isOpening, RegionStyle regionStyle);
@@ -309,6 +323,7 @@ public class TokenCache
     private LineTokens TokenizeLine(int lineIndex, LineTokenizer callback, string lineText, ref int startState)
     {
         LineTokens lineTokens = new LineTokens(lineIndex, startState);
+        lineTokens.IsLastLine = lineIndex == _document.LineCount - 1;
         if ((callback == null || !callback(startState, lineText, lineTokens, out startState)) && lineText.Length > 0)
         {
             lineTokens.AddToken(startState, 0, lineText.Length);
@@ -333,13 +348,13 @@ public class TokenCache
         PairAll(null);
     }
 
-    private int RetokenizeFrom(int startLineIndex, int endLineIndex, LineTokenizer callback, UnpairedTokenSet unpairedTokenSet)
+    private int RetokenizeFrom(int startLineIndex, int endLineIndex, LineTokenizer callback, UnpairedTokenSet unpairedTokenSet, int? startState = null)
     {
         if (startLineIndex >= this._lines.Count)
         {
             return 0;
         }
-        int currentState = this._lines[startLineIndex].StartState;
+        int currentState = startState ?? this._lines[startLineIndex].StartState;
         int lineIndex;
         for (lineIndex = startLineIndex; lineIndex < _document.LineCount && (lineIndex <= endLineIndex || currentState != this._lines[lineIndex].StartState); lineIndex++)
         {
@@ -360,6 +375,9 @@ public class TokenCache
 
     public void OnLinesChanged(int startLineIndex, int oldLineCount, int newLineCount, LineTokenizer callback)
     {
+        // The state in front of the first changed line: lines that are inserted or removed there must not reset it
+        // (a new line starts inside the block comment, the string or the indented block that surrounds it).
+        int startState = (startLineIndex < this._lines.Count) ? this._lines[startLineIndex].StartState : 0;
         if (oldLineCount > newLineCount)
         {
             for (int i = 0; i < oldLineCount - newLineCount; i++)
@@ -381,7 +399,7 @@ public class TokenCache
         {
             this._lines[lineIndex].Line = lineIndex;
         }
-        this.RetokenizeFrom(startLineIndex, startLineIndex + newLineCount, callback, this._unpaired);
+        this.RetokenizeFrom(startLineIndex, startLineIndex + newLineCount, callback, this._unpaired, startState);
     }
 
     public List<Token> GetLineTokens(int lineIndex)

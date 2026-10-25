@@ -267,8 +267,9 @@ internal static class Program
             foreach (int state in new[] { 0, 1, 2, 4, 0x10, 0x20, 0x110, 0x220 })
             {
                 foreach (string sample in samples)
+                foreach (bool lastLine in new[] { false, true })
                 {
-                    RecordingSink sink = new RecordingSink();
+                    RecordingSink sink = new RecordingSink { IsLastLine = lastLine };
                     tokenizer(state, sample, sink, out int _);
                     int end = 0;
                     foreach (Tuple<int, int> token in sink.Tokens)
@@ -290,6 +291,8 @@ internal static class Program
         public readonly List<Tuple<int, int>> Tokens = new List<Tuple<int, int>>();
 
         public int CurrentLine => 0;
+
+        public bool IsLastLine { get; set; }
 
         public void AddToken(int type, int start, int end)
         {
@@ -313,7 +316,21 @@ internal static class Program
                 if (token.Kind == TokenCache.Token.TokenKind.Paired && token.IsOpening && token.Style != null &&
                     token.Partner != null && token.Partner.LineNumber != line)
                 {
-                    folds.Add(line + ":" + token.Partner.LineNumber);
+                    int partnerLine = token.Partner.LineNumber;
+                    if (token.Style.EndsBeforeClosingLine)
+                    {
+                        // Mirrors FoldingManager: the closing line and the blank lines before it stay visible.
+                        int hidden = partnerLine - line - 1;
+                        for (int blank = partnerLine - 1; blank > line && hidden > 0 && h.Doc.GetLineText(blank).Trim().Length == 0; blank--)
+                        {
+                            hidden--;
+                        }
+                        if (hidden <= 0)
+                        {
+                            continue;
+                        }
+                    }
+                    folds.Add(line + ":" + partnerLine);
                 }
             }
         }
@@ -391,6 +408,12 @@ internal static class Program
         Equal(Join(mk.Tokens(10, SyntaxHighlighting.TypeSection)), "all", "rule target");
         Equal(Join(mk.Tokens(11, SyntaxHighlighting.TypeVariable)), "$@", "automatic variable");
 
+        // Makefile rules end at the first blank line or the next line that is not a recipe.
+        Highlighted rules = new Highlighted(L.Makefile, "all: build\n\t@echo a\n\t@echo b\nbuild:\n\t@true\n\ndefine X\nfoo: bar\n\tbaz\nendef\nlast:\n\tone\n\ttwo\n");
+        Equal(Folds(rules), "0:3,3:5,6:9,10:13", "Makefile rules fold up to the next rule, a blank line or the end of the document");
+        Highlighted rulesNoNewline = new Highlighted(L.Makefile, "a:\n\tone\n\ttwo");
+        Equal(Folds(rulesNoNewline), "0:2", "a rule at the end of a file without a trailing newline keeps its last line visible");
+
         // UCI.
         Highlighted uci = new Highlighted(L.Uci,
             "package network\n\nconfig interface 'lan'\n\toption proto 'static'\n\toption mtu 1500\n\tlist dns '8.8.8.8' # google\n\nconfig device\n\toption name 'br-lan'\n\nconfig interface 'wan'\n\toption proto 'dhcp'");
@@ -401,6 +424,38 @@ internal static class Program
         Equal(Join(uci.Tokens(3, SyntaxHighlighting.TypeVariable)), "proto", "option name");
         Equal(Join(uci.Tokens(4, SyntaxHighlighting.TypeNumber)), "1500", "numeric option value");
         Equal(Join(uci.Tokens(5, SyntaxHighlighting.TypeComment)), "# google", "comment after a value");
+        Highlighted uciTight = new Highlighted(L.Uci, "config a\n\toption x '1'\n\toption y '2'\nconfig b\n\toption z '3'\n\toption w '4'\n");
+        Equal(Folds(uciTight), "0:3,3:6", "UCI blocks without blank lines fold up to the next config and to the end of the document");
+        Highlighted uciOpen = new Highlighted(L.Uci, "config a\n\toption x '1'\n\toption y '2'");
+        Equal(Folds(uciOpen), "0:2", "the last line of the document stays visible");
+        uciOpen.Doc.InsertText(new TextDocument.TextPosition(uciOpen.Doc.GetLineText(2).Length, 2), "\n", inheritLineEnding: true);
+        uciOpen.Cache.OnLinesChanged(2, 0, 1, uciOpen.Tokenizer);
+        Equal(Folds(uciOpen), "0:3", "a new last line ends the block again after an edit");
+
+        // Python: blocks by indentation.
+        Highlighted py = new Highlighted(L.Python,
+            "import os\n\nclass A:\n    x = 1\n\n    def f(self, a,\n          b):\n        if a:\n            return {\n  'k': 1,\n  }\n        else:\n            pass  # c\n\n    # about g\n    def g(self):\n        s = \"\"\"\n  doc:\n\"\"\"\n        return s\n\n\ndef h():\n    return 1\n");
+        Equal(Folds(py), "2:22,6:14,7:11,11:14,15:22,22:24", "Python blocks fold by indentation (multi-line signatures, strings and brackets do not end them)");
+        Highlighted pyOne = new Highlighted(L.Python, "if x: y = 1\nz = {\n 'a':\n 1}\ndef f():\n  pass");
+        Equal(Folds(pyOne), "", "one-line statements and dictionaries do not fold");
+
+        // Editing keeps the blocks: Enter inside a body, then a body line that loses its indentation.
+        Highlighted pyEdit = new Highlighted(L.Python, "def f():\n    a = 1\n    b = 2\n\nx = 3\n");
+        Equal(Folds(pyEdit), "0:4", "a function body folds up to the next statement");
+        pyEdit.Doc.InsertText(new TextDocument.TextPosition(pyEdit.Doc.GetLineText(1).Length, 1), "\n    c = 3", inheritLineEnding: true);
+        pyEdit.Cache.OnLinesChanged(1, 0, 1, pyEdit.Tokenizer);
+        Equal(Folds(pyEdit), "0:5", "Enter in the body of a function extends the block");
+        pyEdit.Doc.ReplaceInLine(3, 0, 4, "");
+        pyEdit.Cache.RetokenizeLine(3, pyEdit.Tokenizer);
+        Equal(Folds(pyEdit), "0:3", "a line without indentation ends the block");
+
+        // YAML: blocks by indentation.
+        Highlighted yaml = new Highlighted(L.Yaml,
+            "---\nname: web   # note\nitems:\n- a: 1\n  b: 2\n- a: 3\nservices:\n  app:\n    image: x\n    env: |\n      A=1\n      B=2\n    ports:\n      - 80\nlast: 1\n");
+        Equal(Folds(yaml), "2:6,3:5,6:14,7:14,9:12,12:14", "YAML mappings, lists at the indentation of their key and block scalars fold");
+        Equal(Join(yaml.Tokens(1, SyntaxHighlighting.TypeVariable)), "name", "YAML keys keep the config colors");
+        Equal(Join(yaml.Tokens(1, SyntaxHighlighting.TypeComment)), "# note", "YAML comments keep the config colors");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yml"), L.Yaml, ".yml is YAML");
     }
 
     private static void PairEditingChecks()

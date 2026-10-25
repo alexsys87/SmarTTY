@@ -1,5 +1,6 @@
 using SmarTTY.Controls;
 using SmarTTY.TextEditing;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -97,13 +98,22 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
 
         private int _trailingBlankLines;
 
-        public int HiddenLineCount => EndToken.LineNumber - StartToken.LineNumber + (_includesPrecedingLine ? 1 : 0) + _trailingBlankLines;
+        public int HiddenLineCount => StartToken.Style.EndsBeforeClosingLine
+            ? _hiddenBeforeClosingLine
+            : EndToken.LineNumber - StartToken.LineNumber + (_includesPrecedingLine ? 1 : 0) + _trailingBlankLines;
+
+        private readonly int _hiddenBeforeClosingLine;
+
+        /// <summary>The last hidden line; the closing token's line stays visible for a block that ends before it.</summary>
+        public int LastHiddenLine => StartToken.LineNumber + HiddenLineCount;
 
         public int HeaderLine => StartToken.LineNumber - (_includesPrecedingLine ? 1 : 0);
 
         public int StartLine => StartToken.LineNumber;
 
         public int EndLine => EndToken.LineNumber;
+
+        public bool EndsBeforeClosingLine => StartToken.Style.EndsBeforeClosingLine;
 
         public int StartColumn => StartToken.Start;
 
@@ -116,6 +126,10 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             StartToken = startToken;
             EndToken = endToken;
             _trailingBlankLines = trailingBlankLines;
+            if (startToken.Style.EndsBeforeClosingLine)
+            {
+                _hiddenBeforeClosingLine = foldingManager.CountHiddenLinesBeforeClosingLine(startToken);
+            }
         }
 
         public override string ToString()
@@ -134,6 +148,14 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
                 case TokenCache.RegionStyle.FoldBoundary.TokenStart:
                     startCol = StartToken.Start;
                     break;
+            }
+            if (StartToken.Style.EndsBeforeClosingLine)
+            {
+                // The line of the closing token is not part of the region: only the header line changes.
+                string label = StartToken.Style.Text ?? "...";
+                characterRange = new CharacterRange(StartToken.End, label.Length);
+                brush = Brushes.DarkGray;
+                return lineText.Substring(0, Math.Min(StartToken.End, lineText.Length)) + label;
             }
             string endLineText = this._manager._tokenCache.Document.GetLineText(EndToken.LineNumber);
             int endCol = endLineText.Length;
@@ -240,7 +262,7 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             if (nextTokens.Count > 0)
             {
                 TokenCache.Token firstToken = nextTokens[0];
-                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && firstToken.Partner != null && firstToken.Partner.LineNumber != firstToken.LineNumber && StartsLine(firstToken))
+                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && IsFoldable(firstToken) && StartsLine(firstToken))
                 {
                     return GutterState.Expandable;
                 }
@@ -248,7 +270,7 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         }
         foreach (TokenCache.Token token in _tokenCache.GetLineTokens(lineIndex))
         {
-            if (token.Style != null && token.IsOpening && token.Partner != null && token.Partner.LineNumber != token.LineNumber)
+            if (token.Style != null && token.IsOpening && IsFoldable(token))
             {
                 // An opening token alone on its line ("{" in Allman style) is folded from the line above.
                 if (!token.Style.OpeningOnNextLine || !StartsLine(token))
@@ -266,6 +288,31 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             return GutterState.SectionEnd;
         }
         return GutterState.Plain;
+    }
+
+    /// <summary>Whether the opening token has a partner on another line and the region hides at least one line.</summary>
+    private bool IsFoldable(TokenCache.Token token)
+    {
+        if (token.Partner == null || token.Partner.LineNumber == token.LineNumber)
+        {
+            return false;
+        }
+        return !token.Style.EndsBeforeClosingLine || CountHiddenLinesBeforeClosingLine(token) > 0;
+    }
+
+    /// <summary>
+    /// For a block that ends before its closing token's line: the lines between the opening and the closing token,
+    /// except the blank lines right before the closing token.
+    /// </summary>
+    internal int CountHiddenLinesBeforeClosingLine(TokenCache.Token opening)
+    {
+        int end = opening.Partner.LineNumber;
+        int hidden = end - opening.LineNumber - 1;
+        for (int line = end - 1; line > opening.LineNumber && hidden > 0 && IsBlankLine(line); line--)
+        {
+            hidden--;
+        }
+        return Math.Max(0, hidden);
     }
 
     private bool IsBlankLine(int lineIndex)
@@ -327,7 +374,7 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             if (nextTokens.Count > 0)
             {
                 TokenCache.Token firstToken = nextTokens[0];
-                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && firstToken.Partner != null && firstToken.Partner.LineNumber != firstToken.LineNumber && StartsLine(firstToken))
+                if (firstToken.Style != null && firstToken.Style.OpeningOnNextLine && firstToken.IsOpening && IsFoldable(firstToken) && StartsLine(firstToken))
                 {
                     _regions[lineIndex] = new FoldedRegion(firstToken, firstToken.Partner, this, includesPrecedingLine: true, this.CountTrailingBlankLines(firstToken.Partner.LineNumber, firstToken.Style.TrailingBlankLines));
                     endToken = firstToken.Partner;
@@ -337,7 +384,7 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         }
         foreach (TokenCache.Token token in _tokenCache.GetLineTokens(lineIndex))
         {
-            if (token.Style != null && token.IsOpening && token.Partner != null && token.Partner.LineNumber != token.LineNumber)
+            if (token.Style != null && token.IsOpening && IsFoldable(token))
             {
                 _regions[lineIndex] = new FoldedRegion(token, token.Partner, this, includesPrecedingLine: false, this.CountTrailingBlankLines(token.Partner.LineNumber, token.Style.TrailingBlankLines));
                 endToken = token.Partner;
@@ -437,7 +484,15 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         List<int> toExpand = new List<int>();
         foreach (KeyValuePair<int, FoldedRegion> item in _regions)
         {
-            if ((item.Value.StartLine < lineIndex || (item.Value.StartLine == lineIndex && item.Value.StartColumn <= columnIndex)) && (item.Value.EndLine > lineIndex || (item.Value.EndLine == lineIndex && item.Value.EndColumn >= columnIndex)))
+            if (item.Value.EndsBeforeClosingLine)
+            {
+                // The caret is in a hidden line or on the "..." of the header line.
+                if ((item.Value.StartLine < lineIndex && lineIndex <= item.Value.LastHiddenLine) || (item.Value.StartLine == lineIndex && item.Value.StartColumn <= columnIndex) || (columnIndex == -1 && item.Value.HeaderLine == lineIndex))
+                {
+                    toExpand.Add(item.Key);
+                }
+            }
+            else if ((item.Value.StartLine < lineIndex || (item.Value.StartLine == lineIndex && item.Value.StartColumn <= columnIndex)) && (item.Value.EndLine > lineIndex || (item.Value.EndLine == lineIndex && item.Value.EndColumn >= columnIndex)))
             {
                 toExpand.Add(item.Key);
             }

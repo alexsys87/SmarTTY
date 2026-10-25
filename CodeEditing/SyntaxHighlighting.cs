@@ -43,7 +43,7 @@ namespace SmarTTY.CodeEditing
             Plain,   // no highlighting
             Python,
             Bash,
-            Config,  // INI / .conf / .properties / YAML / TOML / systemd units
+            Config,  // INI / .conf / .properties / TOML / systemd units
             CLike,   // C, C++, C#, Java, JavaScript, Go, Rust, CSS, ...: // and /* */ comments
             Script,  // Dockerfile, CMake, Ruby, Perl, ...: # comments
             Sql,     // SQL: -- comments
@@ -52,14 +52,15 @@ namespace SmarTTY.CodeEditing
             Lua,     // Lua: -- comments, [[long strings]], foldable function/if/for/while/do/repeat blocks
             Json,    // JSON: keys, strings, numbers, foldable { } and [ ] blocks
             Makefile,// Makefile: variables, targets, foldable ifeq/define blocks
-            Uci      // OpenWrt UCI (/etc/config/*): config/option/list, foldable config blocks
+            Uci,     // OpenWrt UCI (/etc/config/*): config/option/list, foldable config blocks
+            Yaml     // YAML: the colors of Config, blocks that fold by indentation
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Python, Language.CLike, Language.Script, Language.Sql, Language.Markup, Language.Diff
+            Language.Python, Language.Yaml, Language.CLike, Language.Script, Language.Sql, Language.Markup, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -73,7 +74,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Lua: return "Lua";
                 case Language.Makefile: return "Makefile";
                 case Language.Json: return "JSON";
-                case Language.Config: return "Config (INI, YAML, conf)";
+                case Language.Config: return "Config (INI, conf, properties)";
+                case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
                 case Language.CLike: return "C, C++, C#, Java, JavaScript";
                 case Language.Script: return "Script (Perl, Ruby, Dockerfile)";
@@ -235,8 +237,6 @@ namespace SmarTTY.CodeEditing
                 case "properties":
                 case "inf":
                 case "editorconfig":
-                case "yml":
-                case "yaml":
                 case "toml":
                 case "env":
                 case "service":
@@ -315,6 +315,10 @@ namespace SmarTTY.CodeEditing
 
                 case "uci":
                     return Language.Uci;
+
+                case "yml":
+                case "yaml":
+                    return Language.Yaml;
 
                 case "html":
                 case "htm":
@@ -417,6 +421,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Json: return TokenizeJson;
                 case Language.Makefile: return TokenizeMakefile;
                 case Language.Uci: return TokenizeUci;
+                case Language.Yaml: return TokenizeYaml;
                 default: return null;
             }
         }
@@ -584,11 +589,58 @@ namespace SmarTTY.CodeEditing
             int len = text.Length;
             int i = 0;
             int last = 0;
+            int stringState = startState & StPyStringMask;
+            int depth = (startState >> PyDepthShift) & 7;          // open indented blocks
+            int bracket = (startState >> PyBracketShift) & 3;      // unclosed ( [ {
+            int header = (startState >> PyHeaderShift) & 31;       // indent + 1 of a block header whose statement goes on
+            int levels = (startState >> PyLevelShift) & 0xFFFFF;   // indent increase of every open block
 
-            if (startState == StPyTripleDouble || startState == StPyTripleSingle)
+            int Pack(int stringBits)
+            {
+                return stringBits | (depth << PyDepthShift) | (bracket << PyBracketShift) | (header << PyHeaderShift) | (levels << PyLevelShift);
+            }
+
+            // At the end of the document every block that is still open ends.
+            void CloseAtEnd()
+            {
+                if (!sink.IsLastLine)
+                {
+                    return;
+                }
+                for (; depth > 0; depth--)
+                {
+                    sink.AddPairedToken(TypeNormal, len, len, PairIndentBlock, false, null);
+                    levels &= ~(0xF << (4 * (depth - 1)));
+                }
+            }
+
+            // The statement ends here (before a comment or at the end of the line): "def f(x):" opens a block.
+            void FinishStatement(int codeEnd)
+            {
+                if (bracket != 0 || header == 0)
+                {
+                    return;
+                }
+                int end = codeEnd;
+                while (end > 0 && IsBlank(text[end - 1]))
+                {
+                    end--;
+                }
+                if (end > 0 && text[end - 1] == ':' && depth < PyMaxLevels)
+                {
+                    int cumulative = IndentLevelSum(levels, depth, 0xF);
+                    int delta = Math.Max(0, Math.Min(15, (header - 1) - cumulative));
+                    levels |= delta << (4 * depth);
+                    depth++;
+                    sink.AddPairedToken(TypeNormal, end, end, PairIndentBlock, true, ExclusiveBlockRegion);
+                }
+                header = 0;
+            }
+
+            if (stringState != 0)
             {
                 // Continuation of a triple-quoted string from the previous line.
-                string quote = (startState == StPyTripleDouble) ? "\"\"\"" : "'''";
+                string quote = (stringState == StPyTripleDouble) ? "\"\"\"" : "'''";
                 int close = FindTripleQuoteEnd(text, 0, quote);
                 if (close < 0)
                 {
@@ -596,7 +648,8 @@ namespace SmarTTY.CodeEditing
                     {
                         sink.AddToken(TypeString, 0, len);
                     }
-                    endState = startState;
+                    CloseAtEnd();
+                    endState = Pack(stringState);
                     return true;
                 }
                 sink.AddToken(TypeString, 0, close);
@@ -605,8 +658,27 @@ namespace SmarTTY.CodeEditing
             }
             else if (TryAddShebang(text, sink))
             {
-                endState = 0;
+                endState = Pack(0);
                 return true;
+            }
+            else
+            {
+                // A new statement: the blocks that are indented as deep or deeper than this line end here.
+                int first = SkipBlanks(text, 0);
+                if (bracket == 0 && first < len)
+                {
+                    int indent = IndentColumns(text, first);
+                    while (depth > 0 && IndentLevelSum(levels, depth, 0xF) >= indent)
+                    {
+                        sink.AddPairedToken(TypeNormal, 0, 0, PairIndentBlock, false, null);
+                        levels &= ~(0xF << (4 * (depth - 1)));
+                        depth--;
+                    }
+                    if (text[first] != '#')
+                    {
+                        header = IsPythonBlockHeader(text, first) ? Math.Min(31, indent + 1) : 0;
+                    }
+                }
             }
 
             int firstNonBlank = SkipBlanks(text, 0);
@@ -617,9 +689,11 @@ namespace SmarTTY.CodeEditing
                 // Comment up to the end of the line.
                 if (c == '#')
                 {
+                    FinishStatement(i);
                     Normal(ref last, last, i, sink);
                     sink.AddToken(TypeComment, i, len);
-                    endState = 0;
+                    CloseAtEnd();
+                    endState = Pack(0);
                     return true;
                 }
 
@@ -635,7 +709,8 @@ namespace SmarTTY.CodeEditing
                         if (close < 0)
                         {
                             sink.AddToken(TypeString, i, len);
-                            endState = (c == '"') ? StPyTripleDouble : StPyTripleSingle;
+                            CloseAtEnd();
+                            endState = Pack((c == '"') ? StPyTripleDouble : StPyTripleSingle);
                             return true;
                         }
                         sink.AddToken(TypeString, i, close);
@@ -709,6 +784,15 @@ namespace SmarTTY.CodeEditing
 
                 if (TryAddBracket(text, i, ref last, sink))
                 {
+                    // Statements go on over lines while a bracket is open.
+                    if (c == '(' || c == '[' || c == '{')
+                    {
+                        bracket = Math.Min(3, bracket + 1);
+                    }
+                    else
+                    {
+                        bracket = Math.Max(0, bracket - 1);
+                    }
                     i++;
                     continue;
                 }
@@ -716,8 +800,10 @@ namespace SmarTTY.CodeEditing
                 i++;
             }
 
+            FinishStatement(len);
             Normal(ref last, last, len, sink);
-            endState = 0;
+            CloseAtEnd();
+            endState = Pack(0);
             return true;
         }
 
@@ -1489,14 +1575,14 @@ namespace SmarTTY.CodeEditing
         }
 
         /// <summary>Opens a block at the end of the code on the line (a zero-width token): "function f(a)" ... "end".</summary>
-        private static void AddEndOfLineOpener(string text, int codeEnd, int pairId, TokenCache.ITokenSink sink)
+        private static void AddEndOfLineOpener(string text, int codeEnd, int pairId, TokenCache.ITokenSink sink, TokenCache.RegionStyle style = null)
         {
             int end = codeEnd;
             while (end > 0 && IsBlank(text[end - 1]))
             {
                 end--;
             }
-            sink.AddPairedToken(TypeNormal, end, end, pairId, true, KeywordBlockRegion);
+            sink.AddPairedToken(TypeNormal, end, end, pairId, true, style ?? KeywordBlockRegion);
         }
 
         /// <summary>
@@ -1523,9 +1609,22 @@ namespace SmarTTY.CodeEditing
 
             public int CurrentLine => _target.CurrentLine;
 
+            public bool IsLastLine => _target.IsLastLine;
+
             public void AddToken(int type, int start, int end)
             {
                 _items.Add(new Item { Type = type, Start = start, End = end, Keep = true });
+            }
+
+            /// <summary>Adds a zero-width paired token in front of the tokens that start at or after the position.</summary>
+            public void InsertPairedToken(int position, int pairId, bool isOpening, TokenCache.RegionStyle regionStyle)
+            {
+                int index = 0;
+                while (index < _items.Count && _items[index].Start < position)
+                {
+                    index++;
+                }
+                _items.Insert(index, new Item { Type = TypeNormal, Start = position, End = position, PairId = pairId, IsPaired = true, IsOpening = isOpening, Style = regionStyle, Keep = true });
             }
 
             public void AddPairedToken(int type, int start, int end, int pairId, bool isOpening, TokenCache.RegionStyle regionStyle)
@@ -1949,21 +2048,48 @@ namespace SmarTTY.CodeEditing
             return text.Length;
         }
 
+        // Line state: 0x01 - inside a rule (its recipe lines follow), 0x02 - inside "define ... endef".
+        private const int StMakeRule = 0x01;
+        private const int StMakeDefine = 0x02;
+
         private static bool TokenizeMakefile(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int state = startState & (StMakeRule | StMakeDefine);
+            bool result = TokenizeMakefileLine(ref state, text, sink);
+            // The end of the document ends the rule that is open.
+            if ((state & StMakeRule) != 0 && sink.IsLastLine)
+            {
+                sink.AddPairedToken(TypeNormal, text.Length, text.Length, PairMakeRule, false, null);
+                state &= ~StMakeRule;
+            }
+            endState = state;
+            return result;
+        }
+
+        private static bool TokenizeMakefileLine(ref int state, string text, TokenCache.ITokenSink sink)
         {
             int len = text.Length;
             int last = 0;
             int i = 0;
             int pendingOpener = 0;  // pair id of a block that opens at the end of this line
-            endState = 0;
+            bool inDefine = (state & StMakeDefine) != 0;
 
             if (TryAddShebang(text, sink))
             {
+                state = 0;
                 return true;
             }
 
             bool recipe = len > 0 && text[0] == '\t';
             int first = SkipBlanks(text, 0);
+
+            // A rule goes on while its recipe lines (they start with a tab) follow; a blank line or any other line ends it.
+            if ((state & StMakeRule) != 0 && !inDefine && (first == len || !recipe))
+            {
+                sink.AddPairedToken(TypeNormal, 0, 0, PairMakeRule, false, null);
+                state &= ~StMakeRule;
+            }
+
             if (!recipe && first < len)
             {
                 if (text[first] == '#')
@@ -1979,6 +2105,10 @@ namespace SmarTTY.CodeEditing
                 }
                 string word = text.Substring(first, wordEnd - first);
                 bool isDirective = MakeDirectives.Contains(word) && (wordEnd == len || IsBlank(text[wordEnd]) || text[wordEnd] == '(');
+                if (inDefine && word != "endef")
+                {
+                    isDirective = false;
+                }
                 if (isDirective)
                 {
                     switch (word)
@@ -1993,6 +2123,7 @@ namespace SmarTTY.CodeEditing
                             break;
                         case "define":
                             pendingOpener = PairDefineBlock;
+                            state |= StMakeDefine;
                             Normal(ref last, last, first, sink);
                             sink.AddToken(TypeKeyword, first, wordEnd);
                             break;
@@ -2000,6 +2131,7 @@ namespace SmarTTY.CodeEditing
                             AddKeywordPair(text, first, wordEnd, PairConditional, false, ref last, sink);
                             break;
                         case "endef":
+                            state &= ~StMakeDefine;
                             AddKeywordPair(text, first, wordEnd, PairDefineBlock, false, ref last, sink);
                             break;
                         default:
@@ -2010,7 +2142,7 @@ namespace SmarTTY.CodeEditing
                     last = wordEnd;
                     i = wordEnd;
                 }
-                else
+                else if (!inDefine)
                 {
                     // "VAR = value", "VAR := value", "VAR ?= value" and "target: deps".
                     int j = first;
@@ -2057,6 +2189,12 @@ namespace SmarTTY.CodeEditing
                             }
                         }
                         string name = text.Substring(first, keyEnd - first);
+                        if (keyEnd > first && !assignment)
+                        {
+                            // The recipe lines below the rule fold.
+                            pendingOpener = PairMakeRule;
+                            state |= StMakeRule;
+                        }
                         if (keyEnd > first && name.IndexOf('$') < 0)
                         {
                             Normal(ref last, last, first, sink);
@@ -2076,7 +2214,7 @@ namespace SmarTTY.CodeEditing
                 {
                     if (pendingOpener != 0)
                     {
-                        AddEndOfLineOpener(text, i, pendingOpener, sink);
+                        AddEndOfLineOpener(text, i, pendingOpener, sink, (pendingOpener == PairMakeRule) ? ExclusiveBlockRegion : null);
                         pendingOpener = 0;
                     }
                     Normal(ref last, last, i, sink);
@@ -2117,9 +2255,225 @@ namespace SmarTTY.CodeEditing
 
             if (pendingOpener != 0)
             {
-                AddEndOfLineOpener(text, len, pendingOpener, sink);
+                AddEndOfLineOpener(text, len, pendingOpener, sink, (pendingOpener == PairMakeRule) ? ExclusiveBlockRegion : null);
             }
             Normal(ref last, last, len, sink);
+            return true;
+        }
+
+        // ==================================================================
+        // Blocks that follow the indentation (Python, YAML) and blocks that end at the next header
+        // ==================================================================
+
+        private const int PairIndentBlock = 11;  // Python def/class/if..., YAML "key:" and "- item"
+        private const int PairMakeRule = 12;     // Makefile "target:" with its recipe
+
+        /// <summary>
+        /// The fold of a block that has no closing keyword: its closing token is a zero-width token at the start of the
+        /// first line after the block, and that line stays visible: "def f(x):..." / "config interface 'lan'...".
+        /// </summary>
+        private static readonly TokenCache.RegionStyle ExclusiveBlockRegion = new TokenCache.RegionStyle(
+            TokenCache.RegionStyle.FoldBoundary.TokenEnd, TokenCache.RegionStyle.FoldBoundary.TokenEnd, unusedFlag: false,
+            TokenCache.RegionStyle.LabelSource.FixedText, "...", openingOnNextLine: false, trailingBlankLines: 0,
+            endsBeforeClosingLine: true);
+
+        /// <summary>The width of the indentation of a line in columns; a tab counts as 4.</summary>
+        private static int IndentColumns(string text, int firstNonBlank)
+        {
+            int columns = 0;
+            for (int i = 0; i < firstNonBlank; i++)
+            {
+                columns += (text[i] == '\t') ? 4 : 1;
+            }
+            return columns;
+        }
+
+        /// <summary>The indentation of the innermost of <paramref name="count"/> open blocks; every block stores its increase in 4 bits.</summary>
+        private static int IndentLevelSum(int levels, int count, int deltaMask)
+        {
+            int sum = 0;
+            for (int level = 0; level < count && level < 8; level++)
+            {
+                sum += (levels >> (4 * level)) & deltaMask;
+            }
+            return sum;
+        }
+
+        private const int PyMaxLevels = 5;
+        private const int StPyStringMask = 0x03;
+        private const int PyDepthShift = 2;     // 3 bits
+        private const int PyBracketShift = 5;   // 2 bits
+        private const int PyHeaderShift = 7;    // 5 bits
+        private const int PyLevelShift = 12;    // 5 levels of 4 bits
+
+        private static readonly HashSet<string> PyBlockKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "def", "class", "if", "elif", "else", "for", "while", "try", "except", "finally", "with", "async", "match", "case"
+        };
+
+        /// <summary>Whether the statement that starts at index starts with a keyword that opens a block.</summary>
+        private static bool IsPythonBlockHeader(string text, int index)
+        {
+            int end = index;
+            while (end < text.Length && IsIdChar(text[end]))
+            {
+                end++;
+            }
+            return end > index && PyBlockKeywords.Contains(text.Substring(index, end - index));
+        }
+
+        // YAML line state: bits 0-2 - open blocks (up to 6), then 4 bits per block:
+        // bits 0-2 the increase of the indentation, bit 3 - the block is a "key:" (a list may sit at the same indentation).
+        private const int YamlMaxLevels = 6;
+        private const int YamlLevelShift = 3;
+
+        /// <summary>The end of the code of a YAML line (the comment and the blanks before it are not included).</summary>
+        private static int YamlCodeEnd(string text, int first)
+        {
+            char quote = '\0';
+            int end = text.Length;
+            for (int i = first; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (quote != '\0')
+                {
+                    if (c == '\\' && quote == '"')
+                    {
+                        i++;
+                    }
+                    else if (c == quote)
+                    {
+                        quote = '\0';
+                    }
+                }
+                else if ((c == '"' || c == '\'') && (i == first || IsBlank(text[i - 1]) || text[i - 1] == ':' || text[i - 1] == '-' || text[i - 1] == '[' || text[i - 1] == '{' || text[i - 1] == ','))
+                {
+                    quote = c;
+                }
+                else if (c == '#' && (i == first || IsBlank(text[i - 1])))
+                {
+                    end = i;
+                    break;
+                }
+            }
+            while (end > first && IsBlank(text[end - 1]))
+            {
+                end--;
+            }
+            return end;
+        }
+
+        /// <summary>Whether the text contains "key:" (a colon followed by a blank or the end) outside quotes.</summary>
+        private static bool HasYamlKey(string code, int start)
+        {
+            char quote = '\0';
+            for (int i = start; i < code.Length; i++)
+            {
+                char c = code[i];
+                if (quote != '\0')
+                {
+                    if (c == quote)
+                    {
+                        quote = '\0';
+                    }
+                }
+                else if (c == '"' || c == '\'')
+                {
+                    quote = c;
+                }
+                else if (c == ':' && (i + 1 == code.Length || IsBlank(code[i + 1])))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>"key: |", "key: >-", "- |2": the text of a block scalar follows on the next lines.</summary>
+        private static bool IsYamlBlockScalarHeader(string code)
+        {
+            int space = code.LastIndexOf(' ');
+            int wordStart = space + 1;
+            if (wordStart >= code.Length || (code[wordStart] != '|' && code[wordStart] != '>'))
+            {
+                return false;
+            }
+            for (int i = wordStart + 1; i < code.Length; i++)
+            {
+                if (code[i] != '+' && code[i] != '-' && !IsDigit(code[i]))
+                {
+                    return false;
+                }
+            }
+            string before = code.Substring(0, Math.Max(0, space)).TrimEnd();
+            return before.EndsWith(":", StringComparison.Ordinal) || before == "-";
+        }
+
+        /// <summary>YAML: the colors of the config tokenizer, and a fold for every "key:", "- key: value" and block scalar.</summary>
+        private static bool TokenizeYaml(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int len = text.Length;
+            int depth = startState & 7;
+            int levels = (startState >> YamlLevelShift) & 0xFFFFFF;
+            LineBuffer buffer = new LineBuffer(sink);
+            int first = SkipBlanks(text, 0);
+            bool code = first < len && text[first] != '#';
+
+            int codeEnd = len;
+            bool isItem = false;
+            if (code)
+            {
+                int indent = IndentColumns(text, first);
+                isItem = text[first] == '-' && (first + 1 == len || IsBlank(text[first + 1]));
+                // The blocks indented as deep or deeper than this line end here; a list at the indentation of its "key:" belongs to the key.
+                while (depth > 0)
+                {
+                    int cumulative = IndentLevelSum(levels, depth, 0x7);
+                    if (cumulative < indent)
+                    {
+                        break;
+                    }
+                    bool keyBlock = ((levels >> (4 * (depth - 1))) & 8) != 0;
+                    if (isItem && keyBlock && cumulative == indent)
+                    {
+                        break;
+                    }
+                    buffer.AddPairedToken(TypeNormal, 0, 0, PairIndentBlock, false, null);
+                    levels &= ~(0xF << (4 * (depth - 1)));
+                    depth--;
+                }
+            }
+
+            TokenizeConfig(0, text, buffer, out int ignored);
+
+            if (code)
+            {
+                codeEnd = YamlCodeEnd(text, first);
+                string statement = text.Substring(first, codeEnd - first);
+                bool endsWithColon = statement.EndsWith(":", StringComparison.Ordinal);
+                bool opensBlock = endsWithColon || IsYamlBlockScalarHeader(statement) || (isItem && HasYamlKey(statement, 1));
+                if (opensBlock && depth < YamlMaxLevels)
+                {
+                    int indent = IndentColumns(text, first);
+                    int cumulative = IndentLevelSum(levels, depth, 0x7);
+                    int delta = Math.Max(0, Math.Min(7, indent - cumulative));
+                    int flag = (endsWithColon && !isItem) ? 8 : 0;
+                    levels |= (delta | flag) << (4 * depth);
+                    depth++;
+                    buffer.InsertPairedToken(codeEnd, PairIndentBlock, true, ExclusiveBlockRegion);
+                }
+            }
+
+            buffer.Flush(-1, -2);
+            if (sink.IsLastLine)
+            {
+                for (; depth > 0; depth--)
+                {
+                    sink.AddPairedToken(TypeNormal, len, len, PairIndentBlock, false, null);
+                    levels &= ~(0xF << (4 * (depth - 1)));
+                }
+            }
+            endState = depth | (levels << YamlLevelShift);
             return true;
         }
 
@@ -2134,99 +2488,103 @@ namespace SmarTTY.CodeEditing
         {
             int len = text.Length;
             int first = SkipBlanks(text, 0);
-            endState = startState & StUciInBlock;
-
-            if (first == len)
+            bool inBlock = (startState & StUciInBlock) != 0;
+            string word = null;
+            int wordEnd = first;
+            if (first < len && text[first] != '#')
             {
-                if (endState != 0)
+                while (wordEnd < len && !IsBlank(text[wordEnd]))
                 {
-                    // A blank line closes the block: "config interface 'lan'...".
-                    sink.AddPairedToken(TypeNormal, 0, 0, PairConfigBlock, false, null);
-                    endState = 0;
+                    wordEnd++;
                 }
-                return true;
+                word = text.Substring(first, wordEnd - first);
+            }
+            bool isConfig = word == "config";
+            bool isStatement = isConfig || word == "option" || word == "list" || word == "package";
+
+            // A blank line, the next "config" or "package" ends the block that is open: it stays visible below "config x...".
+            if (inBlock && (first == len || isConfig || word == "package"))
+            {
+                sink.AddPairedToken(TypeNormal, 0, 0, PairConfigBlock, false, null);
+                inBlock = false;
             }
 
-            if (text[first] == '#')
+            if (isStatement)
+            {
+                int last = 0;
+                Normal(ref last, last, first, sink);
+                sink.AddToken(TypeKeyword, first, wordEnd);
+                last = wordEnd;
+
+                // Arguments: "config <type> [name]", "option <name> <value>", "list <name> <value>".
+                int i = SkipBlanks(text, wordEnd);
+                int argument = 0;
+                while (i < len)
+                {
+                    char c = text[i];
+                    if (c == '#')
+                    {
+                        break;
+                    }
+                    int s = i;
+                    int e;
+                    if (c == '"' || c == '\'')
+                    {
+                        int close = FindQuoteEnd(text, i, c);
+                        e = (close < 0) ? len : close;
+                    }
+                    else
+                    {
+                        e = i;
+                        while (e < len && !IsBlank(text[e]))
+                        {
+                            e++;
+                        }
+                    }
+                    string value = text.Substring(s, e - s);
+                    int type;
+                    if (argument == 0 && word != "package")
+                    {
+                        type = isConfig ? TypeSection : TypeVariable;
+                    }
+                    else if (c == '"' || c == '\'')
+                    {
+                        type = TypeString;
+                    }
+                    else
+                    {
+                        long number;
+                        type = long.TryParse(value, out number) ? TypeNumber : TypeString;
+                    }
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(type, s, e);
+                    last = e;
+                    argument++;
+                    i = SkipBlanks(text, e);
+                }
+
+                if (isConfig)
+                {
+                    AddEndOfLineOpener(text, (i < len) ? i : len, PairConfigBlock, sink, ExclusiveBlockRegion);
+                    inBlock = true;
+                }
+                if (i < len)
+                {
+                    sink.AddToken(TypeComment, i, len);
+                }
+            }
+            else if (first < len && text[first] == '#')
             {
                 sink.AddToken(TypeComment, first, len);
-                return true;
             }
 
-            int wordEnd = first;
-            while (wordEnd < len && !IsBlank(text[wordEnd]))
+            // The end of the document ends the block too.
+            if (inBlock && sink.IsLastLine)
             {
-                wordEnd++;
+                sink.AddPairedToken(TypeNormal, len, len, PairConfigBlock, false, null);
+                inBlock = false;
             }
-            string word = text.Substring(first, wordEnd - first);
-            bool isConfig = word == "config";
-            if (!isConfig && word != "option" && word != "list" && word != "package")
-            {
-                return true;    // not UCI: leave the line plain
-            }
-
-            int last = 0;
-            Normal(ref last, last, first, sink);
-            sink.AddToken(TypeKeyword, first, wordEnd);
-            last = wordEnd;
-
-            // Arguments: "config <type> [name]", "option <name> <value>", "list <name> <value>".
-            int i = SkipBlanks(text, wordEnd);
-            int argument = 0;
-            while (i < len)
-            {
-                char c = text[i];
-                if (c == '#')
-                {
-                    break;
-                }
-                int s = i;
-                int e;
-                if (c == '"' || c == '\'')
-                {
-                    int close = FindQuoteEnd(text, i, c);
-                    e = (close < 0) ? len : close;
-                }
-                else
-                {
-                    e = i;
-                    while (e < len && !IsBlank(text[e]))
-                    {
-                        e++;
-                    }
-                }
-                string value = text.Substring(s, e - s);
-                int type;
-                if (argument == 0 && word != "package")
-                {
-                    type = isConfig ? TypeSection : TypeVariable;
-                }
-                else if (c == '"' || c == '\'')
-                {
-                    type = TypeString;
-                }
-                else
-                {
-                    long number;
-                    type = long.TryParse(value, out number) ? TypeNumber : TypeString;
-                }
-                Normal(ref last, last, s, sink);
-                sink.AddToken(type, s, e);
-                last = e;
-                argument++;
-                i = SkipBlanks(text, e);
-            }
-
-            if (isConfig)
-            {
-                // The block starts here; an earlier block without a blank line in between stays unfoldable.
-                AddEndOfLineOpener(text, (i < len) ? i : len, PairConfigBlock, sink);
-                endState = StUciInBlock;
-            }
-            if (i < len)
-            {
-                sink.AddToken(TypeComment, i, len);
-            }
+            endState = inBlock ? StUciInBlock : 0;
             return true;
         }
     }
