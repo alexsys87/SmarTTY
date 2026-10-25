@@ -381,6 +381,9 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             throw new RemoteOperationException("Failed to query home directory. Please try disabling virtual mode.");
         }
+        // The horizontal scroll bar sits right under the terminal: leave a few rows free so that selecting the last lines
+        // for copying does not end up on it (touching it dropped the selection).
+        BottomGapRows = 3;
         UpdateTitle();
         TerminalSizeChanged += OnTerminalSizeChanged;
         base.DataEntered += OnDataEntered;
