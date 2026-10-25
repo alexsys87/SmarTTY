@@ -133,7 +133,8 @@ public class TokenCache
         {
             if (this._acceptsTokens)
             {
-                if (start >= end)
+                // A zero-width token is allowed: it marks a position (the end of a block header line).
+                if (start > end)
                 {
                     throw new ArgumentException();
                 }

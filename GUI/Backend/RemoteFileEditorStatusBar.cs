@@ -1,3 +1,4 @@
+using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
@@ -33,23 +34,28 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
 
     private readonly Button _lineEndingButton;
 
+    private readonly Button _syntaxButton;
+
     public RemoteFileEditorStatusBar(RemoteFileEditor editor, RemoteFileEditorPanel panel)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _panel = panel ?? throw new ArgumentNullException(nameof(panel));
         _encodingButton = CreateMenuButton(ShowEncodingMenu);
         _lineEndingButton = CreateMenuButton(ShowLineEndingMenu);
+        _syntaxButton = CreateMenuButton(ShowSyntaxMenu);
         _selectionItem = CreateItem(_selection, Dock.Right);
 
         // A DockPanel fills the last item and stacks the others from the right: the first one added is the rightmost.
         Items.Add(CreateItem(_lineEndingButton, Dock.Right));
         Items.Add(CreateItem(_encodingButton, Dock.Right));
+        Items.Add(CreateItem(_syntaxButton, Dock.Right));
         Items.Add(_selectionItem);
         Items.Add(CreateItem(_position, Dock.Right));
         Items.Add(CreateItem(_state, Dock.Right));
         Items.Add(new StatusBarItem { Content = _path });
 
         panel.StateChanged += (sender, e) => Update();
+        editor.CurrentLanguageChanged += (sender, e) => Update();
         Update();
     }
 
@@ -120,6 +126,14 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
             ? "UTF-8 with a byte order mark: it breaks a script that starts with #!. Choose UTF-8 in this menu to save without it."
             : "Encoding of the file: choose how it is saved, or read it again in another encoding";
         _encodingButton.IsEnabled = !loading;
+
+        SyntaxHighlighting.Language language = _editor.CurrentLanguage;
+        bool automatic = _editor.SyntaxOverride == null;
+        _syntaxButton.Content = SyntaxHighlighting.GetDisplayName(language);
+        _syntaxButton.ToolTip = automatic
+            ? "Syntax highlighting, detected from the file name and the #! line: click to choose another"
+            : "Syntax highlighting, chosen by hand: click to change it or to detect it automatically";
+        _syntaxButton.FontStyle = automatic ? FontStyles.Normal : FontStyles.Italic;
 
         LineEndingKind lineEndings = _editor.LineEndings;
         _lineEndingButton.Content = LineEndingDetector.GetName(lineEndings);
@@ -201,6 +215,41 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
                 {
                     _editor.ReopenWithEncoding(chosen);
                 }
+                _editor.Focus();
+            };
+            menu.Items.Add(item);
+        }
+        OpenMenu(button, menu);
+    }
+
+    private void ShowSyntaxMenu(Button button)
+    {
+        ContextMenu menu = new ContextMenu();
+        menu.Items.Add(CreateHeader("Syntax highlighting"));
+        SyntaxHighlighting.Language detected = SyntaxHighlighting.DetectLanguage(_editor.RemotePath, _editor.EditableDocument?.GetLineText(0));
+        MenuItem automatic = new MenuItem
+        {
+            Header = "Detect automatically (" + SyntaxHighlighting.GetDisplayName(detected) + ")",
+            IsChecked = _editor.SyntaxOverride == null
+        };
+        automatic.Click += (sender, e) =>
+        {
+            _editor.SetSyntax(null);
+            _editor.Focus();
+        };
+        menu.Items.Add(automatic);
+        menu.Items.Add(new Separator());
+        foreach (SyntaxHighlighting.Language language in SyntaxHighlighting.SelectableLanguages)
+        {
+            SyntaxHighlighting.Language chosen = language;
+            MenuItem item = new MenuItem
+            {
+                Header = SyntaxHighlighting.GetDisplayName(language),
+                IsChecked = _editor.SyntaxOverride == language
+            };
+            item.Click += (sender, e) =>
+            {
+                _editor.SetSyntax(chosen);
                 _editor.Focus();
             };
             menu.Items.Add(item);
