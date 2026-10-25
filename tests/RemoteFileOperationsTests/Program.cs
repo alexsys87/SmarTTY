@@ -581,9 +581,24 @@ internal static class Program
         return result;
     }
 
+    // The POSIX file mode (CA1416): this harness runs the commands of the remote shell on this machine, so it only
+    // ever runs on Unix, and the guard is what tells the analyzer that.
     private static int Mode(string path)
     {
+        if (OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException("the file mode checks need a POSIX file system");
+        }
         return (int)File.GetUnixFileMode(path);
+    }
+
+    private static void SetMode(string path, int mode)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException("the file mode checks need a POSIX file system");
+        }
+        File.SetUnixFileMode(path, (UnixFileMode)mode);
     }
 
     private static int Octal(string digits)
@@ -634,7 +649,7 @@ internal static class Program
         string name = "it's a $file";
         string file = Path.Combine(root, name);
         File.WriteAllText(file, "data");
-        File.SetUnixFileMode(file, (UnixFileMode)Octal("644"));
+        SetMode(file, Octal("644"));
         Equal(RunAll(RemoteFileOperations.ChmodCommands(new[] { file }, "+x", ChmodScope.Selected), out string errors), 0, _shell + ": chmod +x" + errors);
         Check((Mode(file) & Octal("111")) != 0 && (Mode(file) & Octal("600")) == Octal("600"), "chmod +x makes the file executable and keeps the rest");
 
@@ -649,11 +664,11 @@ internal static class Program
         {
             foreach (string path in new[] { tree, sub })
             {
-                File.SetUnixFileMode(path, (UnixFileMode)Octal("775"));
+                SetMode(path, Octal("775"));
             }
             foreach (string path in new[] { top, inner })
             {
-                File.SetUnixFileMode(path, (UnixFileMode)Octal("664"));
+                SetMode(path, Octal("664"));
             }
         }
 
