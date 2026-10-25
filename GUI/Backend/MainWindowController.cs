@@ -302,23 +302,23 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 SessionWrapper activeSession = RequireSshSession("Opening remote files");
                 tabWithCurrentDir = tabWithCurrentDir ?? activeSession.ActiveTab;
-                RemoteOpenFileDialog remoteOpenFileDialog = activeSession.CreateRemoteOpenFileDialog();
+                RemoteOpenFileWindow remoteOpenFileWindow = activeSession.CreateRemoteOpenFileDialog();
                 // A name that does not exist yet opens an empty editor that creates the file on save.
-                remoteOpenFileDialog.AllowNewFile = true;
+                remoteOpenFileWindow.AllowNewFile = true;
                 string text = activeSession.TryExtractCurrentDir(tabWithCurrentDir) ?? activeSession.LastDownloadDir;
                 if ((tabWithCurrentDir as NormalTabContext)?.Terminal is SshTerminalControl sshTerminalControl)
                 {
-                    remoteOpenFileDialog.InitialDirectory = sshTerminalControl.CurrentDirectory;
+                    remoteOpenFileWindow.InitialDirectory = sshTerminalControl.CurrentDirectory;
                 }
                 else if (text == activeSession.CurrentDirDuringLastOpen && !string.IsNullOrEmpty(activeSession.LastUsedOpenDir))
                 {
-                    remoteOpenFileDialog.InitialDirectory = activeSession.LastUsedOpenDir;
+                    remoteOpenFileWindow.InitialDirectory = activeSession.LastUsedOpenDir;
                 }
                 else
                 {
-                    remoteOpenFileDialog.InitialDirectory = text;
+                    remoteOpenFileWindow.InitialDirectory = text;
                 }
-                string selectedPath = remoteOpenFileDialog.ShowDialog();
+                string selectedPath = remoteOpenFileWindow.PickPath();
                 if (selectedPath != null)
                 {
                     activeSession.LastUsedOpenDir = RemotePathUtils.GetDirectoryName(selectedPath);
@@ -609,10 +609,13 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm(RequireSshSession("Directory transfer").Session, isUpload: false);
-                directoryTransferForm.LocalDirectory = _Controller.Settings.DefaultDownloadDirectory;
-                directoryTransferForm.FormClosed += Frm_FormClosed;
-                directoryTransferForm.Show();
+                DirectoryTransferWindow window = new DirectoryTransferWindow(RequireSshSession("Directory transfer").Session, isUpload: false)
+                {
+                    LocalDirectory = _Controller.Settings.DefaultDownloadDirectory
+                };
+                window.Closed += Frm_FormClosed;
+                WindowOwnership.Attach(window, _Controller._Window);
+                window.Show();
             }
             catch (Exception exception)
             {
@@ -620,16 +623,16 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
-        private void Frm_FormClosed(object sender, FormClosedEventArgs e)
+        private void Frm_FormClosed(object sender, EventArgs e)
         {
-            DirectoryTransferForm directoryTransferForm = (DirectoryTransferForm)sender;
-            if (directoryTransferForm.IsUpload)
+            DirectoryTransferWindow window = (DirectoryTransferWindow)sender;
+            if (window.IsUpload)
             {
-                _Controller.Settings.DefaultUploadDirectory = directoryTransferForm.RemoteDirectory;
+                _Controller.Settings.DefaultUploadDirectory = window.RemoteDirectory;
             }
             else
             {
-                _Controller.Settings.DefaultDownloadDirectory = directoryTransferForm.LocalDirectory;
+                _Controller.Settings.DefaultDownloadDirectory = window.LocalDirectory;
             }
             _Controller.Settings.Save();
         }
@@ -638,10 +641,13 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm(RequireSshSession("Directory transfer").Session, isUpload: true);
-                directoryTransferForm.RemoteDirectory = _Controller.Settings.DefaultUploadDirectory;
-                directoryTransferForm.FormClosed += Frm_FormClosed;
-                directoryTransferForm.Show();
+                DirectoryTransferWindow window = new DirectoryTransferWindow(RequireSshSession("Directory transfer").Session, isUpload: true)
+                {
+                    RemoteDirectory = _Controller.Settings.DefaultUploadDirectory
+                };
+                window.Closed += Frm_FormClosed;
+                WindowOwnership.Attach(window, _Controller._Window);
+                window.Show();
             }
             catch (Exception exception)
             {
@@ -656,7 +662,7 @@ public class MainWindowController : INotifyPropertyChanged
                 SessionWrapper activeSession = RequireSshSession("File transfer");
                 if (fn == null)
                 {
-                    fn = activeSession.CreateRemoteOpenFileDialog().ShowDialog();
+                    fn = activeSession.CreateRemoteOpenFileDialog().PickPath();
                     if (fn == null)
                     {
                         return;

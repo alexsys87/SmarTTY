@@ -1617,18 +1617,19 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// </summary>
     public void ShowDirectoryUploadForm(string localDir, string remoteDir)
     {
-        DirectoryTransferForm directoryTransferForm = new DirectoryTransferForm(Session, isUpload: true)
+        DirectoryTransferWindow window = new DirectoryTransferWindow(Session, isUpload: true)
         {
             LocalDirectory = localDir,
             RemoteDirectory = remoteDir
         };
         // The new folder shows up in the file panels once the upload window is closed.
-        directoryTransferForm.FormClosed += (object sender, System.Windows.Forms.FormClosedEventArgs e) =>
+        window.Closed += (object sender, EventArgs e) =>
         {
             RefreshFileExplorers(RemotePathUtils.GetDirectoryName(remoteDir.TrimEnd('/')));
             RefreshFileExplorers(remoteDir);
         };
-        directoryTransferForm.Show();
+        WindowOwnership.Attach(window, WindowOwnership.ActiveWindow());
+        window.Show();
     }
 
     public string TryExtractCurrentDir(ITabContext activeTab = null)
@@ -1666,13 +1667,11 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    internal RemoteOpenFileDialog CreateRemoteOpenFileDialog()
+    internal RemoteOpenFileWindow CreateRemoteOpenFileDialog()
     {
-        string text = TryExtractCurrentDir() ?? LastDownloadDir;
-        RemoteOpenFileDialog remoteOpenFileDialog = new RemoteOpenFileDialog();
-        remoteOpenFileDialog.InitialDirectory = text;
-        remoteOpenFileDialog.CommandRequested += ExecuteAsyncCommand;
-        return remoteOpenFileDialog;
+        RemoteOpenFileWindow window = RemoteOpenFileWindow.Create(ExecuteAsyncCommand);
+        window.InitialDirectory = TryExtractCurrentDir() ?? LastDownloadDir;
+        return window;
     }
 
     public void CreateNewTerminalPage(bool virtualMode = false, InitialCommand command = default(InitialCommand), string initialDirForVirtualMode = null)

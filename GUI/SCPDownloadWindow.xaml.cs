@@ -1,4 +1,3 @@
-using SmarTTY.Forms;
 using SmarTTY.IO;
 using System;
 using System.Windows;
@@ -10,7 +9,7 @@ namespace SmarTTY.GUI;
 /// </summary>
 public partial class SCPDownloadWindow : Window
 {
-    private readonly RemoteOpenFileDialog _remoteFileDialog;
+    private readonly RemoteCommandStarter _callback;
 
     private readonly string _initialDirectory;
 
@@ -53,12 +52,9 @@ public partial class SCPDownloadWindow : Window
     public SCPDownloadWindow(RemoteCommandStarter callback, string initialDirectory, bool showCheckBox)
     {
         InitializeComponent();
-        // The remote file picker is still the WinForms one; it is migrated with the remote-open-file dialog.
-        _remoteFileDialog = new RemoteOpenFileDialog();
-        _remoteFileDialog.CommandRequested += callback;
+        _callback = callback;
         _initialDirectory = initialDirectory;
         OpenLocalDirBox.Visibility = showCheckBox ? Visibility.Visible : Visibility.Collapsed;
-        Closed += (object sender, EventArgs e) => _remoteFileDialog.Dispose();
     }
 
     private void LocalBrowse_Click(object sender, RoutedEventArgs e)
@@ -83,12 +79,8 @@ public partial class SCPDownloadWindow : Window
 
     private void RemoteBrowse_Click(object sender, RoutedEventArgs e)
     {
-        if (RemoteFileBox.Text == "" && _initialDirectory != null)
-        {
-            _remoteFileDialog.InitialDirectory = _initialDirectory;
-        }
-        _remoteFileDialog.FileName = RemoteFileBox.Text;
-        string selected = _remoteFileDialog.ShowDialog();
+        string dirPath = (RemoteFileBox.Text == "" && _initialDirectory != null) ? _initialDirectory : null;
+        string selected = RemoteOpenFileWindow.Browse(_callback, RemoteFileBox.Text, dirPath, allowNewFile: false);
         if (selected != null)
         {
             RemoteFileBox.Text = selected;

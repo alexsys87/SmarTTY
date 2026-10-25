@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.RemoteFolderBrowserWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Browse For Folder" Width="368" Height="360" MinWidth="368" MinHeight="160" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TreeView Grid.Row="0" Name="DirectoryTree" MinHeight="120" SelectedItemChanged="DirectoryTree_SelectedItemChanged" />
+    <StackPanel Grid.Row="1" Name="BusyPanel" Visibility="Collapsed" Margin="0 6 0 0">
+      <ProgressBar Height="18" IsIndeterminate="True" />
+      <DockPanel Margin="0 4 0 0">
+        <Button DockPanel.Dock="Right" Name="BusyCancelButton" Content="Cancel" MinWidth="75" Click="BusyCancel_Click" />
+        <TextBlock Text="Waiting to complete..." VerticalAlignment="Center" Margin="0 0 8 0" />
+      </DockPanel>
+    </StackPanel>
+    <TextBlock Grid.Row="2" Name="ErrorText" Foreground="{DynamicResource Theme.Error}" TextWrapping="Wrap" Visibility="Collapsed" Margin="0 6 0 0" />
+    <DockPanel Grid.Row="3" Margin="0 6 0 0">
+      <TextBlock DockPanel.Dock="Left" Text="Folder:" VerticalAlignment="Center" Margin="0 0 6 0" />
+      <TextBox Name="FolderBox" KeyDown="FolderBox_KeyDown" />
+    </DockPanel>
+    <CheckBox Grid.Row="4" Name="RelativeCheck" Content="Save relatively to project directory" Visibility="Collapsed" Margin="0 6 0 0" />
+    <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 12 0 0">
+      <Button Name="OkButton" Content="OK" IsDefault="True" MinWidth="75" Margin="0 0 5 0" Click="Ok_Click" />
+      <Button Name="CancelButton" Content="Cancel" IsCancel="True" MinWidth="75" />
+    </StackPanel>
+  </Grid>
+</Window>
