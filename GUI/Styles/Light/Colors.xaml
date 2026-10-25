@@ -47,6 +47,12 @@
   <SolidColorBrush x:Key="Theme.Error" Color="#C62828" />
   <SolidColorBrush x:Key="Theme.TextSelection" Color="#3D7BE6" />
 
+  <!-- File list: names coloured by access permissions -->
+  <SolidColorBrush x:Key="Theme.Permission.ReadOnly" Color="#5F646C" />
+  <SolidColorBrush x:Key="Theme.Permission.Executable" Color="#1E7B34" />
+  <SolidColorBrush x:Key="Theme.Permission.SetId" Color="#A84A00" />
+  <SolidColorBrush x:Key="Theme.Permission.WorldWritable" Color="#C62828" />
+
   <!-- Scroll bars -->
   <SolidColorBrush x:Key="Theme.ScrollTrack" Color="Transparent" />
   <SolidColorBrush x:Key="Theme.ScrollThumb" Color="#B9BEC6" />

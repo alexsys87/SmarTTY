@@ -169,6 +169,20 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             }
         }
 
+        /// <summary>What the file list colours the name and the permissions in; see <see cref="RemotePermissions.Classify"/>.</summary>
+        public PermissionHighlight Highlight => RemotePermissions.Classify(Entry.Mode);
+
+        /// <summary>The tooltip of a name: the permissions, with the reason of the colour when there is one.</summary>
+        public string PermissionsToolTip
+        {
+            get
+            {
+                string text = PermissionsText;
+                string reason = RemotePermissions.DescribeHighlight(Highlight);
+                return text == null || reason == null ? text : text + " - " + reason;
+            }
+        }
+
         public ItemWrapper(LsOutputParser.LsEntry item, string baseDir)
         {
             Entry = item;

@@ -47,6 +47,23 @@ internal static class Program
         LsOutputParser.LsEntry setgidDir = LsOutputParser.LsParser.ParseLine("drwxrwsr-x. 2 root staff 4096 2026-10-19 19:30:28.965886611 +0000 shared/");
         Check(setgidDir.Name == "shared" && setgidDir.IsDirectory && RemotePermissions.ParseMode(setgidDir.Mode) == Convert.ToInt32("2775", 8), "mode with a setgid bit and an SELinux dot");
 
+        // The colour of a name by its permissions: the most telling property wins.
+        Check(RemotePermissions.Classify("-rwxr-xr-x") == PermissionHighlight.Executable, "executable file");
+        Check(RemotePermissions.Classify("drwxr-xr-x") == PermissionHighlight.None, "an ordinary folder is not highlighted although it has execute bits");
+        Check(RemotePermissions.Classify("-rw-r--r--") == PermissionHighlight.None, "ordinary file");
+        Check(RemotePermissions.Classify("-r--r--r--") == PermissionHighlight.ReadOnly, "read-only file");
+        Check(RemotePermissions.Classify("dr-xr-xr-x") == PermissionHighlight.ReadOnly, "read-only folder");
+        Check(RemotePermissions.Classify("-rw-rw-rw-") == PermissionHighlight.WorldWritable, "world-writable file");
+        Check(RemotePermissions.Classify("-rwxrwxrwx") == PermissionHighlight.WorldWritable, "world-writable beats executable");
+        Check(RemotePermissions.Classify("drwxrwxrwx") == PermissionHighlight.WorldWritable, "world-writable folder");
+        Check(RemotePermissions.Classify("drwxrwxrwt") == PermissionHighlight.None, "a sticky world-writable folder like /tmp is not highlighted");
+        Check(RemotePermissions.Classify("-rwsr-xr-x") == PermissionHighlight.SetId, "setuid file");
+        Check(RemotePermissions.Classify("drwxrwsr-x.") == PermissionHighlight.SetId, "setgid folder with an SELinux dot");
+        Check(RemotePermissions.Classify("-rwsrwxrwx") == PermissionHighlight.WorldWritable, "world-writable beats setuid");
+        Check(RemotePermissions.Classify("lrwxrwxrwx") == PermissionHighlight.None, "a symlink is never highlighted");
+        Check(RemotePermissions.Classify(null) == PermissionHighlight.None && RemotePermissions.Classify("garbage") == PermissionHighlight.None, "no mode, no colour");
+        Check(RemotePermissions.DescribeHighlight(PermissionHighlight.None) == null && RemotePermissions.DescribeHighlight(PermissionHighlight.SetId) == "setuid or setgid", "colour reasons");
+
         Check(LsOutputParser.LsParser.ParseLine("total 20").Name == null, "total line ignored");
         Check(LsOutputParser.LsParser.ParseLine("").Name == null, "empty line ignored");
 
