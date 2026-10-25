@@ -157,12 +157,26 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
     }
 
+    /// <summary>
+    /// True when the window is being closed to go back to the start window (File > Back to launcher): the application then
+    /// shows the launcher again instead of exiting.
+    /// </summary>
+    public bool ReturnToLauncher { get; private set; }
+
+    private void BackToLauncher_Click(object sender, RoutedEventArgs e)
+    {
+        ReturnToLauncher = true;
+        Close();
+    }
+
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
         // Closing the window used to drop the unsaved changes of open remote file editors silently.
         if (!Controller.ConfirmCloseUnsavedEditors())
         {
             e.Cancel = true;
+            // The user chose to stay: the window is not going back to the launcher after all.
+            ReturnToLauncher = false;
             return;
         }
         base.OnClosing(e);

@@ -45,9 +45,33 @@ public partial class App : Application
         RemoteFileEditor.SudoConfirmationPrompt = (channel, promptText) =>
             SudoConfirmationWindow.Show(WindowOwnership.ActiveWindow(), channel, promptText);
 
-        ConnectionSelectionWindow connectionSelectionWindow = new ConnectionSelectionWindow(showRawConnections: true, e.Args.FirstOrDefault());
+        ShowLauncher(e.Args.FirstOrDefault());
+    }
+
+    /// <summary>
+    /// Shows the start window with the list of connections. What it does when it is closed depends on what was chosen:
+    /// the main window opens, or the application exits when nothing was chosen.
+    /// </summary>
+    private static void ShowLauncher(string defaultItemNameOrCmdLine)
+    {
+        ConnectionSelectionWindow connectionSelectionWindow = new ConnectionSelectionWindow(showRawConnections: true, defaultItemNameOrCmdLine);
         connectionSelectionWindow.Closed += OnSelectionWindowClosed;
         connectionSelectionWindow.Show();
+    }
+
+    // The application ends with the main window, unless it was closed by File > Back to launcher.
+    private static void ExitWithMainWindow(MainWindow mainWindow)
+    {
+        mainWindow.Closed += (object sender, EventArgs e) =>
+        {
+            if (!mainWindow.ReturnToLauncher)
+            {
+                Application.Current.Shutdown();
+                return;
+            }
+            // Later, not from the Closed event: the window is still being disposed and its preferences saved there.
+            Application.Current.Dispatcher.BeginInvoke((Action)(() => ShowLauncher(null)));
+        };
     }
 
     // Creates CommandCompletions.xml next to the exe on startup if it is missing.
@@ -72,10 +96,7 @@ public partial class App : Application
         {
             MainWindow mainWindow = new MainWindow(connectionSelectionWindow.Controller.CreatedSession, connectionSelectionWindow.Controller.SelectedSettings, connectionSelectionWindow.Controller.Job?.Command, connectionSelectionWindow.Controller.Job?.EchoInitialCommand ?? false);
             mainWindow.Show();
-            mainWindow.Closed += (object _, EventArgs e) =>
-            {
-                Application.Current.Shutdown();
-            };
+            ExitWithMainWindow(mainWindow);
         }
         else if (connectionSelectionWindow.Controller.PendingRawConnectionSettings != null)
         {
@@ -83,10 +104,7 @@ public partial class App : Application
             // any SSH sessions that are added later, instead of in a separate window of its own.
             MainWindow rawWindow = new MainWindow(connectionSelectionWindow.Controller.PendingRawConnectionSettings);
             rawWindow.Show();
-            rawWindow.Closed += (object closedSender, EventArgs closedArgs) =>
-            {
-                Application.Current.Shutdown();
-            };
+            ExitWithMainWindow(rawWindow);
         }
         else
         {
