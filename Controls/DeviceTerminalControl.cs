@@ -49,6 +49,14 @@ public partial class DeviceTerminalControl : DpiAwareControl
     // protocol and typing, pasting and sending from the toolbar are refused so nothing else gets into the data stream.
     private volatile bool _isXModemActive;
 
+    // The connection that a running transfer belongs to (set together with _isXModemActive). The protocol writes to it and
+    // reads only its data: after a reconnect the new session is not part of the transfer - it must neither get the resent
+    // packets nor have its output swallowed by the protocol.
+    private volatile AsyncTransportConnection _lineOwner;
+
+    // Cancels the running transfer (its window's token); called when the connection is replaced.
+    private volatile Action _cancelLineTransfer;
+
     // Continuous log of received data; null while not recording.
     private TerminalLogWriter _logWriter;
 
@@ -883,6 +891,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
             _reconnectPolicy.Reset();
         }
         int connectTimeoutMs = value;
+        // A transfer belongs to the connection that is being replaced: stop it instead of letting it wait for retries that
+        // would go to the new session.
+        _cancelLineTransfer?.Invoke();
         if (_asyncTransportConnection != null)
         {
             // Closing waits for the port to be released; if the driver still holds it for a moment, the new connection
@@ -937,10 +948,20 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// </summary>
     private bool SendToDevice(byte[] buffer, int count, Action<bool> completed = null)
     {
-        AsyncTransportConnection connection = _asyncTransportConnection;
+        return SendToConnection(_asyncTransportConnection, buffer, count, completed);
+    }
+
+    /// <summary>As <see cref="SendToDevice"/>, but to the given connection: a transfer must not follow a reconnect to the new session.</summary>
+    private bool SendToConnection(AsyncTransportConnection connection, byte[] buffer, int count, Action<bool> completed = null)
+    {
         if (connection == null)
         {
             throw new InvalidOperationException("The connection is closed. Use Reconnect first.");
+        }
+        if (!ReferenceEquals(connection, _asyncTransportConnection))
+        {
+            // The connection was replaced (reconnect): the data belongs to a session that no longer exists.
+            return false;
         }
         // A connection that has already ended drops the data; the toolbar says it is closed.
         if (!connection.Send(buffer, count, completed))
@@ -1180,7 +1201,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         Interlocked.Add(ref _bytesReceived, value);
         _consoleTap?.Invoke(buffer, value);
-        if (_isXModemActive)
+        // Only what the transfer's own connection sends belongs to the protocol; the output of a newer session (banner,
+        // login prompt) is shown as usual.
+        if (_isXModemActive && ReferenceEquals(sender, _lineOwner))
         {
             for (int i = 0; i < value; i++)
             {
@@ -1295,6 +1318,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // Claim the line only after the window is up (a failing Show must not leave the terminal locked). Stale bytes
         // (a prompt, echo) must not be mistaken for the peer's first answer.
         while (_xmodemRxQueue.TryTake(out _)) { }
+        AsyncTransportConnection owner = _asyncTransportConnection;
+        _lineOwner = owner;
+        _cancelLineTransfer = transferForm.Cancel;
         _isXModemActive = true;
 
         // The callback parameter must not be called "_": a lone "_" parameter is an ordinary variable, so the
@@ -1311,7 +1337,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 {
                     // Writes are queued, so a failure of an earlier one is only known now: end the transfer with its reason
                     // instead of letting it wait for answers that cannot come.
-                    string writeError = _asyncTransportConnection?.WriteError;
+                    string writeError = owner?.WriteError;
                     if (writeError != null)
                     {
                         throw new IOException(writeError);
@@ -1319,7 +1345,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     lock (queueGate)
                     {
                         // Wait for the line to catch up; a cancel or an ended connection ends the wait (the caller notices them).
-                        while (queuedBytes > MaxQueuedTransferBytes && !transferForm.IsCancelled && _asyncTransportConnection?.HasEnded == false)
+                        while (queuedBytes > MaxQueuedTransferBytes && !transferForm.IsCancelled && owner?.HasEnded == false)
                         {
                             Monitor.Wait(queueGate, 100);
                         }
@@ -1331,7 +1357,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     {
                         byte[] copy = new byte[length];
                         Array.Copy(data, offset, copy, 0, length);
-                        queued = SendToDevice(copy, length, written =>
+                        queued = SendToConnection(owner, copy, length, written =>
                         {
                             lock (queueGate)
                             {
@@ -1369,6 +1395,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
             finally
             {
                 _isXModemActive = false;
+                _lineOwner = null;
+                _cancelLineTransfer = null;
                 while (_xmodemRxQueue.TryTake(out _)) { } // Clear leftovers
             }
 

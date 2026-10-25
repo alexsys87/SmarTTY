@@ -1,5 +1,6 @@
 using SmarTTY.Forms;
 using SmarTTY.IO;
+using SmarTTY.Transport;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -115,6 +116,7 @@ public partial class DeviceTerminalControl
             return false;
         }
         while (_xmodemRxQueue.TryTake(out _)) { }
+        _lineOwner = _asyncTransportConnection;
         _isXModemActive = true;
         for (int i = start; i < count; i++)
         {
@@ -140,20 +142,29 @@ public partial class DeviceTerminalControl
             ReleaseZModemLine();
             return;
         }
+        AsyncTransportConnection owner = _lineOwner;
         string folder = ChooseZModemFolder("The device wants to send files via ZMODEM." + Environment.NewLine
             + "Choose the folder to save them in, or press Cancel to refuse.");
         if (folder == null)
         {
-            // Tell the sender to give up, and drop what it has sent in the meantime.
+            // Tell the sender to give up, and drop what it has sent in the meantime. The dialog pumps messages, so a
+            // reconnect may have put a new connection in place: never send the cancel bytes to that new session.
             try
             {
                 byte[] cancel = { 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08 };
-                SendToDevice(cancel, cancel.Length);
+                SendToConnection(owner, cancel, cancel.Length);
             }
             catch (InvalidOperationException)
             {
                 // The connection is already gone.
             }
+            ReleaseZModemLine();
+            return;
+        }
+        // The dialog pumps messages, so the connection that asked for the files may have been replaced while the user
+        // was choosing a folder: the queued bytes belong to the old session and the transfer must not start on the new one.
+        if (!ReferenceEquals(owner, _asyncTransportConnection) || _connectionState != ConnectionStateEnum.Connected)
+        {
             ReleaseZModemLine();
             return;
         }
@@ -194,6 +205,8 @@ public partial class DeviceTerminalControl
     private void ReleaseZModemLine()
     {
         _isXModemActive = false;
+        _lineOwner = null;
+        _cancelLineTransfer = null;
         while (_xmodemRxQueue.TryTake(out _)) { }
         _zmodemTail = new byte[0];
         _zmodemIgnoreUntil = Environment.TickCount + 3000;
@@ -202,17 +215,20 @@ public partial class DeviceTerminalControl
 
     private ZModemTransfer.SendDataHandler CreateZModemSendHandler()
     {
+        // The connection the transfer started on (the line is claimed before this is called): never the one that a
+        // reconnect puts in its place.
+        AsyncTransportConnection owner = _lineOwner ?? _asyncTransportConnection;
         return (data, offset, length) =>
         {
             // Writes are queued, so a failure of an earlier one is only known now: end the transfer with its reason.
-            string writeError = _asyncTransportConnection?.WriteError;
+            string writeError = owner?.WriteError;
             if (writeError != null)
             {
                 throw new IOException(writeError);
             }
             byte[] copy = new byte[length];
             Array.Copy(data, offset, copy, 0, length);
-            if (!SendToDevice(copy, length))
+            if (!SendToConnection(owner, copy, length))
             {
                 throw new IOException("The connection is closed.");
             }
@@ -240,6 +256,7 @@ public partial class DeviceTerminalControl
         }
         // Claim the line before the first byte can arrive; stale bytes (a prompt, echo) must not reach the protocol.
         while (_xmodemRxQueue.TryTake(out _)) { }
+        _lineOwner = _asyncTransportConnection;
         _isXModemActive = true;
         RunZModemReceive(folder);
     }
@@ -258,6 +275,7 @@ public partial class DeviceTerminalControl
             ReleaseZModemLine();
             throw;
         }
+        _cancelLineTransfer = transferForm.Cancel;
 
         ZModemOptions options = new ZModemOptions { EscapeControlCharacters = escapeZModemControlToolStripMenuItem.Checked };
         Dictionary<ZModemFileInfo, string> paths = new Dictionary<ZModemFileInfo, string>();
@@ -446,6 +464,8 @@ public partial class DeviceTerminalControl
         transferForm.Show(this);
 
         while (_xmodemRxQueue.TryTake(out _)) { }
+        _lineOwner = _asyncTransportConnection;
+        _cancelLineTransfer = transferForm.Cancel;
         _isXModemActive = true;
         ZModemOptions options = new ZModemOptions { EscapeControlCharacters = escapeZModemControlToolStripMenuItem.Checked };
 
