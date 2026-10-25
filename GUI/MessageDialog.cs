@@ -78,13 +78,8 @@ internal sealed class MessageDialog : Window
     private static MessageBoxResult ShowOnUiThread(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons)
     {
         MessageDialog dialog = new MessageDialog(text, caption, icon, buttons);
-        Window owner = ActiveWindow();
-        if (owner != null)
-        {
-            // Owned by the window the user is working in, so the prompt stays above it and is centered on it.
-            dialog.Owner = owner;
-            dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        }
+        // Owned by the window the user is working in, so the prompt stays above it and is centered on it.
+        WindowOwnership.Attach(dialog, WindowOwnership.ActiveWindow());
         dialog.ShowDialog();
         return dialog._Result;
     }
@@ -94,22 +89,6 @@ internal sealed class MessageDialog : Window
         return (buttons == MessageDialogButtons.Ok) ? MessageBoxResult.OK
             : (buttons == MessageDialogButtons.YesNo) ? MessageBoxResult.No
             : MessageBoxResult.Cancel;
-    }
-
-    private static Window ActiveWindow()
-    {
-        WindowCollection windows = Application.Current?.Windows;
-        if (windows != null)
-        {
-            foreach (Window window in windows)
-            {
-                if (window.IsActive && window.IsVisible)
-                {
-                    return window;
-                }
-            }
-        }
-        return null;
     }
 
     // The dialog is closed with Close() and the chosen value is read from _Result, so the outcome does not depend on

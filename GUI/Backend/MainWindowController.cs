@@ -94,9 +94,10 @@ public class MainWindowController : INotifyPropertyChanged
                 _Controller.MinimalisticMode = value;
                 if (value && _Controller.Settings.ShowMinimalisticModeWarning)
                 {
-                    using MinimalisticModeNotificationForm minimalisticModeNotificationForm = new MinimalisticModeNotificationForm();
-                    minimalisticModeNotificationForm.ShowModal();
-                    _Controller.Settings.ShowMinimalisticModeWarning = !minimalisticModeNotificationForm.DontShowAgain;
+                    MinimalisticModeWindow minimalisticModeWindow = new MinimalisticModeWindow();
+                    WindowOwnership.Attach(minimalisticModeWindow, _Controller._Window);
+                    minimalisticModeWindow.ShowDialog();
+                    _Controller.Settings.ShowMinimalisticModeWarning = !minimalisticModeWindow.DontShowAgain;
                     _Controller.Settings.Save();
                 }
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("MinimalisticMode"));
@@ -596,7 +597,9 @@ public class MainWindowController : INotifyPropertyChanged
 
         internal void About()
         {
-            new AboutForm().ShowModal();
+            AboutWindow aboutWindow = new AboutWindow();
+            WindowOwnership.Attach(aboutWindow, _Controller._Window);
+            aboutWindow.ShowDialog();
         }
 
         internal void DownloadDir()

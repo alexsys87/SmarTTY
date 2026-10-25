@@ -492,7 +492,7 @@ public partial class FileListControl : UserControl, IComponentConnector
         {
             return;
         }
-        string newName = RemoteNameDialog.Ask("Rename", "New name for '" + selected[0].Name + "':", selected[0].Name, selectStemOnly: !selected[0].Entry.IsDirectory);
+        string newName = RemoteNameWindow.Ask(Window.GetWindow(this), "Rename", "New name for '" + selected[0].Name + "':", selected[0].Name, selectStemOnly: !selected[0].Entry.IsDirectory);
         if (newName != null)
         {
             explorer.Rename(selected[0], newName);
@@ -506,7 +506,7 @@ public partial class FileListControl : UserControl, IComponentConnector
         {
             return;
         }
-        string name = RemoteNameDialog.Ask(folder ? "New folder" : "New empty file", (folder ? "Name of the new folder in " : "Name of the new file in ") + explorer.WorkingDirectory + ":", explorer.SuggestNewName(folder ? "New folder" : "new file.txt", folder), selectStemOnly: !folder);
+        string name = RemoteNameWindow.Ask(Window.GetWindow(this), folder ? "New folder" : "New empty file", (folder ? "Name of the new folder in " : "Name of the new file in ") + explorer.WorkingDirectory + ":", explorer.SuggestNewName(folder ? "New folder" : "new file.txt", folder), selectStemOnly: !folder);
         if (name != null)
         {
             explorer.CreateEntry(name, folder);
