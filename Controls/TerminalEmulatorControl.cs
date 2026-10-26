@@ -1891,10 +1891,17 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 base.Paste();
                 return;
             }
-            string text = XtermProtocol.PreparePaste(Win32Clipboard.GetText(Handle), PasteLineBreak, IsPrivateModeSet(BracketedPasteMode));
-            if (!string.IsNullOrEmpty(text))
+            // With bracketed paste the program gets the text as one piece and decides itself what to do with the line
+            // breaks (bash, zsh, vim and nano do not run or auto-indent it), so only without it the lines run at once.
+            bool bracketed = IsPrivateModeSet(BracketedPasteMode);
+            string text = PasteGuard.Prepare(Win32Clipboard.GetText(Handle), AppSettings, linesRunAtOnce: !bracketed, owner: this);
+            if (text != null)
             {
-                SendText(text, InputKind.Paste);
+                text = XtermProtocol.PreparePaste(text, PasteGuard.ResolveLineBreak(AppSettings, PasteLineBreak), bracketed);
+                if (!string.IsNullOrEmpty(text))
+                {
+                    SendText(text, InputKind.Paste);
+                }
             }
         }
         catch (Exception exception)

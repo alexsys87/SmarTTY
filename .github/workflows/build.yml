@@ -65,6 +65,9 @@ jobs:
       - name: Run xterm protocol checks (modified keys, mouse, paste, SGR colours)
         run: dotnet run --project tests/XtermProtocolTests -c Release
 
+      - name: Run paste checks (control characters, typographic characters, line breaks, dangerous commands)
+        run: dotnet run --project tests/PasteSanitizerTests -c Release
+
       - name: Run Smart Terminal command line checks (tokens, completion target, quoting, paste, export, shell selection)
         run: dotnet run --project tests/SmartTerminalCommandLineTests -c Release
 

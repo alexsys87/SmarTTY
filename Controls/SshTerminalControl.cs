@@ -1716,7 +1716,10 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             // The command line is a single line: pasted lines are joined the way the shell would run them instead of
             // being glued together without a separator.
-            string text = ShellCommandLine.JoinPastedLines(Win32Clipboard.GetText(Handle));
+            // The text only lands in the command line and nothing runs until Enter, so it is cleaned and only a large
+            // paste is confirmed.
+            string text = PasteGuard.Prepare(Win32Clipboard.GetText(Handle), AppSettings, linesRunAtOnce: false, owner: this);
+            text = ShellCommandLine.JoinPastedLines(text);
             if (string.IsNullOrEmpty(text))
             {
                 return;

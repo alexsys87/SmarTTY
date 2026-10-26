@@ -1870,8 +1870,18 @@ public partial class DeviceTerminalControl : DpiAwareControl
             {
                 return;
             }
-            // Each pasted line ends the way Enter ends a typed one, whatever the clipboard used (Windows CR LF, Unix LF).
-            text = DeviceInputText.ConvertLineEndings(text, GetLineEnding(_deviceTerminalSettings.LineEnding));
+            // A command wrapped by its source must not go out in pieces; every line break sends the line at once.
+            text = ShellCommandLine.JoinWrappedLines(text, indentContinues: false);
+            text = PasteGuard.Prepare(text, _commonSettings, linesRunAtOnce: true, owner: this);
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+            // Each pasted line ends the way Enter ends a typed one, whatever the clipboard used (Windows CR LF, Unix LF),
+            // unless the paste settings name a line break. Without a line ending in the connection settings the text keeps
+            // the Windows form.
+            string lineEnding = PasteGuard.ResolveLineBreak(_commonSettings, GetLineEnding(_deviceTerminalSettings.LineEnding) ?? "\r\n");
+            text = DeviceInputText.ConvertLineEndings(text, lineEnding);
             byte[] bytes = _textEncoding.GetBytes(text);
             SendToDevice(bytes, bytes.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
