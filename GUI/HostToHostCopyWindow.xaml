@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.HostToHostCopyWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Copy a directory between hosts" Width="560" MinWidth="440" MaxWidth="2000" SizeToContent="Height" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Image Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Name="TransferImage" Width="52" Height="47" VerticalAlignment="Top" Margin="0 0 6 0" />
+        <TextBlock Grid.Row="0" Grid.Column="1" Text="From host:" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <ComboBox Grid.Row="0" Grid.Column="2" Name="SourceHostBox" Grid.ColumnSpan="2" Margin="0,0,0,4" SelectionChanged="SourceHost_SelectionChanged" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Text="Source folder:" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <TextBox Grid.Row="1" Grid.Column="2" Name="SourcePathBox" MinWidth="200" />
+        <Button Grid.Row="1" Grid.Column="3" Name="SourceBrowseButton" Margin="6,0,0,0" Padding="6 2" ToolTip="Browse the folders on the source host" Click="SourceBrowse_Click">
+            <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
+        </Button>
+        <TextBlock Grid.Row="2" Grid.Column="1" Text="To host:" VerticalAlignment="Center" Margin="0,8,8,0" />
+        <ComboBox Grid.Row="2" Grid.Column="2" Name="DestinationHostBox" Grid.ColumnSpan="2" Margin="0,8,0,4" SelectionChanged="DestinationHost_SelectionChanged" />
+        <TextBlock Grid.Row="3" Grid.Column="1" Text="Target folder:" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <TextBox Grid.Row="3" Grid.Column="2" Name="DestinationPathBox" MinWidth="200" />
+        <Button Grid.Row="3" Grid.Column="3" Name="DestinationBrowseButton" Margin="6,0,0,0" Padding="6 2" ToolTip="Browse the folders on the target host" Click="DestinationBrowse_Click">
+            <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
+        </Button>
+        <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="4" Name="StatusText" Text="Inactive" TextTrimming="CharacterEllipsis" Margin="0,10,0,0" />
+        <TextBox Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="4" Name="LogBox" Height="90" Margin="0,4,0,0" IsReadOnly="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" TextWrapping="NoWrap" />
+        <ProgressBar Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="4" Name="TransferProgress" Height="22" Margin="0,6,0,0" Minimum="0" Maximum="1000" IsIndeterminate="True" Visibility="Collapsed" />
+        <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="4" Name="NoteText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="Gray" Text="The folder is streamed between the two hosts (tar over both SSH connections), so it never passes through this computer's disk." />
+        <StackPanel Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Name="StartButton" Content="_Copy" MinWidth="75" Margin="0 0 5 0" Click="Start_Click" />
+            <Button Name="CancelButton" Content="Cancel" IsCancel="True" MinWidth="75" Click="Cancel_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

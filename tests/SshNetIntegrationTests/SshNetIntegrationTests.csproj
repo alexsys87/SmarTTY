@@ -31,6 +31,7 @@
     <Compile Include="../../Ssh/*.cs" LinkBase="Ssh" />
     <Compile Include="../../IO/DfOutputParser.cs" Link="IO/DfOutputParser.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="IO/RemotePathUtils.cs" />
+    <Compile Include="../../IO/PathUtils.cs" Link="IO/PathUtils.cs" />
     <Compile Include="../../IO/RemoteFileOperations.cs" Link="IO/RemoteFileOperations.cs" />
     <Compile Include="../../IO/RemoteScript.cs" Link="IO/RemoteScript.cs" />
     <Compile Include="../../IO/RemoteProcessList.cs" Link="IO/RemoteProcessList.cs" />
@@ -41,6 +42,14 @@
     <Compile Include="../../Transport/RateLimiter.cs" Link="Transport/RateLimiter.cs" />
     <Compile Include="../../Transport/TransferQueueStore.cs" Link="Transport/TransferQueueStore.cs" />
     <Compile Include="../../Utilities/EnumDisplayText.cs" Link="Utilities/EnumDisplayText.cs" />
+    <Compile Include="../../Utilities/DataExtensions.cs" Link="Utilities/DataExtensions.cs" />
+    <Compile Include="../../Utilities/StringUtils.cs" Link="Utilities/StringUtils.cs" />
+    <Compile Include="../../Native/ReparsePoints.cs" Link="Native/ReparsePoints.cs" />
+    <Compile Include="../../Sync/*.cs" LinkBase="Sync" />
+    <Compile Include="../../Ssh/QuickSync/*.cs" LinkBase="Ssh/QuickSync" />
+    <Compile Include="../../LineSplitter.cs" Link="LineSplitter.cs" />
+    <Compile Include="../../Terminal/Utf8StreamDecoder.cs" Link="Terminal/Utf8StreamDecoder.cs" />
+    <Compile Include="../../Terminal/TextStreamDecoder.cs" Link="Terminal/TextStreamDecoder.cs" />
   </ItemGroup>
 
 </Project>

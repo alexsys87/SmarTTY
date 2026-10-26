@@ -674,6 +674,28 @@ public class MainWindowController : INotifyPropertyChanged
             _Controller.Settings.Save();
         }
 
+        /// <summary>
+        /// Copies a directory from one open SSH host to another. The copy needs two SSH sessions at once, so the
+        /// window offers every open SSH session and the user picks the source and the target there.
+        /// </summary>
+        internal void CopyDirBetweenHosts()
+        {
+            try
+            {
+                SessionWrapper activeSession = RequireSshSession("Directory transfer");
+                HostToHostCopyWindow window = new HostToHostCopyWindow(
+                    activeSession,
+                    _Controller.AllSessions.ToList(),
+                    activeSession.TryExtractCurrentDir() ?? activeSession.LastDownloadDir);
+                WindowOwnership.Attach(window, _Controller._Window);
+                window.Show();
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
         internal void UploadDir()
         {
             try
