@@ -184,7 +184,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         };
     }
 
-    /// <summary>One-line description for the status bar, e.g. "COM3 (115200 bps): connected".</summary>
+    /// <summary>
+    /// One-line description for the status bar, e.g. "COM3 (115200 bps): connected". While the connection is up it
+    /// also says what the terminal believes the device is doing (at its prompt, or running a full-screen program),
+    /// which is what explains why the keys are edited here or sent to the device.
+    /// </summary>
     public string StatusText
     {
         get
@@ -193,18 +197,41 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return _connectionState switch
             {
                 ConnectionStateEnum.Connecting => name + ": connecting...",
-                ConnectionStateEnum.Connected => name + ": connected",
+                ConnectionStateEnum.Connected => ConnectedStatusText(name),
                 ConnectionStateEnum.Failed => name + ": connection failed",
                 _ => name + ": disconnected",
             };
         }
     }
 
+    private string ConnectedStatusText(string name)
+    {
+        string state = DeviceTerminalStateText.State(connected: true, _serialTerminalControl.HasInputLine, _serialTerminalControl.FullScreenProgramActive, _serialTerminalControl.CurrentPrompt);
+        return state.Length == 0 ? name + ": connected" : name + ": connected (" + state + ")";
+    }
+
     private string _transportDisplayName;
+
+    // What the status line last reported, so a change is announced only when it happens (the status bar reads the
+    // text a few times a second, and a repaint per tick would be wasted work).
+    private string _reportedStatusText;
 
     private void RaiseStatusChanged()
     {
+        _reportedStatusText = StatusText;
         StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Announces a status change when the state the status line reports is not the one it reported last. The
+    /// COM/TCP terminal calls this when it shows or hides its input line or a full-screen program takes over.
+    /// </summary>
+    internal void RefreshStatusIfChanged()
+    {
+        if (!string.Equals(_reportedStatusText, StatusText, StringComparison.Ordinal))
+        {
+            RaiseStatusChanged();
+        }
     }
 
     /// <summary>
@@ -711,6 +738,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.KeyDown += OnTerminalKeyDown;
         _serialTerminalControl.CompletionPopupRequested += OnSerialCompletionPopupRequested;
         _serialTerminalControl.OpenFileRequested += OnSerialOpenFileRequested;
+        // The status line shows what the terminal is doing (at its prompt, a full-screen program), so it has to be
+        // told when that changes.
+        _serialTerminalControl.InputLineStateChanged += (sender, args) => RefreshStatusIfChanged();
 
         // Add to controls at the same position as the old control
         Controls.Add(_serialTerminalControl);
