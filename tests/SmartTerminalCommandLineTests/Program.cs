@@ -139,6 +139,12 @@ internal static class Program
         Equal(ShellCommandLine.JoinPastedLines("echo \"a b\nc d\"\nls"), "echo \"a b c d\"; ls", "a quote left open continues on the next line");
         Equal(ShellCommandLine.JoinPastedLines("echo \\\"x\ny"), "echo \\\"x; y", "an escaped quote is not an open quote");
         Equal(ShellCommandLine.JoinPastedLines("echo 'it''s'\nls"), "echo 'it''s'; ls", "closed quotes do not join");
+        Equal(ShellCommandLine.JoinWrappedLines("a\nb\n", false), "a\nb\n", "wrapped: separate lines and the final line break are kept");
+        Equal(ShellCommandLine.JoinWrappedLines("cat a\n| grep b\nls", false), "cat a | grep b\nls", "wrapped: a pipe at the start joins");
+        Equal(ShellCommandLine.JoinWrappedLines("echo \"a\nb\"\nls", false), "echo \"a b\"\nls", "wrapped: an open quote joins");
+        Equal(ShellCommandLine.JoinWrappedLines("interface x\n  ip address 1\n", false), "interface x\n  ip address 1\n", "wrapped: an indented block stays when indent is off");
+        Equal(ShellCommandLine.JoinWrappedLines("run a\n   b\n", true), "run a b\n", "wrapped: indented rest joins when indent is on");
+        Equal(ShellCommandLine.JoinWrappedLines("a\n\n| b", false), "a\n\n| b", "wrapped: a blank line is not joined to");
     }
 
     private static void VariableChecks()

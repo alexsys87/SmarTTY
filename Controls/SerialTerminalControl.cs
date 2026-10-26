@@ -1801,7 +1801,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
             string text = Win32Clipboard.GetText(Handle);
             if (text != null)
             {
-                text = text.Replace("\r", "");
+                // Each line is sent as a command: a command wrapped by its source must not go out in pieces.
+                text = ShellCommandLine.JoinWrappedLines(text.Replace("\r", ""), indentContinues: false);
             }
             if (_inputLine != null && !string.IsNullOrEmpty(text))
             {
