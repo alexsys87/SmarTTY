@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
@@ -516,6 +517,34 @@ internal static class Program
         Equal(count, 0, "nothing counted for an empty search text");
     }
 
+    // The "show a line under each tab character" setting of the editor is wired end to end. The ReadonlyTextBrowser
+    // that paints the tabs and the settings window are Windows-only, so they are checked by reading the sources, the
+    // same way the theme harness checks the settings window XAML.
+    private static void ShowTabsChecks()
+    {
+        string root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Combine(root, "SmarTTY.csproj")))
+        {
+            root = Path.GetDirectoryName(root);
+        }
+        if (root == null)
+        {
+            Console.WriteLine("SKIP: repository root not found, the ShowTabs wiring is not checked");
+            return;
+        }
+        string browser = File.ReadAllText(Path.Combine(root, "Controls", "ReadonlyTextBrowser.cs"));
+        Check(browser.Contains("public bool ShowTabs") && browser.Contains("_showTabs = value"),
+            "the terminal/editor paints a line under tabs through a ShowTabs property");
+        string settings = File.ReadAllText(Path.Combine(root, "VisualTTY", "GlobalSettings.cs"));
+        Check(settings.Contains("public bool ShowTabs;"), "the editor settings carry the ShowTabs value");
+        string wrapper = File.ReadAllText(Path.Combine(root, "VisualTTY", "EditorSettingsWrapper.cs"));
+        Check(wrapper.Contains("public bool ShowTabs"), "the settings wrapper exposes ShowTabs to the window");
+        string controller = File.ReadAllText(Path.Combine(root, "GUI", "Backend", "MainWindowController.cs"));
+        Check(controller.Contains("edit.ShowTabs = Settings.Editor.ShowTabs"), "opening the editor applies the ShowTabs setting");
+        string xaml = File.ReadAllText(Path.Combine(root, "GUI", "GlobalSettingsWindow.xaml"));
+        Check(xaml.Contains("EditorWrapper.ShowTabs"), "Editor Settings offers a checkbox for ShowTabs");
+    }
+
     private static int Main()
     {
         try
@@ -531,6 +560,7 @@ internal static class Program
             GenericChecks();
             TokenOrderChecks();
             PairEditingChecks();
+            ShowTabsChecks();
         }
         catch (Exception exception)
         {

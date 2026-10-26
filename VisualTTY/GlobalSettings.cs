@@ -79,6 +79,9 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public bool ShowLineNumbers;
 
+        // A grey line under each tab character, to tell tab-indented lines from space-indented ones.
+        public bool ShowTabs;
+
         public bool SyntaxHighlighting;
 
         // Tab and indentation insert TabSize spaces instead of a tab character.
@@ -292,6 +295,8 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public bool SyntaxHighlightingMigrated { get; set; }
 
+    public bool ShowTabsMigrated { get; set; }
+
     [XmlIgnore]
     public EditorSettingsWrapper EditorWrapper { get; }
 
@@ -443,6 +448,14 @@ public class GlobalSettings : INotifyPropertyChanged
             // once for existing configurations; it can be switched off in Settings afterwards.
             Editor.SyntaxHighlighting = true;
             SyntaxHighlightingMigrated = true;
+            Save();
+        }
+        if (!ShowTabsMigrated)
+        {
+            // The tab underline is a new setting: turn it on once for existing configurations,
+            // as the feature is meant to be visible by default and can be switched off in Settings afterwards.
+            Editor.ShowTabs = true;
+            ShowTabsMigrated = true;
             Save();
         }
         if (!CompletionTriggersMigratedV2)

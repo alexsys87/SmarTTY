@@ -1350,6 +1350,7 @@ public class MainWindowController : INotifyPropertyChanged
         edit.TabSize = Settings.Editor.TabSize;
         edit.InsertSpaces = Settings.Editor.InsertSpaces;
         edit.HideMargins = !Settings.Editor.ShowLineNumbers;
+        edit.ShowTabs = Settings.Editor.ShowTabs;
         ApplySyntaxHighlighting(edit);
     }
 
