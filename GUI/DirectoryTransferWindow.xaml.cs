@@ -199,13 +199,15 @@ public partial class DirectoryTransferWindow : Window
             _lastProgressUpdate = DateTime.Now;
             DirectoryCopier.CopyStage stage = copyProgress.Stage;
             string currentPath = _currentPath;
+            int filesDone = copyProgress.FilesDone;
+            int filesTotal = copyProgress.FilesTotal;
             long bytesDone = copyProgress.BytesDone;
             long bytesTotal = copyProgress.BytesTotal;
-            Dispatcher.BeginInvoke((Action)(() => UpdateProgress(stage, currentPath, bytesDone, bytesTotal)));
+            Dispatcher.BeginInvoke((Action)(() => UpdateProgress(stage, currentPath, filesDone, filesTotal, bytesDone, bytesTotal)));
         }
     }
 
-    private void UpdateProgress(DirectoryCopier.CopyStage copyStage, string currentPath, long bytesDone, long bytesTotal)
+    private void UpdateProgress(DirectoryCopier.CopyStage copyStage, string currentPath, int filesDone, int filesTotal, long bytesDone, long bytesTotal)
     {
         if (bytesDone > bytesTotal)
         {
@@ -220,25 +222,42 @@ public partial class DirectoryTransferWindow : Window
             case DirectoryCopier.CopyStage.Counting:
                 StatusText.Text = (currentPath == null) ? "Determining directory size..." : "Scanning " + currentPath + "...";
                 TransferProgress.IsIndeterminate = true;
-                StatsText.Text = StringUtils.FormatSize(bytesDone) + "B found";
+                StatsText.Text = StringUtils.FormatSize(bytesDone) + "B found" + FormatFileCount(filesDone, filesTotal);
                 break;
             case DirectoryCopier.CopyStage.CopyingFile:
                 StatusText.Text = (_isUpload ? "Uploading " : "Downloading ") + currentPath + "...";
                 TransferProgress.IsIndeterminate = false;
                 TransferProgress.Value = bytesDone * TransferProgress.Maximum / bytesTotal;
-                StatsText.Text = StringUtils.FormatSize(bytesDone) + "B done";
+                StatsText.Text = StringUtils.FormatSize(bytesDone) + "B done" + FormatFileCount(filesDone, filesTotal);
                 break;
             case DirectoryCopier.CopyStage.CopyingTarEntry:
                 StatusText.Text = "Linking " + currentPath + "...";
                 TransferProgress.IsIndeterminate = true;
-                StatsText.Text = "";
+                StatsText.Text = FormatFileCount(filesDone, filesTotal).TrimStart(' ');
                 break;
             case DirectoryCopier.CopyStage.StreamingTar:
                 StatusText.Text = "Downloading external symbolic link targets...";
                 TransferProgress.IsIndeterminate = true;
-                StatsText.Text = StringUtils.FormatSize(bytesDone) + "B done";
+                StatsText.Text = StringUtils.FormatSize(bytesDone) + "B done" + FormatFileCount(filesDone, filesTotal);
                 break;
         }
+    }
+
+    /// <summary>
+    /// " - 12 of 300 files" once the total is known, otherwise " - 12 files" (the count of the scan so far). The
+    /// labels of the tar stages show the file count alone, so the leading separator is trimmed there.
+    /// </summary>
+    private static string FormatFileCount(int filesDone, int filesTotal)
+    {
+        if (filesTotal > 0)
+        {
+            return " - " + filesDone + " of " + filesTotal + " files";
+        }
+        if (filesDone > 0)
+        {
+            return " - " + filesDone + " files";
+        }
+        return "";
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
