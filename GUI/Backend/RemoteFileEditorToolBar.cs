@@ -2,6 +2,7 @@ using SmarTTY.Controls;
 using System;
 using System.Collections.Generic;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -14,7 +15,7 @@ namespace SmarTTY.GUI.Backend;
 /// </summary>
 internal sealed class RemoteFileEditorToolBar : ToolBar
 {
-    private readonly Dictionary<EditorToolbarCommand, Button> _buttons = new Dictionary<EditorToolbarCommand, Button>();
+    private readonly Dictionary<EditorToolbarCommand, ButtonBase> _buttons = new Dictionary<EditorToolbarCommand, ButtonBase>();
 
     public RemoteFileEditorToolBar(RemoteFileEditorPanel panel)
     {
@@ -40,13 +41,14 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
             };
             // The images are 16 pixels; smooth the upscaling on a high-DPI monitor.
             RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
-            Button button = new Button
-            {
-                Content = icon,
-                ToolTip = description.ToolTip
-            };
+            // Commands that switch something on are toggle buttons; the state below keeps them in step with the editor.
+            ButtonBase button = (command.Value == EditorToolbarCommand.ShowAllCharacters)
+                ? new ToggleButton { Content = icon, ToolTip = description.ToolTip }
+                : new Button { Content = icon, ToolTip = description.ToolTip };
             ToolTipService.SetShowOnDisabled(button, true);
-            button.SetResourceReference(StyleProperty, ToolBar.ButtonStyleKey);
+            button.SetResourceReference(StyleProperty, (command.Value == EditorToolbarCommand.ShowAllCharacters)
+                ? ToolBar.ToggleButtonStyleKey
+                : ToolBar.ButtonStyleKey);
             EditorToolbarCommand current = command.Value;
             button.Click += (sender, e) => panel.RunCommand(current);
             _buttons[current] = button;
@@ -58,9 +60,13 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
 
     private void UpdateState(EditorCommandState state)
     {
-        foreach (KeyValuePair<EditorToolbarCommand, Button> pair in _buttons)
+        foreach (KeyValuePair<EditorToolbarCommand, ButtonBase> pair in _buttons)
         {
             pair.Value.IsEnabled = state.IsEnabled(pair.Key);
+            if (pair.Value is ToggleButton toggle)
+            {
+                toggle.IsChecked = state.IsChecked(pair.Key);
+            }
         }
     }
 
