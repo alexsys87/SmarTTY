@@ -23,10 +23,18 @@ public static class EditorCompletionSource
 
         public readonly bool IsKeyword;
 
-        public Word(string text, bool isKeyword)
+        /// <summary>0 for a keyword, 1 for an API symbol, 2 for a plain document word.</summary>
+        public readonly int Rank;
+
+        // The standard API symbol behind the word, or null for a keyword or a plain document word.
+        public readonly ApiSymbolDatabase.Symbol Symbol;
+
+        public Word(string text, int rank, ApiSymbolDatabase.Symbol symbol = null)
         {
             Text = text;
-            IsKeyword = isKeyword;
+            Rank = rank;
+            IsKeyword = rank == 0;
+            Symbol = symbol;
         }
 
         // No icons in the editor popup (the list has no image list).
@@ -34,14 +42,14 @@ public static class EditorCompletionSource
 
         public string DisplayName => Text;
 
-        public string DetailText => IsKeyword ? "keyword" : "word";
+        public string DetailText => Symbol != null ? (Symbol.Summary ?? "function") : (IsKeyword ? "keyword" : "word");
 
-        // An empty hint keeps the little "hint" window of the popup closed.
-        public string HintText => "";
+        // An empty hint keeps the little "hint" window of the popup closed; an API symbol shows its signature there.
+        public string HintText => Symbol != null ? (Symbol.Signature ?? "") : "";
 
-        public bool IsBold => false;
+        public bool IsBold => Symbol != null;
 
-        public string HintDescription => null;
+        public string HintDescription => Symbol?.Description;
     }
 
     /// <summary>A character that can be part of an identifier in any of the supported languages.</summary>
@@ -69,23 +77,38 @@ public static class EditorCompletionSource
 
     /// <summary>
     /// The completion items for a language and a document: keywords first (alphabetically), then the
-    /// document's identifiers. Only words that start with <paramref name="prefix"/> are returned; an empty
-    /// prefix returns everything (the Ctrl+Space case).
+    /// standard API symbols of the language, then the document's identifiers. Only words that start with
+    /// <paramref name="prefix"/> are returned; an empty prefix returns everything (the Ctrl+Space case).
+    /// <paramref name="database"/> may be null, in which case only keywords and document words are offered.
     /// </summary>
     public static List<ISuggestion> Build(SyntaxHighlighting.Language language, string documentText, string prefix)
+    {
+        return Build(language, documentText, prefix, null);
+    }
+
+    /// <summary>The overload that also offers the standard API symbols of <paramref name="database"/>.</summary>
+    public static List<ISuggestion> Build(SyntaxHighlighting.Language language, string documentText, string prefix, ApiSymbolDatabase database)
     {
         List<Word> words = new List<Word>();
         HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (string keyword in SyntaxHighlighting.GetKeywords(language))
         {
-            Add(words, seen, keyword, isKeyword: true, prefix);
+            Add(words, seen, keyword, 0, null, prefix);
+        }
+        if (database != null)
+        {
+            foreach (ApiSymbolDatabase.Symbol symbol in database.ForLanguage(language))
+            {
+                // The list is keyed by the plain name; a "math.sqrt" entry is offered as "sqrt".
+                Add(words, seen, ShortName(symbol.Name), 1, symbol, prefix);
+            }
         }
         if (documentText != null)
         {
             foreach (string word in EnumerateWords(documentText))
             {
-                Add(words, seen, word, isKeyword: false, prefix);
+                Add(words, seen, word, 2, null, prefix);
             }
         }
 
@@ -100,7 +123,17 @@ public static class EditorCompletionSource
         return result;
     }
 
-    private static void Add(List<Word> words, HashSet<string> seen, string word, bool isKeyword, string prefix)
+    private static string ShortName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return name;
+        }
+        int dot = name.LastIndexOf('.');
+        return (dot >= 0) ? name.Substring(dot + 1) : name;
+    }
+
+    private static void Add(List<Word> words, HashSet<string> seen, string word, int rank, ApiSymbolDatabase.Symbol symbol, string prefix)
     {
         if (word == null || word.Length == 0 || word.Length > MaxWordLength)
         {
@@ -110,11 +143,12 @@ public static class EditorCompletionSource
         {
             return;
         }
+        // A document word may match a name already offered as a keyword or API symbol; the better one stays.
         if (!seen.Add(word))
         {
             return;
         }
-        words.Add(new Word(word, isKeyword));
+        words.Add(new Word(word, rank, symbol));
     }
 
     private static bool MatchesPrefix(string word, string prefix)
@@ -153,9 +187,9 @@ public static class EditorCompletionSource
 
     private static int CompareWords(Word a, Word b)
     {
-        if (a.IsKeyword != b.IsKeyword)
+        if (a.Rank != b.Rank)
         {
-            return a.IsKeyword ? -1 : 1;
+            return a.Rank - b.Rank;
         }
         return string.Compare(a.Text, b.Text, StringComparison.OrdinalIgnoreCase);
     }

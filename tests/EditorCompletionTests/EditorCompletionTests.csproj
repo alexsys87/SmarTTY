@@ -15,5 +15,9 @@
     <Compile Include="../../CodeEditing/SyntaxHighlighting.cs" Link="SyntaxHighlighting.cs" />
     <Compile Include="../../Completion/ISuggestion.cs" Link="ISuggestion.cs" />
     <Compile Include="../../Completion/EditorCompletionSource.cs" Link="EditorCompletionSource.cs" />
+    <Compile Include="../../Completion/ISignatureInfo.cs" Link="ISignatureInfo.cs" />
+    <Compile Include="../../Completion/ISignatureParameter.cs" Link="ISignatureParameter.cs" />
+    <Compile Include="../../Completion/ParameterSignature.cs" Link="ParameterSignature.cs" />
+    <Compile Include="../../Completion/ApiSymbolDatabase.cs" Link="ApiSymbolDatabase.cs" />
   </ItemGroup>
 </Project>

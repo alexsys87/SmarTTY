@@ -90,6 +90,10 @@ public class GlobalSettings : INotifyPropertyChanged
         // The completion popup also opens by itself after a couple of letters of an identifier.
         public bool AutocompletionOnTyping;
 
+        // The completion list and the parameter hint also offer the standard API symbols of the language
+        // (Python builtins, the C library, the shell builtins, ...) from ApiSymbols.xml.
+        public bool ApiSymbols;
+
         // Tab and indentation insert TabSize spaces instead of a tab character.
         public bool InsertSpaces;
 
@@ -173,7 +177,8 @@ public class GlobalSettings : INotifyPropertyChanged
         ShowLineNumbers = true,
         SyntaxHighlighting = true,
         Autocompletion = true,
-        AutocompletionOnTyping = false
+        AutocompletionOnTyping = false,
+        ApiSymbols = true
     };
 
     public int LargeBlockCutoffPoint = 1048576;
@@ -306,6 +311,8 @@ public class GlobalSettings : INotifyPropertyChanged
     public bool ShowTabsMigrated { get; set; }
 
     public bool EditorAutocompletionMigrated { get; set; }
+
+    public bool EditorApiSymbolsMigrated { get; set; }
 
     [XmlIgnore]
     public EditorSettingsWrapper EditorWrapper { get; }
@@ -475,6 +482,14 @@ public class GlobalSettings : INotifyPropertyChanged
             // configurations; it can be switched off in Settings afterwards.
             Editor.Autocompletion = true;
             EditorAutocompletionMigrated = true;
+            Save();
+        }
+        if (!EditorApiSymbolsMigrated)
+        {
+            // The API symbols are a new setting: turn them on once for existing configurations,
+            // as the feature is meant to be visible by default and can be switched off in Settings afterwards.
+            Editor.ApiSymbols = true;
+            EditorApiSymbolsMigrated = true;
             Save();
         }
         if (!CompletionTriggersMigratedV2)

@@ -101,6 +101,18 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool ApiSymbols
+    {
+        get
+        {
+            return _Settings.Editor.ApiSymbols;
+        }
+        set
+        {
+            _Settings.Editor.ApiSymbols = value;
+        }
+    }
+
     public GlobalSettings.EditorColors Colors
     {
         get

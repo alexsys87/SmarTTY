@@ -78,6 +78,10 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     private bool _completionOnTyping;
 
+    // The standard API symbols (Python builtins, the C library, the shell builtins, ...). Null when the
+    // feature is switched off, so nothing is loaded and the completion list stays keywords + document words.
+    private ApiSymbolDatabase _apiSymbols;
+
     private bool _suppressHintClose;
 
     internal TabHandler _tabHandler;
@@ -529,6 +533,22 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     /// <summary>The number of typed letters that open the popup by themselves.</summary>
     private const int AutoTriggerLength = 2;
 
+    /// <summary>
+    /// The standard API symbols offered in the completion list and used by the parameter hint. Set from
+    /// the settings; null switches the feature off (keywords and document words only).
+    /// </summary>
+    public ApiSymbolDatabase ApiSymbols
+    {
+        get
+        {
+            return _apiSymbols;
+        }
+        set
+        {
+            _apiSymbols = value;
+        }
+    }
+
     /// <summary>Shows the completion popup for the word the caret is in (Ctrl+Space, or typing).</summary>
     public void ShowCompletion()
     {
@@ -538,7 +558,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
         // The whole list is passed to the popup: it narrows itself down to the typed prefix, and can widen
         // again when letters are deleted, which a list filtered here could not.
-        List<ISuggestion> items = EditorCompletionSource.Build(_completionLanguage, base.EditableDocument.GetText(), "");
+        List<ISuggestion> items = EditorCompletionSource.Build(_completionLanguage, base.EditableDocument.GetText(), "", _apiSymbols);
         if (items.Count == 0)
         {
             return;
@@ -657,8 +677,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             HideSignatureHint();
             return;
         }
-        EditorSignatureSource.FunctionSignature signature = EditorSignatureSource.FindSignature(
-            _completionLanguage, base.EditableDocument.GetText(), CaretPosition.Line, CaretPosition.Column, out int activeParameter);
+        ParameterSignature signature = EditorSignatureSource.FindSignature(
+            _completionLanguage, base.EditableDocument.GetText(), CaretPosition.Line, CaretPosition.Column, _apiSymbols, out int activeParameter);
         if (signature == null)
         {
             HideSignatureHint();
