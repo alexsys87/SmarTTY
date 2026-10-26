@@ -14,58 +14,24 @@ namespace SmarTTY.Completion;
 /// </summary>
 public static class EditorSignatureSource
 {
-    /// <summary>A function found in the document, exposed as the editor's signature model.</summary>
-    public sealed class FunctionSignature : ISignatureInfo
-    {
-        public readonly string Name;
-
-        private readonly string[] _parameters;
-
-        public FunctionSignature(string name, string[] parameters)
-        {
-            Name = name;
-            _parameters = parameters ?? new string[0];
-        }
-
-        public int ParameterCount => _parameters.Length;
-
-        public string Separator => ", ";
-
-        public bool IsVertical => false;
-
-        public ISignatureParameter GetParameter(int index)
-        {
-            return new Parameter(_parameters[index]);
-        }
-
-        /// <summary>The full signature, e.g. "foo(int x, int y)"; used by the tests.</summary>
-        public override string ToString()
-        {
-            return Name + "(" + string.Join(Separator, _parameters) + ")";
-        }
-
-        private sealed class Parameter : ISignatureParameter
-        {
-            public Parameter(string text)
-            {
-                Text = text;
-            }
-
-            public string Text { get; }
-        }
-    }
-
     /// <summary>The function definitions found in a document, in the order they appear.</summary>
-    public static List<FunctionSignature> ParseDefinitions(SyntaxHighlighting.Language language, string documentText)
+    public static List<ParameterSignature> ParseDefinitions(SyntaxHighlighting.Language language, string documentText)
     {
         return ParseDefinitionsNormalized(language, Normalize(documentText));
     }
 
     /// <summary>
     /// The signature of the call the caret is inside, together with the index of the parameter being
-    /// typed. Returns null when the caret is not inside a call of a function defined in the document.
+    /// typed. Returns null when the caret is not inside a call. A function defined in the document wins;
+    /// otherwise the standard API symbols of <paramref name="database"/> are consulted.
     /// </summary>
-    public static FunctionSignature FindSignature(SyntaxHighlighting.Language language, string documentText, int line, int column, out int activeParameter)
+    public static ParameterSignature FindSignature(SyntaxHighlighting.Language language, string documentText, int line, int column, out int activeParameter)
+    {
+        return FindSignature(language, documentText, line, column, null, out activeParameter);
+    }
+
+    /// <summary>The overload that falls back to the standard API symbols of <paramref name="database"/>.</summary>
+    public static ParameterSignature FindSignature(SyntaxHighlighting.Language language, string documentText, int line, int column, ApiSymbolDatabase database, out int activeParameter)
     {
         activeParameter = 0;
         if (documentText == null || line < 0 || column < 0)
@@ -77,7 +43,7 @@ public static class EditorSignatureSource
         {
             return null;
         }
-        foreach (FunctionSignature signature in ParseDefinitionsNormalized(language, text))
+        foreach (ParameterSignature signature in ParseDefinitionsNormalized(language, text))
         {
             if (signature.Name == name)
             {
@@ -86,6 +52,18 @@ public static class EditorSignatureSource
                     activeParameter = Math.Max(0, signature.ParameterCount - 1);
                 }
                 return signature;
+            }
+        }
+        if (database != null)
+        {
+            ParameterSignature apiSignature = database.FindSignature(language, name);
+            if (apiSignature != null)
+            {
+                if (activeParameter >= apiSignature.ParameterCount)
+                {
+                    activeParameter = Math.Max(0, apiSignature.ParameterCount - 1);
+                }
+                return apiSignature;
             }
         }
         return null;
@@ -112,9 +90,9 @@ public static class EditorSignatureSource
         return FindCallAt(language, text, offset, out name, out activeParameter);
     }
 
-    private static List<FunctionSignature> ParseDefinitionsNormalized(SyntaxHighlighting.Language language, string text)
+    private static List<ParameterSignature> ParseDefinitionsNormalized(SyntaxHighlighting.Language language, string text)
     {
-        List<FunctionSignature> result = new List<FunctionSignature>();
+        List<ParameterSignature> result = new List<ParameterSignature>();
         int offset = 0;
         foreach (string line in text.Split('\n'))
         {
@@ -123,7 +101,7 @@ public static class EditorSignatureSource
                 string inner = ExtractParenGroup(text, offset + openParen);
                 if (inner != null)
                 {
-                    result.Add(new FunctionSignature(name, SplitParameters(inner)));
+                    result.Add(new ParameterSignature(name, ParameterSignature.SplitParameters(inner)));
                 }
             }
             offset += line.Length + 1;
@@ -536,54 +514,6 @@ public static class EditorSignatureSource
             }
         }
         return -1;
-    }
-
-    private static string[] SplitParameters(string inner)
-    {
-        List<string> parts = new List<string>();
-        int depth = 0;
-        int start = 0;
-        for (int i = 0; i < inner.Length; i++)
-        {
-            char c = inner[i];
-            if (c == '\'' || c == '"')
-            {
-                i = SkipString(inner, i, inner.Length) - 1;
-                continue;
-            }
-            if (c == '(' || c == '[' || c == '{')
-            {
-                depth++;
-            }
-            else if (c == ')' || c == ']' || c == '}')
-            {
-                if (depth > 0)
-                {
-                    depth--;
-                }
-            }
-            else if (c == ',' && depth == 0)
-            {
-                AddParameter(parts, inner.Substring(start, i - start));
-                start = i + 1;
-            }
-        }
-        AddParameter(parts, inner.Substring(start));
-        // "void foo(void)" declares no parameters.
-        if (parts.Count == 1 && parts[0] == "void")
-        {
-            parts.Clear();
-        }
-        return parts.ToArray();
-    }
-
-    private static void AddParameter(List<string> parts, string text)
-    {
-        string trimmed = text.Trim();
-        if (trimmed.Length > 0)
-        {
-            parts.Add(trimmed);
-        }
     }
 
     private static string StripLineComment(SyntaxHighlighting.Language language, string line)

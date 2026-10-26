@@ -1,6 +1,7 @@
 using SmarTTY.Ssh;
 using Microsoft.Win32;
 using SmarTTY.CodeEditing;
+using SmarTTY.Completion;
 using SmarTTY.Controls;
 using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
@@ -1007,6 +1008,22 @@ public class MainWindowController : INotifyPropertyChanged
 
     public GlobalSettings Settings { get; private set; }
 
+    // The standard API symbols (ApiSymbols.xml). Loaded at most once, on the first editor that needs them,
+    // and only while the setting is on, so a switched-off feature never reads the file.
+    private ApiSymbolDatabase _ApiSymbols;
+
+    private ApiSymbolDatabase ApiSymbols
+    {
+        get
+        {
+            if (_ApiSymbols == null && Settings.Editor.ApiSymbols)
+            {
+                _ApiSymbols = ApiSymbolDatabase.Load();
+            }
+            return _ApiSymbols;
+        }
+    }
+
     public MenuCommandHandlersImpl MenuCommandHandlers { get; }
 
     public ToolStripImpl ToolStrip { get; }
@@ -1353,6 +1370,7 @@ public class MainWindowController : INotifyPropertyChanged
         edit.ShowTabs = Settings.Editor.ShowTabs;
         edit.CompletionEnabled = Settings.Editor.Autocompletion;
         edit.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;
+        edit.ApiSymbols = Settings.Editor.ApiSymbols ? ApiSymbols : null;
         ApplySyntaxHighlighting(edit);
     }
 

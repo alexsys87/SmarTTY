@@ -36,7 +36,7 @@ internal static class Program
 
     private static string Signature(L language, string text, int line, int column)
     {
-        EditorSignatureSource.FunctionSignature signature =
+        ParameterSignature signature =
             EditorSignatureSource.FindSignature(language, text, line, column, out int active);
         return signature == null ? null : signature + "@" + active;
     }

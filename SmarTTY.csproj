@@ -49,6 +49,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="VisualTTY\XTermKeys.xml" LogicalName="VisualTTY.XTermKeys.xml" />
+    <EmbeddedResource Include="Completion\ApiSymbols.xml" LogicalName="SmarTTY.Completion.ApiSymbols.xml" />
     <!-- Window icons of the WinForms dialogs, loaded by Forms/FormIcons.cs. -->
     <EmbeddedResource Include="icons\forms\*.ico" LogicalName="SmarTTY.FormIcons.%(Filename).ico" />
     <EmbeddedResource Include="app.ico" LogicalName="SmarTTY.FormIcons.app.ico" />

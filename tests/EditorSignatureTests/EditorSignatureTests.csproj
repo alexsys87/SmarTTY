@@ -18,5 +18,7 @@
     <Compile Include="../../Completion/ISignatureInfo.cs" Link="ISignatureInfo.cs" />
     <Compile Include="../../Completion/ISignatureParameter.cs" Link="ISignatureParameter.cs" />
     <Compile Include="../../Completion/EditorSignatureSource.cs" Link="EditorSignatureSource.cs" />
+    <Compile Include="../../Completion/ParameterSignature.cs" Link="ParameterSignature.cs" />
+    <Compile Include="../../Completion/ApiSymbolDatabase.cs" Link="ApiSymbolDatabase.cs" />
   </ItemGroup>
 </Project>
