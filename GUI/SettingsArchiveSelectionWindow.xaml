@@ -30,7 +30,7 @@
         <CheckBox x:Name="SshProfilesBox" Content="SSH connection profiles" />
         <CheckBox x:Name="RawProfilesBox" Content="COM / TCP / Telnet connection profiles" />
         <CheckBox x:Name="PasswordsBox" Margin="26 3 4 3" Content="Saved passwords inside the profiles" ToolTip="Saved passwords are encrypted with a key that belongs to your Windows account, so on another computer they work only together with the password protection key (see below)." />
-        <CheckBox x:Name="CompletionsBox" Content="Command completions (CommandCompletions.xml)" ToolTip="The command completion database that is kept next to SmarTTY.exe. It is replaced as a whole. Applied after SmarTTY is restarted." />
+        <CheckBox x:Name="CompletionsBox" Content="Command completions (CommandCompletions.xml or .xml.gz)" ToolTip="The command completion database that is kept next to SmarTTY.exe, as CommandCompletions.xml or as the compressed CommandCompletions.xml.gz. It is replaced as a whole, in the form of the archive. Applied after SmarTTY is restarted." />
       </StackPanel>
     </GroupBox>
     <GroupBox Grid.Row="2" Header="Authentication keys" Margin="3">
