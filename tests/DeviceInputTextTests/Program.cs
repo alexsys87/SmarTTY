@@ -37,6 +37,16 @@ internal static class Program
         }
     }
 
+    private static bool Pasted(string text, params byte[] expected)
+    {
+        return DeviceInputText.TryParsePastedHex(text, out byte[] bytes) && System.Linq.Enumerable.SequenceEqual(bytes, expected);
+    }
+
+    private static bool NotPasted(string text)
+    {
+        return !DeviceInputText.TryParsePastedHex(text, out byte[] bytes) && bytes == null;
+    }
+
     private static bool Near(double a, double b)
     {
         return Math.Abs(a - b) < 0.5;
@@ -122,6 +132,25 @@ internal static class Program
         Check(TransferRateMeter.FormatRate(959.6) == "960 B/s", "rate: bytes");
         Check(TransferRateMeter.FormatRate(11571) == "11.3 KB/s", "rate: KB");
         Check(TransferRateMeter.FormatRate(1.5 * 1048576) == "1.5 MB/s", "rate: MB");
+
+        // ---- pasted text as bytes (the HEX view of a COM/TCP terminal)
+        Check(Pasted("DE AD BE EF", 0xDE, 0xAD, 0xBE, 0xEF), "paste: space separated bytes");
+        Check(Pasted("DEADBEEF", 0xDE, 0xAD, 0xBE, 0xEF), "paste: one group of digits");
+        Check(Pasted("0xDE, 0xAD,", 0xDE, 0xAD), "paste: 0x prefixes and a trailing comma");
+        Check(Pasted("{0x41, 0x42, 0x43}", 0x41, 0x42, 0x43), "paste: a C array");
+        Check(Pasted("[0x41,0x42]", 0x41, 0x42), "paste: brackets");
+        Check(Pasted("\\x41\\x42\\x0d\\x0a", 0x41, 0x42, 0x0D, 0x0A), "paste: backslash-x escapes");
+        Check(Pasted("de:ad:be:ef", 0xDE, 0xAD, 0xBE, 0xEF), "paste: colons, lower case");
+        Check(Pasted("41\r\n42\r\n", 0x41, 0x42), "paste: one byte per line");
+        Check(Pasted("1 2 a", 0x01, 0x02, 0x0A), "paste: single digits are bytes");
+        Check(NotPasted("hello world"), "paste: ordinary text is not bytes");
+        Check(NotPasted("123"), "paste: an odd group of several digits is not bytes");
+        Check(NotPasted("DE AD XX"), "paste: a non-HEX character");
+        Check(NotPasted("   "), "paste: blanks");
+        Check(NotPasted(""), "paste: empty");
+        Check(NotPasted(null), "paste: null");
+        Check(NotPasted("0x"), "paste: a lone prefix");
+        Check(NotPasted("{}"), "paste: empty braces");
 
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed");

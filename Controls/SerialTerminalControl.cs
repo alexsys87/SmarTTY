@@ -1807,16 +1807,16 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
     }
 
-    public override void Paste()
+    public override void PasteText(string clipboardText)
     {
         if (UsesTerminalInput)
         {
-            base.Paste();
+            base.PasteText(clipboardText);
             return;
         }
         try
         {
-            string text = Win32Clipboard.GetText(Handle);
+            string text = clipboardText;
             if (!string.IsNullOrEmpty(text))
             {
                 // Each line is sent as a command: a command wrapped by its source must not go out in pieces.
@@ -1824,6 +1824,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
             }
             // Every line break submits the line to the device at once.
             text = _inputLine != null ? PasteGuard.Prepare(text, AppSettings, linesRunAtOnce: true, owner: this) : null;
+            // The device may use an encoding without some of the characters of the text.
+            text = text != null ? PasteGuard.FitToEncoding(text, InputEncoding, AppSettings, this) : null;
             if (_inputLine != null && !string.IsNullOrEmpty(text))
             {
                 int offset = _inputLine.CaretIndex;

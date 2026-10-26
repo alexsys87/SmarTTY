@@ -444,6 +444,7 @@ public class GlobalSettings : INotifyPropertyChanged
     private void FixDefaults()
     {
         Paste ??= new PasteSettings();
+        Paste.Snippets ??= new System.Collections.Generic.List<PasteSnippet>();
         if (DefaultTextColor.Alpha == 0)
         {
             DefaultTextColor = TerminalEmulatorControl.DefaultTextColor;

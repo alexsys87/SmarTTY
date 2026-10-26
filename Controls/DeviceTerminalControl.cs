@@ -336,6 +336,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.TerminalSizeChanged += OnTerminalSizeChanged;
         AddClearCommand();
         AddReturnToInputLineCommand();
+        AddPasteCommands();
         AddRemoteSizeCommands();
         InitializeCommandLists();
         
@@ -1872,6 +1873,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
             CloseTabRequested?.Invoke(this, EventArgs.Empty);
             return;
         }
+        // The menu with the history and the snippets: Ctrl+Shift+Insert, and Ctrl+Shift+V when the settings say so.
+        if (e.Control && e.Shift && !e.Alt
+            && (e.KeyCode == Keys.Insert || (e.KeyCode == Keys.V && PasteGuard.OptionsOf(common).CtrlShiftV == PasteSettings.ShortcutAction.HistoryMenu)))
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            ShowPasteMenu();
+            return;
+        }
         if (!e.Control && e.Alt && !e.Shift && e.KeyCode == Keys.Return)
         {
             // Not a character for the device: toggle full screen like in SSH tabs.
@@ -1903,7 +1913,52 @@ public partial class DeviceTerminalControl : DpiAwareControl
         e.SuppressKeyPress = true;
     }
 
+    private enum PasteKind
+    {
+        /// <summary>Text, except in the HEX view, where text that reads as bytes is sent as bytes.</summary>
+        Auto,
+        Text,
+        HexBytes
+    }
+
     private void pasteToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        PasteToDevice(null, PasteKind.Auto);
+    }
+
+    private ToolStripMenuItem _pasteAsHexMenuItem;
+
+    private ToolStripMenuItem _pasteAsTextMenuItem;
+
+    private void AddPasteCommands()
+    {
+        ToolStripMenuItem history = new ToolStripMenuItem("Paste from history and snippets...", null, (sender, args) => ShowPasteMenu())
+        {
+            ShortcutKeyDisplayString = "Ctrl+Shift+Insert"
+        };
+        _pasteAsHexMenuItem = new ToolStripMenuItem("Paste as HEX bytes", null, (sender, args) => PasteToDevice(null, PasteKind.HexBytes))
+        {
+            ToolTipText = "The clipboard text such as DE AD BE EF is sent as bytes"
+        };
+        _pasteAsTextMenuItem = new ToolStripMenuItem("Paste as text", null, (sender, args) => PasteToDevice(null, PasteKind.Text))
+        {
+            ToolTipText = "Send the clipboard text as characters, even in the HEX view"
+        };
+        int index = contextMenuStrip1.Items.IndexOf(pasteToolStripMenuItem);
+        index = index < 0 ? contextMenuStrip1.Items.Count : index + 1;
+        contextMenuStrip1.Items.Insert(index, history);
+        contextMenuStrip1.Items.Insert(index + 1, _pasteAsHexMenuItem);
+        contextMenuStrip1.Items.Insert(index + 2, _pasteAsTextMenuItem);
+    }
+
+    /// <summary>The menu with the clipboard, the texts pasted lately and the snippets; the choice goes to the device.</summary>
+    private void ShowPasteMenu()
+    {
+        Control owner = HexMode ? hexTerminalControl1 : (Control)_serialTerminalControl;
+        PasteMenu.Show(owner, _commonSettings, null, () => PasteToDevice(null, PasteKind.Auto), text => PasteToDevice(text, PasteKind.Auto));
+    }
+
+    private void PasteToDevice(string clipboardText, PasteKind kind)
     {
         if (IsLineClaimed)
         {
@@ -1911,9 +1966,27 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         try
         {
-            string text = Win32Clipboard.GetText(Handle);
+            string text = clipboardText ?? Win32Clipboard.GetText(Handle);
             if (string.IsNullOrEmpty(text))
             {
+                return;
+            }
+            PasteSettings options = PasteGuard.OptionsOf(_commonSettings);
+            bool asHex = kind == PasteKind.HexBytes
+                || (kind == PasteKind.Auto && HexMode && options.HexViewPastesBytes && DeviceInputText.TryParsePastedHex(text, out _));
+            if (asHex)
+            {
+                if (!DeviceInputText.TryParsePastedHex(text, out byte[] hexBytes))
+                {
+                    ThemedMessageBox.Show("The clipboard does not hold a string of HEX bytes such as DE AD BE EF, 0xDE,0xAD or \\xDE\\xAD.", "Paste as HEX bytes", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                PasteHistory.Add(text, options.EffectiveHistorySize);
+                SendToDevice(hexBytes, hexBytes.Length);
+                if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
+                {
+                    hexTerminalControl1.AppendData(hexBytes, hexBytes.Length, isEcho: true);
+                }
                 return;
             }
             // A command wrapped by its source must not go out in pieces; every line break sends the line at once.
@@ -1928,6 +2001,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
             // the Windows form.
             string lineEnding = PasteGuard.ResolveLineBreak(_commonSettings, GetLineEnding(_deviceTerminalSettings.LineEnding) ?? "\r\n");
             text = DeviceInputText.ConvertLineEndings(text, lineEnding);
+            // A single-byte code page lacks many characters: curly quotes get their ASCII form, anything else that is
+            // missing is reported instead of reaching the device as "?".
+            text = PasteGuard.FitToEncoding(text, _textEncoding, _commonSettings, this);
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
             byte[] bytes = _textEncoding.GetBytes(text);
             SendToDevice(bytes, bytes.Length);
             if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
