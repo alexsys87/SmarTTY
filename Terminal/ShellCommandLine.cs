@@ -595,6 +595,41 @@ internal static class ShellCommandLine
         return result.ToString().TrimEnd();
     }
 
+    /// <summary>
+    /// Keeps the lines of pasted text as lines (separated by "\n"), but joins with a space a line that only continues
+    /// the previous one because the text was wrapped where it was copied from: it starts with an operator or an option
+    /// (see <see cref="JoinPastedLines"/>), the previous line leaves a quote open, or - with
+    /// <paramref name="indentContinues"/> - it is indented deeper than the previous command. Blank lines and a final
+    /// line break are kept. Used where each line is sent as a command of its own (the Serial terminal), so that a wrapped
+    /// command is not sent in pieces. Devices whose commands are indented blocks (a router configuration) need
+    /// <paramref name="indentContinues"/> off.
+    /// </summary>
+    public static string JoinWrappedLines(string text, bool indentContinues)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text ?? "";
+        }
+        string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        List<string> result = new List<string>(lines.Length);
+        int commandIndent = 0;
+        foreach (string line in lines)
+        {
+            string trimmed = line.TrimStart();
+            int indent = line.Length - trimmed.Length;
+            string previous = result.Count > 0 ? result[result.Count - 1] : null;
+            if (previous != null && previous.Trim().Length > 0 && trimmed.Length > 0 &&
+                ((indentContinues && indent > commandIndent) || StartsWithContinuation(trimmed) || HasOpenQuote(previous)))
+            {
+                result[result.Count - 1] = previous.TrimEnd() + " " + trimmed;
+                continue;
+            }
+            result.Add(line);
+            commandIndent = indent;
+        }
+        return string.Join("\n", result);
+    }
+
     // A line that cannot start a command, so it goes on with the previous one: "| grep x", "&& make", "> file", "-v".
     private static bool StartsWithContinuation(string line)
     {
