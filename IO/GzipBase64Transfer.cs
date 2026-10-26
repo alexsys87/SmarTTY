@@ -63,11 +63,24 @@ public static class GzipBase64Transfer
         /// <summary>Replace the destination when it exists. Otherwise an existing destination stops the transfer.</summary>
         public bool Overwrite;
 
-        /// <summary>Bytes typed between two looks at the echo of the device's terminal.</summary>
+        /// <summary>
+        /// Characters in a line of the text typed to the device (base64). A line is typed without its line end, compared with the
+        /// echo of the device's terminal and committed only when the echo is the same; a line that came back damaged is erased
+        /// and typed again, so a smaller value costs less when the line is noisy. 64 to 2048.
+        /// </summary>
         public int WindowBytes = 1024;
 
-        /// <summary>The speed limit used when the device does not echo (the echo is what tells that the data has arrived).</summary>
+        /// <summary>The speed limit used when the device does not echo (the echo is what tells that a line has arrived undamaged).</summary>
         public int NoEchoBytesPerSecond = 6000;
+
+        /// <summary>
+        /// Called when the transfer had to give up while the device was still running its end of it and the connection was
+        /// already gone, so that the device could not be told to stop (a reconnect, a cable pulled). The bytes are what to send to
+        /// the device once there is a connection to it again: they end its reader, remove the unfinished file and restore its
+        /// signals, so that its console is not left waiting for the rest of the data and eating whatever is typed next.
+        /// May be called on any thread.
+        /// </summary>
+        public Action<byte[]> RecoveryRequired;
 
         /// <summary>Receives the lines of the debug log (what was typed to the device, what it answered, what was decided); null for no log.</summary>
         public Action<string> Log;
@@ -79,7 +92,6 @@ public static class GzipBase64Transfer
         0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
     };
 
-    private const int Base64BytesPerLine = 57;   // 76 characters per line, as base64 itself writes them
     private const int UuBytesPerLine = 45;       // 61 characters per line, as uuencode writes them
     private const string MarkerStart = "SMTTY:";
 
@@ -259,6 +271,7 @@ public static class GzipBase64Transfer
         private readonly XModemTransfer.ProgressHandler _progress;
         private readonly string _nonce;
         private readonly string _marker;      // what the device prints: SMTTY:<nonce>:
+        private readonly string _endMarker;   // the line that ends the data typed to the device: SMTTY_END_<nonce>
         private readonly StringBuilder _line = new StringBuilder();
 
         // Lines of the device's script that arrived while this side was busy with something else (typing the data): the
@@ -269,6 +282,10 @@ public static class GzipBase64Transfer
         // Set while a script typed into the device is still running and would have to be stopped (Ctrl-C) when this side gives up:
         // "" when there is nothing to remove, otherwise the shell text that sets $d to the destination whose "$d.smtty~" is to be removed.
         private string _pendingCleanup;
+
+        // True while the device's reader waits for the lines of the data (it ends on the end marker): ending it is how a
+        // transfer is stopped, and how a damaged one is told to give up.
+        private bool _readerWaiting;
 
         // For the debug log and for the error texts: when did the transfer start, what did the device print last.
         private readonly int _startedAt = Environment.TickCount;
@@ -295,6 +312,7 @@ public static class GzipBase64Transfer
             }
             _nonce = text.ToString();
             _marker = MarkerStart + _nonce + ":";
+            _endMarker = "SMTTY_END_" + _nonce;
         }
 
         private void Report(long done, long total, string status)
@@ -556,8 +574,8 @@ public static class GzipBase64Transfer
         {
             Report(0, 0, "Checking the tools on the device...");
             TypeLines(
-                "c=; for t in base64 uudecode uuencode gzip gunzip sha256sum md5sum cksum head dd wc cat mv rm; do command -v $t >/dev/null 2>&1 && c=\"$c $t\"; done",
-                "[ \"$(printf ab | head -c1 2>/dev/null)\" = a ] && c=\"$c headc\"; printf " + Say("CAPS:%s") + " \"$c\"");
+                "c=; for t in base64 uudecode uuencode gzip gunzip sha256sum md5sum cksum sed wc cat mv rm; do command -v $t >/dev/null 2>&1 && c=\"$c $t\"; done",
+                "printf " + Say("CAPS:%s") + " \"$c\"");
             string answer = WaitForMarker(15000, "tool check");
             if (!answer.StartsWith("CAPS:", StringComparison.Ordinal))
             {
@@ -652,6 +670,12 @@ public static class GzipBase64Transfer
             }
         }
 
+        /// <summary>Characters in a line of base64: a multiple of 4, and well under the 4095 that a terminal line may hold.</summary>
+        private int BlockChars()
+        {
+            return Math.Max(64, Math.Min(2048, _options.WindowBytes)) / 4 * 4;
+        }
+
         /// <summary>Packs the file, calculates its checksum and writes the text form of the archive to a temporary file.</summary>
         private Prepared Prepare(string localPath, string storedName, EncodingKind encoding, ChecksumKind checksum)
         {
@@ -689,7 +713,7 @@ public static class GzipBase64Transfer
                 using (FileStream compressed = new FileStream(compressedPath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (FileStream encodedOut = new FileStream(prepared.EncodedPath, FileMode.Create, FileAccess.Write))
                 {
-                    EncodeText(compressed, encodedOut, encoding, storedName);
+                    EncodeText(compressed, encodedOut, encoding, storedName, BlockChars(), _endMarker);
                 }
                 prepared.EncodedLength = new FileInfo(prepared.EncodedPath).Length;
                 return prepared;
@@ -724,14 +748,10 @@ public static class GzipBase64Transfer
             {
                 StartShell();
                 Capabilities caps = Probe();
-                string missing = Missing(caps, "gunzip", "mv", "rm", "cat");
+                string missing = Missing(caps, "gunzip", "mv", "rm", "cat", "sed");
                 if (missing != null)
                 {
                     throw new IOException("The device has no: " + missing + ".");
-                }
-                if (!caps.Has("headc") && !caps.Has("dd"))
-                {
-                    throw new IOException("The device has neither \"head -c\" nor \"dd\" to read the data with.");
                 }
                 EncodingKind encoding = ChooseEncoding(caps, sending: true);
                 ChecksumKind checksum = ChooseChecksum(caps);
@@ -788,8 +808,6 @@ public static class GzipBase64Transfer
         private string SendAttempt(Prepared prepared, Capabilities caps, EncodingKind encoding, ChecksumKind checksum, string name, string remotePath,
             string summary, string attemptText)
         {
-            string reader = caps.Has("headc") ? "head -c " + prepared.EncodedLength.ToString(CultureInfo.InvariantCulture)
-                : "dd bs=1 count=" + prepared.EncodedLength.ToString(CultureInfo.InvariantCulture) + " 2>/dev/null";
             string decoder = encoding == EncodingKind.Base64 ? "base64 -d" : "uudecode -o /dev/stdout";
             string sumTool = ChecksumTool(checksum);
             string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
@@ -798,9 +816,10 @@ public static class GzipBase64Transfer
             // definition): the shell never answers with its continuation prompt "> " in the middle of the script, which is
             // the fragile part of typing into a console, and no line is longer than the line editor of a small
             // busybox takes (OpenWrt builds it with 512 characters).
-            // The data is read by head/dd for exactly the number of bytes it has, so that the shell never gets a
-            // line of it (a uuencoded line can hold anything) whatever fails on the way, and without Ctrl-D, which
-            // would log a shell out.
+            // The data is read by sed up to its end marker line, so that nothing depends on counting bytes that a noisy
+            // line may lose, the shell never gets a line of the data (a uuencoded line can hold anything) whatever fails on
+            // the way, and no Ctrl-D is needed (it would log a shell out). Ctrl-C, Ctrl-\ and Ctrl-Z are ignored while the
+            // data is read: they are what the noise of a bad line is made of now and then, and they would stop the reader.
             string overwriteCheck = _options.Overwrite
                 ? "if false; then :; "
                 : "if [ -e \"$d\" ]; then printf " + Say("EXISTS") + "; ";
@@ -809,18 +828,21 @@ public static class GzipBase64Transfer
                 DestinationScript(remotePath, name) + "; p=\"$d.smtty~\"",
                 "_smtty_end() { s=$(" + sumTool + " <\"$p\");" + trim + " if [ $r -eq 0 ] && [ \"$s\" = " + ShellQuote(prepared.Checksum) + " ]; then mv -f \"$p\" \"$d\" && printf "
                     + Say("OK:%s") + " \"$s\"; else z=$(wc -c <\"$p\" 2>/dev/null); rm -f \"$p\"; printf " + Say("FAIL:%s:%s:%s") + " \"$r\" \"$s\" \"$z\"; fi; }",
-                overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else printf " + Say("READY") + "; " + reader + " | ( " + decoder
-                    + " | gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; _smtty_end; unset -f _smtty_end 2>/dev/null; fi"
+                overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else trap '' INT QUIT TSTP; printf " + Say("READY")
+                    + "; sed -n " + ShellQuote("/^" + _endMarker + "$/q;p") + " | ( " + decoder
+                    + " | gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; trap - INT QUIT TSTP; _smtty_end; unset -f _smtty_end 2>/dev/null; fi"
             };
 
             Report(0, prepared.EncodedLength, "Starting the receiver on the device...");
             _pendingCleanup = DestinationScript(remotePath, name);
+            _readerWaiting = false;
             TypeLines(script);
             string answer = WaitForMarker(20000, "receiver start");
             if (answer == "EXISTS" || answer == "NOWRITE")
             {
                 _pendingCleanup = null;
             }
+            _readerWaiting = answer == "READY";
             if (answer == "EXISTS")
             {
                 throw new IOException("The file already exists on the device. Choose \"Overwrite\" to replace it.");
@@ -835,11 +857,27 @@ public static class GzipBase64Transfer
             }
             Pause(250);
 
-            SendData(prepared, summary + attemptText);
+            bool intact = SendData(prepared, summary + attemptText);
+            if (!intact)
+            {
+                // A line that came back damaged was committed (the device took a line end out of the noise): the data that the
+                // device has is spoiled. End its reader so that it removes the partial file and answers, then try again.
+                Trace("Ending the device's reader after a damaged line");
+                EndReader();
+            }
+            else
+            {
+                _readerWaiting = false; // the end marker has been typed: the reader is over
+            }
 
             Report(prepared.EncodedLength, prepared.EncodedLength, "Unpacking and checking on the device...");
             string result = WaitForResult(prepared);
+            _readerWaiting = false;
             _pendingCleanup = null; // the script is over, and it has removed its partial file itself when it failed
+            if (!intact)
+            {
+                return "A damaged line reached the device before it could be taken back.";
+            }
             if (result.StartsWith("OK:", StringComparison.Ordinal))
             {
                 string deviceSum = result.Substring(3).Trim();
@@ -866,171 +904,74 @@ public static class GzipBase64Transfer
             throw new IOException("Unexpected answer of the device: " + result);
         }
 
-        /// <summary>
-        /// Waits for the device's verdict. A character that was lost on the way leaves the device's reader waiting for it
-        /// (it was told how many bytes to read): when the verdict is late, empty lines are typed to make up for the missing
-        /// bytes, so that the damaged data is checked and refused at once instead of after a long wait.
-        /// </summary>
+        /// <summary>Waits for the device's verdict (the checksum is compared after the data has been unpacked, which takes a while for a big file).</summary>
         private string WaitForResult(Prepared prepared)
         {
-            int started = Environment.TickCount;
-            int timeout = 30000 + (int)Math.Min(int.MaxValue / 2, prepared.EncodedLength / 500) + MaxFillerBytes / 256 * 1000;
-            int nextFiller = started + 3000 + (int)Math.Min(60000, prepared.EncodedLength / 200);
-            int fillerSent = 0;
-            byte[] filler = new byte[256];
-            for (int i = 0; i < filler.Length; i++)
-            {
-                filler[i] = (byte)'\n';
-            }
-            while (true)
-            {
-                _token.ThrowIfCancellationRequested();
-                if (Environment.TickCount - started >= timeout)
-                {
-                    throw new IOException("The device did not answer (result of the transfer). Is a shell prompt waiting there, and is the line free?" + RecentOutput());
-                }
-                string line = ReadLine(300);
-                if (line != null)
-                {
-                    int at = line.IndexOf(_marker, StringComparison.Ordinal);
-                    if (at >= 0)
-                    {
-                        return line.Substring(at + _marker.Length);
-                    }
-                    continue;
-                }
-                if (Environment.TickCount - nextFiller >= 0 && fillerSent < MaxFillerBytes)
-                {
-                    SendBytes(filler);
-                    fillerSent += filler.Length;
-                    nextFiller = Environment.TickCount + 1000;
-                }
-            }
+            int timeout = 30000 + (int)Math.Min(int.MaxValue / 4, prepared.EncodedLength / 200);
+            return WaitForMarker(timeout, "result of the transfer");
         }
 
-        private const int MaxFillerBytes = 16384;
+        private const int MaxLineAttempts = 8;
 
-        /// <summary>Types the text of the archive. After each window the echo of the device's terminal says that it has taken it.</summary>
-        private void SendData(Prepared prepared, string status)
+        private static readonly byte[] NewLine = { (byte)'\n' };
+
+        // Ctrl-U: erases the line that has been typed and not committed.
+        private static readonly byte[] KillLine = { 0x15 };
+
+        /// <summary>
+        /// Types the text of the archive, one line at a time, the way a person does at a terminal: a line is typed without its
+        /// line end, and the device's terminal sends back what it received. When that is the same as what was typed, the line
+        /// end commits the line to the device's reader; when it is not (the noise of the line has changed or lost characters)
+        /// the line is erased with Ctrl-U and typed again, so nothing damaged ever reaches the reader. Returns false only
+        /// when a damaged line got committed anyway.
+        /// </summary>
+        private bool SendData(Prepared prepared, string status)
         {
             // The echoed lines are the data itself: only what is wrong with them goes to the log.
             bool wasQuiet = _quietRx;
             _quietRx = true;
             try
             {
-                using (FileStream stream = new FileStream(prepared.EncodedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
+                bool echoWorks = true;
+                int rate = Math.Max(500, _options.NoEchoBytesPerSecond);
+                long sent = 0;
+                int lineNumber = 0;
+                Trace("Sending " + prepared.EncodedLength + " bytes of text in lines of up to " + BlockChars() + " characters, each checked against the echo; without echo " + rate + " bytes/s");
+                using (StreamReader reader = new StreamReader(prepared.EncodedPath, Encoding.ASCII))
                 {
-                    int windowBytes = Math.Max(64, _options.WindowBytes);
-                    long sent = 0;
-                    long expectedLines = 0, seenLines = 0;
-                    int echoTimeouts = 0;
-                    int windowNumber = 0;
-                    bool echoWorks = true;
-                    bool echoComparable = true; // the echo of this window is not mixed with what is left of an earlier one
-                    bool firstWindow = true;
-                    int rate = Math.Max(500, _options.NoEchoBytesPerSecond);
-                    byte[] window = new byte[windowBytes + 256];
-                    Trace("Sending " + prepared.EncodedLength + " bytes of text in windows of about " + windowBytes + " bytes; echo wait, else " + rate + " bytes/s");
-                    // The window ends at a line end, so that a line is never typed in two pieces.
-                    while (sent < prepared.EncodedLength)
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
                     {
                         _token.ThrowIfCancellationRequested();
-                        int count = ReadWindow(stream, window, windowBytes);
-                        if (count == 0)
-                        {
-                            break;
-                        }
-                        int lines = 0;
-                        for (int i = 0; i < count; i++)
-                        {
-                            if (window[i] == (byte)'\n')
-                            {
-                                lines++;
-                            }
-                        }
-                        windowNumber++;
+                        lineNumber++;
                         int startedAt = Environment.TickCount;
-                        _send(window, 0, count);
-                        sent += count;
-                        expectedLines += lines;
-                        if (windowNumber <= 3 || windowNumber % 100 == 0)
+                        if (lineNumber <= 3 || lineNumber % 100 == 0)
                         {
-                            Trace("TX window " + windowNumber + ": " + count + " bytes, " + sent + " of " + prepared.EncodedLength + " sent; starts with " + Escape(Latin1(window).Substring(0, Math.Min(count, 40)), 80));
+                            Trace("Line " + lineNumber + ": " + line.Length + " characters, " + sent + " of " + prepared.EncodedLength + " bytes done; starts with " + Escape(line.Substring(0, Math.Min(line.Length, 40)), 80));
                         }
+                        if (!SendVerifiedLine(line, lineNumber, ref echoWorks, rate))
+                        {
+                            return false;
+                        }
+                        sent += line.Length + 1;
                         Report(sent, prepared.EncodedLength, status + " - sending " + FormatSize(sent) + " of " + FormatSize(prepared.EncodedLength));
-
-                        if (echoWorks)
-                        {
-                            // 2 s plus what the line itself needs; a device that never echoes is found out by the first window.
-                            int timeout = 2000 + (int)(count * 1000L / rate) * 2;
-                            int deadline = startedAt + timeout;
-                            StringBuilder echoed = new StringBuilder();
-                            while (seenLines < expectedLines && Environment.TickCount - deadline < 0)
-                            {
-                                _token.ThrowIfCancellationRequested();
-                                if (PumpKeepingAnswers(50, out bool lineEnded))
-                                {
-                                    echoed.Append((char)_lastByte);
-                                    if (lineEnded)
-                                    {
-                                        seenLines++;
-                                    }
-                                }
-                            }
-                            if (seenLines < expectedLines)
-                            {
-                                echoTimeouts++;
-                                Trace("ECHO TIMEOUT in window " + windowNumber + ": " + (expectedLines - seenLines) + " of " + lines + " lines were not echoed within " + timeout + " ms (echoed: " + Escape(echoed.ToString(), 120) + ")");
-                                echoComparable = false;
-                                if (firstWindow && seenLines == 0)
-                                {
-                                    Trace("The device does not echo what is typed: the speed limit is used from now on.");
-                                    echoWorks = false;
-                                }
-                                else if (echoTimeouts >= 3)
-                                {
-                                    Trace("Three windows were not echoed in time: the speed limit is used from now on.");
-                                    echoWorks = false;
-                                }
-                                else
-                                {
-                                    _errors++;
-                                }
-                                seenLines = expectedLines; // what was lost will not come any more
-                            }
-                            else if (echoComparable)
-                            {
-                                // The terminal of the device sends back what it received: a difference is damage on the way to it.
-                                string got = echoed.ToString().Replace("\r", string.Empty);
-                                string want = Latin1(window).Substring(0, count);
-                                if (got != want)
-                                {
-                                    int at = 0;
-                                    while (at < got.Length && at < want.Length && got[at] == want[at])
-                                    {
-                                        at++;
-                                    }
-                                    Trace("ECHO MISMATCH in window " + windowNumber + " at byte " + at + ": sent " + Escape(want.Substring(Math.Max(0, at - 10), Math.Min(30, want.Length - Math.Max(0, at - 10))), 100)
-                                        + " but the device echoed " + Escape(got.Substring(Math.Max(0, at - 10), Math.Min(30, got.Length - Math.Max(0, at - 10))), 100));
-                                    _errors++;
-                                    echoComparable = false; // one report is enough; the rest of the log would only repeat it
-                                }
-                            }
-                        }
-                        else
+                        if (!echoWorks)
                         {
                             // No echo to wait for: keep to the speed limit and keep the receive queue empty.
-                            int due = startedAt + (int)(count * 1000L / rate);
+                            int due = startedAt + (int)((line.Length + 1) * 1000L / rate);
                             while (Environment.TickCount - due < 0)
                             {
                                 _token.ThrowIfCancellationRequested();
                                 PumpKeepingAnswers(Math.Max(1, Math.Min(50, due - Environment.TickCount)), out _);
                             }
                         }
-                        firstWindow = false;
                     }
-                    Trace("All " + sent + " bytes sent in " + windowNumber + " windows");
                 }
+                // sed acts on the end marker only when it has read something of the line after it (GNU sed one character, busybox
+                // a whole line): an empty line does it. It is not checked against the echo: the device may be answering already.
+                _send(NewLine, 0, 1);
+                Trace("All " + sent + " bytes sent in " + lineNumber + " lines");
+                return true;
             }
             finally
             {
@@ -1038,67 +979,176 @@ public static class GzipBase64Transfer
             }
         }
 
-        private static int ReadWindow(FileStream stream, byte[] window, int windowBytes)
+        private bool SendVerifiedLine(string line, int lineNumber, ref bool echoWorks, int rate)
         {
-            int count = 0;
-            int b;
-            while (count < windowBytes && (b = stream.ReadByte()) >= 0)
+            byte[] text = Encoding.ASCII.GetBytes(line);
+            for (int attempt = 1; attempt <= MaxLineAttempts; attempt++)
             {
-                window[count++] = (byte)b;
-                if (b == '\n' && count >= windowBytes - 128)
+                _token.ThrowIfCancellationRequested();
+                _send(text, 0, text.Length);
+                if (!echoWorks)
                 {
-                    break;
+                    _send(NewLine, 0, 1);
+                    return true;
+                }
+
+                // 1 s plus what the line itself needs on the wire; the first line has more time, it also finds out whether there is an echo.
+                int timeout = (lineNumber == 1 && attempt == 1 ? 2500 : 1000) + (int)(line.Length * 1000L / rate) * 3;
+                string echoed = ReadEcho(line.Length, timeout);
+                if (echoed == line)
+                {
+                    _send(NewLine, 0, 1);
+                    WaitForLineEnd(1000);
+                    return true;
+                }
+
+                if (lineNumber == 1 && attempt == 1 && echoed.Length == 0)
+                {
+                    Trace("The device does not echo what is typed: the lines cannot be checked, the speed limit is used instead.");
+                    echoWorks = false;
+                    EraseLine();
+                    continue;
+                }
+
+                _errors++;
+                int at = 0;
+                while (at < echoed.Length && at < line.Length && echoed[at] == line[at])
+                {
+                    at++;
+                }
+                Trace("ECHO MISMATCH in line " + lineNumber + " (attempt " + attempt + ") at character " + at + ": typed "
+                    + Escape(line.Substring(Math.Max(0, at - 10), Math.Min(30, line.Length - Math.Max(0, at - 10))), 100)
+                    + " but the device echoed " + Escape(echoed.Substring(Math.Max(0, at - 10), Math.Min(30, echoed.Length - Math.Max(0, at - 10))), 120)
+                    + " (" + echoed.Length + " of " + line.Length + " characters)");
+                if (echoed.IndexOf('\n') >= 0 || echoed.IndexOf('\r') >= 0)
+                {
+                    Trace("The noise contained a line end: the damaged line has been committed on the device.");
+                    return false;
+                }
+                EraseLine();
+            }
+            throw new IOException("A line of the data could not be typed to the device without damage in " + MaxLineAttempts
+                + " attempts: the line is too noisy (a smaller block size, a lower baud rate or flow control may help)." + RecentOutput());
+        }
+
+        /// <summary>Takes what the device echoes of a line that was typed: until all of it is there and the line has been quiet for a moment, or until the time is up.</summary>
+        private string ReadEcho(int expectedLength, int timeoutMs)
+        {
+            StringBuilder echoed = new StringBuilder();
+            int deadline = Environment.TickCount + timeoutMs;
+            while (Environment.TickCount - deadline < 0)
+            {
+                _token.ThrowIfCancellationRequested();
+                bool enough = echoed.Length >= expectedLength;
+                if (PumpKeepingAnswers(enough ? 12 : 50, out _))
+                {
+                    echoed.Append((char)_lastByte);
+                }
+                else if (enough)
+                {
+                    break; // all of it is there and nothing more comes
                 }
             }
-            // Finish the line that the window stopped in.
-            if (count > 0 && window[count - 1] != (byte)'\n')
+            return echoed.ToString();
+        }
+
+        /// <summary>Waits for the line end that was typed to come back (the device's terminal echoes it as a line break).</summary>
+        private void WaitForLineEnd(int timeoutMs)
+        {
+            int deadline = Environment.TickCount + timeoutMs;
+            while (Environment.TickCount - deadline < 0)
             {
-                while (count < window.Length && (b = stream.ReadByte()) >= 0)
+                _token.ThrowIfCancellationRequested();
+                if (PumpKeepingAnswers(50, out _) && _lastByte == (byte)'\n')
                 {
-                    window[count++] = (byte)b;
-                    if (b == '\n')
-                    {
-                        break;
-                    }
+                    return;
                 }
             }
-            return count;
+            Trace("The echo of a line end did not come back; going on.");
+        }
+
+        /// <summary>Erases the line that was typed and not committed. Its echo (the terminal rubs it out) is thrown away.</summary>
+        private void EraseLine()
+        {
+            _send(KillLine, 0, 1);
+            Drain(100, 3000);
+            _line.Length = 0;
+        }
+
+        /// <summary>Ends the device's reader by typing the end marker (after erasing what may be on the line).</summary>
+        private void EndReader()
+        {
+            _send(KillLine, 0, 1);
+            Thread.Sleep(50); // not Pause: this also runs after a cancel, when the token is cancelled already
+            byte[] end = Encoding.ASCII.GetBytes(_endMarker + "\n\n"); // and an empty line: sed reads ahead
+            _send(end, 0, end.Length);
+            _readerWaiting = false;
         }
 
         /// <summary>
-        /// When this side gives up (cancel, an error) while a script it typed is still running, the device may be stuck in its
-        /// reader: Ctrl-C ends it, and the unfinished file is removed.
+        /// When this side gives up (cancel, an error) while a script it typed is still running, the device may be waiting for
+        /// more data: the end marker ends its reader (the script then removes the unfinished file by itself), Ctrl-C ends
+        /// anything else, and the unfinished file is removed once more to be sure.
         /// </summary>
         private void AbortDevice()
         {
             string cleanup = _pendingCleanup;
+            bool readerWaiting = _readerWaiting;
             _pendingCleanup = null;
+            _readerWaiting = false;
             if (cleanup == null)
             {
                 return;
             }
             try
             {
+                if (readerWaiting)
+                {
+                    EndReader();
+                    Thread.Sleep(600);
+                }
                 SendBytes(new byte[] { 0x03 });
                 Thread.Sleep(200);
                 SendBytes(new byte[] { 0x03, (byte)'\r' });
                 Thread.Sleep(300);
                 if (cleanup.Length > 0)
                 {
-                    SendBytes(Ascii(cleanup + "; rm -f \"$d.smtty~\"\r"));
+                    SendBytes(Ascii("trap - INT QUIT TSTP; " + cleanup + "; rm -f \"$d.smtty~\"\r"));
                     Thread.Sleep(100);
                 }
                 while (_readByte(150) != null)
                 {
                 }
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException || ex is InvalidOperationException)
             {
-                // The line is gone: nothing more to clean up from here.
+                // The line is gone, so the device cannot be told now. It is left in its reader (the console would wait for the
+                // rest of the data and eat what is typed next): hand over what ends that, for the next connection to it.
+                Trace("The connection is gone, the device could not be told to stop (" + ex.Message + "): the recovery is handed over for the next connection");
+                try
+                {
+                    _options.RecoveryRequired?.Invoke(BuildRecovery(cleanup));
+                }
+                catch (Exception callbackError) when (callbackError is IOException || callbackError is InvalidOperationException || callbackError is ObjectDisposedException)
+                {
+                    Trace("The recovery could not be handed over: " + callbackError.Message);
+                }
             }
-            catch (InvalidOperationException)
+        }
+
+        /// <summary>
+        /// What brings a console back that a lost transfer left in the middle of it. For a receive (nothing is removed): Ctrl-C ends the
+        /// sender. For a send: Ctrl-U clears the line, the end marker ends the reader (the script then removes the unfinished file by
+        /// itself and restores its signals, as it does after any ended transfer), and the last two lines do the same once more in
+        /// case there was no script any more. At a plain prompt all of this is harmless: the marker is an unknown command.
+        /// </summary>
+        private byte[] BuildRecovery(string cleanup)
+        {
+            if (cleanup.Length == 0)
             {
+                return new byte[] { 0x03, (byte)'\r' };
             }
+            return Ascii("\u0015" + _endMarker + "\n\ntrap - INT QUIT TSTP\r" + cleanup + "; rm -f \"$d.smtty~\"\r");
         }
 
         // ----- receiving -----
@@ -1115,6 +1165,7 @@ public static class GzipBase64Transfer
             }
             string partPath = localPath + ".smtty~";
             bool done = false;
+            bool keepPart = false;
             Trace("RECEIVE " + remotePath + " -> " + localPath + "; encoding " + _options.Encoding + ", checksum " + _options.Checksum + ", attempts " + _options.Attempts + ", overwrite " + _options.Overwrite);
             try
             {
@@ -1135,11 +1186,26 @@ public static class GzipBase64Transfer
                     string failure = ReceiveAttempt(caps, encoding, checksum, remotePath, Path.GetFileName(localPath), partPath, attemptText);
                     if (failure == null)
                     {
-                        if (File.Exists(localPath))
+                        // From here the unfinished file is the only copy of the checked data: it is kept if it cannot be put in place,
+                        // and the old file is replaced in one step (File.Replace), never deleted first.
+                        keepPart = true;
+                        try
                         {
-                            File.Delete(localPath); // the new file is complete and checked: only now is the old one given up
+                            if (File.Exists(localPath))
+                            {
+                                File.Replace(partPath, localPath, null);
+                            }
+                            else
+                            {
+                                File.Move(partPath, localPath);
+                            }
                         }
-                        File.Move(partPath, localPath);
+                        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                        {
+                            throw new IOException("The file was received and its checksum matches, but it could not be saved as " + localPath + " (" + ex.Message
+                                + "). The checked copy is kept as " + partPath + ": rename it when the file can be replaced.", ex);
+                        }
+                        keepPart = false;
                         done = true;
                         Report(1, 1, "Done: " + checksum + " matches.");
                         return true;
@@ -1169,7 +1235,7 @@ public static class GzipBase64Transfer
             }
             finally
             {
-                if (!done)
+                if (!done && !keepPart)
                 {
                     try
                     {
@@ -1357,31 +1423,38 @@ public static class GzipBase64Transfer
 
     // ---------- text forms ----------
 
-    private static void EncodeText(Stream compressed, Stream output, EncodingKind encoding, string storedName)
+    private static void EncodeText(Stream compressed, Stream output, EncodingKind encoding, string storedName, int blockChars, string endMarker)
     {
         if (encoding == EncodingKind.Base64)
         {
-            byte[] block = new byte[Base64BytesPerLine];
+            // One line is one block of the archive: it is checked against the echo as a whole before the device is given it.
+            byte[] block = new byte[blockChars / 4 * 3];
             int count;
             while ((count = ReadFull(compressed, block)) > 0)
             {
                 byte[] line = Encoding.ASCII.GetBytes(Convert.ToBase64String(block, 0, count) + "\n");
                 output.Write(line, 0, line.Length);
             }
-            return;
         }
-
-        byte[] header = Encoding.ASCII.GetBytes("begin 644 " + UuSafeName(storedName) + "\n");
-        output.Write(header, 0, header.Length);
-        byte[] data = new byte[UuBytesPerLine];
-        int got;
-        while ((got = ReadFull(compressed, data)) > 0)
+        else
         {
-            byte[] line = Encoding.ASCII.GetBytes(UuEncodeLine(data, got) + "\n");
-            output.Write(line, 0, line.Length);
+            byte[] header = Encoding.ASCII.GetBytes("begin 644 " + UuSafeName(storedName) + "\n");
+            output.Write(header, 0, header.Length);
+            byte[] data = new byte[UuBytesPerLine];
+            int got;
+            while ((got = ReadFull(compressed, data)) > 0)
+            {
+                byte[] line = Encoding.ASCII.GetBytes(UuEncodeLine(data, got) + "\n");
+                output.Write(line, 0, line.Length);
+            }
+            byte[] footer = Encoding.ASCII.GetBytes("`\nend\n");
+            output.Write(footer, 0, footer.Length);
         }
-        byte[] footer = Encoding.ASCII.GetBytes("`\nend\n");
-        output.Write(footer, 0, footer.Length);
+        // The end marker is the last line of the file. sed reads ahead (to know whether a line is the last), so it acts on the
+        // marker only when something of the next line has come: SendData types an empty line after it, which sed reads and takes
+        // away with it, so it never reaches the shell.
+        byte[] end = Encoding.ASCII.GetBytes(endMarker + "\n");
+        output.Write(end, 0, end.Length);
     }
 
     private static int ReadFull(Stream stream, byte[] buffer)

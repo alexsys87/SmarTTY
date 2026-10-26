@@ -1171,6 +1171,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             if (connectionStateEnum == ConnectionStateEnum.Connected)
             {
                 _serialTerminalControl.BeginNewSession();
+                DeliverPendingGzipBase64Recovery();
             }
         }
         finally

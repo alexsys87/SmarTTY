@@ -182,9 +182,9 @@ public partial class GzipBase64TransferWindow : Window
             return;
         }
 
-        if (!int.TryParse(BlockBox.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int block) || block < 64 || block > 8192)
+        if (!int.TryParse(BlockBox.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int block) || block < 64 || block > 2048)
         {
-            MessageBoxes.Warning("The block size must be a number from 64 to 8192 bytes.");
+            MessageBoxes.Warning("The block size must be a number from 64 to 2048 characters.");
             BlockBox.Focus();
             return;
         }

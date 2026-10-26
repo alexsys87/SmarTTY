@@ -62,10 +62,10 @@
         <TextBox x:Name="RateBox" Width="70" Text="6000" VerticalContentAlignment="Center" ToolTip="Bytes per second. Used only when the device does not echo what is typed: the echo is how the sender knows that the data has arrived. 11520 is the top of a 115200 baud line; keep it lower." />
         <TextBlock Text="bytes/s" VerticalAlignment="Center" Margin="6 0 0 0" />
       </StackPanel>
-      <TextBlock Grid.Row="2" Grid.Column="0" Text="Block size:" VerticalAlignment="Center" Margin="0 2 8 2" />
+      <TextBlock Grid.Row="2" Grid.Column="0" Text="Line length:" VerticalAlignment="Center" Margin="0 2 8 2" />
       <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0 2 12 2">
-        <TextBox x:Name="BlockBox" Width="50" Text="1024" VerticalContentAlignment="Center" ToolTip="Bytes typed to the device between two looks at its echo. Make it smaller (e.g. 128) if the data arrives damaged." />
-        <TextBlock Text="bytes" VerticalAlignment="Center" Margin="6 0 0 0" />
+        <TextBox x:Name="BlockBox" Width="50" Text="1024" VerticalContentAlignment="Center" ToolTip="Characters in a line of the text typed to the device. Every line is checked against the echo of the device and typed again if it came back damaged. A smaller value costs less on a noisy line." />
+        <TextBlock Text="characters" VerticalAlignment="Center" Margin="6 0 0 0" />
       </StackPanel>
       <CheckBox x:Name="DebugBox" Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2" Content="Write a debug log (Temp folder)" IsChecked="True" VerticalAlignment="Center" Margin="0 2 0 2" ToolTip="Saves everything typed to the device and everything it answered to a text file; its path is shown if the transfer fails." />
     </Grid>
