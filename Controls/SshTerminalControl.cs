@@ -744,6 +744,16 @@ public class SshTerminalControl : TerminalEmulatorControl
         return false;
     }
 
+    protected override int GetScreenSelectionLastLine()
+    {
+        // Ctrl+double click selects the visible output, not the command line the user is editing.
+        if (_inputLine != null)
+        {
+            return _inputLine.StartLine - 1;
+        }
+        return base.GetScreenSelectionLastLine();
+    }
+
     private bool InputWraps()
     {
         // Before the first layout there are no columns yet; rewrapping to 0 columns would never finish.
@@ -919,15 +929,6 @@ public class SshTerminalControl : TerminalEmulatorControl
             SetSelectionEnd(new TextDocument.TextPosition(((EditableTextBrowser)this).EditableDocument.GetLineText(((EditableTextBrowser)this).EditableDocument.LineCount - 1).Length, ((EditableTextBrowser)this).EditableDocument.LineCount - 1));
             SetSelection(select: true, new TextDocument.TextPosition(_inputLine.Prompt.Length, _inputLine.StartLine));
         }
-    }
-
-    protected override void AdjustSelectionEnd(ref TextDocument.TextPosition textPosition)
-    {
-        if (_inputLine != null && ((ReadonlyTextBrowser)this).HasSelection && !(SelectionEnd < _inputLine.StartPosition) && textPosition < _inputLine.StartPosition)
-        {
-            textPosition = _inputLine.StartPosition;
-        }
-        base.AdjustSelectionEnd(ref textPosition);
     }
 
     private void ShowCompletions(CompletionTrigger completionTrigger = CompletionTrigger.Normal)
