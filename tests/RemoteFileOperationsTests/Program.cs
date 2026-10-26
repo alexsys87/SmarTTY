@@ -62,6 +62,25 @@ internal static class Program
         Check(loaded != null && loaded.IsNewFile && loaded.Text == "", "a second save replaces the draft (new file, empty text)");
         Equal(Directory.GetFiles(directory).Length, 1, "no temporary files are left behind");
 
+        // The raw bytes of the hex view (format 3): any byte, an empty file, and encryption.
+        string hexKey = EditorDraftStore.KeyFor("a", "/bin/blob");
+        byte[] bytes = { 0x00, 0x01, 0x02, 0x0A, 0x0D, 0x7F, 0x80, 0xFE, 0xFF };
+        store.Save(hexKey, new EditorDraft { RemotePath = "/bin/blob", SavedUtc = saved, BaseHash = "h", Bytes = bytes });
+        EditorDraft hexDraft = store.TryLoad(hexKey);
+        Check(hexDraft != null && hexDraft.Text == null, "a byte draft has no text");
+        Equal(Convert.ToBase64String(hexDraft?.Bytes ?? Array.Empty<byte>()), Convert.ToBase64String(bytes), "a byte draft keeps every byte");
+        string rawHex = File.ReadAllText(Path.Combine(directory, hexKey + ".draft"));
+        Check(rawHex.StartsWith("SmarTTY-draft 3\n", StringComparison.Ordinal), "a byte draft has its own format");
+        store.Save(hexKey, new EditorDraft { RemotePath = "/bin/blob", SavedUtc = saved, Bytes = Array.Empty<byte>() });
+        hexDraft = store.TryLoad(hexKey);
+        Check(hexDraft != null && hexDraft.Bytes != null && hexDraft.Bytes.Length == 0 && hexDraft.Text == null, "an empty byte draft is not an empty text draft");
+        EditorDraftStore protectedHexStore = new EditorDraftStore(directory, new ReversingProtector());
+        protectedHexStore.Save(hexKey, new EditorDraft { RemotePath = "/bin/blob", SavedUtc = saved, BaseHash = "h", Bytes = bytes });
+        hexDraft = protectedHexStore.TryLoad(hexKey);
+        Check(hexDraft != null && hexDraft.Text == null && Convert.ToBase64String(hexDraft.Bytes) == Convert.ToBase64String(bytes), "an encrypted byte draft is read back");
+        Check(store.TryLoad(hexKey) == null, "an encrypted byte draft is not read without the protector");
+        store.Delete(hexKey);
+
         File.WriteAllText(Path.Combine(directory, key + ".draft"), "not a draft");
         Check(store.TryLoad(key) == null, "a damaged draft is ignored");
         store.Delete(key);

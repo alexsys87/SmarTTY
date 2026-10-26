@@ -2,6 +2,7 @@ using SmarTTY.Controls;
 using System;
 using System.Collections.Generic;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -14,7 +15,9 @@ namespace SmarTTY.GUI.Backend;
 /// </summary>
 internal sealed class RemoteFileEditorToolBar : ToolBar
 {
-    private readonly Dictionary<EditorToolbarCommand, Button> _buttons = new Dictionary<EditorToolbarCommand, Button>();
+    private readonly Dictionary<EditorToolbarCommand, ButtonBase> _buttons = new Dictionary<EditorToolbarCommand, ButtonBase>();
+
+    private readonly ToggleButton _hexButton;
 
     public RemoteFileEditorToolBar(RemoteFileEditorPanel panel)
     {
@@ -40,6 +43,22 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
             };
             // The images are 16 pixels; smooth the upscaling on a high-DPI monitor.
             RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
+            EditorToolbarCommand current = command.Value;
+            if (current == EditorToolbarCommand.ToggleHex)
+            {
+                ToggleButton toggle = new ToggleButton
+                {
+                    Content = icon,
+                    ToolTip = description.ToolTip
+                };
+                ToolTipService.SetShowOnDisabled(toggle, true);
+                toggle.SetResourceReference(StyleProperty, ToolBar.ToggleButtonStyleKey);
+                toggle.Click += (sender, e) => panel.RunCommand(current);
+                _hexButton = toggle;
+                _buttons[current] = toggle;
+                Items.Add(toggle);
+                continue;
+            }
             Button button = new Button
             {
                 Content = icon,
@@ -47,7 +66,6 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
             };
             ToolTipService.SetShowOnDisabled(button, true);
             button.SetResourceReference(StyleProperty, ToolBar.ButtonStyleKey);
-            EditorToolbarCommand current = command.Value;
             button.Click += (sender, e) => panel.RunCommand(current);
             _buttons[current] = button;
             Items.Add(button);
@@ -58,9 +76,13 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
 
     private void UpdateState(EditorCommandState state)
     {
-        foreach (KeyValuePair<EditorToolbarCommand, Button> pair in _buttons)
+        foreach (KeyValuePair<EditorToolbarCommand, ButtonBase> pair in _buttons)
         {
             pair.Value.IsEnabled = state.IsEnabled(pair.Key);
+        }
+        if (_hexButton != null)
+        {
+            _hexButton.IsChecked = state.HexMode;
         }
     }
 

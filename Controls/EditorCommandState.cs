@@ -16,7 +16,8 @@ internal enum EditorToolbarCommand
     Find,
     Replace,
     GoToLine,
-    Reload
+    Reload,
+    ToggleHex
 }
 
 /// <summary>
@@ -46,6 +47,12 @@ internal struct EditorCommandState
     /// <summary>A save is running in the background.</summary>
     public bool IsSaving { get; set; }
 
+    /// <summary>The editor shows the bytes in the hex view.</summary>
+    public bool HexMode { get; set; }
+
+    /// <summary>The file is loaded and no save is running: the hex view can be opened.</summary>
+    public bool CanUseHex { get; set; }
+
     public bool IsEnabled(EditorToolbarCommand command)
     {
         switch (command)
@@ -68,13 +75,16 @@ internal struct EditorCommandState
             case EditorToolbarCommand.SelectAll:
                 return HasText;
             case EditorToolbarCommand.Replace:
-                return !ReadOnly;
+                // The text search and replace window does not know about the bytes in the hex view.
+                return !ReadOnly && !HexMode;
             case EditorToolbarCommand.Reload:
                 // There is a file on the server to load again, and nothing is being written to it.
                 return !ReadOnly && !IsNewFile && !IsSaving;
             case EditorToolbarCommand.Find:
             case EditorToolbarCommand.GoToLine:
                 return true;
+            case EditorToolbarCommand.ToggleHex:
+                return CanUseHex && !IsSaving;
             default:
                 return false;
         }
@@ -130,7 +140,9 @@ internal static class EditorCommandCatalog
         null,
         EditorToolbarCommand.Find,
         EditorToolbarCommand.Replace,
-        EditorToolbarCommand.GoToLine
+        EditorToolbarCommand.GoToLine,
+        null,
+        EditorToolbarCommand.ToggleHex
     };
 
     public static readonly EditorToolbarCommand?[] ContextMenuLayout =
@@ -148,6 +160,8 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.Find,
         EditorToolbarCommand.Replace,
         EditorToolbarCommand.GoToLine,
+        null,
+        EditorToolbarCommand.ToggleHex,
         null,
         EditorToolbarCommand.Save,
         EditorToolbarCommand.Reload
@@ -181,6 +195,8 @@ internal static class EditorCommandCatalog
                 return new EditorCommandDescription("Go to Line...", "goto-line", "editor/goto-line.png", "Ctrl+G");
             case EditorToolbarCommand.Reload:
                 return new EditorCommandDescription("Reload from Server", "refresh", "MainWindow/refresh16.png", "");
+            case EditorToolbarCommand.ToggleHex:
+                return new EditorCommandDescription("Hex Editor", "hex", "editor/hex.png", "");
             default:
                 throw new ArgumentOutOfRangeException(nameof(command));
         }
@@ -201,6 +217,20 @@ internal static class EditorStatusText
     {
         string text = characters + ((characters == 1) ? " char" : " chars");
         return (lines > 1) ? (text + ", " + lines + " lines") : text;
+    }
+
+    /// <summary>The caret of the hex view: the byte offset, the size of the file, and the typing mode.</summary>
+    public static string HexPosition(int offset, int length, bool insertMode)
+    {
+        return "Offset 0x" + offset.ToString("X8", System.Globalization.CultureInfo.InvariantCulture)
+            + " of 0x" + length.ToString("X8", System.Globalization.CultureInfo.InvariantCulture)
+            + (insertMode ? " (INS)" : " (OVR)");
+    }
+
+    /// <summary>The selection of the hex view: its length in bytes.</summary>
+    public static string HexSelection(int bytes)
+    {
+        return bytes + ((bytes == 1) ? " byte" : " bytes");
     }
 
     /// <summary>Whether the file on the server matches the text in the editor.</summary>

@@ -33,7 +33,7 @@ public partial class TextEditorControl : EditableTextBrowser
         return base.EditableDocument.GetRangeText(start, end);
     }
 
-    public void CopyAll()
+    public virtual void CopyAll()
     {
         try
         {
@@ -53,7 +53,7 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
-    public void CopySelection(bool select = true)
+    public virtual void CopySelection(bool select = true)
     {
         try
         {
@@ -98,7 +98,7 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
-    public void Cut()
+    public virtual void Cut()
     {
         CopySelection();
         if (!_hasSelection)
@@ -113,7 +113,7 @@ public partial class TextEditorControl : EditableTextBrowser
     }
 
     /// <summary>Removes the selected text; does nothing without a selection (unlike Cut, it leaves the clipboard alone).</summary>
-    public void DeleteSelection()
+    public virtual void DeleteSelection()
     {
         if (IsEditable && _hasSelection)
         {

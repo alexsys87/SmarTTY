@@ -383,7 +383,13 @@ public class MainWindowController : INotifyPropertyChanged
 
         internal void Search()
         {
-            TextSearcher searcher = _Controller.ActiveSession?.ActiveTab?.Searcher;
+            ITabContext activeTab = _Controller.ActiveSession?.ActiveTab;
+            if (activeTab is EditorTabContext editorTab && editorTab.Editor.IsHexMode)
+            {
+                editorTab.ShowHexFind();
+                return;
+            }
+            TextSearcher searcher = activeTab?.Searcher;
             if (searcher != null)
             {
                 searcher.IsReplaceVisible = false;
@@ -397,6 +403,19 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 return;
             }
+            if (editor.IsHexMode)
+            {
+                GoToOffsetWindow offsetWindow = new GoToOffsetWindow(editor.HexEditor.CaretOffset, editor.HexEditor.Length)
+                {
+                    Owner = _Controller._Window
+                };
+                if (offsetWindow.ShowDialog() == true)
+                {
+                    editor.HexEditor.GoToOffset(offsetWindow.Offset);
+                }
+                editor.FocusActiveView();
+                return;
+            }
             GoToLineWindow window = new GoToLineWindow(editor.CaretPosition.Line + 1, Math.Max(1, editor.LineCount))
             {
                 Owner = _Controller._Window
@@ -405,7 +424,7 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 editor.GoToPosition(window.Line - 1, Math.Max(0, window.Column - 1));
             }
-            editor.Focus();
+            editor.FocusActiveView();
         }
 
         private void editor_UnsavedChanged(EditableTextBrowser editor, bool newValue)
@@ -464,7 +483,10 @@ public class MainWindowController : INotifyPropertyChanged
                     case Keys.H:
                         // Ctrl+H is also Backspace as a character: keep it from reaching the editor.
                         e.SuppressKeyPress = true;
-                        _Controller.ActiveSession?.ActiveTab?.Searcher?.ActivateReplace();
+                        if ((sender as RemoteFileEditor)?.IsHexMode != true)
+                        {
+                            _Controller.ActiveSession?.ActiveTab?.Searcher?.ActivateReplace();
+                        }
                         break;
                     case Keys.G:
                         e.SuppressKeyPress = true;
@@ -472,9 +494,17 @@ public class MainWindowController : INotifyPropertyChanged
                         break;
                 }
             }
-            else if (!e.Control && !e.Alt && e.KeyCode == Keys.F3 && (sender as ReadonlyTextBrowser)?.Tag is EditorTabContext editorTabContext)
+            else if (!e.Control && !e.Alt && e.KeyCode == Keys.F3)
             {
-                editorTabContext?.Searcher?.Search(e.Shift);
+                if (sender is RemoteFileEditor hexEditor && hexEditor.IsHexMode)
+                {
+                    e.SuppressKeyPress = true;
+                    hexEditor.HexEditor.FindNext(!e.Shift);
+                }
+                else if ((sender as ReadonlyTextBrowser)?.Tag is EditorTabContext editorTabContext)
+                {
+                    editorTabContext?.Searcher?.Search(e.Shift);
+                }
             }
         }
 
