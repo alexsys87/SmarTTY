@@ -121,23 +121,6 @@ public class SetupApiDeviceSet : IDisposable
         DetectUnused48 = 48
     }
 
-    public enum OemSourceMediaTypeLegacy
-    {
-        Unknown = 1,
-        CdRom,
-        Disk,
-        Directory,
-        Web
-    }
-
-    [Flags]
-    private enum DeviceFlagsLegacy
-    {
-        Flag0x1 = 1,
-        Flag0x2 = 2,
-        Flag0x4 = 4
-    }
-
     private enum DeviceRegistryProperty
     {
         DeviceDescription = 0,
@@ -275,7 +258,7 @@ public class SetupApiDeviceSet : IDisposable
 
     public SetupApiDeviceSet(Guid guid)
     {
-        _deviceInfoSet = SetupDiGetClassDevs(ref guid, null, (IntPtr)0, 2u);
+        _deviceInfoSet = SetupDiGetClassDevs(ref guid, null, (IntPtr)0, (uint)DiGetClassFlags.Present);
         if (_deviceInfoSet == InvalidHandleValue)
         {
             // Nothing to enumerate; an invalid set would make every call fail.

@@ -5,32 +5,6 @@ namespace SmarTTY.Native;
 
 public class Win32Clipboard
 {
-    private enum ClipboardFormat : uint
-    {
-        Text = 1u,
-        Bitmap = 2u,
-        MetafilePict = 3u,
-        Sylk = 4u,
-        Dif = 5u,
-        Tiff = 6u,
-        OemText = 7u,
-        Dib = 8u,
-        Palette = 9u,
-        PenData = 10u,
-        Riff = 11u,
-        Wave = 12u,
-        UnicodeText = 13u,
-        EnhMetafile = 14u,
-        HDrop = 15u,
-        Locale = 16u,
-        DibV5 = 17u,
-        OwnerDisplay = 128u,
-        DspText = 129u,
-        DspBitmap = 130u,
-        DspMetafilePict = 131u,
-        DspEnhMetafile = 142u
-    }
-
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool OpenClipboard(IntPtr hWndNewOwner);
 

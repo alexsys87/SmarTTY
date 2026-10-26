@@ -12,14 +12,6 @@ namespace SmarTTY.Sync;
 
 internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 {
-    public class SysprogsSyncException : Exception
-    {
-        public SysprogsSyncException(string message)
-            : base(message)
-        {
-        }
-    }
-
     private enum SessionMode
     {
         Download,
