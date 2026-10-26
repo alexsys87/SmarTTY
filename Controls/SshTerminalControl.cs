@@ -921,15 +921,6 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
     }
 
-    protected override void AdjustSelectionEnd(ref TextDocument.TextPosition textPosition)
-    {
-        if (_inputLine != null && ((ReadonlyTextBrowser)this).HasSelection && !(SelectionEnd < _inputLine.StartPosition) && textPosition < _inputLine.StartPosition)
-        {
-            textPosition = _inputLine.StartPosition;
-        }
-        base.AdjustSelectionEnd(ref textPosition);
-    }
-
     private void ShowCompletions(CompletionTrigger completionTrigger = CompletionTrigger.Normal)
     {
         ICompletionPopup completionPopup = _popup;
