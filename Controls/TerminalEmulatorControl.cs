@@ -3,6 +3,7 @@ using SmarTTY.Terminal;
 using SmarTTY.Utilities;
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Media;
@@ -27,6 +28,12 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         WaveFile
     }
 
+    /// <summary>
+    /// Collects what one escape sequence meant and, when it is disposed, hands that to <c>TerminalEmulatorBase.Trace</c>
+    /// as a single line. It is only ever created in a Debug build (see <c>ProcessOutput</c>), and every method that
+    /// feeds it is <see cref="ConditionalAttribute"/> on DEBUG, so a Release build neither calls nor allocates any of
+    /// this and the description strings are not even compiled in.
+    /// </summary>
     internal class EscapeTrace : IDisposable
     {
         private string _warning;
@@ -34,8 +41,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         private string _description;
 
         private string _raw;
-
-        private string _input;
 
         private int _position;
 
@@ -48,40 +53,44 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
         public void Dispose()
         {
+            string prefix = "[ESC @" + _position + "] ";
             if (_description != null)
             {
-                _terminal.Trace("[ESC] " + _description);
+                _terminal.Trace(prefix + _description);
             }
             else if (_warning != null)
             {
-                _terminal.Trace("[ESC] WARNING: " + _warning + " (" + _raw + " )");
+                _terminal.Trace(prefix + "WARNING: " + _warning + " (" + _raw + " )");
             }
             else if (_raw != null)
             {
-                _terminal.Trace(_raw);
+                _terminal.Trace(prefix + _raw);
             }
             else
             {
-                _terminal.Trace("???");
+                _terminal.Trace(prefix + "???");
             }
         }
 
-        internal void SetInput(string text, int position)
+        [Conditional("DEBUG")]
+        internal void SetPosition(int position)
         {
-            _input = text;
             _position = position;
         }
 
+        [Conditional("DEBUG")]
         internal void SetDescription(string text)
         {
             _description = text;
         }
 
+        [Conditional("DEBUG")]
         internal void SetWarning(string text)
         {
             _warning = text;
         }
 
+        [Conditional("DEBUG")]
         internal void SetRaw(string text)
         {
             this._raw = text;
@@ -398,7 +407,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     base.ResetLinkTracking();
                 }
                 segmentStart = charIndex + 1;
-                EscapeTrace escapeTrace = null;
                 switch (output[charIndex])
                 {
                     case '\r':
@@ -445,6 +453,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                         break;
                     case '\u001b':
                         {
+                            // Escape diagnostics exist in a Debug build only. The tracing object is created just
+                            // around the sequence, so its Dispose() reports what the sequence meant right after
+                            // it is parsed. A Release build compiles the whole thing out.
+#if DEBUG
+                            using EscapeTrace escapeTrace = new EscapeTrace(this);
+#else
+                            EscapeTrace escapeTrace = null;
+#endif
                             int consumed = ParseEscapeSequence(output, charIndex, out var text, escapeTrace);
                             charIndex += consumed - 1;
                             segmentStart += consumed - 1;
@@ -541,7 +557,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     private int ParseEscapeSequence(string text, int position, out string parsedText, EscapeTrace escapeTrace = null)
     {
         parsedText = null;
-        escapeTrace?.SetInput(text, position);
+        escapeTrace?.SetPosition(position);
         if (position + 1 >= text.Length)
         {
             _incompleteEscape = text.Substring(position);
