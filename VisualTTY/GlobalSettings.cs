@@ -82,6 +82,9 @@ public class GlobalSettings : INotifyPropertyChanged
         // A grey line under each tab character, to tell tab-indented lines from space-indented ones.
         public bool ShowTabs;
 
+        // Marks for spaces, tabs, line ends and other characters that would otherwise leave no ink (see ShowTabs).
+        public bool ShowAllCharacters;
+
         public bool SyntaxHighlighting;
 
         // The editor offers words (keywords and identifiers of the file) while typing; Ctrl+Space opens the list.

@@ -379,6 +379,12 @@ public class MainWindowController : INotifyPropertyChanged
             // The tool bar and the context menu of the editor.
             newTab.EditorPanel.SaveRequested += (object sender, EventArgs e) => SaveFile();
             newTab.EditorPanel.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
+            newTab.EditorPanel.ShowAllCharactersChanged += (object sender, EventArgs e) =>
+            {
+                // The switch on the tool bar and in the context menu is the same setting as in the settings window.
+                _Controller.Settings.Editor.ShowAllCharacters = editor.ShowAllCharacters;
+                _Controller.Settings.Save();
+            };
         }
 
         internal void Search()
@@ -1368,10 +1374,16 @@ public class MainWindowController : INotifyPropertyChanged
         edit.InsertSpaces = Settings.Editor.InsertSpaces;
         edit.HideMargins = !Settings.Editor.ShowLineNumbers;
         edit.ShowTabs = Settings.Editor.ShowTabs;
+        edit.ShowAllCharacters = Settings.Editor.ShowAllCharacters;
         edit.CompletionEnabled = Settings.Editor.Autocompletion;
         edit.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;
         edit.ApiSymbols = Settings.Editor.ApiSymbols ? ApiSymbols : null;
         ApplySyntaxHighlighting(edit);
+        // The settings window can switch the character marks too, so the tool bar and the menu show the new state.
+        if (edit.Tag is EditorTabContext editorTab)
+        {
+            editorTab.EditorPanel.RefreshState();
+        }
     }
 
     private void ApplySyntaxHighlighting(RemoteFileEditor edit)

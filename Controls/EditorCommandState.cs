@@ -16,6 +16,7 @@ internal enum EditorToolbarCommand
     Find,
     Replace,
     GoToLine,
+    ShowAllCharacters,
     Reload
 }
 
@@ -46,6 +47,9 @@ internal struct EditorCommandState
     /// <summary>A save is running in the background.</summary>
     public bool IsSaving { get; set; }
 
+    /// <summary>The editor shows spaces, tabs, line ends and other invisible characters as marks.</summary>
+    public bool ShowAllCharacters { get; set; }
+
     public bool IsEnabled(EditorToolbarCommand command)
     {
         switch (command)
@@ -74,10 +78,17 @@ internal struct EditorCommandState
                 return !ReadOnly && !IsNewFile && !IsSaving;
             case EditorToolbarCommand.Find:
             case EditorToolbarCommand.GoToLine:
+            case EditorToolbarCommand.ShowAllCharacters:
                 return true;
             default:
                 return false;
         }
+    }
+
+    /// <summary>Whether a command that switches something on is currently on.</summary>
+    public bool IsChecked(EditorToolbarCommand command)
+    {
+        return command == EditorToolbarCommand.ShowAllCharacters && ShowAllCharacters;
     }
 }
 
@@ -130,7 +141,9 @@ internal static class EditorCommandCatalog
         null,
         EditorToolbarCommand.Find,
         EditorToolbarCommand.Replace,
-        EditorToolbarCommand.GoToLine
+        EditorToolbarCommand.GoToLine,
+        null,
+        EditorToolbarCommand.ShowAllCharacters
     };
 
     public static readonly EditorToolbarCommand?[] ContextMenuLayout =
@@ -148,6 +161,7 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.Find,
         EditorToolbarCommand.Replace,
         EditorToolbarCommand.GoToLine,
+        EditorToolbarCommand.ShowAllCharacters,
         null,
         EditorToolbarCommand.Save,
         EditorToolbarCommand.Reload
@@ -179,6 +193,8 @@ internal static class EditorCommandCatalog
                 return new EditorCommandDescription("Replace", "replace", "editor/replace.png", "Ctrl+H");
             case EditorToolbarCommand.GoToLine:
                 return new EditorCommandDescription("Go to Line...", "goto-line", "editor/goto-line.png", "Ctrl+G");
+            case EditorToolbarCommand.ShowAllCharacters:
+                return new EditorCommandDescription("Show All Characters", "show-all-characters", "editor/show-all-characters.png", "");
             case EditorToolbarCommand.Reload:
                 return new EditorCommandDescription("Reload from Server", "refresh", "MainWindow/refresh16.png", "");
             default:
