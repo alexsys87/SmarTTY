@@ -69,6 +69,12 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     private SignatureHintController _signatureHintController;
 
+    private SyntaxHighlighting.Language _completionLanguage = SyntaxHighlighting.Language.Plain;
+
+    private bool _completionEnabled = true;
+
+    private bool _completionOnTyping;
+
     private bool _suppressHintClose;
 
     internal TabHandler _tabHandler;
@@ -117,7 +123,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             {
                 return null;
             }
-            return base.EditableDocument.GetLineText(CaretPosition.Line);
+            // The identifier being typed: the completion popup filters its list by it.
+            return GetWordAtCaret(out int ignoredColumn, out int ignoredLength) ?? "";
         }
     }
 
@@ -189,6 +196,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         VirtualLineProviders.Add(_inlineMessageProvider);
         VirtualLineProviders.Add(_foldingManager);
         AddMargin(new FoldingManager.FoldingMargin(_foldingManager));
+        // The completion popup reads its images from this list; the editor shows words without icons.
+        ImageList = new ImageList();
+        ImageList.ImageSize = new Size(16, 16);
+        ImageList.ColorDepth = ColorDepth.Depth32Bit;
+        SuggestionAccepted += OnSuggestionAccepted;
     }
 
     protected override void OnTextReplaced()
@@ -416,6 +428,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
         if (e.KeyCode == Keys.Escape)
         {
+            HideCompletion();
             HideSignatureHint();
             if (_hoverControl != null)
             {
@@ -446,6 +459,105 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             else
             {
                 WndProc(ref message);
+            }
+        }
+    }
+
+    /// <summary>The words of this language are offered by the completion popup (set by the code that picks the tokenizer).</summary>
+    public SyntaxHighlighting.Language CompletionLanguage
+    {
+        get
+        {
+            return _completionLanguage;
+        }
+        set
+        {
+            _completionLanguage = value;
+            if (_suggestionController != null && _suggestionController.IsVisible)
+            {
+                HideCompletion();
+            }
+        }
+    }
+
+    /// <summary>Enables the completion popup (Ctrl+Space and, with <see cref="CompletionOnTyping"/>, typing).</summary>
+    public bool CompletionEnabled
+    {
+        get
+        {
+            return _completionEnabled;
+        }
+        set
+        {
+            _completionEnabled = value;
+            if (!value)
+            {
+                HideCompletion();
+            }
+        }
+    }
+
+    /// <summary>Opens the popup by itself once a couple of letters of an identifier have been typed.</summary>
+    public bool CompletionOnTyping
+    {
+        get
+        {
+            return _completionOnTyping;
+        }
+        set
+        {
+            _completionOnTyping = value;
+        }
+    }
+
+    /// <summary>The number of typed letters that open the popup by themselves.</summary>
+    private const int AutoTriggerLength = 2;
+
+    /// <summary>Shows the completion popup for the word the caret is in (Ctrl+Space, or typing).</summary>
+    public void ShowCompletion()
+    {
+        if (!_completionEnabled || base.EditableDocument == null)
+        {
+            return;
+        }
+        // The whole list is passed to the popup: it narrows itself down to the typed prefix, and can widen
+        // again when letters are deleted, which a list filtered here could not.
+        List<ISuggestion> items = EditorCompletionSource.Build(_completionLanguage, base.EditableDocument.GetText(), "");
+        if (items.Count == 0)
+        {
+            return;
+        }
+        ShowSuggestions(items);
+    }
+
+    /// <summary>Hides the completion popup, if it is open.</summary>
+    public void HideCompletion()
+    {
+        if (_suggestionController != null)
+        {
+            _suggestionController.Hide();
+        }
+    }
+
+    /// <summary>The user accepted an item of the popup: the word replaces the one at the caret.</summary>
+    private void OnSuggestionAccepted(CodeEditorPP codeEditorPP, ISuggestion suggestion, Keys keys)
+    {
+        if (suggestion != null)
+        {
+            ReplaceWordAtCaret(suggestion.DisplayName);
+        }
+    }
+
+    protected override void OnCharTyped(char ch, TextDocument.TextPosition textPosition)
+    {
+        base.OnCharTyped(ch, textPosition);
+        if (_completionOnTyping && _completionEnabled && !IsSuggestionVisible
+            && EditorCompletionSource.IsIdentifierChar(ch) && (Control.ModifierKeys & Keys.Control) == 0)
+        {
+            string word = CurrentText;
+            if (word != null && word.Length >= AutoTriggerLength)
+            {
+                ShowCompletion();
             }
         }
     }
@@ -522,7 +634,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     {
         if (_suggestionController != null && _suggestionController.IsVisible)
         {
-            string text = GetCurrentTokenText();
+            string text = CurrentText;
             if (text != null && text.Length > 0 && text[0] >= '0' && text[0] <= '9')
             {
                 _suggestionController.Hide();

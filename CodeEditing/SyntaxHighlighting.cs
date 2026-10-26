@@ -426,6 +426,68 @@ namespace SmarTTY.CodeEditing
             }
         }
 
+        // ---- Word lists for the editor's autocompletion (one list per language) ----
+
+        private static readonly HashSet<string> JsonLiterals = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "true", "false", "null"
+        };
+
+        private static readonly HashSet<string> UciKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "config", "option", "list", "package"
+        };
+
+        /// <summary>
+        /// The words the editor offers as completions for a language: the language keywords (the same sets the
+        /// tokenizers highlight with) plus the common literals and directives. Plain text and Diff have none.
+        /// </summary>
+        public static IReadOnlyCollection<string> GetKeywords(Language language)
+        {
+            switch (language)
+            {
+                case Language.Python:
+                    return Combine(PyKeywords, PyBlockKeywords);
+                case Language.Bash:
+                    return Combine(BashKeywords);
+                case Language.Lua:
+                    return Combine(LuaKeywords);
+                case Language.CLike:
+                    return Combine(CLikeKeywords, PreprocessorDirectives);
+                case Language.Script:
+                    return Combine(ScriptKeywords);
+                case Language.Sql:
+                    return Combine(SqlKeywords);
+                case Language.Makefile:
+                    return Combine(MakeDirectives);
+                case Language.Json:
+                    return Combine(JsonLiterals);
+                case Language.Config:
+                    return Combine(ConfigConstants);
+                case Language.Yaml:
+                    return Combine(ConfigConstants);
+                case Language.Uci:
+                    return Combine(UciKeywords);
+                default:
+                    return EmptyKeywords;
+            }
+        }
+
+        private static readonly string[] EmptyKeywords = new string[0];
+
+        private static IReadOnlyCollection<string> Combine(params IEnumerable<string>[] sets)
+        {
+            HashSet<string> result = new HashSet<string>(StringComparer.Ordinal);
+            foreach (IEnumerable<string> set in sets)
+            {
+                foreach (string word in set)
+                {
+                    result.Add(word);
+                }
+            }
+            return result;
+        }
+
         // ==================================================================
         // Helpers
         // ==================================================================

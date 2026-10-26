@@ -77,6 +77,30 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool Autocompletion
+    {
+        get
+        {
+            return _Settings.Editor.Autocompletion;
+        }
+        set
+        {
+            _Settings.Editor.Autocompletion = value;
+        }
+    }
+
+    public bool AutocompletionOnTyping
+    {
+        get
+        {
+            return _Settings.Editor.AutocompletionOnTyping;
+        }
+        set
+        {
+            _Settings.Editor.AutocompletionOnTyping = value;
+        }
+    }
+
     public GlobalSettings.EditorColors Colors
     {
         get
