@@ -206,36 +206,38 @@
               <ListBox Grid.Row="7" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=ByteOrientedLineEditing, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ByteOrientedLineEditing}" />
             </Grid>
           </GroupBox>
-          <GroupBox Header="Paste" Padding="5" DataContext="{Binding Paste}">
-            <Grid>
-              <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-              </Grid.RowDefinitions>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-              </Grid.ColumnDefinitions>
-              <CheckBox Content="Remove escape sequences and control characters from pasted text" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding RemoveControlCharacters}" ToolTip="Text copied from a web page can hide terminal control sequences or invisible characters that change what is run (paste-jacking)." />
-              <CheckBox Content="Replace curly quotes, long dashes and no-break spaces with ASCII characters" Grid.Row="1" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding ReplaceTypographicCharacters}" ToolTip="For example the em dash of a copied &quot;—version&quot; becomes &quot;--version&quot;." />
-              <CheckBox Content="Remove the line break at the end of the pasted text" Grid.Row="2" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding TrimTrailingNewline}" ToolTip="The last pasted line then waits for Enter instead of running at once." />
-              <TextBlock Text="Line break of pasted text:" Grid.Row="3" ToolTip="Automatic: Enter (CR) in SSH tabs, the line ending of the connection in COM/TCP/Telnet tabs." />
-              <ListBox Grid.Row="3" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=LineBreak, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding LineBreak}" />
-              <CheckBox Content="Ask before pasting several lines that run at once" Grid.Row="4" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding ConfirmMultiline}" ToolTip="Not asked while the program uses bracketed paste (bash, zsh, vim and nano then keep the pasted lines for editing)." />
-              <TextBlock Text="Ask from this many lines:" Grid.Row="5" />
-              <TextBox Grid.Row="5" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding ConfirmLineThreshold}" ToolTip="A single line that ends with a line break is asked about as well." />
-              <TextBlock Text="Ask from this many characters:" Grid.Row="6" />
-              <TextBox Grid.Row="6" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding ConfirmSizeThreshold}" ToolTip="0 turns the size check off." />
-              <CheckBox Content="Warn about dangerous commands (sudo, curl | sh, rm -rf, dd, shutdown, ...)" Grid.Row="7" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding WarnDangerous}" ToolTip="Always asks, even when asking about several lines is turned off." />
-            </Grid>
-          </GroupBox>
         </StackPanel>
+      </TabItem>
+      <TabItem Header="Paste Settings">
+        <GroupBox Header="Paste" Padding="5" DataContext="{Binding Paste}">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <CheckBox Content="Remove escape sequences and control characters from pasted text" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding RemoveControlCharacters}" ToolTip="Text copied from a web page can hide terminal control sequences or invisible characters that change what is run (paste-jacking)." />
+            <CheckBox Content="Replace curly quotes, long dashes and no-break spaces with ASCII characters" Grid.Row="1" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding ReplaceTypographicCharacters}" ToolTip="For example the em dash of a copied &quot;—version&quot; becomes &quot;--version&quot;." />
+            <CheckBox Content="Remove the line break at the end of the pasted text" Grid.Row="2" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding TrimTrailingNewline}" ToolTip="The last pasted line then waits for Enter instead of running at once." />
+            <TextBlock Text="Line break of pasted text:" Grid.Row="3" ToolTip="Automatic: Enter (CR) in SSH tabs, the line ending of the connection in COM/TCP/Telnet tabs." />
+            <ListBox Grid.Row="3" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=LineBreak, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding LineBreak}" />
+            <CheckBox Content="Ask before pasting several lines that run at once" Grid.Row="4" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding ConfirmMultiline}" ToolTip="Not asked while the program uses bracketed paste (bash, zsh, vim and nano then keep the pasted lines for editing)." />
+            <TextBlock Text="Ask from this many lines:" Grid.Row="5" />
+            <TextBox Grid.Row="5" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding ConfirmLineThreshold}" ToolTip="A single line that ends with a line break is asked about as well." />
+            <TextBlock Text="Ask from this many characters:" Grid.Row="6" />
+            <TextBox Grid.Row="6" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding ConfirmSizeThreshold}" ToolTip="0 turns the size check off." />
+            <CheckBox Content="Warn about dangerous commands (sudo, curl | sh, rm -rf, dd, shutdown, ...)" Grid.Row="7" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding WarnDangerous}" ToolTip="Always asks, even when asking about several lines is turned off." />
+          </Grid>
+        </GroupBox>
       </TabItem>
       <TabItem Header="Visual Settings">
         <StackPanel>
