@@ -93,7 +93,9 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public EditorColors GetEffectiveColors(SmarTTYTheme theme)
         {
-            if (theme != SmarTTYTheme.Dark)
+            // The editor colours come in a dark and a light family, not one per palette: a dark theme (Dark, Blue,
+            // Midnight, Nord, Solarized Dark, High Contrast) edits with the dark family, a light one with the light.
+            if (theme.IsLight())
             {
                 return LightColors;
             }

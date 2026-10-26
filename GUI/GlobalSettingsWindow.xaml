@@ -75,6 +75,18 @@
               </Setter.Value>
             </Setter>
           </Style>
+          <!-- Same choices, but wrapped into rows: the theme list is longer than a single line fits. -->
+          <Style x:Key="EnumWrapListBox" TargetType="{x:Type ListBox}" BasedOn="{StaticResource EnumListBox}">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="ItemsPanel">
+              <Setter.Value>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
           <Style x:Key="ColorEditor" TargetType="{x:Type Border}">
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Margin" Value="0 2 0 2" />
@@ -298,7 +310,7 @@
               <TextBlock Text="Session header position:" Grid.Row="3" />
               <ListBox Grid.Column="1" Grid.Row="3" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=SessionHeaderOrientation, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding SessionHeaderOrientation}" />
               <TextBlock Text="Application theme:" Grid.Row="4" />
-              <ListBox Grid.Column="1" Grid.Row="4" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=Theme, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding Theme}" />
+              <ListBox Grid.Column="1" Grid.Row="4" Style="{StaticResource EnumWrapListBox}" ItemsSource="{Binding Path=Theme, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding Theme}" />
             </Grid>
           </GroupBox>
           <GroupBox Header="Other Settings">

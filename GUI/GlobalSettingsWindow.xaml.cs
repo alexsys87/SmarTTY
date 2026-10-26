@@ -164,7 +164,7 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
     private void ResetEditorColors_Click(object sender, RoutedEventArgs e)
     {
         GlobalSettings.EditorColors colors = _ClonedSettings.EditorWrapper.Colors;
-        GlobalSettings.EditorColors defaults = (_ClonedSettings.Theme == SmarTTYTheme.Dark) ? GlobalSettings.EditorColors.DarkColors : GlobalSettings.EditorColors.LightColors;
+        GlobalSettings.EditorColors defaults = _ClonedSettings.Theme.IsLight() ? GlobalSettings.EditorColors.LightColors : GlobalSettings.EditorColors.DarkColors;
         foreach (PropertyInfo property in typeof(GlobalSettings.EditorColors).GetProperties())
         {
             if (property.CanWrite && property.PropertyType == typeof(DeviceTerminalSettings.ColorWrapper))

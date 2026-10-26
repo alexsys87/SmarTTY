@@ -69,11 +69,11 @@ public class EditorSettingsWrapper
     {
         get
         {
-            if (_Settings.Theme == SmarTTYTheme.Dark)
+            if (_Settings.Theme.IsLight())
             {
-                return _Settings.Editor.DarkColors;
+                return _Settings.Editor.LightColors;
             }
-            return _Settings.Editor.LightColors;
+            return _Settings.Editor.DarkColors;
         }
     }
 
