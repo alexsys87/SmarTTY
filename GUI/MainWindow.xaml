@@ -218,6 +218,11 @@
             <Image Source="../icons/dialog-scp-download.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="Synchronize folders..." Click="Synchronize_Click">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/refresh16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="_Tools">
         <MenuItem Header="Manage Linux _Packages" Click="ManagePackages_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">

@@ -145,6 +145,10 @@ jobs:
 
       - name: Run theme palette checks (matching keys and WCAG contrast for every theme)
         run: dotnet run --project tests/ThemePaletteTests -c Release
+
+      - name: Run folder synchronization settings checks (direction, options, exclusion masks)
+        run: dotnet run --project tests/SyncRequestTests -c Release
+
       - name: Run icon resource checks (every Icons.Load name is embedded, no .resx left)
         run: dotnet run --project tests/IconResourceTests -c Release
 

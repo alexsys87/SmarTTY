@@ -290,6 +290,11 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         Controller.MenuCommandHandlers.CopyDirBetweenHosts();
     }
 
+    private void Synchronize_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.MenuCommandHandlers.Synchronize();
+    }
+
     private void PublicKey_Click(object sender, RoutedEventArgs e)
     {
         Controller.MenuCommandHandlers.SetupPublicKey();
