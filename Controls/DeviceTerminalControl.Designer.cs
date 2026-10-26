@@ -121,7 +121,6 @@ public partial class DeviceTerminalControl
 	private void InitializeComponent()
 	{
             this.components = new System.ComponentModel.Container();
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(DeviceTerminalControl));
             SmarTTY.TextEditing.HighlightStyle highlightStyle1 = new SmarTTY.TextEditing.HighlightStyle();
             this.pnlConnectionInProgress = new System.Windows.Forms.Panel();
             this.linkLabel1 = new System.Windows.Forms.LinkLabel();
@@ -260,7 +259,7 @@ public partial class DeviceTerminalControl
             // btnDisconnect
             // 
             this.btnDisconnect.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.btnDisconnect.Image = ((System.Drawing.Image)(resources.GetObject("btnDisconnect.Image")));
+            Icons.Apply(this.btnDisconnect, "terminal-disconnect");
             this.btnDisconnect.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.btnDisconnect.Name = "btnDisconnect";
             this.btnDisconnect.Size = new System.Drawing.Size(23, 24);
@@ -269,7 +268,7 @@ public partial class DeviceTerminalControl
             // btnReconnect
             // 
             this.btnReconnect.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.btnReconnect.Image = ((System.Drawing.Image)(resources.GetObject("btnReconnect.Image")));
+            Icons.Apply(this.btnReconnect, "terminal-reconnect");
             this.btnReconnect.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.btnReconnect.Name = "btnReconnect";
             this.btnReconnect.Size = new System.Drawing.Size(23, 24);
@@ -282,7 +281,7 @@ public partial class DeviceTerminalControl
             this.btnSend.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.sendAsHEXToolStripMenuItem,
             this.sendImmediatelyToolStripMenuItem});
-            this.btnSend.Image = ((System.Drawing.Image)(resources.GetObject("btnSend.Image")));
+            Icons.Apply(this.btnSend, "terminal-send");
             this.btnSend.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.btnSend.Name = "btnSend";
             this.btnSend.Size = new System.Drawing.Size(32, 24);
@@ -322,7 +321,7 @@ public partial class DeviceTerminalControl
             // toolStripButton1
             // 
             this.toolStripButton1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton1.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton1.Image")));
+            Icons.Apply(this.toolStripButton1, "terminal-clear");
             this.toolStripButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton1.Name = "toolStripButton1";
             this.toolStripButton1.Size = new System.Drawing.Size(23, 24);
@@ -345,7 +344,7 @@ public partial class DeviceTerminalControl
             this.escapeZModemControlToolStripMenuItem,
             this.sendFilesViaKermitToolStripMenuItem,
             this.receiveFilesViaKermitToolStripMenuItem});
-            this.toolStripButton3.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton3.Image")));
+            Icons.Apply(this.toolStripButton3, "terminal-transfer");
             this.toolStripButton3.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton3.Name = "toolStripButton3";
             this.toolStripButton3.Size = new System.Drawing.Size(32, 24);
@@ -438,7 +437,7 @@ public partial class DeviceTerminalControl
             // toolStripButton2
             // 
             this.toolStripButton2.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton2.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButton2.Image")));
+            Icons.Apply(this.toolStripButton2, "terminal-save");
             this.toolStripButton2.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton2.Name = "toolStripButton2";
             this.toolStripButton2.Size = new System.Drawing.Size(23, 24);
@@ -467,7 +466,7 @@ public partial class DeviceTerminalControl
             this.terminalTypeToolStripMenuItem,
             this.echoTypedCharactersToolStripMenuItem,
             this.changeSettingsToolStripMenuItem});
-            this.toolStripDropDownButton1.Image = ((System.Drawing.Image)(resources.GetObject("toolStripDropDownButton1.Image")));
+            Icons.Apply(this.toolStripDropDownButton1, "terminal-settings");
             this.toolStripDropDownButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripDropDownButton1.Name = "toolStripDropDownButton1";
             this.toolStripDropDownButton1.Size = new System.Drawing.Size(29, 24);
@@ -564,7 +563,7 @@ public partial class DeviceTerminalControl
             // 
             // copyToolStripMenuItem
             // 
-            this.copyToolStripMenuItem.Image = ((System.Drawing.Image)(resources.GetObject("copyToolStripMenuItem.Image")));
+            Icons.Apply(this.copyToolStripMenuItem, "copy");
             this.copyToolStripMenuItem.Name = "copyToolStripMenuItem";
             this.copyToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+C";
             this.copyToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
@@ -572,14 +571,14 @@ public partial class DeviceTerminalControl
             // 
             // copyAllToolStripMenuItem
             // 
-            this.copyAllToolStripMenuItem.Image = ((System.Drawing.Image)(resources.GetObject("copyAllToolStripMenuItem.Image")));
+            Icons.Apply(this.copyAllToolStripMenuItem, "copy");
             this.copyAllToolStripMenuItem.Name = "copyAllToolStripMenuItem";
             this.copyAllToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
             this.copyAllToolStripMenuItem.Text = "Copy all";
             // 
             // pasteToolStripMenuItem
             // 
-            this.pasteToolStripMenuItem.Image = ((System.Drawing.Image)(resources.GetObject("pasteToolStripMenuItem.Image")));
+            Icons.Apply(this.pasteToolStripMenuItem, "paste");
             this.pasteToolStripMenuItem.Name = "pasteToolStripMenuItem";
             this.pasteToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+V";
             this.pasteToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
