@@ -283,6 +283,9 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public VirtualTerminalSettings VirtualTerminal { get; set; } = new VirtualTerminalSettings();
 
+    /// <summary>Cleaning and checking of text pasted into terminals.</summary>
+    public PasteSettings Paste { get; set; } = new PasteSettings();
+
     public bool CompletionTriggersMigratedV2 { get; set; }
 
     public bool SyntaxHighlightingMigrated { get; set; }
@@ -413,6 +416,7 @@ public class GlobalSettings : INotifyPropertyChanged
 
     private void FixDefaults()
     {
+        Paste ??= new PasteSettings();
         if (DefaultTextColor.Alpha == 0)
         {
             DefaultTextColor = TerminalEmulatorControl.DefaultTextColor;

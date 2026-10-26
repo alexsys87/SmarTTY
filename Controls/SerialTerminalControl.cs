@@ -1799,11 +1799,13 @@ public class SerialTerminalControl : TerminalEmulatorControl
         try
         {
             string text = Win32Clipboard.GetText(Handle);
-            if (text != null)
+            if (!string.IsNullOrEmpty(text))
             {
                 // Each line is sent as a command: a command wrapped by its source must not go out in pieces.
-                text = ShellCommandLine.JoinWrappedLines(text.Replace("\r", ""), indentContinues: false);
+                text = ShellCommandLine.JoinWrappedLines(text, indentContinues: false);
             }
+            // Every line break submits the line to the device at once.
+            text = _inputLine != null ? PasteGuard.Prepare(text, AppSettings, linesRunAtOnce: true, owner: this) : null;
             if (_inputLine != null && !string.IsNullOrEmpty(text))
             {
                 int offset = _inputLine.CaretIndex;
