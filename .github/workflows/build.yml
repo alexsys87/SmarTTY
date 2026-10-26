@@ -89,6 +89,9 @@ jobs:
       - name: Run COM/TCP input and transfer rate checks
         run: dotnet run --project tests/DeviceInputTextTests -c Release
 
+      - name: Run COM/TCP terminal state checks (prompt and full-screen program in the status bar)
+        run: dotnet run --project tests/DeviceTerminalStateTests -c Release
+
       - name: Run transport write failure checks
         run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
 

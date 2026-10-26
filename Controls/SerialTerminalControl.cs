@@ -131,6 +131,12 @@ public class SerialTerminalControl : TerminalEmulatorControl
     }
 
     private InputLine? _inputLine;
+
+    // What the input line and the full-screen state were when they were last reported, so a change is announced
+    // once (the status bar shows them).
+    private bool _reportedHasInputLine;
+
+    private bool _reportedFullScreenProgramActive;
     private List<string> _commandHistory = new List<string>();
     private int _historyIndex = -1;
     private const int MaxHistorySize = 1000;
@@ -764,6 +770,21 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// <summary>True while a program that draws the whole screen seems to run on the device and gets every key.</summary>
     public bool FullScreenProgramActive => _inputLine == null && _remoteProgram.OwnsScreen;
 
+    /// <summary>Raised when <see cref="HasInputLine"/>, <see cref="FullScreenProgramActive"/> or the prompt changes.</summary>
+    public event EventHandler InputLineStateChanged;
+
+    /// <summary>Announces a change of the input line or the full-screen state, once per change.</summary>
+    private void NotifyInputLineState()
+    {
+        if (_reportedHasInputLine == HasInputLine && _reportedFullScreenProgramActive == FullScreenProgramActive)
+        {
+            return;
+        }
+        _reportedHasInputLine = HasInputLine;
+        _reportedFullScreenProgramActive = FullScreenProgramActive;
+        InputLineStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>
     /// Shows the local input line again, whatever the terminal believes the device is doing. For a program that
     /// ended without restoring the terminal (killed, crashed) or a prompt that is not recognized as one.
@@ -783,6 +804,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             ShowPrompt();
         }
+        NotifyInputLineState();
     }
 
     /// <summary>
@@ -1604,6 +1626,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         _inputLine = null;
         // Whatever ran before is over; the command just sent starts with a clean slate.
         _remoteProgram.Reset();
+        NotifyInputLineState();
     }
 
     // True when the input line continues the device's own prompt and the device echoes what it receives (telnet
@@ -1738,6 +1761,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         _remoteProgram.Reset();
         _announcedSize = Size.Empty;
         _shellPromptSeen = false;
+        NotifyInputLineState();
     }
 
     // Also run for ESC c from the device, which prints its prompt again by itself.
@@ -1748,6 +1772,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         _remoteProgram.Reset();
         _historySearch = null;
         _historyIndex = _commandHistory.Count;
+        NotifyInputLineState();
     }
 
     /// <summary>
@@ -1846,6 +1871,20 @@ public class SerialTerminalControl : TerminalEmulatorControl
     }
 
     public void OnDataReceived(string text)
+    {
+        try
+        {
+            OnDataReceivedCore(text);
+        }
+        finally
+        {
+            // Showing or hiding the input line, and a full-screen program taking over or leaving, are reported here
+            // for every path above, including the early returns.
+            NotifyInputLineState();
+        }
+    }
+
+    private void OnDataReceivedCore(string text)
     {
         if (ContinuesDevicePrompt && !string.IsNullOrEmpty(text) && LineInputText.TrimTrailingControlSequences(text).Length > 0)
         {
