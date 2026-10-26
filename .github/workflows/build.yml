@@ -127,6 +127,8 @@ jobs:
 
       - name: Run theme palette checks (matching keys and WCAG contrast for every theme)
         run: dotnet run --project tests/ThemePaletteTests -c Release
+      - name: Run icon resource checks (every Icons.Load name is embedded, no .resx left)
+        run: dotnet run --project tests/IconResourceTests -c Release
 
   interop:
     name: File transfer interoperability (lrzsz, C-Kermit, G-Kermit, gzip + base64 through BusyBox ash and bash)
