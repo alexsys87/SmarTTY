@@ -406,6 +406,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -443,6 +444,7 @@
             <TextBox Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding EditorWrapper.TemporaryDirectory}" />
             <CheckBox Content="Enable syntax highlighting" Grid.Row="9" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.SyntaxHighlighting}" />
             <CheckBox Content="Keep a backup copy (file~) when saving" Grid.Row="10" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.BackupBeforeSave}" ToolTip="The first save of a file after it was opened copies the old file to the same name with a ~ added, on the server." />
+            <CheckBox Content="Show a line under each tab character" Grid.Row="11" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ShowTabs}" ToolTip="Underlines tabs so lines indented with tabs are easy to tell from lines indented with spaces" />
           </Grid>
         </GroupBox>
       </TabItem>

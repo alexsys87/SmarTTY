@@ -596,6 +596,20 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    /// <summary>Draws a grey line under each tab character, so tab-indented lines are easy to tell from space-indented ones.</summary>
+    public bool ShowTabs
+    {
+        get
+        {
+            return _showTabs;
+        }
+        set
+        {
+            _showTabs = value;
+            Redraw();
+        }
+    }
+
     public int TopLine
     {
         get
@@ -2496,7 +2510,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 {
                     if (tabStartColumn == -1)
                     {
-                        tabStartColumn = characterIndex;
+                        tabStartColumn = column;
                     }
                 }
                 else if (tabStartColumn != -1)
@@ -2559,7 +2573,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         if (_showTabs && tabStartColumn != -1)
         {
             float tabUnderlineY = (float)y + _charSize.Height / 2f;
-            graphics.DrawLine(Pens.DarkGray, (float)left + (float)tabStartColumn * _charSize.Width, tabUnderlineY, (float)left + (float)text.Length * _charSize.Width, tabUnderlineY);
+            graphics.DrawLine(Pens.DarkGray, (float)left + (float)tabStartColumn * _charSize.Width, tabUnderlineY, (float)left + (float)column * _charSize.Width, tabUnderlineY);
         }
         PaintLineOverlay(graphics, line, firstColumn, left, y, (int)Math.Ceiling(_charSize.Height));
         if (list == null || pen == null)

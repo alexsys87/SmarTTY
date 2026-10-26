@@ -65,6 +65,18 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool ShowTabs
+    {
+        get
+        {
+            return _Settings.Editor.ShowTabs;
+        }
+        set
+        {
+            _Settings.Editor.ShowTabs = value;
+        }
+    }
+
     public GlobalSettings.EditorColors Colors
     {
         get
