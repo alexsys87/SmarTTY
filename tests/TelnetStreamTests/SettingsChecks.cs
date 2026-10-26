@@ -115,6 +115,22 @@ internal static class SettingsChecks
         check(back.LineMode && !telnet.LineMode && !((DeviceTerminalSettings.ConnectionSettings.Telnet)loaded.Settings.Connection).LineMode,
             "linemode setting: off by default, survives the round trip, a file saved before it existed has it off");
 
+        // the default prompt: a new profile has "> ", an empty value falls back to it, it survives a round trip
+        // and a settings file written before it existed gets the default.
+        check(new DeviceTerminalSettings().DefaultPrompt == "> ", "default prompt: a new profile uses '> '");
+        check(new DeviceTerminalSettings { DefaultPrompt = "" }.DefaultPrompt == "> ", "default prompt: an empty value falls back to '> '");
+        check(new DeviceTerminalSettings { DefaultPrompt = null }.DefaultPrompt == "> ", "default prompt: null falls back to '> '");
+        DeviceTerminalSettings promptSettings = new DeviceTerminalSettings
+        {
+            Connection = new DeviceTerminalSettings.ConnectionSettings.Tcp { Host = "10.0.0.9", Port = 5002 },
+            DefaultPrompt = "router# "
+        };
+        RawConnectionSettings promptLoaded = RoundTrip(new RawConnectionSettings { Settings = promptSettings }, out string promptXml);
+        check(promptXml.Contains("<DefaultPrompt>router# </DefaultPrompt>"), "default prompt: saved as its own element");
+        check(promptLoaded.Settings.DefaultPrompt == "router# ", "default prompt: survives the round trip");
+        check(promptSettings.Clone().DefaultPrompt == "router# ", "default prompt: Clone() keeps it");
+        check(loaded.Settings.DefaultPrompt == "> ", "default prompt: a file saved before it existed gets '> '");
+
         // auto login fields
         check(!telnet.HasAutoLogin, "auto login: none by default");
         DeviceTerminalSettings.ConnectionSettings.Telnet withLogin = new DeviceTerminalSettings.ConnectionSettings.Telnet

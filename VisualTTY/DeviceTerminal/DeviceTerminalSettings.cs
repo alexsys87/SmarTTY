@@ -568,6 +568,9 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
     private int _ReconnectIntervalSeconds = 2;
 
+    // An explicit backing field, so a Clone() and a settings file without the element agree.
+    private string _DefaultPrompt = "> ";
+
     public string BackspaceSequence;
 
     private TerminalColors _Colors = new TerminalColors
@@ -718,6 +721,24 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
     public LineEndingType LineEnding { get; set; } = LineEndingType.LF;
 
     public bool TreatLFAsCRLF { get; set; }
+
+    /// <summary>
+    /// The prompt the input line is drawn with when the device has not printed one that is recognised (and
+    /// before any has been seen). Default "> ". An empty value falls back to that default. Once a shell prompt
+    /// is recognised, the input line continues the device's own prompt, so this only decides the initial and
+    /// the fallback prompt.
+    /// </summary>
+    public string DefaultPrompt
+    {
+        get
+        {
+            return _DefaultPrompt;
+        }
+        set
+        {
+            _DefaultPrompt = string.IsNullOrEmpty(value) ? "> " : value;
+        }
+    }
 
     /// <summary>
     /// Encoding of the text exchanged with the device (see <see cref="TerminalEncodings"/>). It is used to decode
