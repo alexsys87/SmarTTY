@@ -1351,6 +1351,8 @@ public class MainWindowController : INotifyPropertyChanged
         edit.InsertSpaces = Settings.Editor.InsertSpaces;
         edit.HideMargins = !Settings.Editor.ShowLineNumbers;
         edit.ShowTabs = Settings.Editor.ShowTabs;
+        edit.CompletionEnabled = Settings.Editor.Autocompletion;
+        edit.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;
         ApplySyntaxHighlighting(edit);
     }
 

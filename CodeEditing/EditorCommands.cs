@@ -26,6 +26,17 @@ public class EditorCommands
 
     public static List<KeyBindingMap.EditorCommand> All = new List<KeyBindingMap.EditorCommand>
     {
+        new DelegateCommand("ShowCompletion", "Show the completion popup", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ShowCompletion();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.Space
+            }
+        },
         new DelegateCommand("RetokenizeDocument", "Rebuild token pairing", (CodeEditorPP codeEditorPP) =>
         {
             codeEditorPP.Retokenize();

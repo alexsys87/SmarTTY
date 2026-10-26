@@ -84,6 +84,12 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public bool SyntaxHighlighting;
 
+        // The editor offers words (keywords and identifiers of the file) while typing; Ctrl+Space opens the list.
+        public bool Autocompletion;
+
+        // The completion popup also opens by itself after a couple of letters of an identifier.
+        public bool AutocompletionOnTyping;
+
         // Tab and indentation insert TabSize spaces instead of a tab character.
         public bool InsertSpaces;
 
@@ -165,7 +171,9 @@ public class GlobalSettings : INotifyPropertyChanged
         LightColors = EditorColors.LightColors,
         TabSize = 4,
         ShowLineNumbers = true,
-        SyntaxHighlighting = true
+        SyntaxHighlighting = true,
+        Autocompletion = true,
+        AutocompletionOnTyping = false
     };
 
     public int LargeBlockCutoffPoint = 1048576;
@@ -296,6 +304,8 @@ public class GlobalSettings : INotifyPropertyChanged
     public bool SyntaxHighlightingMigrated { get; set; }
 
     public bool ShowTabsMigrated { get; set; }
+
+    public bool EditorAutocompletionMigrated { get; set; }
 
     [XmlIgnore]
     public EditorSettingsWrapper EditorWrapper { get; }
@@ -456,6 +466,15 @@ public class GlobalSettings : INotifyPropertyChanged
             // as the feature is meant to be visible by default and can be switched off in Settings afterwards.
             Editor.ShowTabs = true;
             ShowTabsMigrated = true;
+            Save();
+        }
+        if (!EditorAutocompletionMigrated)
+        {
+            // Settings files written before the editor completion existed have no <Autocompletion>
+            // element, so XmlSerializer leaves the flag false: turn the feature on once for existing
+            // configurations; it can be switched off in Settings afterwards.
+            Editor.Autocompletion = true;
+            EditorAutocompletionMigrated = true;
             Save();
         }
         if (!CompletionTriggersMigratedV2)

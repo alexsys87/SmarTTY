@@ -113,6 +113,9 @@ jobs:
       - name: Run editor text model and syntax highlighting checks
         run: dotnet run --project tests/EditorTextTests -c Release
 
+      - name: Run editor autocompletion checks
+        run: dotnet run --project tests/EditorCompletionTests -c Release
+
       - name: Run editor tool bar command state checks
         run: dotnet run --project tests/EditorCommandStateTests -c Release
 
