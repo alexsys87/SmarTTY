@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using SmarTTY.Utilities;
 using VisualTTY;
 
 // Regression harness for the theme palettes (GUI/Styles/<name>/Colors.xaml). Every theme must define exactly the
@@ -153,6 +154,21 @@ internal static class Program
                 "Dark is a dark theme and Light is a light theme");
             Check(!SmarTTYTheme.Blue.IsLight() && SmarTTYTheme.SolarizedLight.IsLight(),
                 "Blue is dark, Solarized Light is light");
+            Check(!SmarTTYTheme.Dracula.IsLight() && !SmarTTYTheme.GruvboxDark.IsLight() &&
+                !SmarTTYTheme.Monokai.IsLight() && !SmarTTYTheme.OneDark.IsLight(),
+                "Dracula, Gruvbox Dark, Monokai and One Dark are dark themes");
+            Check(SmarTTYTheme.Sepia.IsLight(), "Sepia is a light theme");
+
+            // Every value names its palette folder (a distinct one, checked above) and carries a display name, so the
+            // picker never shows a bare enum identifier.
+            foreach (SmarTTYTheme theme in themes)
+            {
+                Check(!string.IsNullOrEmpty(theme.PaletteName()), $"theme {theme} names its palette folder");
+                System.Reflection.FieldInfo field = typeof(SmarTTYTheme).GetField(theme.ToString());
+                EnumDisplayText display = (EnumDisplayText)Attribute.GetCustomAttribute(field, typeof(EnumDisplayText));
+                Check(display != null && !string.IsNullOrEmpty(display.Text),
+                    $"theme {theme} has a display name for the picker");
+            }
 
             // The XAML the settings window binds to lists every value through EnumValueFetcher; a display name keeps
             // the choices readable.
