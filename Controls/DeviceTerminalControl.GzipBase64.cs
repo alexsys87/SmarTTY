@@ -1,7 +1,9 @@
 using SmarTTY.IO;
+using SmarTTY.Transport;
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
@@ -21,6 +23,13 @@ public partial class DeviceTerminalControl
     /// cancelled. Injected by <c>App</c> (the window is WPF).
     /// </summary>
     public static Func<bool, GzipBase64Transfer.Request> GzipBase64RequestPrompt;
+
+    // A transfer that had to stop after its connection was gone (a reconnect, a cable pulled) leaves the device's console in the
+    // middle of it: the shell script there waits for the rest of the data and eats whatever is typed next. What ends that is kept
+    // here and sent when the connection to the same device is open again.
+    private readonly object _recoveryGate = new object();
+    private byte[] _pendingDeviceRecovery;
+    private string _pendingRecoveryTarget;
 
     private void InitializeGzipBase64Menu()
     {
@@ -65,13 +74,16 @@ public partial class DeviceTerminalControl
             return;
         }
 
+        string target = _transportDisplayName;
+        request.Options.RecoveryRequired = bytes => RememberDeviceRecovery(bytes, target);
+
         if (sending)
         {
             StartLineTransfer("Send via gzip + base64 - " + Path.GetFileName(request.LocalPath), "gzip + base64", "send",
                 (sendData, progress, token) => RunWithDebugLog(request, "send",
                     () => GzipBase64Transfer.SendFile(request.LocalPath, request.RemotePath, request.Options, sendData, ReadXModemByte, token, progress)),
                 () => "The file arrived on the device and its checksum matches the original:\r\n" + request.RemotePath,
-                SendEnterToDevice);
+                AfterGzipBase64Transfer);
         }
         else
         {
@@ -79,7 +91,7 @@ public partial class DeviceTerminalControl
                 (sendData, progress, token) => RunWithDebugLog(request, "receive",
                     () => GzipBase64Transfer.ReceiveFile(request.RemotePath, request.LocalPath, request.Options, sendData, ReadXModemByte, token, progress)),
                 () => "The file was saved and its checksum matches the original on the device:\r\n" + request.LocalPath,
-                SendEnterToDevice);
+                AfterGzipBase64Transfer);
         }
     }
 
@@ -131,11 +143,79 @@ public partial class DeviceTerminalControl
     }
 
     /// <summary>
-    /// The shell prompt that appeared during the transfer was taken by it; Enter makes the device print a fresh one
-    /// in the terminal.
+    /// Called by a transfer that could not tell the device to stop because its connection was gone (any thread). The bytes that
+    /// bring the console back are kept for the next connection to <paramref name="target"/>; if it is already open, they go now.
     /// </summary>
-    private void SendEnterToDevice()
+    private void RememberDeviceRecovery(byte[] bytes, string target)
     {
+        lock (_recoveryGate)
+        {
+            _pendingDeviceRecovery = bytes;
+            _pendingRecoveryTarget = target;
+        }
+        try
+        {
+            BeginInvoke((Action)DeliverPendingGzipBase64Recovery);
+        }
+        catch (InvalidOperationException)
+        {
+            // The control is gone: the recovery stays unsent, there is no terminal to send it from.
+        }
+    }
+
+    /// <summary>
+    /// Sends the pending recovery to the device when a connection to the same device is open and free. UI thread. Called when a
+    /// connection is established and when a recovery is handed over.
+    /// </summary>
+    private void DeliverPendingGzipBase64Recovery()
+    {
+        AsyncTransportConnection connection = _asyncTransportConnection;
+        byte[] bytes;
+        lock (_recoveryGate)
+        {
+            if (_pendingDeviceRecovery == null || connection == null || _connectionState != ConnectionStateEnum.Connected || IsLineClaimed)
+            {
+                return; // stays pending: the connection is not open yet, or another transfer has the line
+            }
+            if (!string.Equals(_pendingRecoveryTarget, _transportDisplayName, StringComparison.Ordinal))
+            {
+                // Another device (other port or address): nothing was left waiting on it, and what is typed there is not ours to type.
+                _pendingDeviceRecovery = null;
+                _pendingRecoveryTarget = null;
+                return;
+            }
+            bytes = _pendingDeviceRecovery;
+            _pendingDeviceRecovery = null;
+            _pendingRecoveryTarget = null;
+        }
+        // Give the console a moment after the connection came up (a serial port may still be settling), then type it.
+        ThreadPool.QueueUserWorkItem(state =>
+        {
+            Thread.Sleep(400);
+            try
+            {
+                BeginInvoke((Action)(() =>
+                {
+                    if (!IsLineClaimed)
+                    {
+                        SendToConnection(connection, bytes, bytes.Length);
+                    }
+                }));
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        });
+    }
+
+    /// <summary>
+    /// Runs on the UI thread when a transfer has ended and the line is free again. A recovery that was handed over while the
+    /// transfer was still ending (the connection was already open again) could not be sent then; it is sent now. The shell prompt
+    /// that appeared during the transfer was taken by it; Enter makes the device print a fresh one in the terminal.
+    /// </summary>
+    private void AfterGzipBase64Transfer()
+    {
+        DeliverPendingGzipBase64Recovery();
         SendToDevice(new byte[] { (byte)'\r' }, 1);
     }
 }

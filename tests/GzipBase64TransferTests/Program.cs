@@ -295,7 +295,7 @@ internal static class Program
                 Run run = RunSend(device, text, target, options);
                 string all = string.Join("\n", log);
                 Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(text)), "block size of 64 bytes", Describe(run));
-                Check(all.Contains("SEND ") && all.Contains("The device has:") && all.Contains("TX window 1:") && all.Contains("All ") && all.Contains(":READY"), "the debug log has the commands, the answers and the windows", all.Length > 600 ? all.Substring(0, 600) : all);
+                Check(all.Contains("SEND ") && all.Contains("The device has:") && all.Contains("Line 1:") && all.Contains("All ") && all.Contains(":READY"), "the debug log has the commands, the answers and the windows", all.Length > 600 ? all.Substring(0, 600) : all);
                 Check(!all.Contains("ECHO MISMATCH"), "no echo mismatch is reported on a clean line");
                 // Every line typed to the shell stays under what a router's line editor keeps (512 characters).
                 int longest = log.Where(l => l.Contains("] TX ") && l.Contains(" bytes: ")).Select(l => int.Parse(l.Substring(l.IndexOf("TX ") + 3, l.IndexOf(" bytes") - l.IndexOf("TX ") - 3))).DefaultIfEmpty(0).Max();
@@ -374,7 +374,7 @@ internal static class Program
                 options.Log = log.Add;
                 Run run = RunSend(device, binary, target, options);
                 device.TxFilter = null;
-                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a damaged character is caught and the second attempt succeeds", Describe(run) + " errors=" + run.Errors);
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a damaged line is caught by the echo, erased and typed again", Describe(run) + " errors=" + run.Errors);
                 Check(log.Any(l => l.Contains("ECHO MISMATCH") && l.Contains("echoed")), "the log shows where the echo differs from what was typed", string.Join("\n", log.Where(l => l.Contains("ECHO") || l.Contains("refused")).ToArray()));
                 Check(!File.Exists(target + ".smtty~"), "no unfinished file left");
             }
@@ -391,7 +391,7 @@ internal static class Program
                 Run run = RunSend(device, binary, target, Fast(attempts: 2));
                 device.TxFilter = null;
                 Check(run.Error is IOException && !File.Exists(target) && !File.Exists(target + ".smtty~"), "damage in every attempt fails and leaves nothing behind", Describe(run));
-                Check(run.Error != null && run.Error.Message.Contains("unpacked") || run.Error != null && run.Error.Message.Contains("gunzip status"), "the failure says what the device made of the data", Describe(run));
+                Check(run.Error != null && run.Error.Message.Contains("could not be typed"), "a line that cannot be typed intact fails with a clear message", Describe(run));
                 Check(device.Run("echo alive2").Contains("alive2"), "the shell is alive after a failed transfer");
             }
             {
@@ -411,8 +411,44 @@ internal static class Program
                 string target = Path.Combine(remoteDir, "lost.bin");
                 Run run = RunSend(device, binary, target, Fast());
                 device.TxFilter = null;
-                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "a lost character is made up for, caught, and the second attempt succeeds", Describe(run));
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "a lost character is caught by the echo, the line erased and typed again", Describe(run));
                 Check(device.Run("echo alive3").Contains("alive3"), "the shell is alive after a lost character");
+            }
+            {
+                // The noise seen on a real line: a burst of bytes that includes Ctrl-C, Backspace, DEL, Ctrl-Z and Ctrl-\ (all of which
+                // a terminal acts on). Once is enough to show that the transfer survives it.
+                int hits = 0;
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length > 500 && Interlocked.Increment(ref hits) == 5)
+                    {
+                        byte[] noise = { 0xbb, 0x50, 0x56, 0x25, 0xa6, 0x26, 0xd5, 0x03, 0x55, 0x7f, 0x08, 0x1a, 0x1c, 0x94 };
+                        Array.Copy(noise, 0, chunk, 300, noise.Length);
+                    }
+                    return chunk;
+                };
+                string target = Path.Combine(remoteDir, "noise.bin");
+                Run run = RunSend(device, binary, target, Fast());
+                device.TxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a burst of noise with control characters (Ctrl-C, DEL, Backspace...) is survived", Describe(run) + " errors=" + run.Errors);
+                Check(device.Run("echo alive8").Contains("alive8"), "the shell is alive and Ctrl-C works again after it (the signals are ignored only while the data is read)");
+            }
+            {
+                // Noise that contains a line end commits a damaged line: the attempt is given up at once and repeated.
+                int hits = 0;
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length > 500 && Interlocked.Increment(ref hits) == 3)
+                    {
+                        chunk[300] = (byte)'\n';
+                    }
+                    return chunk;
+                };
+                string target = Path.Combine(remoteDir, "committed.bin");
+                Run run = RunSend(device, binary, target, Fast());
+                device.TxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a damaged line that got committed makes the attempt start again", Describe(run) + " errors=" + run.Errors);
+                Check(!File.Exists(target + ".smtty~"), "no unfinished file left after it");
             }
             {
                 device.Run("stty -echo");
@@ -634,6 +670,202 @@ internal static class Program
         Directory.Delete(dir, true);
     }
 
+    /// <summary>True when the shell of the device executes a command (and is not stuck in a reader that eats what is typed).</summary>
+    private static bool Responds(Device device)
+    {
+        device.Drain();
+        byte[] bytes = Encoding.ASCII.GetBytes("echo RE''SP\r");
+        device.Write(bytes, 0, bytes.Length);
+        StringBuilder text = new StringBuilder();
+        int deadline = Environment.TickCount + 2500;
+        while (Environment.TickCount < deadline)
+        {
+            byte? b = device.Read(100);
+            if (b != null) text.Append((char)b.Value);
+            if (text.ToString().Contains("RESP")) return true;
+        }
+        return false;
+    }
+
+    private static string Output(Device device, string command)
+    {
+        device.Drain();
+        byte[] bytes = Encoding.ASCII.GetBytes(command + "\r");
+        device.Write(bytes, 0, bytes.Length);
+        StringBuilder text = new StringBuilder();
+        int deadline = Environment.TickCount + 2000;
+        while (Environment.TickCount < deadline)
+        {
+            byte? b = device.Read(100);
+            if (b != null) text.Append((char)b.Value);
+        }
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// The connection goes away in the middle of a transfer (a reconnect, a cable pulled) while the console of the device stays
+    /// where it is: the transfer cannot tell the device to stop, so it hands over what ends the device's reader, to be sent
+    /// when there is a connection again. Here "connection again" is the same console, written to by the test.
+    /// </summary>
+    private static void RecoveryCases()
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        string binary = Path.Combine(dir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(120_000, 21));
+        string big = Path.Combine(remoteDir, "big.bin");
+        File.WriteAllBytes(big, RandomBytes(900_000, 22));
+
+        using (Device device = Ash())
+        {
+            Section("busybox ash: the connection is lost in the middle of a transfer");
+            {
+                byte[] recovery = null;
+                long sent = 0;
+                bool cut = false;
+                GzipBase64Transfer.Options options = Fast();
+                options.RecoveryRequired = bytes => recovery = bytes;
+                string target = Path.Combine(remoteDir, "cut.bin");
+                Exception error = null;
+                try
+                {
+                    GzipBase64Transfer.SendFile(binary, target, options,
+                        (data, offset, length) =>
+                        {
+                            if (cut || (sent += length) > 30_000)
+                            {
+                                cut = true;
+                                throw new IOException("The connection is closed.");
+                            }
+                            device.Write(data, offset, length);
+                        },
+                        timeout => cut ? null : device.Read(timeout), CancellationToken.None, null);
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                }
+                Check(error is IOException && recovery != null && recovery.Length > 20, "a lost connection hands over the recovery", error == null ? "no error" : error.Message);
+                Check(!Responds(device), "without it the console of the device is stuck and eats what is typed (the problem)");
+                if (recovery != null)
+                {
+                    device.Write(recovery, 0, recovery.Length);
+                    Thread.Sleep(1500);
+                }
+                Check(Responds(device), "after the recovery the shell answers again");
+                Check(!File.Exists(target + ".smtty~") && !File.Exists(target), "the unfinished file is gone");
+                Check(!Output(device, "trap").Contains("'' INT"), "the signals are restored (Ctrl-C works again)");
+            }
+            {
+                byte[] recovery = null;
+                long received = 0;
+                bool cut = false;
+                GzipBase64Transfer.Options options = Fast();
+                options.RecoveryRequired = bytes => recovery = bytes;
+                string local = Path.Combine(dir, "cut-receive.bin");
+                Exception error = null;
+                try
+                {
+                    GzipBase64Transfer.ReceiveFile(big, local, options,
+                        (data, offset, length) =>
+                        {
+                            if (cut) throw new IOException("The connection is closed.");
+                            device.Write(data, offset, length);
+                        },
+                        timeout =>
+                        {
+                            if (cut) return null;
+                            byte? b = device.Read(timeout);
+                            if (b != null && ++received > 60_000) { cut = true; return null; }
+                            return b;
+                        }, CancellationToken.None, null);
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                }
+                Check(error is IOException && recovery != null, "a receive that loses its connection hands over a recovery too", error == null ? "no error" : error.Message);
+                Check(!File.Exists(local) && !File.Exists(local + ".smtty~"), "no local file is left from it");
+                if (recovery != null)
+                {
+                    device.Write(recovery, 0, recovery.Length);
+                }
+                Thread.Sleep(1500);
+                device.Drain();
+                Check(Responds(device), "the shell answers after the recovery of a receive");
+            }
+        }
+        Directory.Delete(dir, true);
+    }
+
+    /// <summary>Putting the received file in place must never lose the old file or the checked copy.</summary>
+    private static void FinalizeCases()
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        string onDevice = Path.Combine(remoteDir, "data.bin");
+        byte[] content = RandomBytes(30_000, 31);
+        File.WriteAllBytes(onDevice, content);
+
+        using (Device device = Ash())
+        {
+            Section("busybox ash: putting the received file in place");
+            {
+                // The destination is an existing folder: the file cannot be put there. The checked copy must stay.
+                string local = Path.Combine(dir, "isfolder");
+                Directory.CreateDirectory(local);
+                Run run = RunReceive(device, onDevice, local, Fast());
+                Check(run.Error is IOException && run.Error.Message.Contains("checked copy is kept") && Directory.Exists(local), "a destination that cannot be written reports it and keeps the checked copy", Describe(run));
+                Check(File.Exists(local + ".smtty~") && File.ReadAllBytes(local + ".smtty~").SequenceEqual(content), "the checked copy is there and complete");
+            }
+            {
+                // An existing file that cannot be replaced (immutable): the old file and the checked copy must both survive.
+                string local = Path.Combine(dir, "locked.bin");
+                byte[] old = RandomBytes(500, 32);
+                File.WriteAllBytes(local, old);
+                bool locked = RunTool("chattr", "+i \"" + local + "\"");
+                if (!locked)
+                {
+                    Console.WriteLine("  skip the file that cannot be replaced (chattr +i is not available here)");
+                }
+                else
+                {
+                    Run run = RunReceive(device, onDevice, local, Fast(overwrite: true));
+                    RunTool("chattr", "-i \"" + local + "\"");
+                    Check(run.Error is IOException && File.ReadAllBytes(local).SequenceEqual(old) && File.Exists(local + ".smtty~") && File.ReadAllBytes(local + ".smtty~").SequenceEqual(content), "an existing file that cannot be replaced keeps both the old file and the checked copy", Describe(run));
+                }
+            }
+            {
+                // And the plain case: the old file is replaced in one step, nothing is left over.
+                string local = Path.Combine(dir, "replace.bin");
+                File.WriteAllBytes(local, RandomBytes(500, 33));
+                Run run = RunReceive(device, onDevice, local, Fast(overwrite: true));
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(content) && !File.Exists(local + ".smtty~"), "an existing file is replaced and nothing is left over", Describe(run));
+            }
+        }
+        Directory.Delete(dir, true);
+    }
+
+    private static bool RunTool(string tool, string arguments)
+    {
+        try
+        {
+            using (Process p = Process.Start(new ProcessStartInfo(tool, arguments) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false }))
+            {
+                p.StandardOutput.ReadToEnd();
+                p.StandardError.ReadToEnd();
+                p.WaitForExit();
+                return p.ExitCode == 0;
+            }
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     private static void SilentDeviceCases()
     {
         string dir = NewWorkDir();
@@ -688,6 +920,8 @@ internal static class Program
         bool Want(string group) => only == null || only == group;
         if (Want("units")) UnitCases();
         if (Want("silent")) SilentDeviceCases();
+        if (Want("finalize")) FinalizeCases();
+        if (Want("recovery")) RecoveryCases();
         if (Want("slow")) SlowLineCases();
         if (Want("send-ash")) SendCases(Ash, gnuUu: true, cksum: false);
         if (Want("receive-ash")) ReceiveCases(Ash, gnuUu: true, cksum: false);
