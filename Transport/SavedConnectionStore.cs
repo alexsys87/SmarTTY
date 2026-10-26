@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Xml.Serialization;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
@@ -163,6 +164,42 @@ public class SavedConnectionStore
             {
             }
         }
+    }
+
+    /// <summary>
+    /// Splits a <c>user@host</c> command-line argument, the form <c>ssh</c> accepts. Returns false when the argument
+    /// has no <c>@</c> or one of the two sides is empty, so the caller keeps looking the argument up as a plain name.
+    /// </summary>
+    public static bool TrySplitUserHost(string argument, out string userName, out string hostName)
+    {
+        userName = null;
+        hostName = null;
+        if (argument == null)
+        {
+            return false;
+        }
+        int separator = argument.IndexOf('@');
+        if (separator <= 0 || separator == argument.Length - 1)
+        {
+            return false;
+        }
+        userName = argument.Substring(0, separator);
+        hostName = argument.Substring(separator + 1);
+        return true;
+    }
+
+    /// <summary>
+    /// Resolves a <c>user@host</c> argument to a saved connection: the exact user and host first, then any connection
+    /// to that host (which is what <c>ssh host</c> does when the user name is not stored). Returns null when the
+    /// argument is not a <c>user@host</c> pair or nothing matches.
+    /// </summary>
+    public SSHConnectionSettings FindSshConnectionForArgument(string argument)
+    {
+        if (!TrySplitUserHost(argument, out string userName, out string hostName))
+        {
+            return null;
+        }
+        return FindSshConnection(hostName, userName) ?? FindByHost(hostName).FirstOrDefault();
     }
 
     public SSHConnectionSettings FindSshConnection(string hostName, string userName)

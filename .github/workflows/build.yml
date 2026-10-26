@@ -71,6 +71,9 @@ jobs:
       - name: Run Smart Terminal command line checks (tokens, completion target, quoting, paste, export, shell selection)
         run: dotnet run --project tests/SmartTerminalCommandLineTests -c Release
 
+      - name: Run saved connection lookup checks (user@host from the command line)
+        run: dotnet run --project tests/ConnectionLookupTests -c Release
+
       - name: Run ls output parser checks
         run: dotnet run --project tests/LsOutputParserTests -c Release
 
