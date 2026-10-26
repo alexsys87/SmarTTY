@@ -741,6 +741,13 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// When true (the default), a prompt the device prints that matches a common pattern (&quot;&gt; &quot;,
+    /// &quot;# &quot;, &quot;$ &quot;, ...) replaces <see cref="DefaultPrompt"/>. Turn it off when a device prints
+    /// something that only looks like a prompt, so that the input line always uses <see cref="DefaultPrompt"/>.
+    /// </summary>
+    public bool AutoDetectPrompt { get; set; } = true;
+
+    /// <summary>
     /// Encoding of the text exchanged with the device (see <see cref="TerminalEncodings"/>). It is used to decode
     /// received data and to encode typed and pasted text. Settings saved before this option existed have no
     /// value in the file and get the UTF-8 default.
