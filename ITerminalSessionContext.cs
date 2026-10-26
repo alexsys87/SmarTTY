@@ -13,5 +13,11 @@ public interface ITerminalSessionContext
 
     bool IsRoot { get; }
 
+    /// <summary>
+    /// True when the connection saves files with sudo without asking about the missing write permission
+    /// (the sudo password is still asked when the file is saved).
+    /// </summary>
+    bool AutoConfirmSudo { get; }
+
     ShellCompletionAnalyzer ProvideAnalyzer();
 }

@@ -213,6 +213,18 @@ public class NewConnectionController : INotifyPropertyChanged
         }
     }
 
+    public bool AutoConfirmSudo
+    {
+        get
+        {
+            return _Settings.AutoConfirmSudo;
+        }
+        set
+        {
+            _Settings.AutoConfirmSudo = value;
+        }
+    }
+
     public BatchTransferMode TransferMode
     {
         get
