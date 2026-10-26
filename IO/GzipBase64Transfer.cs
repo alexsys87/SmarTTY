@@ -47,6 +47,9 @@ public static class GzipBase64Transfer
         public string LocalPath;
         public string RemotePath;
         public Options Options;
+
+        /// <summary>Write a log of everything typed to the device and everything it answered (for finding out why a transfer fails).</summary>
+        public bool DebugLog;
     }
 
     public sealed class Options
@@ -65,6 +68,9 @@ public static class GzipBase64Transfer
 
         /// <summary>The speed limit used when the device does not echo (the echo is what tells that the data has arrived).</summary>
         public int NoEchoBytesPerSecond = 6000;
+
+        /// <summary>Receives the lines of the debug log (what was typed to the device, what it answered, what was decided); null for no log.</summary>
+        public Action<string> Log;
     }
 
     // A gzip file of no data. GZipStream writes nothing at all for an empty input on some versions of .NET, and gunzip refuses that.
@@ -266,6 +272,12 @@ public static class GzipBase64Transfer
         // "" when there is nothing to remove, otherwise the shell text that sets $d to the destination whose "$d.smtty~" is to be removed.
         private string _pendingCleanup;
 
+        // For the debug log and for the error texts: when did the transfer start, what did the device print last.
+        private readonly int _startedAt = Environment.TickCount;
+        private readonly StringBuilder _recent = new StringBuilder();
+        private byte _lastByte;
+        private bool _quietRx; // the lines that go by are the data itself: they are not logged one by one
+
         public Session(Options options, XModemTransfer.SendDataHandler send, ReadByteHandler readByte, CancellationToken token, XModemTransfer.ProgressHandler progress)
         {
             _options = options;
@@ -296,18 +308,89 @@ public static class GzipBase64Transfer
 
         private void SendBytes(byte[] data)
         {
+            Trace("TX " + data.Length + " bytes: " + Escape(Latin1(data), 400));
             _send(data, 0, data.Length);
         }
 
+        /// <summary>Text for the line: UTF-8, so that a name with national letters reaches the shell as it is.</summary>
         private static byte[] Ascii(string text)
         {
-            byte[] bytes = new byte[text.Length];
-            for (int i = 0; i < text.Length; i++)
-            {
-                bytes[i] = (byte)text[i];
-            }
-            return bytes;
+            return Encoding.UTF8.GetBytes(text);
         }
+
+        private static string Latin1(byte[] data)
+        {
+            char[] chars = new char[data.Length];
+            for (int i = 0; i < data.Length; i++)
+            {
+                chars[i] = (char)data[i];
+            }
+            return new string(chars);
+        }
+
+        private void Trace(string text)
+        {
+            Action<string> log = _options.Log;
+            if (log == null)
+            {
+                return;
+            }
+            try
+            {
+                log("[" + (Environment.TickCount - _startedAt).ToString(CultureInfo.InvariantCulture).PadLeft(7) + " ms] " + text);
+            }
+            catch (IOException)
+            {
+                // A log that cannot be written must not stop the transfer.
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        /// <summary>The last of what the device printed, readable (control characters shown as \r, \n, \xNN), for an error text.</summary>
+        private string RecentOutput()
+        {
+            string text = _recent.ToString() + _line.ToString();
+            if (text.Length == 0)
+            {
+                return " The device has printed nothing.";
+            }
+            return " The last output of the device: \"" + Escape(text.Length > 300 ? text.Substring(text.Length - 300) : text, 600) + "\"";
+        }
+
+        private static string Escape(string text, int max)
+        {
+            StringBuilder result = new StringBuilder();
+            foreach (char c in text)
+            {
+                if (result.Length >= max)
+                {
+                    result.Append("...");
+                    break;
+                }
+                if (c == '\r')
+                {
+                    result.Append("\\r");
+                }
+                else if (c == '\n')
+                {
+                    result.Append("\\n");
+                }
+                else if (c < 32 || c > 126)
+                {
+                    result.Append("\\x").Append(((int)c).ToString("x2", CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    result.Append(c);
+                }
+            }
+            return result.ToString();
+        }
+
+        // The line editor of a busybox shell built for a router keeps 512 characters of a line (OpenWrt) and silently drops the rest.
+        private const int MaxLineLength = 480;
 
         /// <summary>Types lines as the user would: each one ends with Enter, and the shell gets a moment to take it.</summary>
         private void TypeLines(params string[] lines)
@@ -315,6 +398,11 @@ public static class GzipBase64Transfer
             foreach (string line in lines)
             {
                 _token.ThrowIfCancellationRequested();
+                if (line.Length > MaxLineLength)
+                {
+                    throw new IOException("A command of " + line.Length + " characters is too long for the shell's line editor (about " + MaxLineLength
+                        + " are safe). Use a shorter path on the device.");
+                }
                 SendBytes(Ascii(line + "\r"));
                 Pause(40);
             }
@@ -360,10 +448,20 @@ public static class GzipBase64Transfer
             {
                 return false;
             }
+            _lastByte = b.Value;
             if (b.Value == (byte)'\n')
             {
                 line = _line.ToString().Trim('\r');
                 _line.Length = 0;
+                if (!_quietRx)
+                {
+                    Trace("RX " + Escape(line, 400));
+                }
+                _recent.Append(line).Append('\n');
+                if (_recent.Length > 1200)
+                {
+                    _recent.Remove(0, _recent.Length - 600);
+                }
             }
             else if (_line.Length < 1 << 16)
             {
@@ -422,7 +520,7 @@ public static class GzipBase64Transfer
                 int left = deadline - Environment.TickCount;
                 if (left <= 0)
                 {
-                    throw new IOException("The device did not answer (" + what + "). Is a shell prompt waiting there, and is the line free?");
+                    throw new IOException("The device did not answer (" + what + "). Is a shell prompt waiting there, and is the line free?" + RecentOutput());
                 }
                 string line = ReadLine(left);
                 if (line == null)
@@ -467,6 +565,7 @@ public static class GzipBase64Transfer
             {
                 throw new IOException("Unexpected answer of the device: " + answer);
             }
+            Trace("The device has: " + answer.Substring(5).Trim());
             List<string> tools = new List<string>(answer.Substring(5).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
             return new Capabilities(tools);
         }
@@ -622,6 +721,7 @@ public static class GzipBase64Transfer
             }
             string name = Path.GetFileName(localPath);
             Prepared prepared = null;
+            Trace("SEND " + localPath + " -> " + remotePath + "; encoding " + _options.Encoding + ", checksum " + _options.Checksum + ", attempts " + _options.Attempts + ", overwrite " + _options.Overwrite);
             try
             {
                 StartShell();
@@ -664,11 +764,13 @@ public static class GzipBase64Transfer
             }
             catch (OperationCanceledException)
             {
+                Trace("Cancelled");
                 AbortDevice();
                 return false;
             }
-            catch (IOException)
+            catch (IOException ex)
             {
+                Trace("FAILED: " + ex.Message);
                 AbortDevice();
                 throw;
             }
@@ -694,7 +796,10 @@ public static class GzipBase64Transfer
             string sumTool = ChecksumTool(checksum);
             string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
 
-            // The script is typed in pieces; the shell starts it only when the last piece has made the "if" complete.
+            // The script is typed as three lines, and each of them is a complete command (a one-line "if", a function
+            // definition): the shell never answers with its continuation prompt "> " in the middle of the script, which is
+            // the fragile part of typing into a console, and no line is longer than the line editor of a small
+            // busybox takes (OpenWrt builds it with 512 characters).
             // The data is read by head/dd for exactly the number of bytes it has, so that the shell never gets a
             // line of it (a uuencoded line can hold anything) whatever fails on the way, and without Ctrl-D, which
             // would log a shell out.
@@ -704,10 +809,10 @@ public static class GzipBase64Transfer
             string[] script =
             {
                 DestinationScript(remotePath, name) + "; p=\"$d.smtty~\"",
-                overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else",
-                "printf " + Say("READY") + "; " + reader + " | ( " + decoder + " | gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?",
-                "s=$(" + sumTool + " <\"$p\");" + trim + " if [ $r -eq 0 ] && [ \"$s\" = " + ShellQuote(prepared.Checksum) + " ]; then mv -f \"$p\" \"$d\" && printf "
-                    + Say("OK:%s") + " \"$s\"; else rm -f \"$p\"; printf " + Say("FAIL:%s:%s") + " \"$r\" \"$s\"; fi; fi"
+                "_smtty_end() { s=$(" + sumTool + " <\"$p\");" + trim + " if [ $r -eq 0 ] && [ \"$s\" = " + ShellQuote(prepared.Checksum) + " ]; then mv -f \"$p\" \"$d\" && printf "
+                    + Say("OK:%s") + " \"$s\"; else z=$(wc -c <\"$p\" 2>/dev/null); rm -f \"$p\"; printf " + Say("FAIL:%s:%s:%s") + " \"$r\" \"$s\" \"$z\"; fi; }",
+                overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else printf " + Say("READY") + "; " + reader + " | ( " + decoder
+                    + " | gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; _smtty_end; unset -f _smtty_end 2>/dev/null; fi"
             };
 
             Report(0, prepared.EncodedLength, "Starting the receiver on the device...");
@@ -748,14 +853,17 @@ public static class GzipBase64Transfer
             }
             if (result.StartsWith("FAIL:", StringComparison.Ordinal))
             {
-                string[] parts = result.Split(new[] { ':' }, 3);
+                string[] parts = result.Split(new[] { ':' }, 4);
                 string code = parts.Length > 1 ? parts[1] : "?";
                 string deviceSum = parts.Length > 2 ? parts[2].Trim() : string.Empty;
+                string unpacked = parts.Length > 3 ? parts[3].Trim() : string.Empty;
+                string size = unpacked.Length > 0 ? " It unpacked " + unpacked + " bytes; the original has " + prepared.OriginalLength + "." : string.Empty;
+                Trace("The device refused the data: gunzip status " + code + ", checksum " + deviceSum + ", unpacked " + unpacked + " bytes");
                 if (code == "0")
                 {
-                    return "Checksum mismatch: the device has " + deviceSum + ", expected " + prepared.Checksum + ".";
+                    return "Checksum mismatch: the device has " + deviceSum + ", expected " + prepared.Checksum + "." + size;
                 }
-                return "The device could not unpack the data (gunzip status " + code + "): the text was damaged on the way.";
+                return "The device could not unpack the data (gunzip status " + code + "): the text was damaged on the way, or a tool on the device failed." + size + RecentOutput();
             }
             throw new IOException("Unexpected answer of the device: " + result);
         }
@@ -781,7 +889,7 @@ public static class GzipBase64Transfer
                 _token.ThrowIfCancellationRequested();
                 if (Environment.TickCount - started >= timeout)
                 {
-                    throw new IOException("The device did not answer (result of the transfer). Is a shell prompt waiting there, and is the line free?");
+                    throw new IOException("The device did not answer (result of the transfer). Is a shell prompt waiting there, and is the line free?" + RecentOutput());
                 }
                 string line = ReadLine(300);
                 if (line != null)
@@ -807,82 +915,128 @@ public static class GzipBase64Transfer
         /// <summary>Types the text of the archive. After each window the echo of the device's terminal says that it has taken it.</summary>
         private void SendData(Prepared prepared, string status)
         {
-            using (FileStream stream = new FileStream(prepared.EncodedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
+            // The echoed lines are the data itself: only what is wrong with them goes to the log.
+            bool wasQuiet = _quietRx;
+            _quietRx = true;
+            try
             {
-                int windowBytes = Math.Max(128, _options.WindowBytes);
-                long sent = 0;
-                long expectedLines = 0, seenLines = 0;
-                int echoTimeouts = 0;
-                bool echoWorks = true;
-                bool firstWindow = true;
-                int rate = Math.Max(500, _options.NoEchoBytesPerSecond);
-                byte[] window = new byte[windowBytes + 256];
-                // The window ends at a line end, so that a line is never typed in two pieces.
-                while (sent < prepared.EncodedLength)
+                using (FileStream stream = new FileStream(prepared.EncodedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
                 {
-                    _token.ThrowIfCancellationRequested();
-                    int count = ReadWindow(stream, window, windowBytes);
-                    if (count == 0)
+                    int windowBytes = Math.Max(64, _options.WindowBytes);
+                    long sent = 0;
+                    long expectedLines = 0, seenLines = 0;
+                    int echoTimeouts = 0;
+                    int windowNumber = 0;
+                    bool echoWorks = true;
+                    bool echoComparable = true; // the echo of this window is not mixed with what is left of an earlier one
+                    bool firstWindow = true;
+                    int rate = Math.Max(500, _options.NoEchoBytesPerSecond);
+                    byte[] window = new byte[windowBytes + 256];
+                    Trace("Sending " + prepared.EncodedLength + " bytes of text in windows of about " + windowBytes + " bytes; echo wait, else " + rate + " bytes/s");
+                    // The window ends at a line end, so that a line is never typed in two pieces.
+                    while (sent < prepared.EncodedLength)
                     {
-                        break;
-                    }
-                    int lines = 0;
-                    for (int i = 0; i < count; i++)
-                    {
-                        if (window[i] == (byte)'\n')
+                        _token.ThrowIfCancellationRequested();
+                        int count = ReadWindow(stream, window, windowBytes);
+                        if (count == 0)
                         {
-                            lines++;
+                            break;
                         }
-                    }
-                    int startedAt = Environment.TickCount;
-                    _send(window, 0, count);
-                    sent += count;
-                    expectedLines += lines;
-                    Report(sent, prepared.EncodedLength, status + " - sending " + FormatSize(sent) + " of " + FormatSize(prepared.EncodedLength));
+                        int lines = 0;
+                        for (int i = 0; i < count; i++)
+                        {
+                            if (window[i] == (byte)'\n')
+                            {
+                                lines++;
+                            }
+                        }
+                        windowNumber++;
+                        int startedAt = Environment.TickCount;
+                        _send(window, 0, count);
+                        sent += count;
+                        expectedLines += lines;
+                        if (windowNumber <= 3 || windowNumber % 100 == 0)
+                        {
+                            Trace("TX window " + windowNumber + ": " + count + " bytes, " + sent + " of " + prepared.EncodedLength + " sent; starts with " + Escape(Latin1(window).Substring(0, Math.Min(count, 40)), 80));
+                        }
+                        Report(sent, prepared.EncodedLength, status + " - sending " + FormatSize(sent) + " of " + FormatSize(prepared.EncodedLength));
 
-                    if (echoWorks)
-                    {
-                        // 2 s plus what the line itself needs; a device that never echoes is found out by the first window.
-                        int timeout = 2000 + (int)(count * 1000L / rate) * 2;
-                        int deadline = startedAt + timeout;
-                        while (seenLines < expectedLines && Environment.TickCount - deadline < 0)
+                        if (echoWorks)
                         {
-                            _token.ThrowIfCancellationRequested();
-                            if (PumpKeepingAnswers(50, out bool lineEnded) && lineEnded)
+                            // 2 s plus what the line itself needs; a device that never echoes is found out by the first window.
+                            int timeout = 2000 + (int)(count * 1000L / rate) * 2;
+                            int deadline = startedAt + timeout;
+                            StringBuilder echoed = new StringBuilder();
+                            while (seenLines < expectedLines && Environment.TickCount - deadline < 0)
                             {
-                                seenLines++;
+                                _token.ThrowIfCancellationRequested();
+                                if (PumpKeepingAnswers(50, out bool lineEnded))
+                                {
+                                    echoed.Append((char)_lastByte);
+                                    if (lineEnded)
+                                    {
+                                        seenLines++;
+                                    }
+                                }
+                            }
+                            if (seenLines < expectedLines)
+                            {
+                                echoTimeouts++;
+                                Trace("ECHO TIMEOUT in window " + windowNumber + ": " + (expectedLines - seenLines) + " of " + lines + " lines were not echoed within " + timeout + " ms (echoed: " + Escape(echoed.ToString(), 120) + ")");
+                                echoComparable = false;
+                                if (firstWindow && seenLines == 0)
+                                {
+                                    Trace("The device does not echo what is typed: the speed limit is used from now on.");
+                                    echoWorks = false;
+                                }
+                                else if (echoTimeouts >= 3)
+                                {
+                                    Trace("Three windows were not echoed in time: the speed limit is used from now on.");
+                                    echoWorks = false;
+                                }
+                                else
+                                {
+                                    _errors++;
+                                }
+                                seenLines = expectedLines; // what was lost will not come any more
+                            }
+                            else if (echoComparable)
+                            {
+                                // The terminal of the device sends back what it received: a difference is damage on the way to it.
+                                string got = echoed.ToString().Replace("\r", string.Empty);
+                                string want = Latin1(window).Substring(0, count);
+                                if (got != want)
+                                {
+                                    int at = 0;
+                                    while (at < got.Length && at < want.Length && got[at] == want[at])
+                                    {
+                                        at++;
+                                    }
+                                    Trace("ECHO MISMATCH in window " + windowNumber + " at byte " + at + ": sent " + Escape(want.Substring(Math.Max(0, at - 10), Math.Min(30, want.Length - Math.Max(0, at - 10))), 100)
+                                        + " but the device echoed " + Escape(got.Substring(Math.Max(0, at - 10), Math.Min(30, got.Length - Math.Max(0, at - 10))), 100));
+                                    _errors++;
+                                    echoComparable = false; // one report is enough; the rest of the log would only repeat it
+                                }
                             }
                         }
-                        if (seenLines < expectedLines)
+                        else
                         {
-                            echoTimeouts++;
-                            if (firstWindow && seenLines == 0)
+                            // No echo to wait for: keep to the speed limit and keep the receive queue empty.
+                            int due = startedAt + (int)(count * 1000L / rate);
+                            while (Environment.TickCount - due < 0)
                             {
-                                echoWorks = false;
+                                _token.ThrowIfCancellationRequested();
+                                PumpKeepingAnswers(Math.Max(1, Math.Min(50, due - Environment.TickCount)), out _);
                             }
-                            else if (echoTimeouts >= 3)
-                            {
-                                echoWorks = false;
-                            }
-                            else
-                            {
-                                _errors++;
-                            }
-                            seenLines = expectedLines; // what was lost will not come any more
                         }
+                        firstWindow = false;
                     }
-                    else
-                    {
-                        // No echo to wait for: keep to the speed limit and keep the receive queue empty.
-                        int due = startedAt + (int)(count * 1000L / rate);
-                        while (Environment.TickCount - due < 0)
-                        {
-                            _token.ThrowIfCancellationRequested();
-                            PumpKeepingAnswers(Math.Max(1, Math.Min(50, due - Environment.TickCount)), out _);
-                        }
-                    }
-                    firstWindow = false;
+                    Trace("All " + sent + " bytes sent in " + windowNumber + " windows");
                 }
+            }
+            finally
+            {
+                _quietRx = wasQuiet;
             }
         }
 
@@ -963,6 +1117,7 @@ public static class GzipBase64Transfer
             }
             string partPath = localPath + ".smtty~";
             bool done = false;
+            Trace("RECEIVE " + remotePath + " -> " + localPath + "; encoding " + _options.Encoding + ", checksum " + _options.Checksum + ", attempts " + _options.Attempts + ", overwrite " + _options.Overwrite);
             try
             {
                 StartShell();
@@ -1004,11 +1159,13 @@ public static class GzipBase64Transfer
             }
             catch (OperationCanceledException)
             {
+                Trace("Cancelled");
                 AbortDevice();
                 return false;
             }
-            catch (IOException)
+            catch (IOException ex)
             {
+                Trace("FAILED: " + ex.Message);
                 AbortDevice();
                 throw;
             }
@@ -1108,6 +1265,8 @@ public static class GzipBase64Transfer
                 try
                 {
                     UuDecoder uu = encoding == EncodingKind.UuEncode ? new UuDecoder() : null;
+                    _quietRx = true; // thousands of data lines: only the other lines are logged
+                    Trace("Receiving the data (the device's own words are logged, the data lines are not)");
                     while (true)
                     {
                         _token.ThrowIfCancellationRequested();
@@ -1120,6 +1279,7 @@ public static class GzipBase64Transfer
                         if (at >= 0)
                         {
                             string tag = line.Substring(at + _marker.Length);
+                            Trace("RX " + Escape(line, 200));
                             if (tag.StartsWith("END:", StringComparison.Ordinal))
                             {
                                 endPayload = tag.Substring(4).Trim();
@@ -1134,6 +1294,7 @@ public static class GzipBase64Transfer
                             if (line.Trim().Length > 0)
                             {
                                 _errors++;
+                                Trace("RX skipped, not a line of the archive: " + Escape(line, 200));
                             }
                             continue;
                         }
@@ -1155,12 +1316,17 @@ public static class GzipBase64Transfer
                     _pendingCleanup = null; // the sender is done
                     pipe.Complete();
                     inflater.Join();
+                    Trace("The data has ended: " + received + " bytes of text, " + Interlocked.Read(ref produced) + " bytes unpacked");
                 }
                 catch
                 {
                     pipe.Abandon();
                     inflater.Join(2000);
                     throw;
+                }
+                finally
+                {
+                    _quietRx = false;
                 }
                 if (inflateError != null)
                 {
@@ -1175,6 +1341,10 @@ public static class GzipBase64Transfer
                         decodeError = "Checksum mismatch: received " + mine + ", the device has " + endPayload + ".";
                     }
                 }
+            }
+            if (decodeError != null)
+            {
+                Trace("The received data was refused: " + decodeError);
             }
             return decodeError;
         }
