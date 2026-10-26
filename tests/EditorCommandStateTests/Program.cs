@@ -33,6 +33,7 @@ internal static class Program
         Check(loading.IsEnabled(EditorToolbarCommand.SelectAll), "loading: Select All works");
         Check(loading.IsEnabled(EditorToolbarCommand.Find), "loading: Find works");
         Check(loading.IsEnabled(EditorToolbarCommand.GoToLine), "loading: Go to Line works");
+        Check(!loading.IsEnabled(EditorToolbarCommand.ToggleHex), "loading: Hex Editor is off");
 
         // An opened file nobody touched.
         EditorCommandState clean = new EditorCommandState { HasText = true };
@@ -88,6 +89,15 @@ internal static class Program
         Check(!loading.IsEnabled(EditorToolbarCommand.Reload), "loading: Reload is off");
         Check(new EditorCommandState { IsModified = true }.IsEnabled(EditorToolbarCommand.Reload), "modified file: Reload is on (the window asks before it drops the changes)");
 
+        // The hex view: it can be opened once the file is loaded, and Replace belongs to the text view.
+        Check(new EditorCommandState { CanUseHex = true }.IsEnabled(EditorToolbarCommand.ToggleHex), "loaded file: Hex Editor is on");
+        Check(!new EditorCommandState { CanUseHex = false }.IsEnabled(EditorToolbarCommand.ToggleHex), "not loaded: Hex Editor is off");
+        Check(!new EditorCommandState { CanUseHex = true, IsSaving = true }.IsEnabled(EditorToolbarCommand.ToggleHex), "saving: Hex Editor is off");
+        EditorCommandState hex = new EditorCommandState { CanUseHex = true, HexMode = true, HasText = true };
+        Check(hex.IsEnabled(EditorToolbarCommand.ToggleHex), "hex view: Hex Editor can be closed");
+        Check(!hex.IsEnabled(EditorToolbarCommand.Replace), "hex view: Replace is off");
+        Check(hex.IsEnabled(EditorToolbarCommand.Find), "hex view: Find is on");
+
         // The tool bar and the context menu list every command once, and each has a label and an icon.
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {
@@ -105,6 +115,10 @@ internal static class Program
         Check(EditorStatusText.Selection(1, 1) == "1 char", "status: one character");
         Check(EditorStatusText.Selection(25, 1) == "25 chars", "status: a selection in one line");
         Check(EditorStatusText.Selection(40, 3) == "40 chars, 3 lines", "status: a selection over several lines");
+        Check(EditorStatusText.HexPosition(0, 16, insertMode: false) == "Offset 0x00000000 of 0x00000010 (OVR)", "status: the hex offset and size");
+        Check(EditorStatusText.HexPosition(0x1F, 0x100, insertMode: true) == "Offset 0x0000001F of 0x00000100 (INS)", "status: the hex insert mode");
+        Check(EditorStatusText.HexSelection(1) == "1 byte", "status: one selected byte");
+        Check(EditorStatusText.HexSelection(256) == "256 bytes", "status: selected bytes");
         Check(EditorStatusText.State(true, false, false, true, false) == "Loading...", "status: loading wins");
         Check(EditorStatusText.State(false, false, true, true, false) == "Saving...", "status: saving before modified");
         Check(EditorStatusText.State(false, false, false, true, false) == "Modified", "status: modified");
@@ -117,7 +131,7 @@ internal static class Program
         // Every command has a rule (an unknown value is off).
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {
-            bool everythingOn = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true }.IsEnabled(command);
+            bool everythingOn = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true, CanUseHex = true }.IsEnabled(command);
             Check(everythingOn, "all conditions met: " + command + " is on");
         }
         Check(!empty.IsEnabled((EditorToolbarCommand)999), "unknown command is off");

@@ -1556,7 +1556,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         return int.MaxValue;
     }
 
-    public void SelectAllText()
+    public new void SelectAllText()
     {
         if (base.EditableDocument.LineCount != 0)
         {

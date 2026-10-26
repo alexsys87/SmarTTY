@@ -42,11 +42,13 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
             // The images are 16 pixels; smooth the upscaling on a high-DPI monitor.
             RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
             // Commands that switch something on are toggle buttons; the state below keeps them in step with the editor.
-            ButtonBase button = (command.Value == EditorToolbarCommand.ShowAllCharacters)
+            bool isToggle = command.Value == EditorToolbarCommand.ShowAllCharacters
+                || command.Value == EditorToolbarCommand.ToggleHex;
+            ButtonBase button = isToggle
                 ? new ToggleButton { Content = icon, ToolTip = description.ToolTip }
                 : new Button { Content = icon, ToolTip = description.ToolTip };
             ToolTipService.SetShowOnDisabled(button, true);
-            button.SetResourceReference(StyleProperty, (command.Value == EditorToolbarCommand.ShowAllCharacters)
+            button.SetResourceReference(StyleProperty, isToggle
                 ? ToolBar.ToggleButtonStyleKey
                 : ToolBar.ButtonStyleKey);
             EditorToolbarCommand current = command.Value;

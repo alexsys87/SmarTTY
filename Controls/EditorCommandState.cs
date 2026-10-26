@@ -17,7 +17,8 @@ internal enum EditorToolbarCommand
     Replace,
     GoToLine,
     ShowAllCharacters,
-    Reload
+    Reload,
+    ToggleHex
 }
 
 /// <summary>
@@ -50,6 +51,12 @@ internal struct EditorCommandState
     /// <summary>The editor shows spaces, tabs, line ends and other invisible characters as marks.</summary>
     public bool ShowAllCharacters { get; set; }
 
+    /// <summary>The editor shows the bytes in the hex view.</summary>
+    public bool HexMode { get; set; }
+
+    /// <summary>The file is loaded and no save is running: the hex view can be opened.</summary>
+    public bool CanUseHex { get; set; }
+
     public bool IsEnabled(EditorToolbarCommand command)
     {
         switch (command)
@@ -72,7 +79,8 @@ internal struct EditorCommandState
             case EditorToolbarCommand.SelectAll:
                 return HasText;
             case EditorToolbarCommand.Replace:
-                return !ReadOnly;
+                // The text search and replace window does not know about the bytes in the hex view.
+                return !ReadOnly && !HexMode;
             case EditorToolbarCommand.Reload:
                 // There is a file on the server to load again, and nothing is being written to it.
                 return !ReadOnly && !IsNewFile && !IsSaving;
@@ -80,6 +88,8 @@ internal struct EditorCommandState
             case EditorToolbarCommand.GoToLine:
             case EditorToolbarCommand.ShowAllCharacters:
                 return true;
+            case EditorToolbarCommand.ToggleHex:
+                return CanUseHex && !IsSaving;
             default:
                 return false;
         }
@@ -88,7 +98,8 @@ internal struct EditorCommandState
     /// <summary>Whether a command that switches something on is currently on.</summary>
     public bool IsChecked(EditorToolbarCommand command)
     {
-        return command == EditorToolbarCommand.ShowAllCharacters && ShowAllCharacters;
+        return (command == EditorToolbarCommand.ShowAllCharacters && ShowAllCharacters)
+            || (command == EditorToolbarCommand.ToggleHex && HexMode);
     }
 }
 
@@ -143,7 +154,8 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.Replace,
         EditorToolbarCommand.GoToLine,
         null,
-        EditorToolbarCommand.ShowAllCharacters
+        EditorToolbarCommand.ShowAllCharacters,
+        EditorToolbarCommand.ToggleHex
     };
 
     public static readonly EditorToolbarCommand?[] ContextMenuLayout =
@@ -162,6 +174,8 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.Replace,
         EditorToolbarCommand.GoToLine,
         EditorToolbarCommand.ShowAllCharacters,
+        null,
+        EditorToolbarCommand.ToggleHex,
         null,
         EditorToolbarCommand.Save,
         EditorToolbarCommand.Reload
@@ -197,6 +211,8 @@ internal static class EditorCommandCatalog
                 return new EditorCommandDescription("Show All Characters", "show-all-characters", "editor/show-all-characters.png", "");
             case EditorToolbarCommand.Reload:
                 return new EditorCommandDescription("Reload from Server", "refresh", "MainWindow/refresh16.png", "");
+            case EditorToolbarCommand.ToggleHex:
+                return new EditorCommandDescription("Hex Editor", "hex", "editor/hex.png", "");
             default:
                 throw new ArgumentOutOfRangeException(nameof(command));
         }
@@ -217,6 +233,20 @@ internal static class EditorStatusText
     {
         string text = characters + ((characters == 1) ? " char" : " chars");
         return (lines > 1) ? (text + ", " + lines + " lines") : text;
+    }
+
+    /// <summary>The caret of the hex view: the byte offset, the size of the file, and the typing mode.</summary>
+    public static string HexPosition(int offset, int length, bool insertMode)
+    {
+        return "Offset 0x" + offset.ToString("X8", System.Globalization.CultureInfo.InvariantCulture)
+            + " of 0x" + length.ToString("X8", System.Globalization.CultureInfo.InvariantCulture)
+            + (insertMode ? " (INS)" : " (OVR)");
+    }
+
+    /// <summary>The selection of the hex view: its length in bytes.</summary>
+    public static string HexSelection(int bytes)
+    {
+        return bytes + ((bytes == 1) ? " byte" : " bytes");
     }
 
     /// <summary>Whether the file on the server matches the text in the editor.</summary>

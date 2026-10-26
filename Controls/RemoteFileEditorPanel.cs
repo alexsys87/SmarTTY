@@ -69,6 +69,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
             RefreshState();
         };
         _editor.ContextMenuStrip = _contextMenu;
+        _editor.HexEditor.ContextMenuStrip = _contextMenu;
 
         _editor.Dock = DockStyle.Fill;
         Controls.Add(_editor);
@@ -84,6 +85,12 @@ internal sealed class RemoteFileEditorPanel : UserControl
         _editor.SavingChanged += (sender, e) => ScheduleRefresh();
         _editor.LoadCompleted += (sender, e) => ScheduleRefresh();
         _editor.FormatChanged += (sender, e) => ScheduleRefresh();
+        _editor.HexModeChanged += (sender, e) => ScheduleRefresh();
+        _editor.HexEditor.StateChanged += (sender, e) => ScheduleRefresh();
+        // Keys handled by the hex control itself (it has the focus while it is shown).
+        _editor.HexEditor.SaveRequested += (sender, e) => SaveRequested?.Invoke(this, EventArgs.Empty);
+        _editor.HexEditor.FindRequested += (sender, e) => FindRequested?.Invoke(this, EventArgs.Empty);
+        _editor.HexEditor.GoToOffsetRequested += (sender, e) => GoToLineRequested?.Invoke(this, EventArgs.Empty);
 
         ThemeManager.ThemeChanged += OnThemeChanged;
         ApplyTheme();
@@ -96,7 +103,8 @@ internal sealed class RemoteFileEditorPanel : UserControl
         // The key is shown only: the editor handles the key itself, a menu shortcut would run the command twice.
         ToolStripMenuItem menuItem = new ToolStripMenuItem(description.Text)
         {
-            ShortcutKeyDisplayString = description.Shortcut
+            ShortcutKeyDisplayString = description.Shortcut,
+            CheckOnClick = false
         };
         Icons.Apply(menuItem, description.IconName);
         menuItem.Click += (sender, e) => RunCommand(command);
@@ -123,10 +131,24 @@ internal sealed class RemoteFileEditorPanel : UserControl
                     SaveRequested?.Invoke(this, EventArgs.Empty);
                     break;
                 case EditorToolbarCommand.Undo:
-                    _editor.Undo();
+                    if (_editor.IsHexMode)
+                    {
+                        _editor.HexEditor.Undo();
+                    }
+                    else
+                    {
+                        _editor.Undo();
+                    }
                     break;
                 case EditorToolbarCommand.Redo:
-                    _editor.Redo();
+                    if (_editor.IsHexMode)
+                    {
+                        _editor.HexEditor.Redo();
+                    }
+                    else
+                    {
+                        _editor.Redo();
+                    }
                     break;
                 case EditorToolbarCommand.Cut:
                     _editor.Cut();
@@ -165,6 +187,9 @@ internal sealed class RemoteFileEditorPanel : UserControl
                     _editor.ShowAllCharacters = !_editor.ShowAllCharacters;
                     ShowAllCharactersChanged?.Invoke(this, EventArgs.Empty);
                     break;
+                case EditorToolbarCommand.ToggleHex:
+                    _editor.ToggleHexMode();
+                    break;
             }
         }
         catch (Exception exception)
@@ -173,13 +198,32 @@ internal sealed class RemoteFileEditorPanel : UserControl
         }
         if (focusEditor)
         {
-            _editor.Focus();
+            _editor.FocusActiveView();
         }
         RefreshState();
     }
 
     internal EditorCommandState CaptureState()
     {
+        bool hex = _editor.IsHexMode;
+        if (hex)
+        {
+            HexEditorControl hexEditor = _editor.HexEditor;
+            return new EditorCommandState
+            {
+                ReadOnly = hexEditor.ReadOnly,
+                HasSelection = hexEditor.HasSelection,
+                HasText = hexEditor.Length > 0,
+                CanUndo = hexEditor.CanUndo,
+                CanRedo = hexEditor.CanRedo,
+                IsModified = _editor.IsModified,
+                IsNewFile = _editor.IsNewFile,
+                IsSaving = _editor.IsSaving,
+                HexMode = true,
+                CanUseHex = _editor.CanToggleHexMode,
+                ShowAllCharacters = _editor.ShowAllCharacters
+            };
+        }
         int lineCount = _editor.LineCount;
         return new EditorCommandState
         {
@@ -191,6 +235,8 @@ internal sealed class RemoteFileEditorPanel : UserControl
             IsModified = _editor.IsModified,
             IsNewFile = _editor.IsNewFile,
             IsSaving = _editor.IsSaving,
+            HexMode = false,
+            CanUseHex = _editor.CanToggleHexMode,
             ShowAllCharacters = _editor.ShowAllCharacters
         };
     }
@@ -242,9 +288,9 @@ internal sealed class RemoteFileEditorPanel : UserControl
     {
         base.OnGotFocus(e);
         // The host focuses its child: the keys are for the editor, not for the menu.
-        if (!_editor.Focused)
+        if (!_editor.Focused && !_editor.HexEditor.Focused)
         {
-            _editor.Focus();
+            _editor.FocusActiveView();
         }
     }
 

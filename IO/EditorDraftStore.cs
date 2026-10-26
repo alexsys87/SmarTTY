@@ -23,7 +23,14 @@ public sealed class EditorDraft
     /// <summary>The file did not exist when the editor was opened.</summary>
     public bool IsNewFile;
 
+    /// <summary>The unsaved text (formats 1 and 2).</summary>
     public string Text;
+
+    /// <summary>
+    /// The unsaved bytes of the hex view (format 3), or null for a text draft. An empty file is an empty array,
+    /// not null, so that the two kinds of drafts stay apart.
+    /// </summary>
+    public byte[] Bytes;
 }
 
 /// <summary>Encrypts the text of the drafts at rest (see <see cref="DpapiDraftProtector"/>).</summary>
@@ -40,13 +47,16 @@ public interface IDraftProtector
 /// the user chose to discard it. A file is replaced as a whole (written next to it, then swapped in with File.Replace),
 /// so a program that ends in the middle of a write, or a swap that fails, leaves the previous draft, not half of a new
 /// one and not none. With a <see cref="IDraftProtector"/> the text is stored encrypted (format 2); drafts written without
-/// one (format 1, plain text) are still read.
+/// one (format 1, plain text) are still read. The hex view stores the raw bytes (format 3), encrypted like format 2 when
+/// a protector is given.
 /// </summary>
 public sealed class EditorDraftStore
 {
     private const string Signature = "SmarTTY-draft 1";
 
     private const string ProtectedSignature = "SmarTTY-draft 2";
+
+    private const string HexSignature = "SmarTTY-draft 3";
 
     private const string Extension = ".draft";
 
@@ -86,15 +96,16 @@ public sealed class EditorDraftStore
     public void Save(string key, EditorDraft draft)
     {
         Directory.CreateDirectory(_directory);
+        bool hex = draft.Bytes != null;
         StringBuilder text = new StringBuilder();
-        text.Append(Signature).Append('\n');
+        text.Append(hex ? HexSignature : Signature).Append('\n');
         text.Append("path: ").Append(Convert.ToBase64String(new UTF8Encoding(false).GetBytes(draft.RemotePath ?? ""))).Append('\n');
         text.Append("saved: ").Append(draft.SavedUtc.Ticks.ToString(CultureInfo.InvariantCulture)).Append('\n');
         text.Append("base: ").Append(draft.BaseHash ?? "").Append('\n');
         text.Append("new: ").Append(draft.IsNewFile ? "1" : "0").Append('\n');
         // An empty line ends the header; the text after it is kept byte for byte (it may start with an empty line).
         text.Append('\n');
-        text.Append(draft.Text ?? "");
+        text.Append(hex ? Convert.ToBase64String(draft.Bytes) : (draft.Text ?? ""));
         string content = text.ToString();
         if (_protector != null)
         {
@@ -182,17 +193,20 @@ public sealed class EditorDraftStore
                 return null;
             }
             string[] header = content.Substring(0, headerEnd).Split('\n');
-            if (header.Length < 5 || header[0] != Signature)
+            bool hex = header.Length >= 5 && header[0] == HexSignature;
+            if (header.Length < 5 || (!hex && header[0] != Signature))
             {
                 return null;
             }
+            string payload = content.Substring(headerEnd + 2);
             EditorDraft draft = new EditorDraft
             {
                 RemotePath = Encoding.UTF8.GetString(Convert.FromBase64String(Field(header[1], "path: "))),
                 SavedUtc = new DateTime(long.Parse(Field(header[2], "saved: "), CultureInfo.InvariantCulture), DateTimeKind.Utc),
                 BaseHash = Field(header[3], "base: "),
                 IsNewFile = Field(header[4], "new: ") == "1",
-                Text = content.Substring(headerEnd + 2)
+                Text = hex ? null : payload,
+                Bytes = hex ? Convert.FromBase64String(payload.Trim()) : null
             };
             return draft;
         }

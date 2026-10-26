@@ -484,7 +484,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     protected internal EditableTextDocument EditableDocument => Document;
 
-    public bool IsModified
+    public virtual bool IsModified
     {
         get
         {
@@ -892,7 +892,8 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
     {
         if (ModifiedChanged != null)
         {
-            ModifiedChanged(this, _modified);
+            // IsModified is virtual: the remote file editor reports the state of its hex view from this event too.
+            ModifiedChanged(this, IsModified);
         }
     }
 
