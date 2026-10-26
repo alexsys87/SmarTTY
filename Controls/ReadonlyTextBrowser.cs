@@ -437,6 +437,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private bool _showTabs;
 
+    private bool _showAllCharacters;
+
     private EditableTextDocument _document = new EditableTextDocument();
 
     private IScrollBar _verticalScrollBar = new ScrollBarAdapter(new VScrollBar());
@@ -607,6 +609,27 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             _showTabs = value;
             Redraw();
+        }
+    }
+
+    /// <summary>
+    /// Draws spaces, tabs, line ends and other characters that leave no ink of their own as visible marks:
+    /// a middle dot for a space, an arrow for a tab, a pilcrow for a line break, a control picture for a
+    /// control character.
+    /// </summary>
+    public bool ShowAllCharacters
+    {
+        get
+        {
+            return _showAllCharacters;
+        }
+        set
+        {
+            if (_showAllCharacters != value)
+            {
+                _showAllCharacters = value;
+                Redraw();
+            }
         }
     }
 
@@ -2439,9 +2462,15 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             text = _displayRows[row].Decorator.Transform(text, out characterRange, out brush);
         }
+        // The overlay marks what is on screen, so it follows a fold that replaces the rest of the line with a label.
+        string overlayText = text;
         text = TextDocument.SubstringFromColumn(text, firstColumn, TabSize, out startIndex, out startColumn);
+        int left = _textArea.Left;
+        int y = Round((float)_textArea.Top + (float)row * _charSize.Height);
         if (string.IsNullOrEmpty(text))
         {
+            // The overlay still marks the line break of an empty line.
+            PaintLineOverlay(graphics, line, overlayText, firstColumn, left, y, (int)Math.Ceiling(_charSize.Height));
             return;
         }
         int binaryDigitCount = 0;
@@ -2465,8 +2494,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             characterRange.Length = text.Length - characterOffset;
         }
-        int left = _textArea.Left;
-        int y = Round((float)_textArea.Top + (float)row * _charSize.Height);
         int tabStartColumn = -1;
         ColorSpan[] colorSpans = ((brush == null) ? GetLineColorSpans(line) : new ColorSpan[1]
         {
@@ -2518,7 +2545,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 foregroundBrush = items[row, column];
                 backgroundBrush = null;
             }
-            if (_showTabs)
+            if (_showTabs || _showAllCharacters)
             {
                 if (text[characterIndex] == '\t')
                 {
@@ -2584,12 +2611,12 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             graphics.FillRectangle(backgroundBrush, ColumnToX(lastPaintedColumn + 1 + ScrollColumn), LineToY(line), _charSize.Width * (float)(_visibleColumns - lastPaintedColumn), _charSize.Height);
         }
-        if (_showTabs && tabStartColumn != -1)
+        if ((_showTabs || _showAllCharacters) && tabStartColumn != -1)
         {
             float tabUnderlineY = (float)y + _charSize.Height / 2f;
             graphics.DrawLine(Pens.DarkGray, (float)left + (float)tabStartColumn * _charSize.Width, tabUnderlineY, (float)left + (float)column * _charSize.Width, tabUnderlineY);
         }
-        PaintLineOverlay(graphics, line, firstColumn, left, y, (int)Math.Ceiling(_charSize.Height));
+        PaintLineOverlay(graphics, line, overlayText, firstColumn, left, y, (int)Math.Ceiling(_charSize.Height));
         if (list == null || pen == null)
         {
             return;
@@ -2601,8 +2628,91 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
-    protected virtual void PaintLineOverlay(Graphics graphics, int line, int firstColumn, int left, int top, int height)
+    protected virtual void PaintLineOverlay(Graphics graphics, int line, string text, int firstColumn, int left, int top, int height)
     {
+        if (_showAllCharacters)
+        {
+            PaintInvisibleCharacters(graphics, line, text, firstColumn, top);
+        }
+    }
+
+    private void PaintInvisibleCharacters(Graphics graphics, int line, string text, int firstColumn, int top)
+    {
+        int lastColumn = firstColumn + _visibleColumns - 1;
+        int column = 0;
+        for (int i = 0; i < text.Length; i++)
+        {
+            char ch = text[i];
+            int nextColumn = (ch == '\t') ? (column + TabSize - column % TabSize) : (column + 1);
+            if (column >= firstColumn && column <= lastColumn)
+            {
+                if (ch == '\t')
+                {
+                    DrawInvisibleCharacter(graphics, "→", column, top);
+                }
+                else
+                {
+                    string marker = GetInvisibleCharacterMarker(ch);
+                    if (marker != null)
+                    {
+                        DrawInvisibleCharacter(graphics, marker, column, top);
+                    }
+                }
+            }
+            column = nextColumn;
+            if (column > lastColumn)
+            {
+                // The rest of the line, including its line break, is off screen.
+                return;
+            }
+        }
+        // The line break itself is not a part of the line text. The last line of the document has none, even when the
+        // model gives it the ending of the line above (see TextDocument.SplitLines).
+        if (column >= firstColumn && column <= lastColumn && line < _document.LineCount - 1)
+        {
+            DrawInvisibleCharacter(graphics, "¶", column, top);
+        }
+    }
+
+    private void DrawInvisibleCharacter(Graphics graphics, string marker, int column, int top)
+    {
+        graphics.DrawString(marker, Font, Brushes.DarkGray, ColumnToX(column), top, _stringFormat);
+    }
+
+    private static string GetInvisibleCharacterMarker(char ch)
+    {
+        if (ch == ' ')
+        {
+            return "·";
+        }
+        if (ch == '\u00A0')
+        {
+            // A no-break space looks like a space but is another character; show it as a ring.
+            return "°";
+        }
+        if (char.IsControl(ch))
+        {
+            if (ch == '\u007F')
+            {
+                return "\u2421";
+            }
+            if (ch < '\u0020')
+            {
+                return ((char)(0x2400 + ch)).ToString();
+            }
+            // C1 control characters have no control picture: a replacement mark still shows them.
+            return "\uFFFD";
+        }
+        if (char.IsWhiteSpace(ch))
+        {
+            return "·";
+        }
+        if (char.GetUnicodeCategory(ch) == System.Globalization.UnicodeCategory.Format)
+        {
+            // Zero-width joiner, BOM, soft hyphen and the bidirectional marks: invisible but present.
+            return "\uFFFD";
+        }
+        return null;
     }
 
     public int AddHighlight(TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle)

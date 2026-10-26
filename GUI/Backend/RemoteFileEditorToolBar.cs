@@ -17,8 +17,6 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
 {
     private readonly Dictionary<EditorToolbarCommand, ButtonBase> _buttons = new Dictionary<EditorToolbarCommand, ButtonBase>();
 
-    private readonly ToggleButton _hexButton;
-
     public RemoteFileEditorToolBar(RemoteFileEditorPanel panel)
     {
         if (panel == null)
@@ -43,29 +41,17 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
             };
             // The images are 16 pixels; smooth the upscaling on a high-DPI monitor.
             RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
-            EditorToolbarCommand current = command.Value;
-            if (current == EditorToolbarCommand.ToggleHex)
-            {
-                ToggleButton toggle = new ToggleButton
-                {
-                    Content = icon,
-                    ToolTip = description.ToolTip
-                };
-                ToolTipService.SetShowOnDisabled(toggle, true);
-                toggle.SetResourceReference(StyleProperty, ToolBar.ToggleButtonStyleKey);
-                toggle.Click += (sender, e) => panel.RunCommand(current);
-                _hexButton = toggle;
-                _buttons[current] = toggle;
-                Items.Add(toggle);
-                continue;
-            }
-            Button button = new Button
-            {
-                Content = icon,
-                ToolTip = description.ToolTip
-            };
+            // Commands that switch something on are toggle buttons; the state below keeps them in step with the editor.
+            bool isToggle = command.Value == EditorToolbarCommand.ShowAllCharacters
+                || command.Value == EditorToolbarCommand.ToggleHex;
+            ButtonBase button = isToggle
+                ? new ToggleButton { Content = icon, ToolTip = description.ToolTip }
+                : new Button { Content = icon, ToolTip = description.ToolTip };
             ToolTipService.SetShowOnDisabled(button, true);
-            button.SetResourceReference(StyleProperty, ToolBar.ButtonStyleKey);
+            button.SetResourceReference(StyleProperty, isToggle
+                ? ToolBar.ToggleButtonStyleKey
+                : ToolBar.ButtonStyleKey);
+            EditorToolbarCommand current = command.Value;
             button.Click += (sender, e) => panel.RunCommand(current);
             _buttons[current] = button;
             Items.Add(button);
@@ -79,10 +65,10 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
         foreach (KeyValuePair<EditorToolbarCommand, ButtonBase> pair in _buttons)
         {
             pair.Value.IsEnabled = state.IsEnabled(pair.Key);
-        }
-        if (_hexButton != null)
-        {
-            _hexButton.IsChecked = state.HexMode;
+            if (pair.Value is ToggleButton toggle)
+            {
+                toggle.IsChecked = state.IsChecked(pair.Key);
+            }
         }
     }
 

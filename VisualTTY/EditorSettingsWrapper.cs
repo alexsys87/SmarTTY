@@ -77,6 +77,18 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool ShowAllCharacters
+    {
+        get
+        {
+            return _Settings.Editor.ShowAllCharacters;
+        }
+        set
+        {
+            _Settings.Editor.ShowAllCharacters = value;
+        }
+    }
+
     public bool Autocompletion
     {
         get

@@ -131,6 +131,20 @@ internal static class SettingsChecks
         check(promptSettings.Clone().DefaultPrompt == "router# ", "default prompt: Clone() keeps it");
         check(loaded.Settings.DefaultPrompt == "> ", "default prompt: a file saved before it existed gets '> '");
 
+        // the prompt auto-detection switch: on by default, survives a round trip, and a settings file written
+        // before it existed keeps the default (on).
+        check(new DeviceTerminalSettings().AutoDetectPrompt, "prompt detection: on by default");
+        DeviceTerminalSettings detectOff = new DeviceTerminalSettings
+        {
+            Connection = new DeviceTerminalSettings.ConnectionSettings.Tcp { Host = "10.0.0.9", Port = 5002 },
+            AutoDetectPrompt = false
+        };
+        RawConnectionSettings detectOffLoaded = RoundTrip(new RawConnectionSettings { Settings = detectOff }, out string detectOffXml);
+        check(detectOffXml.Contains("<AutoDetectPrompt>false</AutoDetectPrompt>"), "prompt detection: saved as its own element");
+        check(!detectOffLoaded.Settings.AutoDetectPrompt, "prompt detection: off survives the round trip");
+        check(!detectOff.Clone().AutoDetectPrompt, "prompt detection: Clone() keeps it off");
+        check(loaded.Settings.AutoDetectPrompt, "prompt detection: a file saved before it existed has it on");
+
         // auto login fields
         check(!telnet.HasAutoLogin, "auto login: none by default");
         DeviceTerminalSettings.ConnectionSettings.Telnet withLogin = new DeviceTerminalSettings.ConnectionSettings.Telnet

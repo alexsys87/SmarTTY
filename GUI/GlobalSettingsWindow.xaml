@@ -412,6 +412,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -450,9 +451,10 @@
             <CheckBox Content="Enable syntax highlighting" Grid.Row="9" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.SyntaxHighlighting}" />
             <CheckBox Content="Keep a backup copy (file~) when saving" Grid.Row="10" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.BackupBeforeSave}" ToolTip="The first save of a file after it was opened copies the old file to the same name with a ~ added, on the server." />
             <CheckBox Content="Show a line under each tab character" Grid.Row="11" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ShowTabs}" ToolTip="Underlines tabs so lines indented with tabs are easy to tell from lines indented with spaces" />
-            <CheckBox Content="Offer completions while editing (Ctrl+Space opens the list)" Grid.Row="12" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.Autocompletion}" ToolTip="Suggests the keywords of the language and the words already used in the file." />
-            <CheckBox Content="Open the completion list automatically while typing" Grid.Row="13" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.AutocompletionOnTyping}" ToolTip="Opens the list after two letters of a word were typed." />
-            <CheckBox Content="Offer the standard functions of the language (API symbols)" Grid.Row="14" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ApiSymbols}" ToolTip="Adds the standard functions of the language (Python builtins, the C library, the shell builtins, ...) with their description and parameter hint. The set lives in ApiSymbols.xml." />
+            <CheckBox Content="Show all characters, including spaces, tabs and line ends" Grid.Row="12" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ShowAllCharacters}" ToolTip="Marks spaces, tabs, line breaks and control characters so invisible differences are easy to see. The same switch is on the editor tool bar." />
+            <CheckBox Content="Offer completions while editing (Ctrl+Space opens the list)" Grid.Row="13" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.Autocompletion}" ToolTip="Suggests the keywords of the language and the words already used in the file." />
+            <CheckBox Content="Open the completion list automatically while typing" Grid.Row="14" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.AutocompletionOnTyping}" ToolTip="Opens the list after two letters of a word were typed." />
+            <CheckBox Content="Offer the standard functions of the language (API symbols)" Grid.Row="15" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ApiSymbols}" ToolTip="Adds the standard functions of the language (Python builtins, the C library, the shell builtins, ...) with their description and parameter hint. The set lives in ApiSymbols.xml." />
           </Grid>
         </GroupBox>
       </TabItem>

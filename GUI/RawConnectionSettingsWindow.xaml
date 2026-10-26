@@ -445,7 +445,12 @@
               </CheckBox>
             </StackPanel>
             <TextBlock Text="Prompt:" Grid.Row="4" Style="{StaticResource HeaderText}" ToolTip="Shown before the device prints a prompt of its own, and when none is recognised. Leave empty for the default &quot;&gt; &quot;." />
-            <TextBox Grid.Column="1" Grid.Row="4" Margin="0 2 0 2" HorizontalAlignment="Left" MinWidth="120" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding Path=Settings.DefaultPrompt, UpdateSourceTrigger=PropertyChanged}" ToolTip="Shown before the device prints a prompt of its own, and when none is recognised. Leave empty for the default &quot;&gt; &quot;." />
+            <StackPanel Grid.Column="1" Grid.Row="4">
+              <TextBox Margin="0 2 0 2" HorizontalAlignment="Left" MinWidth="120" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding Path=Settings.DefaultPrompt, UpdateSourceTrigger=PropertyChanged}" ToolTip="Shown before the device prints a prompt of its own, and when none is recognised. Leave empty for the default &quot;&gt; &quot;." />
+              <CheckBox VerticalContentAlignment="Center" Margin="0 2 0 2" IsChecked="{Binding Path=Settings.AutoDetectPrompt}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent" ToolTip="When the device prints a prompt that matches a common pattern (&quot;&gt; &quot;, &quot;# &quot;, &quot;$ &quot;, ...), the input line continues it. Turn this off when the device prints something that only looks like a prompt: the input line then always uses the prompt above.">
+                <TextBlock Text="Detect the prompt printed by the device" />
+              </CheckBox>
+            </StackPanel>
             <TextBlock Text="Display mode:" Grid.Row="5" Style="{StaticResource HeaderText}" />
             <ListBox Grid.Column="1" Grid.Row="5" SelectedItem="{Binding Path=EffectiveDisplayMode}">
               <ItemsControl.ItemsSource>

@@ -43,6 +43,9 @@ internal sealed class RemoteFileEditorPanel : UserControl
 
     public event EventHandler GoToLineRequested;
 
+    /// <summary>The toolbar or the context menu switched the invisible-character marks on or off.</summary>
+    public event EventHandler ShowAllCharactersChanged;
+
     /// <summary>The enabled state of the commands changed (for the WPF tool bar).</summary>
     internal event EventHandler StateChanged;
 
@@ -180,6 +183,10 @@ internal sealed class RemoteFileEditorPanel : UserControl
                     focusEditor = false;
                     GoToLineRequested?.Invoke(this, EventArgs.Empty);
                     break;
+                case EditorToolbarCommand.ShowAllCharacters:
+                    _editor.ShowAllCharacters = !_editor.ShowAllCharacters;
+                    ShowAllCharactersChanged?.Invoke(this, EventArgs.Empty);
+                    break;
                 case EditorToolbarCommand.ToggleHex:
                     _editor.ToggleHexMode();
                     break;
@@ -213,7 +220,8 @@ internal sealed class RemoteFileEditorPanel : UserControl
                 IsNewFile = _editor.IsNewFile,
                 IsSaving = _editor.IsSaving,
                 HexMode = true,
-                CanUseHex = _editor.CanToggleHexMode
+                CanUseHex = _editor.CanToggleHexMode,
+                ShowAllCharacters = _editor.ShowAllCharacters
             };
         }
         int lineCount = _editor.LineCount;
@@ -228,7 +236,8 @@ internal sealed class RemoteFileEditorPanel : UserControl
             IsNewFile = _editor.IsNewFile,
             IsSaving = _editor.IsSaving,
             HexMode = false,
-            CanUseHex = _editor.CanToggleHexMode
+            CanUseHex = _editor.CanToggleHexMode,
+            ShowAllCharacters = _editor.ShowAllCharacters
         };
     }
 
@@ -243,10 +252,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         foreach (KeyValuePair<EditorToolbarCommand, ToolStripMenuItem> pair in _menuItems)
         {
             pair.Value.Enabled = CommandState.IsEnabled(pair.Key);
-            if (pair.Key == EditorToolbarCommand.ToggleHex)
-            {
-                pair.Value.Checked = CommandState.HexMode;
-            }
+            pair.Value.Checked = CommandState.IsChecked(pair.Key);
         }
         StateChanged?.Invoke(this, EventArgs.Empty);
     }

@@ -789,6 +789,12 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
         // No answer is not "not writable": without a connection nothing is known.
         _context.Session.ThrowIfConnectionLost();
+        if (_context.AutoConfirmSudo)
+        {
+            // The connection asks to save with sudo without the question: the save goes through sudo directly.
+            _sudoOnSave = true;
+            return;
+        }
         string what = forNewFile ? "the directory " + target + ", where this new file would be created" : target;
         switch (Ask("You do not have permission to write to " + what + ".\n\n"
             + "Yes: edit the text and save it with sudo (the password is asked when you save).\n"

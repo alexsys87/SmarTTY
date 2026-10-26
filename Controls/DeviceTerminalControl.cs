@@ -890,7 +890,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         terminal.ForeColor = backColor;
         _serialTerminalControl.EnterSequence = GetLineEnding(deviceTerminalSettings.LineEnding);
         // The prompt drawn before the device prints one of its own (and when none is recognised).
-        _serialTerminalControl.SetPrompt(deviceTerminalSettings.DefaultPrompt, autoDetect: true);
+        _serialTerminalControl.SetPrompt(deviceTerminalSettings.DefaultPrompt, deviceTerminalSettings.AutoDetectPrompt);
         SetTextEncoding(deviceTerminalSettings.TextEncoding);
         SelectEncodingInToolbar(deviceTerminalSettings.TextEncoding);
         hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo);

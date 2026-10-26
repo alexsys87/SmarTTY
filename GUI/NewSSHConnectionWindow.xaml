@@ -155,6 +155,7 @@
           <RowDefinition />
           <RowDefinition />
           <RowDefinition />
+          <RowDefinition />
         </Grid.RowDefinitions>
         <FrameworkElement.Resources>
           <ResourceDictionary>
@@ -181,7 +182,8 @@
         </StackPanel>
         <CheckBox Content="Forward X11 (graphical programs open their windows here through VcXsrv)" Grid.ColumnSpan="2" Grid.Row="4" Margin="{StaticResource CheckBoxMargin}" IsChecked="{Binding ForwardX11}" ToolTip="Like ssh -X: the server sets DISPLAY for programs started in terminal tabs. Needs xauth and X11Forwarding yes on the server; SmarTTY offers to start or install VcXsrv when the first program connects." />
         <CheckBox Content="Start SOCKS5 proxy on connect (like ssh -D; address and port are set in Tools &gt; SOCKS5 proxy over SSH)" Grid.ColumnSpan="2" Grid.Row="5" Margin="{StaticResource CheckBoxMargin}" IsChecked="{Binding AutoStartSocksProxy}" ToolTip="Opens a SOCKS5 proxy on this computer (127.0.0.1:1080 unless changed in Tools &gt; SOCKS5 proxy over SSH) as soon as the connection is established, so that other programs can reach the network through the SSH server. Every connection that starts it needs its own port: if the port is taken, SmarTTY reports it and the connection works as usual." />
-        <CheckBox Content="Save this connection to connections list" Grid.Row="6" Margin="0 10 0 0" IsChecked="{Binding SaveSettings}" Visibility="{Binding Path=Customization.SaveCheckboxVisibility}" />
+        <CheckBox Content="Save files with sudo without asking" Grid.Row="6" Margin="{StaticResource CheckBoxMargin}" IsChecked="{Binding AutoConfirmSudo}" ToolTip="When the remote file cannot be written, the editor saves it through sudo directly instead of asking. The sudo password is still requested when the file is saved." />
+        <CheckBox Content="Save this connection to connections list" Grid.Row="7" Margin="0 10 0 0" IsChecked="{Binding SaveSettings}" Visibility="{Binding Path=Customization.SaveCheckboxVisibility}" />
       </Grid>
     </StackPanel>
     <Grid>

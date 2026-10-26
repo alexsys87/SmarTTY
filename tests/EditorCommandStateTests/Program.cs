@@ -53,6 +53,14 @@ internal static class Program
         Check(!empty.IsEnabled(EditorToolbarCommand.SelectAll), "empty document: Select All is off");
         Check(empty.IsEnabled(EditorToolbarCommand.Find), "empty document: Find is on");
         Check(empty.IsEnabled(EditorToolbarCommand.GoToLine), "empty document: Go to Line is on");
+        Check(empty.IsEnabled(EditorToolbarCommand.ShowAllCharacters), "empty document: Show All Characters is on");
+
+        // Show All Characters is a switch: its tick follows the editor, not the other commands.
+        Check(!empty.IsChecked(EditorToolbarCommand.ShowAllCharacters), "Show All Characters starts off");
+        Check(new EditorCommandState { ShowAllCharacters = true }.IsChecked(EditorToolbarCommand.ShowAllCharacters),
+            "Show All Characters is ticked when the editor shows the marks");
+        Check(!new EditorCommandState { ShowAllCharacters = true }.IsChecked(EditorToolbarCommand.Save),
+            "only Show All Characters has a tick");
 
         // Edits.
         EditorCommandState edited = new EditorCommandState { HasText = true, IsModified = true, CanUndo = true };

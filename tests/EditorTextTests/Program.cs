@@ -522,11 +522,7 @@ internal static class Program
     // same way the theme harness checks the settings window XAML.
     private static void ShowTabsChecks()
     {
-        string root = AppContext.BaseDirectory;
-        while (root != null && !File.Exists(Path.Combine(root, "SmarTTY.csproj")))
-        {
-            root = Path.GetDirectoryName(root);
-        }
+        string root = FindRepositoryRoot();
         if (root == null)
         {
             Console.WriteLine("SKIP: repository root not found, the ShowTabs wiring is not checked");
@@ -545,6 +541,61 @@ internal static class Program
         Check(xaml.Contains("EditorWrapper.ShowTabs"), "Editor Settings offers a checkbox for ShowTabs");
     }
 
+    // "Show all characters" is a property of the editor, a toggle button on the WPF tool bar and a checkable item in
+    // the WinForms context menu, backed by a setting. The controls are Windows-only, so the wiring is checked by
+    // reading the sources, as the ShowTabs checks above do.
+    private static void ShowAllCharactersChecks()
+    {
+        string root = FindRepositoryRoot();
+        if (root == null)
+        {
+            Console.WriteLine("SKIP: repository root not found, the Show All Characters wiring is not checked");
+            return;
+        }
+        string browser = File.ReadAllText(Path.Combine(root, "Controls", "ReadonlyTextBrowser.cs"));
+        Check(browser.Contains("public bool ShowAllCharacters") && browser.Contains("_showAllCharacters = value"),
+            "the editor draws the invisible-character marks through a ShowAllCharacters property");
+        Check(browser.Contains("PaintInvisibleCharacters") && browser.Contains("\"¶\"") && browser.Contains("0x2400 + ch"),
+            "the overlay marks spaces, tabs, line ends and control characters");
+        string commands = File.ReadAllText(Path.Combine(root, "Controls", "EditorCommandState.cs"));
+        Check(commands.Contains("ShowAllCharacters") && commands.Contains("public bool IsChecked"),
+            "the tool bar and the menu have a ShowAllCharacters command with a checked state");
+        Check(commands.Contains("new EditorCommandDescription(\"Show All Characters\""),
+            "the command catalog names Show All Characters");
+        string toolbar = File.ReadAllText(Path.Combine(root, "GUI", "Backend", "RemoteFileEditorToolBar.cs"));
+        Check(toolbar.Contains("new ToggleButton") && toolbar.Contains("ToolBar.ToggleButtonStyleKey") && toolbar.Contains("state.IsChecked"),
+            "the WPF tool bar shows Show All Characters as a toggle button");
+        string panel = File.ReadAllText(Path.Combine(root, "Controls", "RemoteFileEditorPanel.cs"));
+        Check(panel.Contains("_editor.ShowAllCharacters = !_editor.ShowAllCharacters")
+            && panel.Contains("ShowAllCharacters = _editor.ShowAllCharacters")
+            && panel.Contains("pair.Value.Checked = CommandState.IsChecked"),
+            "the panel toggles the marks, captures the state and checks the menu item");
+        string settings = File.ReadAllText(Path.Combine(root, "VisualTTY", "GlobalSettings.cs"));
+        Check(settings.Contains("public bool ShowAllCharacters;"), "the editor settings carry the ShowAllCharacters value");
+        string wrapper = File.ReadAllText(Path.Combine(root, "VisualTTY", "EditorSettingsWrapper.cs"));
+        Check(wrapper.Contains("public bool ShowAllCharacters") && wrapper.Contains("_Settings.Editor.ShowAllCharacters = value"),
+            "the settings wrapper exposes ShowAllCharacters to the window");
+        string controller = File.ReadAllText(Path.Combine(root, "GUI", "Backend", "MainWindowController.cs"));
+        Check(controller.Contains("edit.ShowAllCharacters = Settings.Editor.ShowAllCharacters"),
+            "opening the editor applies the ShowAllCharacters setting");
+        Check(controller.Contains("Settings.Editor.ShowAllCharacters = editor.ShowAllCharacters"),
+            "the tool bar toggle saves the ShowAllCharacters setting");
+        string xaml = File.ReadAllText(Path.Combine(root, "GUI", "GlobalSettingsWindow.xaml"));
+        Check(xaml.Contains("EditorWrapper.ShowAllCharacters"), "Editor Settings offers a checkbox for ShowAllCharacters");
+        Check(File.Exists(Path.Combine(root, "icons", "editor", "show-all-characters.png")),
+            "the Show All Characters tool bar icon exists");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        string root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Combine(root, "SmarTTY.csproj")))
+        {
+            root = Path.GetDirectoryName(root);
+        }
+        return root;
+    }
+
     private static int Main()
     {
         try
@@ -561,6 +612,7 @@ internal static class Program
             TokenOrderChecks();
             PairEditingChecks();
             ShowTabsChecks();
+            ShowAllCharactersChecks();
         }
         catch (Exception exception)
         {

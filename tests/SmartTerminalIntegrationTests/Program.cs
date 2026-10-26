@@ -33,6 +33,8 @@ internal static class Program
 
         public bool IsRoot => false;
 
+        public bool AutoConfirmSudo => false;
+
         public ShellCompletionAnalyzer ProvideAnalyzer()
         {
             lock (this)

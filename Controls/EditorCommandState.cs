@@ -16,6 +16,7 @@ internal enum EditorToolbarCommand
     Find,
     Replace,
     GoToLine,
+    ShowAllCharacters,
     Reload,
     ToggleHex
 }
@@ -46,6 +47,9 @@ internal struct EditorCommandState
 
     /// <summary>A save is running in the background.</summary>
     public bool IsSaving { get; set; }
+
+    /// <summary>The editor shows spaces, tabs, line ends and other invisible characters as marks.</summary>
+    public bool ShowAllCharacters { get; set; }
 
     /// <summary>The editor shows the bytes in the hex view.</summary>
     public bool HexMode { get; set; }
@@ -82,12 +86,20 @@ internal struct EditorCommandState
                 return !ReadOnly && !IsNewFile && !IsSaving;
             case EditorToolbarCommand.Find:
             case EditorToolbarCommand.GoToLine:
+            case EditorToolbarCommand.ShowAllCharacters:
                 return true;
             case EditorToolbarCommand.ToggleHex:
                 return CanUseHex && !IsSaving;
             default:
                 return false;
         }
+    }
+
+    /// <summary>Whether a command that switches something on is currently on.</summary>
+    public bool IsChecked(EditorToolbarCommand command)
+    {
+        return (command == EditorToolbarCommand.ShowAllCharacters && ShowAllCharacters)
+            || (command == EditorToolbarCommand.ToggleHex && HexMode);
     }
 }
 
@@ -142,6 +154,7 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.Replace,
         EditorToolbarCommand.GoToLine,
         null,
+        EditorToolbarCommand.ShowAllCharacters,
         EditorToolbarCommand.ToggleHex
     };
 
@@ -160,6 +173,7 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.Find,
         EditorToolbarCommand.Replace,
         EditorToolbarCommand.GoToLine,
+        EditorToolbarCommand.ShowAllCharacters,
         null,
         EditorToolbarCommand.ToggleHex,
         null,
@@ -193,6 +207,8 @@ internal static class EditorCommandCatalog
                 return new EditorCommandDescription("Replace", "replace", "editor/replace.png", "Ctrl+H");
             case EditorToolbarCommand.GoToLine:
                 return new EditorCommandDescription("Go to Line...", "goto-line", "editor/goto-line.png", "Ctrl+G");
+            case EditorToolbarCommand.ShowAllCharacters:
+                return new EditorCommandDescription("Show All Characters", "show-all-characters", "editor/show-all-characters.png", "");
             case EditorToolbarCommand.Reload:
                 return new EditorCommandDescription("Reload from Server", "refresh", "MainWindow/refresh16.png", "");
             case EditorToolbarCommand.ToggleHex:
