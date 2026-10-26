@@ -696,6 +696,28 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
+        /// Opens the folder synchronization window for the active SSH session. Unlike a directory transfer, this
+        /// compares both sides first and copies only the differences, with an optional deletion of the extra files.
+        /// </summary>
+        internal void Synchronize()
+        {
+            try
+            {
+                SessionWrapper activeSession = RequireSshSession("Folder synchronization");
+                SynchronizeWindow window = new SynchronizeWindow(activeSession.Session)
+                {
+                    RemoteDirectory = activeSession.TryExtractCurrentDir() ?? activeSession.LastDownloadDir,
+                    LocalDirectory = _Controller.Settings.DefaultDownloadDirectory
+                };
+                WindowOwnership.Attach(window, _Controller._Window);
+                window.Show();
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
         internal void UploadDir()
         {
             try
