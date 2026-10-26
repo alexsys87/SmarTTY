@@ -180,13 +180,11 @@ public static class GzipBase64Transfer
     /// <summary>A checksum calculated while the data goes by.</summary>
     private sealed class RunningChecksum : IDisposable
     {
-        private readonly ChecksumKind _kind;
         private readonly HashAlgorithm _hash;
         private readonly CksumState _cksum;
 
         public RunningChecksum(ChecksumKind kind)
         {
-            _kind = kind;
             if (kind == ChecksumKind.Sha256)
             {
                 _hash = SHA256.Create();

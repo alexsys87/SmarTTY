@@ -713,20 +713,6 @@ internal class CompletionSession : IDisposable
         return list.ToArray();
     }
 
-    private static bool ContainsUnescapedSpace(string text)
-    {
-        bool isEscaped = false;
-        for (int i = 0; i < text.Length; i++)
-        {
-            if (!isEscaped && text[i] == ' ')
-            {
-                return true;
-            }
-            isEscaped = text[i] == '\\' && !isEscaped;
-        }
-        return false;
-    }
-
     public bool OnTextChanged(string newFullText, int offset, int oldLength, int newLength)
     {
         int endOffset = offset + oldLength;

@@ -390,10 +390,6 @@ public partial class DynamicTreeBrowser : UserControl
 
     private LoadOperation CurrentOperation
     {
-        get
-        {
-            return _currentOperation;
-        }
         set
         {
             if (_currentOperation != null)

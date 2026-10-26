@@ -28,7 +28,6 @@ namespace SmarTTY.IO;
 /// </summary>
 public class YModemTransfer
 {
-    private const byte SOH = XModemTransfer.SOH;
     private const byte STX = XModemTransfer.STX;
     private const byte EOT = XModemTransfer.EOT;
     private const byte ACK = XModemTransfer.ACK;

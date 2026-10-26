@@ -9,8 +9,6 @@ internal class SuggestionPopup
 {
     private SuggestionListForm _form;
 
-    private IntPtr _parentHandle;
-
     private ISuggestionSource _source;
 
     private ICompletionHost _host;
@@ -46,8 +44,6 @@ internal class SuggestionPopup
         _source = suggestionSource;
         _form.SetSource(_source);
         _host = completionHost;
-        Control parent = _host.HostControl.Parent;
-        this._parentHandle = parent.Handle;
     }
 
     public void SelectMatch(string prefix, bool exactMatch)

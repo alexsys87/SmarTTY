@@ -75,8 +75,6 @@ public class TarExtractor
 
     private static DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0);
 
-    private long _bytesRead;
-
     private DirectoryStatistics _statistics = new DirectoryStatistics();
 
     private List<PendingSymlink> _symlinks = new List<PendingSymlink>();
@@ -118,7 +116,6 @@ public class TarExtractor
             return null;
         }
         Encoding utf8 = Encoding.UTF8;
-        _bytesRead += bytesRead;
         if (bytesRead != 512)
         {
             throw new IOException("Incomplete TAR header");
@@ -419,13 +416,11 @@ public class TarExtractor
             }
             _statistics.TotalFiles++;
             _statistics.TotalBytes += (long)entrySize;
-            _bytesRead += (long)entrySize;
             int padLen = 512 - (int)(entrySize % 512);
             if (padLen != 512)
             {
                 _stream.Read(headerBuffer, 0, padLen);
             }
-            _bytesRead += padLen;
             if (PreserveTimestamps)
             {
                 try
@@ -473,24 +468,6 @@ public class TarExtractor
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern int GetFileAttributes(string path);
-
-    private static string ResolvePath(string basePath, string relativePath)
-    {
-        Stack<string> stack = new Stack<string>(basePath.Split(new char[1] { '/' }, StringSplitOptions.RemoveEmptyEntries));
-        string[] segments = relativePath.Split('/');
-        foreach (string segment in segments)
-        {
-            if (!(segment == ""))
-            {
-                if (segment == ".." && stack.Count > 0)
-                {
-                    stack.Pop();
-                }
-                stack.Push(segment);
-            }
-        }
-        return "/" + string.Join("/", stack.ToArray());
-    }
 
     internal static int CountParentReferences(string path, bool isForward)
     {

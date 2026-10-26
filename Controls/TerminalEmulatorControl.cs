@@ -1089,11 +1089,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
-    private void TraceFormat(string text, params object[] items)
-    {
-        Trace(string.Format(text, items));
-    }
-
     private bool ExecuteOsc(string content, EscapeTrace escapeTrace)
     {
         escapeTrace?.SetDescription("OSC");

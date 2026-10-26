@@ -18,8 +18,6 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
 {
     private readonly RemoteFileEditor _editor;
 
-    private readonly RemoteFileEditorPanel _panel;
-
     private readonly TextBlock _path = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis };
 
     private readonly TextBlock _state = new TextBlock();
@@ -39,7 +37,10 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
     public RemoteFileEditorStatusBar(RemoteFileEditor editor, RemoteFileEditorPanel panel)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
-        _panel = panel ?? throw new ArgumentNullException(nameof(panel));
+        if (panel == null)
+        {
+            throw new ArgumentNullException(nameof(panel));
+        }
         _encodingButton = CreateMenuButton(ShowEncodingMenu);
         _lineEndingButton = CreateMenuButton(ShowLineEndingMenu);
         _syntaxButton = CreateMenuButton(ShowSyntaxMenu);
