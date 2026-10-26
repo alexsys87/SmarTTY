@@ -1875,7 +1875,19 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 return;
             }
             byte[] input = System.Text.Encoding.UTF8.GetBytes(" " + commandLine + "\r");
-            channel.Input.Write(input, 0, input.Length);
+            // Writing may wait for the server (the window of the channel is full, the connection is slow), which must not
+            // block the UI thread.
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    channel.Input.Write(input, 0, input.Length);
+                }
+                catch (Exception exception)
+                {
+                    _Controller.BeginInvoke(() => MessageBoxes.Exception(exception));
+                }
+            });
             tab.Terminal.Focus();
         }
         catch (Exception exception)
