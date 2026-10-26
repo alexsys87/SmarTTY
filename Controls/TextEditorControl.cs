@@ -85,11 +85,23 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
+    /// <summary>The text of the clipboard (null when it holds none).</summary>
+    protected string ReadClipboardText()
+    {
+        return (!CodeEditorPP.IsWindows()) ? Clipboard.GetText() : Win32Clipboard.GetText(Handle);
+    }
+
     public virtual void Paste()
+    {
+        PasteText(ReadClipboardText());
+    }
+
+    /// <summary>Pastes <paramref name="text"/> as if it came from the clipboard (the paste menu pastes its history and snippets this way).</summary>
+    public virtual void PasteText(string text)
     {
         try
         {
-            ReplaceText(text: (!CodeEditorPP.IsWindows()) ? Clipboard.GetText() : Win32Clipboard.GetText(Handle), start: CaretPosition, end: SelectionStart, select: !_hasSelection);
+            ReplaceText(text: text, start: CaretPosition, end: SelectionStart, select: !_hasSelection);
             UpdateMaxLineWidth(-1);
         }
         catch (Exception exception)

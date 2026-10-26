@@ -1,4 +1,5 @@
 using SmarTTY.Utilities;
+using System.Collections.Generic;
 
 namespace VisualTTY;
 
@@ -19,6 +20,35 @@ public class PasteSettings
         LF,
         [EnumDisplayText("CR LF")]
         CRLF
+    }
+
+    /// <summary>What a mouse button does in a terminal.</summary>
+    public enum MouseAction
+    {
+        [EnumDisplayText("Context menu")]
+        Menu,
+        [EnumDisplayText("Paste")]
+        Paste,
+        [EnumDisplayText("Copy the selection, paste when nothing is selected")]
+        CopyOrPaste
+    }
+
+    /// <summary>What Ctrl+Shift+V does in a terminal.</summary>
+    public enum ShortcutAction
+    {
+        [EnumDisplayText("Paste")]
+        Paste,
+        [EnumDisplayText("Menu with the history and the snippets")]
+        HistoryMenu
+    }
+
+    /// <summary>What happens to characters that the encoding of a COM/TCP/Telnet session cannot represent.</summary>
+    public enum UnmappableMode
+    {
+        [EnumDisplayText("Ask (they would be sent as ?)")]
+        Ask,
+        [EnumDisplayText("Send them as ?")]
+        QuestionMark
     }
 
     /// <summary>Removes escape sequences and control characters (protection from text that acts on the terminal).</summary>
@@ -48,6 +78,39 @@ public class PasteSettings
     /// <summary>Warns about dangerous commands (sudo, curl | sh, rm -rf, ...) in text that runs at once. Always asks.</summary>
     public bool WarnDangerous { get; set; } = true;
 
+    /// <summary>What the right mouse button does in a terminal (Shift+right button always opens the menu).</summary>
+    public MouseAction RightClick { get; set; } = MouseAction.Menu;
+
+    /// <summary>The middle mouse button pastes.</summary>
+    public bool MiddleClickPastes { get; set; } = true;
+
+    /// <summary>What Ctrl+Shift+V does; the history menu is also on Ctrl+Shift+Insert and in the terminal menu.</summary>
+    public ShortcutAction CtrlShiftV { get; set; } = ShortcutAction.Paste;
+
+    /// <summary>
+    /// Remembers pasted texts for the history menu. The history lives in memory only (never in a file) and is gone when
+    /// SmarTTY is closed.
+    /// </summary>
+    public bool KeepHistory { get; set; } = true;
+
+    /// <summary>The number of pasted texts the history keeps (1 to 50).</summary>
+    public int HistorySize { get; set; } = 20;
+
+    /// <summary>Texts saved by the user, offered by the paste menu.</summary>
+    public List<PasteSnippet> Snippets { get; set; } = new List<PasteSnippet>();
+
+    /// <summary>Files in the clipboard (copied in Explorer) are offered for upload instead of being ignored by Paste.</summary>
+    public bool OfferClipboardFiles { get; set; } = true;
+
+    /// <summary>In the HEX view of a COM/TCP terminal a pasted text such as "DE AD BE EF" is sent as bytes.</summary>
+    public bool HexViewPastesBytes { get; set; } = true;
+
+    /// <summary>What to do with characters that the session encoding cannot represent.</summary>
+    public UnmappableMode UnmappableCharacters { get; set; } = UnmappableMode.Ask;
+
+    /// <summary>The number of history entries to keep, within the allowed range.</summary>
+    public int EffectiveHistorySize => KeepHistory ? System.Math.Max(1, System.Math.Min(HistorySize, 50)) : 0;
+
     /// <summary>The line break to send: <paramref name="automatic"/> unless a mode is chosen.</summary>
     public string ResolveLineBreak(string automatic)
     {
@@ -63,4 +126,12 @@ public class PasteSettings
                 return automatic;
         }
     }
+}
+
+/// <summary>A text saved for the paste menu.</summary>
+public class PasteSnippet
+{
+    public string Name { get; set; }
+
+    public string Text { get; set; }
 }

@@ -783,6 +783,18 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public bool HasSelection => _hasSelection;
 
+    /// <summary>Removes the selection (the text stays).</summary>
+    public void ClearSelection()
+    {
+        if (!_hasSelection)
+        {
+            return;
+        }
+        _hasSelection = false;
+        OnSelectionStartChanged();
+        Redraw();
+    }
+
     protected Rectangle TextArea => _textArea;
 
     protected internal SizeF CharSize => _charSize;

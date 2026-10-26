@@ -1790,11 +1790,11 @@ public class SshTerminalControl : TerminalEmulatorControl
         });
     }
 
-    public override void Paste()
+    public override void PasteText(string clipboardText)
     {
         if (_inputLine == null)
         {
-            base.Paste();
+            base.PasteText(clipboardText);
             return;
         }
         try
@@ -1803,7 +1803,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             // being glued together without a separator.
             // The text only lands in the command line and nothing runs until Enter, so it is cleaned and only a large
             // paste is confirmed.
-            string text = PasteGuard.Prepare(Win32Clipboard.GetText(Handle), AppSettings, linesRunAtOnce: false, owner: this);
+            string text = PasteGuard.Prepare(clipboardText, AppSettings, linesRunAtOnce: false, owner: this);
             text = ShellCommandLine.JoinPastedLines(text);
             if (string.IsNullOrEmpty(text))
             {

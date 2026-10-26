@@ -68,6 +68,11 @@ jobs:
       - name: Run paste checks (control characters, typographic characters, line breaks, dangerous commands)
         run: dotnet run --project tests/PasteSanitizerTests -c Release
 
+      - name: Run paste history and encoding checks (history order and capacity, characters a code page lacks)
+        run: |
+          dotnet run --project tests/PasteHistoryTests -c Release
+          dotnet run --project tests/PasteEncodingTests -c Release
+
       - name: Run Smart Terminal command line checks (tokens, completion target, quoting, paste, export, shell selection)
         run: dotnet run --project tests/SmartTerminalCommandLineTests -c Release
 
