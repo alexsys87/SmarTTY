@@ -3,6 +3,7 @@ using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 using VisualTTY;
@@ -965,8 +966,17 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
     }
 
+    /// <summary>
+    /// Writes one line of terminal diagnostics (the control characters seen and, through <c>EscapeTrace</c>,
+    /// what every escape sequence meant). Only a Debug build calls this: the attribute removes every call from a
+    /// Release build, so nothing is executed or allocated there. The lines go to the debugger output
+    /// (<c>Debug.WriteLine</c>), i.e. the Visual Studio Output window, DebugView or a debugger; a Release build
+    /// that runs without a debugger therefore stays completely unaffected.
+    /// </summary>
+    [Conditional("DEBUG")]
     protected void Trace(string text)
     {
+        Debug.WriteLine(text);
     }
 
     public void WriteText(string text, bool moveCursor = true)
