@@ -542,6 +542,10 @@ internal static class ShellCommandLine
     /// a separator (what used to happen) silently produced a different command. A line continued with a backslash is
     /// joined directly, a line that ends with an operator (|, &amp;, ;) or an opening keyword is joined with a space, other lines
     /// with "; " as a shell would run them one after another. Tabs become spaces.
+    /// A command that was only wrapped by the place it was copied from (a long command broken into several lines) must not
+    /// be cut into several commands, so a line is joined with a space to the previous one when it continues it: it is
+    /// indented deeper than the previous command, starts with an operator (|, &amp;&amp;, &gt;, ...) or an option (-x), or the
+    /// previous line leaves a quote open.
     /// </summary>
     public static string JoinPastedLines(string text)
     {
@@ -552,6 +556,8 @@ internal static class ShellCommandLine
         string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\t', ' ').Split('\n');
         StringBuilder result = new StringBuilder(text.Length);
         bool continued = false;
+        // Indent of the line that started the command being built: a wrapped rest is indented deeper than that.
+        int commandIndent = 0;
         foreach (string rawLine in lines)
         {
             string line = rawLine;
@@ -562,9 +568,21 @@ internal static class ShellCommandLine
             if (result.Length > 0 && !continued)
             {
                 string previous = result.ToString().TrimEnd();
+                string trimmed = line.TrimStart();
+                int indent = line.Length - trimmed.Length;
+                bool wrapped = indent > commandIndent || StartsWithContinuation(trimmed) || HasOpenQuote(previous);
                 result.Length = previous.Length;
-                result.Append(EndsWithJoiningOperator(previous) ? " " : "; ");
+                result.Append(wrapped || EndsWithJoiningOperator(previous) ? " " : "; ");
+                if (!wrapped)
+                {
+                    commandIndent = indent;
+                }
+                line = trimmed;
+            }
+            else if (result.Length == 0)
+            {
                 line = line.TrimStart();
+                commandIndent = rawLine.Length - line.Length;
             }
             continued = false;
             if (EndsWithContinuation(line))
@@ -575,6 +593,54 @@ internal static class ShellCommandLine
             result.Append(line);
         }
         return result.ToString().TrimEnd();
+    }
+
+    // A line that cannot start a command, so it goes on with the previous one: "| grep x", "&& make", "> file", "-v".
+    private static bool StartsWithContinuation(string line)
+    {
+        if (line.Length == 0)
+        {
+            return false;
+        }
+        char first = line[0];
+        if (first == '|' || first == '&' || first == ';' || first == '<' || first == '>' || first == ')')
+        {
+            return true;
+        }
+        return first == '-' && line.Length > 1 && !char.IsWhiteSpace(line[1]);
+    }
+
+    // True when a ' or " opened in the text is not closed yet (an escaped quote does not count).
+    private static bool HasOpenQuote(string text)
+    {
+        char quote = '\0';
+        for (int i = 0; i < text.Length; i++)
+        {
+            char ch = text[i];
+            if (quote == '\'')
+            {
+                if (ch == '\'')
+                {
+                    quote = '\0';
+                }
+            }
+            else if (ch == '\\')
+            {
+                i++;
+            }
+            else if (quote == '"')
+            {
+                if (ch == '"')
+                {
+                    quote = '\0';
+                }
+            }
+            else if (ch == '\'' || ch == '"')
+            {
+                quote = ch;
+            }
+        }
+        return quote != '\0';
     }
 
     private static bool EndsWithContinuation(string line)

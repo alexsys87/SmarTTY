@@ -130,6 +130,15 @@ internal static class Program
         Equal(ShellCommandLine.JoinPastedLines("\n\na\n\n\nb\n"), "a; b", "blank lines are skipped");
         Equal(ShellCommandLine.JoinPastedLines("a\tb"), "a b", "tabs become spaces");
         Equal(ShellCommandLine.JoinPastedLines("\\\n\nx"), "x", "an empty continued line does not break joining");
+        Equal(ShellCommandLine.JoinPastedLines("opkg install foo bar\n    baz qux\n"), "opkg install foo bar baz qux", "a wrapped line indented deeper is the same command");
+        Equal(ShellCommandLine.JoinPastedLines("opkg install a\n    b\n    c\n"), "opkg install a b c", "several wrapped lines");
+        Equal(ShellCommandLine.JoinPastedLines("    cd /tmp\n    ls\n"), "cd /tmp; ls", "lines with the same indent are separate commands");
+        Equal(ShellCommandLine.JoinPastedLines("tar -c dir\n--exclude x\n"), "tar -c dir --exclude x", "a line that starts with an option");
+        Equal(ShellCommandLine.JoinPastedLines("cat a\n| grep b\n"), "cat a | grep b", "a line that starts with a pipe");
+        Equal(ShellCommandLine.JoinPastedLines("make\n&& run\n"), "make && run", "a line that starts with &&");
+        Equal(ShellCommandLine.JoinPastedLines("echo \"a b\nc d\"\nls"), "echo \"a b c d\"; ls", "a quote left open continues on the next line");
+        Equal(ShellCommandLine.JoinPastedLines("echo \\\"x\ny"), "echo \\\"x; y", "an escaped quote is not an open quote");
+        Equal(ShellCommandLine.JoinPastedLines("echo 'it''s'\nls"), "echo 'it''s'; ls", "closed quotes do not join");
     }
 
     private static void VariableChecks()
