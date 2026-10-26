@@ -125,6 +125,9 @@ jobs:
       - name: Run VcXsrv setup checks (installer selection from the GitHub release data)
         run: dotnet run --project tests/VcxsrvSetupTests -c Release
 
+      - name: Run theme palette checks (matching keys and WCAG contrast for every theme)
+        run: dotnet run --project tests/ThemePaletteTests -c Release
+
   interop:
     name: File transfer interoperability (lrzsz, C-Kermit, G-Kermit, gzip + base64 through BusyBox ash and bash)
     runs-on: ubuntu-latest

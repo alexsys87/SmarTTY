@@ -7,7 +7,7 @@ using VisualTTY;
 namespace SmarTTY.GUI.Styles;
 
 /// <summary>
-/// Applies the dark or the light theme to the whole application.
+/// Applies one of the themes to the whole application.
 /// </summary>
 /// <remarks>
 /// Application.Resources holds two dictionaries: the control styles (Controls.xaml, loaded once) and the palette of the
@@ -85,7 +85,6 @@ public static class ThemeManager
 
     private static Uri PaletteUri(SmarTTYTheme theme)
     {
-        string name = theme == SmarTTYTheme.Light ? "Light" : "Dark";
-        return new Uri($"pack://application:,,,/GUI/Styles/{name}/Colors.xaml");
+        return new Uri($"pack://application:,,,/GUI/Styles/{theme.PaletteName()}/Colors.xaml");
     }
 }

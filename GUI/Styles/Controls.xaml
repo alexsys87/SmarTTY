@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Control styles shared by the dark and the light theme.
+  Control styles shared by every theme.
 
-  The styles never name a colour: every brush comes from the active palette (Dark/Colors.xaml or Light/Colors.xaml)
+  The styles never name a colour: every brush comes from the active palette (GUI/Styles/<theme>/Colors.xaml)
   through DynamicResource, so ThemeManager switches the theme of every open window by swapping the palette alone.
-  Both dictionaries live in Application.Resources, which also makes them visible to popups, context menus and
-  tooltips (they are not part of the window's element tree).
+  The styles and the palette both live in Application.Resources, which also makes them visible to popups, context
+  menus and tooltips (they are not part of the window's element tree).
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
