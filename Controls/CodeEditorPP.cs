@@ -69,6 +69,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     private SignatureHintController _signatureHintController;
 
+    // The name of the signature the hint currently shows, so typing inside one call does not rebuild it.
+    private string _signatureHintName;
+
     private SyntaxHighlighting.Language _completionLanguage = SyntaxHighlighting.Language.Plain;
 
     private bool _completionEnabled = true;
@@ -437,6 +440,19 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             }
         }
         base.OnKeyDown(e);
+        switch (e.KeyCode)
+        {
+            case Keys.Left:
+            case Keys.Right:
+            case Keys.Up:
+            case Keys.Down:
+            case Keys.Home:
+            case Keys.End:
+            case Keys.Back:
+            case Keys.Delete:
+                UpdateSignatureHint();
+                break;
+        }
     }
 
     public void AcceptSuggestion(ISuggestion suggestion, Keys keys)
@@ -527,6 +543,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         {
             return;
         }
+        HideSignatureHint();
         ShowSuggestions(items);
     }
 
@@ -559,6 +576,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             {
                 ShowCompletion();
             }
+        }
+        // Only these characters change the call the caret is in; other letters leave the hint alone.
+        if (ch == '(' || ch == ',' || ch == ')')
+        {
+            UpdateSignatureHint();
         }
     }
 
@@ -609,11 +631,46 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     public void HideSignatureHint()
     {
+        _signatureHintName = null;
         if (_signatureHintController != null)
         {
             _signatureHintController.Hide();
             _signatureHintController = null;
         }
+    }
+
+    /// <summary>
+    /// Shows, updates or hides the parameter hint for the call the caret is inside. The definitions are
+    /// read from the document, so the hint appears as soon as an opening parenthesis is typed after a
+    /// function the file defines.
+    /// </summary>
+    private void UpdateSignatureHint()
+    {
+        if (!_completionEnabled || base.EditableDocument == null || CaretPosition.Line < 0)
+        {
+            HideSignatureHint();
+            return;
+        }
+        // The word list and the parameter hint would overlap; the list wins while it is open.
+        if (IsSuggestionVisible)
+        {
+            HideSignatureHint();
+            return;
+        }
+        EditorSignatureSource.FunctionSignature signature = EditorSignatureSource.FindSignature(
+            _completionLanguage, base.EditableDocument.GetText(), CaretPosition.Line, CaretPosition.Column, out int activeParameter);
+        if (signature == null)
+        {
+            HideSignatureHint();
+            return;
+        }
+        if (IsSignatureHintVisible && _signatureHintName == signature.Name)
+        {
+            SetActiveParameter(activeParameter);
+            return;
+        }
+        ShowSignatureHint(signature, activeParameter, null);
+        _signatureHintName = signature.Name;
     }
 
     protected virtual bool IsWordSeparator(char ch)

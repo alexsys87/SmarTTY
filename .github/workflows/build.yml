@@ -116,6 +116,9 @@ jobs:
       - name: Run editor autocompletion checks
         run: dotnet run --project tests/EditorCompletionTests -c Release
 
+      - name: Run editor parameter hint checks
+        run: dotnet run --project tests/EditorSignatureTests -c Release
+
       - name: Run editor tool bar command state checks
         run: dotnet run --project tests/EditorCommandStateTests -c Release
 
