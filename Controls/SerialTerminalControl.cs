@@ -32,15 +32,13 @@ public class SerialTerminalControl : TerminalEmulatorControl
         public readonly string Prompt;
         private string _text = "";
         private int _caretIndex = 0;
-        private readonly SerialTerminalControl _terminal;
 
         public string Text => _text;
         public int CaretIndex => _caretIndex;
         public TextDocument.TextPosition StartPosition => new TextDocument.TextPosition(StartColumn, StartLine);
 
-        public InputLine(SerialTerminalControl terminal, int startLine, int startColumn, string prompt)
+        public InputLine(int startLine, int startColumn, string prompt)
         {
-            _terminal = terminal;
             StartLine = startLine;
             StartColumn = startColumn;
             Prompt = prompt;
@@ -137,7 +135,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
     private int _historyIndex = -1;
     private const int MaxHistorySize = 1000;
     private HistorySearchSession? _historySearch;
-    private string _defaultPrompt = "> ";
     private string _currentPrompt = "> ";
     private bool _autoDetectPrompt = true;
     private bool _localEcho = true;
@@ -192,7 +189,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
         private readonly ICompletionPopup _popup;
         private readonly bool _autoApply;
         private List<CompletionItem> _items;
-        private bool _isLoading;
         // Directory whose children _items was last listed from ("" for command targets).
         private string _itemsDirectory = "";
 
@@ -251,13 +247,11 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 }
 
                 _items = itemsList;
-                _isLoading = false;
                 _terminal.BeginInvoke((Action)(() => OnItemsLoaded()));
             }
             catch (Exception ex)
             {
                 _popup.DisplayException(ex);
-                _isLoading = false;
             }
         }
 
@@ -606,7 +600,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         private void OnItemsLoaded()
         {
-            _isLoading = false;
             UpdatePopup();
             if (_autoApply)
             {
@@ -943,7 +936,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             document.RemoveLines(cursor.Line + 1, document.LineCount - cursor.Line - 1);
         }
-        _inputLine = new InputLine(this, cursor.Line, prompt.Length, prompt);
+        _inputLine = new InputLine(cursor.Line, prompt.Length, prompt);
         RewrapInput();
         OnTextReplaced();
         UpdateCaretFromInputLine();
@@ -997,7 +990,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         int startLine = ((EditableTextBrowser)this).EditableDocument.LineCount;
         int startColumn = 0;
-        _inputLine = new InputLine(this, startLine, startColumn, _currentPrompt);
+        _inputLine = new InputLine(startLine, startColumn, _currentPrompt);
         ((EditableTextBrowser)this).EditableDocument.AppendLine(_currentPrompt);
         RewrapInput();
         OnTextReplaced();

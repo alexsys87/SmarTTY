@@ -30,8 +30,6 @@ public partial class DeviceTerminalControl : DpiAwareControl
     // device (colors, line ending, encoding, baud rate, ...) stays in _deviceTerminalSettings.
     private GlobalSettings _commonSettings;
 
-    private Brush _brush;
-
     private DeviceTerminalSettings.CharacterDisplayMode _displayMode = DeviceTerminalSettings.CharacterDisplayMode.ASCII;
 
     // Text exchanged with the device (received text, typed and pasted input, echo, "Send" box) always goes
@@ -893,7 +891,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.EnterSequence = GetLineEnding(deviceTerminalSettings.LineEnding);
         SetTextEncoding(deviceTerminalSettings.TextEncoding);
         SelectEncodingInToolbar(deviceTerminalSettings.TextEncoding);
-        _brush = (hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo));
+        hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo);
         // One persisted mode decides what is rendered; older profiles that enabled the text pane next to the HEX
         // dump are resolved to the combined view instead of silently dropping one of the two panes.
         DeviceTerminalSettings.CharacterDisplayMode displayMode = DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(

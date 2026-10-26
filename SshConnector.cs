@@ -593,10 +593,6 @@ public partial class SshConnector : Component
         return resultSession;
     }
 
-    private void IgnoreConnected(SshConnector sshConnector, SshSession sshSession, SSHConnectionSettings sshConnectionSettings)
-    {
-    }
-
     public void CancelConnection()
     {
         if (_currentAttempt != null)
