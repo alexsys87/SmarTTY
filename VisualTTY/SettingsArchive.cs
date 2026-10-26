@@ -96,7 +96,8 @@ public sealed class SettingsContents
 ///   SavedConnections/*.sshconnection     &lt;- %APPDATA%\SmarTTY\SavedConnections\
 ///   SavedConnections/*.rawconnection     &lt;- %APPDATA%\SmarTTY\SavedConnections\
 ///   Local/GUIPreferences.xml             &lt;- %LOCALAPPDATA%\SmarTTY\GUIPreferences.xml
-///   CommandCompletions.xml               &lt;- CommandCompletions.xml next to SmarTTY.exe
+///   CommandCompletions.xml               &lt;- CommandCompletions.xml next to SmarTTY.exe, or
+///   CommandCompletions.xml.gz            &lt;- CommandCompletions.xml.gz (gzip) when that is the file SmarTTY uses; stored as it is
 ///   Keys/SmarTTY-ssh-key.xml             &lt;- the SmarTTY public key authentication key (CSP container, RSAParameters XML)
 ///   Keys/SmarTTY-password-key.xml        &lt;- the key that protects saved passwords (CSP container, RSAParameters XML)
 ///   OpenSSH/id_ed25519[.pub], id_ecdsa[.pub], id_rsa[.pub]   &lt;- the .ssh folder of the user
@@ -112,6 +113,7 @@ public static class SettingsArchive
     public const string KnownHostsFileName = "KnownHosts.xml";
     public const string GuiPreferencesFileName = "GUIPreferences.xml";
     public const string CommandCompletionsFileName = "CommandCompletions.xml";
+    public const string CommandCompletionsGzipEntryName = "CommandCompletions.xml.gz";
     public const string ConnectionsDirectoryName = "SavedConnections";
     public const string SshConnectionExtension = ".sshconnection";
     public const string RawConnectionExtension = ".rawconnection";
@@ -195,6 +197,8 @@ public static class SettingsArchive
         public string FileName;
         /// <summary>Null for entries that are not XML (OpenSSH key files).</summary>
         public string RootElement;
+        /// <summary>The entry is gzip data that holds the XML (CommandCompletions.xml.gz).</summary>
+        public bool Compressed;
     }
 
     private sealed class Planned
@@ -366,7 +370,7 @@ public static class SettingsArchive
                             }
                             else
                             {
-                                XDocument document = LoadXml(data);
+                                XDocument document = LoadXml(target.Compressed ? Decompress(item.Name, data) : data);
                                 if (document.Root == null || document.Root.Name.LocalName != target.RootElement)
                                 {
                                     result.Skipped.Add(item.Name);
@@ -468,9 +472,18 @@ public static class SettingsArchive
             {
                 report.NotFound.Add("command completions");
             }
+            else if (File.Exists(locations.CommandCompletionsPath))
+            {
+                items.Add(new ExportItem { Name = CommandCompletionsFileName, Path = locations.CommandCompletionsPath });
+            }
+            else if (File.Exists(locations.CommandCompletionsPath + ".gz"))
+            {
+                // SmarTTY reads CommandCompletions.xml.gz when there is no plain file (the editor can store it that way).
+                items.Add(new ExportItem { Name = CommandCompletionsGzipEntryName, Path = locations.CommandCompletionsPath + ".gz" });
+            }
             else
             {
-                AddIfExists(items, report, "command completions", CommandCompletionsFileName, locations.CommandCompletionsPath);
+                report.NotFound.Add("command completions");
             }
         }
 
@@ -602,7 +615,9 @@ public static class SettingsArchive
                 ignored.Add(entry.Name);
                 continue;
             }
-            if (!seen.Add(target.Kind + "/" + target.FileName.ToUpperInvariant()))
+            // CommandCompletions.xml and CommandCompletions.xml.gz are the same file in two forms: only one of them may be present.
+            string seenKey = target.Kind == EntryKind.CommandCompletions ? target.Kind.ToString() : target.Kind + "/" + target.FileName.ToUpperInvariant();
+            if (!seen.Add(seenKey))
             {
                 throw new InvalidDataException("The archive contains '" + entry.Name + "' more than once.");
             }
@@ -615,7 +630,7 @@ public static class SettingsArchive
             {
                 try
                 {
-                    document = LoadXml(entry.Data);
+                    document = LoadXml(target.Compressed ? Decompress(entry.Name, entry.Data) : entry.Data);
                 }
                 catch (XmlException ex)
                 {
@@ -766,7 +781,16 @@ public static class SettingsArchive
                     }
                     break;
                 case EntryKind.CommandCompletions:
-                    WriteFileReplacing(locations.CommandCompletionsPath, data);
+                    // Keep the form of the archive. SmarTTY prefers the plain file, so the other form is removed:
+                    // it would hide the imported data (a plain file) or bring back the old data (a stale gzip file).
+                    string plainPath = locations.CommandCompletionsPath;
+                    string gzipPath = plainPath + ".gz";
+                    WriteFileReplacing(item.Target.Compressed ? gzipPath : plainPath, data);
+                    string stalePath = item.Target.Compressed ? plainPath : gzipPath;
+                    if (File.Exists(stalePath))
+                    {
+                        File.Delete(stalePath);
+                    }
                     result.CommandCompletionsImported = true;
                     break;
                 case EntryKind.OpenSshKey:
@@ -825,6 +849,10 @@ public static class SettingsArchive
         {
             target = new Target { Kind = EntryKind.CommandCompletions, Part = SettingsParts.CommandCompletions, FileName = CommandCompletionsFileName, RootElement = "CommandCompletionDatabase" };
         }
+        else if (name == CommandCompletionsGzipEntryName)
+        {
+            target = new Target { Kind = EntryKind.CommandCompletions, Part = SettingsParts.CommandCompletions, FileName = CommandCompletionsGzipEntryName, RootElement = "CommandCompletionDatabase", Compressed = true };
+        }
         else if (name == SshKeyEntryName)
         {
             target = new Target { Kind = EntryKind.SshKey, Part = SettingsParts.SshKey, FileName = name.Substring(KeysPrefix.Length), RootElement = "RSAParameters" };
@@ -859,6 +887,34 @@ public static class SettingsArchive
             }
         }
         return target != null;
+    }
+
+    // Unpacks the gzip data of an entry. The size limit also covers a gzip bomb.
+    private static byte[] Decompress(string entryName, byte[] data)
+    {
+        try
+        {
+            using (MemoryStream input = new MemoryStream(data))
+            using (GZipStream gzip = new GZipStream(input, CompressionMode.Decompress))
+            using (MemoryStream output = new MemoryStream())
+            {
+                byte[] buffer = new byte[16384];
+                int read;
+                while ((read = gzip.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    if (output.Length + read > MaxEntrySize)
+                    {
+                        throw new InvalidDataException("'" + entryName + "' is too large once unpacked.");
+                    }
+                    output.Write(buffer, 0, read);
+                }
+                return output.ToArray();
+            }
+        }
+        catch (IOException ex)
+        {
+            throw new InvalidDataException("'" + entryName + "' is not a valid gzip file: " + ex.Message, ex);
+        }
     }
 
     // An OpenSSH key file is text: a PEM/OpenSSH private key, or a one-line public key. Anything else is not a key.
