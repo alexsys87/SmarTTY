@@ -1570,32 +1570,116 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
     }
 
+    /// <summary>
+    /// Opening the channel takes several round trips to the server and waits until the helper commands of the file
+    /// panel have finished (see PtySetupGate), so it is done on a worker thread: on the UI thread the whole window used
+    /// to freeze when a script was started from the file panel. The prompt stays hidden (no input line) until the
+    /// channel is ready, so no second command can start meanwhile.
+    /// </summary>
     private void RunRemoteCommand(string command)
     {
+        SshSession session = _context.Session;
         // In byte mode (a shell counting UTF-8 bytes, OpenWrt) the PTY is opened without IUTF8, so that a program using
         // the kernel line editing (read, cat) counts bytes like BusyBox does and the repeated Backspace matches it.
-        SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(BuildRemoteCommand(command), "xterm", ExtendedDataMode.Merge, utf8Tty: !ByteOrientedLineEditing);
-        if (sshShellChannel == null)
+        bool utf8Tty = !ByteOrientedLineEditing;
+        ThreadPool.QueueUserWorkItem(delegate
         {
-            throw new Exception("Failed to open an SSH channel");
+            SshShellChannel sshShellChannel = null;
+            Exception failure = null;
+            try
+            {
+                // The shell probe may be waited for here as well, which is not allowed on the UI thread either.
+                sshShellChannel = session.OpenShellChannel(BuildRemoteCommand(command), "xterm", ExtendedDataMode.Merge, utf8Tty: utf8Tty);
+                if (sshShellChannel == null)
+                {
+                    failure = new Exception("Failed to open an SSH channel");
+                }
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+            bool posted = false;
+            try
+            {
+                if (!IsDisposed && IsHandleCreated)
+                {
+                    BeginInvoke(new Action(() => CompleteRemoteCommand(command, sshShellChannel, failure)));
+                    posted = true;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // The tab is being closed.
+            }
+            if (!posted)
+            {
+                DisposeChannelQuietly(sshShellChannel);
+            }
+        });
+    }
+
+    private static void DisposeChannelQuietly(SshShellChannel channel)
+    {
+        if (channel == null)
+        {
+            return;
         }
-        CommandRun item = new CommandRun(this, command, _currentDirectory, ((EditableTextBrowser)this).EditableDocument.LineCount - 1);
-        _runs.Add(item);
-        CommandChannel commandChannel = new CommandChannel(sshShellChannel, this, item);
-        _channel = commandChannel;
-        ResetByteColumns();
-        sshShellChannel.Finished += (object sender) =>
+        try
         {
-            // Read on the session thread: the exit status may still be on its way when the channel reports EOF.
-            bool connectionLost = sshShellChannel.ClosedByConnectionLoss;
-            bool disposed = sshShellChannel.IsDisposed;
-            bool statusKnown = connectionLost || disposed ||
-                sshShellChannel.HasExitStatus || sshShellChannel.ExitSignal != null;
-            int exitStatus = (connectionLost || disposed) ? 0 : sshShellChannel.ExitStatus;
-            OnCommandFinished(commandChannel, connectionLost, exitStatus, statusKnown);
-        };
-        sshShellChannel.PollingEnabled = true;
-        sshShellChannel.ResizePty(TerminalSize.Width, TerminalSize.Height);
+            channel.Dispose();
+        }
+        catch
+        {
+        }
+    }
+
+    // On the UI thread.
+    private void CompleteRemoteCommand(string command, SshShellChannel sshShellChannel, Exception failure)
+    {
+        if (IsDisposed)
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                DisposeChannelQuietly(sshShellChannel);
+            });
+            return;
+        }
+        try
+        {
+            if (failure != null)
+            {
+                throw failure;
+            }
+            CommandRun item = new CommandRun(this, command, _currentDirectory, ((EditableTextBrowser)this).EditableDocument.LineCount - 1);
+            _runs.Add(item);
+            CommandChannel commandChannel = new CommandChannel(sshShellChannel, this, item);
+            _channel = commandChannel;
+            ResetByteColumns();
+            sshShellChannel.Finished += (object sender) =>
+            {
+                // Read on the session thread: the exit status may still be on its way when the channel reports EOF.
+                bool connectionLost = sshShellChannel.ClosedByConnectionLoss;
+                bool disposed = sshShellChannel.IsDisposed;
+                bool statusKnown = connectionLost || disposed ||
+                    sshShellChannel.HasExitStatus || sshShellChannel.ExitSignal != null;
+                int exitStatus = (connectionLost || disposed) ? 0 : sshShellChannel.ExitStatus;
+                OnCommandFinished(commandChannel, connectionLost, exitStatus, statusKnown);
+            };
+            sshShellChannel.PollingEnabled = true;
+            sshShellChannel.ResizePty(TerminalSize.Width, TerminalSize.Height);
+        }
+        catch (Exception exception)
+        {
+            ProcessOutput(TerminalEmulatorControl.Colorize(exception.Message, 1));
+            if (_channel == null)
+            {
+                // Nothing runs: the channel was never attached, so it is closed here and the prompt comes back. If it was
+                // attached, its Finished event shows the prompt.
+                DisposeChannelQuietly(sshShellChannel);
+                ShowPrompt();
+            }
+        }
     }
 
     internal override ILinkScanner CreateLinkScanner()
