@@ -34,6 +34,9 @@ internal static class Program
 
         public long SentBytes;
 
+        /// <summary>The speed of the line in bytes per second in both directions (11520 = 115200 baud); 0 = as fast as the pipe goes.</summary>
+        public int BytesPerSecond;
+
         public Device(string shellCommand, string shellName)
         {
             _shellName = shellName;
@@ -61,6 +64,10 @@ internal static class Program
                         if (Environment.GetEnvironmentVariable("SMTTY_TRACE") == "1")
                         {
                             Console.Error.Write(Encoding.Latin1.GetString(chunk).Replace("\r", "\\r"));
+                        }
+                        if (BytesPerSecond > 0)
+                        {
+                            Thread.Sleep(count * 1000 / BytesPerSecond);
                         }
                         Func<byte[], byte[]> filter = RxFilter;
                         if (filter != null)
@@ -96,6 +103,10 @@ internal static class Program
             Stream input = _process.StandardInput.BaseStream;
             input.Write(chunk, 0, chunk.Length);
             input.Flush();
+            if (BytesPerSecond > 0)
+            {
+                Thread.Sleep(chunk.Length * 1000 / BytesPerSecond);
+            }
         }
 
         public byte? Read(int timeoutMs)
@@ -275,6 +286,31 @@ internal static class Program
                 Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(text)), "text file", Describe(run));
             }
             {
+                // The debug log tells what was typed and what the device answered; a small block size works too.
+                List<string> log = new List<string>();
+                GzipBase64Transfer.Options options = Fast();
+                options.Log = log.Add;
+                options.WindowBytes = 64;
+                string target = Path.Combine(remoteDir, "logged.txt");
+                Run run = RunSend(device, text, target, options);
+                string all = string.Join("\n", log);
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(text)), "block size of 64 bytes", Describe(run));
+                Check(all.Contains("SEND ") && all.Contains("The device has:") && all.Contains("TX window 1:") && all.Contains("All ") && all.Contains(":READY"), "the debug log has the commands, the answers and the windows", all.Length > 600 ? all.Substring(0, 600) : all);
+                Check(!all.Contains("ECHO MISMATCH"), "no echo mismatch is reported on a clean line");
+                // Every line typed to the shell stays under what a router's line editor keeps (512 characters).
+                int longest = log.Where(l => l.Contains("] TX ") && l.Contains(" bytes: ")).Select(l => int.Parse(l.Substring(l.IndexOf("TX ") + 3, l.IndexOf(" bytes") - l.IndexOf("TX ") - 3))).DefaultIfEmpty(0).Max();
+                Check(longest > 100 && longest <= 481, "the typed commands are complete lines of at most 480 characters", "longest " + longest);
+                Run tooLong = RunSend(device, text, "/tmp/" + new string('x', 600), Fast());
+                Check(tooLong.Error is IOException && tooLong.Error.Message.Contains("too long"), "a path that would not fit the line editor is refused with a clear message", Describe(tooLong));
+            }
+            {
+                string cyr = Path.Combine(dir, "файл №1.txt");
+                File.WriteAllBytes(cyr, TextBytes(30));
+                Run run = RunSend(device, cyr, remoteDir, Fast());
+                string target = Path.Combine(remoteDir, "файл №1.txt");
+                Check(run.Error == null && run.Result && File.Exists(target) && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(cyr)), "a file name with national letters", Describe(run));
+            }
+            {
                 string target = Path.Combine(remoteDir, "empty.dat");
                 Run run = RunSend(device, empty, target, Fast());
                 Check(run.Error == null && run.Result && File.Exists(target) && new FileInfo(target).Length == 0, "empty file", Describe(run));
@@ -333,9 +369,13 @@ internal static class Program
                     return chunk;
                 };
                 string target = Path.Combine(remoteDir, "retry.bin");
-                Run run = RunSend(device, binary, target, Fast());
+                List<string> log = new List<string>();
+                GzipBase64Transfer.Options options = Fast();
+                options.Log = log.Add;
+                Run run = RunSend(device, binary, target, options);
                 device.TxFilter = null;
                 Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a damaged character is caught and the second attempt succeeds", Describe(run) + " errors=" + run.Errors);
+                Check(log.Any(l => l.Contains("ECHO MISMATCH") && l.Contains("echoed")), "the log shows where the echo differs from what was typed", string.Join("\n", log.Where(l => l.Contains("ECHO") || l.Contains("refused")).ToArray()));
                 Check(!File.Exists(target + ".smtty~"), "no unfinished file left");
             }
             {
@@ -351,6 +391,7 @@ internal static class Program
                 Run run = RunSend(device, binary, target, Fast(attempts: 2));
                 device.TxFilter = null;
                 Check(run.Error is IOException && !File.Exists(target) && !File.Exists(target + ".smtty~"), "damage in every attempt fails and leaves nothing behind", Describe(run));
+                Check(run.Error != null && run.Error.Message.Contains("unpacked") || run.Error != null && run.Error.Message.Contains("gunzip status"), "the failure says what the device made of the data", Describe(run));
                 Check(device.Run("echo alive2").Contains("alive2"), "the shell is alive after a failed transfer");
             }
             {
@@ -570,6 +611,44 @@ internal static class Program
         Directory.Delete(dir, true);
     }
 
+    private static void SlowLineCases()
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        string binary = Path.Combine(dir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(25_000, 11));
+        string onDevice = Path.Combine(remoteDir, "big.bin");
+
+        using (Device device = Ash())
+        {
+            device.BytesPerSecond = 11520; // 115200 baud, both ways, with the time it takes
+            Section("busybox ash on a 115200 baud line");
+            Run run = RunSend(device, binary, Path.Combine(remoteDir, "slow-send.bin"), Fast());
+            Check(run.Error == null && run.Result && File.ReadAllBytes(Path.Combine(remoteDir, "slow-send.bin")).SequenceEqual(File.ReadAllBytes(binary)), "send at the speed of a real line", Describe(run));
+            File.Copy(binary, onDevice);
+            string local = Path.Combine(dir, "slow-receive.bin");
+            run = RunReceive(device, onDevice, local, Fast());
+            Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "receive at the speed of a real line", Describe(run));
+        }
+        Directory.Delete(dir, true);
+    }
+
+    private static void SilentDeviceCases()
+    {
+        string dir = NewWorkDir();
+        string file = Path.Combine(dir, "x.bin");
+        File.WriteAllBytes(file, RandomBytes(1000, 9));
+        // "cat" only echoes: there is no shell to answer, which is what a console in the wrong state looks like.
+        using (Device device = new Device("cat", "cat (no shell)"))
+        {
+            Section("a console without a shell");
+            Run run = RunSend(device, file, "/tmp/x.bin", Fast());
+            Check(run.Error is IOException && run.Error.Message.Contains("did not answer") && run.Error.Message.Contains("last output of the device"), "the error shows what the device last printed", Describe(run));
+        }
+        Directory.Delete(dir, true);
+    }
+
     private static void UnitCases()
     {
         Section("helpers");
@@ -608,6 +687,8 @@ internal static class Program
         string only = args.Length > 0 ? args[0] : null;
         bool Want(string group) => only == null || only == group;
         if (Want("units")) UnitCases();
+        if (Want("silent")) SilentDeviceCases();
+        if (Want("slow")) SlowLineCases();
         if (Want("send-ash")) SendCases(Ash, gnuUu: true, cksum: false);
         if (Want("receive-ash")) ReceiveCases(Ash, gnuUu: true, cksum: false);
         if (Want("fault")) FaultCases();
