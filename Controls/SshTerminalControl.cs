@@ -744,6 +744,16 @@ public class SshTerminalControl : TerminalEmulatorControl
         return false;
     }
 
+    protected override int GetScreenSelectionLastLine()
+    {
+        // Ctrl+double click selects the visible output, not the command line the user is editing.
+        if (_inputLine != null)
+        {
+            return _inputLine.StartLine - 1;
+        }
+        return base.GetScreenSelectionLastLine();
+    }
+
     private bool InputWraps()
     {
         // Before the first layout there are no columns yet; rewrapping to 0 columns would never finish.

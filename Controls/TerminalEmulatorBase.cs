@@ -1485,10 +1485,15 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
     }
 
-    private string GetLineBreak(int line)
+    private bool IsLineWrapped(int line)
     {
         ScreenBuffer screenBuffer = ActiveBuffer;
-        if (screenBuffer != null && screenBuffer.Lines?.GetLine(line)?.IsWrapped == true)
+        return screenBuffer != null && screenBuffer.Lines?.GetLine(line)?.IsWrapped == true;
+    }
+
+    private string GetLineBreak(int line)
+    {
+        if (IsLineWrapped(line))
         {
             return "";
         }
@@ -1498,6 +1503,57 @@ public partial class TerminalEmulatorBase : TextEditorControl
     protected override string GetSelectedText(TextDocument.TextPosition start, TextDocument.TextPosition end)
     {
         return base.EditableDocument.GetRangeText(start, end, GetLineBreak);
+    }
+
+    protected override void SelectTerminalLine(TextDocument.TextPosition textPosition)
+    {
+        if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+        {
+            SelectVisibleScreen();
+            return;
+        }
+        // A line the terminal wrapped continues on the following document lines without a line break between them,
+        // so the click selects the whole logical line even when it lands on one of the continuation rows.
+        int firstLine = textPosition.Line;
+        while (firstLine > 0 && IsLineWrapped(firstLine - 1))
+        {
+            firstLine--;
+        }
+        int lastLine = textPosition.Line;
+        while (lastLine + 1 < base.EditableDocument.LineCount && IsLineWrapped(lastLine))
+        {
+            lastLine++;
+        }
+        SelectLineRange(firstLine, lastLine);
+    }
+
+    private void SelectVisibleScreen()
+    {
+        if (base.EditableDocument.LineCount == 0)
+        {
+            return;
+        }
+        int firstLine = YToLine(TextArea.Top);
+        int lastLine = YToLine(TextArea.Bottom - 1);
+        if (firstLine < 0 || lastLine < 0)
+        {
+            return;
+        }
+        lastLine = Math.Min(lastLine, GetScreenSelectionLastLine());
+        if (lastLine < firstLine)
+        {
+            // Only the command line is visible: there is no output on the screen to select.
+            SetSelection(select: false, SelectionStart);
+            return;
+        }
+        SelectLineRange(firstLine, lastLine);
+    }
+
+    // The last line of the visible screen that belongs to the console output. Controls that keep the editable
+    // command line at the bottom of the screen exclude it, so a copy does not start or end with the prompt.
+    protected virtual int GetScreenSelectionLastLine()
+    {
+        return int.MaxValue;
     }
 
     public void SelectAllText()

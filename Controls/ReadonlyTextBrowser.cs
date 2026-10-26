@@ -839,8 +839,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public bool NoLeftPadding { get; set; }
 
-    protected virtual bool AllowCrossLineWordSelection => false;
-
     protected bool FillLineBackground { get; set; }
 
     public override string Text
@@ -1614,23 +1612,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     TextDocument.TextPosition textPosition = HitTest(e.Location);
                     if (textPosition.IsValid && textPosition.Line < Document.LineCount)
                     {
-                        if (isDoubleClick)
-                        {
-                            SetSelection(select: true, new TextDocument.TextPosition(0, textPosition.Line));
-                            SetSelectionEnd(new TextDocument.TextPosition(GetLineOrNull(textPosition.Line).Length, textPosition.Line));
-                            InvalidateLine(textPosition.Line);
-                        }
-                        else
-                        {
-                            TextDocument.TextPosition wordLeft = ComputeMovedPosition(CaretMove.WordLeft, Control.ModifierKeys, textPosition);
-                            TextDocument.TextPosition wordRight = ComputeMovedPosition(CaretMove.WordRight, Control.ModifierKeys, textPosition);
-                            if (wordLeft.Line == wordRight.Line || AllowCrossLineWordSelection)
-                            {
-                                SetSelection(select: true, wordLeft);
-                                SetSelectionEnd(wordRight);
-                                InvalidateLine(wordLeft.Line);
-                            }
-                        }
+                        SelectTerminalLine(textPosition);
                     }
                 }
                 else
@@ -1745,6 +1727,38 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected virtual void AdjustSelectionEnd(ref TextDocument.TextPosition textPosition)
     {
+    }
+
+    // A double click in a terminal selects the line under the mouse instead of a word. Terminals extend this to
+    // rows the line was wrapped onto, and Ctrl selects the visible screen (see TerminalEmulatorBase).
+    protected virtual void SelectTerminalLine(TextDocument.TextPosition textPosition)
+    {
+        SelectLineRange(textPosition.Line, textPosition.Line);
+    }
+
+    protected void SelectLineRange(int firstLine, int lastLine)
+    {
+        if (firstLine > lastLine)
+        {
+            int swap = firstLine;
+            firstLine = lastLine;
+            lastLine = swap;
+        }
+        if (firstLine < 0)
+        {
+            firstLine = 0;
+        }
+        if (lastLine >= LineCount)
+        {
+            lastLine = LineCount - 1;
+        }
+        if (lastLine < firstLine)
+        {
+            return;
+        }
+        SetSelection(select: true, new TextDocument.TextPosition(0, firstLine));
+        SetSelectionEnd(new TextDocument.TextPosition(GetLineOrNull(lastLine).Length, lastLine));
+        Redraw();
     }
 
     private void UpdateSelectionFromPoint(bool adjustStart, Point point, bool select)
