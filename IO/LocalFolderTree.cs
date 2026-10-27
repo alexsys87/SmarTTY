@@ -19,7 +19,7 @@ public static class LocalFolderTree
     public static List<LocalFolderEntry> GetRoots()
     {
         List<LocalFolderEntry> roots = new List<LocalFolderEntry>();
-        HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> seen = new HashSet<string>(PathComparer);
         roots.Add(new LocalFolderEntry("This PC", null));
 
         AddShellFolder(roots, seen, "Desktop", Environment.SpecialFolder.Desktop);
@@ -37,20 +37,27 @@ public static class LocalFolderTree
         return roots;
     }
 
-    /// <summary>The ready (mounted, formatted) drives of the machine.</summary>
+    /// <summary>
+    /// The ready (mounted, formatted) drives of the machine. A mount point the platform reports more than once
+    /// is listed once: on Linux <see cref="DriveInfo.GetDrives"/> can repeat a mount (the same device mounted
+    /// twice), and the tree must not show the same folder as two nodes.
+    /// </summary>
     public static List<DriveInfo> GetReadyDrives()
     {
         List<DriveInfo> drives = new List<DriveInfo>();
+        HashSet<string> seen = new HashSet<string>(PathComparer);
         try
         {
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
                 try
                 {
-                    if (drive.IsReady)
+                    string name = drive.Name;
+                    if (string.IsNullOrEmpty(name) || !drive.IsReady || !seen.Add(name))
                     {
-                        drives.Add(drive);
+                        continue;
                     }
+                    drives.Add(drive);
                 }
                 catch (IOException)
                 {
@@ -68,6 +75,10 @@ public static class LocalFolderTree
         }
         return drives;
     }
+
+    /// <summary>Paths are compared case-insensitively on Windows and case-sensitively elsewhere.</summary>
+    private static StringComparer PathComparer =>
+        (Path.DirectorySeparatorChar == '\\') ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     /// <summary>The label of a drive: "C:\ (System)", or just the volume name when there is one.</summary>
     public static string DriveDisplayName(DriveInfo drive)
