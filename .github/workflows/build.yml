@@ -154,8 +154,8 @@ jobs:
       - name: Run settings window layout checks (fixed size, one scroll viewer per tab)
         run: dotnet run --project tests/SettingsWindowLayoutTests -c Release
 
-      - name: Run colour picker checks (hex text helpers, basic colour grid, native dialog replaced)
-        run: dotnet run --project tests/ColorPickerTests -c Release
+      - name: Run folder browser checks (themed chooser replaced the native FolderBrowserDialog)
+        run: dotnet run --project tests/FolderBrowserTests -c Release
 
       - name: Run folder synchronization settings checks (direction, options, exclusion masks)
         run: dotnet run --project tests/SyncRequestTests -c Release

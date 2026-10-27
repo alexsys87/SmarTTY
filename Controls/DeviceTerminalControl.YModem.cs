@@ -104,18 +104,12 @@ public partial class DeviceTerminalControl
             return;
         }
 
-        using FolderBrowserDialog folderDialog = new FolderBrowserDialog
-        {
-            Description = "Select the folder to save the received file(s) to. The names come from the sender; an existing file is never overwritten.",
-            ShowNewFolderButton = true
-        };
-
-        if (folderDialog.ShowDialog(this) != DialogResult.OK || string.IsNullOrEmpty(folderDialog.SelectedPath))
+        string folder = ThemedFolderBrowser.Browse(this,
+            "Select the folder to save the received file(s) to. The names come from the sender; an existing file is never overwritten.");
+        if (string.IsNullOrEmpty(folder))
         {
             return;
         }
-
-        string folder = folderDialog.SelectedPath;
         // Touched only by the transfer worker while it runs, and read after it has ended.
         List<string> saved = new List<string>();
         Dictionary<int, string> pathByIndex = new Dictionary<int, string>();

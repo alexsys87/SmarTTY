@@ -66,16 +66,12 @@ public partial class DeviceTerminalControl
             return;
         }
 
-        using FolderBrowserDialog folderDialog = new FolderBrowserDialog
-        {
-            Description = "Select the folder for the files received via Kermit (then start the sender on the device, e.g. \"kermit -s file\")"
-        };
-        if (folderDialog.ShowDialog(this) != DialogResult.OK)
+        string folder = ThemedFolderBrowser.Browse(this,
+            "Select the folder for the files received via Kermit (then start the sender on the device, e.g. \"kermit -s file\")");
+        if (string.IsNullOrEmpty(folder))
         {
             return;
         }
-
-        string folder = folderDialog.SelectedPath;
         Dictionary<string, string> created = new Dictionary<string, string>();
         StartLineTransfer("Kermit Receive", "Kermit", "receive", (sendData, progress, token) =>
             KermitTransfer.ReceiveFiles(

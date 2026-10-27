@@ -41,12 +41,17 @@ public partial class LocalFolderBrowserWindow : Window
     }
 
     /// <summary>Asks for a folder on the local machine; returns null when the window was cancelled.</summary>
-    public static string Browse(string initialPath = null, string title = null)
+    public static string Browse(string initialPath = null, string title = null, string description = null)
     {
         LocalFolderBrowserWindow window = new LocalFolderBrowserWindow();
         if (!string.IsNullOrEmpty(title))
         {
             window.Title = title;
+        }
+        if (!string.IsNullOrEmpty(description))
+        {
+            window.DescriptionText.Text = description;
+            window.DescriptionText.Visibility = Visibility.Visible;
         }
         if (!string.IsNullOrEmpty(initialPath))
         {
