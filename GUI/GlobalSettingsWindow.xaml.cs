@@ -41,6 +41,9 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
     public GlobalSettingsWindow(GlobalSettings settings)
     {
         InitializeComponent();
+        // The window keeps one height for every tab (it no longer sizes itself to the current tab), so cap it to
+        // the screen: a shorter display would otherwise push the OK/Cancel buttons off the bottom.
+        MaxHeight = SystemParameters.WorkArea.Height;
         _OriginalSettings = settings;
         this.DataContext = (_ClonedSettings = settings.Clone());
         if (settings.LargeBlockCutoffPoint == 0)

@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.GlobalSettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" xmlns:coll="clr-namespace:System.Collections;assembly=mscorlib" xmlns:sys="clr-namespace:System;assembly=mscorlib" Title="SmarTTY Settings" SizeToContent="Height" Width="800" WindowStartupLocation="CenterOwner" Style="{DynamicResource SecondaryWindowStyle}">
+<Window x:Class="SmarTTY.GUI.GlobalSettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:SmarTTY.GUI" xmlns:coll="clr-namespace:System.Collections;assembly=mscorlib" xmlns:sys="clr-namespace:System;assembly=mscorlib" Title="SmarTTY Settings" Width="800" Height="700" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" Style="{DynamicResource SecondaryWindowStyle}">
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="*" />
@@ -96,6 +96,7 @@
         </ResourceDictionary>
       </FrameworkElement.Resources>
       <TabItem Header="Common Settings">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
           <GroupBox Header="File transfer settings" Padding="5">
             <Grid>
@@ -207,8 +208,10 @@
             </Grid>
           </GroupBox>
         </StackPanel>
+        </ScrollViewer>
       </TabItem>
       <TabItem Header="Paste Settings">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
           <GroupBox Header="Paste" Padding="5" DataContext="{Binding Paste}">
             <Grid>
@@ -295,8 +298,10 @@
             </Grid>
           </GroupBox>
         </StackPanel>
+        </ScrollViewer>
       </TabItem>
       <TabItem Header="Visual Settings">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
           <GroupBox Header="X Server">
             <Grid>
@@ -449,8 +454,10 @@
             </Grid>
           </GroupBox>
         </StackPanel>
+        </ScrollViewer>
       </TabItem>
       <TabItem Header="Editor Settings">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <GroupBox Header="Remote file editor settings">
           <Grid>
             <Grid.RowDefinitions>
@@ -514,8 +521,10 @@
             <CheckBox Content="Offer the standard functions of the language (API symbols)" Grid.Row="15" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ApiSymbols}" ToolTip="Adds the standard functions of the language (Python builtins, the C library, the shell builtins, ...) with their description and parameter hint. The set lives in ApiSymbols.xml." />
           </Grid>
         </GroupBox>
+        </ScrollViewer>
       </TabItem>
       <TabItem Header="Smart Terminal Settings">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
           <GroupBox Header="Common Settings" DataContext="{Binding VirtualTerminal}">
             <Grid>
@@ -631,6 +640,7 @@
             </StackPanel>
           </GroupBox>
         </StackPanel>
+        </ScrollViewer>
       </TabItem>
     </TabControl>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Grid.Row="1" Margin="0 5 0 5">
