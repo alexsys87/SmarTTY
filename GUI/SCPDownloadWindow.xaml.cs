@@ -59,21 +59,10 @@ public partial class SCPDownloadWindow : Window
 
     private void LocalBrowse_Click(object sender, RoutedEventArgs e)
     {
-        System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog
+        string selected = LocalFolderBrowserWindow.Browse(LocalDirectoryBox.Text, "Select the local folder");
+        if (selected != null)
         {
-            RootFolder = Environment.SpecialFolder.MyComputer
-        };
-        try
-        {
-            dialog.SelectedPath = LocalDirectoryBox.Text;
-        }
-        catch
-        {
-            // A path that is no longer valid is not a reason to fail the browse.
-        }
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-        {
-            LocalDirectoryBox.Text = dialog.SelectedPath;
+            LocalDirectoryBox.Text = selected;
         }
     }
 

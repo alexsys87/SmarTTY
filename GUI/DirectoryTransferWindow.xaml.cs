@@ -316,21 +316,10 @@ public partial class DirectoryTransferWindow : Window
 
     private static void BrowseLocal(TextBox box)
     {
-        System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog
+        string selected = LocalFolderBrowserWindow.Browse(box.Text);
+        if (selected != null)
         {
-            RootFolder = Environment.SpecialFolder.MyComputer
-        };
-        try
-        {
-            dialog.SelectedPath = box.Text;
-        }
-        catch
-        {
-            // A path that is no longer valid is not a reason to fail the browse.
-        }
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-        {
-            box.Text = dialog.SelectedPath;
+            box.Text = selected;
         }
     }
 

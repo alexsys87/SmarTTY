@@ -103,9 +103,6 @@
     <Compile Update="Controls\DpiAwareControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Update="Controls\DynamicTreeBrowser.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
     <Compile Update="Controls\EditableTextBrowser.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -174,9 +171,6 @@
     </Compile>
     <Compile Update="Controls\DpiAwareControl.Designer.cs">
       <DependentUpon>DpiAwareControl.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\DynamicTreeBrowser.Designer.cs">
-      <DependentUpon>DynamicTreeBrowser.cs</DependentUpon>
     </Compile>
     <Compile Update="Controls\EditableTextBrowser.Designer.cs">
       <DependentUpon>EditableTextBrowser.cs</DependentUpon>

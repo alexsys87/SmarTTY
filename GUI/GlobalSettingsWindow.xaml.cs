@@ -134,10 +134,10 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
 
     private void BrowseDir_Click(object sender, RoutedEventArgs e)
     {
-        FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog();
-        if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        string selected = LocalFolderBrowserWindow.Browse(_ClonedSettings.DefaultDownloadDirectory, "Select download directory");
+        if (selected != null)
         {
-            _ClonedSettings.DefaultDownloadDirectory = folderBrowserDialog.SelectedPath;
+            _ClonedSettings.DefaultDownloadDirectory = selected;
         }
     }
 
