@@ -174,11 +174,6 @@ public partial class DeviceTerminalControl
     /// <summary>Asks for the folder; null when the user cancels.</summary>
     private string ChooseZModemFolder(string description)
     {
-        using FolderBrowserDialog dialog = new FolderBrowserDialog
-        {
-            Description = description,
-            ShowNewFolderButton = true
-        };
         string start = _zmodemFolder;
         if (string.IsNullOrEmpty(start) || !Directory.Exists(start))
         {
@@ -189,15 +184,12 @@ public partial class DeviceTerminalControl
             string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
             start = Directory.Exists(downloads) ? downloads : null;
         }
-        if (!string.IsNullOrEmpty(start))
-        {
-            dialog.SelectedPath = start;
-        }
-        if (dialog.ShowDialog(this) != DialogResult.OK || string.IsNullOrEmpty(dialog.SelectedPath))
+        string chosen = ThemedFolderBrowser.Browse(this, description, start);
+        if (string.IsNullOrEmpty(chosen))
         {
             return null;
         }
-        _zmodemFolder = dialog.SelectedPath;
+        _zmodemFolder = chosen;
         return _zmodemFolder;
     }
 
