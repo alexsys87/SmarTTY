@@ -85,10 +85,20 @@ public partial class SynchronizeWindow : Window
             MessageBoxes.Error("Both folders are required.");
             return;
         }
+        SyncSettings settings;
+        try
+        {
+            settings = BuildSettings(localDir, remoteDir);
+        }
+        catch (ArgumentException exception)
+        {
+            // An invalid regular expression in the Exclude box; report it instead of starting the run.
+            MessageBoxes.Error("The Exclude pattern is not a valid regular expression: " + exception.Message);
+            return;
+        }
         _cancelRequested = false;
         LogBox.Clear();
         _errorLog.Length = 0;
-        SyncSettings settings = BuildSettings(localDir, remoteDir);
         new Thread(() => RunSync(settings)).Start();
         SetInputEnabled(false);
         TransferProgress.Visibility = Visibility.Visible;
@@ -104,7 +114,8 @@ public partial class SynchronizeWindow : Window
             deleteExtraneous: DeleteExtraneousBox.IsChecked == true,
             skipSymlinks: SkipSymlinksBox.IsChecked == true,
             skipHardlinks: SkipHardlinksBox.IsChecked == true,
-            overwriteTrigger: SelectedTrigger());
+            overwriteTrigger: SelectedTrigger(),
+            excludeIsRegex: ExcludeRegexBox.IsChecked == true);
     }
 
     private QuickSyncOverwriteTrigger SelectedTrigger()
@@ -240,6 +251,7 @@ public partial class SynchronizeWindow : Window
         SkipSymlinksBox.IsEnabled = enabled;
         SkipHardlinksBox.IsEnabled = enabled;
         ExcludeBox.IsEnabled = enabled;
+        ExcludeRegexBox.IsEnabled = enabled;
     }
 
     /// <summary>

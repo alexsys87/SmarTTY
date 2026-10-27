@@ -45,7 +45,8 @@
             <CheckBox Name="SkipHardlinksBox" Content="Skip hard links" />
         </StackPanel>
         <TextBlock Grid.Row="5" Grid.Column="0" Text="Exclude:" VerticalAlignment="Center" Margin="0,8,8,0" ToolTip="Masks separated by semicolons, for example: *.log;build" />
-        <TextBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" Name="ExcludeBox" Margin="0,8,0,0" ToolTip="Files and folders to leave out, separated by semicolons, for example: *.log;build" />
+        <TextBox Grid.Row="5" Grid.Column="1" Name="ExcludeBox" MinWidth="220" Margin="0,8,0,0" ToolTip="Files and folders to leave out, separated by semicolons, for example: *.log;build" />
+        <CheckBox Grid.Row="5" Grid.Column="2" Name="ExcludeRegexBox" Content="Regular expression" Margin="6,8,0,0" VerticalAlignment="Center" ToolTip="Treat the Exclude box as one regular expression instead of a semicolon-separated mask list" />
         <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Name="StatusText" Text="Inactive" TextTrimming="CharacterEllipsis" Margin="0,10,0,0" />
         <TextBlock Grid.Row="6" Grid.Column="2" Name="StatsText" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" Margin="0,10,0,0" />
         <TextBox Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Name="LogBox" Height="96" Margin="0,4,0,0" IsReadOnly="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" TextWrapping="NoWrap" />
