@@ -39,6 +39,9 @@ public partial class App : Application
         // The paste confirmation of the harness-compiled paste guard becomes the themed WPF window.
         ThemedPasteConfirmAdapter.Install();
 
+        // The progress window of a long paste becomes the themed WPF window.
+        ThemedPasteProgressAdapter.Install();
+
         // The proxy prompt is raised from the harness-compiled connection controller, which cannot reference the WPF
         // dialog; the window is wired in here instead.
         NewConnectionController.ProxyCredentialsPrompt = (string realm, string credentials) =>
