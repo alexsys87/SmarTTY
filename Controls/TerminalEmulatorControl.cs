@@ -3,6 +3,7 @@ using SmarTTY.Terminal;
 using SmarTTY.Utilities;
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Media;
@@ -27,6 +28,12 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         WaveFile
     }
 
+    /// <summary>
+    /// Collects what one escape sequence meant and, when it is disposed, hands that to <c>TerminalEmulatorBase.Trace</c>
+    /// as a single line. It is only ever created in a Debug build (see <c>ProcessOutput</c>), and every method that
+    /// feeds it is <see cref="ConditionalAttribute"/> on DEBUG, so a Release build neither calls nor allocates any of
+    /// this and the description strings are not even compiled in.
+    /// </summary>
     internal class EscapeTrace : IDisposable
     {
         private string _warning;
@@ -34,8 +41,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         private string _description;
 
         private string _raw;
-
-        private string _input;
 
         private int _position;
 
@@ -48,40 +53,44 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
         public void Dispose()
         {
+            string prefix = "[ESC @" + _position + "] ";
             if (_description != null)
             {
-                _terminal.Trace("[ESC] " + _description);
+                _terminal.Trace(prefix + _description);
             }
             else if (_warning != null)
             {
-                _terminal.Trace("[ESC] WARNING: " + _warning + " (" + _raw + " )");
+                _terminal.Trace(prefix + "WARNING: " + _warning + " (" + _raw + " )");
             }
             else if (_raw != null)
             {
-                _terminal.Trace(_raw);
+                _terminal.Trace(prefix + _raw);
             }
             else
             {
-                _terminal.Trace("???");
+                _terminal.Trace(prefix + "???");
             }
         }
 
-        internal void SetInput(string text, int position)
+        [Conditional("DEBUG")]
+        internal void SetPosition(int position)
         {
-            _input = text;
             _position = position;
         }
 
+        [Conditional("DEBUG")]
         internal void SetDescription(string text)
         {
             _description = text;
         }
 
+        [Conditional("DEBUG")]
         internal void SetWarning(string text)
         {
             _warning = text;
         }
 
+        [Conditional("DEBUG")]
         internal void SetRaw(string text)
         {
             this._raw = text;
@@ -417,7 +426,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     base.ResetLinkTracking();
                 }
                 segmentStart = charIndex + 1;
-                EscapeTrace escapeTrace = null;
                 switch (output[charIndex])
                 {
                     case '\r':
@@ -464,6 +472,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                         break;
                     case '\u001b':
                         {
+                            // Escape diagnostics exist in a Debug build only. The tracing object is created just
+                            // around the sequence, so its Dispose() reports what the sequence meant right after
+                            // it is parsed. A Release build compiles the whole thing out.
+#if DEBUG
+                            using EscapeTrace escapeTrace = new EscapeTrace(this);
+#else
+                            EscapeTrace escapeTrace = null;
+#endif
                             int consumed = ParseEscapeSequence(output, charIndex, out var text, escapeTrace);
                             charIndex += consumed - 1;
                             segmentStart += consumed - 1;
@@ -560,7 +576,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     private int ParseEscapeSequence(string text, int position, out string parsedText, EscapeTrace escapeTrace = null)
     {
         parsedText = null;
-        escapeTrace?.SetInput(text, position);
+        escapeTrace?.SetPosition(position);
         if (position + 1 >= text.Length)
         {
             _incompleteEscape = text.Substring(position);
@@ -1006,7 +1022,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 else
                 {
                     // DECSTBM: an omitted (or 0) top is the first line, an omitted bottom the last one.
-                    int rows = ((ReadonlyTextBrowser)this)._visibleRows;
+                    int rows = _visibleRows;
                     if (items.Length < 1 || !int.TryParse(items[0], out var top) || top < 1)
                     {
                         top = 1;
@@ -1106,11 +1122,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             _insertMode = enabled;
         }
-    }
-
-    private void TraceFormat(string text, params object[] items)
-    {
-        Trace(string.Format(text, items));
     }
 
     private bool ExecuteOsc(string content, EscapeTrace escapeTrace)
@@ -1554,17 +1565,21 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
         if (Dispatcher == null)
         {
-            TerminalSizeChanged(this, _visibleColumns, ((ReadonlyTextBrowser)this)._visibleRows);
+            TerminalSizeChanged(this, _visibleColumns, _visibleRows);
             return;
         }
         Dispatcher.PostResize(() =>
         {
-            TerminalSizeChanged(this, _visibleColumns, ((ReadonlyTextBrowser)this)._visibleRows);
+            TerminalSizeChanged(this, _visibleColumns, _visibleRows);
         });
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        if (TryHandlePasteShortcut(e))
+        {
+            return;
+        }
         if (!UsesTerminalInput)
         {
             base.OnKeyDown(e);
@@ -1608,11 +1623,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             {
                 if (e.KeyCode == Keys.Prior)
                 {
-                    TopLine -= ((ReadonlyTextBrowser)this)._visibleRows;
+                    TopLine -= _visibleRows;
                 }
                 else
                 {
-                    TopLine += ((ReadonlyTextBrowser)this)._visibleRows;
+                    TopLine += _visibleRows;
                 }
                 e.SuppressKeyPress = true;
                 e.Handled = true;
@@ -1669,8 +1684,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         return true;
     }
 
+    private const int WM_CONTEXTMENU = 0x007B;
+
     protected override void WndProc(ref Message message)
     {
+        if (message.Msg == WM_CONTEXTMENU && HandleRightClick(ref message))
+        {
+            return;
+        }
         if (message.Msg == 256)
         {
             _extendedKey = ((int)message.LParam & 0x1000000) != 0;
@@ -1854,7 +1875,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     {
         // A click in scrolled-back text or in the partial cell at the edge is reported at the nearest screen cell.
         int column = Math.Max(0, Math.Min(cell.X, _visibleColumns - 1));
-        int row = Math.Max(0, Math.Min(cell.Y, ((ReadonlyTextBrowser)this)._visibleRows - 1));
+        int row = Math.Max(0, Math.Min(cell.Y, _visibleRows - 1));
         SendBytes(XtermProtocol.EncodeMouseReport(buttonCode, column, row, release, IsPrivateModeSet(SgrMouseMode)), InputKind.MouseReport);
     }
 
@@ -1869,7 +1890,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             HandleMouseButton(e, pressed: true);
             return;
         }
-        if (e.Button == MouseButtons.Middle)
+        if (e.Button == MouseButtons.Middle && PasteOptions.MiddleClickPastes)
         {
             Paste();
         }
@@ -1900,14 +1921,108 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
+    /// <summary>
+    /// Raised when Paste finds files (copied in Explorer) and no text in the clipboard: the owner of the tab decides what
+    /// to do with them (upload them, paste their paths).
+    /// </summary>
+    public event Action<TerminalEmulatorControl, string[]> ClipboardFilesPasted;
+
+    private PasteSettings PasteOptions => PasteGuard.OptionsOf(AppSettings);
+
     public override void Paste()
+    {
+        string text = ReadClipboardText();
+        if (string.IsNullOrEmpty(text) && TryPasteClipboardFiles())
+        {
+            return;
+        }
+        PasteText(text);
+    }
+
+    private bool TryPasteClipboardFiles()
+    {
+        if (ClipboardFilesPasted == null || !PasteOptions.OfferClipboardFiles || !CodeEditorPP.IsWindows() || !Win32Clipboard.HasFiles())
+        {
+            return false;
+        }
+        string[] files = Win32Clipboard.GetFiles(Handle);
+        if (files == null || files.Length == 0)
+        {
+            return false;
+        }
+        ClipboardFilesPasted(this, files);
+        return true;
+    }
+
+    /// <summary>Shows the menu with the clipboard, the texts pasted lately and the snippets.</summary>
+    public void ShowPasteMenu(Point? clientLocation = null)
+    {
+        PasteMenu.Show(this, AppSettings, clientLocation, Paste, PasteText);
+    }
+
+    // Ctrl+Shift+V pastes (or opens the paste menu, as the settings say) and Ctrl+Shift+Insert opens the menu, in every
+    // state of the terminal: while a program reads the keyboard and in the command line of a Smart Terminal.
+    private bool TryHandlePasteShortcut(KeyEventArgs e)
+    {
+        if (e.Alt || !e.Control || !e.Shift)
+        {
+            return false;
+        }
+        if (e.KeyCode == Keys.V)
+        {
+            if (PasteOptions.CtrlShiftV == PasteSettings.ShortcutAction.HistoryMenu)
+            {
+                ShowPasteMenu();
+            }
+            else
+            {
+                Paste();
+            }
+        }
+        else if (e.KeyCode == Keys.Insert)
+        {
+            ShowPasteMenu();
+        }
+        else
+        {
+            return false;
+        }
+        e.SuppressKeyPress = true;
+        e.Handled = true;
+        return true;
+    }
+
+    // What the right mouse button does when the settings say something else than opening the menu. Shift+right button
+    // and the menu key still open the menu, and a program that reports the mouse gets the button itself.
+    private bool HandleRightClick(ref Message message)
+    {
+        PasteSettings.MouseAction action = PasteOptions.RightClick;
+        long position = message.LParam.ToInt64();
+        bool fromKeyboard = position == -1 || (position & 0xFFFFFFFFL) == 0xFFFFFFFFL;
+        if (action == PasteSettings.MouseAction.Menu || fromKeyboard || _mouseMode != MouseReportingMode.Off || (ModifierKeys & Keys.Shift) != 0)
+        {
+            return false;
+        }
+        if (action == PasteSettings.MouseAction.CopyOrPaste && HasSelection)
+        {
+            CopySelection();
+            ClearSelection();
+        }
+        else
+        {
+            Paste();
+        }
+        return true;
+    }
+
+    public override void PasteText(string clipboardText)
     {
         DropPrediction();
         try
         {
             if (!UsesTerminalInput)
             {
-                base.Paste();
+                base.PasteText(clipboardText);
                 return;
             }
             // With bracketed paste the program gets the text as one piece and decides itself what to do with the line
@@ -1918,8 +2033,13 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 // The previous paste is still being sent.
                 return;
             }
-            string clipboardText = PasteGuard.ApplyMode(Win32Clipboard.GetText(Handle), _pasteMode);
+            clipboardText = PasteGuard.ApplyMode(clipboardText, _pasteMode);
             string text = PasteGuard.Prepare(clipboardText, AppSettings, linesRunAtOnce: !bracketed, owner: this);
+            if (text != null)
+            {
+                // A COM/TCP session may use an encoding without some of the characters of the text.
+                text = PasteGuard.FitToEncoding(text, InputEncoding, AppSettings, this);
+            }
             if (text != null && !OfferUpload(text))
             {
                 string lineBreak = PasteGuard.ResolveLineBreak(AppSettings, PasteLineBreak);

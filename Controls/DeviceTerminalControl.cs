@@ -30,8 +30,6 @@ public partial class DeviceTerminalControl : DpiAwareControl
     // device (colors, line ending, encoding, baud rate, ...) stays in _deviceTerminalSettings.
     private GlobalSettings _commonSettings;
 
-    private Brush _brush;
-
     private DeviceTerminalSettings.CharacterDisplayMode _displayMode = DeviceTerminalSettings.CharacterDisplayMode.ASCII;
 
     // Text exchanged with the device (received text, typed and pasted input, echo, "Send" box) always goes
@@ -186,7 +184,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         };
     }
 
-    /// <summary>One-line description for the status bar, e.g. "COM3 (115200 bps): connected".</summary>
+    /// <summary>
+    /// One-line description for the status bar, e.g. "COM3 (115200 bps): connected". While the connection is up it
+    /// also says what the terminal believes the device is doing (at its prompt, or running a full-screen program),
+    /// which is what explains why the keys are edited here or sent to the device.
+    /// </summary>
     public string StatusText
     {
         get
@@ -195,18 +197,41 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return _connectionState switch
             {
                 ConnectionStateEnum.Connecting => name + ": connecting...",
-                ConnectionStateEnum.Connected => name + ": connected",
+                ConnectionStateEnum.Connected => ConnectedStatusText(name),
                 ConnectionStateEnum.Failed => name + ": connection failed",
                 _ => name + ": disconnected",
             };
         }
     }
 
+    private string ConnectedStatusText(string name)
+    {
+        string state = DeviceTerminalStateText.State(connected: true, _serialTerminalControl.HasInputLine, _serialTerminalControl.FullScreenProgramActive, _serialTerminalControl.CurrentPrompt);
+        return state.Length == 0 ? name + ": connected" : name + ": connected (" + state + ")";
+    }
+
     private string _transportDisplayName;
+
+    // What the status line last reported, so a change is announced only when it happens (the status bar reads the
+    // text a few times a second, and a repaint per tick would be wasted work).
+    private string _reportedStatusText;
 
     private void RaiseStatusChanged()
     {
+        _reportedStatusText = StatusText;
         StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Announces a status change when the state the status line reports is not the one it reported last. The
+    /// COM/TCP terminal calls this when it shows or hides its input line or a full-screen program takes over.
+    /// </summary>
+    internal void RefreshStatusIfChanged()
+    {
+        if (!string.Equals(_reportedStatusText, StatusText, StringComparison.Ordinal))
+        {
+            RaiseStatusChanged();
+        }
     }
 
     /// <summary>
@@ -311,6 +336,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.TerminalSizeChanged += OnTerminalSizeChanged;
         AddClearCommand();
         AddReturnToInputLineCommand();
+        AddPasteCommands();
         AddPasteSpecialCommands();
         AddRemoteSizeCommands();
         InitializeCommandLists();
@@ -324,6 +350,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         InitializeZModemMenu();
         InitializeYModemMenu();
         InitializeKermitMenu();
+        InitializeGzipBase64Menu();
         InitializeTftpSupport();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
         ThemeManager.ThemeChanged += OnThemeChanged;
@@ -760,6 +787,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.KeyDown += OnTerminalKeyDown;
         _serialTerminalControl.CompletionPopupRequested += OnSerialCompletionPopupRequested;
         _serialTerminalControl.OpenFileRequested += OnSerialOpenFileRequested;
+        // The status line shows what the terminal is doing (at its prompt, a full-screen program), so it has to be
+        // told when that changes.
+        _serialTerminalControl.InputLineStateChanged += (sender, args) => RefreshStatusIfChanged();
 
         // Add to controls at the same position as the old control
         Controls.Add(_serialTerminalControl);
@@ -898,10 +928,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         try
         {
             // Same rule as for SSH tabs: without a configured font the control keeps its own default.
-            if (!string.IsNullOrEmpty(settings.FontName) && settings.FontSize != 0f)
+            Font configuredFont = settings.ConfiguredFont;
+            if (configuredFont != null)
             {
-                hexTerminalControl1.Font = new Font(settings.FontName, settings.FontSize);
-                terminal.Font = new Font(settings.FontName, settings.FontSize);
+                hexTerminalControl1.Font = configuredFont;
+                terminal.Font = configuredFont;
             }
         }
         catch
@@ -938,9 +969,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         backColor = (hexTerminalControl1.ForeColor = deviceTerminalSettings.Colors.Text);
         terminal.ForeColor = backColor;
         _serialTerminalControl.EnterSequence = GetLineEnding(deviceTerminalSettings.LineEnding);
+        // The prompt drawn before the device prints one of its own (and when none is recognised).
+        _serialTerminalControl.SetPrompt(deviceTerminalSettings.DefaultPrompt, deviceTerminalSettings.AutoDetectPrompt);
         SetTextEncoding(deviceTerminalSettings.TextEncoding);
         SelectEncodingInToolbar(deviceTerminalSettings.TextEncoding);
-        _brush = (hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo));
+        hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo);
         // One persisted mode decides what is rendered; older profiles that enabled the text pane next to the HEX
         // dump are resolved to the combined view instead of silently dropping one of the two panes.
         DeviceTerminalSettings.CharacterDisplayMode displayMode = DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(
@@ -1188,6 +1221,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             if (connectionStateEnum == ConnectionStateEnum.Connected)
             {
                 _serialTerminalControl.BeginNewSession();
+                DeliverPendingGzipBase64Recovery();
             }
         }
         finally
@@ -1389,9 +1423,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// Runs one file transfer protocol (XMODEM, YMODEM, Kermit) on a worker thread with a progress window;
     /// <paramref name="run"/> is the protocol itself and gets the line (callbacks for sending bytes and reporting
     /// progress, the cancel token). <paramref name="successNote"/> (optional) is called on the UI thread after a
-    /// successful transfer and may return an extra paragraph for the final message. Must be called on the UI thread.
+    /// successful transfer and may return an extra paragraph for the final message. <paramref name="afterEnd"/> (optional)
+    /// is called on the UI thread when the transfer has ended, whatever its result, after the window has been closed.
+    /// Must be called on the UI thread.
     /// </summary>
-    private void StartLineTransfer(string title, string protocolName, string verb, LineTransferRun run, Func<string> successNote = null)
+    private void StartLineTransfer(string title, string protocolName, string verb, LineTransferRun run, Func<string> successNote = null, Action afterEnd = null)
     {
         if (IsLineClaimed)
         {
@@ -1495,6 +1531,17 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     bool cancelled = transferForm.IsCancelled;
                     string lastStatus = transferForm.LastStatus;
                     transferForm.Dispose();
+                    if (afterEnd != null)
+                    {
+                        try
+                        {
+                            afterEnd();
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            // The connection is gone: nothing to tell the device.
+                        }
+                    }
                     if (success)
                     {
                         string note = successNote?.Invoke();
@@ -1532,7 +1579,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     {
         if (_isXModemActive)
         {
-            ThemedMessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM or Kermit) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ThemedMessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM, Kermit or gzip + base64) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return true;
         }
         if (_isFileSendActive)
@@ -1877,6 +1924,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
             CloseTabRequested?.Invoke(this, EventArgs.Empty);
             return;
         }
+        // The menu with the history and the snippets: Ctrl+Shift+Insert, and Ctrl+Shift+V when the settings say so.
+        if (e.Control && e.Shift && !e.Alt
+            && (e.KeyCode == Keys.Insert || (e.KeyCode == Keys.V && PasteGuard.OptionsOf(common).CtrlShiftV == PasteSettings.ShortcutAction.HistoryMenu)))
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            ShowPasteMenu();
+            return;
+        }
         if (!e.Control && e.Alt && !e.Shift && e.KeyCode == Keys.Return)
         {
             // Not a character for the device: toggle full screen like in SSH tabs.
@@ -1908,7 +1964,52 @@ public partial class DeviceTerminalControl : DpiAwareControl
         e.SuppressKeyPress = true;
     }
 
+    private enum PasteKind
+    {
+        /// <summary>Text, except in the HEX view, where text that reads as bytes is sent as bytes.</summary>
+        Auto,
+        Text,
+        HexBytes
+    }
+
     private void pasteToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        PasteToDevice(null, PasteKind.Auto);
+    }
+
+    private ToolStripMenuItem _pasteAsHexMenuItem;
+
+    private ToolStripMenuItem _pasteAsTextMenuItem;
+
+    private void AddPasteCommands()
+    {
+        ToolStripMenuItem history = new ToolStripMenuItem("Paste from history and snippets...", null, (sender, args) => ShowPasteMenu())
+        {
+            ShortcutKeyDisplayString = "Ctrl+Shift+Insert"
+        };
+        _pasteAsHexMenuItem = new ToolStripMenuItem("Paste as HEX bytes", null, (sender, args) => PasteToDevice(null, PasteKind.HexBytes))
+        {
+            ToolTipText = "The clipboard text such as DE AD BE EF is sent as bytes"
+        };
+        _pasteAsTextMenuItem = new ToolStripMenuItem("Paste as text", null, (sender, args) => PasteToDevice(null, PasteKind.Text))
+        {
+            ToolTipText = "Send the clipboard text as characters, even in the HEX view"
+        };
+        int index = contextMenuStrip1.Items.IndexOf(pasteToolStripMenuItem);
+        index = index < 0 ? contextMenuStrip1.Items.Count : index + 1;
+        contextMenuStrip1.Items.Insert(index, history);
+        contextMenuStrip1.Items.Insert(index + 1, _pasteAsHexMenuItem);
+        contextMenuStrip1.Items.Insert(index + 2, _pasteAsTextMenuItem);
+    }
+
+    /// <summary>The menu with the clipboard, the texts pasted lately and the snippets; the choice goes to the device.</summary>
+    private void ShowPasteMenu()
+    {
+        Control owner = HexMode ? hexTerminalControl1 : (Control)_serialTerminalControl;
+        PasteMenu.Show(owner, _commonSettings, null, () => PasteToDevice(null, PasteKind.Auto), text => PasteToDevice(text, PasteKind.Auto));
+    }
+
+    private void PasteToDevice(string clipboardText, PasteKind kind)
     {
         if (IsLineClaimed || (_pasteJob != null && _pasteJob.IsActive))
         {
@@ -1916,9 +2017,27 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         try
         {
-            string text = Win32Clipboard.GetText(Handle);
+            string text = clipboardText ?? Win32Clipboard.GetText(Handle);
             if (string.IsNullOrEmpty(text))
             {
+                return;
+            }
+            PasteSettings options = PasteGuard.OptionsOf(_commonSettings);
+            bool asHex = kind == PasteKind.HexBytes
+                || (kind == PasteKind.Auto && HexMode && options.HexViewPastesBytes && DeviceInputText.TryParsePastedHex(text, out _));
+            if (asHex)
+            {
+                if (!DeviceInputText.TryParsePastedHex(text, out byte[] hexBytes))
+                {
+                    ThemedMessageBox.Show("The clipboard does not hold a string of HEX bytes such as DE AD BE EF, 0xDE,0xAD or \\xDE\\xAD.", "Paste as HEX bytes", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                PasteHistory.Add(text, options.EffectiveHistorySize);
+                SendToDevice(hexBytes, hexBytes.Length);
+                if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
+                {
+                    hexTerminalControl1.AppendData(hexBytes, hexBytes.Length, isEcho: true);
+                }
                 return;
             }
             // A command wrapped by its source must not go out in pieces; every line break sends the line at once.
@@ -1934,7 +2053,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
             // the Windows form.
             string lineEnding = PasteGuard.ResolveLineBreak(_commonSettings, GetLineEnding(_deviceTerminalSettings.LineEnding) ?? "\r\n");
             text = DeviceInputText.ConvertLineEndings(text, lineEnding);
-            PasteSettings options = PasteGuard.OptionsOf(_commonSettings);
+            // A single-byte code page lacks many characters: curly quotes get their ASCII form, anything else that is
+            // missing is reported instead of reaching the device as "?".
+            text = PasteGuard.FitToEncoding(text, _textEncoding, _commonSettings, this);
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
             bool slow = _pasteMode == PasteMode.Slow || options.SlowPasteAlways;
             if (!slow && text.Length < AsyncPasteThreshold)
             {

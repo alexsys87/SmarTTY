@@ -780,6 +780,16 @@ public class SshTerminalControl : TerminalEmulatorControl
         return false;
     }
 
+    protected override int GetScreenSelectionLastLine()
+    {
+        // Ctrl+double click selects the visible output, not the command line the user is editing.
+        if (_inputLine != null)
+        {
+            return _inputLine.StartLine - 1;
+        }
+        return base.GetScreenSelectionLastLine();
+    }
+
     private bool InputWraps()
     {
         // Before the first layout there are no columns yet; rewrapping to 0 columns would never finish.
@@ -955,15 +965,6 @@ public class SshTerminalControl : TerminalEmulatorControl
             SetSelectionEnd(new TextDocument.TextPosition(((EditableTextBrowser)this).EditableDocument.GetLineText(((EditableTextBrowser)this).EditableDocument.LineCount - 1).Length, ((EditableTextBrowser)this).EditableDocument.LineCount - 1));
             SetSelection(select: true, new TextDocument.TextPosition(_inputLine.Prompt.Length, _inputLine.StartLine));
         }
-    }
-
-    protected override void AdjustSelectionEnd(ref TextDocument.TextPosition textPosition)
-    {
-        if (_inputLine != null && ((ReadonlyTextBrowser)this).HasSelection && !(SelectionEnd < _inputLine.StartPosition) && textPosition < _inputLine.StartPosition)
-        {
-            textPosition = _inputLine.StartPosition;
-        }
-        base.AdjustSelectionEnd(ref textPosition);
     }
 
     private void ShowCompletions(CompletionTrigger completionTrigger = CompletionTrigger.Normal)
@@ -1747,7 +1748,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         try
         {
             // Every command runs when its turn comes, so the confirmation and the warnings of a paste apply.
-            string text = PasteGuard.Prepare(Win32Clipboard.GetText(Handle), AppSettings, linesRunAtOnce: true, owner: this);
+            string text = PasteGuard.Prepare(ReadClipboardText(), AppSettings, linesRunAtOnce: true, owner: this);
             if (text == null)
             {
                 return false;
@@ -1967,11 +1968,11 @@ public class SshTerminalControl : TerminalEmulatorControl
         });
     }
 
-    public override void Paste()
+    public override void PasteText(string clipboardText)
     {
         if (_inputLine == null)
         {
-            base.Paste();
+            base.PasteText(clipboardText);
             return;
         }
         try
@@ -1980,7 +1981,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             // being glued together without a separator.
             // The text only lands in the command line and nothing runs until Enter, so it is cleaned and only a large
             // paste is confirmed.
-            string text = PasteGuard.Prepare(PasteGuard.ApplyMode(Win32Clipboard.GetText(Handle), PasteModeInUse), AppSettings, linesRunAtOnce: false, owner: this);
+            string text = PasteGuard.Prepare(PasteGuard.ApplyMode(clipboardText, PasteModeInUse), AppSettings, linesRunAtOnce: false, owner: this);
             text = ShellCommandLine.JoinPastedLines(text);
             if (string.IsNullOrEmpty(text))
             {

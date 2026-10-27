@@ -90,6 +90,7 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         term.DragEnter += Terminal_DragOver;
         term.DragOver += Terminal_DragOver;
         term.DragDrop += Terminal_DragDrop;
+        term.ClipboardFilesPasted += Terminal_ClipboardFilesPasted;
         WinFormsHostWrapper winFormsHostWrapper = new WinFormsHostWrapper();
         ((WindowsFormsHost)winFormsHostWrapper).Child = term;
         Control = (FrameworkElement)winFormsHostWrapper;
@@ -132,6 +133,39 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                 MessageBoxes.Exception(exception);
             }
         }));
+    }
+
+    // Files copied in Explorer and pasted into the terminal: the same upload as for dropped files, or their paths as text.
+    private void Terminal_ClipboardFilesPasted(TerminalEmulatorControl terminal, string[] files)
+    {
+        if (_Session.IsDevice || files == null || files.Length == 0)
+        {
+            return;
+        }
+        string what = files.Length == 1 ? "\"" + System.IO.Path.GetFileName(files[0]) + "\"" : files.Length + " files";
+        System.Windows.Forms.DialogResult answer = ThemedMessageBox.Show(
+            terminal,
+            "The clipboard holds " + what + ".\n\nYes: upload to the server (like dropping the files on the terminal).\nNo: paste the local path" + (files.Length == 1 ? "" : "s") + " as text.",
+            "Paste",
+            System.Windows.Forms.MessageBoxButtons.YesNoCancel,
+            System.Windows.Forms.MessageBoxIcon.Question);
+        try
+        {
+            if (answer == System.Windows.Forms.DialogResult.Yes)
+            {
+                _Session.UploadFiles(files, this);
+            }
+            else if (answer == System.Windows.Forms.DialogResult.No)
+            {
+                // A path with a space is quoted; several paths are separated by a space.
+                string paths = string.Join(" ", System.Linq.Enumerable.Select(files, file => file.IndexOf(' ') >= 0 ? "\"" + file + "\"" : file));
+                terminal.PasteText(paths);
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
     }
 
     public void OnSessionInactiveChanged(bool isInactive)

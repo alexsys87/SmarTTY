@@ -68,8 +68,16 @@ jobs:
       - name: Run paste checks (control characters, typographic characters, line breaks, dangerous commands)
         run: dotnet run --project tests/PasteSanitizerTests -c Release
 
+      - name: Run paste history and encoding checks (history order and capacity, characters a code page lacks)
+        run: |
+          dotnet run --project tests/PasteHistoryTests -c Release
+          dotnet run --project tests/PasteEncodingTests -c Release
+
       - name: Run Smart Terminal command line checks (tokens, completion target, quoting, paste, export, shell selection)
         run: dotnet run --project tests/SmartTerminalCommandLineTests -c Release
+
+      - name: Run saved connection lookup checks (user@host from the command line)
+        run: dotnet run --project tests/ConnectionLookupTests -c Release
 
       - name: Run ls output parser checks
         run: dotnet run --project tests/LsOutputParserTests -c Release
@@ -85,6 +93,9 @@ jobs:
 
       - name: Run COM/TCP input and transfer rate checks
         run: dotnet run --project tests/DeviceInputTextTests -c Release
+
+      - name: Run COM/TCP terminal state checks (prompt and full-screen program in the status bar)
+        run: dotnet run --project tests/DeviceTerminalStateTests -c Release
 
       - name: Run transport write failure checks
         run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
@@ -113,11 +124,23 @@ jobs:
       - name: Run editor text model and syntax highlighting checks
         run: dotnet run --project tests/EditorTextTests -c Release
 
+      - name: Run editor autocompletion checks
+        run: dotnet run --project tests/EditorCompletionTests -c Release
+
+      - name: Run editor parameter hint checks
+        run: dotnet run --project tests/EditorSignatureTests -c Release
+
+      - name: Run API symbol checks
+        run: dotnet run --project tests/ApiSymbolTests -c Release
+
       - name: Run editor tool bar command state checks
         run: dotnet run --project tests/EditorCommandStateTests -c Release
 
       - name: Run editor search, encoding and line ending checks
         run: dotnet run --project tests/EditorTextFormatTests -c Release
+
+      - name: Run hex editor checks
+        run: dotnet run --project tests/HexEditorTests -c Release
 
       - name: Run local OpenWrt repository checks (opkg and apk feeds, HTTP server, feed scripts, signature check, tunnel host)
         run: dotnet run --project tests/LocalRepoTests -c Release
@@ -125,8 +148,17 @@ jobs:
       - name: Run VcXsrv setup checks (installer selection from the GitHub release data)
         run: dotnet run --project tests/VcxsrvSetupTests -c Release
 
+      - name: Run theme palette checks (matching keys and WCAG contrast for every theme)
+        run: dotnet run --project tests/ThemePaletteTests -c Release
+
+      - name: Run folder synchronization settings checks (direction, options, exclusion masks)
+        run: dotnet run --project tests/SyncRequestTests -c Release
+
+      - name: Run icon resource checks (every Icons.Load name is embedded, no .resx left)
+        run: dotnet run --project tests/IconResourceTests -c Release
+
   interop:
-    name: File transfer interoperability (lrzsz, C-Kermit, G-Kermit)
+    name: File transfer interoperability (lrzsz, C-Kermit, G-Kermit, gzip + base64 through BusyBox ash and bash)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -138,7 +170,7 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Install lrzsz, C-Kermit and G-Kermit
-        run: sudo apt-get update && sudo apt-get install -y lrzsz ckermit gkermit python3
+        run: sudo apt-get update && sudo apt-get install -y lrzsz ckermit gkermit python3 socat busybox-static sharutils
 
       - name: Build the command line clients
         run: |
@@ -150,6 +182,9 @@ jobs:
 
       - name: Kermit against C-Kermit and G-Kermit (sliding windows, clean and noisy lines)
         run: python3 tests/KermitInterop/run_interop.py
+
+      - name: gzip + base64 transfer through a real shell on a pseudo terminal (BusyBox ash as on OpenWrt, bash; damaged data, cancel, no echo)
+        run: dotnet run --project tests/GzipBase64TransferTests -c Release
 
   sshnet:
     name: SSH.NET integration tests

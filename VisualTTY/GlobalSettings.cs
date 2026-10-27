@@ -79,7 +79,23 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public bool ShowLineNumbers;
 
+        // A grey line under each tab character, to tell tab-indented lines from space-indented ones.
+        public bool ShowTabs;
+
+        // Marks for spaces, tabs, line ends and other characters that would otherwise leave no ink (see ShowTabs).
+        public bool ShowAllCharacters;
+
         public bool SyntaxHighlighting;
+
+        // The editor offers words (keywords and identifiers of the file) while typing; Ctrl+Space opens the list.
+        public bool Autocompletion;
+
+        // The completion popup also opens by itself after a couple of letters of an identifier.
+        public bool AutocompletionOnTyping;
+
+        // The completion list and the parameter hint also offer the standard API symbols of the language
+        // (Python builtins, the C library, the shell builtins, ...) from ApiSymbols.xml.
+        public bool ApiSymbols;
 
         // Tab and indentation insert TabSize spaces instead of a tab character.
         public bool InsertSpaces;
@@ -93,7 +109,9 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public EditorColors GetEffectiveColors(SmarTTYTheme theme)
         {
-            if (theme != SmarTTYTheme.Dark)
+            // The editor colours come in a dark and a light family, not one per palette: the dark themes edit with
+            // the dark family, the light ones (Light, Solarized Light, Sepia) with the light family.
+            if (theme.IsLight())
             {
                 return LightColors;
             }
@@ -143,6 +161,12 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public float FontSize;
 
+    /// <summary>Bold variant of the terminal font, chosen in the font picker.</summary>
+    public bool FontBold;
+
+    /// <summary>Italic variant of the terminal font, chosen in the font picker.</summary>
+    public bool FontItalic;
+
     public bool ShowMinimalisticModeWarning = true;
 
     public ConsolePalette PaletteOverride;
@@ -154,7 +178,10 @@ public class GlobalSettings : INotifyPropertyChanged
         LightColors = EditorColors.LightColors,
         TabSize = 4,
         ShowLineNumbers = true,
-        SyntaxHighlighting = true
+        SyntaxHighlighting = true,
+        Autocompletion = true,
+        AutocompletionOnTyping = false,
+        ApiSymbols = true
     };
 
     public int LargeBlockCutoffPoint = 1048576;
@@ -247,8 +274,19 @@ public class GlobalSettings : INotifyPropertyChanged
         }
     }
 
+    /// <summary>The bold/italic variant chosen in the font picker.</summary>
     [XmlIgnore]
-    public Font EffectiveFont => new Font(string.IsNullOrEmpty(FontName) ? "Courier New" : FontName, (FontSize == 0f) ? 12f : FontSize);
+    public FontStyle FontVariant => (FontBold ? FontStyle.Bold : FontStyle.Regular) | (FontItalic ? FontStyle.Italic : FontStyle.Regular);
+
+    [XmlIgnore]
+    public Font EffectiveFont => new Font(string.IsNullOrEmpty(FontName) ? "Courier New" : FontName, (FontSize == 0f) ? 12f : FontSize, FontVariant);
+
+    /// <summary>
+    /// The configured terminal font, or null when nothing is configured — the caller then keeps its own default
+    /// instead of overriding it with Courier New.
+    /// </summary>
+    [XmlIgnore]
+    public Font ConfiguredFont => (string.IsNullOrEmpty(FontName) || FontSize == 0f) ? null : new Font(FontName, FontSize, FontVariant);
 
     public bool ShowUnrecognizedCharactersAsHex { get; set; }
 
@@ -272,6 +310,12 @@ public class GlobalSettings : INotifyPropertyChanged
     public bool CompletionTriggersMigratedV2 { get; set; }
 
     public bool SyntaxHighlightingMigrated { get; set; }
+
+    public bool ShowTabsMigrated { get; set; }
+
+    public bool EditorAutocompletionMigrated { get; set; }
+
+    public bool EditorApiSymbolsMigrated { get; set; }
 
     [XmlIgnore]
     public EditorSettingsWrapper EditorWrapper { get; }
@@ -400,6 +444,7 @@ public class GlobalSettings : INotifyPropertyChanged
     private void FixDefaults()
     {
         Paste ??= new PasteSettings();
+        Paste.Snippets ??= new System.Collections.Generic.List<PasteSnippet>();
         if (DefaultTextColor.Alpha == 0)
         {
             DefaultTextColor = TerminalEmulatorControl.DefaultTextColor;
@@ -424,6 +469,31 @@ public class GlobalSettings : INotifyPropertyChanged
             // once for existing configurations; it can be switched off in Settings afterwards.
             Editor.SyntaxHighlighting = true;
             SyntaxHighlightingMigrated = true;
+            Save();
+        }
+        if (!ShowTabsMigrated)
+        {
+            // The tab underline is a new setting: turn it on once for existing configurations,
+            // as the feature is meant to be visible by default and can be switched off in Settings afterwards.
+            Editor.ShowTabs = true;
+            ShowTabsMigrated = true;
+            Save();
+        }
+        if (!EditorAutocompletionMigrated)
+        {
+            // Settings files written before the editor completion existed have no <Autocompletion>
+            // element, so XmlSerializer leaves the flag false: turn the feature on once for existing
+            // configurations; it can be switched off in Settings afterwards.
+            Editor.Autocompletion = true;
+            EditorAutocompletionMigrated = true;
+            Save();
+        }
+        if (!EditorApiSymbolsMigrated)
+        {
+            // The API symbols are a new setting: turn them on once for existing configurations,
+            // as the feature is meant to be visible by default and can be switched off in Settings afterwards.
+            Editor.ApiSymbols = true;
+            EditorApiSymbolsMigrated = true;
             Save();
         }
         if (!CompletionTriggersMigratedV2)

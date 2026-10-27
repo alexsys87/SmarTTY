@@ -285,6 +285,16 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         Controller.MenuCommandHandlers.UploadDir();
     }
 
+    private void CopyDirBetweenHosts_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.MenuCommandHandlers.CopyDirBetweenHosts();
+    }
+
+    private void Synchronize_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.MenuCommandHandlers.Synchronize();
+    }
+
     private void PublicKey_Click(object sender, RoutedEventArgs e)
     {
         Controller.MenuCommandHandlers.SetupPublicKey();

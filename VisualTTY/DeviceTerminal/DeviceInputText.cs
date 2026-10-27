@@ -145,6 +145,63 @@ public static class DeviceInputText
         return result.ToString();
     }
 
+    /// <summary>
+    /// Reads pasted text as a string of bytes: what <see cref="ParseHex"/> reads ("DE AD BE EF", "0xDE,0xAD", "DE:AD",
+    /// "DEADBEEF") plus the forms found in code and logs: "\xDE\xAD" and a C array in braces, brackets or parentheses.
+    /// Anything else, ordinary text above all, is not bytes: false. A group of several digits must have an even number of
+    /// them ("123" is more likely a number than the bytes 12 03).
+    /// </summary>
+    public static bool TryParsePastedHex(string text, out byte[] bytes)
+    {
+        bytes = null;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+        StringBuilder cleaned = new StringBuilder(text.Length);
+        for (int i = 0; i < text.Length; i++)
+        {
+            char ch = text[i];
+            if (ch == '\\' && i + 1 < text.Length && (text[i + 1] == 'x' || text[i + 1] == 'X'))
+            {
+                cleaned.Append(' ');
+                i++;
+            }
+            else if (ch == '{' || ch == '}' || ch == '[' || ch == ']' || ch == '(' || ch == ')')
+            {
+                cleaned.Append(' ');
+            }
+            else
+            {
+                cleaned.Append(ch);
+            }
+        }
+        string normalized = cleaned.ToString();
+        List<string> groups = SplitHexGroups(normalized);
+        if (groups.Count == 0)
+        {
+            return false;
+        }
+        foreach (string group in groups)
+        {
+            string digits = StripHexPrefix(group);
+            if (digits.Length == 0 || (digits.Length > 1 && digits.Length % 2 != 0))
+            {
+                return false;
+            }
+        }
+        try
+        {
+            bytes = ParseHex(normalized);
+        }
+        catch (FormatException)
+        {
+            bytes = null;
+            return false;
+        }
+        return bytes.Length > 0;
+    }
+
     private static List<string> SplitHexGroups(string text)
     {
         List<string> groups = new List<string>();

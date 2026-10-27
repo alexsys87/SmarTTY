@@ -38,6 +38,8 @@ public partial class RemoteFileEditor
     internal void ReportLanguage(SyntaxHighlighting.Language language)
     {
         CurrentLanguage = language;
+        // The completion popup offers the words of the highlighted language.
+        CompletionLanguage = language;
         CurrentLanguageChanged?.Invoke(this, EventArgs.Empty);
     }
 }

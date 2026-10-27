@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The theme enum and its metadata (VisualTTY/SmarTTYTheme.cs) plus the display-name attribute it uses. -->
+    <Compile Include="../../VisualTTY/SmarTTYTheme.cs" Link="SmarTTYTheme.cs" />
+    <Compile Include="../../Utilities/EnumDisplayText.cs" Link="EnumDisplayText.cs" />
+  </ItemGroup>
+</Project>

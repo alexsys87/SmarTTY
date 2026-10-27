@@ -69,6 +69,19 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     private SignatureHintController _signatureHintController;
 
+    // The name of the signature the hint currently shows, so typing inside one call does not rebuild it.
+    private string _signatureHintName;
+
+    private SyntaxHighlighting.Language _completionLanguage = SyntaxHighlighting.Language.Plain;
+
+    private bool _completionEnabled = true;
+
+    private bool _completionOnTyping;
+
+    // The standard API symbols (Python builtins, the C library, the shell builtins, ...). Null when the
+    // feature is switched off, so nothing is loaded and the completion list stays keywords + document words.
+    private ApiSymbolDatabase _apiSymbols;
+
     private bool _suppressHintClose;
 
     internal TabHandler _tabHandler;
@@ -117,7 +130,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             {
                 return null;
             }
-            return base.EditableDocument.GetLineText(CaretPosition.Line);
+            // The identifier being typed: the completion popup filters its list by it.
+            return GetWordAtCaret(out int ignoredColumn, out int ignoredLength) ?? "";
         }
     }
 
@@ -189,6 +203,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         VirtualLineProviders.Add(_inlineMessageProvider);
         VirtualLineProviders.Add(_foldingManager);
         AddMargin(new FoldingManager.FoldingMargin(_foldingManager));
+        // The completion popup reads its images from this list; the editor shows words without icons.
+        ImageList = new ImageList();
+        ImageList.ImageSize = new Size(16, 16);
+        ImageList.ColorDepth = ColorDepth.Depth32Bit;
+        SuggestionAccepted += OnSuggestionAccepted;
     }
 
     protected override void OnTextReplaced()
@@ -416,6 +435,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
         if (e.KeyCode == Keys.Escape)
         {
+            HideCompletion();
             HideSignatureHint();
             if (_hoverControl != null)
             {
@@ -424,6 +444,19 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             }
         }
         base.OnKeyDown(e);
+        switch (e.KeyCode)
+        {
+            case Keys.Left:
+            case Keys.Right:
+            case Keys.Up:
+            case Keys.Down:
+            case Keys.Home:
+            case Keys.End:
+            case Keys.Back:
+            case Keys.Delete:
+                UpdateSignatureHint();
+                break;
+        }
     }
 
     public void AcceptSuggestion(ISuggestion suggestion, Keys keys)
@@ -447,6 +480,127 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             {
                 WndProc(ref message);
             }
+        }
+    }
+
+    /// <summary>The words of this language are offered by the completion popup (set by the code that picks the tokenizer).</summary>
+    public SyntaxHighlighting.Language CompletionLanguage
+    {
+        get
+        {
+            return _completionLanguage;
+        }
+        set
+        {
+            _completionLanguage = value;
+            if (_suggestionController != null && _suggestionController.IsVisible)
+            {
+                HideCompletion();
+            }
+        }
+    }
+
+    /// <summary>Enables the completion popup (Ctrl+Space and, with <see cref="CompletionOnTyping"/>, typing).</summary>
+    public bool CompletionEnabled
+    {
+        get
+        {
+            return _completionEnabled;
+        }
+        set
+        {
+            _completionEnabled = value;
+            if (!value)
+            {
+                HideCompletion();
+            }
+        }
+    }
+
+    /// <summary>Opens the popup by itself once a couple of letters of an identifier have been typed.</summary>
+    public bool CompletionOnTyping
+    {
+        get
+        {
+            return _completionOnTyping;
+        }
+        set
+        {
+            _completionOnTyping = value;
+        }
+    }
+
+    /// <summary>The number of typed letters that open the popup by themselves.</summary>
+    private const int AutoTriggerLength = 2;
+
+    /// <summary>
+    /// The standard API symbols offered in the completion list and used by the parameter hint. Set from
+    /// the settings; null switches the feature off (keywords and document words only).
+    /// </summary>
+    public ApiSymbolDatabase ApiSymbols
+    {
+        get
+        {
+            return _apiSymbols;
+        }
+        set
+        {
+            _apiSymbols = value;
+        }
+    }
+
+    /// <summary>Shows the completion popup for the word the caret is in (Ctrl+Space, or typing).</summary>
+    public void ShowCompletion()
+    {
+        if (!_completionEnabled || base.EditableDocument == null)
+        {
+            return;
+        }
+        // The whole list is passed to the popup: it narrows itself down to the typed prefix, and can widen
+        // again when letters are deleted, which a list filtered here could not.
+        List<ISuggestion> items = EditorCompletionSource.Build(_completionLanguage, base.EditableDocument.GetText(), "", _apiSymbols);
+        if (items.Count == 0)
+        {
+            return;
+        }
+        HideSignatureHint();
+        ShowSuggestions(items);
+    }
+
+    /// <summary>Hides the completion popup, if it is open.</summary>
+    public void HideCompletion()
+    {
+        if (_suggestionController != null)
+        {
+            _suggestionController.Hide();
+        }
+    }
+
+    /// <summary>The user accepted an item of the popup: the word replaces the one at the caret.</summary>
+    private void OnSuggestionAccepted(CodeEditorPP codeEditorPP, ISuggestion suggestion, Keys keys)
+    {
+        if (suggestion != null)
+        {
+            ReplaceWordAtCaret(suggestion.DisplayName);
+        }
+    }
+
+    protected override void OnCharTyped(char ch, TextDocument.TextPosition textPosition)
+    {
+        base.OnCharTyped(ch, textPosition);
+        if (_completionOnTyping && _completionEnabled && !IsSuggestionVisible
+            && EditorCompletionSource.IsIdentifierChar(ch) && (Control.ModifierKeys & Keys.Control) == 0)
+        {
+            string word = CurrentText;
+            if (word != null && word.Length >= AutoTriggerLength)
+            {
+                ShowCompletion();
+            }
+        }
+        // Only these characters change the call the caret is in; other letters leave the hint alone.
+        if (ch == '(' || ch == ',' || ch == ')')
+        {
+            UpdateSignatureHint();
         }
     }
 
@@ -497,11 +651,46 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     public void HideSignatureHint()
     {
+        _signatureHintName = null;
         if (_signatureHintController != null)
         {
             _signatureHintController.Hide();
             _signatureHintController = null;
         }
+    }
+
+    /// <summary>
+    /// Shows, updates or hides the parameter hint for the call the caret is inside. The definitions are
+    /// read from the document, so the hint appears as soon as an opening parenthesis is typed after a
+    /// function the file defines.
+    /// </summary>
+    private void UpdateSignatureHint()
+    {
+        if (!_completionEnabled || base.EditableDocument == null || CaretPosition.Line < 0)
+        {
+            HideSignatureHint();
+            return;
+        }
+        // The word list and the parameter hint would overlap; the list wins while it is open.
+        if (IsSuggestionVisible)
+        {
+            HideSignatureHint();
+            return;
+        }
+        ParameterSignature signature = EditorSignatureSource.FindSignature(
+            _completionLanguage, base.EditableDocument.GetText(), CaretPosition.Line, CaretPosition.Column, _apiSymbols, out int activeParameter);
+        if (signature == null)
+        {
+            HideSignatureHint();
+            return;
+        }
+        if (IsSignatureHintVisible && _signatureHintName == signature.Name)
+        {
+            SetActiveParameter(activeParameter);
+            return;
+        }
+        ShowSignatureHint(signature, activeParameter, null);
+        _signatureHintName = signature.Name;
     }
 
     protected virtual bool IsWordSeparator(char ch)
@@ -522,7 +711,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     {
         if (_suggestionController != null && _suggestionController.IsVisible)
         {
-            string text = GetCurrentTokenText();
+            string text = CurrentText;
             if (text != null && text.Length > 0 && text[0] >= '0' && text[0] <= '9')
             {
                 _suggestionController.Hide();

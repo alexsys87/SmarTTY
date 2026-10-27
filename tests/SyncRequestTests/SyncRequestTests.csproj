@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <RootNamespace>SmarTTY.Sync.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The real synchronization settings builder and the filter classes it compiles the masks with, so the checks
+         run against the same code the window uses. The Win32-backed file access stays out: only the settings are built. -->
+    <Compile Include="../../Sync/SyncRequest.cs" Link="Sync/SyncRequest.cs" />
+    <Compile Include="../../Sync/SyncSettings.cs" Link="Sync/SyncSettings.cs" />
+    <Compile Include="../../Sync/SyncDirection.cs" Link="Sync/SyncDirection.cs" />
+    <Compile Include="../../Sync/SyncOptions.cs" Link="Sync/SyncOptions.cs" />
+    <Compile Include="../../Sync/ClockOffsetInfo.cs" Link="Sync/ClockOffsetInfo.cs" />
+    <Compile Include="../../Ssh/QuickSync/QuickSyncFilter.cs" Link="Ssh/QuickSync/QuickSyncFilter.cs" />
+    <Compile Include="../../Ssh/QuickSync/QuickSyncAction.cs" Link="Ssh/QuickSync/QuickSyncAction.cs" />
+    <Compile Include="../../Ssh/QuickSync/QuickSyncOverwriteTrigger.cs" Link="Ssh/QuickSync/QuickSyncOverwriteTrigger.cs" />
+    <Compile Include="../../Ssh/QuickSync/WildcardParser.cs" Link="Ssh/QuickSync/WildcardParser.cs" />
+    <Compile Include="../../Ssh/QuickSync/MaskSpec.cs" Link="Ssh/QuickSync/MaskSpec.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="IO/RemotePathUtils.cs" />
+    <Compile Include="../../Utilities/DataExtensions.cs" Link="Utilities/DataExtensions.cs" />
+  </ItemGroup>
+</Project>

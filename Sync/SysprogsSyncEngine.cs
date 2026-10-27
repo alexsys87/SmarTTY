@@ -12,14 +12,6 @@ namespace SmarTTY.Sync;
 
 internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 {
-    public class SysprogsSyncException : Exception
-    {
-        public SysprogsSyncException(string message)
-            : base(message)
-        {
-        }
-    }
-
     private enum SessionMode
     {
         Download,
@@ -281,8 +273,6 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
     {
         private ManualResetEvent _exitEvent = new ManualResetEvent(initialState: false);
 
-        private SysprogsSyncEngine _engine;
-
         private LineSplitter _lineSplitter = new LineSplitter();
 
         private List<byte> _pending = new List<byte>();
@@ -297,9 +287,8 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 
         public event Action<int, int> ActionFailedReceived;
 
-        public SysprogsSyncOutputParser(SysprogsSyncEngine sysprogsSyncEngine, SshShellChannel sshShellChannel)
+        public SysprogsSyncOutputParser(SshShellChannel sshShellChannel)
         {
-            _engine = sysprogsSyncEngine;
             sshShellChannel.DataReceived += OnDataReceived;
             sshShellChannel.Finished += OnFinished;
             sshShellChannel.PollingEnabled = true;
@@ -462,7 +451,7 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
             fileStamps = new LocalFileSystem.FileStamp[localPaths.Count];
             symlinkDict = new Dictionary<int, KeyValuePair<string, string>>();
         }
-        SysprogsSyncOutputParser outputParser = new SysprogsSyncOutputParser(this, _channel);
+        SysprogsSyncOutputParser outputParser = new SysprogsSyncOutputParser(_channel);
         outputParser.StderrLine += (string line) =>
         {
             _events?.OnWarning(new SyncWarning

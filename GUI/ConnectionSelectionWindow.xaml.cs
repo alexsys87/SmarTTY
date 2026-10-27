@@ -919,11 +919,27 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 ConnectWithSettings(new SettingsWrappers.SSH(conn: (Job = XmlStorage.LoadFromFile<SmarTTYJob>(defaultItemName.Substring(5), new Type[0])).Settings, mgr: _Connections));
                 return;
             }
-            IConnectionSettingsWrapper connectionSettingsWrapper = FilteredSettings.FirstOrDefault((IConnectionSettingsWrapper candidate) => candidate.Title == defaultItemName);
+            IConnectionSettingsWrapper connectionSettingsWrapper = FindByCommandLine(defaultItemName);
             if (connectionSettingsWrapper != null)
             {
                 ConnectWithSettings(connectionSettingsWrapper);
             }
+        }
+
+        /// <summary>
+        /// Looks up the saved connection named on the command line. A title matches first, exactly as before; a
+        /// <c>user@host</c> argument that names no saved entry directly is then looked up by host and user (and by
+        /// host alone), so a profile saved under another name or case can still be opened the way <c>ssh</c> does.
+        /// </summary>
+        private IConnectionSettingsWrapper FindByCommandLine(string name)
+        {
+            IConnectionSettingsWrapper byTitle = FilteredSettings.FirstOrDefault((IConnectionSettingsWrapper candidate) => candidate.Title == name);
+            if (byTitle != null)
+            {
+                return byTitle;
+            }
+            SSHConnectionSettings connection = _Connections.FindSshConnectionForArgument(name);
+            return connection == null ? null : new SettingsWrappers.SSH(_Connections, connection);
         }
 
         private void UpdateMachineStates(IEnumerable<IConnectionSettingsWrapper> settings)

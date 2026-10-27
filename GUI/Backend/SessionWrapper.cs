@@ -384,6 +384,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public bool IsRoot => Settings.UserName == "root";
 
+    public bool AutoConfirmSudo => Settings?.AutoConfirmSudo ?? false;
+
     public event PropertyChangedEventHandler PropertyChanged;
 
     public void RaiseHideHeadersChanged()

@@ -36,6 +36,7 @@ internal static class Program
             Console.WriteLine("Using the test server at " + environment.Host + ":" + environment.Port + " as " + environment.User);
             SshIntegrationTests.Run(environment);
             FileTransferManagerTests.Run(environment);
+            HostToHostCopyTests.Run(environment);
             X11ForwardingTests.RunLive(environment);
         }
         else

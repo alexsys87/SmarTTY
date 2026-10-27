@@ -63,7 +63,8 @@ internal partial class SuggestionListForm
 		FormBorderStyle = FormBorderStyle.None;
 		Name = "SuggestionListForm";
 		ShowIcon = false;
-		ShowInTaskbar = true;
+		// A completion popup must not add a button to the taskbar.
+		ShowInTaskbar = false;
 		Text = "SuggestionList";
 		Deactivate += SuggestionListForm_Deactivate;
 		Activated += SuggestionListForm_Activated;

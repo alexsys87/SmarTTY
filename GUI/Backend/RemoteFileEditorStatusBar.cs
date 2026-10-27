@@ -18,8 +18,6 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
 {
     private readonly RemoteFileEditor _editor;
 
-    private readonly RemoteFileEditorPanel _panel;
-
     private readonly TextBlock _path = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis };
 
     private readonly TextBlock _state = new TextBlock();
@@ -39,7 +37,10 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
     public RemoteFileEditorStatusBar(RemoteFileEditor editor, RemoteFileEditorPanel panel)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
-        _panel = panel ?? throw new ArgumentNullException(nameof(panel));
+        if (panel == null)
+        {
+            throw new ArgumentNullException(nameof(panel));
+        }
         _encodingButton = CreateMenuButton(ShowEncodingMenu);
         _lineEndingButton = CreateMenuButton(ShowLineEndingMenu);
         _syntaxButton = CreateMenuButton(ShowSyntaxMenu);
@@ -93,7 +94,9 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
 
     private void Update()
     {
-        bool loading = _editor.ReadOnly && !_editor.IsReadOnlyMode;
+        bool hex = _editor.IsHexMode;
+        bool readOnly = hex ? _editor.HexEditor.ReadOnly : _editor.ReadOnly;
+        bool loading = readOnly && !_editor.IsReadOnlyMode;
         _state.Text = EditorStatusText.State(loading, _editor.IsReadOnlyMode, _editor.IsSaving, _editor.IsModified, _editor.IsNewFile);
         if (_editor.IsModified || _editor.IsSaving)
         {
@@ -107,42 +110,67 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
         _path.Text = _editor.IsPreview ? (_editor.RemotePath + " (the beginning of the file)") : _editor.RemotePath;
         _path.ToolTip = _editor.RemotePath;
 
-        TextDocument.TextPosition caret = _editor.CaretPosition;
-        _position.Text = EditorStatusText.Position(caret.Line, caret.Column);
-
-        int selectedLength = GetSelectionLength(out int selectedLines);
-        _selectionItem.Visibility = (selectedLength > 0) ? Visibility.Visible : Visibility.Collapsed;
-        if (selectedLength > 0)
+        if (hex)
         {
-            _selection.Text = EditorStatusText.Selection(selectedLength, selectedLines);
+            HexEditorControl hexEditor = _editor.HexEditor;
+            _position.Text = EditorStatusText.HexPosition(hexEditor.CaretOffset, hexEditor.Length, hexEditor.InsertMode);
+            _position.ToolTip = "Byte offset of the caret, the size of the file, and the typing mode (Insert toggles it)";
+            int selectedBytes = hexEditor.SelectionLength;
+            _selectionItem.Visibility = (selectedBytes > 0) ? Visibility.Visible : Visibility.Collapsed;
+            if (selectedBytes > 0)
+            {
+                _selection.Text = EditorStatusText.HexSelection(selectedBytes);
+                _selection.ToolTip = "The selected bytes";
+            }
+        }
+        else
+        {
+            TextDocument.TextPosition caret = _editor.CaretPosition;
+            _position.Text = EditorStatusText.Position(caret.Line, caret.Column);
+            _position.ToolTip = "Line and column of the caret";
+
+            int selectedLength = GetSelectionLength(out int selectedLines);
+            _selectionItem.Visibility = (selectedLength > 0) ? Visibility.Visible : Visibility.Collapsed;
+            if (selectedLength > 0)
+            {
+                _selection.Text = EditorStatusText.Selection(selectedLength, selectedLines);
+                _selection.ToolTip = "The selected text";
+            }
         }
 
         // A byte order mark breaks scripts and CRLF breaks shell scripts and OpenWrt configuration files: make them stand out.
         TextFileEncoding encoding = _editor.FileEncoding;
         _encodingButton.Content = encoding.DisplayName;
         bool bom = encoding == TextFileEncodings.Utf8Bom;
-        SetWarning(_encodingButton, bom);
-        _encodingButton.ToolTip = bom
-            ? "UTF-8 with a byte order mark: it breaks a script that starts with #!. Choose UTF-8 in this menu to save without it."
-            : "Encoding of the file: choose how it is saved, or read it again in another encoding";
-        _encodingButton.IsEnabled = !loading;
+        SetWarning(_encodingButton, bom && !hex);
+        _encodingButton.ToolTip = hex
+            ? "The file is shown as bytes: the encoding applies to the text view"
+            : (bom
+                ? "UTF-8 with a byte order mark: it breaks a script that starts with #!. Choose UTF-8 in this menu to save without it."
+                : "Encoding of the file: choose how it is saved, or read it again in another encoding");
+        _encodingButton.IsEnabled = !loading && !hex;
 
         SyntaxHighlighting.Language language = _editor.CurrentLanguage;
         bool automatic = _editor.SyntaxOverride == null;
         _syntaxButton.Content = SyntaxHighlighting.GetDisplayName(language);
-        _syntaxButton.ToolTip = automatic
-            ? "Syntax highlighting, detected from the file name and the #! line: click to choose another"
-            : "Syntax highlighting, chosen by hand: click to change it or to detect it automatically";
+        _syntaxButton.ToolTip = hex
+            ? "The file is shown as bytes: syntax highlighting applies to the text view"
+            : (automatic
+                ? "Syntax highlighting, detected from the file name and the #! line: click to choose another"
+                : "Syntax highlighting, chosen by hand: click to change it or to detect it automatically");
         _syntaxButton.FontStyle = automatic ? FontStyles.Normal : FontStyles.Italic;
+        _syntaxButton.IsEnabled = !hex;
 
         LineEndingKind lineEndings = _editor.LineEndings;
         _lineEndingButton.Content = LineEndingDetector.GetName(lineEndings);
         bool windowsEndings = lineEndings == LineEndingKind.CrLf || lineEndings == LineEndingKind.Mixed;
-        SetWarning(_lineEndingButton, windowsEndings);
-        _lineEndingButton.ToolTip = windowsEndings
-            ? "CRLF line endings break shell scripts and OpenWrt configuration files. Choose LF in this menu to convert them."
-            : "Line endings of the file: choose how it is saved";
-        _lineEndingButton.IsEnabled = !_editor.ReadOnly;
+        SetWarning(_lineEndingButton, windowsEndings && !hex);
+        _lineEndingButton.ToolTip = hex
+            ? "The file is shown as bytes: line endings apply to the text view"
+            : (windowsEndings
+                ? "CRLF line endings break shell scripts and OpenWrt configuration files. Choose LF in this menu to convert them."
+                : "Line endings of the file: choose how it is saved");
+        _lineEndingButton.IsEnabled = !readOnly && !hex;
     }
 
     /// <summary>The length of the selection in characters (line breaks included) and the number of lines it touches.</summary>
@@ -199,7 +227,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
             item.Click += (sender, e) =>
             {
                 _editor.SetSaveEncoding(chosen);
-                _editor.Focus();
+                _editor.FocusActiveView();
             };
             menu.Items.Add(item);
         }
@@ -215,7 +243,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
                 {
                     _editor.ReopenWithEncoding(chosen);
                 }
-                _editor.Focus();
+                _editor.FocusActiveView();
             };
             menu.Items.Add(item);
         }
@@ -235,7 +263,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
         automatic.Click += (sender, e) =>
         {
             _editor.SetSyntax(null);
-            _editor.Focus();
+            _editor.FocusActiveView();
         };
         menu.Items.Add(automatic);
         menu.Items.Add(new Separator());
@@ -250,7 +278,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
             item.Click += (sender, e) =>
             {
                 _editor.SetSyntax(chosen);
-                _editor.Focus();
+                _editor.FocusActiveView();
             };
             menu.Items.Add(item);
         }
@@ -273,7 +301,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
         item.Click += (sender, e) =>
         {
             _editor.SetLineEnding(lineEnding);
-            _editor.Focus();
+            _editor.FocusActiveView();
         };
         menu.Items.Add(item);
     }

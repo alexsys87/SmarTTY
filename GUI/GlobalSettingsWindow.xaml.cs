@@ -10,7 +10,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Forms;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Markup;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
@@ -32,7 +31,8 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
         get
         {
             Font effectiveFont = _ClonedSettings.EffectiveFont;
-            return $"{effectiveFont.Name}, Size = {effectiveFont.Size}";
+            string style = (effectiveFont.Bold ? " Bold" : string.Empty) + (effectiveFont.Italic ? " Italic" : string.Empty);
+            return $"{effectiveFont.Name}{style}, Size = {effectiveFont.Size}";
         }
     }
 
@@ -148,47 +148,23 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
 
     private void EditFont_Click(object sender, RoutedEventArgs e)
     {
-        FontDialog fontDialog = new FontDialog();
-        GlobalSettings clonedSettings = _ClonedSettings;
-        fontDialog.Font = clonedSettings.EffectiveFont;
-        if (fontDialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+        Font current = _ClonedSettings.EffectiveFont;
+        FontSelection selection = FontPickerWindow.Pick(this, current.Name, current.Size, current.Bold, current.Italic);
+        if (selection == null)
         {
             return;
         }
-        try
-        {
-            using (Graphics graphics = Graphics.FromHwnd(new WindowInteropHelper((Window)this).Handle))
-            {
-                string[] strings = new string[5] { "M", "|", ".", "l", "L" };
-                float value = graphics.MeasureString(strings[0], fontDialog.Font).Width;
-                float currentValue = value;
-                string[] items = strings;
-                foreach (string text in items)
-                {
-                    SizeF sizeF = graphics.MeasureString(text, fontDialog.Font, 32767, StringFormat.GenericTypographic);
-                    value = Math.Min(value, sizeF.Width);
-                    currentValue = Math.Max(value, sizeF.Width);
-                }
-                if (Math.Abs(value - currentValue) > 1f)
-                {
-                    MessageBoxes.Error("The font you have selected is not a monospace font. The console window requires a monospace font, e.g. Courier New.");
-                    return;
-                }
-            }
-            Font font = fontDialog.Font;
-            _ClonedSettings.FontSize = font.Size;
-            _ClonedSettings.FontName = font.Name;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SelectedFont"));
-        }
-        catch
-        {
-        }
+        _ClonedSettings.FontName = selection.FamilyName;
+        _ClonedSettings.FontSize = (float)selection.Size;
+        _ClonedSettings.FontBold = selection.Bold;
+        _ClonedSettings.FontItalic = selection.Italic;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SelectedFont"));
     }
 
     private void ResetEditorColors_Click(object sender, RoutedEventArgs e)
     {
         GlobalSettings.EditorColors colors = _ClonedSettings.EditorWrapper.Colors;
-        GlobalSettings.EditorColors defaults = (_ClonedSettings.Theme == SmarTTYTheme.Dark) ? GlobalSettings.EditorColors.DarkColors : GlobalSettings.EditorColors.LightColors;
+        GlobalSettings.EditorColors defaults = _ClonedSettings.Theme.IsLight() ? GlobalSettings.EditorColors.LightColors : GlobalSettings.EditorColors.DarkColors;
         foreach (PropertyInfo property in typeof(GlobalSettings.EditorColors).GetProperties())
         {
             if (property.CanWrite && property.PropertyType == typeof(DeviceTerminalSettings.ColorWrapper))

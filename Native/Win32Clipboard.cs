@@ -1,36 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
 
 namespace SmarTTY.Native;
 
 public class Win32Clipboard
 {
-    private enum ClipboardFormat : uint
-    {
-        Text = 1u,
-        Bitmap = 2u,
-        MetafilePict = 3u,
-        Sylk = 4u,
-        Dif = 5u,
-        Tiff = 6u,
-        OemText = 7u,
-        Dib = 8u,
-        Palette = 9u,
-        PenData = 10u,
-        Riff = 11u,
-        Wave = 12u,
-        UnicodeText = 13u,
-        EnhMetafile = 14u,
-        HDrop = 15u,
-        Locale = 16u,
-        DibV5 = 17u,
-        OwnerDisplay = 128u,
-        DspText = 129u,
-        DspBitmap = 130u,
-        DspMetafilePict = 131u,
-        DspEnhMetafile = 142u
-    }
-
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool OpenClipboard(IntPtr hWndNewOwner);
 
@@ -52,10 +29,87 @@ public class Win32Clipboard
     [DllImport("user32.dll")]
     private static extern IntPtr SetClipboardData(uint format, IntPtr hMem);
 
+    // The clipboard formats this class asks for. A dead-code cleanup removed the larger enum this came from, but the
+    // file-clipboard code below reads them by name.
+    private enum ClipboardFormat : uint
+    {
+        UnicodeText = 13u,
+        HDrop = 15u
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool IsClipboardFormatAvailable(uint format);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint DragQueryFile(IntPtr hDrop, uint iFile, StringBuilder lpszFile, uint cch);
+
+    /// <summary>
+    /// Opens the clipboard, trying again for a moment: another program (a clipboard manager, a remote desktop client)
+    /// often holds it for a few milliseconds after a copy, and a failed open used to look like an empty clipboard.
+    /// </summary>
+    private static bool OpenClipboardWithRetry(IntPtr hWnd)
+    {
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            if (OpenClipboard(hWnd))
+            {
+                return true;
+            }
+            Thread.Sleep(15);
+        }
+        return false;
+    }
+
+    /// <summary>Whether the clipboard holds files (copied or cut in Explorer).</summary>
+    public static bool HasFiles()
+    {
+        return IsClipboardFormatAvailable((uint)ClipboardFormat.HDrop);
+    }
+
+    /// <summary>Whether the clipboard holds text.</summary>
+    public static bool HasText()
+    {
+        return IsClipboardFormatAvailable((uint)ClipboardFormat.UnicodeText);
+    }
+
+    /// <summary>The full paths of the files in the clipboard, or null when it holds none.</summary>
+    public static string[] GetFiles(IntPtr hWnd)
+    {
+        if (!HasFiles() || !OpenClipboardWithRetry(hWnd))
+        {
+            return null;
+        }
+        try
+        {
+            IntPtr drop = GetClipboardData((uint)ClipboardFormat.HDrop);
+            if (drop == IntPtr.Zero)
+            {
+                return null;
+            }
+            uint count = DragQueryFile(drop, 0xFFFFFFFFu, null, 0u);
+            List<string> files = new List<string>();
+            for (uint i = 0; i < count; i++)
+            {
+                uint length = DragQueryFile(drop, i, null, 0u);
+                StringBuilder path = new StringBuilder((int)length + 1);
+                DragQueryFile(drop, i, path, length + 1);
+                if (path.Length > 0)
+                {
+                    files.Add(path.ToString());
+                }
+            }
+            return files.Count == 0 ? null : files.ToArray();
+        }
+        finally
+        {
+            CloseClipboard();
+        }
+    }
+
     public static string GetText(IntPtr hWnd)
     {
         IntPtr lockedPtr = IntPtr.Zero;
-        if (!OpenClipboard(hWnd))
+        if (!OpenClipboardWithRetry(hWnd))
         {
             return null;
         }
@@ -81,7 +135,7 @@ public class Win32Clipboard
 
     public static void SetText(IntPtr hWnd, string text)
     {
-        if (!OpenClipboard(hWnd))
+        if (!OpenClipboardWithRetry(hWnd))
         {
             throw new InvalidOperationException("Cannot open clipboard, error " + Marshal.GetLastWin32Error());
         }

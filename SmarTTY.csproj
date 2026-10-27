@@ -49,6 +49,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="VisualTTY\XTermKeys.xml" LogicalName="VisualTTY.XTermKeys.xml" />
+    <EmbeddedResource Include="Completion\ApiSymbols.xml" LogicalName="SmarTTY.Completion.ApiSymbols.xml" />
     <!-- Window icons of the WinForms dialogs, loaded by Forms/FormIcons.cs. -->
     <EmbeddedResource Include="icons\forms\*.ico" LogicalName="SmarTTY.FormIcons.%(Filename).ico" />
     <EmbeddedResource Include="app.ico" LogicalName="SmarTTY.FormIcons.app.ico" />
@@ -75,6 +76,14 @@
     <EmbeddedResource Include="icons\editor\*.png" LogicalName="SmarTTY.Icons.%(Filename).png" />
     <EmbeddedResource Include="icons\keys\locked.png" LogicalName="SmarTTY.Icons.key-locked.png" />
     <EmbeddedResource Include="icons\keys\unlocked.png" LogicalName="SmarTTY.Icons.key-unlocked.png" />
+    <!-- Images of the device terminal tool bar. -->
+    <EmbeddedResource Include="icons\terminal-disconnect.png" LogicalName="SmarTTY.Icons.terminal-disconnect.png" />
+    <EmbeddedResource Include="icons\terminal-reconnect.png" LogicalName="SmarTTY.Icons.terminal-reconnect.png" />
+    <EmbeddedResource Include="icons\terminal-send.png" LogicalName="SmarTTY.Icons.terminal-send.png" />
+    <EmbeddedResource Include="icons\terminal-clear.png" LogicalName="SmarTTY.Icons.terminal-clear.png" />
+    <EmbeddedResource Include="icons\terminal-transfer.png" LogicalName="SmarTTY.Icons.terminal-transfer.png" />
+    <EmbeddedResource Include="icons\terminal-save.png" LogicalName="SmarTTY.Icons.terminal-save.png" />
+    <EmbeddedResource Include="icons\terminal-settings.png" LogicalName="SmarTTY.Icons.terminal-settings.png" />
     <Resource Include="icons\**\*.png" />
   </ItemGroup>
 
@@ -101,9 +110,6 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\HexTerminalControl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\IndefiniteWaitControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\ReadonlySmartScrollBrowser.cs">
@@ -178,9 +184,6 @@
     <Compile Update="Controls\HexTerminalControl.Designer.cs">
       <DependentUpon>HexTerminalControl.cs</DependentUpon>
     </Compile>
-    <Compile Update="Controls\IndefiniteWaitControl.Designer.cs">
-      <DependentUpon>IndefiniteWaitControl.cs</DependentUpon>
-    </Compile>
     <Compile Update="Controls\ReadonlySmartScrollBrowser.Designer.cs">
       <DependentUpon>ReadonlySmartScrollBrowser.cs</DependentUpon>
     </Compile>
@@ -220,15 +223,6 @@
     <Compile Update="Terminal\TerminalEventDispatcher.Designer.cs">
       <DependentUpon>TerminalEventDispatcher.cs</DependentUpon>
     </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Update="Controls\DeviceTerminalControl.resx">
-      <DependentUpon>DeviceTerminalControl.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Controls\IndefiniteWaitControl.resx">
-      <DependentUpon>IndefiniteWaitControl.cs</DependentUpon>
-    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

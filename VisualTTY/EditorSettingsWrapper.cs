@@ -65,15 +65,75 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool ShowTabs
+    {
+        get
+        {
+            return _Settings.Editor.ShowTabs;
+        }
+        set
+        {
+            _Settings.Editor.ShowTabs = value;
+        }
+    }
+
+    public bool ShowAllCharacters
+    {
+        get
+        {
+            return _Settings.Editor.ShowAllCharacters;
+        }
+        set
+        {
+            _Settings.Editor.ShowAllCharacters = value;
+        }
+    }
+
+    public bool Autocompletion
+    {
+        get
+        {
+            return _Settings.Editor.Autocompletion;
+        }
+        set
+        {
+            _Settings.Editor.Autocompletion = value;
+        }
+    }
+
+    public bool AutocompletionOnTyping
+    {
+        get
+        {
+            return _Settings.Editor.AutocompletionOnTyping;
+        }
+        set
+        {
+            _Settings.Editor.AutocompletionOnTyping = value;
+        }
+    }
+
+    public bool ApiSymbols
+    {
+        get
+        {
+            return _Settings.Editor.ApiSymbols;
+        }
+        set
+        {
+            _Settings.Editor.ApiSymbols = value;
+        }
+    }
+
     public GlobalSettings.EditorColors Colors
     {
         get
         {
-            if (_Settings.Theme == SmarTTYTheme.Dark)
+            if (_Settings.Theme.IsLight())
             {
-                return _Settings.Editor.DarkColors;
+                return _Settings.Editor.LightColors;
             }
-            return _Settings.Editor.LightColors;
+            return _Settings.Editor.DarkColors;
         }
     }
 

@@ -395,6 +395,89 @@ internal static class Program
         Check(Read(telnetData2, "SavedConnections/USB Serial Port_COM3.rawconnection") == RawXml, "a raw profile without a password is imported unchanged");
 
         RunSelectablePartsChecks();
+        RunCompletionsGzipChecks();
+    }
+
+    private static byte[] Gzip(string text)
+    {
+        using (MemoryStream stream = new MemoryStream())
+        {
+            using (System.IO.Compression.GZipStream gzip = new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Compress, true))
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(text);
+                gzip.Write(bytes, 0, bytes.Length);
+            }
+            return stream.ToArray();
+        }
+    }
+
+    private static string Gunzip(string path)
+    {
+        using (FileStream file = File.OpenRead(path))
+        using (System.IO.Compression.GZipStream gzip = new System.IO.Compression.GZipStream(file, System.IO.Compression.CompressionMode.Decompress))
+        using (StreamReader reader = new StreamReader(gzip, Encoding.UTF8))
+        {
+            return reader.ReadToEnd();
+        }
+    }
+
+    // CommandCompletions.xml.gz is what SmarTTY reads when there is no plain CommandCompletions.xml (the editor can save it that way).
+    private static void RunCompletionsGzipChecks()
+    {
+        const string PlainXml = "<?xml version=\"1.0\"?><CommandCompletionDatabase><Completions><CommandCompletion><Command>plain</Command></CommandCompletion></Completions></CommandCompletionDatabase>";
+        string app = NewDir("gz-app"), data = NewDir("gz-data"), local = NewDir("gz-local");
+        string xmlPath = Path.Combine(app, "CommandCompletions.xml");
+        File.WriteAllBytes(xmlPath + ".gz", Gzip(CompletionsXml));
+        SettingsLocations loc = MakeLocations(data, local, xmlPath, null, null);
+
+        Check((SettingsArchive.Describe(loc).Available & SettingsParts.CommandCompletions) != SettingsParts.None, "describe finds CommandCompletions.xml.gz when there is no plain file");
+        string archive = Path.Combine(NewDir("gzout"), "gz.tar.gz");
+        var exported = SettingsArchive.Export(archive, loc, SettingsParts.CommandCompletions);
+        var entries = ReadArchive(archive);
+        Check(exported.FileCount == 1 && exported.NotFound.Count == 0 && entries.Count == 1 && entries[0].Name == "CommandCompletions.xml.gz", "export takes CommandCompletions.xml.gz when it is the only form");
+        Check(entries[0].Data.SequenceEqual(File.ReadAllBytes(xmlPath + ".gz")), "the gzip file is stored as it is");
+        Check(SettingsArchive.Inspect(archive).Available == SettingsParts.CommandCompletions, "inspect offers the command completions of a gzip entry");
+
+        Put(app, "CommandCompletions.xml", PlainXml);
+        string both = Path.Combine(NewDir("gzout"), "both.tar.gz");
+        SettingsArchive.Export(both, loc, SettingsParts.CommandCompletions);
+        var bothEntries = ReadArchive(both);
+        Check(bothEntries.Count == 1 && bothEntries[0].Name == "CommandCompletions.xml" && Encoding.UTF8.GetString(bothEntries[0].Data).Contains("plain"), "when both forms exist the plain file wins, as in SmarTTY");
+        File.Delete(xmlPath);
+
+        // import keeps the form of the archive and removes the other one
+        string dstApp = NewDir("gz-dstapp");
+        string dstXml = Path.Combine(dstApp, "CommandCompletions.xml");
+        Put(dstApp, "CommandCompletions.xml", PlainXml);
+        SettingsLocations dst = MakeLocations(NewDir("gz-dstdata"), NewDir("gz-dstlocal"), dstXml, null, null);
+        string backup = Path.Combine(NewDir("gzout"), "backup.tar.gz");
+        var imported = SettingsArchive.Import(archive, dst, SettingsParts.CommandCompletions, backup);
+        Check(imported.CommandCompletionsImported && File.Exists(dstXml + ".gz") && !File.Exists(dstXml) && Gunzip(dstXml + ".gz") == CompletionsXml, "a gzip entry is imported as .xml.gz and replaces the plain file");
+        Check(ReadArchive(backup).Any(e => e.Name == "CommandCompletions.xml" && Encoding.UTF8.GetString(e.Data).Contains("plain")), "the replaced plain file is in the backup");
+        var back = SettingsArchive.Import(both, dst, SettingsParts.CommandCompletions, Path.Combine(NewDir("gzout"), "backup2.tar.gz"));
+        Check(back.CommandCompletionsImported && File.Exists(dstXml) && !File.Exists(dstXml + ".gz") && File.ReadAllText(dstXml).Contains("plain"), "a plain entry is imported as .xml and replaces the gzip file");
+
+        // validation
+        string twice = Path.Combine(NewDir("gzout"), "twice.tar.gz");
+        MakeArchive(twice, E("CommandCompletions.xml", PlainXml), new KeyValuePair<string, byte[]>("CommandCompletions.xml.gz", Gzip(PlainXml)));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(twice, dst, SettingsParts.All, null), "both forms in one archive are rejected");
+        string notGzip = Path.Combine(NewDir("gzout"), "notgzip.tar.gz");
+        MakeArchive(notGzip, E("CommandCompletions.xml.gz", "this is not gzip data"));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(notGzip, dst, SettingsParts.All, null), "a gzip entry that is not gzip data is rejected");
+        string wrongRoot = Path.Combine(NewDir("gzout"), "wrongroot.tar.gz");
+        MakeArchive(wrongRoot, new KeyValuePair<string, byte[]>("CommandCompletions.xml.gz", Gzip("<GlobalSettings />")));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(wrongRoot, dst, SettingsParts.All, null), "a gzip entry with another root element is rejected");
+        string notXml = Path.Combine(NewDir("gzout"), "notxml.tar.gz");
+        MakeArchive(notXml, new KeyValuePair<string, byte[]>("CommandCompletions.xml.gz", Gzip("not xml at all")));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(notXml, dst, SettingsParts.All, null), "a gzip entry that holds no XML is rejected");
+
+        // a damaged gzip file is skipped on export instead of producing an archive that cannot be imported
+        string badApp = NewDir("gz-badapp");
+        File.WriteAllBytes(Path.Combine(badApp, "CommandCompletions.xml.gz"), new byte[] { 1, 2, 3, 4 });
+        string badData = NewDir("gz-baddata");
+        Put(badData, "Settings.xml", SettingsXml);
+        var skipped = SettingsArchive.Export(Path.Combine(NewDir("gzout"), "bad.tar.gz"), MakeLocations(badData, NewDir("gz-badlocal"), Path.Combine(badApp, "CommandCompletions.xml"), null, null), SettingsParts.MainSettings | SettingsParts.CommandCompletions);
+        Check(skipped.FileCount == 1 && skipped.Skipped.Contains("CommandCompletions.xml.gz"), "a damaged gzip file is skipped on export");
     }
 
     private sealed class FakeKeyStore : ISettingsKeyStore

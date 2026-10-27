@@ -1,0 +1,707 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApiSymbols>
+  <Symbols>
+    <Symbol language="Python" name="print" signature="print(value, sep=&#x27; &#x27;, end=&#x27;\n&#x27;, file=sys.stdout, flush=False)">
+      <Summary>Write objects to the text stream</Summary>
+    </Symbol>
+    <Symbol language="Python" name="len" signature="len(obj)">
+      <Summary>Number of items in an object</Summary>
+    </Symbol>
+    <Symbol language="Python" name="range" signature="range(start, stop, step)">
+      <Summary>Arithmetic progression of integers</Summary>
+    </Symbol>
+    <Symbol language="Python" name="open" signature="open(file, mode=&#x27;r&#x27;, encoding=None, errors=None, newline=None)">
+      <Summary>Open a file and return a file object</Summary>
+    </Symbol>
+    <Symbol language="Python" name="input" signature="input(prompt=&#x27;&#x27;)">
+      <Summary>Read a line from the standard input</Summary>
+    </Symbol>
+    <Symbol language="Python" name="str" signature="str(object=&#x27;&#x27;)">
+      <Summary>Text representation of an object</Summary>
+    </Symbol>
+    <Symbol language="Python" name="int" signature="int(x, base=10)">
+      <Summary>Integer number</Summary>
+    </Symbol>
+    <Symbol language="Python" name="float" signature="float(x)">
+      <Summary>Floating point number</Summary>
+    </Symbol>
+    <Symbol language="Python" name="complex" signature="complex(real, imag)">
+      <Summary>Complex number</Summary>
+    </Symbol>
+    <Symbol language="Python" name="bool" signature="bool(x=False)">
+      <Summary>Boolean value</Summary>
+    </Symbol>
+    <Symbol language="Python" name="list" signature="list(iterable=())">
+      <Summary>New list</Summary>
+    </Symbol>
+    <Symbol language="Python" name="tuple" signature="tuple(iterable=())">
+      <Summary>New tuple</Summary>
+    </Symbol>
+    <Symbol language="Python" name="dict" signature="dict(**kwargs)">
+      <Summary>New dictionary</Summary>
+    </Symbol>
+    <Symbol language="Python" name="set" signature="set(iterable=())">
+      <Summary>New set</Summary>
+    </Symbol>
+    <Symbol language="Python" name="frozenset" signature="frozenset(iterable=())">
+      <Summary>New immutable set</Summary>
+    </Symbol>
+    <Symbol language="Python" name="bytes" signature="bytes(source, encoding, errors)">
+      <Summary>Immutable sequence of bytes</Summary>
+    </Symbol>
+    <Symbol language="Python" name="bytearray" signature="bytearray(source, encoding, errors)">
+      <Summary>Mutable sequence of bytes</Summary>
+    </Symbol>
+    <Symbol language="Python" name="enumerate" signature="enumerate(iterable, start=0)">
+      <Summary>Index and value pairs</Summary>
+    </Symbol>
+    <Symbol language="Python" name="zip" signature="zip(*iterables)">
+      <Summary>Pair the items of the iterables</Summary>
+    </Symbol>
+    <Symbol language="Python" name="map" signature="map(function, *iterables)">
+      <Summary>Apply a function to every item</Summary>
+    </Symbol>
+    <Symbol language="Python" name="filter" signature="filter(function, iterable)">
+      <Summary>Keep the items the function accepts</Summary>
+    </Symbol>
+    <Symbol language="Python" name="reversed" signature="reversed(sequence)">
+      <Summary>Iterate in reverse order</Summary>
+    </Symbol>
+    <Symbol language="Python" name="sorted" signature="sorted(iterable, key=None, reverse=False)">
+      <Summary>New sorted list</Summary>
+    </Symbol>
+    <Symbol language="Python" name="sum" signature="sum(iterable, start=0)">
+      <Summary>Sum of the items</Summary>
+    </Symbol>
+    <Symbol language="Python" name="min" signature="min(iterable, key=None, default=None)">
+      <Summary>Smallest item</Summary>
+    </Symbol>
+    <Symbol language="Python" name="max" signature="max(iterable, key=None, default=None)">
+      <Summary>Largest item</Summary>
+    </Symbol>
+    <Symbol language="Python" name="abs" signature="abs(x)">
+      <Summary>Absolute value</Summary>
+    </Symbol>
+    <Symbol language="Python" name="round" signature="round(number, ndigits=None)">
+      <Summary>Round to the nearest value</Summary>
+    </Symbol>
+    <Symbol language="Python" name="pow" signature="pow(base, exp, mod=None)">
+      <Summary>Raise to a power</Summary>
+    </Symbol>
+    <Symbol language="Python" name="divmod" signature="divmod(a, b)">
+      <Summary>Quotient and remainder</Summary>
+    </Symbol>
+    <Symbol language="Python" name="repr" signature="repr(obj)">
+      <Summary>String representation for debugging</Summary>
+    </Symbol>
+    <Symbol language="Python" name="type" signature="type(object)">
+      <Summary>Type of an object</Summary>
+    </Symbol>
+    <Symbol language="Python" name="isinstance" signature="isinstance(object, classinfo)">
+      <Summary>Type test</Summary>
+    </Symbol>
+    <Symbol language="Python" name="issubclass" signature="issubclass(cls, classinfo)">
+      <Summary>Subclass test</Summary>
+    </Symbol>
+    <Symbol language="Python" name="hasattr" signature="hasattr(object, name)">
+      <Summary>Attribute test</Summary>
+    </Symbol>
+    <Symbol language="Python" name="getattr" signature="getattr(object, name, default)">
+      <Summary>Read an attribute</Summary>
+    </Symbol>
+    <Symbol language="Python" name="setattr" signature="setattr(object, name, value)">
+      <Summary>Set an attribute</Summary>
+    </Symbol>
+    <Symbol language="Python" name="delattr" signature="delattr(object, name)">
+      <Summary>Delete an attribute</Summary>
+    </Symbol>
+    <Symbol language="Python" name="callable" signature="callable(object)">
+      <Summary>Callable test</Summary>
+    </Symbol>
+    <Symbol language="Python" name="iter" signature="iter(object)">
+      <Summary>Iterator of an object</Summary>
+    </Symbol>
+    <Symbol language="Python" name="next" signature="next(iterator, default)">
+      <Summary>Next item of an iterator</Summary>
+    </Symbol>
+    <Symbol language="Python" name="format" signature="format(value, format_spec)">
+      <Summary>Format a value as text</Summary>
+    </Symbol>
+    <Symbol language="Python" name="chr" signature="chr(i)">
+      <Summary>Character of a code point</Summary>
+    </Symbol>
+    <Symbol language="Python" name="ord" signature="ord(c)">
+      <Summary>Code point of a character</Summary>
+    </Symbol>
+    <Symbol language="Python" name="hex" signature="hex(number)">
+      <Summary>Hexadecimal text of an integer</Summary>
+    </Symbol>
+    <Symbol language="Python" name="oct" signature="oct(number)">
+      <Summary>Octal text of an integer</Summary>
+    </Symbol>
+    <Symbol language="Python" name="bin" signature="bin(number)">
+      <Summary>Binary text of an integer</Summary>
+    </Symbol>
+    <Symbol language="Python" name="id" signature="id(object)">
+      <Summary>Identity of an object</Summary>
+    </Symbol>
+    <Symbol language="Python" name="hash" signature="hash(object)">
+      <Summary>Hash value</Summary>
+    </Symbol>
+    <Symbol language="Python" name="dir" signature="dir(object)">
+      <Summary>Names of the attributes of an object</Summary>
+    </Symbol>
+    <Symbol language="Python" name="vars" signature="vars(object)">
+      <Summary>__dict__ of an object</Summary>
+    </Symbol>
+    <Symbol language="Python" name="globals" signature="globals()">
+      <Summary>Dictionary of the global namespace</Summary>
+    </Symbol>
+    <Symbol language="Python" name="locals" signature="locals()">
+      <Summary>Dictionary of the local namespace</Summary>
+    </Symbol>
+    <Symbol language="Python" name="super" signature="super()">
+      <Summary>Proxy to the base class</Summary>
+    </Symbol>
+    <Symbol language="Python" name="exit" signature="exit(code=0)">
+      <Summary>Exit the interpreter</Summary>
+    </Symbol>
+    <Symbol language="Python" name="any" signature="any(iterable)">
+      <Summary>True when any item is true</Summary>
+    </Symbol>
+    <Symbol language="Python" name="all" signature="all(iterable)">
+      <Summary>True when every item is true</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="printf" signature="printf(format, ...)">
+      <Summary>Formatted output to stdout</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fprintf" signature="fprintf(stream, format, ...)">
+      <Summary>Formatted output to a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sprintf" signature="sprintf(buffer, format, ...)">
+      <Summary>Formatted output into a string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="snprintf" signature="snprintf(buffer, size, format, ...)">
+      <Summary>Bounded formatted output</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="puts" signature="puts(text)">
+      <Summary>Write a string and a newline</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="putchar" signature="putchar(c)">
+      <Summary>Write a single character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="getchar" signature="getchar()">
+      <Summary>Read a character from stdin</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scanf" signature="scanf(format, ...)">
+      <Summary>Formatted input from stdin</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sscanf" signature="sscanf(text, format, ...)">
+      <Summary>Parse a string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fopen" signature="fopen(path, mode)">
+      <Summary>Open a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fclose" signature="fclose(stream)">
+      <Summary>Close a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fread" signature="fread(buffer, size, count, stream)">
+      <Summary>Read items from a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fwrite" signature="fwrite(buffer, size, count, stream)">
+      <Summary>Write items to a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fgets" signature="fgets(buffer, size, stream)">
+      <Summary>Read a line from a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fputs" signature="fputs(text, stream)">
+      <Summary>Write a string to a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fseek" signature="fseek(stream, offset, origin)">
+      <Summary>Move the file position</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ftell" signature="ftell(stream)">
+      <Summary>Current file position</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="rewind" signature="rewind(stream)">
+      <Summary>Seek to the start of a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fflush" signature="fflush(stream)">
+      <Summary>Flush the output buffer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="feof" signature="feof(stream)">
+      <Summary>End-of-file test</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ferror" signature="ferror(stream)">
+      <Summary>Error indicator of a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="malloc" signature="malloc(size)">
+      <Summary>Allocate memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="calloc" signature="calloc(count, size)">
+      <Summary>Allocate zeroed memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="realloc" signature="realloc(pointer, size)">
+      <Summary>Resize an allocation</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="free" signature="free(pointer)">
+      <Summary>Release memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memcpy" signature="memcpy(dest, src, count)">
+      <Summary>Copy memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memmove" signature="memmove(dest, src, count)">
+      <Summary>Copy overlapping memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memset" signature="memset(dest, value, count)">
+      <Summary>Fill memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memcmp" signature="memcmp(a, b, count)">
+      <Summary>Compare memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strlen" signature="strlen(text)">
+      <Summary>Length of a string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strcpy" signature="strcpy(dest, src)">
+      <Summary>Copy a string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strncpy" signature="strncpy(dest, src, count)">
+      <Summary>Bounded string copy</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strcat" signature="strcat(dest, src)">
+      <Summary>Append a string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strncat" signature="strncat(dest, src, count)">
+      <Summary>Bounded string append</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strcmp" signature="strcmp(a, b)">
+      <Summary>Compare two strings</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strncmp" signature="strncmp(a, b, count)">
+      <Summary>Bounded string compare</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strchr" signature="strchr(text, c)">
+      <Summary>First occurrence of a character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strrchr" signature="strrchr(text, c)">
+      <Summary>Last occurrence of a character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strstr" signature="strstr(haystack, needle)">
+      <Summary>First occurrence of a substring</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtok" signature="strtok(text, delimiters)">
+      <Summary>Split a string into tokens</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atoi" signature="atoi(text)">
+      <Summary>Text to int</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atof" signature="atof(text)">
+      <Summary>Text to double</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtol" signature="strtol(text, end, base)">
+      <Summary>Text to long</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtod" signature="strtod(text, end)">
+      <Summary>Text to double</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sqrt" signature="sqrt(x)">
+      <Summary>Square root</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="pow" signature="pow(base, exp)">
+      <Summary>Raise to a power</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sin" signature="sin(x)">
+      <Summary>Sine</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="cos" signature="cos(x)">
+      <Summary>Cosine</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tan" signature="tan(x)">
+      <Summary>Tangent</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log" signature="log(x)">
+      <Summary>Natural logarithm</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="exp" signature="exp(x)">
+      <Summary>Exponential</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="floor" signature="floor(x)">
+      <Summary>Round down</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ceil" signature="ceil(x)">
+      <Summary>Round up</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fabs" signature="fabs(x)">
+      <Summary>Absolute value of a double</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="rand" signature="rand()">
+      <Summary>Pseudo-random number</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="srand" signature="srand(seed)">
+      <Summary>Seed the random generator</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="qsort" signature="qsort(base, count, size, compare)">
+      <Summary>Sort an array</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="bsearch" signature="bsearch(key, base, count, size, compare)">
+      <Summary>Binary search in a sorted array</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="exit" signature="exit(status)">
+      <Summary>End the program</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="abort" signature="abort()">
+      <Summary>Abort the program</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="perror" signature="perror(text)">
+      <Summary>Print the last error message</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="time" signature="time(timer)">
+      <Summary>Current calendar time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="clock" signature="clock()">
+      <Summary>Processor time used</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="assert" signature="assert(expression)">
+      <Summary>Runtime assertion</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="echo" signature="echo(args)">
+      <Summary>Write the arguments and a newline</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="printf" signature="printf(format, args)">
+      <Summary>Formatted output</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="read" signature="read(variable)">
+      <Summary>Read a line into a variable</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="cd" signature="cd(directory)">
+      <Summary>Change the working directory</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="pwd" signature="pwd()">
+      <Summary>Print the working directory</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="export" signature="export(variable)">
+      <Summary>Mark a variable for the environment</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="unset" signature="unset(variable)">
+      <Summary>Remove a variable or function</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="set" signature="set(options)">
+      <Summary>Set shell options or positional parameters</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="shift" signature="shift(count)">
+      <Summary>Drop positional parameters</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="source" signature="source(file)">
+      <Summary>Run a file in the current shell</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="test" signature="test(expression)">
+      <Summary>Evaluate a condition</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="exit" signature="exit(status)">
+      <Summary>Leave the shell</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="return" signature="return(status)">
+      <Summary>Return from a function</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="trap" signature="trap(command, signal)">
+      <Summary>Handle a signal</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="exec" signature="exec(command)">
+      <Summary>Replace the shell with a command</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="eval" signature="eval(text)">
+      <Summary>Evaluate text as a command</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="alias" signature="alias(name, value)">
+      <Summary>Define an alias</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="local" signature="local(name)">
+      <Summary>Declare a local variable in a function</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="declare" signature="declare(name)">
+      <Summary>Declare a variable</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="let" signature="let(expression)">
+      <Summary>Arithmetic evaluation</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="type" signature="type(name)">
+      <Summary>Describe how a command would be run</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="which" signature="which(name)">
+      <Summary>Path of a command</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="basename" signature="basename(path, suffix)">
+      <Summary>File name without the directory</Summary>
+    </Symbol>
+    <Symbol language="Bash" name="dirname" signature="dirname(path)">
+      <Summary>Directory part of a path</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="print" signature="print(...)">
+      <Summary>Write the arguments and a newline</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="type" signature="type(value)">
+      <Summary>Type name of a value</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="tostring" signature="tostring(value)">
+      <Summary>Text representation</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="tonumber" signature="tonumber(value, base)">
+      <Summary>Convert to a number</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="ipairs" signature="ipairs(table)">
+      <Summary>Iterate the array part</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="pairs" signature="pairs(table)">
+      <Summary>Iterate all keys</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="next" signature="next(table, key)">
+      <Summary>Next key of a table</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="select" signature="select(index, ...)">
+      <Summary>Arguments from an index</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="rawget" signature="rawget(table, key)">
+      <Summary>Read without metatables</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="rawset" signature="rawset(table, key, value)">
+      <Summary>Write without metatables</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="setmetatable" signature="setmetatable(table, metatable)">
+      <Summary>Set the metatable</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="getmetatable" signature="getmetatable(object)">
+      <Summary>Read the metatable</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="assert" signature="assert(value, message)">
+      <Summary>Raise when the value is false</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="error" signature="error(message, level)">
+      <Summary>Raise an error</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="pcall" signature="pcall(function, ...)">
+      <Summary>Protected call</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="xpcall" signature="xpcall(function, handler)">
+      <Summary>Protected call with a handler</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="unpack" signature="unpack(list, i, j)">
+      <Summary>Table elements as values</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="require" signature="require(module)">
+      <Summary>Load a module</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="collectgarbage" signature="collectgarbage(option, arg)">
+      <Summary>Control the garbage collector</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="string.format" signature="string.format(format, ...)">
+      <Summary>Formatted string</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="string.sub" signature="string.sub(text, i, j)">
+      <Summary>Substring</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="string.len" signature="string.len(text)">
+      <Summary>Length of a string</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="string.find" signature="string.find(text, pattern)">
+      <Summary>Find a pattern</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="string.match" signature="string.match(text, pattern)">
+      <Summary>Match a pattern</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="string.gsub" signature="string.gsub(text, pattern, replacement)">
+      <Summary>Replace a pattern</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="string.rep" signature="string.rep(text, count)">
+      <Summary>Repeat a string</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="string.upper" signature="string.upper(text)">
+      <Summary>Upper case</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="string.lower" signature="string.lower(text)">
+      <Summary>Lower case</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="table.insert" signature="table.insert(list, value)">
+      <Summary>Insert an element</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="table.remove" signature="table.remove(list, index)">
+      <Summary>Remove an element</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="table.sort" signature="table.sort(list, compare)">
+      <Summary>Sort a table</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="table.concat" signature="table.concat(list, separator)">
+      <Summary>Join the elements</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="math.floor" signature="math.floor(x)">
+      <Summary>Round down</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="math.ceil" signature="math.ceil(x)">
+      <Summary>Round up</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="math.abs" signature="math.abs(x)">
+      <Summary>Absolute value</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="math.max" signature="math.max(...)">
+      <Summary>Largest value</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="math.min" signature="math.min(...)">
+      <Summary>Smallest value</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="math.sqrt" signature="math.sqrt(x)">
+      <Summary>Square root</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="math.random" signature="math.random(m, n)">
+      <Summary>Pseudo-random number</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="io.open" signature="io.open(path, mode)">
+      <Summary>Open a file</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="io.read" signature="io.read(format)">
+      <Summary>Read from the standard input</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="io.write" signature="io.write(...)">
+      <Summary>Write to the standard output</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="io.lines" signature="io.lines(path)">
+      <Summary>Iterate the lines of a file</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="os.time" signature="os.time()">
+      <Summary>Current time</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="os.date" signature="os.date(format)">
+      <Summary>Formatted date and time</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="os.getenv" signature="os.getenv(name)">
+      <Summary>Environment variable</Summary>
+    </Symbol>
+    <Symbol language="Lua" name="os.exit" signature="os.exit(code)">
+      <Summary>End the program</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="COUNT" signature="COUNT(expression)">
+      <Summary>Number of rows</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="SUM" signature="SUM(expression)">
+      <Summary>Sum of a column</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="AVG" signature="AVG(expression)">
+      <Summary>Average of a column</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="MIN" signature="MIN(expression)">
+      <Summary>Smallest value</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="MAX" signature="MAX(expression)">
+      <Summary>Largest value</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="COALESCE" signature="COALESCE(value, fallback)">
+      <Summary>First non-null value</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="NULLIF" signature="NULLIF(a, b)">
+      <Summary>Null when the two values are equal</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="IFNULL" signature="IFNULL(value, fallback)">
+      <Summary>Fallback when the value is null</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="CAST" signature="CAST(value AS type)">
+      <Summary>Convert a value to a type</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="LENGTH" signature="LENGTH(text)">
+      <Summary>Number of characters</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="UPPER" signature="UPPER(text)">
+      <Summary>Upper case</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="LOWER" signature="LOWER(text)">
+      <Summary>Lower case</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="TRIM" signature="TRIM(text)">
+      <Summary>Remove the surrounding spaces</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="SUBSTR" signature="SUBSTR(text, start, length)">
+      <Summary>Substring</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="REPLACE" signature="REPLACE(text, from, to)">
+      <Summary>Replace occurrences</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="ROUND" signature="ROUND(number, digits)">
+      <Summary>Round a number</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="ABS" signature="ABS(number)">
+      <Summary>Absolute value</Summary>
+    </Symbol>
+    <Symbol language="Sql" name="NOW" signature="NOW()">
+      <Summary>Current date and time</Summary>
+    </Symbol>
+    <Symbol language="Script" name="puts" signature="puts(args)">
+      <Summary>Write the arguments and a newline</Summary>
+    </Symbol>
+    <Symbol language="Script" name="print" signature="print(args)">
+      <Summary>Write the arguments</Summary>
+    </Symbol>
+    <Symbol language="Script" name="p" signature="p(object)">
+      <Summary>Inspect and write an object</Summary>
+    </Symbol>
+    <Symbol language="Script" name="gets" signature="gets()">
+      <Summary>Read a line from the input</Summary>
+    </Symbol>
+    <Symbol language="Script" name="require" signature="require(name)">
+      <Summary>Load a library</Summary>
+    </Symbol>
+    <Symbol language="Script" name="chomp" signature="chomp(text)">
+      <Summary>Remove the trailing newline</Summary>
+    </Symbol>
+    <Symbol language="Script" name="strip" signature="strip(text)">
+      <Summary>Remove the surrounding spaces</Summary>
+    </Symbol>
+    <Symbol language="Script" name="split" signature="split(text, separator)">
+      <Summary>Split a string</Summary>
+    </Symbol>
+    <Symbol language="Script" name="join" signature="join(separator, items)">
+      <Summary>Join the items into a string</Summary>
+    </Symbol>
+    <Symbol language="Script" name="to_s" signature="to_s()">
+      <Summary>Convert to a string</Summary>
+    </Symbol>
+    <Symbol language="Script" name="to_i" signature="to_i()">
+      <Summary>Convert to an integer</Summary>
+    </Symbol>
+    <Symbol language="Script" name="to_f" signature="to_f()">
+      <Summary>Convert to a float</Summary>
+    </Symbol>
+    <Symbol language="Script" name="length" signature="length()">
+      <Summary>Number of characters</Summary>
+    </Symbol>
+    <Symbol language="Script" name="upcase" signature="upcase()">
+      <Summary>Upper case</Summary>
+    </Symbol>
+    <Symbol language="Script" name="downcase" signature="downcase()">
+      <Summary>Lower case</Summary>
+    </Symbol>
+    <Symbol language="Script" name="each" signature="each(block)">
+      <Summary>Iterate the items</Summary>
+    </Symbol>
+    <Symbol language="Script" name="map" signature="map(block)">
+      <Summary>Transform the items</Summary>
+    </Symbol>
+    <Symbol language="Script" name="select" signature="select(block)">
+      <Summary>Keep the items the block accepts</Summary>
+    </Symbol>
+    <Symbol language="Script" name="reject" signature="reject(block)">
+      <Summary>Drop the items the block accepts</Summary>
+    </Symbol>
+    <Symbol language="Script" name="sort" signature="sort(block)">
+      <Summary>Sort the items</Summary>
+    </Symbol>
+    <Symbol language="Script" name="push" signature="push(value)">
+      <Summary>Append an item</Summary>
+    </Symbol>
+    <Symbol language="Script" name="delete" signature="delete(key)">
+      <Summary>Remove an item</Summary>
+    </Symbol>
+    <Symbol language="Script" name="printf" signature="printf(format, args)">
+      <Summary>Formatted output</Summary>
+    </Symbol>
+    <Symbol language="Script" name="sprintf" signature="sprintf(format, args)">
+      <Summary>Formatted string</Summary>
+    </Symbol>
+  </Symbols>
+</ApiSymbols>

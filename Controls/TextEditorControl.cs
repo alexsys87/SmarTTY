@@ -33,7 +33,7 @@ public partial class TextEditorControl : EditableTextBrowser
         return base.EditableDocument.GetRangeText(start, end);
     }
 
-    public void CopyAll()
+    public virtual void CopyAll()
     {
         try
         {
@@ -53,7 +53,7 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
-    public void CopySelection(bool select = true)
+    public virtual void CopySelection(bool select = true)
     {
         try
         {
@@ -85,11 +85,23 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
+    /// <summary>The text of the clipboard (null when it holds none).</summary>
+    protected string ReadClipboardText()
+    {
+        return (!CodeEditorPP.IsWindows()) ? Clipboard.GetText() : Win32Clipboard.GetText(Handle);
+    }
+
     public virtual void Paste()
+    {
+        PasteText(ReadClipboardText());
+    }
+
+    /// <summary>Pastes <paramref name="text"/> as if it came from the clipboard (the paste menu pastes its history and snippets this way).</summary>
+    public virtual void PasteText(string text)
     {
         try
         {
-            ReplaceText(text: (!CodeEditorPP.IsWindows()) ? Clipboard.GetText() : Win32Clipboard.GetText(Handle), start: CaretPosition, end: SelectionStart, select: !_hasSelection);
+            ReplaceText(text: text, start: CaretPosition, end: SelectionStart, select: !_hasSelection);
             UpdateMaxLineWidth(-1);
         }
         catch (Exception exception)
@@ -98,7 +110,7 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
-    public void Cut()
+    public virtual void Cut()
     {
         CopySelection();
         if (!_hasSelection)
@@ -113,7 +125,7 @@ public partial class TextEditorControl : EditableTextBrowser
     }
 
     /// <summary>Removes the selected text; does nothing without a selection (unlike Cut, it leaves the clipboard alone).</summary>
-    public void DeleteSelection()
+    public virtual void DeleteSelection()
     {
         if (IsEditable && _hasSelection)
         {

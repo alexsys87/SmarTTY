@@ -42,6 +42,9 @@ public partial class App : Application
         DeviceTerminalControl.SerialSettingsPrompt = (settings, portName) =>
             SerialPortSettingsWindow.Prompt(WindowOwnership.ActiveWindow(), settings, portName);
         DeviceTerminalControl.TransferProgressWindowFactory = (title, showErrorCount) => XModemTransferWindow.Create(title, showErrorCount);
+        DeviceTerminalControl.GzipBase64RequestPrompt = sending => sending
+            ? GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow())
+            : GzipBase64TransferWindow.ShowReceive(WindowOwnership.ActiveWindow());
         DeviceTerminalControl.CommandListEditor = (title, description, commands) =>
             DeviceCommandListWindow.Edit(WindowOwnership.ActiveWindow(), title, description, commands);
         DeviceTerminalControl.TftpFirmwareWindowFactory = (terminal, title) => new TftpFirmwareWindow(terminal, title);

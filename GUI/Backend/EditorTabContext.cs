@@ -19,6 +19,15 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     private string _Title;
 
+    // The find window of the hex view (modeless), and whether the WPF scroll bars were hidden for that view.
+    private HexFindWindow _hexFindWindow;
+
+    private bool _hexChromeHidden;
+
+    private Visibility _verticalScrollBarVisibility;
+
+    private Visibility _horizontalScrollBarVisibility;
+
     public readonly string FilePath;
 
     public FrameworkElement Control { get; }
@@ -83,18 +92,82 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         };
         EditorPanel.FindRequested += (object sender, EventArgs e) =>
         {
+            if (Editor.IsHexMode)
+            {
+                ShowHexFind();
+                return;
+            }
             Searcher.IsReplaceVisible = false;
             Searcher.Activate();
         };
-        EditorPanel.ReplaceRequested += (object sender, EventArgs e) => Searcher.ActivateReplace();
+        EditorPanel.ReplaceRequested += (object sender, EventArgs e) =>
+        {
+            if (!Editor.IsHexMode)
+            {
+                Searcher.ActivateReplace();
+            }
+        };
         editor.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
+        editor.HexModeChanged += (object sender, EventArgs e) => UpdateEditorChrome();
+        UpdateEditorChrome();
         Title = RemotePathUtils.GetFileName(filePath);
         FilePath = filePath;
     }
 
+    /// <summary>Opens (or brings forward) the modeless find window of the hex view.</summary>
+    internal void ShowHexFind()
+    {
+        if (!Editor.IsHexMode)
+        {
+            return;
+        }
+        if (_hexFindWindow == null)
+        {
+            _hexFindWindow = new HexFindWindow(Editor.HexEditor);
+            _hexFindWindow.Closed += (object sender, EventArgs e) => _hexFindWindow = null;
+        }
+        if (!_hexFindWindow.IsVisible)
+        {
+            _hexFindWindow.Show();
+        }
+        _hexFindWindow.Activate();
+    }
+
+    private void CloseHexFind()
+    {
+        _hexFindWindow?.Close();
+        _hexFindWindow = null;
+    }
+
+    /// <summary>
+    /// The hex view draws its own scroll bars: the WPF ones above and below the editor are hidden while it is shown.
+    /// The text view gets back the visibility it had.
+    /// </summary>
+    private void UpdateEditorChrome()
+    {
+        bool hex = Editor.IsHexMode;
+        if (hex && !_hexChromeHidden)
+        {
+            _verticalScrollBarVisibility = VerticalScrollBar.Visibility;
+            _horizontalScrollBarVisibility = HorizontalScrollBar.Visibility;
+        }
+        else if (!hex && _hexChromeHidden)
+        {
+            VerticalScrollBar.Visibility = _verticalScrollBarVisibility;
+            HorizontalScrollBar.Visibility = _horizontalScrollBarVisibility;
+            CloseHexFind();
+        }
+        if (hex)
+        {
+            VerticalScrollBar.Visibility = Visibility.Collapsed;
+            HorizontalScrollBar.Visibility = Visibility.Collapsed;
+        }
+        _hexChromeHidden = hex;
+    }
+
     public void Close()
     {
-        if (((EditableTextBrowser)Editor).IsModified)
+        if (Editor.IsModified)
         {
             switch (MessageBoxes.YesNoCancel("Save " + FilePath + "?"))
             {
@@ -117,6 +190,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public void Dispose()
     {
+        CloseHexFind();
         // The panel owns the editor; disposing the editor again is harmless.
         EditorPanel.Dispose();
         Editor.Dispose();
@@ -124,7 +198,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public void FocusMainControl()
     {
-        Editor?.Focus();
+        Editor?.FocusActiveView();
     }
 
     public void OnSessionInactiveChanged(bool isInactive)

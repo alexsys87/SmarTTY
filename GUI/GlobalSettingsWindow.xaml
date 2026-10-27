@@ -75,6 +75,18 @@
               </Setter.Value>
             </Setter>
           </Style>
+          <!-- Same choices, but wrapped into rows: the theme list is longer than a single line fits. -->
+          <Style x:Key="EnumWrapListBox" TargetType="{x:Type ListBox}" BasedOn="{StaticResource EnumListBox}">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="ItemsPanel">
+              <Setter.Value>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
           <Style x:Key="ColorEditor" TargetType="{x:Type Border}">
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Margin" Value="0 2 0 2" />
@@ -194,6 +206,10 @@
               <ListBox Grid.Row="7" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=ByteOrientedLineEditing, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ByteOrientedLineEditing}" />
             </Grid>
           </GroupBox>
+        </StackPanel>
+      </TabItem>
+      <TabItem Header="Paste Settings">
+        <StackPanel>
           <GroupBox Header="Paste" Padding="5" DataContext="{Binding Paste}">
             <Grid>
               <Grid.RowDefinitions>
@@ -246,6 +262,36 @@
               <TextBox Grid.Row="15" Grid.Column="1" HorizontalAlignment="Left" MinWidth="120" Text="{Binding SlowPrompt}" />
               <TextBlock Text="Slow paste: wait at most (ms):" Grid.Row="16" ToolTip="Without the echo the paste goes on after this time; without the prompt it stops." />
               <TextBox Grid.Row="16" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding SlowWaitTimeoutMs}" />
+            </Grid>
+          </GroupBox>
+          <GroupBox Header="Paste: mouse, keys, history and files" Padding="5" DataContext="{Binding Paste}">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="Right mouse button:" ToolTip="Shift+right button and the menu key always open the menu. A program that uses the mouse (vim, mc) gets the button itself." />
+              <ListBox Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=RightClick, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding RightClick}" />
+              <CheckBox Content="Middle mouse button pastes" Grid.Row="1" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding MiddleClickPastes}" ToolTip="Shift+Insert and Ctrl+Shift+V paste as well. Selected text is copied by the &quot;Copy on select&quot; setting of the terminal." />
+              <TextBlock Text="Ctrl+Shift+V:" Grid.Row="2" ToolTip="Ctrl+Shift+Insert always opens the menu with the history and the snippets." />
+              <ListBox Grid.Row="2" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=CtrlShiftV, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding CtrlShiftV}" />
+              <CheckBox Content="Remember the pasted texts for the paste menu" Grid.Row="3" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding KeepHistory}" ToolTip="The history is kept in memory only, never in a file, and is gone when SmarTTY is closed. Turn it off if you paste passwords." />
+              <TextBlock Text="Texts in the history (1 to 50):" Grid.Row="4" />
+              <TextBox Grid.Row="4" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding HistorySize}" />
+              <CheckBox Content="Offer to upload files that are copied in Explorer when pasting" Grid.Row="5" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding OfferClipboardFiles}" ToolTip="SSH tabs: upload the files like dropping them on the terminal, or paste their paths." />
+              <CheckBox Content="HEX view of COM/TCP tabs: paste text such as DE AD BE EF as bytes" Grid.Row="6" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding HexViewPastesBytes}" ToolTip="&quot;Paste as text&quot; and &quot;Paste as HEX bytes&quot; in the terminal menu choose it explicitly." />
+              <TextBlock Text="Characters the encoding lacks:" Grid.Row="7" ToolTip="COM, TCP and Telnet tabs with a single-byte encoding (Windows-1251, CP866, KOI8-R ...)." />
+              <ListBox Grid.Row="7" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=UnmappableCharacters, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding UnmappableCharacters}" />
             </Grid>
           </GroupBox>
         </StackPanel>
@@ -323,7 +369,7 @@
               <TextBlock Text="Session header position:" Grid.Row="3" />
               <ListBox Grid.Column="1" Grid.Row="3" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=SessionHeaderOrientation, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding SessionHeaderOrientation}" />
               <TextBlock Text="Application theme:" Grid.Row="4" />
-              <ListBox Grid.Column="1" Grid.Row="4" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=Theme, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding Theme}" />
+              <ListBox Grid.Column="1" Grid.Row="4" Style="{StaticResource EnumWrapListBox}" ItemsSource="{Binding Path=Theme, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding Theme}" />
             </Grid>
           </GroupBox>
           <GroupBox Header="Other Settings">
@@ -419,6 +465,11 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -456,6 +507,11 @@
             <TextBox Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding EditorWrapper.TemporaryDirectory}" />
             <CheckBox Content="Enable syntax highlighting" Grid.Row="9" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.SyntaxHighlighting}" />
             <CheckBox Content="Keep a backup copy (file~) when saving" Grid.Row="10" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.BackupBeforeSave}" ToolTip="The first save of a file after it was opened copies the old file to the same name with a ~ added, on the server." />
+            <CheckBox Content="Show a line under each tab character" Grid.Row="11" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ShowTabs}" ToolTip="Underlines tabs so lines indented with tabs are easy to tell from lines indented with spaces" />
+            <CheckBox Content="Show all characters, including spaces, tabs and line ends" Grid.Row="12" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ShowAllCharacters}" ToolTip="Marks spaces, tabs, line breaks and control characters so invisible differences are easy to see. The same switch is on the editor tool bar." />
+            <CheckBox Content="Offer completions while editing (Ctrl+Space opens the list)" Grid.Row="13" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.Autocompletion}" ToolTip="Suggests the keywords of the language and the words already used in the file." />
+            <CheckBox Content="Open the completion list automatically while typing" Grid.Row="14" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.AutocompletionOnTyping}" ToolTip="Opens the list after two letters of a word were typed." />
+            <CheckBox Content="Offer the standard functions of the language (API symbols)" Grid.Row="15" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ApiSymbols}" ToolTip="Adds the standard functions of the language (Python builtins, the C library, the shell builtins, ...) with their description and parameter hint. The set lives in ApiSymbols.xml." />
           </Grid>
         </GroupBox>
       </TabItem>

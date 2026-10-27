@@ -105,7 +105,38 @@ internal static class PasteGuard
         {
             return null;
         }
-        return Confirm(text, options, settings, linesRunAtOnce, owner) ? text : null;
+        if (!Confirm(text, options, settings, linesRunAtOnce, owner))
+        {
+            return null;
+        }
+        PasteHistory.Add(text, options.EffectiveHistorySize);
+        return text;
+    }
+
+    /// <summary>
+    /// Fits the text to the encoding of a COM/TCP/Telnet session: letters are composed, curly quotes get their ASCII form
+    /// when the encoding lacks them, and when characters remain that the encoding cannot represent (they would be sent as
+    /// "?") the user is asked, unless the settings say to send them as they are. Returns the text to send, or null when
+    /// the user cancelled.
+    /// </summary>
+    public static string FitToEncoding(string text, Encoding encoding, GlobalSettings settings, IWin32Window owner)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+        PasteEncodingResult result = PasteEncoding.Analyze(text, encoding);
+        if (result.IsLossless || OptionsOf(settings).UnmappableCharacters == PasteSettings.UnmappableMode.QuestionMark)
+        {
+            return result.Text;
+        }
+        string name = string.IsNullOrEmpty(encoding?.EncodingName) ? "the encoding of the session" : encoding.EncodingName;
+        string message = result.UnmappableCount + (result.UnmappableCount == 1 ? " character" : " characters")
+            + " of the text cannot be represented in " + name + " and would be sent as \"?\":\n\n"
+            + PasteEncoding.Describe(result.Unmappable, 12)
+            + "\n\nSend the text anyway? Choose another encoding in the terminal toolbar to keep these characters.";
+        DialogResult answer = ThemedMessageBox.Show(owner, message, "Paste", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+        return answer == DialogResult.Yes ? result.Text : null;
     }
 
     private static bool Confirm(string text, PasteSettings options, GlobalSettings settings, bool linesRunAtOnce, IWin32Window owner)

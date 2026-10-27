@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.GzipBase64TransferWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Transfer via gzip + base64" Width="560" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FocusManager.FocusedElement="{Binding ElementName=RemoteBox}">
+  <Grid Margin="14">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TextBlock x:Name="IntroText" Grid.Row="0" TextWrapping="Wrap" Margin="0 0 0 10" />
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <TextBlock x:Name="LocalLabel" Grid.Row="0" Grid.Column="0" Text="File on this computer:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <TextBox x:Name="LocalBox" Grid.Row="0" Grid.Column="1" Margin="0 2 4 2" VerticalContentAlignment="Center" />
+      <Button x:Name="BrowseButton" Grid.Row="0" Grid.Column="2" Content="Browse..." MinWidth="80" Margin="0 2 0 2" Click="Browse_Click" />
+      <TextBlock x:Name="RemoteLabel" Grid.Row="1" Grid.Column="0" Text="Path on the device:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <TextBox x:Name="RemoteBox" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0 2 0 2" VerticalContentAlignment="Center" />
+    </Grid>
+    <TextBlock x:Name="RemoteHint" Grid.Row="2" TextWrapping="Wrap" Margin="0 2 0 8" Opacity="0.7" />
+    <Grid Grid.Row="3" Margin="0 4 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <TextBlock Grid.Row="0" Grid.Column="0" Text="Text form:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <ComboBox x:Name="EncodingBox" Grid.Row="0" Grid.Column="1" Margin="0 2 12 2" SelectedIndex="0" ToolTip="base64 is what almost every Linux has (busybox included). uuencode is the fallback for a device without a base64 command.">
+        <ComboBoxItem Content="Automatic (base64, else uuencode)" />
+        <ComboBoxItem Content="base64" />
+        <ComboBoxItem Content="uuencode" />
+      </ComboBox>
+      <TextBlock Grid.Row="0" Grid.Column="2" Text="Checksum:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <ComboBox x:Name="ChecksumBox" Grid.Row="0" Grid.Column="3" Margin="0 2 0 2" SelectedIndex="0" ToolTip="The checksum of the original file is compared with the checksum of the unpacked result.">
+        <ComboBoxItem Content="Automatic (SHA-256, MD5, cksum)" />
+        <ComboBoxItem Content="SHA-256 (sha256sum)" />
+        <ComboBoxItem Content="MD5 (md5sum)" />
+        <ComboBoxItem Content="CRC-32 (cksum)" />
+      </ComboBox>
+      <TextBlock Grid.Row="1" Grid.Column="0" Text="Attempts:" VerticalAlignment="Center" Margin="0 2 8 2" />
+      <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0 2 12 2">
+        <TextBox x:Name="AttemptsBox" Width="50" Text="2" VerticalContentAlignment="Center" ToolTip="How many times the whole transfer is tried when the checksum does not match (1 = no repeat)." />
+      </StackPanel>
+      <TextBlock Grid.Row="1" Grid.Column="2" Text="Speed without echo:" VerticalAlignment="Center" Margin="0 2 8 2" />
+      <StackPanel Grid.Row="1" Grid.Column="3" Orientation="Horizontal" Margin="0 2 0 2">
+        <TextBox x:Name="RateBox" Width="70" Text="6000" VerticalContentAlignment="Center" ToolTip="Bytes per second. Used only when the device does not echo what is typed: the echo is how the sender knows that the data has arrived. 11520 is the top of a 115200 baud line; keep it lower." />
+        <TextBlock Text="bytes/s" VerticalAlignment="Center" Margin="6 0 0 0" />
+      </StackPanel>
+      <TextBlock Grid.Row="2" Grid.Column="0" Text="Line length:" VerticalAlignment="Center" Margin="0 2 8 2" />
+      <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0 2 12 2">
+        <TextBox x:Name="BlockBox" Width="50" Text="1024" VerticalContentAlignment="Center" ToolTip="Characters in a line of the text typed to the device. Every line is checked against the echo of the device and typed again if it came back damaged. A smaller value costs less on a noisy line." />
+        <TextBlock Text="characters" VerticalAlignment="Center" Margin="6 0 0 0" />
+      </StackPanel>
+      <CheckBox x:Name="DebugBox" Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2" Content="Write a debug log (Temp folder)" IsChecked="True" VerticalAlignment="Center" Margin="0 2 0 2" ToolTip="Saves everything typed to the device and everything it answered to a text file; its path is shown if the transfer fails." />
+    </Grid>
+    <CheckBox x:Name="OverwriteBox" Grid.Row="4" Margin="0 8 0 0" Content="Replace the file if it exists" />
+    <TextBlock Grid.Row="5" TextWrapping="Wrap" Margin="0 10 0 0" Opacity="0.7" Text="Start this at an idle shell prompt of the device (not inside another program). The device needs gzip, base64 (or uuencode) and sha256sum (or md5sum); OpenWrt has them in busybox. Nothing is installed on the device. The file is packed with gzip, typed into the shell as text and unpacked there, then the checksums are compared; the file gets its name only when they match." />
+    <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 14 0 0">
+      <Button x:Name="StartButton" Content="_Start" IsDefault="True" MinWidth="80" Margin="0 0 5 0" Click="Start_Click" />
+      <Button Content="Cancel" IsCancel="True" MinWidth="80" />
+    </StackPanel>
+  </Grid>
+</Window>

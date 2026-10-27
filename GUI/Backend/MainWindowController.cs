@@ -1,6 +1,7 @@
 using SmarTTY.Ssh;
 using Microsoft.Win32;
 using SmarTTY.CodeEditing;
+using SmarTTY.Completion;
 using SmarTTY.Controls;
 using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
@@ -378,11 +379,23 @@ public class MainWindowController : INotifyPropertyChanged
             // The tool bar and the context menu of the editor.
             newTab.EditorPanel.SaveRequested += (object sender, EventArgs e) => SaveFile();
             newTab.EditorPanel.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
+            newTab.EditorPanel.ShowAllCharactersChanged += (object sender, EventArgs e) =>
+            {
+                // The switch on the tool bar and in the context menu is the same setting as in the settings window.
+                _Controller.Settings.Editor.ShowAllCharacters = editor.ShowAllCharacters;
+                _Controller.Settings.Save();
+            };
         }
 
         internal void Search()
         {
-            TextSearcher searcher = _Controller.ActiveSession?.ActiveTab?.Searcher;
+            ITabContext activeTab = _Controller.ActiveSession?.ActiveTab;
+            if (activeTab is EditorTabContext editorTab && editorTab.Editor.IsHexMode)
+            {
+                editorTab.ShowHexFind();
+                return;
+            }
+            TextSearcher searcher = activeTab?.Searcher;
             if (searcher != null)
             {
                 searcher.IsReplaceVisible = false;
@@ -396,6 +409,19 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 return;
             }
+            if (editor.IsHexMode)
+            {
+                GoToOffsetWindow offsetWindow = new GoToOffsetWindow(editor.HexEditor.CaretOffset, editor.HexEditor.Length)
+                {
+                    Owner = _Controller._Window
+                };
+                if (offsetWindow.ShowDialog() == true)
+                {
+                    editor.HexEditor.GoToOffset(offsetWindow.Offset);
+                }
+                editor.FocusActiveView();
+                return;
+            }
             GoToLineWindow window = new GoToLineWindow(editor.CaretPosition.Line + 1, Math.Max(1, editor.LineCount))
             {
                 Owner = _Controller._Window
@@ -404,7 +430,7 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 editor.GoToPosition(window.Line - 1, Math.Max(0, window.Column - 1));
             }
-            editor.Focus();
+            editor.FocusActiveView();
         }
 
         private void editor_UnsavedChanged(EditableTextBrowser editor, bool newValue)
@@ -463,7 +489,10 @@ public class MainWindowController : INotifyPropertyChanged
                     case Keys.H:
                         // Ctrl+H is also Backspace as a character: keep it from reaching the editor.
                         e.SuppressKeyPress = true;
-                        _Controller.ActiveSession?.ActiveTab?.Searcher?.ActivateReplace();
+                        if ((sender as RemoteFileEditor)?.IsHexMode != true)
+                        {
+                            _Controller.ActiveSession?.ActiveTab?.Searcher?.ActivateReplace();
+                        }
                         break;
                     case Keys.G:
                         e.SuppressKeyPress = true;
@@ -471,9 +500,17 @@ public class MainWindowController : INotifyPropertyChanged
                         break;
                 }
             }
-            else if (!e.Control && !e.Alt && e.KeyCode == Keys.F3 && (sender as ReadonlyTextBrowser)?.Tag is EditorTabContext editorTabContext)
+            else if (!e.Control && !e.Alt && e.KeyCode == Keys.F3)
             {
-                editorTabContext?.Searcher?.Search(e.Shift);
+                if (sender is RemoteFileEditor hexEditor && hexEditor.IsHexMode)
+                {
+                    e.SuppressKeyPress = true;
+                    hexEditor.HexEditor.FindNext(!e.Shift);
+                }
+                else if ((sender as ReadonlyTextBrowser)?.Tag is EditorTabContext editorTabContext)
+                {
+                    editorTabContext?.Searcher?.Search(e.Shift);
+                }
             }
         }
 
@@ -635,6 +672,50 @@ public class MainWindowController : INotifyPropertyChanged
                 _Controller.Settings.DefaultDownloadDirectory = window.LocalDirectory;
             }
             _Controller.Settings.Save();
+        }
+
+        /// <summary>
+        /// Copies a directory from one open SSH host to another. The copy needs two SSH sessions at once, so the
+        /// window offers every open SSH session and the user picks the source and the target there.
+        /// </summary>
+        internal void CopyDirBetweenHosts()
+        {
+            try
+            {
+                SessionWrapper activeSession = RequireSshSession("Directory transfer");
+                HostToHostCopyWindow window = new HostToHostCopyWindow(
+                    activeSession,
+                    _Controller.AllSessions.ToList(),
+                    activeSession.TryExtractCurrentDir() ?? activeSession.LastDownloadDir);
+                WindowOwnership.Attach(window, _Controller._Window);
+                window.Show();
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
+        /// Opens the folder synchronization window for the active SSH session. Unlike a directory transfer, this
+        /// compares both sides first and copies only the differences, with an optional deletion of the extra files.
+        /// </summary>
+        internal void Synchronize()
+        {
+            try
+            {
+                SessionWrapper activeSession = RequireSshSession("Folder synchronization");
+                SynchronizeWindow window = new SynchronizeWindow(activeSession.Session)
+                {
+                    RemoteDirectory = activeSession.TryExtractCurrentDir() ?? activeSession.LastDownloadDir,
+                    LocalDirectory = _Controller.Settings.DefaultDownloadDirectory
+                };
+                WindowOwnership.Attach(window, _Controller._Window);
+                window.Show();
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
         }
 
         internal void UploadDir()
@@ -1007,6 +1088,22 @@ public class MainWindowController : INotifyPropertyChanged
 
     public GlobalSettings Settings { get; private set; }
 
+    // The standard API symbols (ApiSymbols.xml). Loaded at most once, on the first editor that needs them,
+    // and only while the setting is on, so a switched-off feature never reads the file.
+    private ApiSymbolDatabase _ApiSymbols;
+
+    private ApiSymbolDatabase ApiSymbols
+    {
+        get
+        {
+            if (_ApiSymbols == null && Settings.Editor.ApiSymbols)
+            {
+                _ApiSymbols = ApiSymbolDatabase.Load();
+            }
+            return _ApiSymbols;
+        }
+    }
+
     public MenuCommandHandlersImpl MenuCommandHandlers { get; }
 
     public ToolStripImpl ToolStrip { get; }
@@ -1350,7 +1447,17 @@ public class MainWindowController : INotifyPropertyChanged
         edit.TabSize = Settings.Editor.TabSize;
         edit.InsertSpaces = Settings.Editor.InsertSpaces;
         edit.HideMargins = !Settings.Editor.ShowLineNumbers;
+        edit.ShowTabs = Settings.Editor.ShowTabs;
+        edit.ShowAllCharacters = Settings.Editor.ShowAllCharacters;
+        edit.CompletionEnabled = Settings.Editor.Autocompletion;
+        edit.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;
+        edit.ApiSymbols = Settings.Editor.ApiSymbols ? ApiSymbols : null;
         ApplySyntaxHighlighting(edit);
+        // The settings window can switch the character marks too, so the tool bar and the menu show the new state.
+        if (edit.Tag is EditorTabContext editorTab)
+        {
+            editorTab.EditorPanel.RefreshState();
+        }
     }
 
     private void ApplySyntaxHighlighting(RemoteFileEditor edit)
@@ -1666,9 +1773,10 @@ public class MainWindowController : INotifyPropertyChanged
         ApplyTerminalSettings(terminalEmulatorControl);
         try
         {
-            if (Settings.FontName != null && Settings.FontSize != 0f)
+            Font configuredFont = Settings.ConfiguredFont;
+            if (configuredFont != null)
             {
-                terminalEmulatorControl.Font = new Font(Settings.FontName, Settings.FontSize);
+                terminalEmulatorControl.Font = configuredFont;
             }
         }
         catch
