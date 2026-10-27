@@ -1123,13 +1123,22 @@ internal static class Program
             Directory.CreateDirectory(openwrtEtc);
             Directory.CreateDirectory(plainEtc);
             Directory.CreateDirectory(Path.Combine(opkgEtc, "opkg"));
+            File.WriteAllText(Path.Combine(opkgEtc, "opkg", "customfeeds.conf"), "# add your custom package feeds here\n");
             File.WriteAllText(Path.Combine(openwrtEtc, "openwrt_release"), "DISTRIB_ID='OpenWrt'\n");
 
             Check(RunProbe(shell, args, openwrtEtc, opkgOnPath: true), name + ": OpenWrt with opkg is detected");
             Check(!RunProbe(shell, args, openwrtEtc, opkgOnPath: false), name + ": OpenWrt without opkg is not offered");
             Check(!RunProbe(shell, args, plainEtc, opkgOnPath: true), name + ": a plain host with opkg installed is not offered");
             Check(!RunProbe(shell, args, plainEtc, opkgOnPath: false), name + ": a plain host is not offered");
-            Check(RunProbe(shell, args, opkgEtc, opkgOnPath: true), name + ": the opkg configuration directory alone counts as OpenWrt");
+            Check(RunProbe(shell, args, opkgEtc, opkgOnPath: true), name + ": the custom feed list of opkg alone counts as OpenWrt");
+
+            // Yocto-based systems have an /etc/opkg directory (and opkg) as well, but are not OpenWrt.
+            string yoctoEtc = Path.Combine(_work, "etc-yocto-" + name.Replace(' ', '-'));
+            Directory.CreateDirectory(Path.Combine(yoctoEtc, "opkg"));
+            File.WriteAllText(Path.Combine(yoctoEtc, "opkg", "opkg.conf"), "src/gz all http://feeds.example/all\n");
+            File.WriteAllText(Path.Combine(yoctoEtc, "opkg", "arch.conf"), "arch all 1\n");
+            File.WriteAllText(Path.Combine(yoctoEtc, "os-release"), "ID=poky\nNAME=\"Poky (Yocto Project Reference Distro)\"\n");
+            Check(!RunProbe(shell, args, yoctoEtc, opkgOnPath: true), name + ": a Yocto system with /etc/opkg and opkg is not taken for OpenWrt");
 
             // Derivatives tell about their OpenWrt base in /etc/os-release only.
             string derivativeEtc = Path.Combine(_work, "etc-immortalwrt-" + name.Replace(' ', '-'));

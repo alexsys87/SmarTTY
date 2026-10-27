@@ -10,6 +10,7 @@
     <Compile Include="../../PackageManagers/AptPackageManagerClient.cs" Link="AptPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/DnfPackageManagerClient.cs" Link="DnfPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/OpkgPackageManagerClient.cs" Link="OpkgPackageManagerClient.cs" />
+    <Compile Include="../../PackageManagers/PackageManagerSelector.cs" Link="PackageManagerSelector.cs" />
     <Compile Include="../../PackageManagers/PacmanPackageManagerClient.cs" Link="PacmanPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/PortagePackageManagerClient.cs" Link="PortagePackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/YumPackageManagerClient.cs" Link="YumPackageManagerClient.cs" />

@@ -8,11 +8,17 @@ namespace SmarTTY;
 
 public class OpkgPackageManagerClient : ILinuxPackageManagerClient
 {
+    /// <summary>
+    /// One point below the other managers: a host that has both opkg and apk (OpenWrt 25.12 with a leftover opkg) is
+    /// managed by apk, which is what OpenWrtDetector reports for it too.
+    /// </summary>
+    public const int ProbeScore = PackageManagerSelector.MaxScore - 1;
+
     public int Probe(ISSHCommandRunner runner)
     {
         if (runner.RunCommand("which opkg") != null || runner.RunCommand("opkg -v") != null)
         {
-            return 1000;
+            return ProbeScore;
         }
         return 0;
     }

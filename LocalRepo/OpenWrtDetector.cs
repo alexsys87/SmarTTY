@@ -16,14 +16,14 @@ public static class OpenWrtDetector
     public const string ApkMarker = "SMARTTY_PKG=apk";
 
     /// <summary>
-    /// Shell command that reports whether the host is OpenWrt (the release file, the opkg configuration directory or the
-    /// custom apk repository list is present, or /etc/os-release names OpenWrt as the system or its base, as derivatives
+    /// Shell command that reports whether the host is OpenWrt (the release file, the custom opkg feed list or the
+    /// custom apk repository list is present - not just the /etc/opkg directory, which Yocto-based systems have too, or /etc/os-release names OpenWrt as the system or its base, as derivatives
     /// such as ImmortalWrt do with ID_LIKE="lede openwrt") and which package manager it has: apk (OpenWrt 25.12 and newer)
     /// or opkg. Both answers are printed as markers so that a missing command, a shell banner or an error line cannot be
     /// mistaken for a positive answer. When both managers are installed, apk wins, like in the package manager window.
     /// </summary>
     public const string ProbeCommand =
-        "if [ -f /etc/openwrt_release ] || [ -d /etc/opkg ] || [ -f /etc/apk/repositories.d/customfeeds.list ] || " +
+        "if [ -f /etc/openwrt_release ] || [ -f /etc/opkg/customfeeds.conf ] || [ -f /etc/apk/repositories.d/customfeeds.list ] || " +
         "grep -qsE '^(ID|ID_LIKE)=.*(openwrt|lede)' /etc/os-release; then echo " + OpenWrtMarker + "; else echo SMARTTY_OS=other; fi; " +
         "pm=none; command -v opkg >/dev/null 2>&1 && pm=opkg; command -v apk >/dev/null 2>&1 && pm=apk; echo SMARTTY_PKG=$pm";
 
