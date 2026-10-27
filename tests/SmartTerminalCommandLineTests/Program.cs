@@ -145,6 +145,31 @@ internal static class Program
         Equal(ShellCommandLine.JoinWrappedLines("interface x\n  ip address 1\n", false), "interface x\n  ip address 1\n", "wrapped: an indented block stays when indent is off");
         Equal(ShellCommandLine.JoinWrappedLines("run a\n   b\n", true), "run a b\n", "wrapped: indented rest joins when indent is on");
         Equal(ShellCommandLine.JoinWrappedLines("a\n\n| b", false), "a\n\n| b", "wrapped: a blank line is not joined to");
+        Equal(ShellCommandLine.JoinAsOneLine("a\nb\nc", " "), "a b c", "one line: spaces");
+        Equal(ShellCommandLine.JoinAsOneLine("a\nb\nc", " && "), "a && b && c", "one line: &&");
+        Equal(ShellCommandLine.JoinAsOneLine("make &&\nrun", " && "), "make && run", "one line: after an operator only a space");
+        Equal(ShellCommandLine.JoinAsOneLine("cat a\n| grep b", " && "), "cat a | grep b", "one line: before an operator only a space");
+        Equal(ShellCommandLine.JoinAsOneLine("a;\nb", " && "), "a; b", "one line: after ; only a space");
+        Equal(ShellCommandLine.JoinAsOneLine("# note\n\n  ls  \n\n  pwd\n", " && "), "ls && pwd", "one line: comments and blank lines are dropped, lines trimmed");
+        Equal(ShellCommandLine.JoinAsOneLine("tar \\\n  -x", " && "), "tar -x", "one line: backslash continuation");
+        Equal(ShellCommandLine.JoinAsOneLine("for f in *; do\necho $f\ndone", " && "), "for f in *; do echo $f; done", "one line: a loop is not broken by &&");
+        Equal(ShellCommandLine.JoinAsOneLine("if a; then\nb\nelse\nc\nfi", " && "), "if a; then b; else c; fi", "one line: if/else");
+        Equal(ShellCommandLine.JoinAsOneLine("", " "), "", "one line: empty");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("ls\npwd\n")), "ls|pwd", "commands: one per line");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("for f in *; do\necho $f\ndone\nls")), "for f in *; do echo $f; done|ls", "commands: a loop is one command");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("if true; then\necho 1\nelse\necho 2\nfi")), "if true; then echo 1; else echo 2; fi", "commands: if/else is one command");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("echo 'a\nb'\nls")), "echo 'a b'|ls", "commands: an open quote goes on");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("make \\\n  all\nls")), "make   all|ls", "commands: backslash continuation");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("cat a\n| grep b\nls")), "cat a | grep b|ls", "commands: a line that starts with a pipe goes on");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("a &&\nb\nc")), "a && b|c", "commands: a trailing && goes on");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("echo a;\necho b")), "echo a;|echo b", "commands: a trailing ; ends the command");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("sleep 1 &\necho b")), "sleep 1 &|echo b", "commands: a trailing & ends the command");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("# c\nls\n\n\npwd")), "ls|pwd", "commands: comments and blank lines are dropped");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("foo() {\n echo hi\n}\nfoo")), "foo() { echo hi; }|foo", "commands: a function is one command");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("echo for\nls")), "echo for|ls", "commands: 'for' as an argument opens nothing");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("x=$(\nls\n)\npwd")), "x=$( ls )|pwd", "commands: an open parenthesis goes on");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("  cd /tmp\n  ls\n")), "cd /tmp|ls", "commands: lines with the same indent are separate");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("")), "", "commands: empty");
     }
 
     private static void VariableChecks()

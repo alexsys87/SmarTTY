@@ -28,6 +28,46 @@ internal static class PasteGuard
         return OptionsOf(settings).ResolveLineBreak(automatic);
     }
 
+    /// <summary>
+    /// Brings the clipboard text into the form of the paste mode: "as one line" modes join the lines into a command line. The
+    /// other modes leave the text alone.
+    /// </summary>
+    public static string ApplyMode(string text, PasteMode mode)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+        switch (mode)
+        {
+            case PasteMode.OneLineSpaces:
+                return ShellCommandLine.JoinAsOneLine(text, " ");
+            case PasteMode.OneLineAnd:
+                return ShellCommandLine.JoinAsOneLine(text, " && ");
+            default:
+                return text;
+        }
+    }
+
+    /// <summary>The size of a text in kilobytes, as it is told to the user.</summary>
+    public static string FormatSize(int characters)
+    {
+        return characters >= 1024 * 1024
+            ? (characters / (1024.0 * 1024.0)).ToString("0.#") + " MB"
+            : Math.Max(characters / 1024, 1) + " KB";
+    }
+
+    /// <summary>
+    /// Asks what to do with a paste that is too large to be typed into a terminal: upload it as a file (Yes), paste it anyway
+    /// (No) or do nothing (Cancel).
+    /// </summary>
+    public static DialogResult AskUpload(int characters, IWin32Window owner)
+    {
+        string text = "The text is " + FormatSize(characters) + ". Typing so much into a terminal takes long, and a remote shell may lose or mangle it." +
+            "\n\nYes: upload it as a file (scp) to the current directory.\nNo: paste it anyway.\nCancel: paste nothing.";
+        return ThemedMessageBox.Show(owner, text, "Large paste", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+    }
+
     /// <summary>The text cleaned as the settings say, with LF line breaks.</summary>
     public static string Clean(string text, PasteSettings options)
     {

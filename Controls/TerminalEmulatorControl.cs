@@ -353,9 +353,28 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public event TerminalDataHandler DataEntered;
 
+    /// <summary>
+    /// The user chose to send a very large paste as a file instead of typing it: the text to upload to the current directory
+    /// of the terminal (raised on the UI thread).
+    /// </summary>
+    public event Action<TerminalEmulatorControl, string> LargePasteUploadRequested;
+
+    // From this size a paste is sent in pieces, one after another, so that the window does not wait for the whole text.
+    private const int AsyncPasteThreshold = 16 * 1024;
+
+    private const int AsyncPasteChunkSize = 4096;
+
+    private PasteMode _pasteMode;
+
+    private PasteJob _pasteJob;
+
+    /// <summary>The way the paste that is being done now was asked for (see <see cref="PasteSpecial"/>).</summary>
+    protected PasteMode PasteModeInUse => _pasteMode;
+
     public TerminalEmulatorControl()
     {
         InitializeComponent();
+        Disposed += (object sender, EventArgs e) => _pasteJob?.Abort();
         ((TextEditorControl)this).CopyLineWhenNoSelection = false;
         try
         {
@@ -2009,25 +2028,152 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             // With bracketed paste the program gets the text as one piece and decides itself what to do with the line
             // breaks (bash, zsh, vim and nano do not run or auto-indent it), so only without it the lines run at once.
             bool bracketed = IsPrivateModeSet(BracketedPasteMode);
+            if (_pasteJob != null && _pasteJob.IsActive)
+            {
+                // The previous paste is still being sent.
+                return;
+            }
+            clipboardText = PasteGuard.ApplyMode(clipboardText, _pasteMode);
             string text = PasteGuard.Prepare(clipboardText, AppSettings, linesRunAtOnce: !bracketed, owner: this);
             if (text != null)
             {
                 // A COM/TCP session may use an encoding without some of the characters of the text.
                 text = PasteGuard.FitToEncoding(text, InputEncoding, AppSettings, this);
             }
-            if (text != null)
+            if (text != null && !OfferUpload(text))
             {
-                text = XtermProtocol.PreparePaste(text, PasteGuard.ResolveLineBreak(AppSettings, PasteLineBreak), bracketed);
-                if (!string.IsNullOrEmpty(text))
-                {
-                    SendText(text, InputKind.Paste);
-                }
+                string lineBreak = PasteGuard.ResolveLineBreak(AppSettings, PasteLineBreak);
+                SendPasted(XtermProtocol.PreparePaste(text, lineBreak, bracketed), lineBreak, bracketed);
             }
         }
         catch (Exception exception)
         {
             ThemedMessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
+    }
+
+    /// <summary>
+    /// Pastes the clipboard text in another way than Paste: as one line (the lines joined with a space or with &amp;&amp;); the
+    /// other modes belong to the terminals that support them.
+    /// </summary>
+    public virtual void PasteSpecial(PasteMode mode)
+    {
+        _pasteMode = mode;
+        try
+        {
+            Paste();
+        }
+        finally
+        {
+            _pasteMode = PasteMode.Normal;
+        }
+    }
+
+    // A text this large is better uploaded than typed: asks, and returns true when the text must not be pasted.
+    private bool OfferUpload(string text)
+    {
+        int thresholdKB = PasteGuard.OptionsOf(AppSettings).UploadOfferThresholdKB;
+        if (thresholdKB <= 0 || LargePasteUploadRequested == null || text.Length < thresholdKB * 1024)
+        {
+            return false;
+        }
+        switch (PasteGuard.AskUpload(text.Length, this))
+        {
+            case DialogResult.Yes:
+                LargePasteUploadRequested(this, text);
+                return true;
+            case DialogResult.No:
+                return false;
+            default:
+                return true;
+        }
+    }
+
+    private void SendPasted(string text, string lineBreak, bool bracketed)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+        if (text.Length < AsyncPasteThreshold)
+        {
+            SendText(text, InputKind.Paste);
+            return;
+        }
+        _pasteJob = new PasteJob(this, "Pasting", PasteModes.BuildSteps(text, AsyncPasteChunkSize, lineBreak, splitLines: false),
+            (string piece, Action written) => SendTextWithCompletion(piece, InputKind.Paste, written),
+            AppSettings?.Paste, slow: false,
+            (PasteJob.Outcome outcome, string message) =>
+            {
+                _pasteJob = null;
+                if (outcome == PasteJob.Outcome.Cancelled && bracketed)
+                {
+                    // The program waits for the end of the paste.
+                    SendText(XtermProtocol.BracketedPasteEnd, InputKind.Paste);
+                }
+                else if (outcome == PasteJob.Outcome.Failed)
+                {
+                    ThemedMessageBox.Show(message, "Paste", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                }
+            });
+        _pasteJob.Start();
+    }
+
+    /// <summary>Stops the paste that is being sent in pieces (Esc); false when there is none.</summary>
+    protected virtual bool CancelActivePaste()
+    {
+        PasteJob job = _pasteJob;
+        if (job == null || !job.IsActive)
+        {
+            return false;
+        }
+        job.Cancel();
+        return true;
+    }
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == Keys.Escape && CancelActivePaste())
+        {
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    /// <summary>As SendText, but <paramref name="written"/> is called (on any thread) when the data has been handed over.</summary>
+    protected bool SendTextWithCompletion(string text, InputKind inputKind, Action written)
+    {
+        if (DataEntered == null)
+        {
+            return false;
+        }
+        byte[] bytes = InputEncoding.GetBytes(text);
+        if (Dispatcher != null)
+        {
+            Dispatcher.PostInput(() =>
+            {
+                try
+                {
+                    DataEntered(this, bytes, inputKind);
+                }
+                finally
+                {
+                    written?.Invoke();
+                }
+            });
+        }
+        else
+        {
+            try
+            {
+                DataEntered(this, bytes, inputKind);
+            }
+            finally
+            {
+                written?.Invoke();
+            }
+        }
+        return true;
     }
 
     public void EnqueueOutput(string text)

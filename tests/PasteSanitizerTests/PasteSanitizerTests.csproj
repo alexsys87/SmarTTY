@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Terminal/PasteSanitizer.cs" Link="PasteSanitizer.cs" />
+    <Compile Include="../../Terminal/PasteModes.cs" Link="PasteModes.cs" />
   </ItemGroup>
 </Project>

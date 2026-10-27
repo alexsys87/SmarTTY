@@ -630,6 +630,213 @@ internal static class ShellCommandLine
         return string.Join("\n", result);
     }
 
+    /// <summary>
+    /// Joins the lines of pasted text into one command line ("paste as one line"): every line is trimmed, blank lines and
+    /// whole-line comments are dropped, a line ended with a backslash is continued, and the lines are separated with
+    /// <paramref name="separator"/> (" " or " &amp;&amp; "). Where that would be a syntax error the separator is replaced:
+    /// after an operator, before an operator or an option the lines are joined with a space, before done/fi/else/then/do
+    /// with "; ".
+    /// </summary>
+    public static string JoinAsOneLine(string text, string separator)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text ?? "";
+        }
+        separator = string.IsNullOrEmpty(separator) ? " " : separator;
+        string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\t', ' ').Split('\n');
+        StringBuilder result = new StringBuilder(text.Length);
+        bool continued = false;
+        foreach (string rawLine in lines)
+        {
+            string line = rawLine.Trim();
+            if (line.Length == 0 || (!continued && line[0] == '#'))
+            {
+                continue;
+            }
+            if (result.Length > 0 && !continued)
+            {
+                string previous = result.ToString().TrimEnd();
+                result.Length = previous.Length;
+                if (EndsWithJoiningOperator(previous) || StartsWithContinuation(line))
+                {
+                    result.Append(' ');
+                }
+                else
+                {
+                    result.Append(StartsWithBlockWord(line) ? "; " : separator);
+                }
+            }
+            continued = false;
+            if (EndsWithContinuation(line))
+            {
+                line = line.Substring(0, line.Length - 1);
+                continued = true;
+            }
+            result.Append(line);
+        }
+        return result.ToString().TrimEnd();
+    }
+
+    private static bool StartsWithBlockWord(string line)
+    {
+        List<Token> tokens = Tokenize(line);
+        if (tokens.Count == 0 || tokens[0].IsOperator)
+        {
+            return false;
+        }
+        string first = tokens[0].Text;
+        return first == "done" || first == "fi" || first == "esac" || first == "else" || first == "elif" || first == "then" || first == "do" || first == "}";
+    }
+
+    /// <summary>
+    /// Splits pasted text into the commands to run one after another ("paste line by line"). A command that goes over
+    /// several lines stays one command: a line ended with a backslash, an open quote, an operator at the end of the line,
+    /// an unfinished if/for/while/case/function or ( block, and a wrapped rest (indented, or starting with an operator or
+    /// an option). Blank lines and whole-line comments are dropped. Each command is a single line, the lines of a block
+    /// are joined as <see cref="JoinPastedLines"/> does.
+    /// </summary>
+    public static List<string> SplitPastedCommands(string text)
+    {
+        List<string> commands = new List<string>();
+        if (string.IsNullOrEmpty(text))
+        {
+            return commands;
+        }
+        string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\t', ' ').Split('\n');
+        StringBuilder raw = new StringBuilder();
+        int firstIndent = 0;
+        foreach (string line in lines)
+        {
+            string trimmed = line.TrimStart();
+            bool inProgress = raw.Length > 0;
+            string current = inProgress ? raw.ToString() : null;
+            if (trimmed.Length > 0 && trimmed[0] == '#' && !(inProgress && HasOpenQuote(current)))
+            {
+                continue;
+            }
+            if (!inProgress)
+            {
+                if (trimmed.Length != 0)
+                {
+                    raw.Append(line);
+                    firstIndent = line.Length - trimmed.Length;
+                }
+                continue;
+            }
+            bool open = IsIncompleteCommand(current);
+            if (!open && trimmed.Length == 0)
+            {
+                continue;
+            }
+            if (!open && !StartsWithContinuation(trimmed) && line.Length - trimmed.Length <= firstIndent)
+            {
+                commands.Add(JoinPastedLines(current));
+                raw.Clear();
+                raw.Append(line);
+                firstIndent = line.Length - trimmed.Length;
+                continue;
+            }
+            raw.Append('\n').Append(line);
+        }
+        if (raw.Length > 0)
+        {
+            commands.Add(JoinPastedLines(raw.ToString()));
+        }
+        return commands.FindAll((string command) => command.Length > 0);
+    }
+
+    // True when the lines collected so far cannot be run yet: more of the command follows.
+    private static bool IsIncompleteCommand(string raw)
+    {
+        int lastBreak = raw.LastIndexOf('\n');
+        if (EndsWithContinuation(lastBreak == -1 ? raw : raw.Substring(lastBreak + 1)))
+        {
+            return true;
+        }
+        string joined = JoinPastedLines(raw);
+        if (HasOpenQuote(joined))
+        {
+            return true;
+        }
+        // "a &&" and "a |" go on; "a;" and "a &" are complete commands.
+        if (joined.EndsWith("&&", StringComparison.Ordinal) || joined.EndsWith("|", StringComparison.Ordinal) ||
+            joined.EndsWith("(", StringComparison.Ordinal) || joined.EndsWith("{", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        List<Token> tokens = Tokenize(joined);
+        if (tokens.Count > 0 && !tokens[tokens.Count - 1].IsOperator)
+        {
+            string last = tokens[tokens.Count - 1].Text;
+            if (last == "then" || last == "do" || last == "else" || last == "in")
+            {
+                return true;
+            }
+        }
+        return OpenBlockDepth(tokens) > 0;
+    }
+
+    // The number of blocks (if, for, while, until, case, select, { } and parentheses) that are opened and not closed. Only a
+    // word where a command starts counts, so "echo for" opens nothing.
+    private static int OpenBlockDepth(List<Token> tokens)
+    {
+        int depth = 0;
+        int parentheses = 0;
+        bool commandPosition = true;
+        foreach (Token token in tokens)
+        {
+            if (token.IsOperator)
+            {
+                foreach (char ch in token.Text)
+                {
+                    if (ch == '(')
+                    {
+                        parentheses++;
+                    }
+                    else if (ch == ')' && parentheses > 0)
+                    {
+                        parentheses--;
+                    }
+                }
+                if (token.IsSeparator)
+                {
+                    commandPosition = true;
+                }
+                continue;
+            }
+            string word = token.Text;
+            if (!commandPosition)
+            {
+                continue;
+            }
+            switch (word)
+            {
+                case "if":
+                case "for":
+                case "while":
+                case "until":
+                case "case":
+                case "select":
+                case "{":
+                    depth++;
+                    break;
+                case "fi":
+                case "done":
+                case "esac":
+                case "}":
+                    if (depth > 0)
+                    {
+                        depth--;
+                    }
+                    break;
+            }
+            commandPosition = word == "if" || word == "then" || word == "do" || word == "else" || word == "elif" ||
+                word == "while" || word == "until" || word == "!" || word == "time" || word == "{";
+        }
+        return depth + parentheses;
+    }
+
     // A line that cannot start a command, so it goes on with the previous one: "| grep x", "&& make", "> file", "-v".
     private static bool StartsWithContinuation(string line)
     {

@@ -1816,7 +1816,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
         try
         {
-            string text = clipboardText;
+            string text = PasteGuard.ApplyMode(clipboardText, PasteModeInUse);
             if (!string.IsNullOrEmpty(text))
             {
                 // Each line is sent as a command: a command wrapped by its source must not go out in pieces.

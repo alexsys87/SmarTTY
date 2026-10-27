@@ -1525,6 +1525,17 @@ public class MainWindowController : INotifyPropertyChanged
         {
             ActiveSession?.ActiveTab?.EditorControl?.Paste();
         });
+        ToolStripMenuItem pasteSpecialMenu = new ToolStripMenuItem("Paste special");
+        pasteSpecialMenu.DropDownItems.Add("Paste as one line (lines joined with a space)", null, (object _, EventArgs e) => PasteSpecial(PasteMode.OneLineSpaces));
+        pasteSpecialMenu.DropDownItems.Add("Paste as one line (lines joined with &&)", null, (object _, EventArgs e) => PasteSpecial(PasteMode.OneLineAnd));
+        ToolStripItem pasteLineByLineItem = pasteSpecialMenu.DropDownItems.Add("Paste line by line (wait for each command)", null, (object _, EventArgs e) => PasteSpecial(PasteMode.LineByLine));
+        pasteLineByLineItem.ToolTipText = "Smart Terminal: runs the pasted commands one after another, each when the previous one has ended; stops at a failed command.";
+        _TerminalContextMenu.Items.Add(pasteSpecialMenu);
+        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) =>
+        {
+            // Only the Smart Terminal knows when a command has ended.
+            pasteLineByLineItem.Enabled = ((_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal) is SshTerminalControl;
+        };
         _TerminalContextMenu.Items.Add("Copy All", Icons.Load("copy"), (object _, EventArgs e) =>
         {
             CopyAll();
@@ -1741,6 +1752,8 @@ public class MainWindowController : INotifyPropertyChanged
             };
             session.AttachChannelToControl(terminalEmulatorControl, sshShellChannel, initialCommand.Command != null, initialCommand.TabKeptAfterExit);
         }
+        // A very large paste can be sent as a file instead of being typed into the terminal.
+        terminalEmulatorControl.LargePasteUploadRequested += (TerminalEmulatorControl control, string text) => session.UploadPastedText(text, control);
         terminalEmulatorControl.CaretWhenUnfocused = false;
         // Pasted line breaks reach the remote program as Enter (CR), as in other terminal emulators; a bare LF is
         // Ctrl+J, which editors such as nano or Emacs treat as a command of its own.
@@ -1770,6 +1783,12 @@ public class MainWindowController : INotifyPropertyChanged
         {
         }
         return terminalEmulatorControl;
+    }
+
+    private void PasteSpecial(PasteMode mode)
+    {
+        TerminalEmulatorControl terminal = (_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+        terminal?.PasteSpecial(mode);
     }
 
     private void Vt_FileOpenRequested(object sender, OpenFileEventArgs e)

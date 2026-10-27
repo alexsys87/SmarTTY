@@ -1,3 +1,4 @@
+using SmarTTY.Forms;
 using SmarTTY.Ssh;
 using SmarTTY.IO;
 using SmarTTY.Native;
@@ -301,6 +302,34 @@ public class SshTerminalControl : TerminalEmulatorControl
 
     private CommandChannel _channel;
 
+    // "Paste line by line": the commands that are still to be run, one after another.
+    private sealed class LinePaste
+    {
+        public readonly Queue<string> Pending;
+
+        public readonly int Total;
+
+        public readonly bool StopOnError;
+
+        public int Started;
+
+        public bool Cancelled;
+
+        public PasteProgressForm Progress;
+
+        public LinePaste(List<string> commands, bool stopOnError)
+        {
+            Pending = new Queue<string>(commands);
+            Total = commands.Count;
+            StopOnError = stopOnError;
+        }
+    }
+
+    private LinePaste _linePaste;
+
+    // The command that ran last ended with an error (a non-zero exit code, a lost connection, a failed cd).
+    private bool _lastCommandFailed;
+
     private string _currentDirectory;
 
     private string _previousDirectory;
@@ -498,6 +527,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             if (_previousDirectory == null)
             {
+                _lastCommandFailed = true;
                 PrintLines(new[] { TerminalEmulatorControl.Colorize("cd: OLDPWD not set", 1) });
                 return;
             }
@@ -514,6 +544,7 @@ public class SshTerminalControl : TerminalEmulatorControl
                     ? $"'cd {arguments}' exited with code {exitCode.Value}"
                     : $"'cd {arguments}' did not report an exit code");
             }
+            _lastCommandFailed = true;
             PrintLines(errors.Select((string line) => TerminalEmulatorControl.Colorize(line, 1)));
             return;
         }
@@ -690,6 +721,11 @@ public class SshTerminalControl : TerminalEmulatorControl
         OnTextReplaced();
         SetCaret(((EditableTextBrowser)this).EditableDocument.EndPosition);
         NavigationLocked = false;
+        if (_linePaste != null && IsHandleCreated && !IsDisposed)
+        {
+            // The next pasted command, once this prompt is on the screen (not from inside the command that has just ended).
+            BeginInvoke(new Action(RunNextPastedLine));
+        }
     }
 
     public void Start()
@@ -1472,6 +1508,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             ShowPrompt();
             return true;
         }
+        _lastCommandFailed = false;
         BeginExecution();
         try
         {
@@ -1489,6 +1526,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         }
         catch (Exception exception)
         {
+            _lastCommandFailed = true;
             ProcessOutput(TerminalEmulatorControl.Colorize(exception.Message, 1));
             ShowPrompt();
             return true;
@@ -1678,9 +1716,147 @@ public class SshTerminalControl : TerminalEmulatorControl
                 // Nothing runs: the channel was never attached, so it is closed here and the prompt comes back. If it was
                 // attached, its Finished event shows the prompt.
                 DisposeChannelQuietly(sshShellChannel);
+                _lastCommandFailed = true;
+                PrintLinePasteNote();
                 ShowPrompt();
             }
         }
+    }
+
+    public override void PasteSpecial(PasteMode mode)
+    {
+        if (mode == PasteMode.LineByLine)
+        {
+            PasteLineByLine();
+            return;
+        }
+        base.PasteSpecial(mode);
+    }
+
+    /// <summary>
+    /// Pastes the clipboard text as commands that run one after another: the next one starts only when the previous one has
+    /// ended, and the paste stops at the first command that fails (unless that is turned off in the settings) or when it
+    /// is cancelled (Esc, or Cancel in the progress window). Returns false when nothing was started.
+    /// </summary>
+    public bool PasteLineByLine()
+    {
+        if (_inputLine == null || _linePaste != null)
+        {
+            ThemedMessageBox.Show("The terminal is busy with another command. Wait until it ends and try again.", "Paste line by line", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return false;
+        }
+        try
+        {
+            // Every command runs when its turn comes, so the confirmation and the warnings of a paste apply.
+            string text = PasteGuard.Prepare(ReadClipboardText(), AppSettings, linesRunAtOnce: true, owner: this);
+            if (text == null)
+            {
+                return false;
+            }
+            List<string> commands = ShellCommandLine.SplitPastedCommands(text);
+            if (commands.Count == 0)
+            {
+                return false;
+            }
+            LinePaste run = new LinePaste(commands, PasteGuard.OptionsOf(AppSettings).LineByLineStopOnError);
+            _linePaste = run;
+            run.Progress = new PasteProgressForm("Paste line by line");
+            run.Progress.CancelRequested += (object sender, EventArgs e) => CancelActivePaste();
+            run.Progress.ShowNear(this);
+            RunNextPastedLine();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            EndLinePaste();
+            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            return false;
+        }
+    }
+
+    // At a prompt: runs the next pasted command, or ends the paste.
+    private void RunNextPastedLine()
+    {
+        LinePaste run = _linePaste;
+        if (run == null || IsDisposed || _inputLine == null || _channel != null)
+        {
+            return;
+        }
+        if (run.Cancelled || run.Pending.Count == 0 || (run.StopOnError && _lastCommandFailed))
+        {
+            EndLinePaste();
+            return;
+        }
+        string command = run.Pending.Dequeue();
+        run.Started++;
+        string shown = command.Length > 60 ? command.Substring(0, 57) + "..." : command;
+        run.Progress?.SetProgress(run.Started - 1, run.Total, "Command " + run.Started + " of " + run.Total + ": " + shown);
+        Submit(command);
+    }
+
+    private void EndLinePaste()
+    {
+        LinePaste run = _linePaste;
+        _linePaste = null;
+        PasteProgressForm progress = run?.Progress;
+        if (progress == null)
+        {
+            return;
+        }
+        try
+        {
+            progress.Close();
+            progress.Dispose();
+        }
+        catch
+        {
+        }
+    }
+
+    // After a command has ended: when the paste line by line has to stop here, says so (and ends it).
+    private void PrintLinePasteNote()
+    {
+        LinePaste run = _linePaste;
+        if (run == null)
+        {
+            return;
+        }
+        string note;
+        if (run.Pending.Count == 0)
+        {
+            EndLinePaste();
+            return;
+        }
+        if (run.Cancelled)
+        {
+            note = "[paste cancelled, " + run.Pending.Count + " command(s) not run]";
+        }
+        else if (run.StopOnError && _lastCommandFailed)
+        {
+            note = "[paste stopped after a failed command, " + run.Pending.Count + " command(s) not run]";
+        }
+        else
+        {
+            return;
+        }
+        EndLinePaste();
+        ProcessOutput((CursorPosition.X > 0 ? "\r\n" : "") + TerminalEmulatorControl.Colorize(note, 3) + "\r\n");
+    }
+
+    protected override bool CancelActivePaste()
+    {
+        LinePaste run = _linePaste;
+        if (run != null && !run.Cancelled)
+        {
+            run.Cancelled = true;
+            run.Progress?.SetProgress(run.Started, run.Total, "Cancelling after the current command...");
+            if (_inputLine != null)
+            {
+                EndLinePaste();
+            }
+            return true;
+        }
+        return base.CancelActivePaste();
     }
 
     internal override ILinkScanner CreateLinkScanner()
@@ -1761,6 +1937,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             ResetLinkTracking();
             ResetByteColumns();
             _channel = null;
+            _lastCommandFailed = connectionLost || (statusKnown && exitStatus != 0);
             string message = null;
             if (connectionLost)
             {
@@ -1786,6 +1963,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             {
                 ProcessOutput((CursorPosition.X > 0 ? "\r\n" : "") + message + "\r\n");
             }
+            PrintLinePasteNote();
             ShowPrompt();
         });
     }
@@ -1803,7 +1981,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             // being glued together without a separator.
             // The text only lands in the command line and nothing runs until Enter, so it is cleaned and only a large
             // paste is confirmed.
-            string text = PasteGuard.Prepare(clipboardText, AppSettings, linesRunAtOnce: false, owner: this);
+            string text = PasteGuard.Prepare(PasteGuard.ApplyMode(clipboardText, PasteModeInUse), AppSettings, linesRunAtOnce: false, owner: this);
             text = ShellCommandLine.JoinPastedLines(text);
             if (string.IsNullOrEmpty(text))
             {
@@ -1830,6 +2008,7 @@ public class SshTerminalControl : TerminalEmulatorControl
         {
             // Closing the tab stops the command that is running in it (tail -f, top, ...): its channel used to stay
             // open until the whole session was closed.
+            EndLinePaste();
             CommandChannel channel = _channel;
             _channel = null;
             channel?.DisposeInBackground();
