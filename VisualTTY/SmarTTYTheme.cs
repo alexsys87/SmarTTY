@@ -31,7 +31,22 @@ public enum SmarTTYTheme
     SolarizedLight,
 
     [EnumDisplayText("High Contrast")]
-    HighContrast
+    HighContrast,
+
+    [EnumDisplayText("Dracula")]
+    Dracula,
+
+    [EnumDisplayText("Gruvbox Dark")]
+    GruvboxDark,
+
+    [EnumDisplayText("Monokai")]
+    Monokai,
+
+    [EnumDisplayText("One Dark")]
+    OneDark,
+
+    [EnumDisplayText("Sepia")]
+    Sepia
 }
 
 /// <summary>Theme metadata: the palette folder and whether the theme is a light one.</summary>
@@ -49,6 +64,11 @@ public static class SmarTTYThemes
             SmarTTYTheme.SolarizedDark => "SolarizedDark",
             SmarTTYTheme.SolarizedLight => "SolarizedLight",
             SmarTTYTheme.HighContrast => "HighContrast",
+            SmarTTYTheme.Dracula => "Dracula",
+            SmarTTYTheme.GruvboxDark => "GruvboxDark",
+            SmarTTYTheme.Monokai => "Monokai",
+            SmarTTYTheme.OneDark => "OneDark",
+            SmarTTYTheme.Sepia => "Sepia",
             _ => "Dark"
         };
     }
@@ -59,6 +79,6 @@ public static class SmarTTYThemes
     /// </summary>
     public static bool IsLight(this SmarTTYTheme theme)
     {
-        return theme is SmarTTYTheme.Light or SmarTTYTheme.SolarizedLight;
+        return theme is SmarTTYTheme.Light or SmarTTYTheme.SolarizedLight or SmarTTYTheme.Sepia;
     }
 }
