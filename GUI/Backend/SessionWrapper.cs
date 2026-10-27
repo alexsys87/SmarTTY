@@ -670,7 +670,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             List<string> output = null;
             try
             {
-                output = session.RunCommand(OpenWrtDetector.ProbeCommand, out _);
+                output = session.RunCommand(OpenWrtDetector.ProbeCommand, out _, timeout: TimeSpan.FromSeconds(20));
             }
             catch
             {

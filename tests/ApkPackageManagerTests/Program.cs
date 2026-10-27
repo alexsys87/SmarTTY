@@ -201,6 +201,35 @@ internal static class Program
         }
         Check(failure != null && failure.Contains("line 30") && failure.Contains("line 23") && !failure.Contains("line 22\n"), "only the tail of a long error output is shown");
 
+        // Choosing the client of a host from the probes (PackageManagerSelector).
+        ILinuxPackageManagerClient[] all =
+        {
+            new AptPackageManagerClient(), new DnfPackageManagerClient(), new ZypperPackageManagerClient(), new PacmanPackageManagerClient(),
+            new PortagePackageManagerClient(), new YumPackageManagerClient(), new OpkgPackageManagerClient(), new ApkPackageManagerClient()
+        };
+        FakeRunner host = new FakeRunner();
+        Check(PackageManagerSelector.Pick(all, host) == null, "Selector: a host without any package manager -> null");
+        host.Responses["which opkg"] = new[] { "/bin/opkg" };
+        Check(PackageManagerSelector.Pick(all, host) is OpkgPackageManagerClient, "Selector: OpenWrt with opkg -> opkg");
+        host.Responses["apk --version"] = new[] { "apk-tools 3.0.0_pre20241113, compiled for arm." };
+        Check(PackageManagerSelector.Pick(all, host) is ApkPackageManagerClient, "Selector: opkg and apk both installed -> apk, like OpenWrtDetector");
+        Check(OpkgPackageManagerClient.ProbeScore < new ApkPackageManagerClient().Probe(host), "Selector: the opkg score is below the apk score");
+        FakeRunner debian = new FakeRunner();
+        debian.Responses["apt -v"] = new[] { "apt 2.6.1 (amd64)" };
+        debian.Responses["which yum"] = new[] { "/usr/bin/yum" };
+        Check(PackageManagerSelector.Pick(all, debian) is AptPackageManagerClient, "Selector: apt (1000) beats yum (500)");
+        Check(debian.Commands.Count == 1 && debian.Commands[0] == "apt -v", "Selector: the probes after a top score are not run");
+        FakeRunner yumOnly = new FakeRunner();
+        yumOnly.Responses["which yum"] = new[] { "/usr/bin/yum" };
+        Check(PackageManagerSelector.Pick(all, yumOnly) is YumPackageManagerClient, "Selector: an old yum-only host -> yum");
+        FakeRunner fedora = new FakeRunner();
+        fedora.Responses["dnf --version"] = new[] { "4.14.0", "dnf" };
+        fedora.Responses["which yum"] = new[] { "/usr/bin/yum" };
+        Check(PackageManagerSelector.Pick(all, fedora) is DnfPackageManagerClient, "Selector: yum is a symlink to dnf on Fedora -> dnf");
+        int asked = 0;
+        Check(PackageManagerSelector.Pick(all, debian, () => ++asked > 0) == null && asked == 1, "Selector: cancelled before the first probe -> null, nothing run more");
+        Check(PackageManagerSelector.Pick(all, new FakeRunner()) == null, "Selector: a failing probe is not a result");
+
         _passed += AdditionalClientsTests.Run();
         _passed += PackageListFixesTests.Run();
 

@@ -240,27 +240,10 @@ public partial class PackageManagerWindow : Window
         {
             try
             {
-                ILinuxPackageManagerClient bestClient = null;
-                int bestScore = 0;
-                foreach (ILinuxPackageManagerClient client in _Clients)
+                ILinuxPackageManagerClient bestClient = PackageManagerSelector.Pick(_Clients, _Session, () => _Closed);
+                if (_Closed)
                 {
-                    if (_Closed)
-                    {
-                        return;
-                    }
-                    int score = -1;
-                    try
-                    {
-                        score = client.Probe(_Session);
-                    }
-                    catch
-                    {
-                    }
-                    if (score > bestScore)
-                    {
-                        bestClient = client;
-                        bestScore = score;
-                    }
+                    return;
                 }
                 if (bestClient == null)
                 {
