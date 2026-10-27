@@ -167,7 +167,7 @@ internal static class Program
         Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("# c\nls\n\n\npwd")), "ls|pwd", "commands: comments and blank lines are dropped");
         Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("foo() {\n echo hi\n}\nfoo")), "foo() { echo hi; }|foo", "commands: a function is one command");
         Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("echo for\nls")), "echo for|ls", "commands: 'for' as an argument opens nothing");
-        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("x=$(\nls\n)\npwd")), "x=$( ls; )|pwd", "commands: an open parenthesis goes on");
+        Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("x=$(\nls\n)\npwd")), "x=$( ls )|pwd", "commands: an open parenthesis goes on");
         Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("  cd /tmp\n  ls\n")), "cd /tmp|ls", "commands: lines with the same indent are separate");
         Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("")), "", "commands: empty");
     }
