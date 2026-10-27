@@ -160,6 +160,9 @@ jobs:
       - name: Run file dialog checks (themed chooser replaced the native OpenFileDialog/SaveFileDialog)
         run: dotnet run --project tests/FileDialogTests -c Release
 
+      - name: Run snippet editor checks (themed editor replaced the WinForms SnippetEditForm)
+        run: dotnet run --project tests/SnippetEditorTests -c Release
+
       - name: Run folder synchronization settings checks (direction, options, exclusion masks)
         run: dotnet run --project tests/SyncRequestTests -c Release
 

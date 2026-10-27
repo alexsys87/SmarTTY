@@ -33,6 +33,9 @@ public partial class App : Application
         // The file choosers of the harness-compiled controls become the themed WPF local file dialog.
         ThemedFileDialogAdapter.Install();
 
+        // The snippet editor of the harness-compiled paste menu becomes the themed WPF window.
+        ThemedSnippetEditorAdapter.Install();
+
         // The proxy prompt is raised from the harness-compiled connection controller, which cannot reference the WPF
         // dialog; the window is wired in here instead.
         NewConnectionController.ProxyCredentialsPrompt = (string realm, string credentials) =>

@@ -1,4 +1,3 @@
-using SmarTTY.Forms;
 using SmarTTY.Native;
 using SmarTTY.Terminal;
 using System;
@@ -156,32 +155,31 @@ internal static class PasteMenu
         catch
         {
         }
-        using SnippetEditForm form = new SnippetEditForm("", text ?? "", canDelete: false);
-        if (form.ShowDialog(owner) != DialogResult.OK)
+        ThemedSnippetEditorResult added = ThemedSnippetEditor.Edit(owner, "", text ?? "", canDelete: false);
+        if (added == null)
         {
             return;
         }
         options.Snippets ??= new List<PasteSnippet>();
-        options.Snippets.Add(new PasteSnippet { Name = form.SnippetName, Text = form.SnippetText });
+        options.Snippets.Add(new PasteSnippet { Name = added.Name, Text = added.Text });
         settings?.Save();
     }
 
     private static void EditSnippet(Control owner, GlobalSettings settings, PasteSettings options, PasteSnippet snippet)
     {
-        using SnippetEditForm form = new SnippetEditForm(snippet.Name, snippet.Text, canDelete: true);
-        DialogResult result = form.ShowDialog(owner);
-        if (result == DialogResult.OK)
+        ThemedSnippetEditorResult edited = ThemedSnippetEditor.Edit(owner, snippet.Name, snippet.Text, canDelete: true);
+        if (edited == null)
         {
-            snippet.Name = form.SnippetName;
-            snippet.Text = form.SnippetText;
+            return;
         }
-        else if (result == DialogResult.Abort)
+        if (edited.Delete)
         {
             options.Snippets.Remove(snippet);
         }
         else
         {
-            return;
+            snippet.Name = edited.Name;
+            snippet.Text = edited.Text;
         }
         settings?.Save();
     }
