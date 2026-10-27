@@ -369,7 +369,7 @@ public class QuickSyncRunner
                     syncEvents?.OnWarning(new SyncWarning
                     {
                         Exception = exception,
-                        Warning = new QuickSyncWarning(QuickSyncWarningType.UnreadableLocalDirectory, localPath.ToString(), 0)
+                        Warning = new QuickSyncWarning(QuickSyncWarningType.UnreadableLocalDirectory, localPath.DisplayPath, 0)
                     });
                 }
             }

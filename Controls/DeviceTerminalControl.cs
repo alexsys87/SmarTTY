@@ -339,6 +339,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         AddPasteCommands();
         AddPasteSpecialCommands();
         AddRemoteSizeCommands();
+        AddPromptDetectionCommand();
         InitializeCommandLists();
         
         foreach (TerminalEncodings.Choice choice in TerminalEncodings.All)
@@ -536,6 +537,32 @@ public partial class DeviceTerminalControl : DpiAwareControl
         if (_deviceTerminalSettings != null)
         {
             _deviceTerminalSettings.SyncRemoteTerminalSize = sync;
+        }
+    }
+
+    // The runtime counterpart of the "Detect the prompt of the device" option in the connection settings: a device
+    // that prints something that only looks like a shell prompt makes the input line continue it, and the setting is
+    // buried in a dialog. Turning it off here keeps the configured prompt. Like the other runtime toggles of this
+    // menu it updates the profile object of the open tab; saving the profile stores the new value.
+    private ToolStripMenuItem _autoDetectPromptMenuItem;
+
+    private void AddPromptDetectionCommand()
+    {
+        _autoDetectPromptMenuItem = new ToolStripMenuItem("Detect the prompt of the device", null, (sender, args) => ToggleAutoDetectPrompt())
+        {
+            ToolTipText = "Continue a prompt the device prints (\"# \", \"$ \", \"> \") in the input line. Switch it off when the device prints something that only looks like a prompt: the input line then always uses the configured prompt."
+        };
+        contextMenuStrip1.Items.Add(_autoDetectPromptMenuItem);
+    }
+
+    private void ToggleAutoDetectPrompt()
+    {
+        bool detect = !_autoDetectPromptMenuItem.Checked;
+        _autoDetectPromptMenuItem.Checked = detect;
+        _serialTerminalControl.EnableAutoPromptDetection(detect);
+        if (_deviceTerminalSettings != null)
+        {
+            _deviceTerminalSettings.AutoDetectPrompt = detect;
         }
     }
 
@@ -992,6 +1019,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _sendRemoteSizeMenuItem.Visible = needsStty;
         _syncRemoteSizeMenuItem.Checked = needsStty && _deviceTerminalSettings.SyncRemoteTerminalSize;
         _serialTerminalControl.SyncRemoteSize = _syncRemoteSizeMenuItem.Checked;
+        _autoDetectPromptMenuItem.Checked = _deviceTerminalSettings.AutoDetectPrompt;
         UpdateSerialLineUi();
         UpdateTelnetMenu(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
         ConfigureCommandLists();

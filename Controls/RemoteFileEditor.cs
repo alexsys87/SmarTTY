@@ -1,4 +1,5 @@
 ﻿using SmarTTY.Ssh;
+using SmarTTY.CodeEditing;
 using SmarTTY.Forms;
 using SmarTTY.IO;
 using SmarTTY.Terminal;
@@ -106,6 +107,9 @@ public partial class RemoteFileEditor : CodeEditorPP
     private bool _restoreHexAfterReload;
 
     private int _hexOffsetToRestore;
+
+    // The blocks folded when the reload started: the fresh document has no folds, so they are put back once it is in.
+    private FoldedLineInfo[] _foldsToRestore;
 
     // The file~ copy of the original is made by the first save of the file after it was loaded.
     private bool _backupDone;
@@ -937,6 +941,14 @@ public partial class RemoteFileEditor : CodeEditorPP
                         _hexEditor.GoToOffset(_hexOffsetToRestore);
                     }
                 }
+                // The fresh document dropped the folds of the previous text: put back the blocks that were
+                // collapsed, matched by their header text (the same rule the editor uses for its own folds).
+                FoldedLineInfo[] folds = _foldsToRestore;
+                _foldsToRestore = null;
+                if (folds != null && folds.Length != 0)
+                {
+                    RestoreFoldState(folds);
+                }
             }
             catch
             {
@@ -1159,6 +1171,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         _caretToRestore = CaretPosition;
         _restoreHexAfterReload = _hexMode;
         _hexOffsetToRestore = _hexMode ? _hexEditor.CaretOffset : 0;
+        _foldsToRestore = GetFoldState();
         if (_hexMode)
         {
             _hexEditor.ReadOnly = true;

@@ -34,6 +34,7 @@ internal static class Program
             CheckOptions();
             CheckExclusionMasks();
             CheckPathNormalizationIsLeftToTheEngine();
+            CheckLocalPathDisplay();
             Console.WriteLine();
             Console.WriteLine($"All {_passed} checks passed.");
             return 0;
@@ -121,5 +122,26 @@ internal static class Program
         SyncSettings settings = SyncRequest.Create(true, "C:/local/dir", "/home/user/dir", null, false, false, false, QuickSyncOverwriteTrigger.Stat);
         Equal("C:/local/dir", settings.LocalPath, "the local path is passed through");
         Equal("/home/user/dir", settings.RemotePath, "the remote path is passed through");
+    }
+
+    private static void CheckLocalPathDisplay()
+    {
+        Console.WriteLine("== LocalPath display");
+        // FromUserPath adds the \\?\ prefix the Win32 long-path calls need; DisplayPath takes it off again, so the
+        // path shown to the user (a synchronization warning, a "Failed to delete" error) has the shape they typed.
+        LocalPath path = LocalPath.FromUserPath(@"C:\Users\me\project");
+        Equal(@"C:\Users\me\project", path.DisplayPath, "DisplayPath drops the long-path prefix");
+        Equal(@"\\?\C:\Users\me\project", path.FullPath, "FullPath keeps the long-path prefix");
+        Equal(@"\\?\C:\Users\me\project", path.ToString(), "ToString is the raw path (with the prefix)");
+        Check(!path.DisplayPath.StartsWith(@"\\?\"), "the displayed path has no long-path prefix");
+
+        // A path built from a raw UNC name has no prefix to drop and stays as it is.
+        Equal(@"\\server\share\file", LocalPath.FromRaw(@"\\server\share\file").DisplayPath, "a raw UNC path is shown unchanged");
+        Equal("", LocalPath.FromRaw("").DisplayPath, "an empty path is shown unchanged");
+        Equal(null, LocalPath.StripLongPathPrefix(null), "StripLongPathPrefix tolerates null");
+
+        // Combine keeps the prefix, so the displayed child path is still the user's shape.
+        LocalPath child = LocalPath.FromUserPath(@"C:\data").Combine("sub");
+        Equal(@"C:\data\sub", child.DisplayPath, "a combined child path is shown without the prefix");
     }
 }
