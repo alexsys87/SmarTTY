@@ -576,7 +576,7 @@ public static class LocalFileSystem
         {
             return;
         }
-        throw new Win32Exception("Failed to delete " + localPath.ToString());
+        throw new Win32Exception("Failed to delete " + localPath.DisplayPath);
     }
 
     public static void DeleteDirectory(LocalPath localPath)
@@ -597,7 +597,7 @@ public static class LocalFileSystem
                 }
             }
         }
-        throw new Win32Exception("Failed to delete " + localPath.ToString());
+        throw new Win32Exception("Failed to delete " + localPath.DisplayPath);
     }
 
     public static void CreateDirectoryLink(LocalPath localPath, string targetPath, LinkOptions linkOptions, Action<RemoteWarningRecord> warningHandler)

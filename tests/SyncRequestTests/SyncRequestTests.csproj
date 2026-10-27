@@ -14,6 +14,7 @@
     <Compile Include="../../Sync/SyncDirection.cs" Link="Sync/SyncDirection.cs" />
     <Compile Include="../../Sync/SyncOptions.cs" Link="Sync/SyncOptions.cs" />
     <Compile Include="../../Sync/ClockOffsetInfo.cs" Link="Sync/ClockOffsetInfo.cs" />
+    <Compile Include="../../Sync/LocalPath.cs" Link="Sync/LocalPath.cs" />
     <Compile Include="../../Ssh/QuickSync/QuickSyncFilter.cs" Link="Ssh/QuickSync/QuickSyncFilter.cs" />
     <Compile Include="../../Ssh/QuickSync/QuickSyncAction.cs" Link="Ssh/QuickSync/QuickSyncAction.cs" />
     <Compile Include="../../Ssh/QuickSync/QuickSyncOverwriteTrigger.cs" Link="Ssh/QuickSync/QuickSyncOverwriteTrigger.cs" />
