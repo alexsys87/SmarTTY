@@ -369,7 +369,7 @@ Smart Terminal не является полной копией постоянн�
 **Очередь передач** (**View → SCP Transfers**; в заголовке панели показан используемый протокол, например «File Transfers: SFTP» или «SCP (no SFTP on the server)»):
 
 - Кнопки панели: **Pause All** — пауза (новые передачи не начинаются, начатую можно отменить, не снимая паузу), **Remove completed** — убрать завершённые, **Remove all** — отменить незавершённые и очистить список, **Retry all** — повторить все передачи, включая уже завершённые.
-- Контекстное меню: **Cancel transfer(s)**, **Retry transfer(s)** (неудачные, с докачкой), **Retry again** (ещё раз, даже если файл уже передан), **Retry all failed**, **Open local file**, **Open containing folder** (файл будет выделен), **Copy local file path**, **Copy remote path** (путь и имя файла на сервере), **Delete uploaded file(s) from the server** (удалить отправленный файл на сервере, с подтверждением).
+- Контекстное меню: **Cancel transfer(s)**, **Retry transfer(s)** (неудачные, с докачкой), **Retry again** (ещё раз, даже если файл уже передан), **Retry all failed**, **Open local file**, **Open containing folder** (файл будет выделен), **Copy local file path**, **Copy remote path** (путь и имя файла на сервере), **Delete uploaded file(s) from the server** (удалить отправленный файл на сервере, с подтверждением), **Delete downloaded file(s) from this computer** (удалить скачанный файл на этом компьютере, с подтверждением).
 - Колонка **Status** показывает процент, оставшееся время, этап («Verifying...», «Replacing...»), пометку о докачке, результат проверки («Completed, SHA-256 verified») и причину ошибки; полный текст и протокол — во всплывающей подсказке.
 
 Как устроены передачи:
