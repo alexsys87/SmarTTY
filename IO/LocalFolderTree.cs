@@ -14,19 +14,25 @@ public static class LocalFolderTree
     /// <summary>
     /// The roots of the tree: the ready drives and the user's shell folders, each with the name shown in the tree.
     /// A shell folder that is empty or missing is left out. The order is This PC, then the shell folders, then the drives.
+    /// A folder that two mounts (or a shell folder and a drive) name the same way is listed once.
     /// </summary>
     public static List<LocalFolderEntry> GetRoots()
     {
         List<LocalFolderEntry> roots = new List<LocalFolderEntry>();
+        HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         roots.Add(new LocalFolderEntry("This PC", null));
 
-        AddShellFolder(roots, "Desktop", Environment.SpecialFolder.Desktop);
-        AddShellFolder(roots, "Documents", Environment.SpecialFolder.MyDocuments);
-        AddShellFolder(roots, "Downloads", null);
+        AddShellFolder(roots, seen, "Desktop", Environment.SpecialFolder.Desktop);
+        AddShellFolder(roots, seen, "Documents", Environment.SpecialFolder.MyDocuments);
+        AddShellFolder(roots, seen, "Downloads", null);
 
         foreach (DriveInfo drive in GetReadyDrives())
         {
-            roots.Add(new LocalFolderEntry(DriveDisplayName(drive), drive.RootDirectory.FullName));
+            // A stacked mount (the same filesystem mounted twice on one point) yields the same drive name twice.
+            if (seen.Add(drive.RootDirectory.FullName))
+            {
+                roots.Add(new LocalFolderEntry(DriveDisplayName(drive), drive.RootDirectory.FullName));
+            }
         }
         return roots;
     }
@@ -209,12 +215,12 @@ public static class LocalFolderTree
         return string.IsNullOrEmpty(name) ? path : name;
     }
 
-    private static void AddShellFolder(List<LocalFolderEntry> roots, string name, Environment.SpecialFolder? folder)
+    private static void AddShellFolder(List<LocalFolderEntry> roots, HashSet<string> seen, string name, Environment.SpecialFolder? folder)
     {
         string path = (folder.HasValue)
             ? Environment.GetFolderPath(folder.Value)
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-        if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
+        if (!string.IsNullOrEmpty(path) && Directory.Exists(path) && seen.Add(path))
         {
             roots.Add(new LocalFolderEntry(name, path));
         }
