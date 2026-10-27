@@ -558,11 +558,6 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
         return null;
     }
 
-    public string GetLineSubstringFromColumn(int lineIndex, int targetColumn, int tabSize, out int columnOffset, out int charIndex)
-    {
-        return SubstringFromColumn(Lines[lineIndex].GetText(), targetColumn, tabSize, out columnOffset, out charIndex);
-    }
-
     public int IndexToColumn(int lineIndex, int index, int tabSize)
     {
         bool isPastEnd;

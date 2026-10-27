@@ -8,8 +8,6 @@ public partial class ReadonlyTextBrowser
 {
 	private IContainer components = null;
 
-	private System.Windows.Forms.Timer _flashTimer;
-
 	protected override void Dispose(bool disposing)
 	{
 		if (disposing && components != null)
@@ -22,10 +20,7 @@ public partial class ReadonlyTextBrowser
 	private void InitializeComponent()
 	{
 		components = new Container();
-		_flashTimer = new System.Windows.Forms.Timer(components);
 		SuspendLayout();
-		_flashTimer.Interval = 1;
-		_flashTimer.Tick += OnFlashTick;
 		AutoScaleDimensions = new SizeF(10f, 18f);
 		AutoScroll = true;
 		BackColor = SystemColors.Window;

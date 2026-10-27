@@ -119,29 +119,6 @@ internal class SuggestionPopup
         return limit;
     }
 
-    public string GetCommonPrefix(string prefix)
-    {
-        string commonPrefix = null;
-        foreach (ISuggestion suggestion in _source.Items)
-        {
-            if (suggestion.DisplayName.Length < prefix.Length || suggestion.DisplayName.Substring(0, prefix.Length) != prefix)
-            {
-                continue;
-            }
-            if (commonPrefix == null)
-            {
-                commonPrefix = suggestion.DisplayName;
-                continue;
-            }
-            int len = CommonPrefixLength(suggestion.DisplayName, commonPrefix);
-            if (len < commonPrefix.Length)
-            {
-                commonPrefix = commonPrefix.Substring(0, len);
-            }
-        }
-        return commonPrefix;
-    }
-
     internal void AcceptSelected()
     {
         if (_form != null && _form.Visible)

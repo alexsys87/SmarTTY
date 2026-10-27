@@ -89,36 +89,6 @@ public partial class DpiAwareForm : Form
         }
     }
 
-    public DialogResult ShowModal()
-    {
-        Stack<DpiAwareForm> stack = GetDialogStack();
-        try
-        {
-            stack.Push(this);
-            return ShowDialog();
-        }
-        finally
-        {
-            try
-            {
-                stack.Pop();
-            }
-            catch
-            {
-            }
-        }
-    }
-
-    public static DpiAwareForm GetActiveDialog()
-    {
-        Stack<DpiAwareForm> stack = GetDialogStack();
-        if (stack != null && stack.Count != 0)
-        {
-            return stack.Peek();
-        }
-        return null;
-    }
-
     public DpiAwareForm()
     {
         InitializeComponent();

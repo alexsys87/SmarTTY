@@ -18,15 +18,6 @@ public class TokenCache
             _tokens[token] = true;
         }
 
-        public Token TakeFirst()
-        {
-            object sender = _tokens.Keys.GetEnumerator();
-            ((IEnumerator)sender).MoveNext();
-            Token current = ((IEnumerator<Token>)sender).Current;
-            _tokens.Remove(current);
-            return current;
-        }
-
         internal void Clear()
         {
             _tokens.Clear();

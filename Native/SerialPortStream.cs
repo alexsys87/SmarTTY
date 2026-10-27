@@ -519,22 +519,6 @@ public class SerialPortStream : Stream, IDisposable
         }
     }
 
-    public void SetTimeouts(uint readInterval, uint readTotalMultiplier, uint readTotalConstant, uint writeTotalMultiplier, uint writeTotalConstant)
-    {
-        CommTimeouts commTimeouts = new CommTimeouts
-        {
-            ReadIntervalTimeout = readInterval,
-            ReadTotalTimeoutMultiplier = readTotalMultiplier,
-            ReadTotalTimeoutConstant = readTotalConstant,
-            WriteTotalTimeoutMultiplier = writeTotalMultiplier,
-            WriteTotalTimeoutConstant = writeTotalConstant
-        };
-        if (!SetCommTimeouts(_handle, ref commTimeouts))
-        {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot set timeouts on a serial port");
-        }
-    }
-
     private static SerialStopBitsKind StopBitsKindOf(DcbStopBits stopBits)
     {
         switch (stopBits)

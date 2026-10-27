@@ -16,8 +16,6 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     internal delegate void TabHandler(ref bool handled);
 
-    public delegate void PlaceholderChangedHandler(CodeEditorPP codeEditorPP, int line, int startColumn, int endColumn, object tag, bool isLast);
-
     public delegate bool TokenPredicate(string text);
 
     public delegate void HoverHandler(TextDocument.TextPosition textPosition, ref Control control);
@@ -72,8 +70,6 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     private bool _suppressHintClose;
 
     internal TabHandler _tabHandler;
-
-    internal TemplateSession _templateSession;
 
     private bool _hoverPending;
 
@@ -167,8 +163,6 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     public event TokenCache.LineTokenizer Tokenizing;
 
     public event SuggestionAcceptedHandler SuggestionAccepted;
-
-    public event PlaceholderChangedHandler PlaceholderChanged;
 
     public event HoverHandler HoverRequested;
 
@@ -295,15 +289,6 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         CancelHover();
     }
 
-    public void EndTemplate()
-    {
-        if (_templateSession != null)
-        {
-            _templateSession.RequestEnd();
-            _templateSession = null;
-        }
-    }
-
     protected override void OnSelectionChanged(TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool hasSelection, SelectionChangeSource selectionChangeSource)
     {
         CancelHover();
@@ -378,22 +363,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         base.OnSelectionChanged(previousCaret, currentCaret, hasSelection, selectionChangeSource);
     }
 
-    public void ClearMessages()
-    {
-        _inlineMessageProvider.Clear();
-        Redraw();
-        UpdateLayout();
-    }
-
     public void AddMessage(int line, InlineMessageProvider.MessageSeverity messageSeverity, string text, int column)
     {
         _inlineMessageProvider.AddMessage(line - 1, messageSeverity, text, column);
-    }
-
-    public void RefreshMessages()
-    {
-        Redraw();
-        UpdateLayout();
     }
 
     public void GoToPosition(int line, int column)
@@ -732,21 +704,6 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
     }
 
-    public TokenCache.Token GetCurrentToken()
-    {
-        return _tokenCache.FindNearestToken(CaretPosition.Line, CaretPosition.Column);
-    }
-
-    public virtual string GetCurrentTokenText()
-    {
-        TokenCache.Token token = _tokenCache.FindNearestToken(CaretPosition.Line, CaretPosition.Column);
-        if (token == null)
-        {
-            return null;
-        }
-        return base.EditableDocument.GetLineText(token.LineNumber).Substring(token.Start, token.End - token.Start);
-    }
-
     public void SetPopupActive(bool active)
     {
         ShowCaretWhenUnfocused = active;
@@ -761,19 +718,6 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         if (IsSignatureHintVisible)
         {
             _signatureHintController.SetActiveParameter(parameterIndex);
-        }
-    }
-
-    public void InsertTemplate(CodeTemplate codeTemplate)
-    {
-        codeTemplate.Insert(this, CaretPosition);
-    }
-
-    internal virtual void RaisePlaceholderChanged(int line, int startColumn, int endColumn, object tag, bool isLast)
-    {
-        if (PlaceholderChanged != null)
-        {
-            PlaceholderChanged(this, line, startColumn, endColumn, tag, isLast);
         }
     }
 
@@ -968,10 +912,5 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             _hoverControl.Dispose();
             _hoverControl = null;
         }
-    }
-
-    public int GetLineLength(int line)
-    {
-        return base.EditableDocument.GetLineLengthWithTerminator(line);
     }
 }

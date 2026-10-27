@@ -134,18 +134,6 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
-    public string GetPaddingToColumn(int column, int columnIndex, int columnNumber)
-    {
-        int lineLength = IndexToColumn(column, columnIndex);
-        if (lineLength >= columnNumber)
-        {
-            return null;
-        }
-        int value = columnNumber % TabSize;
-        int count = (columnNumber - value - lineLength + TabSize - 1) / TabSize;
-        return new string('\t', count) + new string(' ', value);
-    }
-
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
         // Tab indents a multi-line selection; a selection inside one line is replaced by the tab as usual.
