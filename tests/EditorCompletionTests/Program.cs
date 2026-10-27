@@ -94,10 +94,28 @@ internal static class Program
         Check(!EditorCompletionSource.IsIdentifier(""), "an empty string is not an identifier");
     }
 
+    private static void SuggestionFilterChecks()
+    {
+        // The rule the completion popup filters its list with. A name shorter than the prefix cannot start with
+        // it; the old catalog test asked for a substring past the end of a short key and threw ArgumentOutOfRange.
+        Check(SuggestionFilter.MatchesPrefix("done", null), "a null prefix matches everything");
+        Check(SuggestionFilter.MatchesPrefix("done", ""), "an empty prefix matches everything");
+        Check(SuggestionFilter.MatchesPrefix("done", "do"), "'done' matches the prefix 'do'");
+        Check(!SuggestionFilter.MatchesPrefix("def", "do"), "'def' does not match the prefix 'do'");
+        Check(!SuggestionFilter.MatchesPrefix("d", "do"), "a name shorter than the prefix does not match");
+        Check(!SuggestionFilter.MatchesPrefix("do", "done"), "a name shorter than a longer prefix does not match");
+        Check(SuggestionFilter.MatchesPrefix("do", "do"), "a name equal to the prefix matches");
+        Check(SuggestionFilter.MatchesPrefix("Done", "Done"), "the prefix is matched case-sensitively");
+        Check(!SuggestionFilter.MatchesPrefix("done", "Done"), "a different case does not match");
+        Check(!SuggestionFilter.MatchesPrefix(null, "do"), "a null name matches nothing");
+        Check(SuggestionFilter.MatchesPrefix("x", null), "a null prefix matches even a short name");
+    }
+
     private static void Main()
     {
         KeywordChecks();
         SourceChecks();
+        SuggestionFilterChecks();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " completion checks passed.");
     }

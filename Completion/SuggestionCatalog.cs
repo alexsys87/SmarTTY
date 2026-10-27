@@ -87,15 +87,45 @@ public class SuggestionCatalog
         return false;
     }
 
+    /// <summary>
+    /// Fills the catalog from a list of suggestions (the editor's completion items): a keyword or API symbol
+    /// arrives with its detail, hint and documentation. Used to offer an already built list through the popup.
+    /// </summary>
+    public void Load(IEnumerable<ISuggestion> suggestions)
+    {
+        if (suggestions == null)
+        {
+            return;
+        }
+        foreach (ISuggestion suggestion in suggestions)
+        {
+            if (suggestion != null && !string.IsNullOrEmpty(suggestion.DisplayName) && !_items.ContainsKey(suggestion.DisplayName))
+            {
+                _items.Add(suggestion.DisplayName, new SuggestionItem(
+                    suggestion.DisplayName,
+                    suggestion.DetailText,
+                    suggestion.HintText,
+                    suggestion.HintDescription,
+                    suggestion.ImageIndex));
+            }
+        }
+    }
+
+    /// <summary>Drops every item (the images stay; they belong to the list, not to one fill).</summary>
+    public void Clear()
+    {
+        _items.Clear();
+    }
+
     public int AddImage(Image image)
     {
         _images.Add(image);
         return _images.Count - 1;
     }
 
-    internal SuggestionPopup CreatePopup(string prefix, ICompletionHost completionHost)
+    internal SuggestionPopup CreatePopup(string prefix, ICompletionHost completionHost, bool allowMultiSelect)
     {
-        return new SuggestionPopup(this, prefix, completionHost, allowMultiSelect: true);
+        return new SuggestionPopup(this, prefix, completionHost, allowMultiSelect);
     }
 
     internal ISuggestionSource CreateSnapshot(string prefix)
@@ -103,7 +133,9 @@ public class SuggestionCatalog
         List<SuggestionItem> itemsList = new List<SuggestionItem>();
         foreach (KeyValuePair<string, SuggestionItem> item in _items)
         {
-            if (prefix == null || (item.Key.Length < prefix.Length && !(item.Key.Substring(0, prefix.Length) != prefix)))
+            // The same rule as CountMatching: a key shorter than the prefix cannot start with it. (The old test
+            // could ask for a substring that runs past the end of a short key and threw ArgumentOutOfRange.)
+            if (SuggestionFilter.MatchesPrefix(item.Key, prefix))
             {
                 itemsList.Add(item.Value);
             }
@@ -116,7 +148,7 @@ public class SuggestionCatalog
         int matchCount = 0;
         foreach (KeyValuePair<string, SuggestionItem> item in _items)
         {
-            if (prefix == null || (item.Key.Length >= prefix.Length && !(item.Key.Substring(0, prefix.Length) != prefix)))
+            if (SuggestionFilter.MatchesPrefix(item.Key, prefix))
             {
                 matchCount++;
             }

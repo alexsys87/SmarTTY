@@ -41,6 +41,24 @@ public class SuggestionController
         }
     }
 
+    /// <summary>
+    /// Shows a catalog through the popup: the popup works on a snapshot of the catalog, filtered by
+    /// <paramref name="prefix"/> (null keeps every item). The snapshot is taken once, when the popup opens.
+    /// </summary>
+    public void Show(SuggestionCatalog suggestionCatalog, string prefix, bool autoSize, bool allowMultiSelect)
+    {
+        if (_popup != null)
+        {
+            _popup.Hide();
+        }
+        _popup = suggestionCatalog.CreatePopup(prefix, _host, allowMultiSelect);
+        _popup.BackColor = this.BackColor;
+        if (_popup != null)
+        {
+            _popup.Show(autoSize);
+        }
+    }
+
     public void Hide()
     {
         if (_popup != null)

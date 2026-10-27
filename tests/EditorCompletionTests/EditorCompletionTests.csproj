@@ -14,6 +14,7 @@
     <Compile Include="../../CodeEditing/TokenCache.cs" Link="TokenCache.cs" />
     <Compile Include="../../CodeEditing/SyntaxHighlighting.cs" Link="SyntaxHighlighting.cs" />
     <Compile Include="../../Completion/ISuggestion.cs" Link="ISuggestion.cs" />
+    <Compile Include="../../Completion/SuggestionFilter.cs" Link="SuggestionFilter.cs" />
     <Compile Include="../../Completion/EditorCompletionSource.cs" Link="EditorCompletionSource.cs" />
     <Compile Include="../../Completion/ISignatureInfo.cs" Link="ISignatureInfo.cs" />
     <Compile Include="../../Completion/ISignatureParameter.cs" Link="ISignatureParameter.cs" />
