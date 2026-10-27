@@ -1,4 +1,3 @@
-using SmarTTY.Forms;
 using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
@@ -175,13 +174,12 @@ internal static class PasteGuard
         {
             summary.Append(" The text is large.");
         }
-        using PasteConfirmForm form = new PasteConfirmForm(summary.ToString(), PasteSanitizer.BuildPreview(text, 30, 300), dangers, multiline);
-        DialogResult result = owner != null ? form.ShowDialog(owner) : form.ShowDialog();
-        if (result != DialogResult.OK)
+        ThemedPasteConfirmResult confirmed = ThemedPasteConfirm.Confirm(owner, summary.ToString(), PasteSanitizer.BuildPreview(text, 30, 300), dangers, multiline);
+        if (confirmed == null)
         {
             return false;
         }
-        if (multiline && form.DontAskAgain)
+        if (multiline && confirmed.DontAskAgain)
         {
             options.ConfirmMultiline = false;
             settings?.Save();

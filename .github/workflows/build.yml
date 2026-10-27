@@ -163,6 +163,9 @@ jobs:
       - name: Run snippet editor checks (themed editor replaced the WinForms SnippetEditForm)
         run: dotnet run --project tests/SnippetEditorTests -c Release
 
+      - name: Run paste confirmation checks (themed window replaced the WinForms PasteConfirmForm)
+        run: dotnet run --project tests/PasteConfirmTests -c Release
+
       - name: Run folder synchronization settings checks (direction, options, exclusion masks)
         run: dotnet run --project tests/SyncRequestTests -c Release
 
