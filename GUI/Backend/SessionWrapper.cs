@@ -1363,6 +1363,40 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    /// <summary>
+    /// A paste that is too large to be typed into the terminal, sent as a file instead: the text is saved in a temporary
+    /// file and uploaded to the current directory of the terminal like a dropped file.
+    /// </summary>
+    public void UploadPastedText(string text, TerminalEmulatorControl terminal)
+    {
+        try
+        {
+            NormalTabContext tab = Tabs.OfType<NormalTabContext>().FirstOrDefault((NormalTabContext candidate) => candidate.Terminal == terminal);
+            string directory = Path.Combine(Path.GetTempPath(), "SmarTTY-paste");
+            Directory.CreateDirectory(directory);
+            foreach (string old in Directory.GetFiles(directory, "paste-*.txt"))
+            {
+                try
+                {
+                    if (File.GetLastWriteTime(old) < DateTime.Now.AddDays(-1))
+                    {
+                        File.Delete(old);
+                    }
+                }
+                catch
+                {
+                }
+            }
+            string file = Path.Combine(directory, "paste-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt");
+            File.WriteAllText(file, text, new System.Text.UTF8Encoding(false));
+            UploadFiles(new[] { file }, tab);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     // Above this size a dropped script is uploaded unchanged: it is not a script written by hand, and it is read into memory to fix it.
     private const long MaxScriptFixSize = 32L * 1024 * 1024;
 

@@ -311,6 +311,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.TerminalSizeChanged += OnTerminalSizeChanged;
         AddClearCommand();
         AddReturnToInputLineCommand();
+        AddPasteSpecialCommands();
         AddRemoteSizeCommands();
         InitializeCommandLists();
         
@@ -426,6 +427,53 @@ public partial class DeviceTerminalControl : DpiAwareControl
         };
         Icons.Apply(_returnToInputLineMenuItem, "go");
         contextMenuStrip1.Items.Add(_returnToInputLineMenuItem);
+    }
+
+    // Paste in other ways: as one line, and slowly (small pieces with pauses, waiting for the echo or the prompt).
+    private void AddPasteSpecialCommands()
+    {
+        ToolStripMenuItem menu = new ToolStripMenuItem("Paste special");
+        menu.DropDownItems.Add(new ToolStripMenuItem("Paste as one line (lines joined with a space)", null, (sender, args) => PasteSpecial(PasteMode.OneLineSpaces)));
+        menu.DropDownItems.Add(new ToolStripMenuItem("Paste as one line (lines joined with &&)", null, (sender, args) => PasteSpecial(PasteMode.OneLineAnd)));
+        menu.DropDownItems.Add(new ToolStripMenuItem("Paste slowly", null, (sender, args) => PasteSpecial(PasteMode.Slow))
+        {
+            ToolTipText = "Sends the text in small pieces with pauses, and can wait for the echo or the prompt of the device (Settings > Paste), so that a slow device does not lose characters."
+        });
+        contextMenuStrip1.Items.Add(menu);
+    }
+
+    /// <summary>Pastes the clipboard text as one line or slowly (see <see cref="PasteMode"/>).</summary>
+    public void PasteSpecial(PasteMode mode)
+    {
+        _pasteMode = mode;
+        try
+        {
+            pasteToolStripMenuItem_Click(this, EventArgs.Empty);
+        }
+        finally
+        {
+            _pasteMode = PasteMode.Normal;
+        }
+    }
+
+    private PasteMode _pasteMode;
+
+    private PasteJob _pasteJob;
+
+    // From this size a paste is sent in pieces, one after another, so that the window does not wait for the whole text.
+    private const int AsyncPasteThreshold = 16 * 1024;
+
+    private const int AsyncPasteChunkSize = 4096;
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        PasteJob job = _pasteJob;
+        if (keyData == Keys.Escape && job != null && job.IsActive)
+        {
+            job.Cancel();
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
     }
 
     // A serial line and a raw TCP connection cannot carry the size of the window, so mc, htop and the like draw into
@@ -774,6 +822,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void DeviceTerminalControl_Disposed(object sender, EventArgs e)
     {
+        _pasteJob?.Abort();
         // The watcher and the theme event are static: a closed tab must not stay reachable from them.
         SerialPortArrivalWatcher.Unsubscribe(OnSerialPortArrived);
         ThemeManager.ThemeChanged -= OnThemeChanged;
@@ -1274,6 +1323,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// <summary>Shows received bytes (<paramref name="count"/> of them, starting at <paramref name="offset"/>) in the active view and records them in the log.</summary>
     private void DisplayReceivedData(byte[] buffer, int count, int offset = 0)
     {
+        // A slow paste looks for the echo of its line or the prompt in what the device sends.
+        _pasteJob?.OnOutput(_textEncoding.GetString(buffer, offset, count));
         if (offset != 0)
         {
             byte[] slice = new byte[count];
@@ -1859,7 +1910,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void pasteToolStripMenuItem_Click(object sender, EventArgs e)
     {
-        if (IsLineClaimed)
+        if (IsLineClaimed || (_pasteJob != null && _pasteJob.IsActive))
         {
             return;
         }
@@ -1871,6 +1922,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 return;
             }
             // A command wrapped by its source must not go out in pieces; every line break sends the line at once.
+            text = PasteGuard.ApplyMode(text, _pasteMode);
             text = ShellCommandLine.JoinWrappedLines(text, indentContinues: false);
             text = PasteGuard.Prepare(text, _commonSettings, linesRunAtOnce: true, owner: this);
             if (string.IsNullOrEmpty(text))
@@ -1882,12 +1934,45 @@ public partial class DeviceTerminalControl : DpiAwareControl
             // the Windows form.
             string lineEnding = PasteGuard.ResolveLineBreak(_commonSettings, GetLineEnding(_deviceTerminalSettings.LineEnding) ?? "\r\n");
             text = DeviceInputText.ConvertLineEndings(text, lineEnding);
-            byte[] bytes = _textEncoding.GetBytes(text);
-            SendToDevice(bytes, bytes.Length);
-            if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
+            PasteSettings options = PasteGuard.OptionsOf(_commonSettings);
+            bool slow = _pasteMode == PasteMode.Slow || options.SlowPasteAlways;
+            if (!slow && text.Length < AsyncPasteThreshold)
             {
-                hexTerminalControl1.AppendData(bytes, bytes.Length, isEcho: true);
+                byte[] bytes = _textEncoding.GetBytes(text);
+                SendToDevice(bytes, bytes.Length);
+                if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
+                {
+                    hexTerminalControl1.AppendData(bytes, bytes.Length, isEcho: true);
+                }
+                return;
             }
+            // Sent in pieces, the next one when the previous has been written (and, for a slow paste, after the pauses and
+            // the echo or the prompt of the device), with a progress window and Esc to cancel.
+            _pasteJob = new PasteJob(this, slow ? "Pasting slowly" : "Pasting",
+                PasteModes.BuildSteps(text, slow ? options.SlowChunkSize : AsyncPasteChunkSize, lineEnding, splitLines: slow),
+                (string piece, Action written) =>
+                {
+                    byte[] bytes = _textEncoding.GetBytes(piece);
+                    if (!SendToDevice(bytes, bytes.Length, (bool ok) => written()))
+                    {
+                        return false;
+                    }
+                    if (HexMode && _deviceTerminalSettings.EchoTypedCharacters)
+                    {
+                        hexTerminalControl1.AppendData(bytes, bytes.Length, isEcho: true);
+                    }
+                    return true;
+                },
+                options, slow,
+                (PasteJob.Outcome outcome, string message) =>
+                {
+                    _pasteJob = null;
+                    if (outcome == PasteJob.Outcome.Failed)
+                    {
+                        ThemedMessageBox.Show(message, "Paste", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                    }
+                });
+            _pasteJob.Start();
         }
         catch (Exception exception)
         {

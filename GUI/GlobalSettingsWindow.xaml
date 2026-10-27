@@ -205,6 +205,15 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -221,6 +230,22 @@
               <TextBlock Text="Ask from this many characters:" Grid.Row="6" />
               <TextBox Grid.Row="6" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding ConfirmSizeThreshold}" ToolTip="0 turns the size check off." />
               <CheckBox Content="Warn about dangerous commands (sudo, curl | sh, rm -rf, dd, shutdown, ...)" Grid.Row="7" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding WarnDangerous}" ToolTip="Always asks, even when asking about several lines is turned off." />
+              <CheckBox Content="Paste line by line (Smart Terminal): stop at the first command that fails" Grid.Row="8" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding LineByLineStopOnError}" ToolTip="Right-click the terminal &gt; Paste special &gt; Paste line by line. Esc or Cancel stops it as well." />
+              <TextBlock Text="Offer to upload a paste as a file from (KB):" Grid.Row="9" ToolTip="SSH tabs: a paste at least this large can be sent with scp to the current directory instead of being typed. 0 turns the offer off." />
+              <TextBox Grid.Row="9" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding UploadOfferThresholdKB}" />
+              <CheckBox Content="COM/TCP/Telnet: paste everything slowly (as &quot;Paste slowly&quot; does)" Grid.Row="10" Grid.ColumnSpan="2" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding SlowPasteAlways}" ToolTip="Right-click the terminal &gt; Paste special &gt; Paste slowly does it for one paste." />
+              <TextBlock Text="Slow paste: characters per block:" Grid.Row="11" ToolTip="0 sends a whole line at once." />
+              <TextBox Grid.Row="11" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding SlowChunkSize}" />
+              <TextBlock Text="Slow paste: pause after a block (ms):" Grid.Row="12" />
+              <TextBox Grid.Row="12" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding SlowCharDelayMs}" />
+              <TextBlock Text="Slow paste: pause after a line (ms):" Grid.Row="13" />
+              <TextBox Grid.Row="13" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding SlowLineDelayMs}" />
+              <TextBlock Text="Slow paste: after a line wait for:" Grid.Row="14" />
+              <ListBox Grid.Row="14" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=SlowWait, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding SlowWait}" />
+              <TextBlock Text="Slow paste: prompt of the device:" Grid.Row="15" ToolTip="For example =&gt; in U-Boot. The next line is sent when the device has printed it." />
+              <TextBox Grid.Row="15" Grid.Column="1" HorizontalAlignment="Left" MinWidth="120" Text="{Binding SlowPrompt}" />
+              <TextBlock Text="Slow paste: wait at most (ms):" Grid.Row="16" ToolTip="Without the echo the paste goes on after this time; without the prompt it stops." />
+              <TextBox Grid.Row="16" Grid.Column="1" HorizontalAlignment="Left" MinWidth="80" Text="{Binding SlowWaitTimeoutMs}" />
             </Grid>
           </GroupBox>
         </StackPanel>

@@ -138,6 +138,36 @@ internal static class Program
         Equal(PasteSanitizer.BuildPreview("", 5, 10), "", "empty text");
     }
 
+    private static string Pieces(List<PasteStep> steps)
+    {
+        return string.Join("|", steps.Select(step => step.Text));
+    }
+
+    private static string Ends(List<PasteStep> steps)
+    {
+        return string.Join(",", steps.Select(step => step.EndsLine ? "L" : "-"));
+    }
+
+    private static void StepChecks()
+    {
+        Equal(Pieces(PasteModes.BuildSteps("abcdefg", 3, "\n", false)), "abc|def|g", "cut by size");
+        Equal(Pieces(PasteModes.BuildSteps("abcdefg", 0, "\n", false)), "abcdefg", "no size limit");
+        Equal(Pieces(PasteModes.BuildSteps("ab\ncd\n", 0, "\n", true)), "ab\n|cd\n", "a piece for every line");
+        Equal(Ends(PasteModes.BuildSteps("ab\ncd\n", 0, "\n", true)), "L,L", "every line piece ends a line");
+        Equal(Pieces(PasteModes.BuildSteps("abcdef\n", 4, "\n", true)), "abcd|ef\n", "a long line is cut");
+        Equal(Ends(PasteModes.BuildSteps("abcdef\n", 4, "\n", true)), "-,L", "only the last piece of a line ends it");
+        Equal(Pieces(PasteModes.BuildSteps("ab\ncd", 0, "\n", true)), "ab\n|cd", "the last line has no line break");
+        Equal(Ends(PasteModes.BuildSteps("ab\ncd", 0, "\n", true)), "L,-", "the last line does not end a line");
+        Equal(Pieces(PasteModes.BuildSteps("ab\r\ncd", 3, "\r\n", false)), "ab|\r\nc|d", "a line break of two characters is not split");
+        Equal(Pieces(PasteModes.BuildSteps("a\r\nb\r\n", 1, "\r\n", true)), "a|\r\n|b|\r\n", "a line break of two characters alone in a piece");
+        Equal(Pieces(PasteModes.BuildSteps("a\U0001F600b", 2, "\n", false)), "a|\U0001F600|b", "a surrogate pair is not split");
+        Check(PasteModes.BuildSteps("", 5, "\n", true).Count == 0, "no text, no steps");
+        Check(PasteModes.TotalLength(PasteModes.BuildSteps("abc\ndef", 2, "\n", true)) == 7, "the pieces add up to the text");
+        string text = string.Concat(Enumerable.Repeat("line of the text\n", 300));
+        Equal(string.Concat(PasteModes.BuildSteps(text, 7, "\n", false).Select(step => step.Text)), text, "the pieces joined give the text back");
+        Equal(string.Concat(PasteModes.BuildSteps(text, 7, "\n", true).Select(step => step.Text)), text, "the line pieces joined give the text back");
+    }
+
     private static void Main()
     {
         LineBreakChecks();
@@ -145,6 +175,7 @@ internal static class Program
         TypographicChecks();
         DangerChecks();
         PreviewChecks();
+        StepChecks();
         Console.WriteLine($"All {_passed} checks passed.");
     }
 }

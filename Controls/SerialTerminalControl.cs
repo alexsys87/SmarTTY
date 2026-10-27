@@ -1798,7 +1798,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
         try
         {
-            string text = Win32Clipboard.GetText(Handle);
+            string text = PasteGuard.ApplyMode(Win32Clipboard.GetText(Handle), PasteModeInUse);
             if (!string.IsNullOrEmpty(text))
             {
                 // Each line is sent as a command: a command wrapped by its source must not go out in pieces.

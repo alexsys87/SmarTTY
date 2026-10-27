@@ -48,6 +48,49 @@ public class PasteSettings
     /// <summary>Warns about dangerous commands (sudo, curl | sh, rm -rf, ...) in text that runs at once. Always asks.</summary>
     public bool WarnDangerous { get; set; } = true;
 
+    /// <summary>What a slow paste waits for after each line before it sends the next one.</summary>
+    public enum SlowWaitMode
+    {
+        [EnumDisplayText("Nothing (only the pauses)")]
+        None,
+        [EnumDisplayText("The echo of the line")]
+        Echo,
+        [EnumDisplayText("The prompt")]
+        Prompt
+    }
+
+    /// <summary>
+    /// COM, TCP and Telnet tabs: every paste is sent slowly, as "Paste slowly" does (otherwise only that command is).
+    /// </summary>
+    public bool SlowPasteAlways { get; set; }
+
+    /// <summary>Slow paste: characters sent at once (0: a whole line).</summary>
+    public int SlowChunkSize { get; set; } = 16;
+
+    /// <summary>Slow paste: pause in milliseconds after each block of characters.</summary>
+    public int SlowCharDelayMs { get; set; } = 10;
+
+    /// <summary>Slow paste: pause in milliseconds after each line.</summary>
+    public int SlowLineDelayMs { get; set; } = 100;
+
+    /// <summary>Slow paste: what to wait for after a line.</summary>
+    public SlowWaitMode SlowWait { get; set; }
+
+    /// <summary>Slow paste: the prompt of the device to wait for (for example "=>" in U-Boot).</summary>
+    public string SlowPrompt { get; set; } = "=>";
+
+    /// <summary>Slow paste: how long to wait for the echo or the prompt, in milliseconds.</summary>
+    public int SlowWaitTimeoutMs { get; set; } = 5000;
+
+    /// <summary>Paste line by line (Smart Terminal): stop when a command ends with a non-zero exit code.</summary>
+    public bool LineByLineStopOnError { get; set; } = true;
+
+    /// <summary>
+    /// SSH tabs: from this size in kilobytes a paste is offered to be uploaded as a file (scp) instead of being typed into the
+    /// terminal; 0 turns the offer off.
+    /// </summary>
+    public int UploadOfferThresholdKB { get; set; } = 256;
+
     /// <summary>The line break to send: <paramref name="automatic"/> unless a mode is chosen.</summary>
     public string ResolveLineBreak(string automatic)
     {
