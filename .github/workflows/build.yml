@@ -151,6 +151,9 @@ jobs:
       - name: Run theme palette checks (matching keys and WCAG contrast for every theme)
         run: dotnet run --project tests/ThemePaletteTests -c Release
 
+      - name: Run settings window layout checks (fixed size, one scroll viewer per tab)
+        run: dotnet run --project tests/SettingsWindowLayoutTests -c Release
+
       - name: Run folder synchronization settings checks (direction, options, exclusion masks)
         run: dotnet run --project tests/SyncRequestTests -c Release
 
