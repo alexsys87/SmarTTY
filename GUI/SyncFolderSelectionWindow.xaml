@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.SyncFolderSelectionWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Select folders to synchronize" Width="520" Height="520" MinWidth="420" MinHeight="320" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TextBlock Grid.Row="0" Text="Folders to synchronize:" Margin="0 0 0 4" />
+    <TreeView Grid.Row="1" Name="FolderTree" MinHeight="160" />
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0 8 0 0">
+      <Button Name="CheckAllButton" Content="Check all" MinWidth="80" Margin="0 0 4 0" Click="CheckAll_Click" />
+      <Button Name="CheckNoneButton" Content="Check none" MinWidth="80" Margin="0 0 4 0" Click="CheckNone_Click" />
+      <TextBlock Name="SummaryText" VerticalAlignment="Center" Margin="8 0 0 0" Foreground="Gray" />
+    </StackPanel>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 12 0 0">
+      <Button Name="OkButton" Content="OK" IsDefault="True" MinWidth="75" Margin="0 0 5 0" Click="Ok_Click" />
+      <Button Name="CancelButton" Content="Cancel" IsCancel="True" MinWidth="75" />
+    </StackPanel>
+  </Grid>
+</Window>

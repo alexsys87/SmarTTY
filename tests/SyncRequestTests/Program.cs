@@ -34,6 +34,7 @@ internal static class Program
             CheckOptions();
             CheckExclusionMasks();
             CheckRegexExclusions();
+            CheckSelection();
             CheckPathNormalizationIsLeftToTheEngine();
             CheckLocalPathDisplay();
             Console.WriteLine();
@@ -156,6 +157,54 @@ internal static class Program
             thrown = true;
         }
         Check(thrown, "an invalid regex is reported as an ArgumentException");
+    }
+
+    /// <summary>
+    /// The "Only selected folders" option: the picked folders narrow the directory filters so that only their subtrees
+    /// are synchronized. The engine matches files by name alone, so the selection lives on the directory filters; the
+    /// root is deliberately left out, which is what keeps the loose files at the root from being copied.
+    /// </summary>
+    private static void CheckSelection()
+    {
+        Console.WriteLine("== Selected folders");
+
+        // Without a selection the directory filters are just the exclude filters, as before.
+        SyncSettings all = SyncRequest.Create(false, "C:/local", "/remote", "*.log", false, false, false, QuickSyncOverwriteTrigger.Stat);
+        Check(IsIncluded("src", all.DirectoryFilters), "without a selection a folder is included");
+        Check(IsIncluded(".", all.DirectoryFilters), "without a selection the root is included");
+        Check(!IsIncluded("app.log", all.FileFilters), "the file filters still exclude");
+
+        // A selection keeps the picked folder and its subtree, and drops its siblings.
+        SyncSettings picked = SyncRequest.Create(false, "C:/local", "/remote", null, false, false, false, QuickSyncOverwriteTrigger.Stat, selectionPaths: new[] { "src" });
+        Check(IsIncluded("src", picked.DirectoryFilters), "a selected folder is included");
+        Check(IsIncluded("src/.", picked.DirectoryFilters), "the selected folder is included as a visited directory");
+        Check(IsIncluded("src/sub", picked.DirectoryFilters), "a subfolder of a selected folder is included");
+        Check(!IsIncluded("docs", picked.DirectoryFilters), "an unselected folder is left out");
+        Check(!IsIncluded("docs/.", picked.DirectoryFilters), "an unselected folder is left out as a visited directory");
+        Check(!IsIncluded(".", picked.DirectoryFilters), "the root is left out, so loose files at the root are not copied");
+        Check(IsIncluded("app.txt", picked.FileFilters), "a selection does not restrict the file filters");
+
+        // The exclude box and the selection coexist: the exclusion is kept, and the selection is added after it.
+        SyncSettings both = SyncRequest.Create(false, "C:/local", "/remote", "build", false, false, false, QuickSyncOverwriteTrigger.Stat, selectionPaths: new[] { "src" });
+        Check(!IsIncluded("build", both.DirectoryFilters), "an excluded folder is still left out with a selection");
+        Check(IsIncluded("src", both.DirectoryFilters), "the selected folder is included next to the exclusion");
+        Check(IsIncluded("src/keep", both.DirectoryFilters), "a subfolder of the selection is included next to the exclusion");
+        Check(!IsIncluded("docs", both.DirectoryFilters), "an unselected folder is left out next to the exclusion");
+
+        // The selection alone (an empty exclude box) still produces filters, without the include-all tail that would
+        // defeat it.
+        QuickSyncFilter[] only = SyncRequest.BuildDirectoryFilters("", false, new[] { "src" });
+        Equal(1, only.Length, "a selection alone produces the folder filter only");
+        Check(IsIncluded("src", only), "the folder filter includes the selected folder");
+        Check(!IsIncluded("docs", only), "the folder filter leaves out the rest");
+
+        // CleanSelection normalizes the picker output.
+        string[] cleaned = SyncRequest.CleanSelection(new[] { " src ", "src", "docs\\sub", "", "..", "a/../b", "." });
+        Equal(2, cleaned.Length, "CleanSelection drops the empty, the duplicate and the climbing entries");
+        Equal("src", cleaned[0], "CleanSelection trims and de-duplicates");
+        Equal("docs/sub", cleaned[1], "CleanSelection uses forward slashes");
+        Equal<string[]>(null, SyncRequest.CleanSelection(null), "CleanSelection returns null for no selection");
+        Equal<string[]>(null, SyncRequest.CleanSelection(new[] { "  ", "." }), "CleanSelection returns null when nothing is left");
     }
 
     private static void CheckPathNormalizationIsLeftToTheEngine()
