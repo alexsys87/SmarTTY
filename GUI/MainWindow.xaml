@@ -685,6 +685,11 @@
                     <Image Source="../icons/delete16.png" />
                   </MenuItem.Icon>
                 </MenuItem>
+                <MenuItem Name="cmdDeleteDownloaded" Header="Delete downloaded file(s) from this computer..." Click="SelectedXfers_DeleteDownloaded">
+                  <MenuItem.Icon>
+                    <Image Source="../icons/delete16.png" />
+                  </MenuItem.Icon>
+                </MenuItem>
               </ContextMenu>
             </FrameworkElement.ContextMenu>
             <ListView.View>

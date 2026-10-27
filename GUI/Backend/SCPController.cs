@@ -261,6 +261,36 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             return true;
         }
 
+        /// <summary>
+        /// Deletes the local file (or folder) a completed download wrote (after asking) and removes the entry. Only
+        /// the local copy is touched; nothing on the server is changed.
+        /// </summary>
+        internal bool DeleteLocalFile(bool ask = true)
+        {
+            if (!_Context.IsDownload || _Context.State != FileTransferManager.TransferState.Completed)
+            {
+                return false;
+            }
+            string localPath = _Context.LocalPath;
+            if (ask && !MessageBoxes.AskWarn("Delete " + localPath + " on this computer?\n\nThis cannot be undone."))
+            {
+                return false;
+            }
+            string parent = Path.GetDirectoryName(localPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            string name = Path.GetFileName(localPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            try
+            {
+                new SmarTTY.Sync.QuickSyncRunner(null).DeleteLocalItems(parent, new[] { name }, null);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Error("Cannot delete " + localPath + ": " + exception.Message);
+                return false;
+            }
+            _Controller.ActiveTransfers.Remove(this);
+            return true;
+        }
+
         internal void OpenLocal()
         {
             string localPath = _Context?.LocalPath;

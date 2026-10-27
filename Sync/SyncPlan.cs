@@ -304,6 +304,25 @@ internal class SyncPlan
             base.Statistics.FilesToDelete++;
             this._plan.AddAction(ActionType.DeleteTargetFile, fullLocalPath.FullPath);
         }
+
+        /// <summary>
+        /// Plans the deletion of the named entries of <paramref name="localPath"/>: files and directories alike, a
+        /// directory together with its contents. Names are matched case-insensitively, like the rest of the engine.
+        /// Used by <see cref="QuickSyncRunner.DeleteLocalItems"/> for the "delete the local copies" command.
+        /// </summary>
+        public SyncPlan PlanDeleteNames(LocalPath localPath, string[] names)
+        {
+            this._plan = new SyncPlan();
+            HashSet<string> nameSet = new HashSet<string>(names.EnsureNotNull(), StringComparer.InvariantCultureIgnoreCase);
+            foreach (LocalFileSystem.FindData findData in LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: true))
+            {
+                if (nameSet.Contains(findData.FileName ?? ""))
+                {
+                    PlanDelete(localPath, findData);
+                }
+            }
+            return this._plan;
+        }
     }
 
     public class UploadPlanner : SyncPlannerBase

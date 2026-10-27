@@ -801,6 +801,27 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
     }
 
+    private void SelectedXfers_DeleteDownloaded(object sender, RoutedEventArgs e)
+    {
+        SCPController.TransferObject[] downloads = ((ListBox)TransferList).SelectedItems.OfType<SCPController.TransferObject>().Where((SCPController.TransferObject xf) => xf.IsDownload && xf.Status == FileTransferManager.TransferState.Completed).ToArray();
+        if (downloads.Length == 0)
+        {
+            return;
+        }
+        string question = (downloads.Length == 1) ? "Delete " + downloads[0].LocalFile + " on this computer?" : "Delete these " + downloads.Length + " files on this computer?\n\n" + string.Join("\n", downloads.Take(15).Select((SCPController.TransferObject xf) => xf.LocalFile)) + ((downloads.Length > 15) ? "\n..." : "");
+        if (!MessageBoxes.AskWarn(question + "\n\nThis cannot be undone."))
+        {
+            return;
+        }
+        foreach (SCPController.TransferObject download in downloads)
+        {
+            if (!download.DeleteLocalFile(ask: false))
+            {
+                break;
+            }
+        }
+    }
+
     private void RunForSelecterXfers(Action<SCPController.TransferObject> action, bool onlyFirst = false)
     {
         SCPController.TransferObject[] items = ((ListBox)TransferList).SelectedItems.OfType<SCPController.TransferObject>().ToArray();
@@ -869,6 +890,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         Visibility deleteVisibility = items.Any((SCPController.TransferObject transferObject) => !transferObject.IsDownload && transferObject.Status == FileTransferManager.TransferState.Completed) ? Visibility.Visible : Visibility.Collapsed;
         cmdDeleteUploaded.Visibility = deleteVisibility;
         sepDeleteUploaded.Visibility = deleteVisibility;
+        cmdDeleteDownloaded.Visibility = items.Any((SCPController.TransferObject transferObject) => transferObject.IsDownload && transferObject.Status == FileTransferManager.TransferState.Completed) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public void UpdateContextMenu()

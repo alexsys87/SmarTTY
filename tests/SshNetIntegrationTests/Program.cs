@@ -26,6 +26,7 @@ internal static class Program
         SshNetContractTests.ReportVersion();
         SshNetContractTests.Run();
         PtySetupGateTests.Run();
+        LocalDeleteTests.Run();
         ShellChannelStateTests.Run();
         X11ForwardingTests.Run();
 

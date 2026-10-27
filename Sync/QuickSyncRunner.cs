@@ -434,6 +434,30 @@ public class QuickSyncRunner
         return false;
     }
 
+    /// <summary>
+    /// Deletes the named entries of the local folder <paramref name="text"/> (files and directories, a directory with
+    /// its contents). This is the "delete the local copies" command of the transfer queue: no server is contacted and
+    /// no files are copied, only the planned deletions are executed. Progress and warnings are reported through
+    /// <paramref name="syncEvents"/>.
+    /// </summary>
+    public void DeleteLocalItems(string text, string[] items, ISyncEvents syncEvents)
+    {
+        SyncPlan.DownloadPlanner downloadPlanner = new SyncPlan.DownloadPlanner(new SyncSettings
+        {
+            LocalPath = text,
+            RemotePath = "/"
+        }, new RemoteFileSet());
+        LocalPath localPath = LocalPath.FromUserPath(text);
+        syncEvents?.OnProgress(new SyncProgress
+        {
+            Stage = SyncStage.BuildingFileList,
+            Total = -1L
+        });
+        SyncPlan syncPlan = downloadPlanner.PlanDeleteNames(localPath, items);
+        TransferStatistics transferStatistics = downloadPlanner.Statistics;
+        this.ExecuteLocalActions(localPath, syncPlan, null, syncEvents, ref transferStatistics);
+    }
+
     private ISyncEngine CreateEngine(SshSession sshSession, SyncSettings syncSettings, ISyncEvents syncEvents, ILocalFileCache localFileCache, ISyncCustomization syncCustomization)
     {
         syncEvents?.OnProgress(new SyncProgress
