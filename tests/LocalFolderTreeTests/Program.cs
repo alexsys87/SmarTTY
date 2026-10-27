@@ -72,6 +72,14 @@ internal static class Program
                 Check(seen.Add(root.Path), "the root path '" + root.Path + "' is listed once");
             }
         }
+        // GetReadyDrives must not hand out the same mount point twice, which is what made GetRoots repeat a node
+        // (the CI runner reports /proc/sys/fs/binfmt_misc twice).
+        HashSet<string> mounts = new HashSet<string>(StringComparer.Ordinal);
+        foreach (System.IO.DriveInfo drive in LocalFolderTree.GetReadyDrives())
+        {
+            Check(mounts.Add(drive.Name), "the mount point '" + drive.Name + "' is returned once");
+        }
+        Check(LocalFolderTree.GetReadyDrives().Count == mounts.Count, "GetReadyDrives returns exactly the unique mounts");
     }
 
     private static void TestChildDirectories()

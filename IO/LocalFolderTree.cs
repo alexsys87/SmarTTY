@@ -13,38 +13,51 @@ public static class LocalFolderTree
 {
     /// <summary>
     /// The roots of the tree: the ready drives and the user's shell folders, each with the name shown in the tree.
-    /// A shell folder that is empty or missing is left out. The order is This PC, then the shell folders, then the drives.
+    /// A shell folder that is empty or missing is left out, and a folder that is already listed (a drive that is also
+    /// a shell folder) is not repeated. The order is This PC, then the shell folders, then the drives.
     /// </summary>
     public static List<LocalFolderEntry> GetRoots()
     {
         List<LocalFolderEntry> roots = new List<LocalFolderEntry>();
         roots.Add(new LocalFolderEntry("This PC", null));
+        HashSet<string> seen = new HashSet<string>(PathComparer);
 
-        AddShellFolder(roots, "Desktop", Environment.SpecialFolder.Desktop);
-        AddShellFolder(roots, "Documents", Environment.SpecialFolder.MyDocuments);
-        AddShellFolder(roots, "Downloads", null);
+        AddShellFolder(roots, seen, "Desktop", Environment.SpecialFolder.Desktop);
+        AddShellFolder(roots, seen, "Documents", Environment.SpecialFolder.MyDocuments);
+        AddShellFolder(roots, seen, "Downloads", null);
 
         foreach (DriveInfo drive in GetReadyDrives())
         {
-            roots.Add(new LocalFolderEntry(DriveDisplayName(drive), drive.RootDirectory.FullName));
+            string path = drive.RootDirectory.FullName;
+            if (seen.Add(path))
+            {
+                roots.Add(new LocalFolderEntry(DriveDisplayName(drive), path));
+            }
         }
         return roots;
     }
 
-    /// <summary>The ready (mounted, formatted) drives of the machine.</summary>
+    /// <summary>
+    /// The ready (mounted, formatted) drives of the machine. A mount point that the platform reports more than once is
+    /// listed once: on Linux <see cref="DriveInfo.GetDrives"/> can repeat a mount (the same device mounted twice), and
+    /// the tree must not show the same folder as two nodes.
+    /// </summary>
     public static List<DriveInfo> GetReadyDrives()
     {
         List<DriveInfo> drives = new List<DriveInfo>();
+        HashSet<string> seen = new HashSet<string>(PathComparer);
         try
         {
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
                 try
                 {
-                    if (drive.IsReady)
+                    string name = drive.Name;
+                    if (string.IsNullOrEmpty(name) || !drive.IsReady || !seen.Add(name))
                     {
-                        drives.Add(drive);
+                        continue;
                     }
+                    drives.Add(drive);
                 }
                 catch (IOException)
                 {
@@ -62,6 +75,10 @@ public static class LocalFolderTree
         }
         return drives;
     }
+
+    /// <summary>Paths are compared case-insensitively on Windows and case-sensitively elsewhere.</summary>
+    private static StringComparer PathComparer =>
+        (Path.DirectorySeparatorChar == '\\') ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     /// <summary>The label of a drive: "C:\ (System)", or just the volume name when there is one.</summary>
     public static string DriveDisplayName(DriveInfo drive)
@@ -209,12 +226,12 @@ public static class LocalFolderTree
         return string.IsNullOrEmpty(name) ? path : name;
     }
 
-    private static void AddShellFolder(List<LocalFolderEntry> roots, string name, Environment.SpecialFolder? folder)
+    private static void AddShellFolder(List<LocalFolderEntry> roots, HashSet<string> seen, string name, Environment.SpecialFolder? folder)
     {
         string path = (folder.HasValue)
             ? Environment.GetFolderPath(folder.Value)
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-        if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
+        if (!string.IsNullOrEmpty(path) && Directory.Exists(path) && seen.Add(path))
         {
             roots.Add(new LocalFolderEntry(name, path));
         }
