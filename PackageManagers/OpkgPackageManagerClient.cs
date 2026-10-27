@@ -16,7 +16,7 @@ public class OpkgPackageManagerClient : ILinuxPackageManagerClient
 
     public int Probe(ISSHCommandRunner runner)
     {
-        if (runner.RunCommand("which opkg") != null || runner.RunCommand("opkg -v") != null)
+        if (runner.RunCommand("command -v opkg || which opkg") != null || runner.RunCommand("opkg -v") != null)
         {
             return ProbeScore;
         }

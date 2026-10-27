@@ -144,6 +144,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // (or has neither opkg nor apk) never sees the item.
     private LocalRepoPackageManager? _LocalRepoManager;
 
+    /// <summary>The package manager client the package manager window found on this connection (null until it asks); forgotten on a reconnect.</summary>
+    internal VisualTTY.ILinuxPackageManagerClient PackageManagerClient;
+
     private object _Sync = new object();
 
     private string _DeviceTitle;
@@ -645,6 +648,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             }
         }
         IsInactive = false;
+        PackageManagerClient = null;
         StartOpenWrtProbe();
         if (deferredError != null)
         {
@@ -670,7 +674,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             List<string> output = null;
             try
             {
-                output = session.RunCommand(OpenWrtDetector.ProbeCommand, out _, timeout: TimeSpan.FromSeconds(20));
+                output = session.RunCommand(PosixShell.Wrap(OpenWrtDetector.ProbeCommand, addAdminDirectoriesToPath: true), out _, timeout: TimeSpan.FromSeconds(20));
             }
             catch
             {
@@ -2114,7 +2118,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public string[] RunCommand(string command)
     {
-        string[] output = Session.RunCommandChecked(command, requireSuccess: true)?.ToArray();
+        // The package manager probes and commands are POSIX shell: run them in sh whatever the login shell is.
+        string[] output = Session.RunCommandChecked(PosixShell.Wrap(command, addAdminDirectoriesToPath: true), requireSuccess: true)?.ToArray();
         if (output == null)
         {
             // null means "the command failed" for the callers (a package manager that is not there); not so for a dropped connection.
