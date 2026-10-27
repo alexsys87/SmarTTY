@@ -289,11 +289,6 @@ public class ShellCompletionAnalyzer : IDisposable
         }
     }
 
-    public static string EscapeForShell(string text)
-    {
-        return SmarTTY.IO.RemotePathUtils.EscapeForDoubleQuotes(text);
-    }
-
     public void AppendToHistory(string text)
     {
         if (string.IsNullOrWhiteSpace(text))

@@ -1,4 +1,3 @@
-using SmarTTY.IO;
 using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
@@ -31,21 +30,6 @@ public struct QuickSyncFilter
         return "-" + Regex;
     }
 
-    public static QuickSyncFilter FromRegex(string maskText, bool ignoreCase)
-    {
-        if (maskText == null)
-        {
-            throw new ArgumentException("maskText");
-        }
-        QuickSyncAction quickSyncAction = QuickSyncAction.Include;
-        if (maskText.StartsWith("-"))
-        {
-            quickSyncAction = QuickSyncAction.Exclude;
-            maskText = maskText.Substring(1);
-        }
-        return new QuickSyncFilter(new Regex(maskText, ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None), quickSyncAction);
-    }
-
     public static QuickSyncFilter FromWildcard(string maskText, bool ignoreCase)
     {
         if (maskText == null)
@@ -70,57 +54,6 @@ public struct QuickSyncFilter
             _fileNameRegex = null;
         }
         _matchesAll = pattern == ".*" || pattern == "^.*$";
-    }
-
-    public static QuickSyncFilter[] FromPaths(IEnumerable<string> paths, bool ignoreCase)
-    {
-        HashSet<string> parentDirs = new HashSet<string>();
-        HashSet<string> targetPaths = new HashSet<string>();
-        HashSet<string> dirWildcards = new HashSet<string>();
-        bool hasRootWildcard = false;
-        foreach (string path in paths)
-        {
-            if (!string.IsNullOrEmpty(path))
-            {
-                string normPath = path.Replace('\\', '/');
-                if (normPath == "*")
-                {
-                    hasRootWildcard = true;
-                }
-                else if (normPath.EndsWith("/*"))
-                {
-                    dirWildcards.Add(normPath.Substring(0, normPath.Length - 2));
-                }
-                else
-                {
-                    targetPaths.Add(normPath);
-                }
-                string parentDir = RemotePathUtils.GetDirectoryName(normPath);
-                while (!string.IsNullOrEmpty(parentDir))
-                {
-                    parentDirs.Add(parentDir);
-                    parentDir = RemotePathUtils.GetDirectoryName(parentDir);
-                }
-            }
-        }
-        List<QuickSyncFilter> filters = new List<QuickSyncFilter>();
-        if (parentDirs.Count > 0)
-        {
-            filters.Add(new QuickSyncFilter(new Regex("^(" + string.Join("|", parentDirs.ArraySelect(Regex.Escape)) + ")$"), QuickSyncAction.Include));
-        }
-        if (targetPaths.Count > 0)
-        {
-            filters.Add(new QuickSyncFilter(new Regex("^(" + string.Join("|", targetPaths.ArraySelect(Regex.Escape)) + ")($|/.*)"), QuickSyncAction.Include));
-        }
-        if (dirWildcards.Count > 0)
-        {
-            filters.Add(new QuickSyncFilter(new Regex("^(" + string.Join("|", dirWildcards.ArraySelect(Regex.Escape)) + ")/\\.$"), QuickSyncAction.Include));
-        }
-        if (hasRootWildcard)
-        {
-            filters.Add(new QuickSyncFilter(new Regex("^\\.$"), QuickSyncAction.Include));
-        }
-        return filters.ToArray();
     }
 
     public static QuickSyncFilter[] FromMaskList(IEnumerable<string> masks, bool ignoreCase)
