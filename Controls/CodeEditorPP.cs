@@ -14,23 +14,6 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 {
     public delegate void SuggestionAcceptedHandler(CodeEditorPP codeEditorPP, ISuggestion suggestion, Keys keys);
 
-    private class SuggestionSource : ISuggestionSource
-    {
-        private CodeEditorPP _editor;
-
-        private IEnumerable<ISuggestion> _items;
-
-        public IEnumerable Images => _editor.ImageList.Images;
-
-        public IEnumerable<ISuggestion> Items => _items;
-
-        public SuggestionSource(CodeEditorPP codeEditorPP, IEnumerable<ISuggestion> items)
-        {
-            this._editor = codeEditorPP;
-            this._items = items;
-        }
-    }
-
     internal delegate void TabHandler(ref bool handled);
 
     public delegate void PlaceholderChangedHandler(CodeEditorPP codeEditorPP, int line, int startColumn, int endColumn, object tag, bool isLast);
@@ -66,6 +49,10 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     public ImageList ImageList;
 
     private SuggestionController _suggestionController;
+
+    // The list the completion popup offers. The catalog is the popup's source: it is filled with the built list
+    // and the popup takes a snapshot of it.
+    private readonly SuggestionCatalog _suggestionCatalog = new SuggestionCatalog();
 
     private SignatureHintController _signatureHintController;
 
@@ -611,7 +598,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             _suggestionController = new SuggestionController(this);
         }
         _suggestionController.BackColor = SuggestionBackColor;
-        _suggestionController.Show(new SuggestionSource(this, items), autoSize: true, allowMultiSelect: false);
+        // The catalog is the source of the popup. The whole list is handed over (no prefix): the popup narrows it
+        // to the typed word itself and can widen it again when letters are deleted.
+        _suggestionCatalog.Clear();
+        _suggestionCatalog.Load(items);
+        _suggestionController.Show(_suggestionCatalog, null, autoSize: true, allowMultiSelect: false);
         UpdateSuggestions();
     }
 
