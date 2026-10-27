@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SmarTTY.LocalRepo;
 using SmarTTY.Ssh;
+using SmarTTY.Utilities;
 
 // Regression harness for the local OpenWrt repository server (Tools > Local OpenWrt repository server): the opkg index that is
 // generated from .ipk files is compared with what OpenWrt's ipkg-make-index.sh pipeline (tar + sed + sha256sum) produces, the
@@ -69,7 +70,7 @@ internal static class Program
         }
     }
 
-    private static int RunArgs(string file, string[] arguments, out string output, out string error)
+    private static int RunArgs(string file, string[] arguments, out string output, out string error, string path = null)
     {
         ProcessStartInfo info = new ProcessStartInfo(file)
         {
@@ -84,6 +85,10 @@ internal static class Program
             info.ArgumentList.Add(argument);
         }
         info.Environment["LC_ALL"] = "C.UTF-8";
+        if (path != null)
+        {
+            info.Environment["PATH"] = path;
+        }
         using (Process process = Process.Start(info))
         {
             Task<string> errorTask = process.StandardError.ReadToEndAsync();
@@ -1153,6 +1158,15 @@ internal static class Program
             Directory.CreateDirectory(debianEtc);
             File.WriteAllText(Path.Combine(debianEtc, "os-release"), "NAME=\"Debian GNU/Linux\"\nID=debian\nHOME_URL=\"https://openwrt.org/\"\n");
             Check(!RunProbe(shell, args, debianEtc, opkgOnPath: true), name + ": another system in os-release is not taken for OpenWrt, even if the word appears elsewhere");
+
+            // The name has to be a whole word in ID / ID_LIKE.
+            foreach ((string osReleaseLine, bool expected) in new[] { ("ID=lede", true), ("ID_LIKE='openwrt'", true), ("ID=prolede", false), ("ID=fedora-lede", false) })
+            {
+                string wordEtc = Path.Combine(_work, "etc-word-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(wordEtc);
+                File.WriteAllText(Path.Combine(wordEtc, "os-release"), osReleaseLine + "\n");
+                Check(RunProbe(shell, args, wordEtc, opkgOnPath: true) == expected, name + ": os-release " + osReleaseLine + (expected ? " is" : " is not") + " taken for OpenWrt");
+            }
         }
 
         Check(!OpenWrtDetector.Parse(null), "probe output: none means not OpenWrt");
@@ -1366,6 +1380,64 @@ internal static class Program
         string path = Path.Combine(directory, name);
         File.WriteAllText(path, "#!/bin/sh\nexit 0\n");
         MakeExecutable(path);
+    }
+
+    /// <summary>
+    /// The probe and the package manager commands are POSIX shell, but an SSH exec channel gives them to the login shell of the
+    /// user: fish and tcsh stop at "if [ ... ]; then" / "LC_ALL=C cmd". PosixShell.Wrap runs them in /bin/sh instead.
+    /// </summary>
+    private static void PosixShellTests()
+    {
+        List<string> shells = new List<string> { "sh" };
+        foreach (string candidate in new[] { "bash", "zsh", "fish", "tcsh", "csh" })
+        {
+            if (Has(candidate))
+            {
+                shells.Add(candidate);
+            }
+        }
+        Console.WriteLine("login shells under test: " + string.Join(", ", shells));
+        foreach (string shell in shells)
+        {
+            // One word whatever the quotes and special characters inside are.
+            int exit = RunArgs(shell, new[] { "-c", PosixShell.Wrap("printf '%s\\n' \"it's\" 'a b' \"$((1+2))\" | cat") }, out string output, out string error);
+            Check(exit == 0 && output.Replace("\r", "") == "it's\na b\n3\n", shell + ": a script with quotes, a pipe and arithmetic runs as written (" + error.Trim() + ")");
+
+            // The system directories are appended to a short PATH, and an existing PATH keeps its order.
+            exit = RunArgs(shell, new[] { "-c", PosixShell.Wrap("echo \"$PATH\"", addAdminDirectoriesToPath: true) }, out output, out error, path: "/usr/bin:/bin");
+            Check(exit == 0 && output.Trim() == "/usr/bin:/bin:" + PosixShell.AdminDirectories, shell + ": /sbin and /usr/sbin are appended to the PATH of the exec channel");
+
+            // The OpenWrt probe and the apk/opkg choice work under every login shell.
+            string openwrtEtc = Path.Combine(_work, "ps-openwrt-" + shell);
+            string yoctoEtc = Path.Combine(_work, "ps-yocto-" + shell);
+            Directory.CreateDirectory(openwrtEtc);
+            Directory.CreateDirectory(Path.Combine(yoctoEtc, "opkg"));
+            File.WriteAllText(Path.Combine(openwrtEtc, "openwrt_release"), "DISTRIB_ID='OpenWrt'\n");
+            File.WriteAllText(Path.Combine(yoctoEtc, "os-release"), "ID=poky\n");
+            foreach ((string etc, bool opkg, bool apk, LocalRepoPackageManager? expected, string what) in new[]
+            {
+                (openwrtEtc, true, false, (LocalRepoPackageManager?)LocalRepoPackageManager.Opkg, "OpenWrt with opkg"),
+                (openwrtEtc, false, true, (LocalRepoPackageManager?)LocalRepoPackageManager.Apk, "OpenWrt with apk"),
+                (openwrtEtc, true, true, (LocalRepoPackageManager?)LocalRepoPackageManager.Apk, "OpenWrt with both: apk"),
+                (yoctoEtc, true, false, (LocalRepoPackageManager?)null, "Yocto with opkg is not OpenWrt"),
+            })
+            {
+                string fakeBin = Path.Combine(_work, "psbin-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(fakeBin);
+                if (opkg)
+                {
+                    MakeFakeProgram(fakeBin, "opkg");
+                }
+                if (apk)
+                {
+                    MakeFakeProgram(fakeBin, "apk");
+                }
+                LinkGrep(fakeBin);
+                string command = PosixShell.Wrap(OpenWrtDetector.ProbeCommand.Replace("/etc/", etc + "/"), addAdminDirectoriesToPath: true);
+                exit = RunArgs(shell, new[] { "-c", command }, out output, out error, path: fakeBin);
+                Check(exit == 0 && OpenWrtDetector.Detect((output + error).Split('\n')) == expected, shell + ": " + what + " (" + error.Trim() + ")");
+            }
+        }
     }
 
     private static LocalRepoPackageManager? RunProbeDetect(string shell, string[] args, string etcDir, bool opkgOnPath, bool apkOnPath)
@@ -1812,6 +1884,7 @@ internal static class Program
             await SignedIndexServerTests();
             await SigningHostTests();
             ApkDetectorAndScannerTests();
+            PosixShellTests();
             ApkConfigTests();
             await ApkServerAndHostTests();
             await ApkEndToEndTests();

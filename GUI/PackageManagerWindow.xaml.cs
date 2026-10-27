@@ -240,7 +240,8 @@ public partial class PackageManagerWindow : Window
         {
             try
             {
-                ILinuxPackageManagerClient bestClient = PackageManagerSelector.Pick(_Clients, _Session, () => _Closed);
+                // The package manager of a host does not change while the connection lasts: the window asks the host once.
+                ILinuxPackageManagerClient bestClient = _Session.PackageManagerClient ?? PackageManagerSelector.Pick(_Clients, _Session, () => _Closed);
                 if (_Closed)
                 {
                     return;
@@ -249,8 +250,9 @@ public partial class PackageManagerWindow : Window
                 {
                     // Every probe failed because the connection went away: say so instead of "no package manager".
                     _Session.Session?.ThrowIfConnectionLost();
-                    throw new Exception("Could not detect the package manager on the remote host");
+                    throw new Exception(PackageManagerSelector.BuildNotFoundMessage(_Session, _Clients));
                 }
+                _Session.PackageManagerClient = bestClient;
                 _Client = bestClient;
                 _IsRoot = PackageIndexUpdater.IsRoot(_Session);
                 LoadPackages(null);

@@ -41,7 +41,7 @@ public class YumPackageManagerClient : ILinuxPackageManagerClient
 
     public int Probe(ISSHCommandRunner runner)
     {
-        if (runner.RunCommand("which yum") != null)
+        if (runner.RunCommand("command -v yum || which yum") != null)
         {
             return 500;
         }

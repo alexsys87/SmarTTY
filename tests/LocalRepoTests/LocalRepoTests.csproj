@@ -20,6 +20,7 @@
     <Compile Include="../../LocalRepo/LocalRepoSettings.cs" Link="LocalRepoSettings.cs" />
     <Compile Include="../../LocalRepo/OpenWrtDetector.cs" Link="OpenWrtDetector.cs" />
     <Compile Include="../../Utilities/XmlStorage.cs" Link="XmlStorage.cs" />
+    <Compile Include="../../Utilities/PosixShell.cs" Link="PosixShell.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
   </ItemGroup>
 </Project>
