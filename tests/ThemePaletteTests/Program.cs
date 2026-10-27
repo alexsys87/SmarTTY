@@ -155,9 +155,9 @@ internal static class Program
             Check(!SmarTTYTheme.Blue.IsLight() && SmarTTYTheme.SolarizedLight.IsLight(),
                 "Blue is dark, Solarized Light is light");
             Check(!SmarTTYTheme.Dracula.IsLight() && !SmarTTYTheme.GruvboxDark.IsLight() &&
-                !SmarTTYTheme.Monokai.IsLight() && !SmarTTYTheme.OneDark.IsLight(),
-                "Dracula, Gruvbox Dark, Monokai and One Dark are dark themes");
-            Check(SmarTTYTheme.Sepia.IsLight(), "Sepia is a light theme");
+                !SmarTTYTheme.Monokai.IsLight() && !SmarTTYTheme.OneDark.IsLight() && !SmarTTYTheme.Forest.IsLight(),
+                "Dracula, Gruvbox Dark, Monokai, One Dark and Forest are dark themes");
+            Check(SmarTTYTheme.Sepia.IsLight() && SmarTTYTheme.Rose.IsLight(), "Sepia and Rose are light themes");
 
             // Every value names its palette folder (a distinct one, checked above) and carries a display name, so the
             // picker never shows a bare enum identifier.
