@@ -157,6 +157,9 @@ jobs:
       - name: Run icon resource checks (every Icons.Load name is embedded, no .resx left)
         run: dotnet run --project tests/IconResourceTests -c Release
 
+      - name: Run local folder browser checks (roots, child folders, ordering, path normalization)
+        run: dotnet run --project tests/LocalFolderTreeTests -c Release
+
   interop:
     name: File transfer interoperability (lrzsz, C-Kermit, G-Kermit, gzip + base64 through BusyBox ash and bash)
     runs-on: ubuntu-latest

@@ -302,21 +302,16 @@ public partial class LocalRepoWindow : Window
 
     private async void Browse_Click(object sender, RoutedEventArgs e)
     {
-        string picked;
-        using (System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog())
+        string start = LocalRepoFolders.Clean(FolderBox.Text);
+        if (start.Length > 0 && !System.IO.Directory.Exists(start))
         {
-            dialog.Description = "Select a folder of the OpenWrt build with packages (a feed, or a folder that contains feeds). A WSL or network folder that is not in this tree can be typed into the box of the window instead.";
-            dialog.ShowNewFolderButton = false;
-            string start = LocalRepoFolders.Clean(FolderBox.Text);
-            if (start.Length > 0 && System.IO.Directory.Exists(start))
-            {
-                dialog.SelectedPath = start;
-            }
-            if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
-            {
-                return;
-            }
-            picked = dialog.SelectedPath;
+            start = null;
+        }
+        string picked = LocalFolderBrowserWindow.Browse(start,
+            "Select a folder of the OpenWrt build with packages (a feed, or a folder that contains feeds)");
+        if (picked == null)
+        {
+            return;
         }
         await AddFolderAsync(picked);
     }

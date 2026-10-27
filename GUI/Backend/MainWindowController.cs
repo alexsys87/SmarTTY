@@ -752,15 +752,11 @@ public class MainWindowController : INotifyPropertyChanged
                 string text = _Controller.Settings.DefaultDownloadDirectory;
                 if (string.IsNullOrEmpty(text) || !Directory.Exists(text))
                 {
-                    FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog
-                    {
-                        Description = "Select download directory"
-                    };
-                    if (folderBrowserDialog.ShowDialog() != DialogResult.OK)
+                    text = LocalFolderBrowserWindow.Browse(text, "Select download directory");
+                    if (text == null)
                     {
                         return;
                     }
-                    text = folderBrowserDialog.SelectedPath;
                 }
                 DoDownloadFile(fn, text, _Controller.Settings.OpenLocalDirAfterDownload);
             }
@@ -781,15 +777,11 @@ public class MainWindowController : INotifyPropertyChanged
                 string text = _Controller.Settings.DefaultDownloadDirectory;
                 if (string.IsNullOrEmpty(text) || !Directory.Exists(text))
                 {
-                    FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog
-                    {
-                        Description = "Select download directory"
-                    };
-                    if (folderBrowserDialog.ShowDialog() != DialogResult.OK)
+                    text = LocalFolderBrowserWindow.Browse(text, "Select download directory");
+                    if (text == null)
                     {
                         return;
                     }
-                    text = folderBrowserDialog.SelectedPath;
                 }
                 activeSession.DoDownloadArchive(remoteDirectory, text, _Controller.Settings.OpenLocalDirAfterDownload);
             }

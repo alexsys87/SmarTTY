@@ -202,20 +202,10 @@ public partial class SynchronizeWindow : Window
 
     private void LocalBrowse_Click(object sender, RoutedEventArgs e)
     {
-        System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog
+        string selected = LocalFolderBrowserWindow.Browse(LocalBox.Text, "Select the local folder to synchronize");
+        if (selected != null)
         {
-            RootFolder = Environment.SpecialFolder.MyComputer
-        };
-        try
-        {
-            dialog.SelectedPath = LocalBox.Text;
-        }
-        catch
-        {
-        }
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-        {
-            LocalBox.Text = dialog.SelectedPath;
+            LocalBox.Text = selected;
         }
     }
 
