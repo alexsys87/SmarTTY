@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Markup;
 using VisualTTY.DeviceTerminal;
@@ -674,12 +673,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             PropertyInfo colorProp = containerObj.GetType().GetProperty(pathParts[1]);
             if (colorProp != null && colorProp.GetValue(containerObj, new object[0]) is DeviceTerminalSettings.ColorWrapper colorWrapper)
             {
-                ColorDialog colorDialog = new ColorDialog();
-                colorDialog.Color = colorWrapper;
-                if (colorDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                DeviceTerminalSettings.ColorWrapper? selectedColor = ColorPickerWindow.Pick(WindowOwnership.ActiveWindow(), colorWrapper);
+                if (selectedColor != null)
                 {
-                    DeviceTerminalSettings.ColorWrapper newColorWrapper = colorDialog.Color;
-                    colorProp.SetValue(containerObj, newColorWrapper, new object[0]);
+                    colorProp.SetValue(containerObj, selectedColor.Value, new object[0]);
                     objProp.SetValue(dataContext, containerObj, new object[0]);
                     ((BindingExpressionBase)bindingExpression).UpdateTarget();
                     OnSettingsChanged();
