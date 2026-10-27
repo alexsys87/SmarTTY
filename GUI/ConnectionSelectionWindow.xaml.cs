@@ -26,11 +26,8 @@ using VisualTTY;
 using VisualTTY.Backend;
 using VisualTTY.DeviceTerminal;
 using Button = System.Windows.Controls.Button;
-using CommonDialog = Microsoft.Win32.CommonDialog;
 using Control = System.Windows.Forms.Control;
-using FileDialog = Microsoft.Win32.FileDialog;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
-using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace SmarTTY.GUI;
 
@@ -1629,14 +1626,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         ToggleButton activeIconPicker = _ActiveIconPicker;
         if (((activeIconPicker != null) ? ((FrameworkElement)activeIconPicker).DataContext : null) is IConnectionSettingsWrapper connectionSettingsWrapper)
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog
+            string image = LocalFileDialogWindow.OpenFile(this, "Locate a custom image...", "PNG images (*.png)|*.png");
+            if (image != null)
             {
-                Title = "Locate a custom image...",
-                Filter = "PNG images|*.png"
-            };
-            if (((CommonDialog)openFileDialog).ShowDialog() == true)
-            {
-                connectionSettingsWrapper.SetIcon(((FileDialog)openFileDialog).FileName);
+                connectionSettingsWrapper.SetIcon(image);
             }
         }
     }

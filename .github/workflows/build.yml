@@ -157,6 +157,9 @@ jobs:
       - name: Run folder browser checks (themed chooser replaced the native FolderBrowserDialog)
         run: dotnet run --project tests/FolderBrowserTests -c Release
 
+      - name: Run file dialog checks (themed chooser replaced the native OpenFileDialog/SaveFileDialog)
+        run: dotnet run --project tests/FileDialogTests -c Release
+
       - name: Run folder synchronization settings checks (direction, options, exclusion masks)
         run: dotnet run --project tests/SyncRequestTests -c Release
 

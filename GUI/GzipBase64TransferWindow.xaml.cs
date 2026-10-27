@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+using SmarTTY.Controls;
 using SmarTTY.IO;
 using System;
 using System.Globalization;
@@ -85,15 +85,10 @@ public partial class GzipBase64TransferWindow : Window
     {
         if (_sending)
         {
-            OpenFileDialog dialog = new OpenFileDialog
+            string chosen = LocalFileDialogWindow.OpenFile(this, "Select the file to send", "All files (*.*)|*.*", initialDirectory: ExistingFolder(_lastLocalFolder));
+            if (chosen != null)
             {
-                Title = "Select the file to send",
-                CheckFileExists = true,
-                InitialDirectory = ExistingFolder(_lastLocalFolder)
-            };
-            if (dialog.ShowDialog(this) == true)
-            {
-                LocalBox.Text = dialog.FileName;
+                LocalBox.Text = chosen;
                 if (RemoteBox.Text.Trim().Length == 0)
                 {
                     RemoteBox.Text = _lastRemoteSendFolder;
@@ -104,16 +99,11 @@ public partial class GzipBase64TransferWindow : Window
         {
             string suggested = RemoteBox.Text.Trim();
             int slash = suggested.LastIndexOf('/');
-            SaveFileDialog dialog = new SaveFileDialog
+            string chosen = LocalFileDialogWindow.SaveFile(this, "Save the received file as", "All files (*.*)|*.*",
+                fileName: slash >= 0 ? suggested.Substring(slash + 1) : suggested, initialDirectory: ExistingFolder(_lastLocalFolder));
+            if (chosen != null)
             {
-                Title = "Save the received file as",
-                OverwritePrompt = true,
-                FileName = slash >= 0 ? suggested.Substring(slash + 1) : suggested,
-                InitialDirectory = ExistingFolder(_lastLocalFolder)
-            };
-            if (dialog.ShowDialog(this) == true)
-            {
-                LocalBox.Text = dialog.FileName;
+                LocalBox.Text = chosen;
                 // The dialog has already asked about replacing an existing file.
                 OverwriteBox.IsChecked = true;
             }

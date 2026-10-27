@@ -427,18 +427,13 @@ public partial class DeviceTerminalControl
             return;
         }
 
-        using OpenFileDialog openFileDialog = new OpenFileDialog
-        {
-            Title = "Select files to send via ZMODEM (at a shell prompt the device's rz is started automatically)",
-            Filter = "All files (*.*)|*.*",
-            Multiselect = true
-        };
-        if (openFileDialog.ShowDialog(this) != DialogResult.OK || openFileDialog.FileNames.Length == 0)
+        string[] fileNames = ThemedFileDialog.OpenFiles(this, "Select files to send via ZMODEM (at a shell prompt the device's rz is started automatically)", "All files (*.*)|*.*");
+        if (fileNames == null)
         {
             return;
         }
-        // The streams are opened later, on the worker thread, when the "using" dialog above is already disposed.
-        StartZModemSend((string[])openFileDialog.FileNames.Clone());
+        // The streams are opened later, on the worker thread: only the names are needed here.
+        StartZModemSend(fileNames);
     }
 
     /// <summary>Must be called on the UI thread: the line is claimed here, before the first byte can arrive.</summary>

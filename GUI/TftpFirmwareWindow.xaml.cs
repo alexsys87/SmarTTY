@@ -229,17 +229,12 @@ public partial class TftpFirmwareWindow : Window, ITftpFirmwareWindow
 
     private void AddFile_Click(object sender, RoutedEventArgs e)
     {
-        OpenFileDialog dialog = new OpenFileDialog
-        {
-            Title = "Select the firmware (or any file the board should fetch over TFTP)",
-            Filter = "All files (*.*)|*.*",
-            Multiselect = true
-        };
-        if (dialog.ShowDialog(this) != true)
+        string[] paths = LocalFileDialogWindow.OpenFiles(this, "Select the firmware (or any file the board should fetch over TFTP)", "All files (*.*)|*.*");
+        if (paths == null)
         {
             return;
         }
-        foreach (string path in dialog.FileNames)
+        foreach (string path in paths)
         {
             string name = SanitizeName(Path.GetFileName(path));
             ServedFile same = _files.Find(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));

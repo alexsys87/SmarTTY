@@ -1642,20 +1642,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
-        using OpenFileDialog openFileDialog = new OpenFileDialog
-        {
-            Title = "Select file to send via " + protocolName,
-            Filter = "All files (*.*)|*.*",
-            Multiselect = false
-        };
-
-        if (openFileDialog.ShowDialog(this) != DialogResult.OK)
+        string fileName = ThemedFileDialog.OpenFile(this, "Select file to send via " + protocolName, "All files (*.*)|*.*");
+        if (string.IsNullOrEmpty(fileName))
         {
             return;
         }
 
-        // The stream is opened later, on the worker thread, when the "using" dialog above is already disposed: take the name now.
-        string fileName = openFileDialog.FileName;
+        // The stream is opened later, on the worker thread: only the name is needed here.
         StartXModemTransfer(protocolName + " Send", "send", fileStream: () => File.OpenRead(fileName), isSend: true, useLargeBlocks: useLargeBlocks);
     }
 
@@ -1671,20 +1664,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
-        using SaveFileDialog saveFileDialog = new SaveFileDialog
-        {
-            Title = "Select destination file for XMODEM receive",
-            Filter = "All files (*.*)|*.*",
-            OverwritePrompt = true
-        };
-
-        if (saveFileDialog.ShowDialog(this) != DialogResult.OK)
+        string fileName = ThemedFileDialog.SaveFile(this, "Select destination file for XMODEM receive", "All files (*.*)|*.*");
+        if (string.IsNullOrEmpty(fileName))
         {
             return;
         }
 
-        // See the send handler: the dialog is disposed before the worker thread opens the file.
-        string fileName = saveFileDialog.FileName;
+        // See the send handler: only the name is needed here; the worker thread opens the file.
         StartXModemTransfer("XMODEM Receive", "receive", fileStream: () => File.Create(fileName), isSend: false);
     }
 
@@ -1857,7 +1843,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void toolStripButton2_Click(object sender, EventArgs e)
     {
-        if (_saveFileDialog.ShowDialog() != DialogResult.OK)
+        string fileName = ThemedFileDialog.SaveFile(this, "Save output to a file", "All files (*.*)|*.*");
+        if (string.IsNullOrEmpty(fileName))
         {
             return;
         }
@@ -1865,11 +1852,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             if (HexMode)
             {
-                File.WriteAllBytes(_saveFileDialog.FileName, hexTerminalControl1.AllBytes);
+                File.WriteAllBytes(fileName, hexTerminalControl1.AllBytes);
             }
             else
             {
-                File.WriteAllText(_saveFileDialog.FileName, _serialTerminalControl.Text);
+                File.WriteAllText(fileName, _serialTerminalControl.Text);
             }
         }
         catch (Exception exception)
@@ -1889,11 +1876,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
             ThemedMessageBox.Show("Please connect first before sending a file.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        if (_openFileDialog.ShowDialog() != DialogResult.OK)
+        string fileName = ThemedFileDialog.OpenFile(this, "Send a binary file", "All files (*.*)|*.*");
+        if (string.IsNullOrEmpty(fileName))
         {
             return;
         }
-        StartFileSend(_openFileDialog.FileName);
+        StartFileSend(fileName);
     }
 
     private void copyAllToolStripMenuItem_Click(object sender, EventArgs e)
@@ -2140,22 +2128,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
             ThemedMessageBox.Show("Stop recording first, then replay.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-        using OpenFileDialog dialog = new OpenFileDialog
-        {
-            Title = "Play back a recorded log of received data",
-            Filter = "All files (*.*)|*.*|Text log (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin",
-            FilterIndex = 1,
-            CheckFileExists = true,
-            Multiselect = false
-        };
-        if (dialog.ShowDialog(this) != DialogResult.OK)
+        string chosen = ThemedFileDialog.OpenFile(this, "Play back a recorded log of received data",
+            "All files (*.*)|*.*|Text log (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin");
+        if (string.IsNullOrEmpty(chosen))
         {
             return;
         }
         byte[] bytes;
         try
         {
-            bytes = File.ReadAllBytes(dialog.FileName);
+            bytes = File.ReadAllBytes(chosen);
         }
         catch (Exception exception)
         {
@@ -2185,20 +2167,14 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private void StartLogging()
     {
         // The format follows the chosen file type; hex mode suggests the hex dump, text mode the text log.
-        using SaveFileDialog dialog = new SaveFileDialog
-        {
-            Title = "Record received data (appended if the file already exists)",
-            Filter = "Text log (UTF-8) (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin",
-            FilterIndex = HexMode ? 2 : 1,
-            FileName = SuggestLogFileName(),
-            AddExtension = true,
-            OverwritePrompt = false
-        };
-        if (dialog.ShowDialog(this) != DialogResult.OK)
+        ThemedFileDialogResult chosen = ThemedFileDialog.SaveFileEx(this, "Record received data (appended if the file already exists)",
+            "Text log (UTF-8) (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin",
+            filterIndex: HexMode ? 2 : 1, fileName: SuggestLogFileName(), overwritePrompt: false, addExtension: true);
+        if (chosen == null)
         {
             return;
         }
-        TerminalLogFormat format = dialog.FilterIndex switch
+        TerminalLogFormat format = chosen.FilterIndex switch
         {
             2 => TerminalLogFormat.HexDump,
             3 => TerminalLogFormat.RawBytes,
@@ -2206,7 +2182,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         };
         try
         {
-            TerminalLogWriter writer = new TerminalLogWriter(dialog.FileName, format, _textEncoding, append: true);
+            TerminalLogWriter writer = new TerminalLogWriter(chosen.FileName, format, _textEncoding, append: true);
             writer.Failed += OnLogFailed;
             _logWriter = writer;
         }

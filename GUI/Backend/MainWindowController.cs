@@ -30,9 +30,7 @@ using VisualTTY.DeviceTerminal;
 using Control = System.Windows.Forms.Control;
 using KeyEventArgs = System.Windows.Forms.KeyEventArgs;
 using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
-using OpenFileDialog = System.Windows.Forms.OpenFileDialog;
 using Point = System.Drawing.Point;
-using SaveFileDialog = System.Windows.Forms.SaveFileDialog;
 
 namespace SmarTTY.GUI.Backend;
 
@@ -234,13 +232,14 @@ public class MainWindowController : INotifyPropertyChanged
             try
             {
                 ITabContext activeTab = _Controller.ActiveSession?.ActiveTab;
-                OpenFileDialog openFileDialog = new OpenFileDialog();
-                if (openFileDialog.ShowDialog() != DialogResult.OK)
+                string chosen = LocalFileDialogWindow.OpenFile(_Controller._Window, "Play back a recorded log of received data",
+                    "All files (*.*)|*.*|Text log (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin");
+                if (chosen == null)
                 {
                     return;
                 }
                 byte[] bytes;
-                using (FileStream fileStream = File.OpenRead(openFileDialog.FileName))
+                using (FileStream fileStream = File.OpenRead(chosen))
                 {
                     using (MemoryStream memoryStream = new MemoryStream())
                     {
@@ -276,18 +275,19 @@ public class MainWindowController : INotifyPropertyChanged
                 {
                     throw new Exception("No active terminal");
                 }
-                SaveFileDialog saveFileDialog = new SaveFileDialog();
                 if (_LogInProgress)
                 {
                     terminalEmulatorControl.OpenLogFile(null);
                 }
                 else
                 {
-                    if (saveFileDialog.ShowDialog() != DialogResult.OK)
+                    string logFile = LocalFileDialogWindow.SaveFile(_Controller._Window, "Save the terminal log to a file",
+                        "Text log (*.log)|*.log|All files (*.*)|*.*");
+                    if (logFile == null)
                     {
                         return;
                     }
-                    terminalEmulatorControl.OpenLogFile(saveFileDialog.FileName);
+                    terminalEmulatorControl.OpenLogFile(logFile);
                 }
                 _LogInProgress = !_LogInProgress;
             }
@@ -823,15 +823,11 @@ public class MainWindowController : INotifyPropertyChanged
             try
             {
                 SessionWrapper activeSession = RequireSshSession("Running scripts");
-                using OpenFileDialog dialog = new OpenFileDialog
+                string script = LocalFileDialogWindow.OpenFile(_Controller._Window, "Select a shell script to run on the server",
+                    "Shell scripts (*.sh;*.ash;*.bash)|*.sh;*.ash;*.bash|All files (*.*)|*.*");
+                if (script != null)
                 {
-                    Title = "Select a shell script to run on the server",
-                    Filter = "Shell scripts (*.sh;*.ash;*.bash)|*.sh;*.ash;*.bash|All files (*.*)|*.*",
-                    CheckFileExists = true
-                };
-                if (dialog.ShowDialog() == DialogResult.OK)
-                {
-                    activeSession.RunScript(dialog.FileName);
+                    activeSession.RunScript(script);
                 }
             }
             catch (Exception exception)

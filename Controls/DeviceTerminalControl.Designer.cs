@@ -71,10 +71,6 @@ public partial class DeviceTerminalControl
 
 	private ToolStripButton toolStripButton2;
 
-	private OpenFileDialog _openFileDialog;
-
-	private SaveFileDialog _saveFileDialog;
-
 	private ContextMenuStrip contextMenuStrip1;
 
 	private ToolStripMenuItem copyToolStripMenuItem;
@@ -168,8 +164,6 @@ public partial class DeviceTerminalControl
             this.copyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.copyAllToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pasteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this._openFileDialog = new System.Windows.Forms.OpenFileDialog();
-            this._saveFileDialog = new System.Windows.Forms.SaveFileDialog();
             this.hexTerminalControl1 = new SmarTTY.Controls.HexTerminalControl();
             this.terminalEmulatorControl1 = new SmarTTY.Controls.TerminalEmulatorControl();
             this.pnlConnectionInProgress.SuspendLayout();
@@ -583,16 +577,6 @@ public partial class DeviceTerminalControl
             this.pasteToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+V";
             this.pasteToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
             this.pasteToolStripMenuItem.Text = "Paste";
-            // 
-            // _openFileDialog
-            // 
-            this._openFileDialog.Filter = "All files|*.*";
-            this._openFileDialog.Title = "Send a binary file";
-            // 
-            // _saveFileDialog
-            // 
-            this._saveFileDialog.Filter = "All files|*.*";
-            this._saveFileDialog.Title = "Save output to a file";
             // 
             // hexTerminalControl1
             // 

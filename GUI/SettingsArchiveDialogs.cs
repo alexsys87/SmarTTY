@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+﻿using SmarTTY.Controls;
 using SmarTTY.Ssh;
 using SmarTTY.Transport;
 using System;
@@ -77,18 +77,12 @@ internal static class SettingsArchiveDialogs
         }
         SettingsParts parts = selection.SelectedParts;
 
-        SaveFileDialog dialog = new SaveFileDialog
-        {
-            Title = "Export SmarTTY settings",
-            Filter = FileFilter,
-            FileName = "SmarTTY-settings-" + DateTime.Now.ToString("yyyyMMdd") + ".tar.gz",
-            OverwritePrompt = true
-        };
-        if (dialog.ShowDialog(owner) != true)
+        string path = LocalFileDialogWindow.SaveFile(owner, "Export SmarTTY settings", FileFilter,
+            fileName: "SmarTTY-settings-" + DateTime.Now.ToString("yyyyMMdd") + ".tar.gz");
+        if (path == null)
         {
             return;
         }
-        string path = dialog.FileName;
         if (!path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
         {
             path += ".tar.gz";
@@ -121,13 +115,8 @@ internal static class SettingsArchiveDialogs
     /// <summary>Returns the import result, or null if the user cancelled or the import failed.</summary>
     public static SettingsArchive.ImportResult Import(Window owner)
     {
-        OpenFileDialog dialog = new OpenFileDialog
-        {
-            Title = "Import SmarTTY settings",
-            Filter = FileFilter,
-            CheckFileExists = true
-        };
-        if (dialog.ShowDialog(owner) != true)
+        string archivePath = LocalFileDialogWindow.OpenFile(owner, "Import SmarTTY settings", FileFilter);
+        if (archivePath == null)
         {
             return null;
         }
@@ -136,7 +125,7 @@ internal static class SettingsArchiveDialogs
         SettingsContents contents;
         try
         {
-            contents = SettingsArchive.Inspect(dialog.FileName);
+            contents = SettingsArchive.Inspect(archivePath);
         }
         catch (Exception ex) when (IsExpected(ex))
         {
@@ -154,7 +143,7 @@ internal static class SettingsArchiveDialogs
 
         string dataDirectory = locations.DataDirectory;
         string backupPath = SettingsArchive.DefaultBackupPath(dataDirectory);
-        string question = "Import the selected settings from:\n" + dialog.FileName + "\n\n" +
+        string question = "Import the selected settings from:\n" + archivePath + "\n\n" +
                           "Settings files, profiles and keys with the same names will be replaced. Other saved connections are kept.\n\n" +
                           "A backup of what is replaced will be saved to:\n" + backupPath;
         if ((parts & SettingsParts.Keys) != SettingsParts.None)
@@ -170,7 +159,7 @@ internal static class SettingsArchiveDialogs
         SettingsArchive.ImportResult result;
         try
         {
-            result = SettingsArchive.Import(dialog.FileName, locations, parts, backupPath);
+            result = SettingsArchive.Import(archivePath, locations, parts, backupPath);
         }
         catch (Exception ex) when (IsExpected(ex))
         {
