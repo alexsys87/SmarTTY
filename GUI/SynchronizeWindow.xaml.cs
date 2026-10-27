@@ -33,6 +33,9 @@ public partial class SynchronizeWindow : Window
 
     private bool _closeRequested;
 
+    // The subfolders of the local folder to synchronize, as paths relative to it; null means the whole folder.
+    private string[] _selection;
+
     public SynchronizeWindow(SshSession sshSession)
     {
         InitializeComponent();
@@ -115,7 +118,8 @@ public partial class SynchronizeWindow : Window
             skipSymlinks: SkipSymlinksBox.IsChecked == true,
             skipHardlinks: SkipHardlinksBox.IsChecked == true,
             overwriteTrigger: SelectedTrigger(),
-            excludeIsRegex: ExcludeRegexBox.IsChecked == true);
+            excludeIsRegex: ExcludeRegexBox.IsChecked == true,
+            selectionPaths: _selection);
     }
 
     private QuickSyncOverwriteTrigger SelectedTrigger()
@@ -220,6 +224,32 @@ public partial class SynchronizeWindow : Window
         }
     }
 
+    private void LocalBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        // The selection is relative to the local folder; a different folder invalidates it.
+        ClearSelection();
+    }
+
+    private void SelectionBrowse_Click(object sender, RoutedEventArgs e)
+    {
+        string[] picked = SyncFolderSelectionWindow.Pick(LocalBox.Text?.Trim());
+        if (picked == null)
+        {
+            return;
+        }
+        _selection = picked;
+        SelectionBox.Text = string.Join("; ", picked);
+    }
+
+    private void ClearSelection()
+    {
+        _selection = null;
+        if (SelectionBox != null)
+        {
+            SelectionBox.Text = "";
+        }
+    }
+
     private void RemoteBrowse_Click(object sender, RoutedEventArgs e)
     {
         void StartRemoteCommand(string command, string arguments, ref IRemoteCommand remoteCommand)
@@ -252,6 +282,8 @@ public partial class SynchronizeWindow : Window
         SkipHardlinksBox.IsEnabled = enabled;
         ExcludeBox.IsEnabled = enabled;
         ExcludeRegexBox.IsEnabled = enabled;
+        SelectionBox.IsEnabled = enabled;
+        SelectionBrowseButton.IsEnabled = enabled;
     }
 
     /// <summary>
