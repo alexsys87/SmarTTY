@@ -46,7 +46,13 @@ public enum SmarTTYTheme
     OneDark,
 
     [EnumDisplayText("Sepia")]
-    Sepia
+    Sepia,
+
+    [EnumDisplayText("Forest")]
+    Forest,
+
+    [EnumDisplayText("Rose")]
+    Rose
 }
 
 /// <summary>Theme metadata: the palette folder and whether the theme is a light one.</summary>
@@ -69,6 +75,8 @@ public static class SmarTTYThemes
             SmarTTYTheme.Monokai => "Monokai",
             SmarTTYTheme.OneDark => "OneDark",
             SmarTTYTheme.Sepia => "Sepia",
+            SmarTTYTheme.Forest => "Forest",
+            SmarTTYTheme.Rose => "Rose",
             _ => "Dark"
         };
     }
@@ -79,6 +87,6 @@ public static class SmarTTYThemes
     /// </summary>
     public static bool IsLight(this SmarTTYTheme theme)
     {
-        return theme is SmarTTYTheme.Light or SmarTTYTheme.SolarizedLight or SmarTTYTheme.Sepia;
+        return theme is SmarTTYTheme.Light or SmarTTYTheme.SolarizedLight or SmarTTYTheme.Sepia or SmarTTYTheme.Rose;
     }
 }
