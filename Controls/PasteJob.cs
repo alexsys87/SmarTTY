@@ -1,4 +1,3 @@
-using SmarTTY.Forms;
 using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
@@ -80,7 +79,7 @@ internal sealed class PasteJob
 
     private string _expectedEcho;
 
-    private PasteProgressForm _form;
+    private IPasteProgress _form;
 
     public bool IsActive => _state != State.Done;
 
@@ -313,7 +312,7 @@ internal sealed class PasteJob
         }
         if (_form == null && unchecked(Environment.TickCount - _startTick) > ProgressDelayMs)
         {
-            _form = new PasteProgressForm(_title);
+            _form = ThemedPasteProgress.Create(_title);
             _form.CancelRequested += (object sender, EventArgs e) => Cancel();
             _form.ShowNear(_owner);
         }
@@ -344,7 +343,7 @@ internal sealed class PasteJob
     {
         _timer.Stop();
         _timer.Dispose();
-        PasteProgressForm form = _form;
+        IPasteProgress form = _form;
         _form = null;
         try
         {

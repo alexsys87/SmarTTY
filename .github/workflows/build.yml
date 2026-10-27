@@ -166,6 +166,9 @@ jobs:
       - name: Run paste confirmation checks (themed window replaced the WinForms PasteConfirmForm)
         run: dotnet run --project tests/PasteConfirmTests -c Release
 
+      - name: Run paste progress checks (themed window replaced the WinForms PasteProgressForm)
+        run: dotnet run --project tests/PasteProgressTests -c Release
+
       - name: Run folder synchronization settings checks (direction, options, exclusion masks)
         run: dotnet run --project tests/SyncRequestTests -c Release
 

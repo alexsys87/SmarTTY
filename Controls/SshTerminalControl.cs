@@ -1,4 +1,3 @@
-using SmarTTY.Forms;
 using SmarTTY.Ssh;
 using SmarTTY.IO;
 using SmarTTY.Native;
@@ -315,7 +314,7 @@ public class SshTerminalControl : TerminalEmulatorControl
 
         public bool Cancelled;
 
-        public PasteProgressForm Progress;
+        public IPasteProgress Progress;
 
         public LinePaste(List<string> commands, bool stopOnError)
         {
@@ -1760,7 +1759,7 @@ public class SshTerminalControl : TerminalEmulatorControl
             }
             LinePaste run = new LinePaste(commands, PasteGuard.OptionsOf(AppSettings).LineByLineStopOnError);
             _linePaste = run;
-            run.Progress = new PasteProgressForm("Paste line by line");
+            run.Progress = ThemedPasteProgress.Create("Paste line by line");
             run.Progress.CancelRequested += (object sender, EventArgs e) => CancelActivePaste();
             run.Progress.ShowNear(this);
             RunNextPastedLine();
@@ -1798,7 +1797,7 @@ public class SshTerminalControl : TerminalEmulatorControl
     {
         LinePaste run = _linePaste;
         _linePaste = null;
-        PasteProgressForm progress = run?.Progress;
+        IPasteProgress progress = run?.Progress;
         if (progress == null)
         {
             return;
