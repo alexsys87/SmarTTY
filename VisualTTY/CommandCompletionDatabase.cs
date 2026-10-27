@@ -153,8 +153,13 @@ public class CommandCompletionDatabase
 
     /// <summary>
     /// Saves the database either as plain XML (<paramref name="xmlPath"/>) or as gzip (<paramref name="xmlPath"/> + ".gz").
-    /// The file is written completely before it replaces the old one. The other variant is deleted afterwards:
-    /// <see cref="Load(string)"/> prefers the plain file, so a leftover would hide the new data or override it with old data.
+    /// The new data is written completely to a temporary file and then swapped in with
+    /// <see cref="File.Replace(string, string, string, bool)"/>, so the old file is still there if anything goes wrong on the way
+    /// (a crash, a virus scanner holding a file, a refused rename).
+    /// The other variant is removed afterwards: <see cref="Load(string)"/> prefers the plain file, so a leftover plain file would
+    /// hide the new gzip data. If such a leftover cannot be removed the method throws, because the saved data would not be the
+    /// data that is read. A leftover gzip file is harmless (it is ignored while the plain file exists), so failing to remove
+    /// that one is not an error.
     /// </summary>
     public void SaveTo(string xmlPath, bool compressed)
     {
@@ -193,11 +198,7 @@ public class CommandCompletionDatabase
                     file.Write(xml, 0, xml.Length);
                 }
             }
-            if (File.Exists(target))
-            {
-                File.Delete(target);
-            }
-            File.Move(temp, target);
+            ReplaceFile(temp, target);
         }
         catch
         {
@@ -213,9 +214,81 @@ public class CommandCompletionDatabase
             }
             throw;
         }
-        if (File.Exists(other))
+        RemoveOtherVariant(other, otherHidesNewData: compressed);
+    }
+
+    private const int FileOperationAttempts = 5;
+
+    /// <summary>
+    /// Puts <paramref name="temporary"/> in place of <paramref name="target"/> in one step, so a failure leaves the old file as it
+    /// was (deleting the old file first and moving the new one afterwards loses both if the move fails). A virus scanner or an
+    /// indexer may hold either file for a moment, so a failure is tried again a few times. Metadata errors (ACLs, attributes)
+    /// are ignored: the folder next to the exe can be on a file system that does not support them.
+    /// </summary>
+    private static void ReplaceFile(string temporary, string target)
+    {
+        for (int attempt = 1; ; attempt++)
         {
-            File.Delete(other);
+            try
+            {
+                if (File.Exists(target))
+                {
+                    try
+                    {
+                        File.Replace(temporary, target, null, true);
+                        return;
+                    }
+                    catch (FileNotFoundException) when (!File.Exists(target))
+                    {
+                        // The old file was removed between the check and the swap: there is nothing to replace.
+                    }
+                }
+                File.Move(temporary, target);
+                return;
+            }
+            catch (Exception exception) when (attempt < FileOperationAttempts &&
+                                              (exception is IOException || exception is UnauthorizedAccessException))
+            {
+                Thread.Sleep(50 * attempt);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes the variant of the file that was not just written. When <paramref name="otherHidesNewData"/> is set (the leftover
+    /// is the plain file, which <see cref="Load(string)"/> prefers) a leftover that cannot be removed is an error: the new data
+    /// would be saved but never read.
+    /// </summary>
+    private static void RemoveOtherVariant(string other, bool otherHidesNewData)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                if (!File.Exists(other))
+                {
+                    return;
+                }
+                // A read-only leftover refuses to be deleted.
+                File.SetAttributes(other, FileAttributes.Normal);
+                File.Delete(other);
+                return;
+            }
+            catch (Exception exception) when (attempt < FileOperationAttempts &&
+                                              (exception is IOException || exception is UnauthorizedAccessException))
+            {
+                Thread.Sleep(50 * attempt);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                if (!otherHidesNewData)
+                {
+                    return;
+                }
+                throw new IOException("The changes were saved, but the old file '" + other + "' could not be removed (" +
+                    exception.Message + "). It is read instead of the new one, so the changes take no effect until it is deleted.",
+                    exception);
+            }
         }
     }
 
