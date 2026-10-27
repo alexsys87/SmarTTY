@@ -33,6 +33,7 @@ internal static class Program
             CheckDirection();
             CheckOptions();
             CheckExclusionMasks();
+            CheckRegexExclusions();
             CheckPathNormalizationIsLeftToTheEngine();
             CheckLocalPathDisplay();
             Console.WriteLine();
@@ -113,6 +114,48 @@ internal static class Program
         Equal("b", masks[1], "SplitMasks trims a mask");
         Equal("c", masks[2], "SplitMasks keeps the last mask");
         Equal<string[]>(null, SyncRequest.SplitMasks("   "), "SplitMasks returns null for whitespace only");
+    }
+
+    /// <summary>
+    /// The "Regular expression" mode of the Exclude box: the whole text is one pattern, and the include-all tail keeps
+    /// the files the pattern does not match (the engine excludes a name that matches no filter).
+    /// </summary>
+    private static void CheckRegexExclusions()
+    {
+        Console.WriteLine("== Regex exclusions");
+        SyncSettings empty = SyncRequest.Create(false, "C:/local", "/remote", "", false, false, false, QuickSyncOverwriteTrigger.Stat, excludeIsRegex: true);
+        Equal<QuickSyncFilter[]>(null, empty.FileFilters, "an empty regex box keeps every file");
+
+        SyncSettings excluded = SyncRequest.Create(false, "C:/local", "/remote", @"\.(log|tmp)$", false, false, false, QuickSyncOverwriteTrigger.Stat, excludeIsRegex: true);
+        Check(excluded.FileFilters != null, "a regex box produces filters");
+        Check(!IsIncluded("app.log", excluded.FileFilters), "the regex excludes a matching file");
+        Check(!IsIncluded("notes.TMP", excluded.FileFilters), "the regex matches case-insensitively");
+        Check(IsIncluded("app.txt", excluded.FileFilters), "a file the regex does not match is kept (include-all tail)");
+
+        SyncSettings dirs = SyncRequest.Create(false, "C:/local", "/remote", @"^(build|\.git)$", false, false, false, QuickSyncOverwriteTrigger.Stat, excludeIsRegex: true);
+        Check(!IsIncluded("build", dirs.DirectoryFilters), "the regex also filters directories");
+        Check(IsIncluded("src", dirs.DirectoryFilters), "a directory the regex does not match is kept");
+
+        // A pattern with an anchor or a group is used as written (FromRegex takes the raw text).
+        SyncSettings anchored = SyncRequest.Create(false, "C:/local", "/remote", "^app.*\\.log$", false, false, false, QuickSyncOverwriteTrigger.Stat, excludeIsRegex: true);
+        Check(!IsIncluded("app-2024.log", anchored.FileFilters), "an anchored regex matches a file name");
+        Check(IsIncluded("other.log", anchored.FileFilters), "an anchored regex leaves other names alone");
+
+        // Mask mode is untouched by the new flag: the semicolon list still behaves like masks.
+        SyncSettings masks = SyncRequest.Create(false, "C:/local", "/remote", "*.log", false, false, false, QuickSyncOverwriteTrigger.Stat, excludeIsRegex: false);
+        Check(!IsIncluded("app.log", masks.FileFilters), "mask mode still excludes by wildcard");
+        Check(IsIncluded("app.txt", masks.FileFilters), "mask mode still keeps a non-matching file");
+
+        bool thrown = false;
+        try
+        {
+            SyncRequest.Create(false, "C:/local", "/remote", "([", false, false, false, QuickSyncOverwriteTrigger.Stat, excludeIsRegex: true);
+        }
+        catch (ArgumentException)
+        {
+            thrown = true;
+        }
+        Check(thrown, "an invalid regex is reported as an ArgumentException");
     }
 
     private static void CheckPathNormalizationIsLeftToTheEngine()

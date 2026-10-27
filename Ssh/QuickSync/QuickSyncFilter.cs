@@ -30,6 +30,25 @@ public struct QuickSyncFilter
         return "-" + Regex;
     }
 
+    /// <summary>
+    /// Builds a filter out of a raw regular expression. A leading "-" makes it an exclusion, exactly like a mask. The
+    /// pattern is taken as written, so the caller can use groups and anchors.
+    /// </summary>
+    public static QuickSyncFilter FromRegex(string maskText, bool ignoreCase)
+    {
+        if (maskText == null)
+        {
+            throw new ArgumentException("maskText");
+        }
+        QuickSyncAction quickSyncAction = QuickSyncAction.Include;
+        if (maskText.StartsWith("-"))
+        {
+            quickSyncAction = QuickSyncAction.Exclude;
+            maskText = maskText.Substring(1);
+        }
+        return new QuickSyncFilter(new Regex(maskText, ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None), quickSyncAction);
+    }
+
     public static QuickSyncFilter FromWildcard(string maskText, bool ignoreCase)
     {
         if (maskText == null)
