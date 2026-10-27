@@ -1,5 +1,4 @@
-﻿using SmarTTY.Forms;
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
@@ -8,7 +7,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
-using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Markup;
 using VisualTTY;
@@ -238,12 +236,10 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
         PropertyInfo property = dataContext.GetType().GetProperty(parts.Last());
         if (property != null && property.GetValue(dataContext, new object[0]) is DeviceTerminalSettings.ColorWrapper colorWrapper)
         {
-            ColorDialog colorDialog = new ColorDialog();
-            colorDialog.Color = colorWrapper;
-            if (colorDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            DeviceTerminalSettings.ColorWrapper? selectedColor = ColorPickerWindow.Pick(this, colorWrapper);
+            if (selectedColor != null)
             {
-                DeviceTerminalSettings.ColorWrapper selectedColor = colorDialog.Color;
-                property.SetValue(dataContext, selectedColor, new object[0]);
+                property.SetValue(dataContext, selectedColor.Value, new object[0]);
                 ((BindingExpressionBase)bindingExpression).UpdateTarget();
             }
         }

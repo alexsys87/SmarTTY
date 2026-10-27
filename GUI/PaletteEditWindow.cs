@@ -2,7 +2,6 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
@@ -11,7 +10,7 @@ namespace SmarTTY.GUI;
 
 /// <summary>
 /// The "Edit console palette" dialog: the eight normal and eight bright colors of the terminal, each swatch opening the
-/// system color picker, and a link that restores the PuTTY palette. Built in code, like <see cref="GoToLineWindow"/>.
+/// color picker, and a link that restores the PuTTY palette. Built in code, like <see cref="GoToLineWindow"/>.
 /// </summary>
 internal sealed class PaletteEditWindow : Window
 {
@@ -142,22 +141,21 @@ internal sealed class PaletteEditWindow : Window
 
     private void PickColor(int colorIndex, bool isBright)
     {
-        using System.Windows.Forms.ColorDialog colorDialog = new System.Windows.Forms.ColorDialog();
-        colorDialog.Color = isBright ? _palette.BrightColors[colorIndex] : _palette.NormalColors[colorIndex];
-        IntPtr owner = new WindowInteropHelper(this).Handle;
-        if (colorDialog.ShowDialog(owner == IntPtr.Zero ? null : new Win32Window(owner)) != System.Windows.Forms.DialogResult.OK)
+        DeviceTerminalSettings.ColorWrapper current = isBright ? _palette.BrightColors[colorIndex] : _palette.NormalColors[colorIndex];
+        DeviceTerminalSettings.ColorWrapper? selected = ColorPickerWindow.Pick(this, current);
+        if (selected == null)
         {
             return;
         }
         if (isBright)
         {
-            _palette.BrightColors[colorIndex] = colorDialog.Color;
-            _bright[colorIndex].Background = ToBrush(colorDialog.Color);
+            _palette.BrightColors[colorIndex] = selected.Value;
+            _bright[colorIndex].Background = ToBrush(selected.Value);
         }
         else
         {
-            _palette.NormalColors[colorIndex] = colorDialog.Color;
-            _normal[colorIndex].Background = ToBrush(colorDialog.Color);
+            _palette.NormalColors[colorIndex] = selected.Value;
+            _normal[colorIndex].Background = ToBrush(selected.Value);
         }
     }
 
@@ -182,16 +180,5 @@ internal sealed class PaletteEditWindow : Window
         PaletteEditWindow window = new PaletteEditWindow(palette);
         WindowOwnership.Attach(window, owner);
         return window.ShowDialog() == true ? window.Palette : null;
-    }
-
-    // The WinForms color picker takes an IWin32Window owner; this wraps the WPF window handle for it.
-    private sealed class Win32Window : System.Windows.Forms.IWin32Window
-    {
-        public IntPtr Handle { get; }
-
-        public Win32Window(IntPtr handle)
-        {
-            Handle = handle;
-        }
     }
 }
