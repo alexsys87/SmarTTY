@@ -434,24 +434,6 @@ public class QuickSyncRunner
         return false;
     }
 
-    public void DeleteLocalItems(string text, string[] items, ISyncEvents syncEvents)
-    {
-        SyncPlan.DownloadPlanner downloadPlanner = new SyncPlan.DownloadPlanner(new SyncSettings
-        {
-            LocalPath = text,
-            RemotePath = "/"
-        }, new RemoteFileSet());
-        LocalPath localPath = LocalPath.FromUserPath(text);
-        syncEvents?.OnProgress(new SyncProgress
-        {
-            Stage = SyncStage.BuildingFileList,
-            Total = -1L
-        });
-        SyncPlan syncPlan = downloadPlanner.PlanDeleteNames(localPath, items);
-        TransferStatistics transferStatistics = downloadPlanner.Statistics;
-        this.ExecuteLocalActions(localPath, syncPlan, null, syncEvents, ref transferStatistics, unused: true);
-    }
-
     private ISyncEngine CreateEngine(SshSession sshSession, SyncSettings syncSettings, ISyncEvents syncEvents, ILocalFileCache localFileCache, ISyncCustomization syncCustomization)
     {
         syncEvents?.OnProgress(new SyncProgress
@@ -588,7 +570,7 @@ public class QuickSyncRunner
         return targetPath.FullPath;
     }
 
-    private void ExecuteLocalActions(LocalPath localPath, SyncPlan syncPlan, IRemoteFileSource remoteFileSource, ISyncEvents syncEvents, ref TransferStatistics transferStatistics, bool unused = false)
+    private void ExecuteLocalActions(LocalPath localPath, SyncPlan syncPlan, IRemoteFileSource remoteFileSource, ISyncEvents syncEvents, ref TransferStatistics transferStatistics)
     {
         Stack<LocalDirectoryContext> stack = new Stack<LocalDirectoryContext>();
         LocalDirectoryContext item = new LocalDirectoryContext(localPath);
@@ -724,15 +706,6 @@ public class QuickSyncRunner
                     {
                         LocalFileSystem.DeleteFile(LocalPath.FromRaw(action.Path), resetReadOnly: true);
                         transferStatistics.DeletedFiles++;
-                        if (unused)
-                        {
-                            syncEvents?.OnProgress(new SyncProgress
-                            {
-                                Stage = SyncStage.DeletingOldContents,
-                                Transferred = transferStatistics.DeletedFiles,
-                                Total = transferStatistics.FilesToDelete
-                            });
-                        }
                     }
                     catch (Exception exception)
                     {

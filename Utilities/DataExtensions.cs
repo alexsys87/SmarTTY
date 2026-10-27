@@ -29,11 +29,6 @@ public static class DataExtensions
         return coll.Concat(new _Ty[1] { element });
     }
 
-    public static _Target[] ArraySelect<_Source, _Target>(this IEnumerable<_Source> coll, Func<_Source, _Target> selector)
-    {
-        return coll?.Select(selector)?.ToArray() ?? new _Target[0];
-    }
-
     public static _Value GetOrDefault<_Key, _Value>(this Dictionary<_Key, _Value> dict, _Key key)
     {
         if (dict.TryGetValue(key, out var value))
@@ -63,19 +58,6 @@ public static class DataExtensions
             }
         }
         return dictionary;
-    }
-
-    public static HashSet<_Ty> ToHashSet<_Ty>(this IEnumerable<_Ty> coll, IEqualityComparer<_Ty> comparer = null)
-    {
-        HashSet<_Ty> hashSet = ((comparer == null) ? new HashSet<_Ty>() : new HashSet<_Ty>(comparer));
-        if (coll != null)
-        {
-            foreach (_Ty item in coll)
-            {
-                hashSet.Add(item);
-            }
-        }
-        return hashSet;
     }
 
     public static bool IsNullOrEmpty(this string str)

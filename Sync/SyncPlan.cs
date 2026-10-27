@@ -304,20 +304,6 @@ internal class SyncPlan
             base.Statistics.FilesToDelete++;
             this._plan.AddAction(ActionType.DeleteTargetFile, fullLocalPath.FullPath);
         }
-
-        public SyncPlan PlanDeleteNames(LocalPath localPath, string[] names)
-        {
-            this._plan = new SyncPlan();
-            HashSet<string> nameSet = DataExtensions.ToHashSet(names.EnsureNotNull(), StringComparer.InvariantCultureIgnoreCase);
-            foreach (LocalFileSystem.FindData findData in LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: true))
-            {
-                if (findData.HasAttribute(FileAttributes.Directory) && nameSet.Contains(findData.FileName ?? ""))
-                {
-                    PlanDelete(localPath, findData);
-                }
-            }
-            return this._plan;
-        }
     }
 
     public class UploadPlanner : SyncPlannerBase

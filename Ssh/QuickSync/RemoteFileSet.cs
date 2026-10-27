@@ -50,31 +50,6 @@ public class RemoteFileSet
 
         public List<RemoteSymlink> Symlinks = new List<RemoteSymlink>();
 
-        public string[] AllFilePaths
-        {
-            get
-            {
-                List<string> pathsList = new List<string>();
-                CollectFilePaths(pathsList, "");
-                return pathsList.ToArray();
-            }
-        }
-
-        public IEnumerable<RemoteDirectory> Descendants
-        {
-            get
-            {
-                yield return this;
-                foreach (RemoteDirectory child in SubDirectories)
-                {
-                    foreach (RemoteDirectory descendant in child.Descendants)
-                    {
-                        yield return descendant;
-                    }
-                }
-            }
-        }
-
         public string FullPath
         {
             get
@@ -91,18 +66,6 @@ public class RemoteFileSet
         {
             Parent = parent;
             Name = dirName;
-        }
-
-        private void CollectFilePaths(List<string> pathsList, string prefix)
-        {
-            foreach (RemoteDirectory child in SubDirectories)
-            {
-                child.CollectFilePaths(pathsList, prefix + child.Name + "/");
-            }
-            foreach (RemoteFileEntry file in Files)
-            {
-                pathsList.Add(prefix + file.Name);
-            }
         }
 
         public override string ToString()

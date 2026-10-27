@@ -82,10 +82,6 @@ public class TokenCache
         /// </summary>
         public readonly bool EndsBeforeClosingLine;
 
-        public static RegionStyle Ellipsis = new RegionStyle(FoldBoundary.TokenEnd, FoldBoundary.TokenEnd, unusedFlag: false, LabelSource.FixedText, "...", openingOnNextLine: true);
-
-        public static RegionStyle Plain = new RegionStyle(FoldBoundary.LineStart, FoldBoundary.LineStart, unusedFlag: false, LabelSource.NextToken, null, openingOnNextLine: false);
-
         public RegionStyle(FoldBoundary startBoundary, FoldBoundary endBoundary, bool unusedFlag, LabelSource labelSource, string text, bool openingOnNextLine, int trailingBlankLines = 1, bool endsBeforeClosingLine = false)
         {
             EndsBeforeClosingLine = endsBeforeClosingLine;
@@ -105,8 +101,6 @@ public class TokenCache
 
         public readonly int StartState;
 
-        private bool _acceptsTokens = true;
-
         private List<Token> _tokens = new List<Token>();
 
         public List<Token> Tokens => _tokens;
@@ -123,34 +117,23 @@ public class TokenCache
             StartState = startState;
         }
 
-        public void CloseForAdding()
-        {
-            _acceptsTokens = false;
-        }
-
         public void AddToken(int type, int start, int end)
         {
-            if (_acceptsTokens)
+            if (start > end)
             {
-                if (start > end)
-                {
-                    throw new ArgumentException();
-                }
-                _tokens.Add(new Token(this, type, start, end, _tokens.Count));
+                throw new ArgumentException();
             }
+            _tokens.Add(new Token(this, type, start, end, _tokens.Count));
         }
 
         public void AddPairedToken(int type, int start, int end, int pairId, bool isOpening, RegionStyle regionStyle)
         {
-            if (this._acceptsTokens)
+            // A zero-width token is allowed: it marks a position (the end of a block header line).
+            if (start > end)
             {
-                // A zero-width token is allowed: it marks a position (the end of a block header line).
-                if (start > end)
-                {
-                    throw new ArgumentException();
-                }
-                _tokens.Add(new Token(this, type, start, end, pairId, isOpening, _tokens.Count, regionStyle));
+                throw new ArgumentException();
             }
+            _tokens.Add(new Token(this, type, start, end, pairId, isOpening, _tokens.Count, regionStyle));
         }
 
         public void Detach(UnpairedTokenSet unpairedTokenSet)
