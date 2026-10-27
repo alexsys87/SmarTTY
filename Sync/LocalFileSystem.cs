@@ -50,18 +50,6 @@ public static class LocalFileSystem
         }
     }
 
-    [Flags]
-    public enum MoveFileFlags
-    {
-        None = 0,
-        ReplaceExisting = 1,
-        CopyAllowed = 2,
-        DelayUntilReboot = 4,
-        WriteThrough = 8,
-        CreateHardlink = 0x10,
-        FailIfNotTrackable = 0x20
-    }
-
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     public struct FileInformation
     {
@@ -120,16 +108,6 @@ public static class LocalFileSystem
                 return first.Size == second.Size;
             }
             return false;
-        }
-
-        [SpecialName]
-        public static bool IsDifferent(FileStamp first, FileStamp second)
-        {
-            if (first.ModifiedSeconds == second.ModifiedSeconds)
-            {
-                return first.Size != second.Size;
-            }
-            return true;
         }
     }
 
@@ -235,9 +213,6 @@ public static class LocalFileSystem
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool RemoveDirectory(string path);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool MoveFileEx(string existingFileName, string newFileName, MoveFileFlags flags);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern SafeFileHandle CreateFile([MarshalAs(UnmanagedType.LPTStr)] string fileName, [MarshalAs(UnmanagedType.U4)] uint desiredAccess, [MarshalAs(UnmanagedType.U4)] FileShare shareMode, IntPtr securityAttributes, [MarshalAs(UnmanagedType.U4)] FileMode creationDisposition, [MarshalAs(UnmanagedType.U4)] FileAttributes flagsAndAttributes, IntPtr templateFile);
@@ -507,14 +482,6 @@ public static class LocalFileSystem
         }
         while (attributes != -1 && (attributes & 0x400) != 0);
         return localPath;
-    }
-
-    public static void MoveFile(LocalPath sourcePath, LocalPath destPath, MoveFileFlags moveFileFlags = MoveFileFlags.None)
-    {
-        if (!MoveFileEx(sourcePath.FullPath, destPath.FullPath, moveFileFlags))
-        {
-            throw new Win32Exception();
-        }
     }
 
     public static void DeleteDirectoryRecursive(LocalPath localPath, Action<RemoteWarningRecord> warningHandler)

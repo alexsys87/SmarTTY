@@ -117,12 +117,6 @@ public class SuggestionCatalog
         _items.Clear();
     }
 
-    public int AddImage(Image image)
-    {
-        _images.Add(image);
-        return _images.Count - 1;
-    }
-
     internal SuggestionPopup CreatePopup(string prefix, ICompletionHost completionHost, bool allowMultiSelect)
     {
         return new SuggestionPopup(this, prefix, completionHost, allowMultiSelect);

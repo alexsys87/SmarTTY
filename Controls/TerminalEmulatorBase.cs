@@ -1604,13 +1604,4 @@ public partial class TerminalEmulatorBase : TextEditorControl
     {
         ArchiveScreen();
     }
-
-    public void ClearText()
-    {
-        Text = "";
-        _cursor = default;
-        ActiveBuffer.FirstRow = 0;
-        UpdateCaret();
-        Redraw();
-    }
 }

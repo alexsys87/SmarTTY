@@ -50,49 +50,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
             _caretIndex = _text.Length;
         }
 
-        public void InsertChar(char ch)
-        {
-            _text = _text.Insert(_caretIndex, ch.ToString());
-            _caretIndex++;
-        }
-
-        public void RemoveCharBackward()
-        {
-            if (_caretIndex > 0)
-            {
-                _text = _text.Remove(_caretIndex - 1, 1);
-                _caretIndex--;
-            }
-        }
-
-        public void RemoveCharForward()
-        {
-            if (_caretIndex < _text.Length)
-            {
-                _text = _text.Remove(_caretIndex, 1);
-            }
-        }
-
-        public void MoveCaretLeft()
-        {
-            if (_caretIndex > 0) _caretIndex--;
-        }
-
-        public void MoveCaretRight()
-        {
-            if (_caretIndex < _text.Length) _caretIndex++;
-        }
-
-        public void MoveCaretHome()
-        {
-            _caretIndex = 0;
-        }
-
-        public void MoveCaretEnd()
-        {
-            _caretIndex = _text.Length;
-        }
-
         public void SetCaretIndex(int index)
         {
             _caretIndex = index < 0 ? 0 : (index > _text.Length ? _text.Length : index);
@@ -119,13 +76,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             if (Matches.Count == 0) return null;
             CurrentIndex = (CurrentIndex + 1) % Matches.Count;
-            return Matches[CurrentIndex];
-        }
-
-        public string? GetPreviousMatch()
-        {
-            if (Matches.Count == 0) return null;
-            CurrentIndex = (CurrentIndex - 1 + Matches.Count) % Matches.Count;
             return Matches[CurrentIndex];
         }
     }

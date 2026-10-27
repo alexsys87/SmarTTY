@@ -179,14 +179,6 @@ public sealed class SftpChannel : IDisposable
         return StatCommon(FxpStat, path);
     }
 
-    /// <summary>
-    /// Like <see cref="Stat"/> but describes a symbolic link itself.
-    /// </summary>
-    public SftpFileAttributes LStat(string path)
-    {
-        return StatCommon(FxpLstat, path);
-    }
-
     private SftpFileAttributes StatCommon(byte type, string path)
     {
         PacketWriter request = new PacketWriter(type);
@@ -198,23 +190,6 @@ public sealed class SftpChannel : IDisposable
         }
         ExpectType(replyType, FxpAttrs, path);
         return ReadAttributes(reply);
-    }
-
-    public SftpFileAttributes FStat(byte[] handle)
-    {
-        PacketWriter request = new PacketWriter(FxpFstat);
-        request.WriteBytes(handle);
-        PacketReader reply = Request(request, null, out byte replyType);
-        ExpectType(replyType, FxpAttrs, null);
-        return ReadAttributes(reply);
-    }
-
-    public void SetStat(string path, SftpFileAttributes attributes)
-    {
-        PacketWriter request = new PacketWriter(FxpSetstat);
-        request.WriteString(path);
-        WriteAttributes(request, attributes);
-        ExpectOk(request, path);
     }
 
     public byte[] OpenFile(string path, OpenFlags flags, SftpFileAttributes attributes = null)

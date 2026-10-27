@@ -34,27 +34,6 @@ public class PathUtils
         }
     }
 
-    public static bool? TryIsPathRooted(string path)
-    {
-        try
-        {
-            return Path.IsPathRooted(path);
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-    }
-
-    public static string StripBasePath(string basePath, string fullPath)
-    {
-        if (!fullPath.StartsWith(basePath, StringComparison.InvariantCultureIgnoreCase))
-        {
-            throw new Exception(fullPath + " does not start with " + basePath);
-        }
-        return fullPath.Substring(basePath.Length).TrimStart('\\', '/');
-    }
-
     public static string GetRelativePath(string basePath, string targetPath, bool useShortPaths = false)
     {
         try
@@ -153,22 +132,6 @@ public class PathUtils
         return new string(charArray);
     }
 
-    public static string GetFullPathOrNull(string path)
-    {
-        try
-        {
-            if (path == null)
-            {
-                return null;
-            }
-            return Path.GetFullPath(path);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     public static bool IsUnderDirectory(string path, string directoryPath)
     {
         if (path == null || directoryPath == null)
@@ -248,39 +211,6 @@ public class PathUtils
         return path;
     }
 
-    public static bool IsAbsolutePath(string path)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return false;
-            }
-            return Path.IsPathRooted(path);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public static string CombineMany(params string[] items)
-    {
-        if (items.Length == 0)
-        {
-            throw new ArgumentException("No path components provided");
-        }
-        string text = items[0];
-        foreach (string item in items.Skip(1))
-        {
-            if (!item.IsNullOrEmpty())
-            {
-                text = Path.Combine(text, item);
-            }
-        }
-        return text;
-    }
-
     public static string GetFileName(string path)
     {
         if (path == null)
@@ -307,56 +237,5 @@ public class PathUtils
             return "";
         }
         return path.Substring(0, separatorIndex).TrimEnd('\\', '/');
-    }
-
-    public static bool PathsEqual(string firstPath, string secondPath)
-    {
-        if (string.IsNullOrEmpty(firstPath) || string.IsNullOrEmpty(secondPath))
-        {
-            return string.IsNullOrEmpty(firstPath) == string.IsNullOrEmpty(secondPath);
-        }
-        try
-        {
-            return StringComparer.InvariantCultureIgnoreCase.Compare(GetFullPathChecked(firstPath), GetFullPathChecked(secondPath)) == 0;
-        }
-        catch
-        {
-            return StringComparer.InvariantCultureIgnoreCase.Compare(firstPath, secondPath) == 0;
-        }
-    }
-
-    public static string GetCommonDirectory(IEnumerable<string> paths)
-    {
-        string commonPrefix = null;
-        foreach (string path in paths)
-        {
-            if (!path.IsNullOrEmpty())
-            {
-                if (commonPrefix == null)
-                {
-                    commonPrefix = path;
-                }
-                int commonLen = StringUtils.CommonPrefixLength(commonPrefix, path);
-                if (commonLen < 0)
-                {
-                    return null;
-                }
-                commonPrefix = commonPrefix.Substring(0, commonLen);
-            }
-        }
-        if (!string.IsNullOrEmpty(commonPrefix))
-        {
-            int separatorIndex = commonPrefix.LastIndexOfAny(new char[2] { '/', '\\' });
-            if (separatorIndex != -1)
-            {
-                return commonPrefix.Substring(0, separatorIndex);
-            }
-        }
-        return null;
-    }
-
-    public static string CombineWithDirectoryOf(string sourceFilePath, string relativeFileName)
-    {
-        return Path.Combine(Path.GetDirectoryName(sourceFilePath), relativeFileName);
     }
 }

@@ -538,14 +538,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private int _nextRealLine;
 
-    private int _flashStep;
-
-    private Bitmap _flashBitmap;
-
-    private Rectangle _flashRect;
-
-    protected Pen _flashPen = Pens.Black;
-
     private Rectangle _caretBounds;
 
     private bool _caretHidden;
@@ -1044,11 +1036,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     public event SelectionChangedHandler SelectionChanged;
 
     public event CtrlTabHandler CtrlTabPressed;
-
-    public void UseUnderlineCaret()
-    {
-        _caret.UnderlineStyle = true;
-    }
 
     private TextDocument.TextPosition NormalizePosition(TextDocument.TextPosition textPosition)
     {
@@ -2061,17 +2048,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
-    protected void MoveCaret(CaretMove caretMove)
-    {
-        TextDocument.TextPosition textPosition = GetMovedPosition(caretMove);
-        SetCaret(textPosition);
-        UpdateCaret();
-        if (EnsureCaretVisible(CaretPosition))
-        {
-            Redraw();
-        }
-    }
-
     private bool TryGetNavigationTarget(KeyEventArgs e, bool extendSelection, out TextDocument.TextPosition textPosition, out CaretDirection caretDirection)
     {
         caretDirection = CaretDirection.Unspecified;
@@ -2766,12 +2742,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected override void OnPaint(PaintEventArgs e)
     {
-        if (_flashBitmap != null)
-        {
-            e.Graphics.DrawImage(_flashBitmap, 0, 0);
-            PaintFlash(e.Graphics);
-            return;
-        }
         if (!_hideMargins)
         {
             foreach (MarginSlot item in _margins)
@@ -3132,85 +3102,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
-    private Rectangle InflateFlashRect(Rectangle flashRect, Rectangle clientBounds, int step, int totalSteps)
-    {
-        int verticalInset = Math.Max(flashRect.Top - clientBounds.Top, clientBounds.Bottom - flashRect.Bottom);
-        int horizontalInset = Math.Min(flashRect.Left - clientBounds.Left, clientBounds.Right - flashRect.Right);
-        horizontalInset = (verticalInset = Math.Min(horizontalInset, verticalInset));
-        horizontalInset = horizontalInset * step / totalSteps;
-        verticalInset = verticalInset * step / totalSteps;
-        return new Rectangle(flashRect.Left - horizontalInset, flashRect.Top - verticalInset, flashRect.Width + 2 * horizontalInset, flashRect.Height + 2 * verticalInset);
-    }
-
-    private void PaintFlash(Graphics graphics)
-    {
-        graphics.DrawRectangle(Pens.Black, _flashRect);
-        for (int step = 0; step < 3; step++)
-        {
-            int inset = _flashStep - step * 2;
-            if (inset >= 0 && inset <= 10)
-            {
-                graphics.DrawRectangle(_flashPen, InflateFlashRect(_flashRect, ClientRectangle, inset, 10));
-            }
-        }
-    }
-
-    public void StartFlash(int interval)
-    {
-        _flashTimer.Interval = (int)Math.Ceiling((double)interval / 16.0);
-        _flashStep = 16;
-        _flashTimer.Enabled = true;
-        Bitmap bitmap = new Bitmap(Width, Height);
-        DrawToBitmap(bitmap, ClientRectangle);
-        _flashBitmap = bitmap;
-        if (!TryGetCaretColumn(CaretPosition, out var caretColumn))
-        {
-            caretColumn = 0;
-        }
-        Point point = Point.Round(PositionToPoint(caretColumn, CaretPosition.Line));
-        TextDocument.TextPosition textPosition = GetMovedPosition(CaretMove.WordRight);
-        caretColumn = ((textPosition.Line != CaretPosition.Line) ? _document.IndexToColumn(textPosition.Line, int.MaxValue, TabSize) : _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize));
-        int endX = (int)ColumnToX(caretColumn);
-        _flashRect = new Rectangle(point.X, point.Y, endX - point.X, (int)_charSize.Height);
-    }
-
-    private void OnFlashTick(object sender, EventArgs e)
-    {
-        if (--_flashStep == 0)
-        {
-            _flashTimer.Enabled = false;
-            _flashBitmap = null;
-        }
-        Redraw();
-    }
-
-    public void CenterOnCaret()
-    {
-        EnsureVisible(CaretPosition, center: true);
-    }
-
-    public void MoveCaretToEnd(bool toStart)
-    {
-        TextDocument.TextPosition textPosition = new TextDocument.TextPosition
-        {
-            Line = _document.LineCount - 1
-        };
-        if (toStart)
-        {
-            textPosition.Column = 0;
-        }
-        else
-        {
-            textPosition.Column = _document.GetLineText(textPosition.Line).Length;
-        }
-        if (_hasSelection)
-        {
-            SetSelection(select: false, default);
-        }
-        SetCaret(textPosition);
-        EnsureCaretVisible(textPosition);
-    }
-
     public virtual void SetDocument(EditableTextDocument editableTextDocument)
     {
         _document = editableTextDocument;
@@ -3241,24 +3132,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     {
         base.OnMouseUp(e);
         _lastMouseButton = MouseButtons.None;
-    }
-
-    public TextDocument.TextPosition GetSelectionBoundary(bool reverse)
-    {
-        if (!_hasSelection)
-        {
-            return CaretPosition;
-        }
-        bool forward = SelectionEnd > SelectionStart;
-        if (reverse)
-        {
-            forward = !forward;
-        }
-        if (!forward)
-        {
-            return SelectionEnd;
-        }
-        return SelectionStart;
     }
 
     public TextDocument.TextPosition Find(TextDocument.TextPosition textPosition, string searchText, bool searchBackward, bool ignoreCase, bool wrapAround, FindSelectMode findSelectMode = FindSelectMode.None)

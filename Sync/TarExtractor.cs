@@ -598,13 +598,6 @@ public class TarExtractor
         }
     }
 
-    public void SaveStatistics(string filePath)
-    {
-        XmlSerializer xmlSerializer = new XmlSerializer(typeof(DirectoryStatistics));
-        using FileStream stream = File.Create(filePath);
-        xmlSerializer.Serialize(stream, _statistics);
-    }
-
     private static void RetryFor(ThreadStart callback, int timeoutMs = 5000)
     {
         try

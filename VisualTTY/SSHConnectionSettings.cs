@@ -87,67 +87,6 @@ public class SSHConnectionSettings
         }
     }
 
-    public bool IsEquivalentToExceptPassword(SSHConnectionSettings settings)
-    {
-        if (settings.HostName != HostName)
-        {
-            return false;
-        }
-        if (settings.UserName != UserName)
-        {
-            return false;
-        }
-        if (settings.AuthenticationType != AuthenticationType)
-        {
-            return false;
-        }
-        if (settings.ExplicitKeyFile != ExplicitKeyFile)
-        {
-            return false;
-        }
-        if (settings.ProxyAuth != ProxyAuth)
-        {
-            return false;
-        }
-        if (settings.ProxyServer != ProxyServer)
-        {
-            return false;
-        }
-        if (settings.ProxyPort != ProxyPort)
-        {
-            return false;
-        }
-        if (settings.EnableCompression != EnableCompression)
-        {
-            return false;
-        }
-        if (settings.EnableOnTheFlyTAR != EnableOnTheFlyTAR)
-        {
-            return false;
-        }
-        if (settings.EnableX11Forwarding != EnableX11Forwarding)
-        {
-            return false;
-        }
-        if (settings.AutoStartSocksProxy != AutoStartSocksProxy)
-        {
-            return false;
-        }
-        if (settings.ConnectionAlias != ConnectionAlias)
-        {
-            return false;
-        }
-        if (settings.SuppressKeyMismatchWarning != SuppressKeyMismatchWarning)
-        {
-            return false;
-        }
-        if (settings.KeepaliveInterval != KeepaliveInterval)
-        {
-            return false;
-        }
-        return true;
-    }
-
     public override string ToString()
     {
         return UserName + "@" + HostName;

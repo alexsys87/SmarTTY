@@ -340,16 +340,4 @@ public class TarWriter
             }
         }
     }
-
-    public void WriteTree(string sourceDirPath, string archiveFilePath, Predicate<string> fileFilter, Predicate<string> dirFilter = null)
-    {
-        byte[] paddingBuffer = new byte[1024];
-        byte[] copyBuffer = new byte[1048576];
-        int filesDone = 0;
-        long bytesDone = 0L;
-        using FileStream stream = File.Create(archiveFilePath);
-        using GZipStream gZipStream = new GZipStream(stream, CompressionMode.Compress);
-        WriteDirectory(gZipStream, sourceDirPath, "", ref filesDone, ref bytesDone, paddingBuffer, copyBuffer, fileFilter, dirFilter);
-        gZipStream.Write(paddingBuffer, 0, 1024);
-    }
 }

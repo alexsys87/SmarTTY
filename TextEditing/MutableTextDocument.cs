@@ -6,10 +6,6 @@ public class MutableTextDocument : TextDocument
 {
     private List<DocumentLine> LineList => Lines;
 
-    public void OnClear()
-    {
-    }
-
     protected void InsertLine(int lineIndex, string text, LineEnding lineEnding)
     {
         this.LineList.Insert(lineIndex, new DocumentLine(text, lineEnding));

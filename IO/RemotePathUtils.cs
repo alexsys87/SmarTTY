@@ -85,20 +85,6 @@ public class RemotePathUtils
         return ext;
     }
 
-    public static string ChangeExtension(string path, string newExtension)
-    {
-        int dotIndex = path.LastIndexOf('.');
-        if (dotIndex == -1)
-        {
-            return path + newExtension;
-        }
-        if (path.Substring(dotIndex).IndexOfAny(new char[2] { '\\', '/' }) != -1)
-        {
-            return path + newExtension;
-        }
-        return path.Substring(0, dotIndex) + newExtension;
-    }
-
     public static string NormalizeUnix(string path)
     {
         if (string.IsNullOrEmpty(path) || path.IndexOf('.') == -1)
@@ -183,52 +169,6 @@ public class RemotePathUtils
             result = result.Substring(1);
         }
         return result;
-    }
-
-    public static string GetNameWithoutExtension(string path)
-    {
-        string fileName = GetFileName(path);
-        if (fileName != null)
-        {
-            int dotIndex = fileName.LastIndexOf('.');
-            if (dotIndex != -1)
-            {
-                fileName = fileName.Substring(0, dotIndex);
-            }
-        }
-        return fileName;
-    }
-
-    public static string GetNameBeforeFirstDot(string path)
-    {
-        string fileName = GetFileName(path);
-        if (fileName != null)
-        {
-            int dotIndex = fileName.IndexOf('.');
-            if (dotIndex != -1)
-            {
-                fileName = fileName.Substring(0, dotIndex);
-            }
-        }
-        return fileName;
-    }
-
-    public static string ReplaceFileName(string path, string newFileName)
-    {
-        if (path == null)
-        {
-            return null;
-        }
-        if (string.IsNullOrEmpty(newFileName))
-        {
-            return path;
-        }
-        int separatorIndex = path.LastIndexOfAny(new char[2] { '\\', '/' });
-        if (separatorIndex == -1)
-        {
-            return newFileName;
-        }
-        return path.Substring(0, separatorIndex + 1) + newFileName;
     }
 
     public static bool IsUnderDirectory(string path, string directoryPath)
