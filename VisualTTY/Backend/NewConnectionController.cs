@@ -1,5 +1,5 @@
 ﻿using SmarTTY.Ssh;
-using Microsoft.Win32;
+using SmarTTY.Controls;
 using SmarTTY;
 using SmarTTY.Utilities;
 using System;
@@ -320,13 +320,10 @@ public class NewConnectionController : INotifyPropertyChanged
 
     public void BrowseForKeyFile()
     {
-        OpenFileDialog openFileDialog = new OpenFileDialog
+        string keyFile = ThemedFileDialog.OpenFile(null, "Select an OpenSSH private key file", "OpenSSH keys|id_dsa;id_rsa|All files (*.*)|*.*");
+        if (keyFile != null)
         {
-            Filter = "OpenSSH keys|id_dsa;id_rsa|All files|*.*"
-        };
-        if (((CommonDialog)openFileDialog).ShowDialog() == true)
-        {
-            CustomSSHKeyFile = ((FileDialog)openFileDialog).FileName;
+            CustomSSHKeyFile = keyFile;
         }
     }
 

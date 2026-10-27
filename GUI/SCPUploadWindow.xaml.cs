@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+using SmarTTY.Controls;
 using SmarTTY.IO;
 using System;
 using System.IO;
@@ -54,17 +54,11 @@ public partial class SCPUploadWindow : Window
 
     private void Open_Click(object sender, RoutedEventArgs e)
     {
-        OpenFileDialog dialog = new OpenFileDialog
-        {
-            Title = "Choose the local files to upload",
-            Filter = "All files|*.*",
-            Multiselect = true
-        };
-        if (dialog.ShowDialog(this) != true)
+        string[] files = LocalFileDialogWindow.OpenFiles(this, "Choose the local files to upload", "All files (*.*)|*.*");
+        if (files == null)
         {
             return;
         }
-        string[] files = dialog.FileNames;
         if (files.Length > 1)
         {
             _selectedFiles = files;
@@ -74,7 +68,7 @@ public partial class SCPUploadWindow : Window
         else
         {
             _selectedFiles = null;
-            LocalFileBox.Text = dialog.FileName;
+            LocalFileBox.Text = files[0];
         }
     }
 

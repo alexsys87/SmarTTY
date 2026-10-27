@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+﻿using SmarTTY.Controls;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -233,15 +233,11 @@ public class XServerLaunchController : INotifyPropertyChanged
         string fn = null;
         if (type == XServerType.Custom)
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog
-            {
-                Filter = "Executable files|*.exe|All files|*.*"
-            };
-            if (((CommonDialog)openFileDialog).ShowDialog() != true)
+            fn = ThemedFileDialog.OpenFile(null, "Select the X server executable", "Executable files|*.exe|All files (*.*)|*.*");
+            if (fn == null)
             {
                 return;
             }
-            fn = ((FileDialog)openFileDialog).FileName;
         }
         new Thread(() =>
         {

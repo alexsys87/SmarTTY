@@ -48,20 +48,13 @@ public partial class DeviceTerminalControl
             return;
         }
 
-        using OpenFileDialog openFileDialog = new OpenFileDialog
-        {
-            Title = "Select file(s) to send via YMODEM",
-            Filter = "All files (*.*)|*.*",
-            Multiselect = true
-        };
-
-        if (openFileDialog.ShowDialog(this) != DialogResult.OK || openFileDialog.FileNames.Length == 0)
+        string[] fileNames = ThemedFileDialog.OpenFiles(this, "Select file(s) to send via YMODEM", "All files (*.*)|*.*");
+        if (fileNames == null)
         {
             return;
         }
 
-        // The files are opened later, on the worker thread, when the "using" dialog above is already disposed: take the names now.
-        string[] fileNames = openFileDialog.FileNames;
+        // The files are opened later, on the worker thread: the names are already taken above.
 
         StartLineTransfer("YMODEM Send", "YMODEM", "send", (sendData, progress, token) =>
         {

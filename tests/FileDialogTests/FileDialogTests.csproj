@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The filter parsing/matching (Utilities/FileDialogFilter.cs) and the listing rules
+         (IO/LocalFileListing.cs + IO/LocalFolderTree.cs) the themed file dialog is built on. They have no UI
+         dependency, so this harness can link and exercise them. StringUtils brings FormatSize, used by the size column. -->
+    <Compile Include="../../Utilities/FileDialogFilter.cs" Link="FileDialogFilter.cs" />
+    <Compile Include="../../Utilities/StringUtils.cs" Link="StringUtils.cs" />
+    <Compile Include="../../IO/LocalFolderTree.cs" Link="LocalFolderTree.cs" />
+    <Compile Include="../../IO/LocalFileListing.cs" Link="LocalFileListing.cs" />
+  </ItemGroup>
+</Project>

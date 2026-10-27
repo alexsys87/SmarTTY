@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+using SmarTTY.Controls;
 using SmarTTY.Ssh;
 using System;
 using System.IO;
@@ -108,14 +108,14 @@ public partial class PublicKeyManagerWindow : Window
         {
             return;
         }
-        SaveFileDialog dialog = new SaveFileDialog { DefaultExt = "sshkey", Filter = "SSH keys|*.sshkey" };
-        if (dialog.ShowDialog(this) != true)
+        string keyFile = LocalFileDialogWindow.SaveFile(this, "Export the public key", "SSH keys (*.sshkey)|*.sshkey", fileName: "id_sshkey.sshkey", addExtension: true);
+        if (keyFile == null)
         {
             return;
         }
         try
         {
-            using FileStream stream = File.Create(dialog.FileName);
+            using FileStream stream = File.Create(keyFile);
             _keyPair.ExportPrivateKey(stream);
         }
         catch (Exception exception)
@@ -130,14 +130,14 @@ public partial class PublicKeyManagerWindow : Window
         {
             return;
         }
-        OpenFileDialog dialog = new OpenFileDialog { DefaultExt = "sshkey", Filter = "SSH keys|*.sshkey" };
-        if (dialog.ShowDialog(this) != true)
+        string keyFile = LocalFileDialogWindow.OpenFile(this, "Import a public key", "SSH keys (*.sshkey)|*.sshkey");
+        if (keyFile == null)
         {
             return;
         }
         try
         {
-            using (FileStream stream = File.OpenRead(dialog.FileName))
+            using (FileStream stream = File.OpenRead(keyFile))
             {
                 _keyPair.ImportPrivateKey(stream);
             }

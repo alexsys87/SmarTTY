@@ -845,15 +845,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
     private void BrowseClientCertificate_Click(object sender, RoutedEventArgs e)
     {
-        Microsoft.Win32.OpenFileDialog dialog = new Microsoft.Win32.OpenFileDialog
+        string certificate = LocalFileDialogWindow.OpenFile(this, "Client certificate (a file without a password)",
+            "Certificates with a private key (*.pfx;*.p12)|*.pfx;*.p12|All files (*.*)|*.*");
+        if (certificate != null)
         {
-            Title = "Client certificate (a file without a password)",
-            Filter = "Certificates with a private key (*.pfx;*.p12)|*.pfx;*.p12|All files (*.*)|*.*",
-            CheckFileExists = true
-        };
-        if (dialog.ShowDialog(this) == true)
-        {
-            _Controller.TelnetTlsClientCertificate = dialog.FileName;
+            _Controller.TelnetTlsClientCertificate = certificate;
         }
     }
 

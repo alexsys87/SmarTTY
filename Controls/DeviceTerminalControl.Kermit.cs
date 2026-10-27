@@ -32,19 +32,14 @@ public partial class DeviceTerminalControl
             return;
         }
 
-        using OpenFileDialog openFileDialog = new OpenFileDialog
-        {
-            Title = "Select files to send via Kermit (start the Kermit receiver on the device first, e.g. \"kermit -r\")",
-            Filter = "All files (*.*)|*.*",
-            Multiselect = true
-        };
-        if (openFileDialog.ShowDialog(this) != DialogResult.OK)
+        string[] fileNames = ThemedFileDialog.OpenFiles(this, "Select files to send via Kermit (start the Kermit receiver on the device first, e.g. \"kermit -r\")", "All files (*.*)|*.*");
+        if (fileNames == null)
         {
             return;
         }
 
         List<KermitTransfer.Source> sources = new List<KermitTransfer.Source>();
-        foreach (string path in openFileDialog.FileNames)
+        foreach (string path in fileNames)
         {
             string fileName = path;
             FileInfo info = new FileInfo(fileName);
