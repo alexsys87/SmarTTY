@@ -14,7 +14,7 @@ using VisualTTY;
 
 namespace SmarTTY.Controls;
 
-public class SshTerminalControl : TerminalEmulatorControl
+public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.IFileListHost
 {
     public class InputRegion
     {

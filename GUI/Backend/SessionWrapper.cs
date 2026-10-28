@@ -744,6 +744,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 }
                 if (isWindows)
                 {
+                    session.RemoteOs = RemoteOsKind.Windows;
                     SetRemoteOs(RemoteOsKind.Windows);
                 }
                 _LocalRepoManager = manager;

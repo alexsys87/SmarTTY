@@ -52,14 +52,22 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             {
                 try
                 {
-                    List<string> lines = Session.RunCommand(text, out _);
-                    if (lines == null)
+                    List<LsOutputParser.LsEntry> list;
+                    if (Session.RemoteOs == RemoteOsKind.Windows)
                     {
-                        throw new Exception("Failed to list " + _Directory);
+                        list = ListWindowsDirectory();
                     }
-                    List<LsOutputParser.LsEntry> list = (from entry in lines.Select(LsOutputParser.LsParser.ParseLine)
-                                                         where entry.Name != null && entry.Name != "." && (_Directory != "/" || entry.Name != "..")
-                                                         select entry).ToList();
+                    else
+                    {
+                        List<string> lines = Session.RunCommand(text, out _);
+                        if (lines == null)
+                        {
+                            throw new Exception("Failed to list " + _Directory);
+                        }
+                        list = (from entry in lines.Select(LsOutputParser.LsParser.ParseLine)
+                                where entry.Name != null && entry.Name != "." && (_Directory != "/" || entry.Name != "..")
+                                select entry).ToList();
+                    }
                     list.Sort(FileEntryComparer);
                     _Explorer.ProcessListResult(new ListResult
                     {
@@ -81,6 +89,37 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             {
                 IsBackground = true
             }.Start();
+        }
+
+        /// <summary>
+        /// The listing of a Windows host over SFTP, as the entries the list is made of: the permissions are left out (the
+        /// mode bits of a Windows file say nothing, and would all be coloured as writable by everybody), a link is shown as
+        /// what it points to, and ".." is added below the root of the drives.
+        /// </summary>
+        private List<LsOutputParser.LsEntry> ListWindowsDirectory()
+        {
+            using SftpChannel sftp = SftpChannel.Open(Session);
+            List<LsOutputParser.LsEntry> list = new List<LsOutputParser.LsEntry>();
+            if (!WindowsSftpPath.IsRoot(_Directory))
+            {
+                list.Add(new LsOutputParser.LsEntry { Name = "..", Flags = LsOutputParser.LsEntryFlags.Directory });
+            }
+            foreach (SftpDirectoryEntry entry in new SftpFileSystem(sftp).List(_Directory))
+            {
+                SftpFileAttributes attributes = entry.Attributes;
+                if (attributes.IsSymbolicLink)
+                {
+                    attributes = sftp.Stat(WindowsSftpPath.ForServer(SftpFileSystem.Child(_Directory, entry.Name))) ?? attributes;
+                }
+                list.Add(new LsOutputParser.LsEntry
+                {
+                    Name = entry.Name,
+                    Size = attributes.Size ?? 0,
+                    ModifiedTime = attributes.ModifyTime ?? default(DateTime),
+                    Flags = attributes.IsDirectory ? LsOutputParser.LsEntryFlags.Directory : LsOutputParser.LsEntryFlags.None
+                });
+            }
+            return list;
         }
 
         private static int FileEntryComparer(LsOutputParser.LsEntry x, LsOutputParser.LsEntry y)
@@ -195,7 +234,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         }
     }
 
-    private SshTerminalControl _Control;
+    private IFileListHost _Control;
 
     private ItemWrapper[] _FilteredItems;
 
@@ -227,6 +266,12 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
 
     /// <summary>The package manager of the OpenWrt host (null if the host is not OpenWrt or has not answered the probe yet).</summary>
     public LocalRepoPackageManager? PackageManager => PackageManagerProvider?.Invoke();
+
+    /// <summary>
+    /// True for a Windows host: the list is read and changed over SFTP there (there is no ls, cp, mv, rm or chmod to run), and
+    /// what only means something on Unix (permissions, extracting archives, running scripts) is not offered.
+    /// </summary>
+    public bool IsWindowsHost => _Control.Session?.RemoteOs == RemoteOsKind.Windows;
 
     /// <summary>True if files copied or cut in this session can be pasted here.</summary>
     public bool CanPaste => _Clipboard != null && _Clipboard.Session == _Control.Session;
@@ -301,7 +346,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
 
     public event PropertyChangedEventHandler PropertyChanged;
 
-    public FileExplorer(SshTerminalControl vtc)
+    public FileExplorer(IFileListHost vtc)
     {
         _Control = vtc;
         _Control.DirectoryChanged += _Control_WorkingDirectoryChanged;
@@ -387,6 +432,11 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     {
         try
         {
+            if (_WorkingDirectory == null)
+            {
+                // A Windows host has not told its start directory yet: the list is made when it does (DirectoryChanged).
+                return;
+            }
             ListOperation listOperation;
             lock (_PendingListLock)
             {
@@ -461,7 +511,9 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         }
         string targetDirectory = _WorkingDirectory;
         HashSet<string> names = CurrentNames();
+        bool windowsHost = IsWindowsHost;
         List<string> commands = new List<string>();
+        List<Action<SftpFileSystem>> operations = new List<Action<SftpFileSystem>>();
         foreach (ItemWrapper item in clipboard.Items)
         {
             string sourceDirectory = RemotePathUtils.GetDirectoryName(item.FullPath);
@@ -496,20 +548,46 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             }
             names.Add(name);
             string destination = RemoteFileOperations.Join(targetDirectory, name);
-            commands.Add(clipboard.Cut ? RemoteFileOperations.MoveCommand(item.FullPath, destination, replace) : RemoteFileOperations.CopyCommand(item.FullPath, destination, replace));
+            if (windowsHost)
+            {
+                string source = item.FullPath;
+                bool replaceTarget = replace;
+                if (clipboard.Cut)
+                {
+                    operations.Add(fileSystem => fileSystem.Move(source, destination, replaceTarget));
+                }
+                else
+                {
+                    operations.Add(fileSystem => fileSystem.Copy(source, destination, replaceTarget));
+                }
+            }
+            else
+            {
+                commands.Add(clipboard.Cut ? RemoteFileOperations.MoveCommand(item.FullPath, destination, replace) : RemoteFileOperations.CopyCommand(item.FullPath, destination, replace));
+            }
         }
-        if (commands.Count == 0)
+        int count = commands.Count + operations.Count;
+        if (count == 0)
         {
             return;
         }
-        RunOperations((clipboard.Cut ? "Moving " : "Copying ") + Describe(commands.Count) + "...", commands, () =>
+        Action afterPaste = () =>
         {
             // Cut files are pasted once; copied ones can be pasted again.
             if (clipboard.Cut && _Clipboard == clipboard)
             {
                 _Clipboard = null;
             }
-        });
+        };
+        string pasting = (clipboard.Cut ? "Moving " : "Copying ") + Describe(count) + "...";
+        if (windowsHost)
+        {
+            RunSftpOperations(pasting, operations, afterPaste);
+        }
+        else
+        {
+            RunOperations(pasting, commands, afterPaste);
+        }
     }
 
     public void Delete(IEnumerable<ItemWrapper> items)
@@ -529,7 +607,13 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         {
             return;
         }
-        RunOperations("Deleting " + Describe(selected.Length) + "...", new List<string> { RemoteFileOperations.DeleteCommand(selected.Select((ItemWrapper item) => item.FullPath)) }, null);
+        string deleting = "Deleting " + Describe(selected.Length) + "...";
+        if (IsWindowsHost)
+        {
+            RunSftpOperations(deleting, selected.Select(entry => (Action<SftpFileSystem>)(fileSystem => fileSystem.Delete(entry.FullPath))).ToList(), null);
+            return;
+        }
+        RunOperations(deleting, new List<string> { RemoteFileOperations.DeleteCommand(selected.Select((ItemWrapper item) => item.FullPath)) }, null);
     }
 
     /// <summary>
@@ -537,6 +621,11 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     /// </summary>
     public void Extract(IEnumerable<ItemWrapper> items)
     {
+        if (IsWindowsHost)
+        {
+            MessageBoxes.Info("Archives are unpacked with tar on the host, which is not done for a Windows host.");
+            return;
+        }
         ItemWrapper[] archives = items.Where((ItemWrapper item) => !item.Entry.IsDirectory && RemoteFileOperations.IsExtractableArchive(item.Name)).ToArray();
         if (archives.Length == 0)
         {
@@ -559,12 +648,23 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             return;
         }
         string destination = RemoteFileOperations.Join(RemotePathUtils.GetDirectoryName(item.FullPath), newName);
+        if (IsWindowsHost)
+        {
+            string source = item.FullPath;
+            RunSftpOperations("Renaming...", new List<Action<SftpFileSystem>> { fileSystem => fileSystem.Move(source, destination, replace: false) }, null);
+            return;
+        }
         RunOperations("Renaming...", new List<string> { RemoteFileOperations.MoveCommand(item.FullPath, destination, replace: false) }, null);
     }
 
     /// <summary>"Make executable": chmod +x on the selected files and folders (as chmod +x does, within the umask).</summary>
     public void MakeExecutable(IEnumerable<ItemWrapper> items)
     {
+        if (IsWindowsHost)
+        {
+            MessageBoxes.Info("Windows has no executable permission bit to set.");
+            return;
+        }
         ItemWrapper[] selected = items.Where((ItemWrapper item) => item.Name != "..").ToArray();
         if (selected.Length == 0)
         {
@@ -579,6 +679,11 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     /// </summary>
     public void ChangePermissions(IEnumerable<ItemWrapper> items, RemotePermissionChange change, ChmodScope scope)
     {
+        if (IsWindowsHost)
+        {
+            MessageBoxes.Info("The permissions of Windows files are access control lists, which chmod cannot set.");
+            return;
+        }
         ItemWrapper[] selected = items.Where((ItemWrapper item) => item.Name != "..").ToArray();
         string mode = change?.ToChmodMode();
         if (selected.Length == 0 || mode == null)
@@ -605,6 +710,11 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             return;
         }
         string path = RemoteFileOperations.Join(_WorkingDirectory, name);
+        if (IsWindowsHost)
+        {
+            RunSftpOperations(folder ? "Creating the folder..." : "Creating the file...", new List<Action<SftpFileSystem>> { fileSystem => { if (folder) { fileSystem.CreateDirectory(path); } else { fileSystem.CreateFile(path); } } }, null);
+            return;
+        }
         RunOperations(folder ? "Creating the folder..." : "Creating the file...", new List<string> { folder ? RemoteFileOperations.CreateDirectoryCommand(path) : RemoteFileOperations.CreateFileCommand(path) }, null);
     }
 
@@ -667,6 +777,58 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
                     string message = string.Join("\n", (output ?? new List<string>()).Where((string line) => line.Trim() != ""));
                     errors.Add(message != "" ? message : (exitCode.HasValue ? "The command failed with exit code " + exitCode : "The command did not report an exit status"));
                 }
+            }
+            dispatcher.BeginInvoke((Action)(() =>
+            {
+                ProgressText = null;
+                Refresh();
+                if (errors.Count != 0)
+                {
+                    MessageBoxes.Error(string.Join("\n", errors.Take(10)) + (errors.Count > 10 ? "\n..." : ""));
+                }
+                else
+                {
+                    onSuccess?.Invoke();
+                }
+            }));
+        })
+        {
+            IsBackground = true
+        }.Start();
+    }
+
+    /// <summary>
+    /// What <see cref="RunOperations"/> does for a Windows host: the operations run one after another on a background
+    /// thread over one SFTP channel, then the list is refreshed and the ones that failed are reported.
+    /// </summary>
+    private void RunSftpOperations(string progressText, List<Action<SftpFileSystem>> operations, Action onSuccess)
+    {
+        SshSession session = _Control.Session;
+        Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
+        ProgressText = progressText;
+        new Thread(() =>
+        {
+            List<string> errors = new List<string>();
+            try
+            {
+                using SftpChannel sftp = SftpChannel.Open(session);
+                SftpFileSystem fileSystem = new SftpFileSystem(sftp);
+                foreach (Action<SftpFileSystem> operation in operations)
+                {
+                    try
+                    {
+                        operation(fileSystem);
+                    }
+                    catch (Exception exception) when (!(exception is System.IO.IOException) || !session.IsConnectionClosed)
+                    {
+                        errors.Add(exception.Message);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                // A lost connection ends the rest of the operations too: say it once, not once per item.
+                errors.Add(session.IsConnectionClosed ? "The connection to the server was lost." : exception.Message);
             }
             dispatcher.BeginInvoke((Action)(() =>
             {

@@ -231,10 +231,12 @@ public partial class FileListControl : UserControl, IComponentConnector
             }
             cmdDownload.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             cmdEdit.Visibility = ((!fileSelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
-            cmdRun.Visibility = SelectedScript() != null ? Visibility.Visible : Visibility.Collapsed;
-            cmdExtract.Visibility = extractableSelected ? Visibility.Visible : Visibility.Collapsed;
+            // Scripts, tar and chmod are the tools of a Unix host.
+            bool windowsHost = Explorer?.IsWindowsHost == true;
+            cmdRun.Visibility = !windowsHost && SelectedScript() != null ? Visibility.Visible : Visibility.Collapsed;
+            cmdExtract.Visibility = !windowsHost && extractableSelected ? Visibility.Visible : Visibility.Collapsed;
             UpdatePackageMenu();
-            cmdDownloadArchive.Visibility = archivableSelected ? Visibility.Visible : Visibility.Collapsed;
+            cmdDownloadArchive.Visibility = !windowsHost && archivableSelected ? Visibility.Visible : Visibility.Collapsed;
             cmdNavigate.Visibility = ((!directorySelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             if (((ListBox)TransferList).SelectedItems.Count == 0 && ((CollectionView)TransferList.Items).Count > 0 && _SelDepth < 5)
             {
@@ -411,8 +413,9 @@ public partial class FileListControl : UserControl, IComponentConnector
         cmdPaste.IsEnabled = explorer != null && explorer.CanPaste;
         cmdNewFolder.IsEnabled = explorer != null;
         cmdNewFile.IsEnabled = explorer != null;
-        cmdMakeExecutable.IsEnabled = explorer != null && selected.Length > 0;
-        cmdPermissions.IsEnabled = explorer != null && selected.Length > 0;
+        // chmod means nothing on a Windows host.
+        cmdMakeExecutable.IsEnabled = explorer != null && !explorer.IsWindowsHost && selected.Length > 0;
+        cmdPermissions.IsEnabled = explorer != null && !explorer.IsWindowsHost && selected.Length > 0;
         UpdatePackageMenu();
     }
 

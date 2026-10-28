@@ -29,6 +29,7 @@ internal static class Program
         LocalDeleteTests.Run();
         ShellChannelStateTests.Run();
         X11ForwardingTests.Run();
+        WindowsHostTests.Run();
 
         if (TestEnvironment.IntegrationEnabled())
         {
@@ -37,6 +38,8 @@ internal static class Program
             Console.WriteLine("Using the test server at " + environment.Host + ":" + environment.Port + " as " + environment.User);
             SshIntegrationTests.Run(environment);
             FileTransferManagerTests.Run(environment);
+            SftpFileSystemTests.Run(environment);
+            WindowsAuthorizedKeysTests.Run(environment);
             HostToHostCopyTests.Run(environment);
             X11ForwardingTests.RunLive(environment);
         }
