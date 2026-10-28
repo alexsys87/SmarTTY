@@ -123,4 +123,12 @@ internal static class AuthorizedKeysFile
     /// line break one is added first, otherwise the new key would be glued to the last line.
     /// </summary>
     public const string AppendScript = "f=\"$1\"; if [ -s \"$f\" ] && [ -n \"$(tail -c1 \"$f\")\" ]; then echo >> \"$f\"; fi; cat >> \"$f\"";
+
+    /// <summary>
+    /// Shell script that replaces the file given as its first argument with standard input, for servers without an scp
+    /// program. The input goes to a temporary file next to the original, which is moved over it only when all of the
+    /// bytes (their number is the second argument) were written, so a full disk or a dropped connection leaves the
+    /// original file as it was. The mode of the new file is 600, as with the scp upload.
+    /// </summary>
+    public const string ReplaceScript = "f=\"$1\"; t=\"$f.smartty\"; umask 077; if cat > \"$t\" && [ \"$(wc -c < \"$t\")\" -eq \"$2\" ] && mv \"$t\" \"$f\"; then exit 0; fi; rm -f \"$t\"; exit 1";
 }

@@ -11,7 +11,7 @@ namespace SmarTTY;
 internal static class AuthorizedKeysManager
 {
 
-    // How long the remote script that appends a key may take; it only copies one line into a file.
+    // How long the remote script that appends a key or rewrites the file may take; it only copies a few lines.
     private static readonly TimeSpan AppendTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
@@ -132,41 +132,87 @@ internal static class AuthorizedKeysManager
     public static void RemoveAuthorizedKey(SshSession sshSession, byte[] keyBlob)
     {
         string homeDir = GetHomeDirectory(sshSession);
+        // Dropbear reads the keys of root from its own file, so the key is still accepted as long as it is there: a failure
+        // in any file is an error. Every file gets its turn first, so that one failure does not leave the key in the others.
+        List<string> failures = new List<string>();
         foreach (string path in GetDropbearRootKeyFiles(sshSession))
         {
-            try
-            {
-                RemoveKeyFromFile(sshSession, path, keyBlob);
-            }
-            catch
-            {
-                // The file of the home directory below is the one the user asked about.
-            }
+            TryRemoveKeyFromFile(sshSession, path, keyBlob, failures);
         }
         if (sshSession.RunCommandChecked("test -d " + ScpChannelStream.QuotePath(homeDir + "/.ssh"), requireSuccess: true) == null)
         {
             // No .ssh directory means there is no key to remove; a lost connection means the removal did not happen.
             sshSession.ThrowIfConnectionLost();
-            return;
         }
-        RemoveKeyFromFile(sshSession, homeDir + "/.ssh/authorized_keys", keyBlob);
+        else
+        {
+            TryRemoveKeyFromFile(sshSession, homeDir + "/.ssh/authorized_keys", keyBlob, failures);
+        }
+        if (failures.Count > 0)
+        {
+            throw new RemoteOperationException(string.Join(Environment.NewLine, failures));
+        }
+    }
+
+    private static void TryRemoveKeyFromFile(SshSession sshSession, string path, byte[] keyBlob, List<string> failures)
+    {
+        try
+        {
+            RemoveKeyFromFile(sshSession, path, keyBlob);
+        }
+        catch (Exception exception)
+        {
+            // A lost connection ends the whole removal; it is not a failure of this file.
+            sshSession.ThrowIfConnectionLost();
+            failures.Add(exception.Message);
+        }
+    }
+
+    /// <summary>
+    /// The lines of the file, or null when there is no such file. Read with scp and, where the server has no scp program
+    /// (OpenWrt and other minimal systems), with cat. Throws when the file exists and cannot be read.
+    /// </summary>
+    private static List<string> ReadFileLines(SshSession sshSession, string path)
+    {
+        try
+        {
+            List<string> lines = new List<string>();
+            using ScpDownloadStream stream = sshSession.OpenDownload(path);
+            using StreamReader streamReader = new StreamReader(stream);
+            string line;
+            while ((line = streamReader.ReadLine()) != null)
+            {
+                lines.Add(line);
+            }
+            return lines;
+        }
+        catch
+        {
+            // No scp program (or no such file): try cat below, unless the connection is gone.
+            sshSession.ThrowIfConnectionLost();
+        }
+        string quotedPath = ScpChannelStream.QuotePath(path);
+        List<string> output = sshSession.RunCommandChecked("cat " + quotedPath, requireSuccess: true);
+        if (output != null)
+        {
+            return output;
+        }
+        sshSession.ThrowIfConnectionLost();
+        if (sshSession.RunCommandChecked("test -e " + quotedPath, requireSuccess: true) == null)
+        {
+            sshSession.ThrowIfConnectionLost();
+            return null;
+        }
+        throw new RemoteOperationException("Cannot read " + path);
     }
 
     private static void RemoveKeyFromFile(SshSession sshSession, string authKeysPath, byte[] keyBlob)
     {
-        List<string> lines = new List<string>();
-        using (ScpDownloadStream stream = sshSession.OpenDownload(authKeysPath))
+        List<string> lines = ReadFileLines(sshSession, authKeysPath);
+        if (lines == null)
         {
-            using StreamReader streamReader = new StreamReader(stream);
-            while (!streamReader.EndOfStream)
-            {
-                string line = streamReader.ReadLine();
-                if (line == null)
-                {
-                    break;
-                }
-                lines.Add(line);
-            }
+            // No file, no key.
+            return;
         }
         // Only the lines of this very key go away: other keys (with or without a comment), comments and blank lines stay.
         List<string> remaining = AuthorizedKeysFile.RemoveKey(lines, keyBlob, out bool removed);
@@ -180,17 +226,45 @@ internal static class AuthorizedKeysManager
             text.Append(line).Append('\n');
         }
         byte[] data = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(text.ToString());
-        using (ScpChannelStream scpChannelStream = sshSession.OpenUpload(authKeysPath + ".smartty", data.Length, default(DateTime), Convert.ToInt32("600", 8)))
+        if (UploadWithScp(sshSession, authKeysPath + ".smartty", data))
         {
-            scpChannelStream.Write(data, 0, data.Length);
+            string quotedPath = ScpChannelStream.QuotePath(authKeysPath);
+            if (sshSession.RunCommandChecked("mv " + ScpChannelStream.QuotePath(authKeysPath + ".smartty") + " " + quotedPath, requireSuccess: true) != null)
+            {
+                return;
+            }
+            sshSession.ThrowIfConnectionLost();
+            throw new Exception("Cannot rename authorized_keys file " + authKeysPath);
         }
-        string quotedPath = ScpChannelStream.QuotePath(authKeysPath);
-        if (sshSession.RunCommandChecked("mv " + ScpChannelStream.QuotePath(authKeysPath + ".smartty") + " " + quotedPath, requireSuccess: true) != null)
+        // OpenWrt and other minimal systems have no scp program: a remote script writes and moves the file instead.
+        string command = "sh -c " + ScpChannelStream.QuotePath(AuthorizedKeysFile.ReplaceScript) + " sh " + ScpChannelStream.QuotePath(authKeysPath) + " " + data.Length;
+        if (RunScriptWithInput(sshSession, command, data, "Timed out while writing " + authKeysPath, "Cannot write " + authKeysPath + ": "))
         {
             return;
         }
+        // The server closed the channel without an exit status: only reading the file back tells whether it was replaced.
         sshSession.ThrowIfConnectionLost();
-        throw new Exception("Cannot rename authorized_keys file");
+        List<string> written = ReadFileLines(sshSession, authKeysPath);
+        if (written != null && AuthorizedKeysFile.ContainsKey(written, keyBlob))
+        {
+            throw new RemoteOperationException("The key is still in " + authKeysPath + " after removing it");
+        }
+    }
+
+    /// <summary>Stores the data in the file with scp. False when that did not work (no scp program); a lost connection is thrown.</summary>
+    private static bool UploadWithScp(SshSession sshSession, string path, byte[] data)
+    {
+        try
+        {
+            using ScpChannelStream scpChannelStream = sshSession.OpenUpload(path, data.Length, default(DateTime), Convert.ToInt32("600", 8));
+            scpChannelStream.Write(data, 0, data.Length);
+            return true;
+        }
+        catch
+        {
+            sshSession.ThrowIfConnectionLost();
+            return false;
+        }
     }
 
     /// <summary>
@@ -318,10 +392,25 @@ internal static class AuthorizedKeysManager
         // "sh -c" keeps this working whatever the login shell of the user is.
         string appendCommand = "sh -c " + ScpChannelStream.QuotePath(AuthorizedKeysFile.AppendScript) + " sh " + ScpChannelStream.QuotePath(path);
         byte[] data = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(line + "\n");
-        using SshShellChannel sshShellChannel = sshSession.OpenShellChannel(appendCommand, extendedDataMode: ExtendedDataMode.Merge);
+        // A server that closes the channel without an exit status says nothing about success: that case is left to the
+        // read-back of the key in AppendAuthorizedKey.
+        RunScriptWithInput(sshSession, appendCommand, data, "Timed out while adding the key to " + path, "Cannot add the key to " + path + ": ");
+    }
+
+    /// <summary>
+    /// Runs the command with the data as its input, waits for it to finish and throws if it failed, was cut short or did
+    /// not finish in time. Returns true when the server reported the exit status 0; false when it closed the channel
+    /// without reporting an exit status (the command may or may not have done its work).
+    /// </summary>
+    private static bool RunScriptWithInput(SshSession sshSession, string command, byte[] data, string timeoutMessage, string failurePrefix)
+    {
+        using SshShellChannel sshShellChannel = sshSession.OpenShellChannel(command, extendedDataMode: ExtendedDataMode.Merge);
         try
         {
-            sshShellChannel.Input.Write(data, 0, data.Length);
+            if (data.Length > 0)
+            {
+                sshShellChannel.Input.Write(data, 0, data.Length);
+            }
             sshShellChannel.SendEof();
         }
         catch (IOException)
@@ -332,20 +421,19 @@ internal static class AuthorizedKeysManager
         if (!sshShellChannel.WaitEof(AppendTimeout))
         {
             sshSession.ThrowIfConnectionLost();
-            throw new RemoteOperationException("Timed out while adding the key to " + path);
+            throw new RemoteOperationException(timeoutMessage);
         }
         if (sshShellChannel.ClosedByConnectionLoss)
         {
             throw new IOException("The connection to the server was lost.");
         }
-        // A server that closes the channel without an exit status says nothing about success: that case is left to the
-        // read-back of the key in AppendAuthorizedKey. A reported failure or a signal is an error right here.
+        // A reported failure or a signal is an error right here.
         bool failed = sshShellChannel.Failure != null
             || sshShellChannel.ExitSignal != null
             || (sshShellChannel.HasExitStatus && sshShellChannel.ExitStatus != 0);
         if (!failed)
         {
-            return;
+            return sshShellChannel.HasExitStatus;
         }
         string output = string.Empty;
         try
@@ -359,6 +447,6 @@ internal static class AuthorizedKeysManager
         string reason = output.Length > 0 ? output
             : sshShellChannel.Failure?.Message
             ?? (sshShellChannel.ExitSignal != null ? "terminated by signal " + sshShellChannel.ExitSignal : "exit status " + sshShellChannel.ExitStatus);
-        throw new RemoteOperationException("Cannot add the key to " + path + ": " + reason);
+        throw new RemoteOperationException(failurePrefix + reason);
     }
 }
