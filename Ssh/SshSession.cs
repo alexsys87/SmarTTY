@@ -295,6 +295,18 @@ public class SshSession : IDisposable
     /// <summary>Software version of the server from its identification string (e.g. "OpenSSH_9.6p1").</summary>
     public string ServerVersion => _client.ConnectionInfo?.ServerVersion;
 
+    private RemoteOsKind? _remoteOs;
+
+    /// <summary>
+    /// What the server runs on: what its identification string says (Win32-OpenSSH calls itself OpenSSH_for_Windows), or what
+    /// was learned by asking it and set here. Unknown means that nothing says it is not a Unix host.
+    /// </summary>
+    public RemoteOsKind RemoteOs
+    {
+        get => _remoteOs ?? RemoteOsDetector.FromServerVersion(ServerVersion);
+        set => _remoteOs = value == RemoteOsKind.Unknown ? (RemoteOsKind?)null : value;
+    }
+
     /// <summary>X11 forwarding of this connection; null unless <see cref="EnableX11Forwarding"/> was called.</summary>
     public X11Forwarding X11 { get; private set; }
 

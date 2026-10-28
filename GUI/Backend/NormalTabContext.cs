@@ -82,6 +82,16 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                 PackageManagerProvider = () => sessionWrapper.LocalRepoManager
             };
         }
+        else if (sessionWrapper.IsWindowsHost)
+        {
+            // A classic terminal on a Windows host: there is no Smart Terminal to follow, so the list has a directory of its own.
+            WindowsFileListHost fileListHost = new WindowsFileListHost(() => sessionWrapper.Session);
+            FileExplorer = new FileExplorer(fileListHost)
+            {
+                IsVisible = sessionWrapper.VTSettings.ShowFileExplorer
+            };
+            fileListHost.Start();
+        }
         _Session = sessionWrapper;
         Terminal = term;
         // The terminal is a WinForms control hosted in WPF: files dropped on it never reach the WPF window's own

@@ -35,6 +35,10 @@ internal static class AuthorizedKeysManager
     /// </summary>
     public static bool IsKeyAuthorized(SshSession sshSession, byte[] keyBlob)
     {
+        if (sshSession.RemoteOs == RemoteOsKind.Windows)
+        {
+            return WindowsAuthorizedKeys.IsKeyAuthorized(sshSession, keyBlob);
+        }
         try
         {
             string homeDir = AuthorizedKeysFile.PickHomeDirectory(sshSession.RunCommandChecked("pwd", requireSuccess: true));
@@ -131,6 +135,11 @@ internal static class AuthorizedKeysManager
 
     public static void RemoveAuthorizedKey(SshSession sshSession, byte[] keyBlob)
     {
+        if (sshSession.RemoteOs == RemoteOsKind.Windows)
+        {
+            WindowsAuthorizedKeys.Remove(sshSession, keyBlob);
+            return;
+        }
         string homeDir = GetHomeDirectory(sshSession);
         // Dropbear reads the keys of root from its own file, so the key is still accepted as long as it is there: a failure
         // in any file is an error. Every file gets its turn first, so that one failure does not leave the key in the others.
@@ -281,6 +290,13 @@ internal static class AuthorizedKeysManager
     {
         byte[] keyBlob = AuthorizedKeysFile.ParseKeyBlob(keyString)
             ?? throw new ArgumentException("The line is not a public key", nameof(keyString));
+        if (sshSession.RemoteOs == RemoteOsKind.Windows)
+        {
+            // No sh, chmod or mv there: the key files are written over SFTP. Nothing is appended in place, so there is no
+            // incomplete line to offer to clean up.
+            WindowsAuthorizedKeys.Append(sshSession, keyString, keyBlob);
+            return;
+        }
         List<string> touchedFiles = new List<string>();
         try
         {

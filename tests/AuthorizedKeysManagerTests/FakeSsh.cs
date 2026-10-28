@@ -246,6 +246,9 @@ namespace SmarTTY.Ssh
 
         public bool IsConnectionClosed { get; set; }
 
+        /// <summary>The Windows path (SFTP) is checked by tests/SshNetIntegrationTests against a real server.</summary>
+        public SmarTTY.Ssh.RemoteOsKind RemoteOs => SmarTTY.Ssh.RemoteOsKind.Unknown;
+
         public string ServerVersion => IsDropbearRoot ? "SSH-2.0-dropbear_2022.83" : "SSH-2.0-OpenSSH_9.6";
 
         public void ThrowIfConnectionLost()

@@ -1,0 +1,137 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+namespace SmarTTY.Ssh;
+
+/// <summary>
+/// The file operations of the file list for a server that has no Unix shell to run cp, mv, rm and mkdir in (a Windows host):
+/// all of them are SFTP requests. Works on one <see cref="SftpChannel"/>, so it is meant for one thread at a time. Paths are
+/// the forward-slash paths of SFTP (see <see cref="WindowsSftpPath"/>).
+/// </summary>
+public sealed class SftpFileSystem
+{
+    private readonly SftpChannel _sftp;
+
+    public SftpFileSystem(SftpChannel sftp)
+    {
+        _sftp = sftp ?? throw new ArgumentNullException(nameof(sftp));
+    }
+
+    /// <summary>The directory the server starts in: the profile of the user on Windows.</summary>
+    public string HomeDirectory()
+    {
+        return _sftp.RealPath(".");
+    }
+
+    /// <summary>The entries of a directory without "." and "..".</summary>
+    public List<SftpDirectoryEntry> List(string directory)
+    {
+        return _sftp.ListDirectory(WindowsSftpPath.ForServer(directory)).Where(entry => entry.Name != "." && entry.Name != "..").ToList();
+    }
+
+    public void CreateDirectory(string path)
+    {
+        _sftp.MakeDirectory(WindowsSftpPath.ForServer(path));
+    }
+
+    /// <summary>Creates an empty file; fails when something of that name exists, as "Create file" must not overwrite.</summary>
+    public void CreateFile(string path)
+    {
+        byte[] handle = _sftp.OpenFile(path, SftpChannel.OpenFlags.Write | SftpChannel.OpenFlags.Create | SftpChannel.OpenFlags.Exclusive);
+        _sftp.CloseHandle(handle);
+    }
+
+    /// <summary>
+    /// Deletes a file, a link or a folder with everything in it; a path that is already gone is not an error. A link is
+    /// removed itself and never followed. A folder is first tried with plain rmdir: that removes an empty folder and also a
+    /// Windows junction or directory link (whose target must stay), and only a folder with something in it is emptied first.
+    /// </summary>
+    public void Delete(string path)
+    {
+        SftpFileAttributes attributes = _sftp.Lstat(path);
+        if (attributes == null)
+        {
+            return;
+        }
+        if (!attributes.IsDirectory)
+        {
+            _sftp.Remove(path);
+            return;
+        }
+        try
+        {
+            _sftp.RemoveDirectory(path);
+            return;
+        }
+        catch (SftpStatusException)
+        {
+            // Not empty (or not allowed): empty it, and let the last rmdir tell the real reason if that fails too.
+        }
+        foreach (SftpDirectoryEntry entry in List(path))
+        {
+            Delete(Child(path, entry.Name));
+        }
+        _sftp.RemoveDirectory(path);
+    }
+
+    /// <summary>
+    /// Moves a file or folder (SFTP rename: within one volume). The server refuses to replace an existing target, so with
+    /// <paramref name="replace"/> the target is deleted first, as "mv" of the file list does after the user agreed.
+    /// </summary>
+    public void Move(string source, string destination, bool replace)
+    {
+        if (replace)
+        {
+            Delete(destination);
+        }
+        _sftp.Rename(source, destination);
+    }
+
+    /// <summary>
+    /// Copies a file or a folder (recursively) to the exact path <paramref name="destination"/>. Links to files are copied as
+    /// the files they point to; a link to a folder is refused, because a copy cannot tell it from a loop.
+    /// </summary>
+    public void Copy(string source, string destination, bool replace)
+    {
+        if (replace)
+        {
+            Delete(destination);
+        }
+        else if (_sftp.Lstat(destination) != null)
+        {
+            // Writing to the path would silently overwrite a file, and merge a folder with the one that is there.
+            throw new SftpStatusException(SftpChannel.StatusFailure, destination + ": already exists");
+        }
+        CopyEntry(source, destination);
+    }
+
+    private void CopyEntry(string source, string destination)
+    {
+        SftpFileAttributes link = _sftp.Lstat(source);
+        SftpFileAttributes attributes = _sftp.Stat(source) ?? throw new RemoteOperationException(source + ": No such file");
+        if (attributes.IsDirectory)
+        {
+            if (link != null && link.IsSymbolicLink)
+            {
+                throw new RemoteOperationException(source + " is a link to a folder; links to folders are not copied.");
+            }
+            _sftp.MakeDirectory(WindowsSftpPath.ForServer(destination), attributes.Mode == null ? (int?)null : attributes.Mode.Value & 0xFFF);
+            foreach (SftpDirectoryEntry entry in List(source))
+            {
+                CopyEntry(Child(source, entry.Name), Child(destination, entry.Name));
+            }
+            return;
+        }
+        using Stream input = _sftp.OpenRead(source, 0);
+        using Stream output = _sftp.OpenWrite(destination, 0, truncate: true, mode: attributes.Mode == null ? 0x1A4 : attributes.Mode.Value & 0xFFF);
+        input.CopyTo(output);
+    }
+
+    /// <summary>The path of <paramref name="name"/> in <paramref name="directory"/>.</summary>
+    public static string Child(string directory, string name)
+    {
+        return directory.TrimEnd('/') + "/" + name;
+    }
+}

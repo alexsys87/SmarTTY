@@ -46,6 +46,14 @@ dotnet build tests/SmartTerminalIntegrationTests -c Release
 xvfb-run -a mono tests/SmartTerminalIntegrationTests/bin/Release/net48/SmartTerminalIntegrationTests.exe
 ```
 
+Windows hosts (`Ssh/SftpFileSystem.cs`, `Ssh/WindowsSftpPath.cs`, `WindowsAuthorizedKeys.cs`) have two groups. The checks of
+the SFTP form of Windows paths, of the key file that sshd of Windows uses (read from `whoami /groups` and `sshd_config`) and of
+the `icacls` command always run. The live ones run the operations behind the file list of a Windows host (listing a directory of
+1500 files in many READDIR requests, a recursive delete that must not follow links, a copy of a 3 MB file on one channel, Cyrillic
+names) and the installation and removal of a key in the key files (CRLF kept, nothing added twice, the administrators' file) over
+SFTP against the Unix test server: the protocol is the same one Win32-OpenSSH speaks. What only a Windows host can answer
+(`whoami`, `icacls`) is a callback in these tests, and a directory of the test stands for `%ProgramData%`.
+
 ## Running
 
 The suite needs the .NET 8 SDK and an OpenSSH server. `setup-sshd.sh` provisions a throwaway

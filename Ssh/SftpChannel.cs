@@ -28,6 +28,15 @@ public sealed class SftpFileAttributes
     public bool IsRegularFile => (Mode & 0xF000) == 0x8000;
 }
 
+/// <summary>An entry of a directory listing (SSH_FXP_READDIR): the name and what the server says about it.</summary>
+public sealed class SftpDirectoryEntry
+{
+    public string Name;
+
+    /// <summary>The attributes of the entry itself: a symbolic link is reported as a link, not as what it points to.</summary>
+    public SftpFileAttributes Attributes;
+}
+
 /// <summary>
 /// An SFTP error reported by the server, with the SSH_FX_* status code.
 /// </summary>
@@ -76,7 +85,11 @@ public sealed class SftpChannel : IDisposable
     private const byte FxpLstat = 7;
     private const byte FxpFstat = 8;
     private const byte FxpSetstat = 9;
+    private const byte FxpOpendir = 11;
+    private const byte FxpReaddir = 12;
     private const byte FxpRemove = 13;
+    private const byte FxpMkdir = 14;
+    private const byte FxpRmdir = 15;
     private const byte FxpRealpath = 16;
     private const byte FxpStat = 17;
     private const byte FxpRename = 18;
@@ -190,6 +203,84 @@ public sealed class SftpChannel : IDisposable
         }
         ExpectType(replyType, FxpAttrs, path);
         return ReadAttributes(reply);
+    }
+
+    /// <summary>
+    /// Like <see cref="Stat"/>, but a symbolic link is described itself, not what it points to; null if it does not exist.
+    /// </summary>
+    public SftpFileAttributes Lstat(string path)
+    {
+        return StatCommon(FxpLstat, path);
+    }
+
+    /// <summary>
+    /// The entries of a directory (OPENDIR, then READDIR until the server answers end of file), in the order the server
+    /// gives them and including "." and ".." where it sends them. Throws if the directory cannot be opened.
+    /// </summary>
+    public List<SftpDirectoryEntry> ListDirectory(string path)
+    {
+        PacketWriter open = new PacketWriter(FxpOpendir);
+        open.WriteString(path);
+        PacketReader openReply = Request(open, path, out byte openType);
+        ExpectType(openType, FxpHandle, path);
+        byte[] handle = openReply.ReadBytes();
+        List<SftpDirectoryEntry> entries = new List<SftpDirectoryEntry>();
+        try
+        {
+            while (true)
+            {
+                PacketWriter read = new PacketWriter(FxpReaddir);
+                read.WriteBytes(handle);
+                uint id = Send(read);
+                PacketReader reply = ReceiveReply(id, out byte replyType);
+                if (replyType == FxpStatus)
+                {
+                    int status = (int)reply.ReadUInt32();
+                    if (status == StatusEof)
+                    {
+                        return entries;
+                    }
+                    throw StatusError(status, reply, path);
+                }
+                ExpectType(replyType, FxpName, path);
+                uint count = reply.ReadUInt32();
+                for (uint index = 0; index < count; index++)
+                {
+                    string name = reply.ReadString();
+                    // The "long name" is the line of ls -l the server makes up; its layout is not defined, so it is not used.
+                    reply.ReadString();
+                    entries.Add(new SftpDirectoryEntry { Name = name, Attributes = ReadAttributes(reply) });
+                }
+            }
+        }
+        finally
+        {
+            try
+            {
+                CloseHandle(handle);
+            }
+            catch
+            {
+                // The listing is what the caller asked for; a handle that cannot be closed goes with the channel.
+            }
+        }
+    }
+
+    /// <summary>Creates a directory; <paramref name="mode"/> is the permission bits to ask for (null: the server decides).</summary>
+    public void MakeDirectory(string path, int? mode = null)
+    {
+        PacketWriter request = new PacketWriter(FxpMkdir);
+        request.WriteString(path);
+        WriteAttributes(request, mode == null ? null : new SftpFileAttributes { Mode = mode });
+        ExpectOk(request, path);
+    }
+
+    /// <summary>Removes an empty directory.</summary>
+    public void RemoveDirectory(string path)
+    {
+        PacketWriter request = new PacketWriter(FxpRmdir);
+        request.WriteString(path);
+        ExpectOk(request, path);
     }
 
     public byte[] OpenFile(string path, OpenFlags flags, SftpFileAttributes attributes = null)

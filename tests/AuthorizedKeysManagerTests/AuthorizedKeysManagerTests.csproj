@@ -10,5 +10,6 @@
     <Compile Include="../../AuthorizedKeysManager.cs" Link="AuthorizedKeysManager.cs" />
     <Compile Include="../../Ssh/RemoteOperationException.cs" Link="RemoteOperationException.cs" />
     <Compile Include="../../Ssh/ExtendedDataMode.cs" Link="ExtendedDataMode.cs" />
+    <Compile Include="../../Ssh/RemoteOsDetector.cs" Link="RemoteOsDetector.cs" />
   </ItemGroup>
 </Project>
