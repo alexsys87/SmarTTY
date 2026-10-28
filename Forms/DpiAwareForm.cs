@@ -1,9 +1,6 @@
 ﻿using SmarTTY.Controls;
-using SmarTTY.Utilities;
 using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Threading;
 using System.Windows.Forms;
 
 namespace SmarTTY.Forms;
@@ -18,8 +15,6 @@ public partial class DpiAwareForm : Form
     }
 
     private static SizeF _scaleFactor;
-
-    private static Dictionary<int, Stack<DpiAwareForm>> _dialogStacks = new Dictionary<int, Stack<DpiAwareForm>>();
 
     private static bool? _isHighDpi;
 
@@ -78,14 +73,6 @@ public partial class DpiAwareForm : Form
             {
                 base.MaximumSize = value;
             }
-        }
-    }
-
-    private static Stack<DpiAwareForm> GetDialogStack()
-    {
-        lock (_dialogStacks)
-        {
-            return _dialogStacks.GetOrInsertNew(Thread.CurrentThread.ManagedThreadId);
         }
     }
 
