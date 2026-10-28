@@ -38,15 +38,6 @@ public static class DataExtensions
         return default;
     }
 
-    public static _Value GetOrInsertNew<_Key, _Value>(this Dictionary<_Key, _Value> dict, _Key key) where _Value : new()
-    {
-        if (dict.TryGetValue(key, out var value))
-        {
-            return value;
-        }
-        return dict[key] = new _Value();
-    }
-
     public static Dictionary<_Key, _Value> ToOverridingDictionary<_Key, _Value>(this IEnumerable<_Value> coll, Func<_Value, _Key> keySelector, IEqualityComparer<_Key> comparer = null)
     {
         Dictionary<_Key, _Value> dictionary = ((comparer == null) ? new Dictionary<_Key, _Value>() : new Dictionary<_Key, _Value>(comparer));
