@@ -240,6 +240,10 @@ public partial class PackageManagerWindow : Window
         {
             try
             {
+                if (_Session.IsWindowsHost)
+                {
+                    throw new Exception(PackageManagerSelector.WindowsHostMessage(_Clients));
+                }
                 // The package manager of a host does not change while the connection lasts: the window asks the host once.
                 ILinuxPackageManagerClient bestClient = _Session.PackageManagerClient ?? PackageManagerSelector.Pick(_Clients, _Session, () => _Closed);
                 if (_Closed)

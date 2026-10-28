@@ -82,6 +82,17 @@ public static class PackageManagerSelector
         return string.Join(", ", new[] { kernel, distribution }.Where(part => !string.IsNullOrEmpty(part)));
     }
 
+    /// <summary>The message for a Windows host: it has none of the package managers of Linux, so none of them is probed.</summary>
+    public static string WindowsHostMessage(IEnumerable<ILinuxPackageManagerClient> clients)
+    {
+        return "The remote host runs Windows. This window handles the package managers of Linux (" + SupportedNames(clients) + "); on Windows use winget, choco or scoop in a terminal tab.";
+    }
+
+    private static string SupportedNames(IEnumerable<ILinuxPackageManagerClient> clients)
+    {
+        return string.Join(", ", clients.Select(client => client.GetType().Name.Replace("PackageManagerClient", "").ToLowerInvariant()));
+    }
+
     /// <summary>
     /// The message for a host where no probe found a package manager: what the host is and which managers are supported, so
     /// that a missing one (Void's xbps, FreeBSD's pkg) is told from a probe that failed.
@@ -97,7 +108,6 @@ public static class PackageManagerSelector
         {
             // The description is a courtesy: the error is shown without it.
         }
-        string supported = string.Join(", ", clients.Select(client => client.GetType().Name.Replace("PackageManagerClient", "").ToLowerInvariant()));
-        return "Could not detect the package manager on the remote host" + (host.Length == 0 ? "" : " (" + host + ")") + ". Supported: " + supported + ".";
+        return "Could not detect the package manager on the remote host" + (host.Length == 0 ? "" : " (" + host + ")") + ". Supported: " + SupportedNames(clients) + ".";
     }
 }

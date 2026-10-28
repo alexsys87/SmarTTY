@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SmarTTY.LocalRepo;
 
@@ -27,6 +28,15 @@ public static class OpenWrtDetector
         "if [ -f /etc/openwrt_release ] || [ -f /etc/opkg/customfeeds.conf ] || [ -f /etc/apk/repositories.d/customfeeds.list ] || " +
         "grep -qsE '^(ID|ID_LIKE)=([^[:alnum:]]*|.*[^[:alnum:]_-])(openwrt|lede)([^[:alnum:]_-]|$)' /etc/os-release; then echo " + OpenWrtMarker + "; else echo SMARTTY_OS=other; fi; " +
         "pm=none; command -v opkg >/dev/null 2>&1 && pm=opkg; command -v apk >/dev/null 2>&1 && pm=apk; echo SMARTTY_PKG=$pm";
+
+    /// <summary>
+    /// True when the host answered the probe at all (it printed "SMARTTY_OS=openwrt" or "SMARTTY_OS=other"). A host that did
+    /// not has no /bin/sh, which is what a Windows host looks like: see <c>RemoteOsDetector</c>.
+    /// </summary>
+    public static bool IsAnswer(IEnumerable<string> lines)
+    {
+        return lines != null && lines.Any(line => line != null && line.TrimStart().StartsWith("SMARTTY_OS=", System.StringComparison.Ordinal));
+    }
 
     /// <summary>
     /// Interprets the output of <see cref="ProbeCommand"/>: the package manager of an OpenWrt host, or null when the host

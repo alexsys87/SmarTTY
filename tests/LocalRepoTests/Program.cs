@@ -1440,6 +1440,48 @@ internal static class Program
         }
     }
 
+    /// <summary>A Windows SSH server is recognised by its banner, and by a command when the banner says nothing.</summary>
+    private static void RemoteOsDetectorTests()
+    {
+        foreach ((string banner, RemoteOsKind expected) in new[]
+        {
+            ("SSH-2.0-OpenSSH_for_Windows_9.5", RemoteOsKind.Windows),
+            ("SSH-2.0-OpenSSH_for_Windows_7.7", RemoteOsKind.Windows),
+            ("OpenSSH_for_Windows_8.6", RemoteOsKind.Windows),
+            ("SSH-2.0-9.31 FlowSsh: Bitvise SSH Server (WinSSHD) 9.31", RemoteOsKind.Windows),
+            ("SSH-2.0-WeOnlyDo 2.1.3", RemoteOsKind.Windows),
+            ("SSH-2.0-dropbear_2022.83", RemoteOsKind.Unix),
+            ("SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.5", RemoteOsKind.Unix),
+            ("SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3", RemoteOsKind.Unix),
+            ("SSH-2.0-OpenSSH_9.3 FreeBSD-20230719", RemoteOsKind.Unix),
+            ("SSH-2.0-OpenSSH_9.7", RemoteOsKind.Unknown),
+            ("", RemoteOsKind.Unknown),
+            (null, RemoteOsKind.Unknown),
+        })
+        {
+            Check(RemoteOsDetector.FromServerVersion(banner) == expected, "Server banner '" + banner + "' -> " + expected);
+        }
+
+        Check(RemoteOsDetector.FromWindowsProbe(new[] { "Windows_NT $env:OS" }) == RemoteOsKind.Windows, "Windows probe: cmd.exe prints Windows_NT");
+        Check(RemoteOsDetector.FromWindowsProbe(new[] { "%OS% Windows_NT" }) == RemoteOsKind.Windows, "Windows probe: PowerShell prints Windows_NT");
+        Check(RemoteOsDetector.FromWindowsProbe(new[] { "%OS% :OS" }) == RemoteOsKind.Unknown, "Windows probe: a POSIX shell is not Windows");
+        Check(RemoteOsDetector.FromWindowsProbe(new[] { "env: Undefined variable." }) == RemoteOsKind.Unknown && RemoteOsDetector.FromWindowsProbe(null) == RemoteOsKind.Unknown, "Windows probe: tcsh's error and no output are not Windows");
+
+        Check(OpenWrtDetector.IsAnswer(new[] { "SMARTTY_OS=other", "SMARTTY_PKG=none" }) && OpenWrtDetector.IsAnswer(new[] { " SMARTTY_OS=openwrt" }), "OpenWrt probe: a host that printed the marker answered");
+        Check(!OpenWrtDetector.IsAnswer(new[] { "'/bin' is not recognized as an internal or external command," }) && !OpenWrtDetector.IsAnswer(null), "OpenWrt probe: the error of cmd.exe is no answer");
+
+        // The probe must not take any Unix login shell for Windows: run it for real.
+        foreach (string shell in new[] { "sh", "bash", "zsh", "fish", "tcsh", "csh" })
+        {
+            if (shell != "sh" && !Has(shell))
+            {
+                continue;
+            }
+            RunArgs(shell, new[] { "-c", RemoteOsDetector.WindowsProbeCommand }, out string output, out string error);
+            Check(RemoteOsDetector.FromWindowsProbe((output + "\n" + error).Split('\n')) == RemoteOsKind.Unknown, shell + ": the Windows probe does not report a Unix shell as Windows (" + output.Trim() + " | " + error.Trim() + ")");
+        }
+    }
+
     private static LocalRepoPackageManager? RunProbeDetect(string shell, string[] args, string etcDir, bool opkgOnPath, bool apkOnPath)
     {
         string fakeBin = Path.Combine(_work, "probebin-" + Guid.NewGuid().ToString("N"));
@@ -1885,6 +1927,7 @@ internal static class Program
             await SigningHostTests();
             ApkDetectorAndScannerTests();
             PosixShellTests();
+            RemoteOsDetectorTests();
             ApkConfigTests();
             await ApkServerAndHostTests();
             await ApkEndToEndTests();

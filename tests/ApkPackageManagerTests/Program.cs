@@ -237,6 +237,7 @@ internal static class Program
         Check(PackageManagerSelector.BuildNotFoundMessage(voidHost, all) == "Could not detect the package manager on the remote host (Linux x86_64, Void Linux). Supported: " + supported + ".", "Not found: the message says what the host is and what is supported");
         Check(PackageManagerSelector.BuildNotFoundMessage(new FakeRunner(), all) == "Could not detect the package manager on the remote host. Supported: " + supported + ".", "Not found: without any information about the host the message has no brackets");
         Check(PackageManagerSelector.DescribeHost(new[] { "sh: 1: uname: not found", "PRETTY_NAME='OpenWrt 23.05.5'" }) == "OpenWrt 23.05.5", "Not found: an error line is not taken for the kernel; single quotes are removed");
+        Check(PackageManagerSelector.WindowsHostMessage(all) == "The remote host runs Windows. This window handles the package managers of Linux (" + supported + "); on Windows use winget, choco or scoop in a terminal tab.", "Windows host: the message names Windows and the supported managers");
         Check(PackageManagerSelector.DescribeHost(new[] { "FreeBSD amd64" }) == "FreeBSD amd64" && PackageManagerSelector.DescribeHost(null) == "", "Not found: FreeBSD without os-release; no lines -> empty");
 
         _passed += AdditionalClientsTests.Run();

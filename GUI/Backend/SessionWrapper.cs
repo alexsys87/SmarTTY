@@ -147,6 +147,30 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// <summary>The package manager client the package manager window found on this connection (null until it asks); forgotten on a reconnect.</summary>
     internal VisualTTY.ILinuxPackageManagerClient PackageManagerClient;
 
+    private RemoteOsKind _RemoteOs;
+
+    /// <summary>What the SSH server runs on: from its identification string at connect, confirmed by a command when that said nothing.</summary>
+    public RemoteOsKind RemoteOs => _RemoteOs;
+
+    /// <summary>True for a Windows host (Win32-OpenSSH, Bitvise): the Unix probes, df and the package managers of Linux do not apply to it.</summary>
+    public bool IsWindowsHost => _RemoteOs == RemoteOsKind.Windows;
+
+    private void SetRemoteOs(RemoteOsKind kind)
+    {
+        if (_RemoteOs == kind)
+        {
+            return;
+        }
+        _RemoteOs = kind;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RemoteOs)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsWindowsHost)));
+        if (kind == RemoteOsKind.Windows)
+        {
+            // df is a Unix command: the bar would only collect failed readings there.
+            DiskSpace.Attach(null);
+        }
+    }
+
     private object _Sync = new object();
 
     private string _DeviceTitle;
@@ -553,7 +577,13 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 oldSession.Dispose();
             }
         }
-        DiskSpace.Attach(session);
+        // A reconnect may land on another kind of host: forget what was known (a Windows host found by the probe) and read the banner again.
+        SetRemoteOs(RemoteOsKind.Unknown);
+        SetRemoteOs(RemoteOsDetector.FromServerVersion(session.ServerVersion));
+        if (!IsWindowsHost)
+        {
+            DiskSpace.Attach(session);
+        }
         EnableX11Forwarding(session);
         // Not only on the first connection: when the start failed because the connection was lost, it is repeated after reconnecting.
         AutoStartSocksProxy(session);
@@ -669,6 +699,14 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             return;
         }
+        RemoteOsKind knownOs = _RemoteOs;
+        if (knownOs == RemoteOsKind.Windows)
+        {
+            // The server said so in its identification string: there is nothing to ask a Windows host about OpenWrt.
+            _LocalRepoManager = null;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalRepoMenuVisibility"));
+            return;
+        }
         ThreadPool.QueueUserWorkItem(delegate
         {
             List<string> output = null;
@@ -684,13 +722,29 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 // The command could not be run (the connection went away): keep the previous answer.
                 return;
             }
-            LocalRepoPackageManager? manager = OpenWrtDetector.Detect(output);
+            bool isWindows = false;
+            if (knownOs != RemoteOsKind.Unix && !OpenWrtDetector.IsAnswer(output))
+            {
+                // Not even "SMARTTY_OS=other": the host has no /bin/sh, and its banner did not say what it is. Ask in its own words.
+                try
+                {
+                    isWindows = RemoteOsDetector.FromWindowsProbe(session.RunCommand(RemoteOsDetector.WindowsProbeCommand, out _, timeout: TimeSpan.FromSeconds(20))) == RemoteOsKind.Windows;
+                }
+                catch
+                {
+                }
+            }
+            LocalRepoPackageManager? manager = isWindows ? null : OpenWrtDetector.Detect(output);
             _Controller.BeginInvoke(() =>
             {
                 // A reconnect may have replaced the connection while the probe ran: only the current one counts.
                 if (!ReferenceEquals(Session, session))
                 {
                     return;
+                }
+                if (isWindows)
+                {
+                    SetRemoteOs(RemoteOsKind.Windows);
                 }
                 _LocalRepoManager = manager;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalRepoMenuVisibility"));
