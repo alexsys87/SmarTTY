@@ -801,7 +801,8 @@ public class SshSession : IDisposable
     /// <summary>
     /// Authenticates with an OpenSSH private key file (RSA, ECDSA or Ed25519).
     /// If no file is specified, the first of id_ed25519, id_ecdsa and id_rsa found in <see cref="UserSshDirectory"/> is used.
-    /// <paramref name="passphraseRequired"/> is set if the key could not be loaded with the given passphrase.
+    /// <paramref name="passphraseRequired"/> is set if the key is encrypted and could not be loaded with the given passphrase.
+    /// A key that cannot be loaded for another reason (damaged, not a private key, unsupported format) is an error.
     /// </summary>
     public bool AuthenticateWithKeyFile(string userName, out bool passphraseRequired, string keyFile = null, string passphrase = null)
     {
@@ -819,9 +820,11 @@ public class SshSession : IDisposable
         {
             key = string.IsNullOrEmpty(passphrase) ? new PrivateKeyFile(keyFile) : new PrivateKeyFile(keyFile, passphrase);
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            // Encrypted key without a passphrase, a wrong passphrase or an unreadable key.
+            // A passphrase helps only an encrypted key (no passphrase given, or a wrong one). A damaged key or a format
+            // that SSH.NET does not read would otherwise be answered with the same prompt again and again.
+            ThrowIfKeyFileCannotBeFixedByPassphrase(keyFile, exception);
             passphraseRequired = true;
             return false;
         }
@@ -832,6 +835,34 @@ public class SshSession : IDisposable
                 using PrivateKeyAuthenticationMethod method = new PrivateKeyAuthenticationMethod(userName, key);
                 return method.Authenticate(session);
             });
+        }
+    }
+
+    /// <summary>
+    /// Called after the key file could not be loaded: returns when it is an encrypted key (the passphrase is what is
+    /// missing or wrong) and otherwise throws an error that says what is wrong with the file.
+    /// </summary>
+    private static void ThrowIfKeyFileCannotBeFixedByPassphrase(string keyFile, Exception loadError)
+    {
+        PrivateKeyFileKind kind;
+        try
+        {
+            kind = PrivateKeyFileFormat.Inspect(keyFile);
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+        {
+            throw new IOException("Cannot read the private key file " + keyFile + ": " + exception.Message, exception);
+        }
+        switch (kind)
+        {
+            case PrivateKeyFileKind.Encrypted:
+                return;
+            case PrivateKeyFileKind.PuttyKey:
+                throw new InvalidDataException(keyFile + " is a PuTTY key (.ppk), which is not supported. Export it as an OpenSSH key with PuTTYgen (Conversions > Export OpenSSH key).", loadError);
+            case PrivateKeyFileKind.NotAPrivateKey:
+                throw new InvalidDataException(keyFile + " is not a PEM or OpenSSH private key (" + loadError.Message + ")", loadError);
+            default:
+                throw new InvalidDataException("The private key " + keyFile + " cannot be loaded: " + loadError.Message, loadError);
         }
     }
 
