@@ -45,9 +45,23 @@ namespace SmarTTY.Ssh
 
     public class ScpChannelStream : MemoryStream
     {
+        /// <summary>Called with the whole upload when the stream is closed, like the server storing the file.</summary>
+        internal Action<byte[]> OnClosed;
+
         internal static string QuotePath(string path)
         {
             return "'" + path.Replace("'", "'\\''") + "'";
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && OnClosed != null)
+            {
+                Action<byte[]> onClosed = OnClosed;
+                OnClosed = null;
+                onClosed(ToArray());
+            }
+            base.Dispose(disposing);
         }
     }
 
@@ -79,6 +93,7 @@ namespace SmarTTY.Ssh
 
         private readonly SshSession _session;
         private readonly string _path;
+        private readonly bool _replace;
         private bool _eofSent;
         private bool _closed;
         private bool _finished;
@@ -101,10 +116,11 @@ namespace SmarTTY.Ssh
 
         public string ExitSignal => null;
 
-        internal SshShellChannel(SshSession session, string path)
+        internal SshShellChannel(SshSession session, string path, bool replace)
         {
             _session = session;
             _path = path;
+            _replace = replace;
             Input = new InputStream(this);
         }
 
@@ -147,14 +163,23 @@ namespace SmarTTY.Ssh
                     break;
                 case AppendOutcome.Success:
                 case AppendOutcome.StoredWithoutStatus:
-                    _session.AppendedPaths.Add(_path);
                     string text = Encoding.UTF8.GetString(((MemoryStream)Input).ToArray());
-                    string existing = _session.Files.TryGetValue(_path, out string current) ? current : "";
-                    if (existing.Length > 0 && !existing.EndsWith("\n"))
+                    if (_replace)
                     {
-                        existing += "\n";
+                        // The script writes a temporary file and moves it over the original: all or nothing.
+                        _session.ReplacedPaths.Add(_path);
+                        _session.Files[_path] = text;
                     }
-                    _session.Files[_path] = existing + text;
+                    else
+                    {
+                        _session.AppendedPaths.Add(_path);
+                        string existing = _session.Files.TryGetValue(_path, out string current) ? current : "";
+                        if (existing.Length > 0 && !existing.EndsWith("\n"))
+                        {
+                            existing += "\n";
+                        }
+                        _session.Files[_path] = existing + text;
+                    }
                     _exitStatus = outcome == AppendOutcome.Success ? 0 : (int?)null;
                     _finished = true;
                     break;
@@ -190,6 +215,15 @@ namespace SmarTTY.Ssh
         public readonly List<string> Commands = new List<string>();
 
         public readonly List<string> AppendedPaths = new List<string>();
+
+        /// <summary>Files replaced by the remote script that works without scp.</summary>
+        public readonly List<string> ReplacedPaths = new List<string>();
+
+        /// <summary>Files stored through scp.</summary>
+        public readonly List<string> ScpUploads = new List<string>();
+
+        /// <summary>Files that exist but cannot be read (no permission).</summary>
+        public readonly HashSet<string> Unreadable = new HashSet<string>();
 
         public string Home = "/root";
 
@@ -245,6 +279,26 @@ namespace SmarTTY.Ssh
             {
                 return FailMkdir ? null : new List<string>();
             }
+            if (command.StartsWith("test -d "))
+            {
+                string directory = command.Substring(8).Trim('\'');
+                return Files.Keys.Any(path => path.StartsWith(directory + "/")) ? new List<string>() : null;
+            }
+            if (command.StartsWith("test -e "))
+            {
+                return Files.ContainsKey(command.Substring(8).Trim('\'')) ? new List<string>() : null;
+            }
+            if (command.StartsWith("mv '"))
+            {
+                string[] paths = command.Substring(4, command.Length - 5).Split(new[] { "' '" }, StringSplitOptions.None);
+                if (!Files.TryGetValue(paths[0], out string moved))
+                {
+                    return null;
+                }
+                Files.Remove(paths[0]);
+                Files[paths[1]] = moved;
+                return new List<string>();
+            }
             if (command.StartsWith("chmod "))
             {
                 return FailChmod ? null : new List<string>();
@@ -256,7 +310,19 @@ namespace SmarTTY.Ssh
             if (command.StartsWith("cat '"))
             {
                 string path = command.Substring(5, command.Length - 6);
-                return Files.TryGetValue(path, out string content) ? content.Split('\n').ToList() : null;
+                if (Unreadable.Contains(path) || !Files.TryGetValue(path, out string content))
+                {
+                    return null;
+                }
+                // Like the line reader of the real session: no empty line after the last line break.
+                List<string> lines = new List<string>();
+                using StringReader reader = new StringReader(content);
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    lines.Add(line);
+                }
+                return lines;
             }
             throw new InvalidOperationException("Unexpected command: " + command);
         }
@@ -295,7 +361,7 @@ namespace SmarTTY.Ssh
             {
                 throw new RemoteOperationException("scp: not found while trying to download " + path);
             }
-            if (!Files.TryGetValue(path, out string content))
+            if (Unreadable.Contains(path) || !Files.TryGetValue(path, out string content))
             {
                 throw new RemoteOperationException("No such file while trying to download " + path);
             }
@@ -308,15 +374,26 @@ namespace SmarTTY.Ssh
 
         public ScpChannelStream OpenUpload(string path, long length, DateTime modifyTime = default(DateTime), int? mode = null)
         {
-            throw new NotSupportedException();
+            if (NoScp)
+            {
+                throw new RemoteOperationException("scp: not found while trying to upload " + path);
+            }
+            return new ScpChannelStream
+            {
+                OnClosed = data =>
+                {
+                    ScpUploads.Add(path);
+                    Files[path] = new UTF8Encoding(false).GetString(data);
+                }
+            };
         }
 
         public SshShellChannel OpenShellChannel(string command = null, string terminalType = null, ExtendedDataMode extendedDataMode = ExtendedDataMode.Normal, bool utf8Tty = true)
         {
-            // "sh -c '<script>' sh '<path>'": the path is the last quoted word.
+            // "sh -c '<script>' sh '<path>' [length]": the path is the quoted word after the script.
             int start = command.LastIndexOf(" sh '") + 5;
-            string path = command.Substring(start, command.Length - start - 1);
-            return new SshShellChannel(this, path);
+            string path = command.Substring(start, command.IndexOf('\'', start) - start);
+            return new SshShellChannel(this, path, command.Contains("mv "));
         }
     }
 }

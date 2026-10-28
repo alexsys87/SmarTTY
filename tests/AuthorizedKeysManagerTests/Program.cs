@@ -186,6 +186,89 @@ internal static class Program
         error = Catch(() => AuthorizedKeysManager.AppendAuthorizedKey(session, line, message => { questions++; return true; }));
         Check(questions == 1 && session.Files[dropbear] == shortLine + "\n" && session.Files[home].Contains(line), "dropbear: only the incomplete line of /etc/dropbear is removed, the home file keeps the key");
 
+        // Removal of the key. No scp program (OpenWrt): the file is read with cat and written back by a remote script.
+        string third = KeyLine(Blob(3));
+        string both = KeyLine(other) + "\n" + line + "\n" + third + "\n";
+        session = new SshSession();
+        session.Files[home] = both;
+        AuthorizedKeysManager.RemoveAuthorizedKey(session, key);
+        Check(session.Files[home] == KeyLine(other) + "\n" + third + "\n", "remove without scp: only the lines of the key go, the others stay");
+        Check(session.ReplacedPaths.SequenceEqual(new[] { home }) && session.ScpUploads.Count == 0, "remove without scp: the file is replaced by the remote script, not by scp");
+        Check(!session.Files.Keys.Any(path => path.EndsWith(".smartty")), "remove without scp: no temporary file is left");
+        Check(!AuthorizedKeysManager.IsKeyAuthorized(session, key), "remove without scp: the key is no longer authorized");
+
+        session = new SshSession();
+        session.Files[home] = line + "\n";
+        AuthorizedKeysManager.RemoveAuthorizedKey(session, key);
+        Check(session.Files[home] == "", "remove without scp: the only key leaves an empty file");
+
+        session = new SshSession();
+        session.Files[home] = KeyLine(other) + "\n";
+        AuthorizedKeysManager.RemoveAuthorizedKey(session, key);
+        Check(session.Files[home] == KeyLine(other) + "\n" && session.ReplacedPaths.Count == 0, "remove without scp: a file without the key is not rewritten");
+
+        session = new SshSession();
+        AuthorizedKeysManager.RemoveAuthorizedKey(session, key);
+        Check(session.Files.Count == 0, "remove: no .ssh directory, nothing to do");
+        session = new SshSession();
+        session.Files["/root/.ssh/known_hosts"] = "host key\n";
+        AuthorizedKeysManager.RemoveAuthorizedKey(session, key);
+        Check(session.Files.Count == 1 && session.ReplacedPaths.Count == 0, "remove: no authorized_keys file, nothing to do");
+
+        // With scp the file still goes through scp.
+        session = new SshSession { NoScp = false };
+        session.Files[home] = both;
+        AuthorizedKeysManager.RemoveAuthorizedKey(session, key);
+        Check(session.Files[home] == KeyLine(other) + "\n" + third + "\n" && session.ScpUploads.SequenceEqual(new[] { home + ".smartty" }) && session.ReplacedPaths.Count == 0, "remove with scp: the file goes through scp");
+
+        // Dropbear root without scp: the file of root is the one the server reads.
+        session = new SshSession { IsDropbearRoot = true };
+        session.Files[home] = both;
+        session.Files[dropbear] = both;
+        AuthorizedKeysManager.RemoveAuthorizedKey(session, key);
+        Check(!session.Files[home].Contains(line) && !session.Files[dropbear].Contains(line) && session.Files[dropbear].Contains(third), "dropbear remove without scp: the key goes from both files, the others stay");
+
+        // A failure in the Dropbear file is reported (the key is still accepted there), after the home file was cleaned too.
+        session = new SshSession { IsDropbearRoot = true, AppendOutcome = AppendOutcome.DiskFull, OutcomeOnlyFor = "/etc/dropbear" };
+        session.Files[home] = both;
+        session.Files[dropbear] = both;
+        error = Catch(() => AuthorizedKeysManager.RemoveAuthorizedKey(session, key));
+        Check(error != null && error.Message.Contains(dropbear) && error.Message.Contains("No space left on device"), "dropbear remove: a failure in /etc/dropbear is reported with its reason");
+        Check(session.Files[dropbear] == both && !session.Files[home].Contains(line), "dropbear remove: the failed file is intact, the home file is cleaned");
+
+        // Full flash: the original file stays as it was and the error says why.
+        session = new SshSession { AppendOutcome = AppendOutcome.DiskFull };
+        session.Files[home] = both;
+        error = Catch(() => AuthorizedKeysManager.RemoveAuthorizedKey(session, key));
+        Check(error != null && error.Message.Contains("No space left on device") && session.Files[home] == both, "remove: full disk is reported and the file is intact");
+
+        // A file that cannot be read is an error, not "nothing to remove".
+        session = new SshSession();
+        session.Files[home] = both;
+        session.Unreadable.Add(home);
+        error = Catch(() => AuthorizedKeysManager.RemoveAuthorizedKey(session, key));
+        Check(error != null && error.Message.Contains("Cannot read") && session.Files[home] == both, "remove: an unreadable file is reported");
+
+        // The channel closes without an exit status: only the read-back tells.
+        session = new SshSession { AppendOutcome = AppendOutcome.ClosedSilently };
+        session.Files[home] = both;
+        error = Catch(() => AuthorizedKeysManager.RemoveAuthorizedKey(session, key));
+        Check(error is RemoteOperationException && error.Message.Contains("still"), "remove: a key that is still there after a silent close is an error");
+        session = new SshSession { AppendOutcome = AppendOutcome.StoredWithoutStatus };
+        session.Files[home] = both;
+        AuthorizedKeysManager.RemoveAuthorizedKey(session, key);
+        Check(!session.Files[home].Contains(line), "remove: a removal without exit status is accepted after the read-back");
+
+        session = new SshSession { AppendOutcome = AppendOutcome.ConnectionLost };
+        session.Files[home] = both;
+        error = Catch(() => AuthorizedKeysManager.RemoveAuthorizedKey(session, key));
+        Check(error is IOException && session.IsConnectionClosed && session.Files[home] == both, "remove: a lost connection is reported as such");
+
+        session = new SshSession { AppendOutcome = AppendOutcome.Hangs };
+        session.Files[home] = both;
+        error = Catch(() => AuthorizedKeysManager.RemoveAuthorizedKey(session, key));
+        Check(error is RemoteOperationException && error.Message.Contains("Timed out") && session.Files[home] == both, "remove: a hanging script is reported");
+
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed");
         return 0;
