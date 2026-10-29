@@ -57,6 +57,53 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
         Controller.Password = (sender as PasswordBox).Password;
     }
 
+    // The proxy field ("user:password@host:port") is hidden in a password box until the eye button is pressed. The
+    // controller always holds the current text: the text box writes it itself, the password box through PasswordChanged.
+    private bool _SyncingProxy;
+
+    private void SetProxyPassword(string value)
+    {
+        _SyncingProxy = true;
+        try
+        {
+            pwdProxy.Password = value ?? string.Empty;
+        }
+        finally
+        {
+            _SyncingProxy = false;
+        }
+    }
+
+    private void ProxyPasswordBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        SetProxyPassword(Controller.Proxy);
+    }
+
+    private void ProxyPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_SyncingProxy)
+        {
+            Controller.Proxy = pwdProxy.Password;
+        }
+    }
+
+    private void ShowProxy_Checked(object sender, RoutedEventArgs e)
+    {
+        txtProxy.Text = pwdProxy.Password;
+        pwdProxy.Visibility = Visibility.Collapsed;
+        txtProxy.Visibility = Visibility.Visible;
+        txtProxy.Focus();
+        txtProxy.CaretIndex = txtProxy.Text.Length;
+    }
+
+    private void ShowProxy_Unchecked(object sender, RoutedEventArgs e)
+    {
+        SetProxyPassword(txtProxy.Text);
+        txtProxy.Visibility = Visibility.Collapsed;
+        pwdProxy.Visibility = Visibility.Visible;
+        pwdProxy.Focus();
+    }
+
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
         Controller.BrowseForKeyFile();
