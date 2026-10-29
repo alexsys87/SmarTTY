@@ -1964,7 +1964,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 }
                 return;
             }
-            SshShellChannel channel = (tab.Terminal.Tag as TerminalTag)?.Channel;
+            TerminalTag terminalTag = tab.Terminal.Tag as TerminalTag;
+            SshShellChannel channel = terminalTag?.Channel;
             if (channel == null || channel.IsDisposed)
             {
                 MessageBoxes.Error("The terminal is not connected.");
@@ -1972,8 +1973,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             }
             byte[] input = System.Text.Encoding.UTF8.GetBytes(" " + commandLine + "\r");
             // Writing may wait for the server (the window of the channel is full, the connection is slow), which must not
-            // block the UI thread.
-            ThreadPool.QueueUserWorkItem(delegate
+            // block the UI thread. The terminal's queue writes on a thread of the pool and keeps this command in order with the
+            // commands given before it and with the keys pressed after it.
+            terminalTag.Writes.Post(delegate
             {
                 try
                 {

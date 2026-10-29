@@ -1935,11 +1935,20 @@ public class MainWindowController : INotifyPropertyChanged
     /// </summary>
     private static bool IsConnectionGoneError(TerminalTag tag, Exception exception)
     {
+        return IsConnectionGoneError(tag, tag.Channel, exception);
+    }
+
+    /// <summary>
+    /// The same for a write that was held back and went to <paramref name="channel"/>, which may no longer be the terminal's
+    /// channel by now (a reconnect replaces it).
+    /// </summary>
+    private static bool IsConnectionGoneError(TerminalTag tag, SshShellChannel channel, Exception exception)
+    {
         if (exception is Renci.SshNet.Common.SshConnectionException || exception is ObjectDisposedException)
         {
             return true;
         }
-        return tag.Channel.IsDisposed || tag.Channel.ClosedByConnectionLoss || tag.Channel.IsEof || (tag.Session?.Session?.IsConnectionClosed ?? false);
+        return channel.IsDisposed || channel.ClosedByConnectionLoss || channel.IsEof || (tag.Session?.Session?.IsConnectionClosed ?? false);
     }
 
     private void terminalEmulatorControl1_HandleTerminalInput(object sender, byte[] input, TerminalEmulatorControl.InputKind type)
@@ -1950,6 +1959,28 @@ public class MainWindowController : INotifyPropertyChanged
         {
             // The shell could not be reopened after a reconnect: this key press is the retry.
             tag.Session?.RetryShell(terminal);
+            return;
+        }
+        if (tag.Writes.IsBusy)
+        {
+            // A command that the program typed in (Run, Install ...) is still on its way into the channel: this key goes behind
+            // it, so the keys and the command arrive in the order they were given. That write runs on a thread of the pool, so
+            // it reports its own errors.
+            SshShellChannel heldChannel = tag.Channel;
+            tag.Writes.Post(delegate
+            {
+                try
+                {
+                    heldChannel.Input.Write(input, 0, input.Length);
+                }
+                catch (Exception exception)
+                {
+                    if (!IsConnectionGoneError(tag, heldChannel, exception))
+                    {
+                        BeginInvoke(() => MessageBoxes.Exception(exception));
+                    }
+                }
+            });
             return;
         }
         try
