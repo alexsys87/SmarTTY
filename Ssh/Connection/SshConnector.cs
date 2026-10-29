@@ -606,7 +606,7 @@ public partial class SshConnector : Component
         CancelConnection();
         ConnectionAttempt connectionAttempt = (_currentAttempt = new ConnectionAttempt());
         // A background thread: a cancelled attempt is not waited for any more, and must not keep the process alive.
-        _currentAttempt.Thread = new Thread(() =>
+        Thread worker = new Thread(() =>
         {
             this.ConnectWorker(sshConnectionSettings, password, connectionAttempt, forcePasswordAuth, autoAcceptHostKey: false);
         })
@@ -614,7 +614,7 @@ public partial class SshConnector : Component
             IsBackground = true,
             Name = "SSH connect worker"
         };
-        _currentAttempt.Thread.Start();
+        worker.Start();
     }
 
     public SshSession Connect(SSHConnectionSettings sshConnectionSettings, string password, bool forcePasswordAuth, bool autoAcceptHostKey)

@@ -13,7 +13,7 @@ concurrency:
 jobs:
   tests:
     name: Regression checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -186,7 +186,7 @@ jobs:
 
   interop:
     name: File transfer interoperability (lrzsz, C-Kermit, G-Kermit, gzip + base64 through BusyBox ash and bash)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -215,7 +215,7 @@ jobs:
 
   sshnet:
     name: SSH.NET integration tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
