@@ -82,10 +82,10 @@ public static class PackageManagerSelector
         return string.Join(", ", new[] { kernel, distribution }.Where(part => !string.IsNullOrEmpty(part)));
     }
 
-    /// <summary>The message for a Windows host: it has none of the package managers of Linux, so none of them is probed.</summary>
-    public static string WindowsHostMessage(IEnumerable<ILinuxPackageManagerClient> clients)
+    /// <summary>The message for a Windows host where winget was not found: the package managers of Linux are not probed there.</summary>
+    public static string WindowsHostMessage()
     {
-        return "The remote host runs Windows. This window handles the package managers of Linux (" + SupportedNames(clients) + "); on Windows use winget, choco or scoop in a terminal tab.";
+        return "The remote host runs Windows, but winget (Windows Package Manager) was not found. Install \"App Installer\" from the Microsoft Store, or use choco or scoop in a terminal tab.";
     }
 
     private static string SupportedNames(IEnumerable<ILinuxPackageManagerClient> clients)
