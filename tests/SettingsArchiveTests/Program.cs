@@ -51,6 +51,15 @@ internal static class Program
                "<HostName>" + host + "</HostName><UserName>root</UserName></SSHConnectionSettings>";
     }
 
+    private static string SshWithProxy(string host, string encryptedProxyAuth, string legacyProxyAuth)
+    {
+        return "<?xml version=\"1.0\"?><SSHConnectionSettings>" +
+               (encryptedProxyAuth == null ? "" : "<EncryptedProxyAuth>" + encryptedProxyAuth + "</EncryptedProxyAuth>") +
+               "<HostName>" + host + "</HostName><UserName>root</UserName>" +
+               (legacyProxyAuth == null ? "" : "<ProxyAuth>" + legacyProxyAuth + "</ProxyAuth>") +
+               "<ProxyServer>proxy.example.com</ProxyServer><ProxyPort>3128</ProxyPort></SSHConnectionSettings>";
+    }
+
     private static string NewDir(string name)
     {
         string path = Path.Combine(_root, name + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
@@ -637,6 +646,31 @@ internal static class Program
         Check(!Read(dstData2, "SavedConnections/root@10.0.0.2.sshconnection").Contains("EncryptedSavedPassword"), "a new profile imported without passwords has none");
         SettingsArchive.Import(withPwd, dst2, SettingsParts.SshProfiles | SettingsParts.SavedPasswords, null);
         Check(Read(dstData2, "SavedConnections/root@192.168.1.1.sshconnection").Contains("SECRETPWD"), "with the passwords part the archived password is imported");
+
+        // the credentials of the HTTP proxy are saved passwords too (encrypted in the profile, plain text in older profiles)
+        string proxySrcData = NewDir("proxy-srcdata"), proxySrcLocal = NewDir("proxy-srclocal");
+        Put(proxySrcData, "SavedConnections/root@proxied.sshconnection", SshWithProxy("proxied", "PROXYSECRET", null));
+        Put(proxySrcData, "SavedConnections/root@legacy.sshconnection", SshWithProxy("legacy", null, "PLAINPROXY"));
+        string proxyArchive = Path.Combine(NewDir("out"), "proxy.tar.gz");
+        SettingsArchive.Export(proxyArchive, proxySrcData, proxySrcLocal, false);
+        var proxyEntries = ReadArchive(proxyArchive);
+        Check(proxyEntries.Count == 2 && proxyEntries.All(e => {
+            string entryText = Encoding.UTF8.GetString(e.Data);
+            return !entryText.Contains("PROXYSECRET") && !entryText.Contains("PLAINPROXY") && !entryText.Contains("EncryptedProxyAuth") && !entryText.Contains("<ProxyAuth>");
+        }), "the proxy credentials are left out of an export without passwords, encrypted or not");
+        Check(proxyEntries.All(e => Encoding.UTF8.GetString(e.Data).Contains("<ProxyServer>proxy.example.com</ProxyServer>")), "the proxy address stays in the stripped profiles");
+        string proxyArchiveWithPwd = Path.Combine(NewDir("out"), "proxy-with-pwd.tar.gz");
+        SettingsArchive.Export(proxyArchiveWithPwd, proxySrcData, proxySrcLocal, true);
+        Check(ReadArchive(proxyArchiveWithPwd).Any(e => Encoding.UTF8.GetString(e.Data).Contains("PROXYSECRET")), "includePasswords keeps the proxy credentials");
+        string proxyDstData = NewDir("proxy-dstdata"), proxyDstLocal = NewDir("proxy-dstlocal");
+        Put(proxyDstData, "SavedConnections/root@proxied.sshconnection", SshWithProxy("proxied", "LOCALPROXY", null));
+        SettingsLocations proxyDst = MakeLocations(proxyDstData, proxyDstLocal, null, null, null);
+        SettingsArchive.Import(proxyArchiveWithPwd, proxyDst, SettingsParts.SshProfiles, null);
+        Check(Read(proxyDstData, "SavedConnections/root@proxied.sshconnection").Contains("LOCALPROXY") && !Read(proxyDstData, "SavedConnections/root@proxied.sshconnection").Contains("PROXYSECRET"),
+            "importing profiles without the passwords part keeps the local proxy credentials and drops the archived ones");
+        Check(!Read(proxyDstData, "SavedConnections/root@legacy.sshconnection").Contains("PLAINPROXY"), "a new profile imported without passwords has no plain-text proxy credentials");
+        SettingsArchive.Import(proxyArchiveWithPwd, proxyDst, SettingsParts.SshProfiles | SettingsParts.SavedPasswords, null);
+        Check(Read(proxyDstData, "SavedConnections/root@proxied.sshconnection").Contains("PROXYSECRET"), "with the passwords part the archived proxy credentials are imported");
 
         // ---- validation
         string badKey = Path.Combine(NewDir("out"), "bad-key.tar.gz");
