@@ -128,6 +128,44 @@ public partial class SshConnector : Component
     /// </summary>
     public static Func<SSHConnectionSettings, string, bool> HostKeyMismatchPrompt;
 
+    /// <summary>
+    /// Tells the user that the list of known hosts is damaged or cannot be read, or that an accepted host key could not be saved:
+    /// otherwise the hosts accepted so far would silently ask for confirmation again. Injected by <c>App</c> like the prompts above;
+    /// without a hook nothing is shown.
+    /// </summary>
+    public static Action<string> KnownHostsProblemNotice;
+
+    private static readonly object KnownHostsNoticeSync = new object();
+
+    private static string _lastKnownHostsProblem;
+
+    // A problem stays until somebody fixes the file, so it is shown once, not at every connection. A clean read of the list
+    // makes the next problem news again.
+    private void NoticeKnownHostsProblem(string problem, bool fromLoad)
+    {
+        lock (KnownHostsNoticeSync)
+        {
+            if (problem == null)
+            {
+                if (fromLoad)
+                {
+                    _lastKnownHostsProblem = null;
+                }
+                return;
+            }
+            if (problem == _lastKnownHostsProblem)
+            {
+                return;
+            }
+            _lastKnownHostsProblem = problem;
+        }
+        Action<string> notice = KnownHostsProblemNotice;
+        if (notice != null)
+        {
+            InvokeOnUi(() => notice(problem));
+        }
+    }
+
     public SshConnector()
         : this(null)
     {
@@ -406,6 +444,7 @@ public partial class SshConnector : Component
             }
             ReportStatus(connectionAttempt, "Connecting...");
             KnownHostKeyStore knownHostKeyStore = new KnownHostKeyStore();
+            NoticeKnownHostsProblem(knownHostKeyStore.LoadProblem, fromLoad: true);
             KnownHostKey knownHostKey = knownHostKeyStore.Find(sshConnectionSettings.HostName);
             SshConnectionParameters sshConnectionParameters = new SshConnectionParameters
             {
@@ -457,7 +496,7 @@ public partial class SshConnector : Component
                         throw new OperationCanceledException();
                     }
                     knownHostKeyStore.Update(sshConnectionSettings.HostName, hostKeyInfo);
-                    knownHostKeyStore.Save();
+                    NoticeKnownHostsProblem(knownHostKeyStore.Save(), fromLoad: false);
                 }
                 else
                 {
@@ -476,7 +515,7 @@ public partial class SshConnector : Component
                             throw new OperationCanceledException();
                         }
                         knownHostKeyStore.Update(sshConnectionSettings.HostName, hostKeyInfo);
-                        knownHostKeyStore.Save();
+                        NoticeKnownHostsProblem(knownHostKeyStore.Save(), fromLoad: false);
                     }
                 }
             }
