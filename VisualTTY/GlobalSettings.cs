@@ -100,6 +100,12 @@ public class GlobalSettings : INotifyPropertyChanged
         // Tab and indentation insert TabSize spaces instead of a tab character.
         public bool InsertSpaces;
 
+        // The zoom of the editor text (Ctrl+wheel, Ctrl+0); 1 is the size of the font, 0 means the setting was never saved.
+        public float FontZoom;
+
+        // The editor wraps long lines at the window edge instead of scrolling sideways.
+        public bool WordWrap;
+
         // The first save of a file copies the old one to file~ on the server.
         public bool BackupBeforeSave;
 

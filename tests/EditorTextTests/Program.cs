@@ -596,6 +596,39 @@ internal static class Program
         return root;
     }
 
+    private static string Join(string[] lines)
+    {
+        return string.Join("|", lines);
+    }
+
+    private static void CommentChecks()
+    {
+        CommentStyle hash = CommentStyle.ForLanguage(SyntaxHighlighting.Language.Bash);
+        Equal(Join(hash.Toggle(new[] { "echo a", "echo b" })), "# echo a|# echo b", "lines are commented out");
+        Equal(Join(hash.Toggle(new[] { "# echo a", "# echo b" })), "echo a|echo b", "commented lines are uncommented");
+        Equal(Join(hash.Toggle(new[] { "# echo a", "echo b" })), "# # echo a|# echo b", "a mixed block is commented as a whole");
+        Equal(Join(hash.Toggle(new[] { "    a", "  b", "" })), "  #   a|  # b|", "the mark goes to the smallest indent, blank lines stay");
+        Equal(Join(hash.Toggle(new[] { "  # a", "", "  # b" })), "  a||  b", "blank lines do not stop the uncomment");
+        Equal(Join(hash.Toggle(new[] { "#a" })), "a", "no space after the mark");
+        Equal(Join(hash.Toggle(new[] { "" })), "# ", "a blank line alone is commented");
+        CommentStyle markup = CommentStyle.ForLanguage(SyntaxHighlighting.Language.Markup);
+        Equal(Join(markup.Toggle(new[] { "<a/>" })), "<!-- <a/> -->", "markup uses a block comment per line");
+        Equal(Join(markup.Toggle(new[] { "<!-- <a/> -->" })), "<a/>", "markup comment is removed");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CLike).Toggle(new[] { "int a;" })), "// int a;", "C-like comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Sql).Toggle(new[] { "select 1" })), "-- select 1", "SQL comment");
+        Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Plain) == null, "plain text has no comments");
+        Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Diff) == null, "a diff has no comments");
+    }
+
+    private static void WrapChecks()
+    {
+        Check(LineWrapper.ComputeBreaks("short", 10, 4) == null, "a short line takes one row");
+        Equal(string.Join(",", LineWrapper.ComputeBreaks("aaaa bbbb cccc", 10, 4)), "10", "the row breaks after the last space that fits");
+        Equal(string.Join(",", LineWrapper.ComputeBreaks("aaaaaaaaaaaaaaaaaaaaaaaaa", 10, 4)), "10,20", "a long word breaks where the row ends");
+        Equal(string.Join(",", LineWrapper.ComputeBreaks("ab\tcd", 4, 4)), "4", "a tab counts to the next tab stop");
+        Equal(string.Join(",", LineWrapper.ComputeBreaks("aa bb cc dd ee", 6, 4)), "6,12", "every row is filled up to the width");
+    }
+
     private static int Main()
     {
         try
@@ -611,6 +644,8 @@ internal static class Program
             GenericChecks();
             TokenOrderChecks();
             PairEditingChecks();
+            CommentChecks();
+            WrapChecks();
             ShowTabsChecks();
             ShowAllCharactersChecks();
         }

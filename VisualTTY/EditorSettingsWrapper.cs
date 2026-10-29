@@ -77,6 +77,18 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool WordWrap
+    {
+        get
+        {
+            return _Settings.Editor.WordWrap;
+        }
+        set
+        {
+            _Settings.Editor.WordWrap = value;
+        }
+    }
+
     public bool ShowAllCharacters
     {
         get

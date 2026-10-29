@@ -46,6 +46,9 @@ internal sealed class RemoteFileEditorPanel : UserControl
     /// <summary>The toolbar or the context menu switched the invisible-character marks on or off.</summary>
     public event EventHandler ShowAllCharactersChanged;
 
+    /// <summary>The toolbar or the context menu switched the word wrap on or off.</summary>
+    public event EventHandler WordWrapChanged;
+
     /// <summary>The enabled state of the commands changed (for the WPF tool bar).</summary>
     internal event EventHandler StateChanged;
 
@@ -187,6 +190,10 @@ internal sealed class RemoteFileEditorPanel : UserControl
                     _editor.ShowAllCharacters = !_editor.ShowAllCharacters;
                     ShowAllCharactersChanged?.Invoke(this, EventArgs.Empty);
                     break;
+                case EditorToolbarCommand.WordWrap:
+                    _editor.WordWrap = !_editor.WordWrap;
+                    WordWrapChanged?.Invoke(this, EventArgs.Empty);
+                    break;
                 case EditorToolbarCommand.ToggleHex:
                     _editor.ToggleHexMode();
                     break;
@@ -221,7 +228,8 @@ internal sealed class RemoteFileEditorPanel : UserControl
                 IsSaving = _editor.IsSaving,
                 HexMode = true,
                 CanUseHex = _editor.CanToggleHexMode,
-                ShowAllCharacters = _editor.ShowAllCharacters
+                ShowAllCharacters = _editor.ShowAllCharacters,
+                WordWrap = _editor.WordWrap
             };
         }
         int lineCount = _editor.LineCount;
@@ -237,7 +245,8 @@ internal sealed class RemoteFileEditorPanel : UserControl
             IsSaving = _editor.IsSaving,
             HexMode = false,
             CanUseHex = _editor.CanToggleHexMode,
-            ShowAllCharacters = _editor.ShowAllCharacters
+            ShowAllCharacters = _editor.ShowAllCharacters,
+            WordWrap = _editor.WordWrap
         };
     }
 

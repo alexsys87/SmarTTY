@@ -24,7 +24,7 @@ internal class LineNumberMargin : IMargin
         for (int rowIdx = 0; rowIdx < rowCount; rowIdx++)
         {
             int lineIndex = readonlyTextBrowser.DisplayRows[rowIdx].Line;
-            if (readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && lineIndex != -1)
+            if (readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && lineIndex != -1 && !readonlyTextBrowser.DisplayRows[rowIdx].Continuation)
             {
                 graphics.DrawString((lineIndex + 1).ToString(), readonlyTextBrowser.Font, this._browser.LineNumberForegroundBrush, rectangle.Right - 5, yPos, this._format);
             }

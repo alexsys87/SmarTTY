@@ -56,6 +56,7 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
+                Alt = true,
                 Key = Keys.D9
             }
         },
@@ -79,6 +80,7 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
+                Alt = true,
                 Key = Keys.D0
             }
         },
@@ -258,6 +260,152 @@ public class EditorCommands
                 Ctrl = true,
                 Alt = true,
                 Key = Keys.Left
+            }
+        },
+        new DelegateCommand("DuplicateLines", "Duplicate line", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.DuplicateLines();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Shift = true,
+                Key = Keys.D
+            }
+        },
+        new DelegateCommand("MoveLinesUp", "Move line up", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.MoveLines(-1);
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Alt = true,
+                Key = Keys.Up
+            }
+        },
+        new DelegateCommand("MoveLinesDown", "Move line down", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.MoveLines(1);
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Alt = true,
+                Key = Keys.Down
+            }
+        },
+        new DelegateCommand("DeleteLines", "Delete line", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.DeleteLines();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Shift = true,
+                Key = Keys.K
+            }
+        },
+        new DelegateCommand("ToggleComment", "Comment / uncomment", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ToggleComment();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.OemQuestion
+            }
+        },
+        new DelegateCommand("ToggleCommentNumpad", "Comment / uncomment (numpad)", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ToggleComment();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.Divide
+            }
+        },
+        new DelegateCommand("ZoomIn", "Zoom in", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ZoomBy(1);
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.Oemplus
+            }
+        },
+        new DelegateCommand("ZoomInShifted", "Zoom in (Ctrl+Plus)", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ZoomBy(1);
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Shift = true,
+                Key = Keys.Oemplus
+            }
+        },
+        new DelegateCommand("ZoomInNumpad", "Zoom in (numpad)", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ZoomBy(1);
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.Add
+            }
+        },
+        new DelegateCommand("ZoomOut", "Zoom out", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ZoomBy(-1);
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.OemMinus
+            }
+        },
+        new DelegateCommand("ZoomOutNumpad", "Zoom out (numpad)", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ZoomBy(-1);
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.Subtract
+            }
+        },
+        new DelegateCommand("ZoomReset", "Reset zoom", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ResetZoom();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.D0
+            }
+        },
+        new DelegateCommand("ZoomResetNumpad", "Reset zoom (numpad)", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ResetZoom();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.NumPad0
             }
         }
     };

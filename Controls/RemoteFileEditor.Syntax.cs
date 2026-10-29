@@ -23,6 +23,9 @@ public partial class RemoteFileEditor
         return SyntaxOverride ?? SyntaxHighlighting.DetectLanguage(RemotePath, EditableDocument?.GetLineText(0));
     }
 
+    /// <summary>Comments follow the syntax of the file, also when the highlighting is switched off.</summary>
+    public override CommentStyle CommentStyle => CommentStyle.ForLanguage(DetectSyntax());
+
     /// <summary>Chooses the syntax by hand; null returns to the detection by the file name and the #! line.</summary>
     public void SetSyntax(SyntaxHighlighting.Language? language)
     {
