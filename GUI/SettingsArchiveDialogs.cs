@@ -205,6 +205,10 @@ internal static class SettingsArchiveDialogs
         {
             done.Add("interface preferences");
         }
+        if (result.TftpFirmwareImported)
+        {
+            done.Add("TFTP firmware settings");
+        }
         if (result.CommandCompletionsImported)
         {
             done.Add("command completions");

@@ -27,6 +27,7 @@
         <CheckBox x:Name="MainSettingsBox" Content="Main settings (Settings.xml)" ToolTip="Global SmarTTY settings: terminal, SSH, file transfer and other options of the Settings window." />
         <CheckBox x:Name="KnownHostsBox" Content="Trusted server keys (KnownHosts.xml)" ToolTip="Fingerprints of the SSH servers you have already trusted." />
         <CheckBox x:Name="GuiPreferencesBox" Content="Interface preferences (GUIPreferences.xml)" ToolTip="Window layout and the preferences of the connection selection window. Fully applied after SmarTTY is restarted." />
+        <CheckBox x:Name="TftpFirmwareBox" Content="TFTP server / U-Boot upload settings (TftpFirmware.xml)" ToolTip="The files the TFTP server hands out, the addresses of the computer and the board, the U-Boot prompt and the commands to run after the download." />
         <CheckBox x:Name="SshProfilesBox" Content="SSH connection profiles" />
         <CheckBox x:Name="RawProfilesBox" Content="COM / TCP / Telnet connection profiles" />
         <CheckBox x:Name="PasswordsBox" Margin="26 3 4 3" Content="Saved passwords inside the profiles" ToolTip="Saved passwords are encrypted with a key that belongs to your Windows account, so on another computer they work only together with the password protection key (see below)." />

@@ -29,11 +29,13 @@ public enum SettingsParts
     /// <summary>OpenSSH private and public keys (id_ed25519, id_ecdsa, id_rsa) from the .ssh folder of the user.</summary>
     OpenSshKeys = 256,
     CommandCompletions = 512,
+    /// <summary>The TFTP server / U-Boot upload window: the files it serves and the commands it types (per computer).</summary>
+    TftpFirmware = 1024,
 
     /// <summary>What the archive held before the parts were selectable (passwords are chosen separately).</summary>
     Legacy = MainSettings | KnownHosts | GuiPreferences | SshProfiles | RawProfiles,
     /// <summary>Selected by default in the export/import window: everything except passwords and private keys.</summary>
-    Default = Legacy | CommandCompletions,
+    Default = Legacy | CommandCompletions | TftpFirmware,
     Keys = SshKey | PasswordKey | OpenSshKeys,
     All = Default | SavedPasswords | Keys
 }
@@ -96,6 +98,7 @@ public sealed class SettingsContents
 ///   SavedConnections/*.sshconnection     &lt;- %APPDATA%\SmarTTY\SavedConnections\
 ///   SavedConnections/*.rawconnection     &lt;- %APPDATA%\SmarTTY\SavedConnections\
 ///   Local/GUIPreferences.xml             &lt;- %LOCALAPPDATA%\SmarTTY\GUIPreferences.xml
+///   Local/TftpFirmware.xml               &lt;- %LOCALAPPDATA%\SmarTTY\TftpFirmware.xml (the TFTP / U-Boot upload window)
 ///   CommandCompletions.xml               &lt;- CommandCompletions.xml next to SmarTTY.exe, or
 ///   CommandCompletions.xml.gz            &lt;- CommandCompletions.xml.gz (gzip) when that is the file SmarTTY uses; stored as it is
 ///   Keys/SmarTTY-ssh-key.xml             &lt;- the SmarTTY public key authentication key (CSP container, RSAParameters XML)
@@ -112,6 +115,7 @@ public static class SettingsArchive
     public const string SettingsFileName = "Settings.xml";
     public const string KnownHostsFileName = "KnownHosts.xml";
     public const string GuiPreferencesFileName = "GUIPreferences.xml";
+    public const string TftpFirmwareFileName = "TftpFirmware.xml";
     public const string CommandCompletionsFileName = "CommandCompletions.xml";
     public const string CommandCompletionsGzipEntryName = "CommandCompletions.xml.gz";
     public const string ConnectionsDirectoryName = "SavedConnections";
@@ -154,6 +158,7 @@ public static class SettingsArchive
         public bool SettingsImported;
         public bool KnownHostsImported;
         public bool GuiPreferencesImported;
+        public bool TftpFirmwareImported;
         public bool CommandCompletionsImported;
         public bool SshKeyImported;
         public bool PasswordKeyImported;
@@ -171,8 +176,8 @@ public static class SettingsArchive
             get
             {
                 return (SettingsImported ? 1 : 0) + (KnownHostsImported ? 1 : 0) + (GuiPreferencesImported ? 1 : 0) +
-                       (CommandCompletionsImported ? 1 : 0) + (SshKeyImported ? 1 : 0) + (PasswordKeyImported ? 1 : 0) +
-                       SshProfiles + RawProfiles + OpenSshKeyFiles;
+                       (TftpFirmwareImported ? 1 : 0) + (CommandCompletionsImported ? 1 : 0) + (SshKeyImported ? 1 : 0) +
+                       (PasswordKeyImported ? 1 : 0) + SshProfiles + RawProfiles + OpenSshKeyFiles;
             }
         }
     }
@@ -182,6 +187,7 @@ public static class SettingsArchive
         Settings,
         KnownHosts,
         GuiPreferences,
+        TftpFirmware,
         SshConnection,
         RawConnection,
         CommandCompletions,
@@ -465,6 +471,10 @@ public static class SettingsArchive
         if (Has(parts, SettingsParts.GuiPreferences))
         {
             AddIfExists(items, report, "interface preferences", LocalPrefix + GuiPreferencesFileName, Path.Combine(locations.LocalDataDirectory, GuiPreferencesFileName));
+        }
+        if (Has(parts, SettingsParts.TftpFirmware))
+        {
+            AddIfExists(items, report, "TFTP firmware settings", LocalPrefix + TftpFirmwareFileName, Path.Combine(locations.LocalDataDirectory, TftpFirmwareFileName));
         }
         if (Has(parts, SettingsParts.CommandCompletions))
         {
@@ -759,6 +769,10 @@ public static class SettingsArchive
                     WriteFileReplacing(Path.Combine(locations.LocalDataDirectory, item.Target.FileName), data);
                     result.GuiPreferencesImported = true;
                     break;
+                case EntryKind.TftpFirmware:
+                    WriteFileReplacing(Path.Combine(locations.LocalDataDirectory, item.Target.FileName), data);
+                    result.TftpFirmwareImported = true;
+                    break;
                 case EntryKind.SshConnection:
                 case EntryKind.RawConnection:
                     string path = Path.Combine(locations.DataDirectory, ConnectionsDirectoryName, item.Target.FileName);
@@ -844,6 +858,10 @@ public static class SettingsArchive
         else if (name == LocalPrefix + GuiPreferencesFileName)
         {
             target = new Target { Kind = EntryKind.GuiPreferences, Part = SettingsParts.GuiPreferences, FileName = GuiPreferencesFileName, RootElement = "CommonGUIPreferences" };
+        }
+        else if (name == LocalPrefix + TftpFirmwareFileName)
+        {
+            target = new Target { Kind = EntryKind.TftpFirmware, Part = SettingsParts.TftpFirmware, FileName = TftpFirmwareFileName, RootElement = "TftpFirmwareSettings" };
         }
         else if (name == CommandCompletionsFileName)
         {
