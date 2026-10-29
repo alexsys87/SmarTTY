@@ -129,6 +129,11 @@ public static class SettingsArchive
     private const string KeysPrefix = "Keys/";
     private const string OpenSshPrefix = "OpenSSH/";
     private const string PasswordElementName = "EncryptedSavedPassword";
+    // The credentials of the HTTP proxy are saved passwords too: encrypted, and in plain text in profiles of earlier versions.
+    private const string ProxyPasswordElementName = "EncryptedProxyAuth";
+    private const string LegacyProxyAuthElementName = "ProxyAuth";
+
+    private static readonly string[] SavedSecretElementNames = { PasswordElementName, ProxyPasswordElementName, LegacyProxyAuthElementName };
 
     private static readonly string[] OpenSshKeyFiles =
     {
@@ -304,8 +309,7 @@ public static class SettingsArchive
     {
         try
         {
-            XElement password = FindPassword(LoadXml(ReadAllBytesShared(path)));
-            return password != null && !string.IsNullOrWhiteSpace(password.Value);
+            return HoldsSavedSecret(LoadXml(ReadAllBytesShared(path)));
         }
         catch (Exception ex) when (ex is XmlException || ex is IOException || ex is UnauthorizedAccessException)
         {
@@ -591,8 +595,7 @@ public static class SettingsArchive
             }
             if (IsConnection(item.Target.Kind) && !Has(contents.Available, SettingsParts.SavedPasswords))
             {
-                XElement password = FindPassword(item.Document);
-                if (password != null && !string.IsNullOrWhiteSpace(password.Value))
+                if (HoldsSavedSecret(item.Document))
                 {
                     contents.Available |= SettingsParts.SavedPasswords;
                 }
@@ -1027,7 +1030,7 @@ public static class SettingsArchive
 
     private static byte[] RemovePassword(XDocument document, byte[] xml)
     {
-        List<XElement> passwords = document.Descendants(PasswordElementName).ToList();
+        List<XElement> passwords = SavedSecretElementNames.SelectMany(name => document.Descendants(name)).ToList();
         if (passwords.Count == 0)
         {
             return xml;
@@ -1040,18 +1043,42 @@ public static class SettingsArchive
     }
 
     // The saved password sits directly under the root of an SSH profile and in the Connection element of a raw one.
-    private static XElement FindPassword(XDocument document)
+    private static XElement FindPassword(XDocument document, string elementName)
     {
         if (document.Root == null)
         {
             return null;
         }
-        return document.Root.Element(PasswordElementName) ?? document.Root.Descendants(PasswordElementName).FirstOrDefault();
+        return document.Root.Element(elementName) ?? document.Root.Descendants(elementName).FirstOrDefault();
     }
 
+    // Whether the profile holds a saved password or saved proxy credentials.
+    private static bool HoldsSavedSecret(XDocument document)
+    {
+        foreach (string name in SavedSecretElementNames)
+        {
+            XElement element = FindPassword(document, name);
+            if (element != null && !string.IsNullOrWhiteSpace(element.Value))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // The saved password and the proxy credentials of the profile that is replaced stay with it, one after the other.
     private static byte[] KeepExistingPassword(XDocument incoming, byte[] raw, string existingPath)
     {
-        XElement incomingPassword = FindPassword(incoming);
+        foreach (string name in SavedSecretElementNames)
+        {
+            raw = KeepExistingElement(incoming, raw, existingPath, name);
+        }
+        return raw;
+    }
+
+    private static byte[] KeepExistingElement(XDocument incoming, byte[] raw, string existingPath, string elementName)
+    {
+        XElement incomingPassword = FindPassword(incoming, elementName);
         if (incomingPassword != null && !string.IsNullOrWhiteSpace(incomingPassword.Value))
         {
             return raw;
@@ -1059,7 +1086,7 @@ public static class SettingsArchive
         try
         {
             XDocument existing = LoadXml(ReadAllBytesShared(existingPath));
-            XElement existingPassword = FindPassword(existing);
+            XElement existingPassword = FindPassword(existing, elementName);
             if (existingPassword == null || string.IsNullOrWhiteSpace(existingPassword.Value))
             {
                 return raw;

@@ -349,15 +349,20 @@ public class NewConnectionController : INotifyPropertyChanged
             {
                 throw new Exception("Please specify the proxy server as host:port (for example proxy.example.com:3128)");
             }
+            // The credentials are saved encrypted, and the encryption takes at most 200 bytes.
+            if (proxyCredentials != null && System.Text.Encoding.UTF8.GetByteCount(proxyCredentials) > 200)
+            {
+                throw new Exception("The proxy user name and password are too long to be saved (200 bytes at most)");
+            }
             _Settings.ProxyAuth = proxyCredentials;
             _Settings.ProxyServer = proxyHost;
             _Settings.ProxyPort = proxyPort;
         }
         else
         {
-            SSHConnectionSettings settings = _Settings;
-            string proxyServer = (_Settings.ProxyAuth = null);
-            settings.ProxyServer = proxyServer;
+            _Settings.ProxyAuth = null;
+            _Settings.ProxyServer = null;
+            _Settings.ProxyPort = 0;
         }
         if (HasAlias)
         {

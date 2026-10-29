@@ -39,7 +39,70 @@ public class SSHConnectionSettings
 
     public string ExplicitKeyFile { get; set; }
 
-    public string ProxyAuth { get; set; }
+    /// <summary>
+    /// The credentials of the HTTP proxy ("user:password") encrypted the same way as the saved password. Only this form
+    /// is written to the profile file.
+    /// </summary>
+    public byte[] EncryptedProxyAuth;
+
+    /// <summary>
+    /// "user:password" of the HTTP proxy, null when it has none. The profile file keeps it only encrypted
+    /// (<see cref="EncryptedProxyAuth"/>); reading gives null when it cannot be decrypted (a profile copied from another
+    /// computer, a replaced key), and the proxy then asks for the credentials when it answers with 407. Writing throws
+    /// when the text is longer than <see cref="PasswordProtector"/> can encrypt.
+    /// </summary>
+    [XmlIgnore]
+    public string ProxyAuth
+    {
+        get
+        {
+            if (EncryptedProxyAuth == null)
+            {
+                return null;
+            }
+            try
+            {
+                return PasswordProtector.Decrypt(EncryptedProxyAuth, AppEnvironment.PasswordContainerName);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        set
+        {
+            EncryptedProxyAuth = string.IsNullOrEmpty(value) ? null : PasswordProtector.Encrypt(value, AppEnvironment.PasswordContainerName);
+        }
+    }
+
+    /// <summary>
+    /// Reads the plain-text &lt;ProxyAuth&gt; element that profiles saved by earlier versions hold and encrypts it into
+    /// <see cref="EncryptedProxyAuth"/>, so that the next save replaces the plain text. It is never written (the getter
+    /// returns null): the profile file only gets <see cref="EncryptedProxyAuth"/>.
+    /// </summary>
+    [XmlElement("ProxyAuth")]
+    public string LegacyProxyAuth
+    {
+        get
+        {
+            return null;
+        }
+        set
+        {
+            if (string.IsNullOrEmpty(value) || EncryptedProxyAuth != null)
+            {
+                return;
+            }
+            try
+            {
+                ProxyAuth = value;
+            }
+            catch
+            {
+                // The key container cannot be used: the proxy asks for its credentials when it needs them.
+            }
+        }
+    }
 
     public string ProxyServer { get; set; }
 
