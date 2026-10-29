@@ -259,7 +259,13 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         {
             InvalidateLines(line, line + linesRetokenized - 1);
         }
+        // The tokens of the line are new ones: a folded block that started or ended there refers to the old tokens.
+        _foldingManager.RemoveStaleRegions(line, 0, 0, out bool staleRegionsRemoved);
         base.OnLineChanged(line, column, addedLength, removedLength);
+        if (staleRegionsRemoved)
+        {
+            UpdateLayout();
+        }
         CancelHover();
     }
 

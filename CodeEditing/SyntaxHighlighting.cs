@@ -202,6 +202,15 @@ namespace SmarTTY.CodeEditing
                     return Language.Config;
             }
 
+            // Variants of well-known names: Dockerfile.dev, Makefile.am.
+            if (name.StartsWith("dockerfile.", StringComparison.Ordinal) || name.StartsWith("containerfile.", StringComparison.Ordinal))
+            {
+                return Language.Script;
+            }
+            if (name.StartsWith("makefile.", StringComparison.Ordinal))
+            {
+                return Language.Makefile;
+            }
             if (name.StartsWith(".bash", StringComparison.Ordinal) ||
                 name.StartsWith(".zsh", StringComparison.Ordinal) ||
                 name.StartsWith(".ksh", StringComparison.Ordinal))
@@ -366,9 +375,18 @@ namespace SmarTTY.CodeEditing
                     }
                 }
             }
+            if (program == "busybox" && words.Length > 1)
+            {
+                // "#!/bin/busybox sh": the applet is the next word.
+                program = ProgramName(words[1]);
+            }
             if (program.StartsWith("python", StringComparison.Ordinal))
             {
                 return Language.Python;
+            }
+            if (program == "node" || program == "nodejs" || program == "deno" || program == "bun")
+            {
+                return Language.CLike;
             }
             switch (program)
             {
@@ -1477,6 +1495,13 @@ namespace SmarTTY.CodeEditing
         // Line state: inside a block comment (/* ... */ or <!-- ... -->).
         private const int StBlockComment = 0x04;
 
+        // Line states of a string that goes on over lines: `...` (JavaScript, Go), """...""" (Java, Kotlin, Swift,
+        // C#) and C# @"..." (a doubled quote is the escape). StInTag: inside an HTML/XML tag, where quotes start values.
+        private const int StBacktick = 0x08;
+        private const int StTripleQuote = 0x10;
+        private const int StVerbatim = 0x20;
+        private const int StInTag = 0x40;
+
         private static readonly HashSet<string> CLikeKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
             "if", "else", "for", "foreach", "while", "do", "switch", "case", "default", "break", "continue",
@@ -1528,6 +1553,10 @@ namespace SmarTTY.CodeEditing
             public bool MarkupTags;            // <tag> and </tag> names are colored as keywords
             public bool Brackets;              // emit paired bracket tokens
             public bool FoldCurlyBraces;       // multi-line { } blocks can be folded
+            public bool BacktickStrings;       // `...` strings that may span lines
+            public bool TripleQuoteStrings;    // """...""" strings that may span lines
+            public bool VerbatimStrings;       // C# @"..." strings that may span lines
+            public bool RustLiterals;          // 'a lifetimes and labels are not strings; r"..." and r#"..."# raw strings
             public string BlockCommentStart;
             public string BlockCommentEnd;
             public HashSet<string> Keywords;
@@ -1546,11 +1575,151 @@ namespace SmarTTY.CodeEditing
                 return HashComments && c == '#' && (i == 0 || char.IsWhiteSpace(text[i - 1]));
             }
 
+            /// <summary>The index after the end of a string of the given kind (a state bit) searched from an index, or -1.</summary>
+            private static int FindStringEnd(string text, int from, int kind)
+            {
+                for (int j = from; j < text.Length; j++)
+                {
+                    char c = text[j];
+                    switch (kind)
+                    {
+                        case StBacktick:
+                            if (c == '\\')
+                            {
+                                j++;
+                            }
+                            else if (c == '`')
+                            {
+                                return j + 1;
+                            }
+                            break;
+                        case StTripleQuote:
+                            if (c == '\\')
+                            {
+                                j++;
+                            }
+                            else if (StartsWithAt(text, j, "\"\"\""))
+                            {
+                                return j + 3;
+                            }
+                            break;
+                        default:
+                            if (c == '"')
+                            {
+                                if (j + 1 < text.Length && text[j + 1] == '"')
+                                {
+                                    j++;
+                                }
+                                else
+                                {
+                                    return j + 1;
+                                }
+                            }
+                            break;
+                    }
+                }
+                return -1;
+            }
+
+            /// <summary>
+            /// A Rust lifetime ('a, 'static) or loop label ('outer:) at index: not a string. Only forms that cannot be
+            /// a short string are taken (after &amp;, inside &lt;&gt;, after break/continue, in front of a loop).
+            /// </summary>
+            private static bool IsRustLifetime(string text, int index, out int end)
+            {
+                end = index;
+                int len = text.Length;
+                if (index + 1 >= len || !IsIdStart(text[index + 1]))
+                {
+                    return false;
+                }
+                int j = index + 2;
+                while (j < len && IsIdChar(text[j]))
+                {
+                    j++;
+                }
+                if (j < len && text[j] == '\'')
+                {
+                    // 'a' is a character literal.
+                    return false;
+                }
+                int p = index - 1;
+                while (p >= 0 && IsBlank(text[p]))
+                {
+                    p--;
+                }
+                char prev = p >= 0 ? text[p] : '\0';
+                bool lifetime = false;
+                if (prev == '&')
+                {
+                    lifetime = !(p > 0 && text[p - 1] == '&');
+                }
+                else if (prev == '<')
+                {
+                    lifetime = true;
+                }
+                else if (prev == ',' || prev == '+')
+                {
+                    int depth = 0;
+                    for (int k = 0; k < index; k++)
+                    {
+                        if (text[k] == '<')
+                        {
+                            depth++;
+                        }
+                        else if (text[k] == '>')
+                        {
+                            depth--;
+                        }
+                    }
+                    lifetime = depth > 0;
+                }
+                else if (IsIdChar(prev))
+                {
+                    int wordStart = p;
+                    while (wordStart > 0 && IsIdChar(text[wordStart - 1]))
+                    {
+                        wordStart--;
+                    }
+                    string word = text.Substring(wordStart, p - wordStart + 1);
+                    lifetime = word == "break" || word == "continue";
+                }
+                else if ((prev == '\0' || prev == '{' || prev == ';') && j < len && text[j] == ':')
+                {
+                    int k = SkipBlanks(text, j + 1);
+                    lifetime = StartsWithAt(text, k, "loop") || StartsWithAt(text, k, "while") || StartsWithAt(text, k, "for");
+                }
+                if (lifetime)
+                {
+                    end = j;
+                }
+                return lifetime;
+            }
+
             public bool Tokenize(int startState, string text, TokenCache.ITokenSink sink, out int endState)
             {
                 int len = text.Length;
                 int i = 0;
                 int last = 0;
+                bool inTag = MarkupTags && (startState & StInTag) != 0;
+
+                int continuedString = startState & (StBacktick | StTripleQuote | StVerbatim);
+                if (continuedString != 0)
+                {
+                    int stringClose = FindStringEnd(text, 0, continuedString);
+                    if (stringClose < 0)
+                    {
+                        if (len > 0)
+                        {
+                            sink.AddToken(TypeString, 0, len);
+                        }
+                        endState = continuedString;
+                        return true;
+                    }
+                    sink.AddToken(TypeString, 0, stringClose);
+                    i = stringClose;
+                    last = i;
+                }
 
                 if ((startState & StBlockComment) != 0 && BlockCommentEnd != null)
                 {
@@ -1619,7 +1788,50 @@ namespace SmarTTY.CodeEditing
                         return true;
                     }
 
-                    if (c == '"' || (c == '\'' && SingleQuoteStrings))
+                    // Strings that go on over lines.
+                    int multiLineKind = 0;
+                    int multiLineStart = i;
+                    int multiLineBody = i + 1;
+                    if (BacktickStrings && c == '`')
+                    {
+                        multiLineKind = StBacktick;
+                    }
+                    else if (c == '"' && VerbatimStrings && i > 0 && text[i - 1] == '@')
+                    {
+                        multiLineKind = StVerbatim;
+                        multiLineStart = i - 1;
+                    }
+                    else if (c == '"' && TripleQuoteStrings && StartsWithAt(text, i, "\"\"\""))
+                    {
+                        multiLineKind = StTripleQuote;
+                        multiLineBody = i + 3;
+                    }
+                    if (multiLineKind != 0)
+                    {
+                        int stringEnd = FindStringEnd(text, multiLineBody, multiLineKind);
+                        // "@" was passed as plain text: the string starts where it stands.
+                        last = Math.Min(last, multiLineStart);
+                        Normal(ref last, last, multiLineStart, sink);
+                        if (stringEnd < 0)
+                        {
+                            sink.AddToken(TypeString, multiLineStart, len);
+                            endState = multiLineKind;
+                            return true;
+                        }
+                        sink.AddToken(TypeString, multiLineStart, stringEnd);
+                        i = stringEnd;
+                        last = i;
+                        continue;
+                    }
+
+                    if (c == '\'' && RustLiterals && IsRustLifetime(text, i, out int lifetimeEnd))
+                    {
+                        i = lifetimeEnd;
+                        continue;
+                    }
+
+                    // In HTML and XML a quote is not special in the text between the tags.
+                    if ((c == '"' || (c == '\'' && SingleQuoteStrings)) && (!MarkupTags || inTag))
                     {
                         int end = FindQuoteEnd(text, i, c);
                         Normal(ref last, last, i, sink);
@@ -1629,11 +1841,19 @@ namespace SmarTTY.CodeEditing
                         continue;
                     }
 
-                    if (MarkupTags && c == '<' && i + 1 < len && (IsIdStart(text[i + 1]) || text[i + 1] == '/' || text[i + 1] == '?'))
+                    if (MarkupTags && c == '>')
+                    {
+                        inTag = false;
+                        i++;
+                        continue;
+                    }
+
+                    if (MarkupTags && c == '<' && i + 1 < len && (IsIdStart(text[i + 1]) || text[i + 1] == '/' || text[i + 1] == '?' || text[i + 1] == '!'))
                     {
                         int s = i;
+                        inTag = true;
                         i++;
-                        if (text[i] == '/' || text[i] == '?')
+                        if (text[i] == '/' || text[i] == '?' || text[i] == '!')
                         {
                             i++;
                         }
@@ -1667,7 +1887,28 @@ namespace SmarTTY.CodeEditing
                         {
                             i++;
                         }
-                        if (Keywords != null && Keywords.Contains(text.Substring(s, i - s)))
+                        string word = text.Substring(s, i - s);
+                        if (RustLiterals && (word == "r" || word == "br") && i < len && (text[i] == '"' || text[i] == '#'))
+                        {
+                            // Raw string r"..." / r#"..."#: no escapes, the quotes inside need the same number of #.
+                            int hashes = 0;
+                            while (i + hashes < len && text[i + hashes] == '#')
+                            {
+                                hashes++;
+                            }
+                            if (i + hashes < len && text[i + hashes] == '"')
+                            {
+                                string closing = "\"" + new string('#', hashes);
+                                int closeAt = text.IndexOf(closing, i + hashes + 1, StringComparison.Ordinal);
+                                int rawEnd = (closeAt < 0) ? len : closeAt + closing.Length;
+                                Normal(ref last, last, s, sink);
+                                sink.AddToken(TypeString, s, rawEnd);
+                                i = rawEnd;
+                                last = i;
+                                continue;
+                            }
+                        }
+                        if (Keywords != null && Keywords.Contains(word))
                         {
                             Normal(ref last, last, s, sink);
                             sink.AddToken(TypeKeyword, s, i);
@@ -1686,7 +1927,7 @@ namespace SmarTTY.CodeEditing
                 }
 
                 Normal(ref last, last, len, sink);
-                endState = 0;
+                endState = inTag ? StInTag : 0;
                 return true;
             }
         }
@@ -1697,6 +1938,10 @@ namespace SmarTTY.CodeEditing
             Preprocessor = true,
             Brackets = true,
             FoldCurlyBraces = true,
+            BacktickStrings = true,
+            TripleQuoteStrings = true,
+            VerbatimStrings = true,
+            RustLiterals = true,
             BlockCommentStart = "/*",
             BlockCommentEnd = "*/",
             Keywords = CLikeKeywords
@@ -2504,6 +2749,9 @@ namespace SmarTTY.CodeEditing
         private const int YamlMaxLevels = 6;
         private const int YamlLevelShift = 3;
 
+        // The innermost open block is a block scalar ("key: |"): its lines, indented deeper than the header, are text.
+        private const int StYamlScalar = 1 << 30;
+
         /// <summary>The end of the code of a YAML line (the comment and the blanks before it are not included).</summary>
         private static int YamlCodeEnd(string text, int first)
         {
@@ -2592,9 +2840,30 @@ namespace SmarTTY.CodeEditing
             int len = text.Length;
             int depth = startState & 7;
             int levels = (startState >> YamlLevelShift) & 0xFFFFFF;
+            bool scalar = (startState & StYamlScalar) != 0;
             LineBuffer buffer = new LineBuffer(sink);
             int first = SkipBlanks(text, 0);
             bool code = first < len && text[first] != '#';
+
+            // The text of a block scalar: no keys, comments or quotes in it, whatever it looks like. A blank line
+            // belongs to it; a line that is not indented deeper than the header ends it.
+            bool scalarText = false;
+            if (scalar)
+            {
+                if (first == len || IndentColumns(text, first) > IndentLevelSum(levels, depth, 0x7))
+                {
+                    scalarText = true;
+                    code = false;
+                    if (first < len)
+                    {
+                        buffer.AddToken(TypeString, first, len);
+                    }
+                }
+                else
+                {
+                    scalar = false;
+                }
+            }
 
             int codeEnd = len;
             bool isItem = false;
@@ -2621,7 +2890,10 @@ namespace SmarTTY.CodeEditing
                 }
             }
 
-            TokenizeConfig(0, text, buffer, out int ignored);
+            if (!scalarText)
+            {
+                TokenizeConfig(0, text, buffer, out int ignored);
+            }
 
             if (code)
             {
@@ -2637,6 +2909,7 @@ namespace SmarTTY.CodeEditing
                     int flag = (endsWithColon && !isItem) ? 8 : 0;
                     levels |= (delta | flag) << (4 * depth);
                     depth++;
+                    scalar = IsYamlBlockScalarHeader(statement);
                     buffer.InsertPairedToken(codeEnd, PairIndentBlock, true, ExclusiveBlockRegion);
                 }
             }
@@ -2650,7 +2923,7 @@ namespace SmarTTY.CodeEditing
                     levels &= ~(0xF << (4 * (depth - 1)));
                 }
             }
-            endState = depth | (levels << YamlLevelShift);
+            endState = depth | (levels << YamlLevelShift) | (scalar && depth > 0 ? StYamlScalar : 0);
             return true;
         }
 
