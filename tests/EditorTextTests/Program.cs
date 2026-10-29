@@ -106,6 +106,10 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/sshd_config"), L.Config, "sshd_config is a config file");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service"), L.Config, "systemd units are config files");
         Equal(SyntaxHighlighting.DetectLanguage("/src/main.c"), L.CLike, "C sources are C-like");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Dockerfile.dev"), L.Script, "Dockerfile.dev is a Dockerfile");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/Makefile.am"), L.Makefile, "Makefile.am is a makefile");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/bin/busybox sh"), L.Bash, "#!/bin/busybox sh is shell");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/env node"), L.CLike, "#!/usr/bin/env node is JavaScript");
         Equal(SyntaxHighlighting.DetectLanguage("/var/log/syslog.log"), L.Plain, "logs are not highlighted");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.txt"), L.Plain, "text files are not highlighted");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/README.md"), L.Plain, "markdown is not highlighted");

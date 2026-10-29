@@ -38,11 +38,12 @@ public class InlineMessageProvider : ReadonlyTextBrowser.IVirtualLineProvider
                     indentColumn = 0;
                 }
             }
-            StringFormat format = new StringFormat(StringFormat.GenericDefault);
-            Font font = new Font(FontFamily.GenericSerif, bounds.Height * 5 / 8);
+            // Drawn on every paint: the GDI+ objects are released each time.
+            using StringFormat format = new StringFormat(StringFormat.GenericDefault);
+            using Font font = new Font(FontFamily.GenericSerif, bounds.Height * 5 / 8);
             Image image = Icons.Load((this._severity == MessageSeverity.Error) ? "message-error" : "message-warning");
             int height = bounds.Height;
-            ImageAttributes imageAttributes = new ImageAttributes();
+            using ImageAttributes imageAttributes = new ImageAttributes();
             int textWidth = (int)graphics.MeasureString(this._text, font).Width + 3;
             if (textWidth > bounds.Width - (4 + height + 3) * 2)
             {
@@ -85,6 +86,19 @@ public class InlineMessageProvider : ReadonlyTextBrowser.IVirtualLineProvider
     public void Clear()
     {
         _messages.Clear();
+        RecomputeBounds();
+    }
+
+    // The first and the last line that hold a message: GetNextSpecialLine answers from them.
+    private void RecomputeBounds()
+    {
+        _firstLine = int.MaxValue;
+        _lastLine = 0;
+        foreach (int line in _messages.Keys)
+        {
+            _firstLine = System.Math.Min(_firstLine, line);
+            _lastLine = System.Math.Max(_lastLine, line);
+        }
     }
 
     public void AddMessage(int line, MessageSeverity messageSeverity, string text, int column)
@@ -131,6 +145,8 @@ public class InlineMessageProvider : ReadonlyTextBrowser.IVirtualLineProvider
                 _messages[msg.Line] = msg;
             }
         }
+        // Messages moved: the bounds are of the old lines (a message pushed below the old last line was never drawn).
+        RecomputeBounds();
     }
 
     public int GetCurrentLine(int lineIndex)

@@ -202,6 +202,15 @@ namespace SmarTTY.CodeEditing
                     return Language.Config;
             }
 
+            // Variants of well-known names: Dockerfile.dev, Makefile.am.
+            if (name.StartsWith("dockerfile.", StringComparison.Ordinal) || name.StartsWith("containerfile.", StringComparison.Ordinal))
+            {
+                return Language.Script;
+            }
+            if (name.StartsWith("makefile.", StringComparison.Ordinal))
+            {
+                return Language.Makefile;
+            }
             if (name.StartsWith(".bash", StringComparison.Ordinal) ||
                 name.StartsWith(".zsh", StringComparison.Ordinal) ||
                 name.StartsWith(".ksh", StringComparison.Ordinal))
@@ -366,9 +375,18 @@ namespace SmarTTY.CodeEditing
                     }
                 }
             }
+            if (program == "busybox" && words.Length > 1)
+            {
+                // "#!/bin/busybox sh": the applet is the next word.
+                program = ProgramName(words[1]);
+            }
             if (program.StartsWith("python", StringComparison.Ordinal))
             {
                 return Language.Python;
+            }
+            if (program == "node" || program == "nodejs" || program == "deno" || program == "bun")
+            {
+                return Language.CLike;
             }
             switch (program)
             {

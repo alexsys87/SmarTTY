@@ -21,6 +21,8 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         public void Paint(Graphics graphics, Rectangle rectangle, SizeF charSize, int firstLineIndex, int lastLineIndex, int rowCount, ReadonlyTextBrowser readonlyTextBrowser)
         {
             float yPos = rectangle.Top;
+            // The text colour: black lines would not be seen on a dark editor.
+            using Pen pen = new Pen(Color.FromArgb(170, readonlyTextBrowser.ForeColor));
             for (int rowIdx = 0; rowIdx < rowCount; rowIdx++)
             {
                 int lineIndex = readonlyTextBrowser.DisplayRows[rowIdx].Line;
@@ -36,21 +38,21 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
                 {
                     case GutterState.Plain:
                     case GutterState.SectionEnd:
-                        graphics.DrawLine(Pens.Black, xCenter, yPos, xCenter, yPos + charSize.Height);
+                        graphics.DrawLine(pen, xCenter, yPos, xCenter, yPos + charSize.Height);
                         if (gutterState == GutterState.SectionEnd)
                         {
-                            graphics.DrawLine(Pens.Black, xCenter, yPos + charSize.Height / 2f, rectangle.Right, yPos + charSize.Height / 2f);
+                            graphics.DrawLine(pen, xCenter, yPos + charSize.Height / 2f, rectangle.Right, yPos + charSize.Height / 2f);
                         }
                         break;
                     case GutterState.Expandable:
                     case GutterState.Collapsed:
-                        graphics.DrawLine(Pens.Black, xCenter, yPos, xCenter, yPos + (float)yOffset);
-                        graphics.DrawRectangle(Pens.Black, xCenter - 5, yPos + (float)yOffset, 10f, 10f);
-                        graphics.DrawLine(Pens.Black, xCenter, yPos + (float)yOffset + 10f, xCenter, yPos + charSize.Height);
-                        graphics.DrawLine(Pens.Black, xCenter - 3, yPos + (float)yOffset + 5f, xCenter + 3, yPos + (float)yOffset + 5f);
+                        graphics.DrawLine(pen, xCenter, yPos, xCenter, yPos + (float)yOffset);
+                        graphics.DrawRectangle(pen, xCenter - 5, yPos + (float)yOffset, 10f, 10f);
+                        graphics.DrawLine(pen, xCenter, yPos + (float)yOffset + 10f, xCenter, yPos + charSize.Height);
+                        graphics.DrawLine(pen, xCenter - 3, yPos + (float)yOffset + 5f, xCenter + 3, yPos + (float)yOffset + 5f);
                         if (gutterState == GutterState.Collapsed)
                         {
-                            graphics.DrawLine(Pens.Black, xCenter, yPos + (float)yOffset + 2f, xCenter, yPos + (float)yOffset + 10f - 2f);
+                            graphics.DrawLine(pen, xCenter, yPos + (float)yOffset + 2f, xCenter, yPos + (float)yOffset + 10f - 2f);
                         }
                         break;
                 }
@@ -402,10 +404,21 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
 
     public int GetTotalHiddenLines()
     {
+        // A folded block inside another folded block hides lines the outer one hides already: count each line once.
+        List<int> headers = new List<int>(_regions.Keys);
+        headers.Sort();
         int hiddenCount = 0;
-        foreach (FoldedRegion region in _regions.Values)
+        int coveredUntil = -1;
+        foreach (int header in headers)
         {
-            hiddenCount += region.HiddenLineCount;
+            int first = header + 1;
+            int last = header + _regions[header].HiddenLineCount;
+            if (last <= coveredUntil)
+            {
+                continue;
+            }
+            hiddenCount += last - Math.Max(first, coveredUntil + 1) + 1;
+            coveredUntil = last;
         }
         return hiddenCount;
     }
@@ -447,7 +460,8 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         List<int> toDelete = new List<int>();
         foreach (KeyValuePair<int, FoldedRegion> item in _regions)
         {
-            if (item.Value.HeaderLine == -1 || item.Value.EndToken.LineNumber == -1)
+            // Tokens of a line that was edited are replaced (and marked deleted): the region refers to the old ones.
+            if (item.Value.StartToken.IsDeleted || item.Value.EndToken.IsDeleted || item.Value.HeaderLine < 0 || item.Value.EndToken.LineNumber < 0)
             {
                 toDelete.Add(item.Key);
             }
