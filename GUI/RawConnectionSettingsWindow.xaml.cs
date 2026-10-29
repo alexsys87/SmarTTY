@@ -287,11 +287,40 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         private byte[] _EncryptedPassword;
 
+        // The saved password that could not be decrypted here (saved by another Windows user or on another computer). It stays
+        // as it was until a password is entered, so that opening and closing the window does not erase it for the place where
+        // it still works.
+        private byte[] _UnreadableEncryptedPassword;
+
+        // Why the password that was typed in could not be saved (too long, no key container), or null.
+        private string _PasswordNotSavedReason;
+
+        /// <summary>Called when the user changes the password: what could not be read before is then replaced on purpose.</summary>
+        public void NotePasswordEdited()
+        {
+            _UnreadableEncryptedPassword = null;
+        }
+
+        /// <summary>
+        /// Why the password that was typed in cannot be saved, or null when it can (or there is none). The connection is then
+        /// saved without a password rather than failing while the window closes, but the user is told.
+        /// </summary>
+        public string PasswordNotSavedReason
+        {
+            get
+            {
+                EncryptTelnetPassword();
+                return _PasswordNotSavedReason;
+            }
+        }
+
         private byte[] EncryptTelnetPassword()
         {
             if (string.IsNullOrEmpty(TelnetPassword))
             {
-                return null;
+                _PasswordNotSavedReason = null;
+                // Nothing typed in: a saved password that this computer cannot read is kept, not erased.
+                return _UnreadableEncryptedPassword;
             }
             if (_EncryptedFor != TelnetPassword)
             {
@@ -299,13 +328,14 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 {
                     _EncryptedPassword = VisualTTY.PasswordProtector.Encrypt(TelnetPassword, "com.sysprogs.smartty.passwords");
                     _EncryptedFor = TelnetPassword;
+                    _PasswordNotSavedReason = null;
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
-                    // Too long or no key container: the connection is saved without a password rather than
-                    // failing while the window closes.
+                    // Too long or no key container.
                     _EncryptedPassword = null;
                     _EncryptedFor = TelnetPassword;
+                    _PasswordNotSavedReason = exception.Message;
                 }
             }
             return _EncryptedPassword;
@@ -568,7 +598,9 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                         }
                         catch (Exception)
                         {
-                            // Saved by another Windows user or on another computer: it has to be entered again.
+                            // Saved by another Windows user or on another computer: it has to be entered again here. What was
+                            // saved stays as it was unless that happens (it still works where it was saved).
+                            _UnreadableEncryptedPassword = telnet.EncryptedSavedPassword;
                         }
                     }
                 }
@@ -710,7 +742,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         {
             Title = "Telnet Terminal Settings";
             txtTelnetPassword.Password = _Controller.TelnetPassword ?? "";
-            txtTelnetPassword.PasswordChanged += (sender, args) => _Controller.TelnetPassword = txtTelnetPassword.Password;
+            txtTelnetPassword.PasswordChanged += (sender, args) =>
+            {
+                _Controller.TelnetPassword = txtTelnetPassword.Password;
+                _Controller.NotePasswordEdited();
+            };
         }
     }
 
@@ -886,11 +922,26 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             }
             if (!_Closed)
             {
+                WarnIfPasswordNotSaved();
                 this.DialogResult = true;
             }
             return;
         }
+        WarnIfPasswordNotSaved();
         this.DialogResult = true;
+    }
+
+    /// <summary>
+    /// Says so when the password typed in could not be saved: the connection is then saved without it, which would otherwise show
+    /// only at the next connect. Shown when the window is accepted, not on every test, because the settings are built several times.
+    /// </summary>
+    private void WarnIfPasswordNotSaved()
+    {
+        string reason = _Controller.PasswordNotSavedReason;
+        if (reason != null)
+        {
+            MessageBoxes.Warning("The password could not be saved (" + reason + "). The connection is saved without it, so the password has to be entered again.");
+        }
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
