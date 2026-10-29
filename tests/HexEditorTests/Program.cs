@@ -84,6 +84,30 @@ internal static class Program
         document.ReplaceByte(2, (byte)'L');
         Check(!document.CanRedo, "a new edit drops the redo history");
 
+        // The second digit of a typed byte joins the undo step of the first one: one undo takes the whole byte back.
+        HexDocument typing = new HexDocument(new byte[] { 1 });
+        typing.Insert(1, new byte[] { 0xA0 });
+        typing.ReplaceByteIntoLastStep(1, 0xAB);
+        EqualBytes(typing.ToArray(), new byte[] { 1, 0xAB }, "the second digit completes the byte");
+        typing.Undo();
+        EqualBytes(typing.ToArray(), new byte[] { 1 }, "one undo takes a typed byte back");
+        Check(!typing.CanUndo && !typing.IsModified, "the typed byte was a single step");
+        typing.Redo();
+        EqualBytes(typing.ToArray(), new byte[] { 1, 0xAB }, "redo brings the whole typed byte back");
+        HexDocument overtyped = new HexDocument(new byte[] { 1, 2 });
+        overtyped.ReplaceByte(1, 0x30);
+        overtyped.ReplaceByteIntoLastStep(1, 0x35);
+        overtyped.Undo();
+        EqualBytes(overtyped.ToArray(), new byte[] { 1, 2 }, "an overtyped byte is restored by one undo");
+        HexDocument savedHalf = new HexDocument(new byte[] { 1 });
+        savedHalf.Insert(1, new byte[] { 0xA0 });
+        savedHalf.MarkSaved();
+        savedHalf.ReplaceByteIntoLastStep(1, 0xAB);
+        Check(savedHalf.IsModified, "a saved step is not changed: the document is modified");
+        savedHalf.Undo();
+        EqualBytes(savedHalf.ToArray(), new byte[] { 1, 0xA0 }, "undo returns to the saved bytes");
+        Check(!savedHalf.IsModified, "and the document is clean again");
+
         // A background save records the bytes written for the version it took, so edits made meanwhile stay modified.
         HexDocument background = new HexDocument(hello);
         object version = background.CurrentVersion;

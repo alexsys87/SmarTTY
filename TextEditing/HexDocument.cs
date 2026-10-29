@@ -128,6 +128,28 @@ public sealed class HexDocument
         Replace(offset, 1, new[] { value });
     }
 
+    /// <summary>
+    /// Replaces the byte at <paramref name="offset"/> and joins the change to the last undo step, which must have put a
+    /// single byte at the same place (the second digit of a byte being typed), so that one undo takes the whole byte
+    /// back. Without such a step it is a plain <see cref="ReplaceByte"/>.
+    /// </summary>
+    public void ReplaceByteIntoLastStep(int offset, byte value)
+    {
+        if (_undo.Count > 0 && _redo.Count == 0 && !ReferenceEquals(_undo.Peek(), _savedStep))
+        {
+            Edit last = _undo.Peek();
+            // A step that was saved must keep its bytes: the saved mark would otherwise stay on changed content.
+            if (last.Offset == offset && last.Inserted.Length == 1 && last.Removed.Length <= 1 && offset < _bytes.Count)
+            {
+                last.Inserted = new[] { value };
+                _bytes[offset] = value;
+                RaiseChanged();
+                return;
+            }
+        }
+        ReplaceByte(offset, value);
+    }
+
     /// <summary>Replaces <paramref name="count"/> bytes at <paramref name="offset"/> (one undo step).</summary>
     public void Replace(int offset, int count, byte[] bytes)
     {

@@ -330,6 +330,18 @@ public class EditorCommands
                 Key = Keys.Divide
             }
         },
+        new DelegateCommand("ToggleCommentShiftedDigit", "Comment / uncomment (Ctrl+/ on layouts where / is Shift+7)", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.ToggleComment();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Shift = true,
+                Key = Keys.D7
+            }
+        },
         new DelegateCommand("ZoomIn", "Zoom in", (CodeEditorPP codeEditorPP) =>
         {
             codeEditorPP.ZoomBy(1);

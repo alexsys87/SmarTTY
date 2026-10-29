@@ -85,6 +85,9 @@ public sealed class HexEditorControl : Control
 
     private int _contentWidth = 640;
 
+    // The first digit of a byte was just typed: the second one joins its undo step.
+    private bool _secondNibblePending;
+
     private bool _updatingScrollBars;
 
     private bool _updatingLayout;
@@ -214,22 +217,26 @@ public sealed class HexEditorControl : Control
 
     private int VisibleWidth => Math.Max(1, ClientSize.Width - (_verticalScrollBar.Visible ? _verticalScrollBar.Width : 0));
 
-    private int RowCount => Math.Max(1, (_document.Length + BytesPerRow - 1) / BytesPerRow);
+    // One more row than the bytes fill when the last row is full: the caret sits there after the last byte.
+    private int RowCount => _document.Length / BytesPerRow + 1;
 
-    public void CopySelection()
+    /// <summary>Copies the selected bytes (the byte under the caret without a selection); false when nothing reached the clipboard.</summary>
+    public bool CopySelection()
     {
         try
         {
             byte[] bytes = GetSelectedBytes();
             if (bytes.Length == 0)
             {
-                return;
+                return false;
             }
             Clipboard.SetText(HexDocument.FormatHex(bytes));
+            return true;
         }
         catch (Exception exception)
         {
             ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            return false;
         }
     }
 
@@ -255,8 +262,11 @@ public sealed class HexEditorControl : Control
         {
             return;
         }
-        CopySelection();
-        DeleteSelection();
+        // The bytes are removed only when they are on the clipboard.
+        if (CopySelection())
+        {
+            DeleteSelection();
+        }
     }
 
     public void DeleteSelection()
@@ -465,6 +475,7 @@ public sealed class HexEditorControl : Control
 
     private void AfterContentChange()
     {
+        _secondNibblePending = false;
         _caretOffset = Math.Max(0, Math.Min(_caretOffset, _document.Length));
         if (_anchor > _document.Length)
         {
@@ -503,13 +514,24 @@ public sealed class HexEditorControl : Control
                 _document.Insert(_caretOffset, new[] { value });
             }
             _nibble = 1;
+            _secondNibblePending = true;
         }
         else
         {
+            bool joinStep = _secondNibblePending;
+            _secondNibblePending = false;
             if (_caretOffset < _document.Length)
             {
                 byte existing = _document[_caretOffset];
-                _document.ReplaceByte(_caretOffset, (byte)((existing & 0xF0) | digit));
+                byte value = (byte)((existing & 0xF0) | digit);
+                if (joinStep)
+                {
+                    _document.ReplaceByteIntoLastStep(_caretOffset, value);
+                }
+                else
+                {
+                    _document.ReplaceByte(_caretOffset, value);
+                }
             }
             else
             {
@@ -530,6 +552,7 @@ public sealed class HexEditorControl : Control
         {
             return;
         }
+        _secondNibblePending = false;
         if (HasSelection)
         {
             DeleteCurrentSelectionOrByte();
@@ -786,6 +809,7 @@ public sealed class HexEditorControl : Control
 
     private void AfterCaretChange()
     {
+        _secondNibblePending = false;
         if (_anchor == _caretOffset)
         {
             _anchor = -1;
@@ -810,6 +834,14 @@ public sealed class HexEditorControl : Control
         bool shift = (ModifierKeys & Keys.Shift) == Keys.Shift;
         if (e.Button == MouseButtons.Right)
         {
+            _secondNibblePending = false;
+            // A right click inside the selection opens the menu for it (Copy, Cut, Delete) and keeps it.
+            if (HasSelection && offset >= SelectionStart && offset < SelectionEnd)
+            {
+                _area = area;
+                Invalidate();
+                return;
+            }
             _anchor = -1;
             _caretOffset = offset;
             _area = area;
@@ -822,7 +854,8 @@ public sealed class HexEditorControl : Control
             return;
         }
         _dragging = true;
-        _dragAnchor = shift && _anchor >= 0 ? _anchor : offset;
+        // Shift+click extends the selection from its anchor, or from the caret when nothing is selected.
+        _dragAnchor = shift ? (_anchor >= 0 ? _anchor : _caretOffset) : offset;
         _anchor = shift ? _dragAnchor : -1;
         _caretOffset = offset;
         _area = area;
@@ -865,7 +898,8 @@ public sealed class HexEditorControl : Control
     {
         if (ModifierKeys == Keys.None || ModifierKeys == Keys.Shift)
         {
-            int rows = Math.Max(1, e.Delta / 120) * 3;
+            // Positive wheel delta scrolls up (towards the start), negative down.
+            int rows = Math.Sign(e.Delta) * Math.Max(1, Math.Abs(e.Delta) / 120) * 3;
             if ((ModifierKeys & Keys.Shift) == Keys.Shift)
             {
                 _scrollX = Math.Max(0, _scrollX - rows * _charWidth * 3);
@@ -999,6 +1033,10 @@ public sealed class HexEditorControl : Control
                         graphics.FillRectangle(caretBrush, caretX, y + _rowHeight - 2, _charWidth, 2);
                     }
                     int asciiX = _asciiStart - _scrollX + index * _charWidth;
+                    if (Focused && _caretVisible && _caretOffset == position && _area == EditArea.Ascii && !selected)
+                    {
+                        graphics.FillRectangle(caretBrush, asciiX, y + _rowHeight - 2, _charWidth, 2);
+                    }
                     if (selected)
                     {
                         graphics.FillRectangle(selectionBrush, asciiX, y, _charWidth, _rowHeight);
@@ -1015,14 +1053,16 @@ public sealed class HexEditorControl : Control
             {
                 TextRenderer.DrawText(graphics, "The file is empty. Type hexadecimal digits to add bytes.", Font, new Point(Margin, _headerHeight + textYOffset), dimBrush.Color, TextFlags);
             }
-            if (Focused && _caretVisible && _caretOffset == _document.Length && _document.Length > 0)
+            if (Focused && _caretVisible && _caretOffset == _document.Length)
             {
                 int row = _caretOffset / BytesPerRow;
                 int column = _caretOffset % BytesPerRow;
                 if (row >= _firstRow)
                 {
                     int y = _headerHeight + (row - _firstRow) * _rowHeight;
-                    int x = _hexStart - _scrollX + column * 3 * _charWidth;
+                    int x = (_area == EditArea.Ascii)
+                        ? _asciiStart - _scrollX + column * _charWidth
+                        : _hexStart - _scrollX + column * 3 * _charWidth;
                     graphics.FillRectangle(caretBrush, x, y + _rowHeight - 2, _charWidth, 2);
                 }
             }

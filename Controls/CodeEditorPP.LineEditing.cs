@@ -141,25 +141,7 @@ public partial class CodeEditorPP
             return;
         }
         GetCommandLines(out int first, out int last);
-        TextDocument.TextPosition start;
-        TextDocument.TextPosition end;
-        if (last < LineCount - 1)
-        {
-            start = new TextDocument.TextPosition(0, first);
-            end = new TextDocument.TextPosition(0, last + 1);
-        }
-        else if (first > 0)
-        {
-            // The last lines have no line break of their own: the one before them goes.
-            start = EndOfLine(first - 1);
-            end = EndOfLine(last);
-        }
-        else
-        {
-            start = new TextDocument.TextPosition(0, 0);
-            end = EndOfLine(last);
-        }
-        ReplaceText(start, end, select: false, "");
+        RemoveLines(first, last);
         SetSelection(false, CaretPosition);
         UpdateMaxLineWidth(-1);
     }

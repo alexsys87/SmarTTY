@@ -2096,6 +2096,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 return textPosition;
             case CaretMove.PageUp:
                 {
+                    if (IsWrapping)
+                    {
+                        return MoveWrappedRows(textPosition, -_visibleRows);
+                    }
                     textPosition.Line -= this._visibleRows;
                     if (textPosition.Line < 0)
                     {
@@ -2111,6 +2115,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 }
             case CaretMove.PageDown:
                 {
+                    if (IsWrapping)
+                    {
+                        return MoveWrappedRows(textPosition, _visibleRows);
+                    }
                     textPosition.Line += this._visibleRows;
                     if (textPosition.Line >= _document.LineCount)
                     {
@@ -2241,8 +2249,12 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     }
                     break;
                 case Keys.A:
-                    SelectAll();
-                    e.Handled = true;
+                    // Ctrl+Alt is AltGr on many keyboards: AltGr+A types a letter there (ą, å).
+                    if (!e.Alt)
+                    {
+                        SelectAll();
+                        e.Handled = true;
+                    }
                     break;
                 case Keys.Tab:
                     OnCtrlTab(e.Shift);
