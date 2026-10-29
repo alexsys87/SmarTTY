@@ -209,6 +209,25 @@ public class SSHConnectionSettings
         return true;
     }
 
+    /// <summary>
+    /// The text of the proxy field for the saved proxy settings: the inverse of <see cref="TryParseProxy"/> ("user:password@"
+    /// when there are credentials, an IPv6 address in brackets). Null when no proxy is set. Without a valid port the host
+    /// alone is returned, so that the user sees what is saved and is asked for the port when connecting.
+    /// </summary>
+    public static string FormatProxy(string credentials, string host, int port)
+    {
+        if (string.IsNullOrEmpty(host))
+        {
+            return null;
+        }
+        string endpoint = host.IndexOf(':') != -1 ? "[" + host + "]" : host;
+        if (port >= 1 && port <= 65535)
+        {
+            endpoint += ":" + port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return string.IsNullOrEmpty(credentials) ? endpoint : credentials + "@" + endpoint;
+    }
+
     public static string StripPortNumber(string hostWithPort)
     {
         return SplitHostPort(hostWithPort, out _);

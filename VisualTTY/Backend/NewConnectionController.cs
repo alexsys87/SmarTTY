@@ -302,6 +302,9 @@ public class NewConnectionController : INotifyPropertyChanged
             HostNameCaption = "Host name:";
         }
         UseConnectProxy = !string.IsNullOrEmpty(_Settings.ProxyServer);
+        // The field shows what is saved (it was left empty, so a connection with a proxy had to be typed in again to be
+        // changed or even connected from this window), in the same "[user:password@]host:port" form it is read from.
+        Proxy = SSHConnectionSettings.FormatProxy(_Settings.ProxyAuth, _Settings.ProxyServer, _Settings.ProxyPort);
         ConnectionAlias = _Settings.ConnectionAlias;
         HasAlias = !string.IsNullOrEmpty(_Settings.ConnectionAlias);
         HasCustomSSHKeyFile = !string.IsNullOrEmpty(_Settings.ExplicitKeyFile);

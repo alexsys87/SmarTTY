@@ -173,6 +173,28 @@ internal static class Program
         CheckProxyRejected("");
         CheckProxyRejected("   ");
         CheckProxyRejected(null);
+
+        // What the window shows for the saved settings reads back as the same settings.
+        Equal(SSHConnectionSettings.FormatProxy(null, "proxy.example.com", 3128), "proxy.example.com:3128", "format: host and port");
+        Equal(SSHConnectionSettings.FormatProxy("user:secret", "proxy", 3128), "user:secret@proxy:3128", "format: with credentials");
+        Equal(SSHConnectionSettings.FormatProxy("", "proxy", 3128), "proxy:3128", "format: empty credentials are left out");
+        Equal(SSHConnectionSettings.FormatProxy(null, "2001:db8::3", 3128), "[2001:db8::3]:3128", "format: an IPv6 address gets brackets");
+        Equal(SSHConnectionSettings.FormatProxy(null, "proxy", 0), "proxy", "format: no valid port leaves the host alone");
+        Equal(SSHConnectionSettings.FormatProxy("u:p", null, 3128), null, "format: no proxy gives no text");
+        Equal(SSHConnectionSettings.FormatProxy("u:p", "", 3128), null, "format: an empty host gives no text");
+        foreach ((string credentials, string host, int port) in new[]
+        {
+            ((string)null, "proxy.example.com", 3128),
+            ("user:secret", "proxy", 8080),
+            ("user:p@ss", "10.0.0.1", 1),
+            ((string)null, "2001:db8::3", 65535),
+            ("u:p", "::1", 3128),
+        })
+        {
+            string text = SSHConnectionSettings.FormatProxy(credentials, host, port);
+            bool parsed = SSHConnectionSettings.TryParseProxy(text, out string parsedCredentials, out string parsedHost, out int parsedPort);
+            Check(parsed && parsedCredentials == credentials && parsedHost == host && parsedPort == port, "format: '" + text + "' reads back unchanged");
+        }
     }
 
     private static void CheckIpv6Hosts()
