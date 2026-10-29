@@ -53,6 +53,7 @@ public partial class App : Application
         // The host-key prompts are raised from SshConnector, which is compiled by the Mono test harness too.
         SshConnector.NewHostKeyPrompt = (settings, fingerprint) => NewHostKeyWindow.Confirm(settings, fingerprint);
         SshConnector.HostKeyMismatchPrompt = (settings, reason) => HostKeyMismatchWindow.Confirm(settings, reason);
+        SshConnector.KnownHostsProblemNotice = message => MessageBoxes.Warning(message);
         // The device terminal (COM/TCP/telnet) raises its dialogs from harness-compiled code as well.
         DeviceTerminalControl.LogReplayPrompt = (bytes, terminal) => LogReplayWindow.Replay(bytes, terminal);
         DeviceTerminalControl.SerialSettingsPrompt = (settings, portName) =>
