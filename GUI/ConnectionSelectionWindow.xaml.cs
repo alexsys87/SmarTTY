@@ -149,12 +149,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         internal State CheckMachine(SSHConnectionSettings connection)
         {
-            int index = connection.HostName.IndexOf(':');
-            if (index == -1)
-            {
-                return CheckMachine(connection.HostName, 22);
-            }
-            return CheckMachine(connection.HostName.Substring(0, index), int.Parse(connection.HostName.Substring(index + 1)));
+            // The same split as the connection itself uses: a bare IPv6 address ("::1") has no port, and "[::1]:2222" has one.
+            // Cutting at the first colon made int.Parse throw for every IPv6 host in the list.
+            string host = SSHConnectionSettings.SplitHostPort(connection.HostName, out int? port);
+            return CheckMachine(host, port ?? 22);
         }
     }
 

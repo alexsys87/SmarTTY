@@ -108,18 +108,75 @@ public class SSHConnectionSettings
         }
     }
 
-    public static string StripPortNumber(string hostWithPort)
+    /// <summary>
+    /// Splits the host field of a connection: "host", "host:port", "[ipv6]" or "[ipv6]:port". Returns the host without
+    /// brackets and the port, or null when there is none. An IPv6 address without brackets has colons of its own, so
+    /// it is a host without a port. Anything that only looks like a port (letters, 0, more than 65535) is not split
+    /// off: the text is returned whole, so that a typo in the port fails when connecting instead of connecting to the
+    /// default port.
+    /// </summary>
+    public static string SplitHostPort(string hostWithPort, out int? port)
     {
-        if (hostWithPort == null)
-        {
-            return null;
-        }
-        int index = hostWithPort.IndexOf(':');
-        if (index == -1)
+        port = null;
+        if (string.IsNullOrEmpty(hostWithPort))
         {
             return hostWithPort;
         }
-        return hostWithPort.Substring(0, index);
+        if (hostWithPort[0] == '[')
+        {
+            int end = hostWithPort.IndexOf(']');
+            if (end < 2)
+            {
+                return hostWithPort;
+            }
+            string address = hostWithPort.Substring(1, end - 1);
+            if (end == hostWithPort.Length - 1)
+            {
+                return address;
+            }
+            if (hostWithPort[end + 1] == ':' && TryParsePort(hostWithPort.Substring(end + 2), out int bracketedPort))
+            {
+                port = bracketedPort;
+                return address;
+            }
+            return hostWithPort;
+        }
+        int colon = hostWithPort.IndexOf(':');
+        if (colon == -1 || colon != hostWithPort.LastIndexOf(':'))
+        {
+            // No port, or an IPv6 address (two or more colons).
+            return hostWithPort;
+        }
+        if (colon > 0 && TryParsePort(hostWithPort.Substring(colon + 1), out int hostPort))
+        {
+            port = hostPort;
+            return hostWithPort.Substring(0, colon);
+        }
+        return hostWithPort;
+    }
+
+    private static bool TryParsePort(string text, out int port)
+    {
+        // Digits only: int.TryParse alone would take a sign or spaces.
+        port = 0;
+        if (text.Length == 0 || text.Length > 5)
+        {
+            return false;
+        }
+        foreach (char digit in text)
+        {
+            if (digit < '0' || digit > '9')
+            {
+                return false;
+            }
+        }
+        port = int.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        return port >= 1 && port <= 65535;
+    }
+
+    public static string StripPortNumber(string hostWithPort)
+    {
+        return SplitHostPort(hostWithPort, out _);
     }
 
     public static bool HostNamesEqual(string firstHost, string secondHost)

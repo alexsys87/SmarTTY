@@ -434,14 +434,9 @@ public partial class SshConnector : Component
         SshSession sshSession = null;
         try
         {
-            int port = 22;
-            string hostName = sshConnectionSettings.HostName;
-            int colonIdx = hostName.IndexOf(':');
-            if (colonIdx != -1 && int.TryParse(hostName.Substring(colonIdx + 1), out var parsedPort))
-            {
-                port = parsedPort;
-                hostName = hostName.Substring(0, colonIdx);
-            }
+            // "host", "host:port", "[ipv6]" and "[ipv6]:port": a bare IPv6 address has colons of its own and no port.
+            string hostName = SSHConnectionSettings.SplitHostPort(sshConnectionSettings.HostName, out int? parsedPort);
+            int port = parsedPort ?? 22;
             ReportStatus(connectionAttempt, "Connecting...");
             KnownHostKeyStore knownHostKeyStore = new KnownHostKeyStore();
             NoticeKnownHostsProblem(knownHostKeyStore.LoadProblem, fromLoad: true);

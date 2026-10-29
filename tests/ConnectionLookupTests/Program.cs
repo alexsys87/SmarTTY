@@ -37,6 +37,8 @@ internal static class Program
             CheckLookup();
             CheckHostOnlyFallback();
             CheckHostWithPort();
+            CheckHostPortSplitting();
+            CheckIpv6Hosts();
             Console.WriteLine($"All {_passed} checks passed.");
             return 0;
         }
@@ -97,6 +99,54 @@ internal static class Program
         Equal(store.Store.FindSshConnection("10.0.0.9", "root"), null, "port: the exact lookup does not strip it");
         Equal(store.Store.FindByHost("10.0.0.9").Count, 1, "port: a host with a port matches its bare host");
         Equal(store.Store.FindSshConnectionForArgument("root@10.0.0.9")?.HostName, "10.0.0.9:2222", "port: the argument fallback strips it");
+    }
+
+    private static void CheckSplit(string text, string expectedHost, int? expectedPort)
+    {
+        string host = SSHConnectionSettings.SplitHostPort(text, out int? port);
+        Equal(host, expectedHost, "split port: host of '" + text + "'");
+        Equal(port, expectedPort, "split port: port of '" + text + "'");
+    }
+
+    // The host field is "host", "host:port", "[ipv6]" or "[ipv6]:port". A bare IPv6 address has colons of its own and
+    // never carries a port; text that only looks like a port is left alone, so that a typo fails loudly.
+    private static void CheckHostPortSplitting()
+    {
+        CheckSplit("host", "host", null);
+        CheckSplit("host.example.com:2222", "host.example.com", 2222);
+        CheckSplit("10.0.0.9:22", "10.0.0.9", 22);
+        CheckSplit("[::1]:2222", "::1", 2222);
+        CheckSplit("[2001:db8::7]:22", "2001:db8::7", 22);
+        CheckSplit("[::1]", "::1", null);
+        CheckSplit("::1", "::1", null);
+        CheckSplit("2001:db8::1", "2001:db8::1", null);
+        CheckSplit("fe80:0:0:0:0:0:0:1", "fe80:0:0:0:0:0:0:1", null);
+        CheckSplit("host:abc", "host:abc", null);
+        CheckSplit("host:", "host:", null);
+        CheckSplit("host:0", "host:0", null);
+        CheckSplit("host:65536", "host:65536", null);
+        CheckSplit("host:-1", "host:-1", null);
+        CheckSplit("[::1]:abc", "[::1]:abc", null);
+        CheckSplit("[::1", "[::1", null);
+        CheckSplit("[::1]x", "[::1]x", null);
+        CheckSplit("", "", null);
+        CheckSplit(null, null, null);
+    }
+
+    private static void CheckIpv6Hosts()
+    {
+        Equal(SSHConnectionSettings.StripPortNumber("10.0.0.9:2222"), "10.0.0.9", "strip: a port is removed");
+        Equal(SSHConnectionSettings.StripPortNumber("::1"), "::1", "strip: a bare IPv6 address is not cut at its first colon");
+        Equal(SSHConnectionSettings.StripPortNumber("[::1]:2222"), "::1", "strip: brackets and port are removed");
+        Check(!SSHConnectionSettings.HostNamesEqual("::1", "::2"), "equal: two bare IPv6 addresses differ");
+        Check(SSHConnectionSettings.HostNamesEqual("[2001:db8::7]:2222", "2001:db8::7"), "equal: an IPv6 host with a port matches its bare address");
+        Check(SSHConnectionSettings.HostNamesEqual("Host:22", "host"), "equal: still case-insensitive and port-insensitive");
+
+        using TempStore store = new TempStore();
+        store.Add("root", "[2001:db8::7]:2222", alias: null);
+        Equal(store.Store.FindByHost("2001:db8::7").Count, 1, "ipv6: a host with a port matches its bare address");
+        Equal(store.Store.FindByHost("2001:db8::8").Count, 0, "ipv6: another address does not match");
+        Equal(store.Store.FindSshConnectionForArgument("root@2001:db8::7")?.HostName, "[2001:db8::7]:2222", "ipv6: the argument fallback finds it");
     }
 
     /// <summary>A saved-connection store backed by a directory of its own, thrown away with the instance.</summary>
