@@ -986,6 +986,49 @@ internal static class Program
         Check("pacing: switched off, the same transfer is quick", r.Completed && watch.ElapsedMilliseconds < paced, watch.ElapsedMilliseconds + " ms");
     }
 
+    // The window keeps its settings in %LOCALAPPDATA%\SmarTTY\TftpFirmware.xml. XDG_DATA_HOME points there on Linux.
+    private static void SettingsTests()
+    {
+        string appData = Path.Combine(_dir, "settings-appdata");
+        Directory.CreateDirectory(appData);
+        string previous = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        Environment.SetEnvironmentVariable("XDG_DATA_HOME", appData);
+        try
+        {
+            Check("settings: defaults without a file", !TftpFirmwareSettings.Exists() && TftpFirmwareSettings.Load().Files.Count == 0);
+            Check("settings: the load address defaults to the board variable", TftpFirmwareSettings.Load().LoadAddress == TftpFirmwareSettings.DefaultLoadAddress);
+            Check("settings: only the board's address is answered by default", TftpFirmwareSettings.Load().RestrictClient);
+
+            string firmware = MakeFile("firmware.bin", 16, 7);
+            TftpFirmwareSettings saved = new TftpFirmwareSettings();
+            saved.Files.Add(new TftpFirmwareSettings.ServedFileEntry { Name = "firmware.bin", FullPath = firmware });
+            saved.ServerIp = "192.168.1.10";
+            saved.DeviceIp = "192.168.1.50";
+            saved.LoadAddress = "0x80060000";
+            saved.Prompt = "=>";
+            saved.After = "bootm {addr}";
+            saved.RestrictClient = false;
+            saved.FileToSend = "firmware.bin";
+            saved.Save();
+
+            TftpFirmwareSettings loaded = TftpFirmwareSettings.Load();
+            Check("settings: the served files survive a restart",
+                loaded.Files.Count == 1 && loaded.Files[0].Name == "firmware.bin" && loaded.Files[0].FullPath == firmware,
+                loaded.Files.Count.ToString());
+            Check("settings: the addresses, the prompt and the commands survive a restart",
+                loaded.ServerIp == "192.168.1.10" && loaded.DeviceIp == "192.168.1.50" && loaded.LoadAddress == "0x80060000" &&
+                loaded.Prompt == "=>" && loaded.After == "bootm {addr}" && loaded.FileToSend == "firmware.bin");
+            Check("settings: the flag survives a restart", !loaded.RestrictClient);
+
+            File.WriteAllText(Directory.GetFiles(appData, "*TftpFirmware.xml", SearchOption.AllDirectories)[0], "not xml at all");
+            Check("settings: a damaged file gives the defaults", TftpFirmwareSettings.Load().Files.Count == 0 && TftpFirmwareSettings.Load().LoadAddress == TftpFirmwareSettings.DefaultLoadAddress);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_DATA_HOME", previous);
+        }
+    }
+
     private static int Main()
     {
         _dir = Path.Combine(Path.GetTempPath(), "tftp-tests-" + Guid.NewGuid().ToString("N"));
@@ -1008,6 +1051,7 @@ internal static class Program
             ChangedFileTests();
             SetFilesTests();
             PacingTests();
+            SettingsTests();
         }
         finally
         {

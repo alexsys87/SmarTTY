@@ -1,5 +1,4 @@
 using SmarTTY.Ssh;
-using Microsoft.Win32;
 using SmarTTY.CodeEditing;
 using SmarTTY.Completion;
 using SmarTTY.Controls;
@@ -1403,14 +1402,8 @@ public class MainWindowController : INotifyPropertyChanged
 
     public void ExportPreferences(CommonGUIPreferences prefs)
     {
-        OpenSettingsKey();
         prefs.FullScreen = FullScreenMode;
         prefs.Minimalistic = MinimalisticMode;
-    }
-
-    public static RegistryKey OpenSettingsKey()
-    {
-        return Registry.CurrentUser.CreateSubKey("SOFTWARE\\Sysprogs\\SmarTTY\\Settings");
     }
 
     private void UpdateResizeMode()

@@ -1,5 +1,4 @@
 using SmarTTY.Ssh;
-using Microsoft.Win32;
 using SmarTTY.Controls;
 using System.Drawing;
 using System.IO;
@@ -13,11 +12,6 @@ public static class AppEnvironment
     public const string PasswordContainerName = "com.sysprogs.smartty.passwords";
 
     public static string ProductName = "SmarTTY";
-
-    public static RegistryKey OpenSettingsKey()
-    {
-        return Registry.CurrentUser.CreateSubKey("SOFTWARE\\Sysprogs\\SmarTTY\\Settings");
-    }
 
     public static string GetCurrentDirectory(TerminalEmulatorControl terminalEmulatorControl, SshSession sshSession, ref string cachedHomeDirectory)
     {

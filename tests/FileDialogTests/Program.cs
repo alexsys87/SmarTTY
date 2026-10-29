@@ -190,7 +190,7 @@ internal static class Program
             Check(!Regex.IsMatch(code, @"\b(OpenFileDialog|SaveFileDialog)\b"), $"the native file dialogs are gone from {name}");
         }
 
-        // These files pulled in Microsoft.Win32 only for the file dialogs; MainWindowController keeps it for Registry.
+        // These files pulled in Microsoft.Win32 only for the file dialogs.
         string[] win32Dropped = new string[]
         {
             Path.Combine(root, "VisualTTY", "Backend", "NewConnectionController.cs"),

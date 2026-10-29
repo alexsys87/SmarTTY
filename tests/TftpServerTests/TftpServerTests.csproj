@@ -8,5 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../IO/TftpServer.cs" Link="TftpServer.cs" />
+    <Compile Include="../../IO/TftpFirmwareSettings.cs" Link="TftpFirmwareSettings.cs" />
+    <Compile Include="../../Utilities/XmlStorage.cs" Link="XmlStorage.cs" />
   </ItemGroup>
 </Project>
