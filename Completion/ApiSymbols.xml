@@ -364,6 +364,1425 @@
     <Symbol language="CLike" name="assert" signature="assert(expression)">
       <Summary>Runtime assertion</Summary>
     </Symbol>
+    <Symbol language="CLike" name="size_t">
+      <Summary>Unsigned integer type returned by sizeof</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ptrdiff_t">
+      <Summary>Signed integer type for pointer differences</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="wchar_t">
+      <Summary>Wide character type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="NULL">
+      <Summary>Null pointer constant</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="max_align_t">
+      <Summary>Type with maximum alignment</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="offsetof" signature="offsetof(type, member)">
+      <Summary>Byte offset of a structure member</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vprintf" signature="vprintf(const char *format, va_list args)">
+      <Summary>Formatted output to stdout using an argument list</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vfprintf" signature="vfprintf(FILE *stream, const char *format, va_list args)">
+      <Summary>Formatted output to a stream using an argument list</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vsprintf" signature="vsprintf(char *buffer, const char *format, va_list args)">
+      <Summary>Formatted output into a string using an argument list</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vsnprintf" signature="vsnprintf(char *buffer, size_t size, const char *format, va_list args)">
+      <Summary>Bounded formatted output using an argument list</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fscanf" signature="fscanf(FILE *stream, const char *format, ...)">
+      <Summary>Formatted input from a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vscanf" signature="vscanf(const char *format, va_list args)">
+      <Summary>Formatted input from stdin using an argument list</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vfscanf" signature="vfscanf(FILE *stream, const char *format, va_list args)">
+      <Summary>Formatted input from a stream using an argument list</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vsscanf" signature="vsscanf(const char *text, const char *format, va_list args)">
+      <Summary>Parse a string using an argument list</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fgetc" signature="fgetc(FILE *stream)">
+      <Summary>Read a character from a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fputc" signature="fputc(int c, FILE *stream)">
+      <Summary>Write a character to a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="getc" signature="getc(FILE *stream)">
+      <Summary>Read a character from a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="putc" signature="putc(int c, FILE *stream)">
+      <Summary>Write a character to a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ungetc" signature="ungetc(int c, FILE *stream)">
+      <Summary>Push a character back onto a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fgetpos" signature="fgetpos(FILE *stream, fpos_t *position)">
+      <Summary>Get the current file position</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fsetpos" signature="fsetpos(FILE *stream, const fpos_t *position)">
+      <Summary>Set the current file position</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="freopen" signature="freopen(const char *path, const char *mode, FILE *stream)">
+      <Summary>Reopen a stream with a new file or mode</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="remove" signature="remove(const char *path)">
+      <Summary>Delete a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="rename" signature="rename(const char *oldpath, const char *newpath)">
+      <Summary>Rename or move a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tmpfile" signature="tmpfile()">
+      <Summary>Create a temporary binary file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tmpnam" signature="tmpnam(char *buffer)">
+      <Summary>Generate a temporary file name</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="setbuf" signature="setbuf(FILE *stream, char *buffer)">
+      <Summary>Set the stream buffer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="setvbuf" signature="setvbuf(FILE *stream, char *buffer, int mode, size_t size)">
+      <Summary>Set the stream buffering mode and size</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="clearerr" signature="clearerr(FILE *stream)">
+      <Summary>Clear stream error and end-of-file flags</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="FILE">
+      <Summary>File stream type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fpos_t">
+      <Summary>File position type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="EOF">
+      <Summary>End-of-file constant</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="BUFSIZ">
+      <Summary>Default stream buffer size</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="FOPEN_MAX">
+      <Summary>Maximum number of open files</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="FILENAME_MAX">
+      <Summary>Maximum file name length</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="L_tmpnam">
+      <Summary>Size of a tmpnam buffer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="TMP_MAX">
+      <Summary>Maximum number of temporary file names</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="SEEK_SET">
+      <Summary>Seek from the beginning of a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="SEEK_CUR">
+      <Summary>Seek from the current position</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="SEEK_END">
+      <Summary>Seek from the end of a file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="stdin">
+      <Summary>Standard input stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="stdout">
+      <Summary>Standard output stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="stderr">
+      <Summary>Standard error stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="_IOFBF">
+      <Summary>Fully buffered stream mode</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="_IOLBF">
+      <Summary>Line buffered stream mode</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="_IONBF">
+      <Summary>Unbuffered stream mode</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atol" signature="atol(const char *text)">
+      <Summary>Convert a string to a long integer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atoll" signature="atoll(const char *text)">
+      <Summary>Convert a string to a long long integer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtof" signature="strtof(const char *text, char **end)">
+      <Summary>Convert a string to a float</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtold" signature="strtold(const char *text, char **end)">
+      <Summary>Convert a string to a long double</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtoll" signature="strtoll(const char *text, char **end, int base)">
+      <Summary>Convert a string to a long long integer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtoul" signature="strtoul(const char *text, char **end, int base)">
+      <Summary>Convert a string to an unsigned long integer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtoull" signature="strtoull(const char *text, char **end, int base)">
+      <Summary>Convert a string to an unsigned long long integer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atexit" signature="atexit(void (*function)(void))">
+      <Summary>Register a function to run at exit</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="at_quick_exit" signature="at_quick_exit(void (*function)(void))">
+      <Summary>Register a function to run at quick exit</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="_Exit" signature="_Exit(int status)">
+      <Summary>Terminate the program without cleanup</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="quick_exit" signature="quick_exit(int status)">
+      <Summary>Terminate the program with quick exit handlers</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="getenv" signature="getenv(const char *name)">
+      <Summary>Read an environment variable</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="system" signature="system(const char *command)">
+      <Summary>Run a command through the host shell</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="abs" signature="abs(int value)">
+      <Summary>Absolute value of an int</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="labs" signature="labs(long value)">
+      <Summary>Absolute value of a long</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="llabs" signature="llabs(long long value)">
+      <Summary>Absolute value of a long long</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="div" signature="div(int numerator, int denominator)">
+      <Summary>Integer division with remainder</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ldiv" signature="ldiv(long numerator, long denominator)">
+      <Summary>Long integer division with remainder</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lldiv" signature="lldiv(long long numerator, long long denominator)">
+      <Summary>Long long division with remainder</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="mblen" signature="mblen(const char *text, size_t count)">
+      <Summary>Length of a multibyte character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="mbtowc" signature="mbtowc(wchar_t *wide, const char *text, size_t count)">
+      <Summary>Convert a multibyte character to wide</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="wctomb" signature="wctomb(char *text, wchar_t wide)">
+      <Summary>Convert a wide character to multibyte</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="mbstowcs" signature="mbstowcs(wchar_t *destination, const char *source, size_t count)">
+      <Summary>Convert a multibyte string to wide</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="wcstombs" signature="wcstombs(char *destination, const wchar_t *source, size_t count)">
+      <Summary>Convert a wide string to multibyte</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="aligned_alloc" signature="aligned_alloc(size_t alignment, size_t size)">
+      <Summary>Allocate aligned memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="div_t">
+      <Summary>Integer division result type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ldiv_t">
+      <Summary>Long integer division result type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lldiv_t">
+      <Summary>Long long division result type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="EXIT_SUCCESS">
+      <Summary>Successful program termination status</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="EXIT_FAILURE">
+      <Summary>Failed program termination status</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="RAND_MAX">
+      <Summary>Maximum value returned by rand</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="MB_CUR_MAX">
+      <Summary>Maximum multibyte character length</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memchr" signature="memchr(const void *buffer, int c, size_t count)">
+      <Summary>Find a byte in memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strcoll" signature="strcoll(const char *left, const char *right)">
+      <Summary>Compare strings using the current locale</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strxfrm" signature="strxfrm(char *destination, const char *source, size_t count)">
+      <Summary>Transform a string for locale-aware comparison</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strerror" signature="strerror(int error)">
+      <Summary>Text for an error code</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strspn" signature="strspn(const char *text, const char *accept)">
+      <Summary>Length of the initial matching span</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strcspn" signature="strcspn(const char *text, const char *reject)">
+      <Summary>Length before the first rejected character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strpbrk" signature="strpbrk(const char *text, const char *accept)">
+      <Summary>Find the first character from a set</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sqrtf" signature="sqrtf(float x)">
+      <Summary>Square root (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sqrtl" signature="sqrtl(long double x)">
+      <Summary>Square root (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="powf" signature="powf(float x, float y)">
+      <Summary>Raise to a power (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="powl" signature="powl(long double x, long double y)">
+      <Summary>Raise to a power (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sinf" signature="sinf(float x)">
+      <Summary>Sine (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sinl" signature="sinl(long double x)">
+      <Summary>Sine (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="cosf" signature="cosf(float x)">
+      <Summary>Cosine (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="cosl" signature="cosl(long double x)">
+      <Summary>Cosine (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tanf" signature="tanf(float x)">
+      <Summary>Tangent (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tanl" signature="tanl(long double x)">
+      <Summary>Tangent (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="logf" signature="logf(float x)">
+      <Summary>Natural logarithm (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="logl" signature="logl(long double x)">
+      <Summary>Natural logarithm (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="expf" signature="expf(float x)">
+      <Summary>Exponential function (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="expl" signature="expl(long double x)">
+      <Summary>Exponential function (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="floorf" signature="floorf(float x)">
+      <Summary>Round down to an integer (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="floorl" signature="floorl(long double x)">
+      <Summary>Round down to an integer (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ceilf" signature="ceilf(float x)">
+      <Summary>Round up to an integer (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ceill" signature="ceill(long double x)">
+      <Summary>Round up to an integer (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fabsf" signature="fabsf(float x)">
+      <Summary>Absolute value (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fabsl" signature="fabsl(long double x)">
+      <Summary>Absolute value (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asin" signature="asin(double x)">
+      <Summary>Arc sine</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asinf" signature="asinf(float x)">
+      <Summary>Arc sine (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asinl" signature="asinl(long double x)">
+      <Summary>Arc sine (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="acos" signature="acos(double x)">
+      <Summary>Arc cosine</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="acosf" signature="acosf(float x)">
+      <Summary>Arc cosine (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="acosl" signature="acosl(long double x)">
+      <Summary>Arc cosine (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atan" signature="atan(double x)">
+      <Summary>Arc tangent</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atanf" signature="atanf(float x)">
+      <Summary>Arc tangent (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atanl" signature="atanl(long double x)">
+      <Summary>Arc tangent (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atan2" signature="atan2(double y, double x)">
+      <Summary>Arc tangent of y/x</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atan2f" signature="atan2f(float y, float x)">
+      <Summary>Arc tangent of y/x (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atan2l" signature="atan2l(long double y, long double x)">
+      <Summary>Arc tangent of y/x (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sinh" signature="sinh(double x)">
+      <Summary>Hyperbolic sine</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sinhf" signature="sinhf(float x)">
+      <Summary>Hyperbolic sine (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sinhl" signature="sinhl(long double x)">
+      <Summary>Hyperbolic sine (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="cosh" signature="cosh(double x)">
+      <Summary>Hyperbolic cosine</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="coshf" signature="coshf(float x)">
+      <Summary>Hyperbolic cosine (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="coshl" signature="coshl(long double x)">
+      <Summary>Hyperbolic cosine (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tanh" signature="tanh(double x)">
+      <Summary>Hyperbolic tangent</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tanhf" signature="tanhf(float x)">
+      <Summary>Hyperbolic tangent (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tanhl" signature="tanhl(long double x)">
+      <Summary>Hyperbolic tangent (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asinh" signature="asinh(double x)">
+      <Summary>Inverse hyperbolic sine</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asinhf" signature="asinhf(float x)">
+      <Summary>Inverse hyperbolic sine (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asinhl" signature="asinhl(long double x)">
+      <Summary>Inverse hyperbolic sine (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="acosh" signature="acosh(double x)">
+      <Summary>Inverse hyperbolic cosine</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="acoshf" signature="acoshf(float x)">
+      <Summary>Inverse hyperbolic cosine (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="acoshl" signature="acoshl(long double x)">
+      <Summary>Inverse hyperbolic cosine (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atanh" signature="atanh(double x)">
+      <Summary>Inverse hyperbolic tangent</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atanhf" signature="atanhf(float x)">
+      <Summary>Inverse hyperbolic tangent (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="atanhl" signature="atanhl(long double x)">
+      <Summary>Inverse hyperbolic tangent (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log10" signature="log10(double x)">
+      <Summary>Base-10 logarithm</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log10f" signature="log10f(float x)">
+      <Summary>Base-10 logarithm (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log10l" signature="log10l(long double x)">
+      <Summary>Base-10 logarithm (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log2" signature="log2(double x)">
+      <Summary>Base-2 logarithm</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log2f" signature="log2f(float x)">
+      <Summary>Base-2 logarithm (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log2l" signature="log2l(long double x)">
+      <Summary>Base-2 logarithm (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log1p" signature="log1p(double x)">
+      <Summary>Natural logarithm of 1+x</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log1pf" signature="log1pf(float x)">
+      <Summary>Natural logarithm of 1+x (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="log1pl" signature="log1pl(long double x)">
+      <Summary>Natural logarithm of 1+x (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="exp2" signature="exp2(double x)">
+      <Summary>Base-2 exponential</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="exp2f" signature="exp2f(float x)">
+      <Summary>Base-2 exponential (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="exp2l" signature="exp2l(long double x)">
+      <Summary>Base-2 exponential (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="expm1" signature="expm1(double x)">
+      <Summary>Exponential minus one</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="expm1f" signature="expm1f(float x)">
+      <Summary>Exponential minus one (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="expm1l" signature="expm1l(long double x)">
+      <Summary>Exponential minus one (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="frexp" signature="frexp(double value, int *exponent)">
+      <Summary>Split a number into fraction and exponent</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="frexpf" signature="frexpf(float value, int *exponent)">
+      <Summary>Split a number into fraction and exponent (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="frexpl" signature="frexpl(long double value, int *exponent)">
+      <Summary>Split a number into fraction and exponent (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ldexp" signature="ldexp(double value, int exponent)">
+      <Summary>Scale a number by a power of two</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ldexpf" signature="ldexpf(float value, int exponent)">
+      <Summary>Scale a number by a power of two (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ldexpl" signature="ldexpl(long double value, int exponent)">
+      <Summary>Scale a number by a power of two (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="modf" signature="modf(double value, double *integer)">
+      <Summary>Split a number into fraction and integer parts</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="modff" signature="modff(float value, float *integer)">
+      <Summary>Split a number into fraction and integer parts (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="modfl" signature="modfl(long double value, long double *integer)">
+      <Summary>Split a number into fraction and integer parts (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scalbn" signature="scalbn(double value, int exponent)">
+      <Summary>Scale by a power of FLT_RADIX</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scalbnf" signature="scalbnf(float value, int exponent)">
+      <Summary>Scale by a power of FLT_RADIX (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scalbnl" signature="scalbnl(long double value, int exponent)">
+      <Summary>Scale by a power of FLT_RADIX (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scalbln" signature="scalbln(double value, long exponent)">
+      <Summary>Scale by a power of FLT_RADIX</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scalblnf" signature="scalblnf(float value, long exponent)">
+      <Summary>Scale by a power of FLT_RADIX (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scalblnl" signature="scalblnl(long double value, long exponent)">
+      <Summary>Scale by a power of FLT_RADIX (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ilogb" signature="ilogb(double value)">
+      <Summary>Exponent of a number as an integer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ilogbf" signature="ilogbf(float value)">
+      <Summary>Exponent of a number as an integer (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ilogbl" signature="ilogbl(long double value)">
+      <Summary>Exponent of a number as an integer (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="logb" signature="logb(double value)">
+      <Summary>Exponent of a number as a floating value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="logbf" signature="logbf(float value)">
+      <Summary>Exponent of a number as a floating value (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="logbl" signature="logbl(long double value)">
+      <Summary>Exponent of a number as a floating value (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="cbrt" signature="cbrt(double x)">
+      <Summary>Cube root</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="cbrtf" signature="cbrtf(float x)">
+      <Summary>Cube root (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="cbrtl" signature="cbrtl(long double x)">
+      <Summary>Cube root (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="hypot" signature="hypot(double x, double y)">
+      <Summary>Length of the hypotenuse</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="hypotf" signature="hypotf(float x, float y)">
+      <Summary>Length of the hypotenuse (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="hypotl" signature="hypotl(long double x, long double y)">
+      <Summary>Length of the hypotenuse (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmod" signature="fmod(double x, double y)">
+      <Summary>Floating-point remainder</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmodf" signature="fmodf(float x, float y)">
+      <Summary>Floating-point remainder (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmodl" signature="fmodl(long double x, long double y)">
+      <Summary>Floating-point remainder (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="remainder" signature="remainder(double x, double y)">
+      <Summary>IEEE remainder</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="remainderf" signature="remainderf(float x, float y)">
+      <Summary>IEEE remainder (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="remainderl" signature="remainderl(long double x, long double y)">
+      <Summary>IEEE remainder (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="remquo" signature="remquo(double x, double y, int *quotient)">
+      <Summary>Remainder and part of the quotient</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="remquof" signature="remquof(float x, float y, int *quotient)">
+      <Summary>Remainder and part of the quotient (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="remquol" signature="remquol(long double x, long double y, int *quotient)">
+      <Summary>Remainder and part of the quotient (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="copysign" signature="copysign(double magnitude, double sign)">
+      <Summary>Copy the sign of a value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="copysignf" signature="copysignf(float magnitude, float sign)">
+      <Summary>Copy the sign of a value (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="copysignl" signature="copysignl(long double magnitude, long double sign)">
+      <Summary>Copy the sign of a value (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nan" signature="nan(const char *text)">
+      <Summary>Quiet NaN</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nanf" signature="nanf(const char *text)">
+      <Summary>Quiet NaN (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nanl" signature="nanl(const char *text)">
+      <Summary>Quiet NaN (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nextafter" signature="nextafter(double from, double to)">
+      <Summary>Next representable value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nextafterf" signature="nextafterf(float from, float to)">
+      <Summary>Next representable value (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nextafterl" signature="nextafterl(long double from, long double to)">
+      <Summary>Next representable value (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nexttoward" signature="nexttoward(double from, long double to)">
+      <Summary>Next value toward a long double</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nexttowardf" signature="nexttowardf(float from, long double to)">
+      <Summary>Next value toward a long double (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nexttowardl" signature="nexttowardl(long double from, long double to)">
+      <Summary>Next value toward a long double (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fdim" signature="fdim(double x, double y)">
+      <Summary>Positive difference</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fdimf" signature="fdimf(float x, float y)">
+      <Summary>Positive difference (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fdiml" signature="fdiml(long double x, long double y)">
+      <Summary>Positive difference (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmax" signature="fmax(double x, double y)">
+      <Summary>Larger of two values</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmaxf" signature="fmaxf(float x, float y)">
+      <Summary>Larger of two values (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmaxl" signature="fmaxl(long double x, long double y)">
+      <Summary>Larger of two values (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmin" signature="fmin(double x, double y)">
+      <Summary>Smaller of two values</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fminf" signature="fminf(float x, float y)">
+      <Summary>Smaller of two values (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fminl" signature="fminl(long double x, long double y)">
+      <Summary>Smaller of two values (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fma" signature="fma(double x, double y, double z)">
+      <Summary>Fused multiply-add</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmaf" signature="fmaf(float x, float y, float z)">
+      <Summary>Fused multiply-add (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmal" signature="fmal(long double x, long double y, long double z)">
+      <Summary>Fused multiply-add (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="trunc" signature="trunc(double x)">
+      <Summary>Round toward zero</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="truncf" signature="truncf(float x)">
+      <Summary>Round toward zero (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="truncl" signature="truncl(long double x)">
+      <Summary>Round toward zero (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="round" signature="round(double x)">
+      <Summary>Round to the nearest integer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="roundf" signature="roundf(float x)">
+      <Summary>Round to the nearest integer (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="roundl" signature="roundl(long double x)">
+      <Summary>Round to the nearest integer (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lround" signature="lround(double x)">
+      <Summary>Round to a long</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lroundf" signature="lroundf(float x)">
+      <Summary>Round to a long (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lroundl" signature="lroundl(long double x)">
+      <Summary>Round to a long (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="llround" signature="llround(double x)">
+      <Summary>Round to a long long</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="llroundf" signature="llroundf(float x)">
+      <Summary>Round to a long long (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="llroundl" signature="llroundl(long double x)">
+      <Summary>Round to a long long (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="rint" signature="rint(double x)">
+      <Summary>Round using the current mode</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="rintf" signature="rintf(float x)">
+      <Summary>Round using the current mode (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="rintl" signature="rintl(long double x)">
+      <Summary>Round using the current mode (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lrint" signature="lrint(double x)">
+      <Summary>Round to a long using the current mode</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lrintf" signature="lrintf(float x)">
+      <Summary>Round to a long using the current mode (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lrintl" signature="lrintl(long double x)">
+      <Summary>Round to a long using the current mode (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="llrint" signature="llrint(double x)">
+      <Summary>Round to a long long using the current mode</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="llrintf" signature="llrintf(float x)">
+      <Summary>Round to a long long using the current mode (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="llrintl" signature="llrintl(long double x)">
+      <Summary>Round to a long long using the current mode (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nearbyint" signature="nearbyint(double x)">
+      <Summary>Round without raising an exception</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nearbyintf" signature="nearbyintf(float x)">
+      <Summary>Round without raising an exception (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nearbyintl" signature="nearbyintl(long double x)">
+      <Summary>Round without raising an exception (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="erf" signature="erf(double x)">
+      <Summary>Error function</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="erff" signature="erff(float x)">
+      <Summary>Error function (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="erfl" signature="erfl(long double x)">
+      <Summary>Error function (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="erfc" signature="erfc(double x)">
+      <Summary>Complementary error function</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="erfcf" signature="erfcf(float x)">
+      <Summary>Complementary error function (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="erfcl" signature="erfcl(long double x)">
+      <Summary>Complementary error function (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tgamma" signature="tgamma(double x)">
+      <Summary>Gamma function</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tgammaf" signature="tgammaf(float x)">
+      <Summary>Gamma function (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tgammal" signature="tgammal(long double x)">
+      <Summary>Gamma function (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lgamma" signature="lgamma(double x)">
+      <Summary>Log gamma function</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lgammaf" signature="lgammaf(float x)">
+      <Summary>Log gamma function (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lgammal" signature="lgammal(long double x)">
+      <Summary>Log gamma function (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fpclassify" signature="fpclassify(x)">
+      <Summary>Classify a floating-point value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isfinite" signature="isfinite(x)">
+      <Summary>Test for a finite value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isinf" signature="isinf(x)">
+      <Summary>Test for infinity</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isnan" signature="isnan(x)">
+      <Summary>Test for NaN</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isnormal" signature="isnormal(x)">
+      <Summary>Test for a normal value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="signbit" signature="signbit(x)">
+      <Summary>Test for a negative sign</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isgreater" signature="isgreater(x, y)">
+      <Summary>Test whether x is greater than y</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isgreaterequal" signature="isgreaterequal(x, y)">
+      <Summary>Test whether x is greater than or equal to y</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isless" signature="isless(x, y)">
+      <Summary>Test whether x is less than y</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="islessequal" signature="islessequal(x, y)">
+      <Summary>Test whether x is less than or equal to y</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="islessgreater" signature="islessgreater(x, y)">
+      <Summary>Test whether x and y are ordered and unequal</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isunordered" signature="isunordered(x, y)">
+      <Summary>Test whether x or y is NaN</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="float_t">
+      <Summary>Floating-point type used by float expressions</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="double_t">
+      <Summary>Floating-point type used by double expressions</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="HUGE_VAL">
+      <Summary>Positive infinity or large double value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="HUGE_VALF">
+      <Summary>Positive infinity or large float value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="HUGE_VALL">
+      <Summary>Positive infinity or large long double value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="INFINITY">
+      <Summary>Positive infinity constant</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="NAN">
+      <Summary>Quiet NaN constant</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="math_errhandling">
+      <Summary>Math error reporting mode</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="MATH_ERRNO">
+      <Summary>Math errors set errno</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="MATH_ERREXCEPT">
+      <Summary>Math errors raise floating-point exceptions</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="FP_INFINITE">
+      <Summary>Floating-point infinity class</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="FP_NAN">
+      <Summary>Floating-point NaN class</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="FP_NORMAL">
+      <Summary>Floating-point normal class</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="FP_SUBNORMAL">
+      <Summary>Floating-point subnormal class</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="FP_ZERO">
+      <Summary>Floating-point zero class</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isalnum" signature="isalnum(int c)">
+      <Summary>Test for an alphanumeric character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isalpha" signature="isalpha(int c)">
+      <Summary>Test for an alphabetic character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isblank" signature="isblank(int c)">
+      <Summary>Test for a blank character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="iscntrl" signature="iscntrl(int c)">
+      <Summary>Test for a control character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isdigit" signature="isdigit(int c)">
+      <Summary>Test for a decimal digit</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isgraph" signature="isgraph(int c)">
+      <Summary>Test for a printable non-space character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="islower" signature="islower(int c)">
+      <Summary>Test for a lowercase letter</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isprint" signature="isprint(int c)">
+      <Summary>Test for a printable character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ispunct" signature="ispunct(int c)">
+      <Summary>Test for a punctuation character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isspace" signature="isspace(int c)">
+      <Summary>Test for a whitespace character</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isupper" signature="isupper(int c)">
+      <Summary>Test for an uppercase letter</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="isxdigit" signature="isxdigit(int c)">
+      <Summary>Test for a hexadecimal digit</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tolower" signature="tolower(int c)">
+      <Summary>Convert a letter to lowercase</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="toupper" signature="toupper(int c)">
+      <Summary>Convert a letter to uppercase</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="difftime" signature="difftime(time_t end, time_t start)">
+      <Summary>Difference between two times in seconds</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="mktime" signature="mktime(struct tm *time)">
+      <Summary>Convert local calendar time to time_t</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strftime" signature="strftime(char *buffer, size_t size, const char *format, const struct tm *time)">
+      <Summary>Format a calendar time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asctime" signature="asctime(const struct tm *time)">
+      <Summary>Text form of a broken-down time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ctime" signature="ctime(const time_t *timer)">
+      <Summary>Text form of a calendar time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="gmtime" signature="gmtime(const time_t *timer)">
+      <Summary>Convert time_t to UTC calendar time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="localtime" signature="localtime(const time_t *timer)">
+      <Summary>Convert time_t to local calendar time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timespec_get" signature="timespec_get(struct timespec *ts, int base)">
+      <Summary>Get the current calendar time with nanoseconds</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="clock_t">
+      <Summary>Processor time type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="time_t">
+      <Summary>Calendar time type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tm">
+      <Summary>Calendar date and time structure (struct tm)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timespec">
+      <Summary>Time with seconds and nanoseconds (struct timespec)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="CLOCKS_PER_SEC">
+      <Summary>Processor clock ticks per second</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="TIME_UTC">
+      <Summary>UTC time base for timespec_get</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fopen_s" signature="fopen_s(FILE **stream, const char *filename, const char *mode)">
+      <Summary>Open a file with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="freopen_s" signature="freopen_s(FILE **stream, const char *filename, const char *mode, FILE *oldstream)">
+      <Summary>Reopen a stream with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tmpfile_s" signature="tmpfile_s(FILE **stream)">
+      <Summary>Create a temporary file with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tmpnam_s" signature="tmpnam_s(char *buffer, rsize_t size)">
+      <Summary>Generate a temporary file name with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fprintf_s" signature="fprintf_s(FILE *stream, const char *format, ...)">
+      <Summary>Formatted output to a stream with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fscanf_s" signature="fscanf_s(FILE *stream, const char *format, ...)">
+      <Summary>Formatted input from a stream with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="printf_s" signature="printf_s(const char *format, ...)">
+      <Summary>Formatted output to stdout with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scanf_s" signature="scanf_s(const char *format, ...)">
+      <Summary>Formatted input from stdin with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="snprintf_s" signature="snprintf_s(char *buffer, rsize_t size, const char *format, ...)">
+      <Summary>Bounded formatted output with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sprintf_s" signature="sprintf_s(char *buffer, rsize_t size, const char *format, ...)">
+      <Summary>Formatted output into a string with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sscanf_s" signature="sscanf_s(const char *text, const char *format, ...)">
+      <Summary>Parse a string with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vfprintf_s" signature="vfprintf_s(FILE *stream, const char *format, va_list args)">
+      <Summary>Formatted output to a stream using an argument list with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vfscanf_s" signature="vfscanf_s(FILE *stream, const char *format, va_list args)">
+      <Summary>Formatted input from a stream using an argument list with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vprintf_s" signature="vprintf_s(const char *format, va_list args)">
+      <Summary>Formatted output to stdout using an argument list with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vscanf_s" signature="vscanf_s(const char *format, va_list args)">
+      <Summary>Formatted input from stdin using an argument list with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vsnprintf_s" signature="vsnprintf_s(char *buffer, rsize_t size, const char *format, va_list args)">
+      <Summary>Bounded formatted output using an argument list with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vsprintf_s" signature="vsprintf_s(char *buffer, rsize_t size, const char *format, va_list args)">
+      <Summary>Formatted output into a string using an argument list with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vsscanf_s" signature="vsscanf_s(const char *text, const char *format, va_list args)">
+      <Summary>Parse a string using an argument list with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="gets_s" signature="gets_s(char *buffer, rsize_t size)">
+      <Summary>Read a line from stdin with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="gets" signature="gets(char *buffer)">
+      <Summary>Read a line from stdin (unsafe; removed in C11)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="bsearch_s" signature="bsearch_s(const void *key, const void *base, size_t count, size_t size, int (*compare)(const void *, const void *, void *), void *context)">
+      <Summary>Binary search with an Annex K context argument</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="qsort_s" signature="qsort_s(void *base, size_t count, size_t size, int (*compare)(const void *, const void *, void *), void *context)">
+      <Summary>Sort with an Annex K context argument</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="getenv_s" signature="getenv_s(size_t *length, char *value, rsize_t size, const char *name)">
+      <Summary>Read an environment variable with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="mbstowcs_s" signature="mbstowcs_s(size_t *count, wchar_t *destination, rsize_t size, const char *source, rsize_t length)">
+      <Summary>Convert a multibyte string to wide with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="wcstombs_s" signature="wcstombs_s(size_t *count, char *destination, rsize_t size, const wchar_t *source, rsize_t length)">
+      <Summary>Convert a wide string to multibyte with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="set_constraint_handler_s" signature="set_constraint_handler_s(constraint_handler_t handler)">
+      <Summary>Set the Annex K constraint handler</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="abort_handler_s" signature="abort_handler_s(const char *message, void *pointer, errno_t error)">
+      <Summary>Abort on an Annex K constraint violation</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ignore_handler_s" signature="ignore_handler_s(const char *message, void *pointer, errno_t error)">
+      <Summary>Ignore an Annex K constraint violation</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memcpy_s" signature="memcpy_s(void *destination, rsize_t size, const void *source, rsize_t count)">
+      <Summary>Copy memory with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memmove_s" signature="memmove_s(void *destination, rsize_t size, const void *source, rsize_t count)">
+      <Summary>Move memory with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memset_s" signature="memset_s(void *destination, rsize_t size, int c, rsize_t count)">
+      <Summary>Fill memory with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strcpy_s" signature="strcpy_s(char *destination, rsize_t size, const char *source)">
+      <Summary>Copy a string with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strncpy_s" signature="strncpy_s(char *destination, rsize_t size, const char *source, rsize_t count)">
+      <Summary>Copy a bounded string with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strcat_s" signature="strcat_s(char *destination, rsize_t size, const char *source)">
+      <Summary>Concatenate strings with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strncat_s" signature="strncat_s(char *destination, rsize_t size, const char *source, rsize_t count)">
+      <Summary>Concatenate bounded strings with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtok_s" signature="strtok_s(char *text, rsize_t *size, const char *delimiters, char **context)">
+      <Summary>Tokenize a string with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strerror_s" signature="strerror_s(char *buffer, rsize_t size, errno_t error)">
+      <Summary>Copy an error message with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strerrorlen_s" signature="strerrorlen_s(errno_t error)">
+      <Summary>Length of an error message</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strnlen_s" signature="strnlen_s(const char *text, size_t size)">
+      <Summary>Bounded string length with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asctime_s" signature="asctime_s(char *buffer, rsize_t size, const struct tm *time)">
+      <Summary>Text form of a broken-down time with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ctime_s" signature="ctime_s(char *buffer, rsize_t size, const time_t *timer)">
+      <Summary>Text form of a calendar time with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="gmtime_s" signature="gmtime_s(const time_t *timer, struct tm *result)">
+      <Summary>Convert time_t to UTC calendar time with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="localtime_s" signature="localtime_s(const time_t *timer, struct tm *result)">
+      <Summary>Convert time_t to local calendar time with Annex K checks</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="errno_t">
+      <Summary>Annex K error number type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="rsize_t">
+      <Summary>Annex K size type for bounds-checked functions</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="constraint_handler_t">
+      <Summary>Annex K constraint handler type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fileno" signature="fileno(FILE *stream)">
+      <Summary>File descriptor of a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fdopen" signature="fdopen(int fd, const char *mode)">
+      <Summary>Create a stream from a file descriptor</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="popen" signature="popen(const char *command, const char *mode)">
+      <Summary>Open a pipe to a command</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="pclose" signature="pclose(FILE *stream)">
+      <Summary>Close a pipe stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="getline" signature="getline(char **line, size_t *size, FILE *stream)">
+      <Summary>Read a line into an allocated buffer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="getdelim" signature="getdelim(char **line, size_t *size, int delimiter, FILE *stream)">
+      <Summary>Read until a delimiter into an allocated buffer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="dprintf" signature="dprintf(int fd, const char *format, ...)">
+      <Summary>Formatted output to a file descriptor</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vdprintf" signature="vdprintf(int fd, const char *format, va_list args)">
+      <Summary>Formatted output to a file descriptor using an argument list</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="flockfile" signature="flockfile(FILE *stream)">
+      <Summary>Lock a stream for thread-safe I/O</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ftrylockfile" signature="ftrylockfile(FILE *stream)">
+      <Summary>Try to lock a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="funlockfile" signature="funlockfile(FILE *stream)">
+      <Summary>Unlock a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="getc_unlocked" signature="getc_unlocked(FILE *stream)">
+      <Summary>Read a character without locking</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="getchar_unlocked" signature="getchar_unlocked()">
+      <Summary>Read a character from stdin without locking</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="putc_unlocked" signature="putc_unlocked(int c, FILE *stream)">
+      <Summary>Write a character without locking</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="putchar_unlocked" signature="putchar_unlocked(int c)">
+      <Summary>Write a character to stdout without locking</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fseeko" signature="fseeko(FILE *stream, off_t offset, int origin)">
+      <Summary>Set the file position with off_t</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ftello" signature="ftello(FILE *stream)">
+      <Summary>Get the file position as off_t</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="fmemopen" signature="fmemopen(void *buffer, size_t size, const char *mode)">
+      <Summary>Open a memory buffer as a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="open_memstream" signature="open_memstream(char **buffer, size_t *size)">
+      <Summary>Open a dynamically growing memory stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asprintf" signature="asprintf(char **text, const char *format, ...)">
+      <Summary>Formatted output into an allocated string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="vasprintf" signature="vasprintf(char **text, const char *format, va_list args)">
+      <Summary>Formatted output into an allocated string using an argument list</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="getw" signature="getw(FILE *stream)">
+      <Summary>Read an int from a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="putw" signature="putw(int value, FILE *stream)">
+      <Summary>Write an int to a stream</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="setenv" signature="setenv(const char *name, const char *value, int overwrite)">
+      <Summary>Set an environment variable</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="unsetenv" signature="unsetenv(const char *name)">
+      <Summary>Remove an environment variable</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="putenv" signature="putenv(char *text)">
+      <Summary>Set an environment variable from a string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="realpath" signature="realpath(const char *path, char *resolved)">
+      <Summary>Resolve an absolute path</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="mkstemp" signature="mkstemp(char *template)">
+      <Summary>Create a unique temporary file</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="mkdtemp" signature="mkdtemp(char *template)">
+      <Summary>Create a unique temporary directory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="posix_memalign" signature="posix_memalign(void **pointer, size_t alignment, size_t size)">
+      <Summary>Allocate aligned memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="random" signature="random()">
+      <Summary>Pseudo-random long integer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="srandom" signature="srandom(unsigned int seed)">
+      <Summary>Seed the random number generator</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="initstate" signature="initstate(unsigned int seed, char *state, size_t size)">
+      <Summary>Initialize a random number generator state</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="setstate" signature="setstate(char *state)">
+      <Summary>Switch the random number generator state</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="drand48" signature="drand48()">
+      <Summary>Pseudo-random double</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="erand48" signature="erand48(unsigned short state[3])">
+      <Summary>Pseudo-random double from explicit state</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lrand48" signature="lrand48()">
+      <Summary>Pseudo-random long</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nrand48" signature="nrand48(unsigned short state[3])">
+      <Summary>Pseudo-random long from explicit state</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="mrand48" signature="mrand48()">
+      <Summary>Signed pseudo-random long</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="jrand48" signature="jrand48(unsigned short state[3])">
+      <Summary>Signed pseudo-random long from explicit state</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="srand48" signature="srand48(long seed)">
+      <Summary>Seed the 48-bit random generator</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="seed48" signature="seed48(unsigned short seed[3])">
+      <Summary>Seed the 48-bit generator and return the old seed</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lcong48" signature="lcong48(unsigned short parameters[7])">
+      <Summary>Set all parameters of the 48-bit generator</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="reallocarray" signature="reallocarray(void *pointer, size_t count, size_t size)">
+      <Summary>Reallocate an array with overflow checking</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strdup" signature="strdup(const char *text)">
+      <Summary>Duplicate a string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strndup" signature="strndup(const char *text, size_t count)">
+      <Summary>Duplicate at most count characters of a string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strnlen" signature="strnlen(const char *text, size_t maxsize)">
+      <Summary>Bounded string length</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strtok_r" signature="strtok_r(char *text, const char *delimiters, char **context)">
+      <Summary>Reentrant string tokenizer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strerror_r" signature="strerror_r(int error, char *buffer, size_t size)">
+      <Summary>Reentrant error message</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="stpcpy" signature="stpcpy(char *destination, const char *source)">
+      <Summary>Copy a string and return its end</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="stpncpy" signature="stpncpy(char *destination, const char *source, size_t count)">
+      <Summary>Copy a bounded string and return its end</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memccpy" signature="memccpy(void *destination, const void *source, int c, size_t count)">
+      <Summary>Copy memory until a byte is found</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="memmem" signature="memmem(const void *haystack, size_t haystack_size, const void *needle, size_t needle_size)">
+      <Summary>Find a byte sequence in memory</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strsignal" signature="strsignal(int signal)">
+      <Summary>Text for a signal number</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_E">
+      <Summary>Euler's number e</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_LOG2E">
+      <Summary>Base-2 logarithm of e</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_LOG10E">
+      <Summary>Base-10 logarithm of e</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_LN2">
+      <Summary>Natural logarithm of 2</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_LN10">
+      <Summary>Natural logarithm of 10</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_PI">
+      <Summary>Pi</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_PI_2">
+      <Summary>Pi divided by 2</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_PI_4">
+      <Summary>Pi divided by 4</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_1_PI">
+      <Summary>1 divided by pi</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_2_PI">
+      <Summary>2 divided by pi</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_2_SQRTPI">
+      <Summary>2 divided by the square root of pi</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_SQRT2">
+      <Summary>Square root of 2</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="M_SQRT1_2">
+      <Summary>Square root of 1/2</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="j0" signature="j0(double x)">
+      <Summary>Bessel function J0</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="j1" signature="j1(double x)">
+      <Summary>Bessel function J1</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="jn" signature="jn(int n, double x)">
+      <Summary>Bessel function Jn</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="y0" signature="y0(double x)">
+      <Summary>Bessel function Y0</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="y1" signature="y1(double x)">
+      <Summary>Bessel function Y1</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="yn" signature="yn(int n, double x)">
+      <Summary>Bessel function Yn</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sincos" signature="sincos(double x, double *sin_value, double *cos_value)">
+      <Summary>Sine and cosine in one call</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sincosf" signature="sincosf(float x, float *sin_value, float *cos_value)">
+      <Summary>Sine and cosine in one call (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="sincosl" signature="sincosl(long double x, long double *sin_value, long double *cos_value)">
+      <Summary>Sine and cosine in one call (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="exp10" signature="exp10(double x)">
+      <Summary>Base-10 exponential</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="exp10f" signature="exp10f(float x)">
+      <Summary>Base-10 exponential (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="exp10l" signature="exp10l(long double x)">
+      <Summary>Base-10 exponential (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="pow10" signature="pow10(double x)">
+      <Summary>Base-10 exponential (legacy)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="pow10f" signature="pow10f(float x)">
+      <Summary>Base-10 exponential (legacy, float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="pow10l" signature="pow10l(long double x)">
+      <Summary>Base-10 exponential (legacy, long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="significand" signature="significand(double x)">
+      <Summary>Significand of a floating-point value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="significandf" signature="significandf(float x)">
+      <Summary>Significand of a floating-point value (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="significandl" signature="significandl(long double x)">
+      <Summary>Significand of a floating-point value (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scalb" signature="scalb(double x, double exponent)">
+      <Summary>Scale by a power of FLT_RADIX</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scalbf" signature="scalbf(float x, float exponent)">
+      <Summary>Scale by a power of FLT_RADIX (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="scalbl" signature="scalbl(long double x, long double exponent)">
+      <Summary>Scale by a power of FLT_RADIX (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="gamma" signature="gamma(double x)">
+      <Summary>Log gamma function (legacy)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="gammaf" signature="gammaf(float x)">
+      <Summary>Log gamma function (legacy, float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="gammal" signature="gammal(long double x)">
+      <Summary>Log gamma function (legacy, long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lgamma_r" signature="lgamma_r(double x, int *sign)">
+      <Summary>Log gamma with sign</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lgammaf_r" signature="lgammaf_r(float x, int *sign)">
+      <Summary>Log gamma with sign (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="lgammal_r" signature="lgammal_r(long double x, int *sign)">
+      <Summary>Log gamma with sign (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="finite" signature="finite(double x)">
+      <Summary>Test for a finite value</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="finitef" signature="finitef(float x)">
+      <Summary>Test for a finite value (float)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="finitel" signature="finitel(long double x)">
+      <Summary>Test for a finite value (long double)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="strptime" signature="strptime(const char *text, const char *format, struct tm *time)">
+      <Summary>Parse a time from a string</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timegm" signature="timegm(struct tm *time)">
+      <Summary>Convert UTC calendar time to time_t</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timelocal" signature="timelocal(struct tm *time)">
+      <Summary>Convert local calendar time to time_t (legacy)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="clock_gettime" signature="clock_gettime(clockid_t clock, struct timespec *time)">
+      <Summary>Read a clock</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="clock_settime" signature="clock_settime(clockid_t clock, const struct timespec *time)">
+      <Summary>Set a clock</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="clock_getres" signature="clock_getres(clockid_t clock, struct timespec *resolution)">
+      <Summary>Get clock resolution</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="nanosleep" signature="nanosleep(const struct timespec *request, struct timespec *remaining)">
+      <Summary>Suspend execution for an interval</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tzset" signature="tzset()">
+      <Summary>Update time zone information</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timer_create" signature="timer_create(clockid_t clock, struct sigevent *event, timer_t *timer)">
+      <Summary>Create a POSIX timer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timer_delete" signature="timer_delete(timer_t timer)">
+      <Summary>Delete a POSIX timer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timer_settime" signature="timer_settime(timer_t timer, int flags, const struct itimerspec *new_value, struct itimerspec *old_value)">
+      <Summary>Arm or disarm a POSIX timer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timer_gettime" signature="timer_gettime(timer_t timer, struct itimerspec *value)">
+      <Summary>Get the remaining time of a POSIX timer</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timer_getoverrun" signature="timer_getoverrun(timer_t timer)">
+      <Summary>Get the timer overrun count</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="clock_nanosleep" signature="clock_nanosleep(clockid_t clock, int flags, const struct timespec *request, struct timespec *remaining)">
+      <Summary>Suspend execution against a clock</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="asctime_r" signature="asctime_r(const struct tm *time, char *buffer)">
+      <Summary>Reentrant text form of a broken-down time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="ctime_r" signature="ctime_r(const time_t *timer, char *buffer)">
+      <Summary>Reentrant text form of a calendar time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="gmtime_r" signature="gmtime_r(const time_t *timer, struct tm *result)">
+      <Summary>Reentrant UTC calendar time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="localtime_r" signature="localtime_r(const time_t *timer, struct tm *result)">
+      <Summary>Reentrant local calendar time</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="clockid_t">
+      <Summary>Clock identifier type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timer_t">
+      <Summary>POSIX timer identifier type</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="itimerspec">
+      <Summary>Timer interval structure (struct itimerspec)</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="CLOCK_REALTIME">
+      <Summary>Realtime clock</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="CLOCK_MONOTONIC">
+      <Summary>Monotonic clock</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="CLOCK_PROCESS_CPUTIME_ID">
+      <Summary>Process CPU-time clock</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="CLOCK_THREAD_CPUTIME_ID">
+      <Summary>Thread CPU-time clock</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="TIMER_ABSTIME">
+      <Summary>Absolute timer expiration flag</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="timezone">
+      <Summary>Difference from UTC in seconds</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="daylight">
+      <Summary>Daylight saving time flag</Summary>
+    </Symbol>
+    <Symbol language="CLike" name="tzname">
+      <Summary>Time zone abbreviations</Summary>
+    </Symbol>
     <Symbol language="Bash" name="echo" signature="echo(args)">
       <Summary>Write the arguments and a newline</Summary>
     </Symbol>
