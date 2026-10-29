@@ -270,15 +270,16 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     Caption = "Edit an SSH Connection",
                     ShowAliasField = true,
                     HeaderText = "SSH Connection Settings",
-                    ConnectButtonText = "Save"
+                    ConnectButtonText = "Save",
+                    ShowSaveOnlyButton = true
                 };
                 NewSSHConnectionWindow newSSHConnectionWindow = new NewSSHConnectionWindow(Connection, customization);
                 newSSHConnectionWindow.Owner = wnd;
                 newSSHConnectionWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                if (newSSHConnectionWindow.ShowDialog() == true && newSSHConnectionWindow.Controller.CreatedSession != null)
+                if (newSSHConnectionWindow.ShowDialog() == true && (newSSHConnectionWindow.Controller.SavedWithoutConnecting || newSSHConnectionWindow.Controller.CreatedSession != null))
                 {
                     _Manager?.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
-                    newSSHConnectionWindow.Controller.CreatedSession.Dispose();
+                    newSSHConnectionWindow.Controller.CreatedSession?.Dispose();
                 }
             }
 
@@ -1169,16 +1170,29 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             return true;
         }
 
+        /// <summary>Whether the last <see cref="CreateNewSSHConnection"/> only saved the connection to the list.</summary>
+        public bool SavedWithoutConnecting { get; private set; }
+
         public bool CreateNewSSHConnection(Window wnd)
         {
             NewConnectionController.WindowCustomization customization = new NewConnectionController.WindowCustomization
             {
-                ShowAliasField = true
+                ShowAliasField = true,
+                ShowSaveOnlyButton = true
             };
+            SavedWithoutConnecting = false;
             NewSSHConnectionWindow newSSHConnectionWindow = new NewSSHConnectionWindow(null, customization);
             newSSHConnectionWindow.Owner = wnd;
             newSSHConnectionWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            if (newSSHConnectionWindow.ShowDialog() == true && newSSHConnectionWindow.Controller.CreatedSession != null)
+            bool accepted = newSSHConnectionWindow.ShowDialog() == true;
+            if (accepted && newSSHConnectionWindow.Controller.SavedWithoutConnecting)
+            {
+                // Saved to the list as entered: there is no session to open, so the list window stays.
+                _Connections.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
+                SavedWithoutConnecting = true;
+                return false;
+            }
+            if (accepted && newSSHConnectionWindow.Controller.CreatedSession != null)
             {
                 if (newSSHConnectionWindow.Controller.SaveSettings)
                 {
@@ -1492,6 +1506,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         if (Controller.CreateNewSSHConnection((Window)this))
         {
             this.Close();
+        }
+        else if (Controller.SavedWithoutConnecting)
+        {
+            Controller.RefreshAll();
         }
     }
 

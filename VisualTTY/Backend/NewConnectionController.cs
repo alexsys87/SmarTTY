@@ -30,6 +30,11 @@ public class NewConnectionController : INotifyPropertyChanged
 
         public bool AllowSavingPassword { get; set; }
 
+        /// <summary>Offers "Save without connecting": the profile is saved as entered, without trying to connect first.</summary>
+        public bool ShowSaveOnlyButton { get; set; }
+
+        public Visibility SaveOnlyButtonVisibility => ShowSaveOnlyButton ? Visibility.Visible : Visibility.Collapsed;
+
         public Visibility SaveCheckboxVisibility
         {
             get
@@ -395,7 +400,11 @@ public class NewConnectionController : INotifyPropertyChanged
         }
     }
 
-    public void Connect()
+    /// <summary>True when the window was closed by "Save without connecting": there is no session, only <see cref="FinalSettings"/> to save.</summary>
+    public bool SavedWithoutConnecting { get; private set; }
+
+    /// <summary>Checks the entered host, user name and key file; the same checks for connecting and for saving.</summary>
+    private void ValidateOrThrow()
     {
         if (string.IsNullOrEmpty(_Settings.HostName))
         {
@@ -413,6 +422,20 @@ public class NewConnectionController : INotifyPropertyChanged
         {
             throw new Exception("The specified OpenSSH key file does not exist!");
         }
+    }
+
+    /// <summary>Takes the entered settings without connecting; the caller saves <see cref="FinalSettings"/> when the window closes.</summary>
+    public void SaveWithoutConnecting()
+    {
+        ValidateOrThrow();
+        UpdateSettingsFieldsOrThrow();
+        SavedWithoutConnecting = true;
+        CloseRequested?.Invoke(true);
+    }
+
+    public void Connect()
+    {
+        ValidateOrThrow();
         UpdateSettingsFieldsOrThrow();
         ProgressText = "Connecting...";
         bool password = AuthenticationType == AuthType.Password;
