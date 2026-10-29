@@ -267,7 +267,20 @@ public partial class ReadonlyTextBrowser
         return true;
     }
 
-    /// <summary>Moves one display row up or down, keeping the caret column inside the row.</summary>
+    /// <summary>Moves a page of display rows up or down; at the top or the bottom the caret goes to the first or the last row.</summary>
+    private TextDocument.TextPosition MoveWrappedRows(TextDocument.TextPosition textPosition, int rows)
+    {
+        int column = _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize);
+        int rowIndex = PositionToRowIndex(textPosition.Line, column);
+        int target = Math.Max(0, Math.Min(rowIndex + rows, ScrollRowCount - 1));
+        if (target == rowIndex)
+        {
+            return textPosition;
+        }
+        return MoveWrappedRow(textPosition, target - rowIndex);
+    }
+
+    /// <summary>Moves up or down by display rows, keeping the caret column inside the row.</summary>
     private TextDocument.TextPosition MoveWrappedRow(TextDocument.TextPosition textPosition, int direction)
     {
         int column = _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize);

@@ -33,11 +33,11 @@ public partial class TextEditorControl : EditableTextBrowser
         return base.EditableDocument.GetRangeText(start, end);
     }
 
-    public virtual void CopyAll()
+    /// <summary>Puts the text on the clipboard; false (after the error was shown) when the clipboard did not take it.</summary>
+    private bool TryCopyToClipboard(string text)
     {
         try
         {
-            string text = GetSelectedText(default, new TextDocument.TextPosition(0, base.EditableDocument.LineCount));
             if (CodeEditorPP.IsWindows())
             {
                 Win32Clipboard.SetText(Handle, text);
@@ -46,43 +46,35 @@ public partial class TextEditorControl : EditableTextBrowser
             {
                 Clipboard.SetText(text);
             }
+            return true;
         }
         catch (Exception exception)
         {
             ThemedMessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            return false;
         }
+    }
+
+    public virtual void CopyAll()
+    {
+        TryCopyToClipboard(GetSelectedText(default, new TextDocument.TextPosition(0, base.EditableDocument.LineCount)));
     }
 
     public virtual void CopySelection(bool select = true)
     {
-        try
+        if (!_hasSelection && !select)
         {
-            string text;
-            if (!_hasSelection)
-            {
-                if (!select)
-                {
-                    return;
-                }
-                text = base.EditableDocument.GetLineText(CaretPosition.Line) + "\r\n";
-            }
-            else
-            {
-                text = GetSelectedText(SelectionStart, SelectionEnd);
-            }
-            if (CodeEditorPP.IsWindows())
-            {
-                Win32Clipboard.SetText(Handle, text);
-            }
-            else
-            {
-                Clipboard.SetText(text);
-            }
+            return;
         }
-        catch (Exception exception)
-        {
-            ThemedMessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
-        }
+        TryCopyToClipboard(GetTextToCopy());
+    }
+
+    /// <summary>The selection, or the line of the caret (with its line break) when nothing is selected.</summary>
+    private string GetTextToCopy()
+    {
+        return _hasSelection
+            ? GetSelectedText(SelectionStart, SelectionEnd)
+            : base.EditableDocument.GetLineText(CaretPosition.Line) + "\r\n";
     }
 
     /// <summary>The text of the clipboard (null when it holds none).</summary>
@@ -112,16 +104,40 @@ public partial class TextEditorControl : EditableTextBrowser
 
     public virtual void Cut()
     {
-        CopySelection();
+        // The text is removed only when the clipboard has it.
+        if (!TryCopyToClipboard(GetTextToCopy()))
+        {
+            return;
+        }
         if (!_hasSelection)
         {
-            int line = CaretPosition.Line;
-            ReplaceText(new TextDocument.TextPosition(0, line), new TextDocument.TextPosition(0, line + 1), select: false, "");
+            RemoveLines(CaretPosition.Line, CaretPosition.Line);
         }
         else
         {
             ReplaceText(CaretPosition, SelectionStart, !_hasSelection, "");
         }
+    }
+
+    /// <summary>Removes the lines together with their line breaks (the line break before them when they are the last ones).</summary>
+    protected void RemoveLines(int first, int last)
+    {
+        TextDocument.TextPosition start;
+        TextDocument.TextPosition end;
+        if (last < base.EditableDocument.LineCount - 1)
+        {
+            start = new TextDocument.TextPosition(0, first);
+            end = new TextDocument.TextPosition(0, last + 1);
+        }
+        else
+        {
+            // The last lines have no line break of their own: the one before them goes.
+            start = (first > 0)
+                ? new TextDocument.TextPosition(base.EditableDocument.GetLineText(first - 1).Length, first - 1)
+                : new TextDocument.TextPosition(0, 0);
+            end = new TextDocument.TextPosition(base.EditableDocument.GetLineText(last).Length, last);
+        }
+        ReplaceText(start, end, select: false, "");
     }
 
     /// <summary>Removes the selected text; does nothing without a selection (unlike Cut, it leaves the clipboard alone).</summary>
@@ -159,7 +175,14 @@ public partial class TextEditorControl : EditableTextBrowser
                             // and no trailing newline): Enter must still insert a line break.
                             content = TextDocument.GetLineEndingText(base.EditableDocument.DefaultLineEnding);
                         }
-                        ReplaceText(CaretPosition, SelectionStart, !_hasSelection, content + GetIndentation(CaretPosition.Line));
+                        // Only the indentation in front of the caret is carried over: with the caret inside it, the
+                        // rest of the indentation stays with the text that moves to the new line.
+                        string indentation = GetIndentation(CaretPosition.Line);
+                        if (CaretPosition.Column < indentation.Length)
+                        {
+                            indentation = indentation.Substring(0, CaretPosition.Column);
+                        }
+                        ReplaceText(CaretPosition, SelectionStart, !_hasSelection, content + indentation);
                         break;
                     }
                 case '\b':
@@ -294,27 +317,29 @@ public partial class TextEditorControl : EditableTextBrowser
                 }
                 UpdateMaxLineWidth(CaretPosition.Line);
             }
-            if (e.Control && (e.KeyCode == Keys.Insert || e.KeyCode == Keys.C))
+            // Ctrl+Alt is AltGr on many keyboards: AltGr+C, V, X, Z, Y type letters there (ć, ż, ...), not commands.
+            bool command = e.Control && !e.Alt;
+            if (command && (e.KeyCode == Keys.Insert || e.KeyCode == Keys.C))
             {
                 CopySelection(CopyLineWhenNoSelection);
                 e.Handled = true;
             }
-            else if ((e.Shift && e.KeyCode == Keys.Insert) || (e.Control && e.KeyCode == Keys.V))
+            else if ((e.Shift && e.KeyCode == Keys.Insert) || (command && e.KeyCode == Keys.V))
             {
                 Paste();
                 e.Handled = true;
             }
-            else if ((e.Shift && e.KeyCode == Keys.Delete) || (e.Control && e.KeyCode == Keys.X))
+            else if ((e.Shift && e.KeyCode == Keys.Delete) || (command && e.KeyCode == Keys.X))
             {
                 Cut();
                 e.Handled = true;
             }
-            else if (!e.Shift && e.Control && e.KeyCode == Keys.Z)
+            else if (!e.Shift && command && e.KeyCode == Keys.Z)
             {
                 Undo();
                 e.Handled = true;
             }
-            else if ((e.Shift && e.Control && e.KeyCode == Keys.Z) || (e.Control && e.KeyCode == Keys.Y))
+            else if ((e.Shift && command && e.KeyCode == Keys.Z) || (command && e.KeyCode == Keys.Y))
             {
                 Redo();
                 e.Handled = true;
