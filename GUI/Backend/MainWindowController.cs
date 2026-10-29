@@ -373,6 +373,7 @@ public class MainWindowController : INotifyPropertyChanged
                 }
             };
             _Controller.ApplyEditorSettings(editor);
+            editor.ZoomChanged += (object sender, EventArgs e) => _Controller.ApplyEditorZoom(editor.FontZoom);
             EditorTabContext newTab = session.AddNewFileEditorOrThrow(editor, fn);
             editor.Tag = newTab;
             // The tool bar and the context menu of the editor.
@@ -382,6 +383,11 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 // The switch on the tool bar and in the context menu is the same setting as in the settings window.
                 _Controller.Settings.Editor.ShowAllCharacters = editor.ShowAllCharacters;
+                _Controller.Settings.Save();
+            };
+            newTab.EditorPanel.WordWrapChanged += (object sender, EventArgs e) =>
+            {
+                _Controller.Settings.Editor.WordWrap = editor.WordWrap;
                 _Controller.Settings.Save();
             };
         }
@@ -1430,6 +1436,8 @@ public class MainWindowController : INotifyPropertyChanged
         edit.HideMargins = !Settings.Editor.ShowLineNumbers;
         edit.ShowTabs = Settings.Editor.ShowTabs;
         edit.ShowAllCharacters = Settings.Editor.ShowAllCharacters;
+        edit.WordWrap = Settings.Editor.WordWrap;
+        edit.FontZoom = Settings.Editor.FontZoom > 0f ? Settings.Editor.FontZoom : 1f;
         edit.CompletionEnabled = Settings.Editor.Autocompletion;
         edit.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;
         edit.ApiSymbols = Settings.Editor.ApiSymbols ? ApiSymbols : null;
@@ -1438,6 +1446,23 @@ public class MainWindowController : INotifyPropertyChanged
         if (edit.Tag is EditorTabContext editorTab)
         {
             editorTab.EditorPanel.RefreshState();
+        }
+    }
+
+    /// <summary>Gives every open file editor the zoom just chosen in one of them.</summary>
+    private void ApplyEditorZoom(float zoom)
+    {
+        Settings.Editor.FontZoom = zoom;
+        Settings.Save();
+        foreach (SessionWrapper session in AllSessions)
+        {
+            foreach (ITabContext tab in session.Tabs)
+            {
+                if (tab is EditorTabContext editorTab)
+                {
+                    editorTab.Editor.FontZoom = zoom;
+                }
+            }
         }
     }
 

@@ -677,6 +677,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     protected virtual void OnLineChanged(int line, int column, int addedLength, int removedLength)
     {
+        InvalidateWrapMap();
         if (line == CaretPosition.Line)
         {
             string text = EditableDocument.GetLineText(line);
@@ -694,6 +695,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     protected virtual void OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
+        InvalidateWrapMap();
         if (RangeChanged != null)
         {
             RangeChanged(this, start, oldEnd, newEnd);

@@ -265,6 +265,13 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
         public ILineDecorator Decorator;
 
+        // Word wrap: the display columns of the line this row shows, and whether it continues the line of the row above.
+        public int SegStart;
+
+        public int SegEnd;
+
+        public bool Continuation;
+
         public override string ToString()
         {
             if (VirtualLine == null)
@@ -817,7 +824,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             {
                 return 0;
             }
-            return Math.Min(_verticalScrollBar.Value, Math.Max(LineCount - _visibleRows, 0));
+            return Math.Min(_verticalScrollBar.Value, Math.Max(ScrollRowCount - _visibleRows, 0));
         }
         set
         {
@@ -848,7 +855,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             try
             {
-                if (_noHorizontalScroll)
+                if (_noHorizontalScroll || IsWrapping)
                 {
                     value = 0;
                 }
@@ -887,6 +894,13 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private float _fontDpiScale = 1f;
 
+    // The user's zoom of the text (Ctrl+wheel, Ctrl+0), on top of the monitor scale.
+    private float _fontZoom = 1f;
+
+    public const float MinFontZoom = 0.5f;
+
+    public const float MaxFontZoom = 4f;
+
     public override Font Font
     {
         get
@@ -896,8 +910,33 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         set
         {
             _logicalFont = value;
-            base.Font = value == null || _fontDpiScale == 1f ? value : SmarTTY.Forms.DpiScaling.ScaleFont(value, _fontDpiScale);
+            ApplyEffectiveFont();
         }
+    }
+
+    /// <summary>The factor the text is shown with on top of its font size: 1 is the size the font was set to.</summary>
+    public float FontZoom
+    {
+        get
+        {
+            return _fontZoom;
+        }
+        set
+        {
+            value = Math.Max(MinFontZoom, Math.Min(MaxFontZoom, value));
+            if (value == _fontZoom)
+            {
+                return;
+            }
+            _fontZoom = value;
+            ApplyEffectiveFont();
+        }
+    }
+
+    private void ApplyEffectiveFont()
+    {
+        float scale = _fontDpiScale * _fontZoom;
+        base.Font = _logicalFont == null || scale == 1f ? _logicalFont : SmarTTY.Forms.DpiScaling.ScaleFont(_logicalFont, scale);
     }
 
     internal void SetFontDpiScale(float scale)
@@ -909,7 +948,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         _fontDpiScale = scale;
         if (_logicalFont != null)
         {
-            base.Font = scale == 1f ? _logicalFont : SmarTTY.Forms.DpiScaling.ScaleFont(_logicalFont, scale);
+            ApplyEffectiveFont();
         }
     }
 
@@ -1270,7 +1309,14 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 AddRef();
             }
             int lineCount = _document.LineCount;
-            if (_virtualLines != null)
+            int maxLineWidth = _maxLineWidth;
+            if (IsWrapping)
+            {
+                _wrapWidth = ComputeWrapWidth(_textArea.Width);
+                lineCount = ScrollRowCount;
+                maxLineWidth = 0;
+            }
+            else if (_virtualLines != null)
             {
                 lineCount += _virtualLines.GetTotalVirtualRows() - _virtualLines.GetTotalHiddenLines();
             }
@@ -1291,7 +1337,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 };
                 _horizontalScrollBar.Limits = new ScrollLimits
                 {
-                    Maximum = _maxLineWidth,
+                    Maximum = maxLineWidth,
                     LargeChange = _visibleColumns
                 };
             }
@@ -1304,17 +1350,17 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 };
                 _horizontalScrollBar.Limits = new ScrollLimits
                 {
-                    Maximum = Math.Max(_maxLineWidth - _visibleColumns + 1, 0),
+                    Maximum = Math.Max(maxLineWidth - _visibleColumns + 1, 0),
                     LargeChange = _visibleColumns
                 };
             }
-            int horizontalScrollRange = _maxLineWidth - _visibleColumns + 2;
+            int horizontalScrollRange = maxLineWidth - _visibleColumns + 2;
             if (horizontalScrollRange < 0)
             {
                 horizontalScrollRange = 0;
             }
             ScrollColumn = Math.Min(ScrollColumn, horizontalScrollRange);
-            int verticalScrollRange = _document.LineCount - _visibleRows + 2;
+            int verticalScrollRange = (IsWrapping ? lineCount : _document.LineCount) - _visibleRows + 2;
             if (verticalScrollRange < 0)
             {
                 verticalScrollRange = 0;
@@ -1386,6 +1432,12 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     protected bool TryGetCaretColumn(TextDocument.TextPosition textPosition, out int column)
     {
         column = 0;
+        if (IsWrapping)
+        {
+            column = _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize);
+            int row = PositionToRowIndex(textPosition.Line, column) - ScrollLine;
+            return row >= 0 && row < _visibleRows;
+        }
         if (textPosition.Line < _firstVisibleLine || textPosition.Line > _lastVisibleLine)
         {
             return false;
@@ -1400,7 +1452,13 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public float ColumnToX(int column)
     {
-        int visibleColumn = column - ScrollColumn;
+        return ColumnToXFrom(column, _rowOrigin >= 0 ? _rowOrigin : ScrollColumn);
+    }
+
+    /// <summary>The x position of a display column when <paramref name="firstColumn"/> is the column at the left edge.</summary>
+    private float ColumnToXFrom(int column, int firstColumn)
+    {
+        int visibleColumn = column - firstColumn;
         if (visibleColumn < 0)
         {
             visibleColumn = 0;
@@ -1445,6 +1503,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected PointF PositionToPoint(int column, int line)
     {
+        if (IsWrapping)
+        {
+            return TryGetWrappedPoint(column, line, out float wrappedX, out float wrappedY) ? new PointF(wrappedX, wrappedY) : new PointF(ColumnToXFrom(column, 0), -1f);
+        }
         return new PointF(ColumnToX(column), LineToY(line));
     }
 
@@ -1477,14 +1539,21 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         return _displayRows[row].Line;
     }
 
-    private int XToColumn(float x)
+    private int XToColumn(float x, int row = -1)
     {
         x -= (float)_textArea.Left;
         if (x < 0f)
         {
             x = 0f;
         }
-        return ScrollColumn + (int)((x + _charSize.Width / 2f) / _charSize.Width);
+        int column = (int)((x + _charSize.Width / 2f) / _charSize.Width);
+        if (IsWrapping && row >= 0 && _displayRows[row].Line >= 0)
+        {
+            // A click right of a row that continues on the next one stays on this row.
+            int rowEnd = _displayRows[row].SegEnd;
+            return rowEnd == int.MaxValue ? _displayRows[row].SegStart + column : Math.Min(_displayRows[row].SegStart + column, rowEnd - 1);
+        }
+        return ScrollColumn + column;
     }
 
     protected TextDocument.TextPosition HitTest(Point point, bool allowPastEnd = false)
@@ -1494,7 +1563,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             return new TextDocument.TextPosition(-1, -1);
         }
-        TextDocument.TextPosition columnIndex = new TextDocument.TextPosition(_document.ColumnToIndex(line, XToColumn(point.X), TabSize, out var isPastEnd), line);
+        TextDocument.TextPosition columnIndex = new TextDocument.TextPosition(_document.ColumnToIndex(line, XToColumn(point.X, YToRow(point.Y)), TabSize, out var isPastEnd), line);
         if (columnIndex.Line >= _document.LineCount || (!allowPastEnd & isPastEnd))
         {
             return new TextDocument.TextPosition(-1, -1);
@@ -1556,6 +1625,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private bool EnsureVisible(TextDocument.TextPosition textPosition, bool center)
     {
+        if (IsWrapping)
+        {
+            return EnsureWrappedVisible(textPosition, center);
+        }
         int firstLine = _firstVisibleLine;
         int lastLine = _lastVisibleLine;
         int firstColumn = ScrollColumn;
@@ -1958,6 +2031,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 }
                 return textPosition;
             case CaretMove.Up:
+                if (IsWrapping)
+                {
+                    return MoveWrappedRow(textPosition, -1);
+                }
                 if (textPosition.Line == 0)
                 {
                     OnMoveBeyondDocument(ref textPosition, -1);
@@ -1970,6 +2047,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 }
                 return textPosition;
             case CaretMove.Down:
+                if (IsWrapping)
+                {
+                    return MoveWrappedRow(textPosition, 1);
+                }
                 if (textPosition.Line == _document.LineCount - 1)
                 {
                     OnMoveBeyondDocument(ref textPosition, 1);
@@ -2057,6 +2138,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             if (_desiredColumn == -1)
             {
                 _desiredColumn = _document.IndexToColumn(CaretPosition.Line, CaretPosition.Column, TabSize);
+                _desiredWrapOffset = IsWrapping ? _desiredColumn - WrapSegmentStart(CaretPosition.Line, WrapSegmentOf(CaretPosition.Line, _desiredColumn)) : 0;
             }
         }
         else
@@ -2148,7 +2230,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 case Keys.Down:
                     if (!TerminalMode)
                     {
-                        if (ScrollLine < _document.LineCount - this._visibleRows + 2)
+                        if (ScrollLine < ScrollRowCount - this._visibleRows + 2)
                         {
                             ScrollLine++;
                             UpdateCaret();
@@ -2292,8 +2374,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             rangeStart = end;
             rangeEnd = start;
         }
-        int firstColumn = ScrollColumn;
-        int lastColumn = firstColumn + _visibleColumns - 1;
+        int scrollColumn = ScrollColumn;
         int previousStartX = -1;
         int previousEndX = -1;
         for (int row = 0; row < this._visibleRows; row++)
@@ -2307,6 +2388,9 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             {
                 break;
             }
+            // The columns at the left edge and at the right edge of this row.
+            int firstColumn = IsWrapping ? _displayRows[row].SegStart : scrollColumn;
+            int lastColumn = firstColumn + _visibleColumns - 1;
             string text = _document.GetLineText(line);
             int lineLength = _document.IndexToColumn(line, text.Length, TabSize);
             int startColumn = 0;
@@ -2331,6 +2415,17 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             {
                 break;
             }
+            if (IsWrapping)
+            {
+                // Only the part of the selection that this row shows.
+                int rowEnd = _displayRows[row].SegEnd;
+                startColumn = Math.Max(startColumn, firstColumn);
+                endColumn = Math.Min(endColumn, rowEnd);
+                if (endColumn < startColumn || (startColumn == endColumn && rowEnd != int.MaxValue && startColumn >= rowEnd))
+                {
+                    continue;
+                }
+            }
             if (highlightStyle.TextBrush != null)
             {
                 for (int column = Math.Max(startColumn, firstColumn); column < Math.Min(endColumn, lastColumn + 1); column++)
@@ -2338,8 +2433,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     items[row, column - firstColumn] = highlightStyle.TextBrush;
                 }
             }
-            int startX = Round(ColumnToX(startColumn));
-            int endX = Round(ColumnToX(endColumn));
+            int startX = Round(ColumnToXFrom(startColumn, firstColumn));
+            int endX = Round(ColumnToXFrom(endColumn, firstColumn));
             if ((line != rangeStart.Line || line != rangeEnd.Line) && startColumn == endColumn)
             {
                 endX = startX + Round(_charSize.Width / 4f);
@@ -2385,6 +2480,11 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected void InvalidateLine(int line)
     {
+        if (IsWrapping)
+        {
+            Invalidate();
+            return;
+        }
         if (line >= _firstVisibleLine && line <= _lastVisibleLine)
         {
             int row = LineToRow(line);
@@ -2397,6 +2497,11 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected void InvalidateLines(int startLine, int endLine)
     {
+        if (IsWrapping)
+        {
+            Invalidate();
+            return;
+        }
         if (startLine > endLine)
         {
             int temporaryLine = startLine;
@@ -2498,7 +2603,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         int lastPaintedColumn = 0;
         int characterIndex = 0;
         int column = startIndex;
-        while (characterIndex < text.Length && column < _visibleColumns)
+        int columnLimit = IsWrapping ? Math.Min(_visibleColumns, _displayRows[row].SegEnd - firstColumn) : _visibleColumns;
+        while (characterIndex < text.Length && column < columnLimit)
         {
             int displayColumn = column + firstColumn;
             int lineColumn = characterIndex + startColumn;
@@ -2626,7 +2732,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private void PaintInvisibleCharacters(Graphics graphics, int line, string text, int firstColumn, int top)
     {
-        int lastColumn = firstColumn + _visibleColumns - 1;
+        int lastColumn = _rowLastColumn >= 0 ? _rowLastColumn : firstColumn + _visibleColumns - 1;
         int column = 0;
         for (int i = 0; i < text.Length; i++)
         {
@@ -2773,7 +2879,24 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 }
                 if (line != -1)
                 {
-                    PaintLine(e.Graphics, line, row, firstColumn, backgroundBrushes);
+                    if (IsWrapping)
+                    {
+                        _rowOrigin = _displayRows[row].SegStart;
+                        _rowLastColumn = Math.Min(_displayRows[row].SegEnd - 1, _rowOrigin + _visibleColumns - 1);
+                        try
+                        {
+                            PaintLine(e.Graphics, line, row, _rowOrigin, backgroundBrushes);
+                        }
+                        finally
+                        {
+                            _rowOrigin = -1;
+                            _rowLastColumn = -1;
+                        }
+                    }
+                    else
+                    {
+                        PaintLine(e.Graphics, line, row, firstColumn, backgroundBrushes);
+                    }
                 }
             }
             else
@@ -2894,6 +3017,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected virtual void OnTextReplaced()
     {
+        _wrapDirty = true;
         _maxLineWidth = -1;
         UpdateLayout();
         Redraw();
@@ -3015,6 +3139,11 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         if (_displayRows == null || _displayRows.Length != _visibleRows)
         {
             _displayRows = new DisplayRow[_visibleRows];
+        }
+        if (IsWrapping)
+        {
+            RebuildWrappedRows();
+            return;
         }
         int scrollLine = ScrollLine;
         if (_virtualLines == null)
@@ -3299,11 +3428,19 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 }
                 int y = Round(RowToY(row));
                 int from = 0;
+                int rowFirst = IsWrapping ? _displayRows[row].SegStart : ScrollColumn;
+                int rowEnd = IsWrapping ? _displayRows[row].SegEnd : int.MaxValue;
                 // A line of a minified file may hold thousands of matches; the first ones are enough to show.
                 for (int shown = 0; shown < 500 && from <= text.Length && matcher.Match(text, from, text.Length, backward: false, allowEmpty: false, out int index, out int length); shown++)
                 {
-                    int startX = Round(ColumnToX(_document.IndexToColumn(line, index, TabSize)));
-                    int endX = Round(ColumnToX(_document.IndexToColumn(line, index + length, TabSize)));
+                    int matchStart = _document.IndexToColumn(line, index, TabSize);
+                    int matchEnd = _document.IndexToColumn(line, index + length, TabSize);
+                    int startX = Round(ColumnToXFrom(matchStart, rowFirst));
+                    int endX = Round(ColumnToXFrom(Math.Min(matchEnd, rowEnd), rowFirst));
+                    if (matchStart >= rowEnd || matchEnd <= rowFirst)
+                    {
+                        endX = startX;
+                    }
                     if (endX > startX)
                     {
                         graphics.FillRectangle(_matchHighlightBrush, startX, y, endX - startX, _charSize.Height);

@@ -790,6 +790,10 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     public void ExpandCurrentFold()
     {
+        if (IsWrapping)
+        {
+            return;
+        }
         if (_foldingManager.ExpandLine(CaretPosition.Line))
         {
             UpdateLayout();
@@ -799,6 +803,10 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     public void CollapseCurrentFold()
     {
+        if (IsWrapping)
+        {
+            return;
+        }
         if (_foldingManager.CollapseLine(CaretPosition.Line, this))
         {
             UpdateLayout();

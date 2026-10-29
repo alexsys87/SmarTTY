@@ -25,7 +25,8 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             {
                 int lineIndex = readonlyTextBrowser.DisplayRows[rowIdx].Line;
                 GutterState gutterState = GutterState.Plain;
-                if (readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && lineIndex != -1)
+                // Folding is not available while long lines are wrapped (see ReadonlyTextBrowser.WordWrap).
+                if (readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && lineIndex != -1 && !readonlyTextBrowser.IsWrapping)
                 {
                     gutterState = this._manager.GetGutterState(lineIndex);
                 }
@@ -64,7 +65,7 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
 
         public bool OnMouseDown(Point point, ReadonlyTextBrowser readonlyTextBrowser, int firstLineIndex, int lastLineIndex, SizeF charSize, int rowIdx)
         {
-            if (readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && this._manager.ToggleFold(readonlyTextBrowser.DisplayRows[rowIdx].Line, readonlyTextBrowser, out var endToken, collapseOnly: false))
+            if (!readonlyTextBrowser.IsWrapping && readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && this._manager.ToggleFold(readonlyTextBrowser.DisplayRows[rowIdx].Line, readonlyTextBrowser, out var endToken, collapseOnly: false))
             {
                 if (endToken != null && readonlyTextBrowser.CaretPosition.Line <= endToken.LineNumber && readonlyTextBrowser.CaretPosition.Line >= endToken.Partner.LineNumber)
                 {

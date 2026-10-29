@@ -62,6 +62,12 @@ internal static class Program
         Check(!new EditorCommandState { ShowAllCharacters = true }.IsChecked(EditorToolbarCommand.Save),
             "only Show All Characters has a tick");
 
+        // Word Wrap is a switch as well, and has no meaning in the hex view.
+        Check(empty.IsEnabled(EditorToolbarCommand.WordWrap), "empty document: Word Wrap is on");
+        Check(!empty.IsChecked(EditorToolbarCommand.WordWrap), "Word Wrap starts off");
+        Check(new EditorCommandState { WordWrap = true }.IsChecked(EditorToolbarCommand.WordWrap), "Word Wrap is ticked when the editor wraps lines");
+        Check(!new EditorCommandState { HexMode = true }.IsEnabled(EditorToolbarCommand.WordWrap), "hex view: Word Wrap is off");
+
         // Edits.
         EditorCommandState edited = new EditorCommandState { HasText = true, IsModified = true, CanUndo = true };
         Check(edited.IsEnabled(EditorToolbarCommand.Save), "modified file: Save is on");

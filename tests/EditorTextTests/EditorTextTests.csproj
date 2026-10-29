@@ -13,5 +13,7 @@
     <Compile Include="../../TextEditing/EditableTextDocument.cs" Link="EditableTextDocument.cs" />
     <Compile Include="../../CodeEditing/TokenCache.cs" Link="TokenCache.cs" />
     <Compile Include="../../CodeEditing/SyntaxHighlighting.cs" Link="SyntaxHighlighting.cs" />
+    <Compile Include="../../CodeEditing/CommentStyle.cs" Link="CommentStyle.cs" />
+    <Compile Include="../../CodeEditing/LineWrapper.cs" Link="LineWrapper.cs" />
   </ItemGroup>
 </Project>
