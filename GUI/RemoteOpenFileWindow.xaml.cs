@@ -288,10 +288,7 @@ public partial class RemoteOpenFileWindow : Window
                     else
                     {
                         IsBusy = false;
-                        // Exit status -1 is what a channel closed by a lost connection reports: no verdict on the directory.
-                        MessageBoxes.Error(remoteCommand.ExitCode == -1
-                            ? "The listing was interrupted, most likely because the connection to the server was lost. Try again after reconnecting."
-                            : "'ls -1' failed with code: " + remoteCommand.ExitCode + ". Non-existent directory?");
+                        MessageBoxes.Error(RemoteListing.DescribeFailure(remoteCommand.ExitCode));
                         _pendingJob = null;
                         _requestedDirectory = null;
                         if (_currentDirectory == null)
@@ -337,7 +334,7 @@ public partial class RemoteOpenFileWindow : Window
             else
             {
                 _timer.Stop();
-                MessageBoxes.Error("Command returned with code: " + _pendingJob.ExitCode);
+                MessageBoxes.Error(RemoteListing.DescribeFailure(_pendingJob.ExitCode));
                 _requestedDirectory = null;
             }
             _pendingJob.Dispose();
