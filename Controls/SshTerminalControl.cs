@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using VisualTTY;
+using SmarTTY.Completion;
 
 namespace SmarTTY.Controls;
 

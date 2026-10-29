@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace SmarTTY;
+namespace SmarTTY.Ssh;
 
 public interface IProjectAwareException
 {

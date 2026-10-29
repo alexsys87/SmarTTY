@@ -1,7 +1,7 @@
 ﻿using SmarTTY.Ssh;
 using System;
 
-namespace SmarTTY;
+namespace SmarTTY.Ssh;
 
 public static class SshKeyExtensions
 {

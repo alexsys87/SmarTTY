@@ -4,14 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-// The namespace AuthorizedKeysManager.cs imports; nothing from it is used.
-namespace VisualTTY
-{
-    internal static class Placeholder
-    {
-    }
-}
-
 namespace SmarTTY.Ssh
 {
     /// <summary>How the remote "sh -c AppendScript" ends in the stand-in below.</summary>

@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading;
 using VisualTTY;
 
-namespace SmarTTY;
+namespace SmarTTY.Completion;
 
 public class ShellCompletionAnalyzer : IDisposable
 {

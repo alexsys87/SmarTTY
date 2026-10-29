@@ -1,7 +1,8 @@
 ﻿using SmarTTY.Ssh;
 using VisualTTY;
+using SmarTTY.Completion;
 
-namespace SmarTTY;
+namespace SmarTTY.Terminal;
 
 public interface ITerminalSessionContext
 {

@@ -1,7 +1,6 @@
-using SmarTTY.Terminal;
 using System.Collections.Generic;
 
-namespace SmarTTY;
+namespace SmarTTY.Terminal;
 
 public class LineSplitter
 {
