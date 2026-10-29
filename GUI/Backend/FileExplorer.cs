@@ -442,7 +442,9 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             {
                 // A failed listing of the directory does not count as a listing: it is tried again.
                 bool listed = _LastListResult?.Directory == _WorkingDirectory && _LastListResult.Exception == null;
-                if ((!forceRefresh && (listed || !_IsActive)) || (_PendingList != null && _PendingList?.Session == _Control.Session))
+                // A refresh replaces a listing that is under way: that one may have been started before the change the
+                // refresh is for (a delete, a paste) and would show the old state; its answer is dropped as stale.
+                if ((!forceRefresh && (listed || !_IsActive)) || (!forceRefresh && _PendingList != null && _PendingList?.Session == _Control.Session))
                 {
                     return;
                 }
@@ -467,7 +469,8 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
     private HashSet<string> CurrentNames()
     {
         ListResult listResult = _LastListResult;
-        HashSet<string> names = new HashSet<string>(StringComparer.Ordinal);
+        // The names of a Windows host differ in case only when they are the same name.
+        HashSet<string> names = new HashSet<string>(IsWindowsHost ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         if (listResult?.Result != null && listResult.Directory == _WorkingDirectory)
         {
             foreach (LsOutputParser.LsEntry entry in listResult.Result)
@@ -517,8 +520,8 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         foreach (ItemWrapper item in clipboard.Items)
         {
             string sourceDirectory = RemotePathUtils.GetDirectoryName(item.FullPath);
-            bool sameDirectory = RemoteFileOperations.IsSameOrInside(sourceDirectory, targetDirectory) && RemoteFileOperations.IsSameOrInside(targetDirectory, sourceDirectory);
-            if (item.Entry.IsDirectory && RemoteFileOperations.IsSameOrInside(targetDirectory, item.FullPath))
+            bool sameDirectory = RemoteFileOperations.IsSameOrInside(sourceDirectory, targetDirectory, windowsHost) && RemoteFileOperations.IsSameOrInside(targetDirectory, sourceDirectory, windowsHost);
+            if (item.Entry.IsDirectory && RemoteFileOperations.IsSameOrInside(targetDirectory, item.FullPath, windowsHost))
             {
                 MessageBoxes.Error("'" + item.Name + "' cannot be " + (clipboard.Cut ? "moved" : "copied") + " into itself.");
                 return;
@@ -892,6 +895,11 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
                 try
                 {
                     string local = System.IO.Path.Combine(target, SafeLocalName(item.Name));
+                    if ((item.Entry.Flags & LsOutputParser.LsEntryFlags.Special) != 0)
+                    {
+                        // Devices, sockets and pipes have no content to copy (reading a pipe would never end).
+                        throw new RemoteOperationException("Not a regular file.");
+                    }
                     if (item.Entry.IsDirectory)
                     {
                         if (sftp != null)
@@ -994,7 +1002,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             {
                 DownloadDirectory(sftp, remote, local);
             }
-            else
+            else if (attributes == null || attributes.Mode == null || attributes.IsRegularFile)
             {
                 DownloadFile(null, sftp, remote, local);
             }

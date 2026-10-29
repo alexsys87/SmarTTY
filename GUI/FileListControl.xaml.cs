@@ -42,7 +42,7 @@ public partial class FileListControl : UserControl, IComponentConnector
         public string[] LocalFiles;
 
         /// <summary>
-        /// The remote package files to install (<see cref="FileEvent.InstallPackage"/> only).
+        /// The remote files to install (<see cref="FileEvent.InstallPackage"/>), download (<see cref="FileEvent.Download"/>) or the remote folders to download as archives (<see cref="FileEvent.DownloadArchive"/>).
         /// </summary>
         public string[] FullPaths;
     }
@@ -177,16 +177,15 @@ public partial class FileListControl : UserControl, IComponentConnector
 
     private void DownloadFile_Click(object sender, RoutedEventArgs e)
     {
-        foreach (FileExplorer.ItemWrapper item in ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>())
+        string[] files = SelectedEntries().Where((FileExplorer.ItemWrapper item) => !item.Entry.IsDirectory).Select((FileExplorer.ItemWrapper item) => item.FullPath).ToArray();
+        if (files.Length != 0)
         {
-            if (!item.Entry.IsDirectory)
+            // One event for all files, so that the download directory is asked for once and not once per file.
+            FileActionRequested?.Invoke(this, new FileEventArgs
             {
-                FileActionRequested?.Invoke(this, new FileEventArgs
-                {
-                    FullPath = item.FullPath,
-                    Event = FileEvent.Download
-                });
-            }
+                FullPaths = files,
+                Event = FileEvent.Download
+            });
         }
     }
 
@@ -262,16 +261,14 @@ public partial class FileListControl : UserControl, IComponentConnector
 
     private void DownloadArchive_Click(object sender, RoutedEventArgs e)
     {
-        foreach (FileExplorer.ItemWrapper item in ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>())
+        string[] folders = SelectedEntries().Where((FileExplorer.ItemWrapper item) => item.Entry.IsDirectory).Select((FileExplorer.ItemWrapper item) => item.FullPath).ToArray();
+        if (folders.Length != 0)
         {
-            if (item.Entry.IsDirectory && item.Name != "..")
+            FileActionRequested?.Invoke(this, new FileEventArgs
             {
-                FileActionRequested?.Invoke(this, new FileEventArgs
-                {
-                    FullPath = item.FullPath,
-                    Event = FileEvent.DownloadArchive
-                });
-            }
+                FullPaths = folders,
+                Event = FileEvent.DownloadArchive
+            });
         }
     }
 
@@ -368,13 +365,17 @@ public partial class FileListControl : UserControl, IComponentConnector
         try
         {
             FileExplorer.ItemWrapper[] items = ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>().ToArray();
+            // Names of folders are relative to the directory that is shown, so only one folder can be entered; with a folder
+            // in the selection nothing else is opened.
+            FileExplorer.ItemWrapper folder = items.FirstOrDefault((FileExplorer.ItemWrapper item) => item.Entry.IsDirectory);
+            if (folder != null)
+            {
+                (this.DataContext as FileExplorer)?.GoToDirectory(folder.Entry.Name);
+                return;
+            }
             foreach (FileExplorer.ItemWrapper itemWrapper in items)
             {
-                if (itemWrapper.Entry.IsDirectory)
-                {
-                    (this.DataContext as FileExplorer)?.GoToDirectory(itemWrapper.Entry.Name);
-                }
-                else if (itemWrapper.Entry.Size <= 1048576 || MessageBoxes.Ask(itemWrapper.FullPath + " is " + itemWrapper.Size + " in size. Are you sure you want to edit it?"))
+                if (itemWrapper.Entry.Size <= 1048576 || MessageBoxes.Ask(itemWrapper.FullPath + " is " + itemWrapper.Size + " in size. Are you sure you want to edit it?"))
                 {
                     FileActionRequested?.Invoke(this, new FileEventArgs
                     {
@@ -392,6 +393,16 @@ public partial class FileListControl : UserControl, IComponentConnector
 
     private void TransferList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        // A double click on the header, a scroll bar or the empty space below the items must not open the selected item.
+        DependencyObject element = e.OriginalSource as DependencyObject;
+        while (element != null && !(element is ListViewItem))
+        {
+            element = (element is System.Windows.Media.Visual || element is System.Windows.Media.Media3D.Visual3D) ? System.Windows.Media.VisualTreeHelper.GetParent(element) : LogicalTreeHelper.GetParent(element);
+        }
+        if (element == null)
+        {
+            return;
+        }
         ActivateSelection();
     }
 

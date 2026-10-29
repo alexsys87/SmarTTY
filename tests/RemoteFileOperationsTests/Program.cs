@@ -203,6 +203,7 @@ internal static class Program
         Check(RemoteFileOperations.IsSameOrInside("/a/b/c", "/a/b/"), "a subfolder is inside");
         Check(!RemoteFileOperations.IsSameOrInside("/a/bc", "/a/b"), "a sibling with the same prefix is not inside");
         Check(!RemoteFileOperations.IsSameOrInside("/a/B", "/a/b"), "paths are case-sensitive");
+        Check(RemoteFileOperations.IsSameOrInside("/C:/Users/Me", "/c:/users", ignoreCase: true), "paths of a Windows host are case-insensitive");
         Check(RemoteFileOperations.IsSameOrInside("/x", "/"), "everything is inside /");
         Equal(RemoteFileOperations.Join("/", "etc"), "/etc", "join to the root");
         Equal(RemoteFileOperations.Join("/home/u/", "f"), "/home/u/f", "join with a trailing slash");

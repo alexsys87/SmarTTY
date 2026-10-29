@@ -39,7 +39,7 @@ public sealed class SftpFileSystem
     /// <summary>Creates an empty file; fails when something of that name exists, as "Create file" must not overwrite.</summary>
     public void CreateFile(string path)
     {
-        byte[] handle = _sftp.OpenFile(path, SftpChannel.OpenFlags.Write | SftpChannel.OpenFlags.Create | SftpChannel.OpenFlags.Exclusive);
+        byte[] handle = _sftp.OpenFile(WindowsSftpPath.ForServer(path), SftpChannel.OpenFlags.Write | SftpChannel.OpenFlags.Create | SftpChannel.OpenFlags.Exclusive);
         _sftp.CloseHandle(handle);
     }
 
