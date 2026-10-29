@@ -108,18 +108,129 @@ public class SSHConnectionSettings
         }
     }
 
-    public static string StripPortNumber(string hostWithPort)
+    /// <summary>
+    /// Splits the host field of a connection: "host", "host:port", "[ipv6]" or "[ipv6]:port". Returns the host without
+    /// brackets and the port, or null when there is none. An IPv6 address without brackets has colons of its own, so
+    /// it is a host without a port. Anything that only looks like a port (letters, 0, more than 65535) is not split
+    /// off: the text is returned whole, so that a typo in the port fails when connecting instead of connecting to the
+    /// default port.
+    /// </summary>
+    public static string SplitHostPort(string hostWithPort, out int? port)
     {
-        if (hostWithPort == null)
-        {
-            return null;
-        }
-        int index = hostWithPort.IndexOf(':');
-        if (index == -1)
+        port = null;
+        if (string.IsNullOrEmpty(hostWithPort))
         {
             return hostWithPort;
         }
-        return hostWithPort.Substring(0, index);
+        if (hostWithPort[0] == '[')
+        {
+            int end = hostWithPort.IndexOf(']');
+            if (end < 2)
+            {
+                return hostWithPort;
+            }
+            string address = hostWithPort.Substring(1, end - 1);
+            if (end == hostWithPort.Length - 1)
+            {
+                return address;
+            }
+            if (hostWithPort[end + 1] == ':' && TryParsePort(hostWithPort.Substring(end + 2), out int bracketedPort))
+            {
+                port = bracketedPort;
+                return address;
+            }
+            return hostWithPort;
+        }
+        int colon = hostWithPort.IndexOf(':');
+        if (colon == -1 || colon != hostWithPort.LastIndexOf(':'))
+        {
+            // No port, or an IPv6 address (two or more colons).
+            return hostWithPort;
+        }
+        if (colon > 0 && TryParsePort(hostWithPort.Substring(colon + 1), out int hostPort))
+        {
+            port = hostPort;
+            return hostWithPort.Substring(0, colon);
+        }
+        return hostWithPort;
+    }
+
+    private static bool TryParsePort(string text, out int port)
+    {
+        // Digits only: int.TryParse alone would take a sign or spaces.
+        port = 0;
+        if (text.Length == 0 || text.Length > 5)
+        {
+            return false;
+        }
+        foreach (char digit in text)
+        {
+            if (digit < '0' || digit > '9')
+            {
+                return false;
+            }
+        }
+        port = int.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+        return port >= 1 && port <= 65535;
+    }
+
+    /// <summary>
+    /// Parses the field of the HTTP proxy: "[user[:password]@]host:port", the host being a name, an IPv4 address or an
+    /// IPv6 address in brackets. The credentials end at the last '@', so a password may contain one. False when there is
+    /// no valid port: a proxy without a port is not guessed, and silently connecting without it would bypass the proxy.
+    /// <paramref name="credentials"/> is null when the text has none.
+    /// </summary>
+    public static bool TryParseProxy(string text, out string credentials, out string host, out int port)
+    {
+        credentials = null;
+        host = null;
+        port = 0;
+        text = text?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+        string endpoint = text;
+        string userAndPassword = null;
+        int at = text.LastIndexOf('@');
+        if (at != -1)
+        {
+            userAndPassword = at > 0 ? text.Substring(0, at) : null;
+            endpoint = text.Substring(at + 1);
+        }
+        string proxyHost = SplitHostPort(endpoint, out int? proxyPort);
+        if (proxyPort == null || string.IsNullOrEmpty(proxyHost))
+        {
+            return false;
+        }
+        credentials = userAndPassword;
+        host = proxyHost;
+        port = proxyPort.Value;
+        return true;
+    }
+
+    /// <summary>
+    /// The text of the proxy field for the saved proxy settings: the inverse of <see cref="TryParseProxy"/> ("user:password@"
+    /// when there are credentials, an IPv6 address in brackets). Null when no proxy is set. Without a valid port the host
+    /// alone is returned, so that the user sees what is saved and is asked for the port when connecting.
+    /// </summary>
+    public static string FormatProxy(string credentials, string host, int port)
+    {
+        if (string.IsNullOrEmpty(host))
+        {
+            return null;
+        }
+        string endpoint = host.IndexOf(':') != -1 ? "[" + host + "]" : host;
+        if (port >= 1 && port <= 65535)
+        {
+            endpoint += ":" + port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return string.IsNullOrEmpty(credentials) ? endpoint : credentials + "@" + endpoint;
+    }
+
+    public static string StripPortNumber(string hostWithPort)
+    {
+        return SplitHostPort(hostWithPort, out _);
     }
 
     public static bool HostNamesEqual(string firstHost, string secondHost)

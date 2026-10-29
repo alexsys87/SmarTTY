@@ -302,6 +302,9 @@ public class NewConnectionController : INotifyPropertyChanged
             HostNameCaption = "Host name:";
         }
         UseConnectProxy = !string.IsNullOrEmpty(_Settings.ProxyServer);
+        // The field shows what is saved (it was left empty, so a connection with a proxy had to be typed in again to be
+        // changed or even connected from this window), in the same "[user:password@]host:port" form it is read from.
+        Proxy = SSHConnectionSettings.FormatProxy(_Settings.ProxyAuth, _Settings.ProxyServer, _Settings.ProxyPort);
         ConnectionAlias = _Settings.ConnectionAlias;
         HasAlias = !string.IsNullOrEmpty(_Settings.ConnectionAlias);
         HasCustomSSHKeyFile = !string.IsNullOrEmpty(_Settings.ExplicitKeyFile);
@@ -335,22 +338,20 @@ public class NewConnectionController : INotifyPropertyChanged
         if (UseConnectProxy)
         {
             string text = Proxy;
-            if (text == null)
+            if (string.IsNullOrWhiteSpace(text))
             {
                 throw new Exception("Please specify the proxy server address");
             }
-            int lastIndex = text.LastIndexOf('@');
-            if (lastIndex != -1)
+            // "[user:password@]host:port", also with an IPv6 address in brackets. Without a valid port the proxy used to be
+            // dropped silently and the connection went out directly, bypassing it; the credentials of an earlier entry
+            // stayed in the settings when the new text had none.
+            if (!SSHConnectionSettings.TryParseProxy(text, out string proxyCredentials, out string proxyHost, out int proxyPort))
             {
-                _Settings.ProxyAuth = text.Substring(0, lastIndex);
-                text = text.Substring(lastIndex + 1);
+                throw new Exception("Please specify the proxy server as host:port (for example proxy.example.com:3128)");
             }
-            lastIndex = text.IndexOf(':');
-            if (lastIndex != -1 && int.TryParse(text.Substring(lastIndex + 1), out var proxyPort))
-            {
-                _Settings.ProxyServer = text.Substring(0, lastIndex);
-                _Settings.ProxyPort = proxyPort;
-            }
+            _Settings.ProxyAuth = proxyCredentials;
+            _Settings.ProxyServer = proxyHost;
+            _Settings.ProxyPort = proxyPort;
         }
         else
         {
