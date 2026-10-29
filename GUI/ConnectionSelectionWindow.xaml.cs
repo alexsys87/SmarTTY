@@ -1148,7 +1148,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         public void BeginSSHConnection(SSHConnectionSettings connection)
         {
-            _Initiator.ConnectAsync(connection, null, connection.AuthenticationType == AuthType.PublicKey);
+            // The key is set up only when a password login replaced a key that the server did not accept: SshConnector
+            // raises that flag itself. Passing true for every key profile re-checked (and re-installed) the key on each
+            // connection and reconnect, and a failed check asked about the password although the key login had worked.
+            _Initiator.ConnectAsync(connection, null, forcePasswordAuth: false);
         }
 
         internal bool TryCancel()
