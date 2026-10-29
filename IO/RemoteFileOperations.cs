@@ -74,16 +74,20 @@ public static class RemoteFileOperations
         }
     }
 
-    /// <summary>True if <paramref name="path"/> is <paramref name="directory"/> itself or lies below it (case-sensitive, as on Unix).</summary>
-    public static bool IsSameOrInside(string path, string directory)
+    /// <summary>
+    /// True if <paramref name="path"/> is <paramref name="directory"/> itself or lies below it (case-sensitive, as on Unix;
+    /// with <paramref name="ignoreCase"/> as on Windows).
+    /// </summary>
+    public static bool IsSameOrInside(string path, string directory, bool ignoreCase = false)
     {
+        StringComparison comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         path = TrimTrailingSlashes(path);
         directory = TrimTrailingSlashes(directory);
-        if (path == directory)
+        if (string.Equals(path, directory, comparison))
         {
             return true;
         }
-        return path.StartsWith(directory == "/" ? "/" : directory + "/", StringComparison.Ordinal);
+        return path.StartsWith(directory == "/" ? "/" : directory + "/", comparison);
     }
 
     public static string Join(string directory, string name)
