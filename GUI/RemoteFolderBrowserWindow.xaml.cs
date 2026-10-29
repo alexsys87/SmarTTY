@@ -154,18 +154,7 @@ public partial class RemoteFolderBrowserWindow : Window
                     else
                     {
                         IsPolling = false;
-                        string errorText = remoteCommand.ErrorText;
-                        if (string.IsNullOrEmpty(errorText))
-                        {
-                            // Exit status -1 is what a channel closed by a lost connection reports: no verdict on the directory.
-                            MessageBoxes.Error(remoteCommand.ExitCode == -1
-                                ? "The listing was interrupted, most likely because the connection to the server was lost. Try again after reconnecting."
-                                : "'ls -1' failed with code: " + remoteCommand.ExitCode + ". Non-existent directory?");
-                        }
-                        else
-                        {
-                            MessageBoxes.Error(errorText);
-                        }
+                        MessageBoxes.Error(RemoteListing.DescribeFailure(remoteCommand.ExitCode, remoteCommand.ErrorText));
                         _pendingJob = null;
                         _loadingNode = null;
                     }
@@ -206,7 +195,7 @@ public partial class RemoteFolderBrowserWindow : Window
             else
             {
                 IsPolling = false;
-                MessageBoxes.Error("Command returned with code: " + _pendingJob.ExitCode);
+                MessageBoxes.Error(RemoteListing.DescribeFailure(_pendingJob.ExitCode, _pendingJob.ErrorText));
                 _loadingNode = null;
             }
             _pendingJob.Dispose();
