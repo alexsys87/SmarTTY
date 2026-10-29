@@ -174,6 +174,41 @@ public class SSHConnectionSettings
         return port >= 1 && port <= 65535;
     }
 
+    /// <summary>
+    /// Parses the field of the HTTP proxy: "[user[:password]@]host:port", the host being a name, an IPv4 address or an
+    /// IPv6 address in brackets. The credentials end at the last '@', so a password may contain one. False when there is
+    /// no valid port: a proxy without a port is not guessed, and silently connecting without it would bypass the proxy.
+    /// <paramref name="credentials"/> is null when the text has none.
+    /// </summary>
+    public static bool TryParseProxy(string text, out string credentials, out string host, out int port)
+    {
+        credentials = null;
+        host = null;
+        port = 0;
+        text = text?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+        string endpoint = text;
+        string userAndPassword = null;
+        int at = text.LastIndexOf('@');
+        if (at != -1)
+        {
+            userAndPassword = at > 0 ? text.Substring(0, at) : null;
+            endpoint = text.Substring(at + 1);
+        }
+        string proxyHost = SplitHostPort(endpoint, out int? proxyPort);
+        if (proxyPort == null || string.IsNullOrEmpty(proxyHost))
+        {
+            return false;
+        }
+        credentials = userAndPassword;
+        host = proxyHost;
+        port = proxyPort.Value;
+        return true;
+    }
+
     public static string StripPortNumber(string hostWithPort)
     {
         return SplitHostPort(hostWithPort, out _);

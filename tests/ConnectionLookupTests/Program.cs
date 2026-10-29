@@ -39,6 +39,7 @@ internal static class Program
             CheckHostWithPort();
             CheckHostPortSplitting();
             CheckIpv6Hosts();
+            CheckProxyParsing();
             Console.WriteLine($"All {_passed} checks passed.");
             return 0;
         }
@@ -131,6 +132,47 @@ internal static class Program
         CheckSplit("[::1]x", "[::1]x", null);
         CheckSplit("", "", null);
         CheckSplit(null, null, null);
+    }
+
+    private static void CheckProxy(string text, string expectedCredentials, string expectedHost, int expectedPort)
+    {
+        bool parsed = SSHConnectionSettings.TryParseProxy(text, out string credentials, out string host, out int port);
+        Check(parsed, "proxy: '" + text + "' is accepted");
+        Equal(credentials, expectedCredentials, "proxy: credentials of '" + text + "'");
+        Equal(host, expectedHost, "proxy: host of '" + text + "'");
+        Equal(port, expectedPort, "proxy: port of '" + text + "'");
+    }
+
+    private static void CheckProxyRejected(string text)
+    {
+        Check(!SSHConnectionSettings.TryParseProxy(text, out string credentials, out string host, out int port) && credentials == null && host == null && port == 0,
+            "proxy: '" + (text ?? "null") + "' is rejected and leaves nothing behind");
+    }
+
+    // "[user:password@]host:port": the credentials end at the last '@', the host may be a bracketed IPv6 address, and a
+    // proxy without a valid port is rejected instead of being dropped (the connection would go out without it).
+    private static void CheckProxyParsing()
+    {
+        CheckProxy("proxy.example.com:3128", null, "proxy.example.com", 3128);
+        CheckProxy("10.0.0.1:8080", null, "10.0.0.1", 8080);
+        CheckProxy("  proxy:3128  ", null, "proxy", 3128);
+        CheckProxy("user:secret@proxy:3128", "user:secret", "proxy", 3128);
+        CheckProxy("user:p@ss@proxy:3128", "user:p@ss", "proxy", 3128);
+        CheckProxy("user@proxy:3128", "user", "proxy", 3128);
+        CheckProxy("[2001:db8::3]:3128", null, "2001:db8::3", 3128);
+        CheckProxy("u:p@[::1]:8080", "u:p", "::1", 8080);
+        CheckProxy("@proxy:3128", null, "proxy", 3128);
+        CheckProxyRejected("proxy.example.com");
+        CheckProxyRejected("proxy:abc");
+        CheckProxyRejected("proxy:0");
+        CheckProxyRejected("user:secret@proxy");
+        CheckProxyRejected("2001:db8::3");
+        CheckProxyRejected("[::1]");
+        CheckProxyRejected(":3128");
+        CheckProxyRejected("user@:3128");
+        CheckProxyRejected("");
+        CheckProxyRejected("   ");
+        CheckProxyRejected(null);
     }
 
     private static void CheckIpv6Hosts()
