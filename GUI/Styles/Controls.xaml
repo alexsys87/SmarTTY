@@ -265,6 +265,18 @@
     <Setter Property="ScrollViewer.PanningMode" Value="VerticalFirst" />
     <Setter Property="Stylus.IsFlicksEnabled" Value="False" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
+    <!-- The stock context menu of a text field is built by WPF and is not a plain ContextMenu, so the ContextMenu style below
+         does not reach it: its items took the light theme text colour and stayed on the white system background. This menu
+         (Cut, Copy, Paste: the commands give the localised captions and the enabled state) is styled like any other. -->
+    <Setter Property="ContextMenu">
+      <Setter.Value>
+        <ContextMenu>
+          <MenuItem Command="ApplicationCommands.Cut" />
+          <MenuItem Command="ApplicationCommands.Copy" />
+          <MenuItem Command="ApplicationCommands.Paste" />
+        </ContextMenu>
+      </Setter.Value>
+    </Setter>
     <Setter Property="Template">
       <Setter.Value>
         <!-- Tag, when set, is shown as a hint while the box is empty. -->
@@ -311,6 +323,18 @@
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="KeyboardNavigation.TabNavigation" Value="None" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
+    <!-- The stock context menu of a text field is built by WPF and is not a plain ContextMenu, so the ContextMenu style below
+         does not reach it: its items took the light theme text colour and stayed on the white system background. This menu
+         (Cut, Copy, Paste: the commands give the localised captions and the enabled state) is styled like any other. -->
+    <Setter Property="ContextMenu">
+      <Setter.Value>
+        <ContextMenu>
+          <MenuItem Command="ApplicationCommands.Cut" />
+          <MenuItem Command="ApplicationCommands.Copy" />
+          <MenuItem Command="ApplicationCommands.Paste" />
+        </ContextMenu>
+      </Setter.Value>
+    </Setter>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="{x:Type PasswordBox}">
@@ -930,6 +954,18 @@
     <Setter Property="SelectionOpacity" Value="0.45" />
     <Setter Property="ScrollViewer.PanningMode" Value="VerticalFirst" />
     <Setter Property="Stylus.IsFlicksEnabled" Value="False" />
+    <!-- The stock context menu of a text field is built by WPF and is not a plain ContextMenu, so the ContextMenu style below
+         does not reach it: its items took the light theme text colour and stayed on the white system background. This menu
+         (same as the TextBox: the commands give the localised captions and the enabled state) is styled like any other. -->
+    <Setter Property="ContextMenu">
+      <Setter.Value>
+        <ContextMenu>
+          <MenuItem Command="ApplicationCommands.Cut" />
+          <MenuItem Command="ApplicationCommands.Copy" />
+          <MenuItem Command="ApplicationCommands.Paste" />
+        </ContextMenu>
+      </Setter.Value>
+    </Setter>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="{x:Type TextBox}">
