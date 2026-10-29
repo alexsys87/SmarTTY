@@ -49,6 +49,14 @@ public partial class FileListControl : UserControl, IComponentConnector
 
     private int _SelDepth;
 
+    private Point? _DragStart;
+
+    /// <summary>
+    /// True while files of the panel are being dragged out. The drag carries local copies of the files, so every drop target
+    /// of this program has to refuse it; otherwise dropping on the terminal or the panel would upload the files again.
+    /// </summary>
+    internal static bool IsDraggingOut { get; private set; }
+
     public event EventHandler FocusRequested;
 
     public event EventHandler<FileEventArgs> FileActionRequested;
@@ -79,7 +87,7 @@ public partial class FileListControl : UserControl, IComponentConnector
 
     private void TransferList_DragOver(object sender, DragEventArgs e)
     {
-        bool canDrop = e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop) && GetDropDirectory(e) != null;
+        bool canDrop = !IsDraggingOut && e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop) && GetDropDirectory(e) != null;
         e.Effects = canDrop ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
@@ -88,6 +96,10 @@ public partial class FileListControl : UserControl, IComponentConnector
     {
         // Handled here, so that the main window does not upload the same files to the terminal's directory as well.
         e.Handled = true;
+        if (IsDraggingOut)
+        {
+            return;
+        }
         string directory = GetDropDirectory(e);
         if (directory == null || !(e.Data?.GetData(DataFormats.FileDrop) is string[] files) || files.Length == 0)
         {
@@ -99,6 +111,63 @@ public partial class FileListControl : UserControl, IComponentConnector
             FullPath = directory,
             LocalFiles = files
         });
+    }
+
+    private void TransferList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // A drag starts only on a selected item, so that a click-and-drag on empty space or an unselected item still selects.
+        DependencyObject element = e.OriginalSource as DependencyObject;
+        while (element != null && !(element is ListViewItem) && !(element is System.Windows.Controls.Primitives.ScrollBar))
+        {
+            element = (element is System.Windows.Media.Visual || element is System.Windows.Media.Media3D.Visual3D) ? System.Windows.Media.VisualTreeHelper.GetParent(element) : LogicalTreeHelper.GetParent(element);
+        }
+        bool onItem = element is ListViewItem;
+        _DragStart = onItem ? e.GetPosition(null) : (Point?)null;
+    }
+
+    private void TransferList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        _DragStart = null;
+    }
+
+    private void TransferList_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _DragStart == null || IsDraggingOut)
+        {
+            return;
+        }
+        Point position = e.GetPosition(null);
+        if (Math.Abs(position.X - _DragStart.Value.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(position.Y - _DragStart.Value.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+        _DragStart = null;
+        FileExplorer explorer = Explorer;
+        FileExplorer.ItemWrapper[] selected = SelectedEntries();
+        if (explorer == null || selected.Length == 0)
+        {
+            return;
+        }
+        try
+        {
+            IsDraggingOut = true;
+            string[] paths = explorer.StageForDrag(selected);
+            if (paths == null || Mouse.LeftButton != MouseButtonState.Pressed)
+            {
+                return;
+            }
+            DataObject data = new DataObject();
+            data.SetData(DataFormats.FileDrop, paths);
+            DragDrop.DoDragDrop(TransferList, data, DragDropEffects.Copy);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+        finally
+        {
+            IsDraggingOut = false;
+        }
     }
 
     private void OpenFile_Click(object sender, RoutedEventArgs e)

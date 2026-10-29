@@ -120,13 +120,13 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     private void Terminal_DragOver(object sender, System.Windows.Forms.DragEventArgs e)
     {
-        bool acceptFiles = !_Session.IsDevice && e.Data != null && e.Data.GetDataPresent(System.Windows.Forms.DataFormats.FileDrop);
+        bool acceptFiles = !FileListControl.IsDraggingOut && !_Session.IsDevice && e.Data != null && e.Data.GetDataPresent(System.Windows.Forms.DataFormats.FileDrop);
         e.Effect = acceptFiles ? System.Windows.Forms.DragDropEffects.Copy : System.Windows.Forms.DragDropEffects.None;
     }
 
     private void Terminal_DragDrop(object sender, System.Windows.Forms.DragEventArgs e)
     {
-        if (_Session.IsDevice || e.Data == null || !(e.Data.GetData(System.Windows.Forms.DataFormats.FileDrop) is string[] files) || files.Length == 0)
+        if (FileListControl.IsDraggingOut || _Session.IsDevice || e.Data == null || !(e.Data.GetData(System.Windows.Forms.DataFormats.FileDrop) is string[] files) || files.Length == 0)
         {
             return;
         }

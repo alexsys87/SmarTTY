@@ -849,6 +849,154 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
         }.Start();
     }
 
+    /// <summary>
+    /// Downloads the given files and folders into a fresh temporary directory so that they can be dragged out of the list
+    /// to Explorer or another program. Runs synchronously: a drag needs the files to exist when it starts. Returns the local
+    /// paths of the top-level items, or null if the user declined or nothing could be downloaded.
+    /// </summary>
+    public string[] StageForDrag(IEnumerable<ItemWrapper> items)
+    {
+        ItemWrapper[] selected = items.Where((ItemWrapper item) => item.Name != "..").ToArray();
+        SshSession session = _Control.Session;
+        if (selected.Length == 0 || session == null)
+        {
+            return null;
+        }
+        long knownSize = selected.Where((ItemWrapper item) => !item.Entry.IsDirectory).Sum((ItemWrapper item) => item.Entry.Size);
+        if (knownSize > DragStageWarnBytes && !MessageBoxes.Ask("The selected files are " + StringUtils.FormatSize(knownSize) + "B in total and have to be downloaded before they can be dragged out. Continue?"))
+        {
+            return null;
+        }
+        string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "SmarTTY-drag");
+        CleanOldDragDirectories(root);
+        string target = System.IO.Path.Combine(root, Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(target);
+        List<string> paths = new List<string>();
+        List<string> errors = new List<string>();
+        SftpChannel sftp = null;
+        System.Windows.Input.Cursor previousCursor = System.Windows.Input.Mouse.OverrideCursor;
+        System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+        try
+        {
+            try
+            {
+                sftp = SftpChannel.Open(session);
+            }
+            catch
+            {
+                // No SFTP on the host (Dropbear without the subsystem, for example): single files go over SCP.
+                sftp = null;
+            }
+            foreach (ItemWrapper item in selected)
+            {
+                try
+                {
+                    string local = System.IO.Path.Combine(target, SafeLocalName(item.Name));
+                    if (item.Entry.IsDirectory)
+                    {
+                        if (sftp == null)
+                        {
+                            throw new RemoteOperationException("Folders can be dragged out only when the host offers SFTP.");
+                        }
+                        DownloadDirectory(sftp, item.FullPath, local);
+                    }
+                    else
+                    {
+                        DownloadFile(session, sftp, item.FullPath, local);
+                    }
+                    paths.Add(local);
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(item.Name + ": " + exception.Message);
+                }
+            }
+        }
+        finally
+        {
+            sftp?.Dispose();
+            System.Windows.Input.Mouse.OverrideCursor = previousCursor;
+        }
+        if (errors.Count != 0)
+        {
+            MessageBoxes.Error(string.Join("\n", errors.Take(10)) + (errors.Count > 10 ? "\n..." : ""));
+        }
+        return paths.Count == 0 ? null : paths.ToArray();
+    }
+
+    private const long DragStageWarnBytes = 200L * 1024 * 1024;
+
+    private static string SafeLocalName(string name)
+    {
+        foreach (char invalid in System.IO.Path.GetInvalidFileNameChars())
+        {
+            name = name.Replace(invalid, '_');
+        }
+        return name;
+    }
+
+    private static void CleanOldDragDirectories(string root)
+    {
+        try
+        {
+            if (!System.IO.Directory.Exists(root))
+            {
+                return;
+            }
+            foreach (string directory in System.IO.Directory.GetDirectories(root))
+            {
+                if (DateTime.UtcNow - System.IO.Directory.GetCreationTimeUtc(directory) > TimeSpan.FromDays(1))
+                {
+                    try
+                    {
+                        System.IO.Directory.Delete(directory, recursive: true);
+                    }
+                    catch
+                    {
+                        // In use or locked: the next drag tries again.
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static void DownloadFile(SshSession session, SftpChannel sftp, string remotePath, string localPath)
+    {
+        using System.IO.Stream source = sftp != null ? sftp.OpenRead(remotePath, 0) : session.OpenDownload(remotePath);
+        using System.IO.FileStream destination = System.IO.File.Create(localPath);
+        source.CopyTo(destination);
+    }
+
+    private static void DownloadDirectory(SftpChannel sftp, string remoteDirectory, string localDirectory)
+    {
+        System.IO.Directory.CreateDirectory(localDirectory);
+        foreach (SftpDirectoryEntry entry in sftp.ListDirectory(remoteDirectory))
+        {
+            if (entry.Name == "." || entry.Name == "..")
+            {
+                continue;
+            }
+            string remote = SftpFileSystem.Child(remoteDirectory, entry.Name);
+            string local = System.IO.Path.Combine(localDirectory, SafeLocalName(entry.Name));
+            SftpFileAttributes attributes = entry.Attributes;
+            if (attributes != null && attributes.IsSymbolicLink)
+            {
+                attributes = sftp.Stat(remote);
+            }
+            if (attributes != null && attributes.IsDirectory)
+            {
+                DownloadDirectory(sftp, remote, local);
+            }
+            else
+            {
+                DownloadFile(null, sftp, remote, local);
+            }
+        }
+    }
+
     internal void Show()
     {
         IsVisible = true;
