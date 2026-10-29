@@ -473,7 +473,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     protected override void OnDrop(DragEventArgs e)
     {
         base.OnDrop(e);
-        if (e.Data.GetDataPresent(DataFormats.FileDrop) && e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length != 0)
+        if (!FileListControl.IsDraggingOut && e.Data.GetDataPresent(DataFormats.FileDrop) && e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length != 0)
         {
             SessionWrapper dropSession = Controller.ActiveSession;
             if (dropSession != null && !dropSession.IsDevice)
@@ -498,7 +498,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     protected override void OnDragEnter(DragEventArgs e)
     {
         base.OnDragEnter(e);
-        if (e.Data.GetDataPresent(DataFormats.FileDrop) && Controller.ActiveSession?.IsDevice != true)
+        if (!FileListControl.IsDraggingOut && e.Data.GetDataPresent(DataFormats.FileDrop) && Controller.ActiveSession?.IsDevice != true)
         {
             e.Effects = (DragDropEffects)1;
         }
