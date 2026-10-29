@@ -32,38 +32,6 @@ public partial class SshConnector : Component
 
     public delegate void ProxyCredentialsHandler(SshConnector sshConnector, string serverHost, ref string credentials, ref bool confirmed);
 
-    private class ConnectionAttempt : IDisposable
-    {
-        public Thread Thread;
-
-        public bool Cancelled;
-
-        public EventWaitHandle CancelEvent = new ManualResetEvent(initialState: false);
-
-        public void Dispose()
-        {
-            Cancelled = true;
-            if (CancelEvent != null)
-            {
-                CancelEvent.Set();
-            }
-            if (Thread != null)
-            {
-                if (!Thread.Join(500))
-                {
-                    Thread.Abort();
-                    Thread.Join();
-                }
-                Thread = null;
-            }
-            if (CancelEvent != null)
-            {
-                CancelEvent.Close();
-                CancelEvent = null;
-            }
-        }
-    }
-
     // Used when the connection settings do not enable keep-alive packets, so that a dead link is detected without user input.
     private const int DefaultKeepAliveSeconds = 15;
 
@@ -224,17 +192,23 @@ public partial class SshConnector : Component
         CancelConnection();
     }
 
-    private void RaiseConnected(SshSession sshSession, SSHConnectionSettings sshConnectionSettings)
+    private void RaiseConnected(ConnectionAttempt connectionAttempt, SshSession sshSession, SSHConnectionSettings sshConnectionSettings)
     {
         if (IsOffUiThread)
         {
             BeginInvokeOnUi(() =>
             {
-                RaiseConnected(sshSession, sshConnectionSettings);
+                RaiseConnected(connectionAttempt, sshSession, sshConnectionSettings);
             });
         }
         else
         {
+            // The user may have cancelled after the worker had finished and before this ran: then nobody asked for this
+            // session any more and it must not appear. Cancelling has already closed it (the attempt held it until now).
+            if (!connectionAttempt.TryReleaseSession())
+            {
+                return;
+            }
             sshConnectionSettings.UpdateLastConnectionTime();
             Connected?.Invoke(this, sshSession, sshConnectionSettings);
         }
@@ -268,17 +242,23 @@ public partial class SshConnector : Component
         }
     }
 
-    private bool Confirm(PromptKind promptKind, string message)
+    // A dialog of a cancelled attempt is not shown: this runs on the UI thread, the thread that cancels, so the check cannot
+    // be overtaken by a cancel. "Not confirmed" is what every caller already treats as the user giving up.
+    private bool Confirm(ConnectionAttempt connectionAttempt, PromptKind promptKind, string message)
     {
         bool confirmed = false;
         InvokeOnUi(() =>
         {
+            if (connectionAttempt.Cancelled)
+            {
+                return;
+            }
             AskConfirmation(promptKind, message, out confirmed);
         });
         return confirmed;
     }
 
-    private void Authenticate(SshSession session, SSHConnectionSettings sshConnectionSettings, string password, ref bool forcePasswordAuth)
+    private void Authenticate(ConnectionAttempt connectionAttempt, SshSession session, SSHConnectionSettings sshConnectionSettings, string password, ref bool forcePasswordAuth)
     {
         bool passwordConfirmed = false;
         while (true)
@@ -297,7 +277,7 @@ public partial class SshConnector : Component
                         }
                         if (!authSuccess)
                         {
-                            if (Confirm(PromptKind.YesNoWarning, "Cannot authenticate using public key. Enter a password instead?"))
+                            if (Confirm(connectionAttempt, PromptKind.YesNoWarning, "Cannot authenticate using public key. Enter a password instead?"))
                             {
                                 sshConnectionSettings.AuthenticationType = AuthType.Password;
                                 forcePasswordAuth = true;
@@ -323,7 +303,10 @@ public partial class SshConnector : Component
                             bool confirmed = false;
                             InvokeOnUi(() =>
                             {
-                                CredentialsRequested(this, sshConnectionSettings, ref password, ref confirmed, isKeyPassphrase: true);
+                                if (!connectionAttempt.Cancelled)
+                                {
+                                    CredentialsRequested(this, sshConnectionSettings, ref password, ref confirmed, isKeyPassphrase: true);
+                                }
                             });
                             if (!confirmed)
                             {
@@ -332,7 +315,7 @@ public partial class SshConnector : Component
                         }
                         else
                         {
-                            if (!Confirm(PromptKind.YesNoWarning, "Cannot authenticate using OpenSSH key. Enter password instead?"))
+                            if (!Confirm(connectionAttempt, PromptKind.YesNoWarning, "Cannot authenticate using OpenSSH key. Enter password instead?"))
                             {
                                 throw new OperationCanceledException();
                             }
@@ -370,7 +353,10 @@ public partial class SshConnector : Component
                         bool pwdConfirmed = false;
                         InvokeOnUi(() =>
                         {
-                            CredentialsRequested(this, sshConnectionSettings, ref password, ref pwdConfirmed, isKeyPassphrase: false);
+                            if (!connectionAttempt.Cancelled)
+                            {
+                                CredentialsRequested(this, sshConnectionSettings, ref password, ref pwdConfirmed, isKeyPassphrase: false);
+                            }
                         });
                         if (pwdConfirmed)
                         {
@@ -386,11 +372,15 @@ public partial class SshConnector : Component
         }
     }
 
-    private bool ConfirmNewHostKey(SSHConnectionSettings sshConnectionSettings, SshSession.HostKeyInfo hostKeyInfo)
+    private bool ConfirmNewHostKey(ConnectionAttempt connectionAttempt, SSHConnectionSettings sshConnectionSettings, SshSession.HostKeyInfo hostKeyInfo)
     {
         if (IsOffUiThread)
         {
-            return (bool)InvokeOnUiWithResult((Func<bool>)(() => ConfirmNewHostKey(sshConnectionSettings, hostKeyInfo)));
+            return (bool)InvokeOnUiWithResult((Func<bool>)(() => ConfirmNewHostKey(connectionAttempt, sshConnectionSettings, hostKeyInfo)));
+        }
+        if (connectionAttempt.Cancelled)
+        {
+            return false;
         }
         string fingerprint = null;
         try
@@ -416,7 +406,7 @@ public partial class SshConnector : Component
         return NewHostKeyPrompt != null && NewHostKeyPrompt(sshConnectionSettings, fingerprint);
     }
 
-    private bool ConfirmHostKeyMismatch(SSHConnectionSettings sshConnectionSettings, SshSession.HostKeyInfo hostKeyInfo, string mismatchReason)
+    private bool ConfirmHostKeyMismatch(ConnectionAttempt connectionAttempt, SSHConnectionSettings sshConnectionSettings, SshSession.HostKeyInfo hostKeyInfo, string mismatchReason)
     {
         if (sshConnectionSettings.SuppressKeyMismatchWarning)
         {
@@ -424,7 +414,11 @@ public partial class SshConnector : Component
         }
         if (IsOffUiThread)
         {
-            return (bool)InvokeOnUiWithResult((Func<bool>)(() => ConfirmHostKeyMismatch(sshConnectionSettings, hostKeyInfo, mismatchReason)));
+            return (bool)InvokeOnUiWithResult((Func<bool>)(() => ConfirmHostKeyMismatch(connectionAttempt, sshConnectionSettings, hostKeyInfo, mismatchReason)));
+        }
+        if (connectionAttempt.Cancelled)
+        {
+            return false;
         }
         return HostKeyMismatchPrompt != null && HostKeyMismatchPrompt(sshConnectionSettings, mismatchReason);
     }
@@ -463,6 +457,8 @@ public partial class SshConnector : Component
                 try
                 {
                     sshSession = new SshSession(sshConnectionParameters, connectionAttempt.CancelEvent);
+                    // From here cancelling closes the session, which ends the key check and the login below.
+                    connectionAttempt.SetSession(sshSession);
                     break;
                 }
                 catch (ProxyException exception) when (exception.Message.Contains("407"))
@@ -470,7 +466,10 @@ public partial class SshConnector : Component
                     bool proxyConfirmed = false;
                     InvokeOnUi(() =>
                     {
-                        ProxyCredentialsRequested(this, sshConnectionSettings.ProxyServer, ref proxyCreds, ref proxyConfirmed);
+                        if (!connectionAttempt.Cancelled)
+                        {
+                            ProxyCredentialsRequested(this, sshConnectionSettings.ProxyServer, ref proxyCreds, ref proxyConfirmed);
+                        }
                     });
                     if (!proxyConfirmed)
                     {
@@ -485,7 +484,7 @@ public partial class SshConnector : Component
             {
                 if (knownHostKey == null)
                 {
-                    if (!autoAcceptHostKey && !ConfirmNewHostKey(sshConnectionSettings, hostKeyInfo))
+                    if (!autoAcceptHostKey && !ConfirmNewHostKey(connectionAttempt, sshConnectionSettings, hostKeyInfo))
                     {
                         // The user did not trust the key: never go on to send credentials to an unverified host.
                         throw new OperationCanceledException();
@@ -504,7 +503,7 @@ public partial class SshConnector : Component
                         {
                             mismatchReason = "Key type changed from " + knownHostKey.KeyType + " to " + hostKeyInfo.Algorithm;
                         }
-                        if (!ConfirmHostKeyMismatch(sshConnectionSettings, hostKeyInfo, mismatchReason))
+                        if (!ConfirmHostKeyMismatch(connectionAttempt, sshConnectionSettings, hostKeyInfo, mismatchReason))
                         {
                             // A changed host key may mean a man-in-the-middle attack: do not authenticate.
                             throw new OperationCanceledException();
@@ -514,8 +513,10 @@ public partial class SshConnector : Component
                     }
                 }
             }
+            // No credentials go to a server the user has stopped connecting to (a host key that needed no question gets here).
+            connectionAttempt.ThrowIfCancelled();
             ReportStatus(connectionAttempt, "Authenticating...");
-            Authenticate(sshSession, sshConnectionSettings, password, ref forcePasswordAuth);
+            Authenticate(connectionAttempt, sshSession, sshConnectionSettings, password, ref forcePasswordAuth);
             if (forcePasswordAuth)
             {
                 ISshKeyPair sshKeyPair = AppEnvironment.KeyFactory.CreateKey(sshConnectionSettings.KeyType.ResolveAuto(PublicKeyType.RSA));
@@ -527,7 +528,7 @@ public partial class SshConnector : Component
                 {
                     if (!AuthorizedKeysManager.IsKeyAuthorized(sshSession, sshKeyPair.GetPublicKeyBlob()))
                     {
-                        AuthorizedKeysManager.AppendAuthorizedKey(sshSession, sshKeyPair.ToAuthorizedKeysLine(Environment.UserName + "@" + Environment.MachineName), message => Confirm(PromptKind.YesNoWarning, message));
+                        AuthorizedKeysManager.AppendAuthorizedKey(sshSession, sshKeyPair.ToAuthorizedKeysLine(Environment.UserName + "@" + Environment.MachineName), message => Confirm(connectionAttempt, PromptKind.YesNoWarning, message));
                     }
                     keyInstalled = true;
                 }
@@ -535,7 +536,7 @@ public partial class SshConnector : Component
                 {
                     // A lost connection is thrown on (the usual reconnect handling follows); a refusal of the server
                     // (full flash, read-only home, no permission) leaves a working password connection.
-                    if (!Confirm(PromptKind.YesNoWarning, "Cannot set up the public key: " + exception.Message + Environment.NewLine + "Continue connecting with the password?"))
+                    if (!Confirm(connectionAttempt, PromptKind.YesNoWarning, "Cannot set up the public key: " + exception.Message + Environment.NewLine + "Continue connecting with the password?"))
                     {
                         throw new OperationCanceledException();
                     }
@@ -549,7 +550,7 @@ public partial class SshConnector : Component
             // when none is set (0); a profile that switched the keep-alive off (negative) keeps it off.
             int keepAliveSeconds = sshConnectionSettings.KeepaliveInterval < 0 ? 0 : (sshConnectionSettings.KeepaliveInterval != 0 ? sshConnectionSettings.KeepaliveInterval : DefaultKeepAliveSeconds);
             sshSession.ConfigureKeepAlive(keepAliveSeconds);
-            RaiseConnected(sshSession, sshConnectionSettings);
+            RaiseConnected(connectionAttempt, sshSession, sshConnectionSettings);
         }
         catch (Exception exception)
         {
@@ -604,10 +605,15 @@ public partial class SshConnector : Component
     {
         CancelConnection();
         ConnectionAttempt connectionAttempt = (_currentAttempt = new ConnectionAttempt());
+        // A background thread: a cancelled attempt is not waited for any more, and must not keep the process alive.
         _currentAttempt.Thread = new Thread(() =>
         {
             this.ConnectWorker(sshConnectionSettings, password, connectionAttempt, forcePasswordAuth, autoAcceptHostKey: false);
-        });
+        })
+        {
+            IsBackground = true,
+            Name = "SSH connect worker"
+        };
         _currentAttempt.Thread.Start();
     }
 
