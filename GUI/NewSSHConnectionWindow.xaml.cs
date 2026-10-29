@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Linq;
 using System.Security;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Markup;
@@ -35,12 +37,18 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
             PasswordBox passwordBox = txtPassword;
             if (passwordBox != null)
             {
-                passwordBox.SelectAll();
-            }
-            PasswordBox passwordBox2 = txtPassword;
-            if (passwordBox2 != null)
-            {
-                ((UIElement)passwordBox2).Focus();
+                // While the password is shown, its text box is the one that is visible.
+                TextBox shown = passwordBox.IsVisible ? null : FindRevealTextBox(passwordBox);
+                if (shown != null)
+                {
+                    shown.SelectAll();
+                    shown.Focus();
+                }
+                else
+                {
+                    passwordBox.SelectAll();
+                    passwordBox.Focus();
+                }
             }
         }
         MessageBoxes.Exception(exception);
@@ -57,26 +65,83 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
         Controller.Password = (sender as PasswordBox).Password;
     }
 
-    // The proxy field ("user:password@host:port") is hidden in a password box until the eye button is pressed. The
-    // controller always holds the current text: the text box writes it itself, the password box through PasswordChanged.
+    // Every secret on this form (password, passphrase, proxy "user:password@host:port") is a password box with an eye
+    // button beside it. The button swaps the password box for a text box that holds the same text; the text box has no
+    // binding: what is typed into it goes to the password box, whose PasswordChanged keeps the controller up to date.
+    private static PasswordBox FindRevealPasswordBox(Panel panel)
+    {
+        return panel?.Children.OfType<PasswordBox>().FirstOrDefault();
+    }
+
+    private static TextBox FindRevealTextBox(PasswordBox passwordBox)
+    {
+        return (passwordBox.Parent as Panel)?.Children.OfType<TextBox>().FirstOrDefault();
+    }
+
+    private static void SetRevealed(object sender, bool revealed)
+    {
+        Panel panel = (sender as ToggleButton)?.Parent as Panel;
+        PasswordBox passwordBox = FindRevealPasswordBox(panel);
+        TextBox textBox = passwordBox == null ? null : FindRevealTextBox(passwordBox);
+        if (textBox == null)
+        {
+            return;
+        }
+        if (revealed)
+        {
+            textBox.Text = passwordBox.Password;
+            passwordBox.Visibility = Visibility.Collapsed;
+            textBox.Visibility = Visibility.Visible;
+            textBox.Focus();
+            textBox.CaretIndex = textBox.Text.Length;
+        }
+        else
+        {
+            passwordBox.Visibility = Visibility.Visible;
+            textBox.Visibility = Visibility.Collapsed;
+            // The secret does not stay behind in a plain text box.
+            textBox.Text = string.Empty;
+            passwordBox.Focus();
+        }
+    }
+
+    private void RevealButton_Checked(object sender, RoutedEventArgs e)
+    {
+        SetRevealed(sender, revealed: true);
+    }
+
+    private void RevealButton_Unchecked(object sender, RoutedEventArgs e)
+    {
+        SetRevealed(sender, revealed: false);
+    }
+
+    private void RevealText_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        TextBox textBox = (TextBox)sender;
+        if (textBox.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+        PasswordBox passwordBox = FindRevealPasswordBox(textBox.Parent as Panel);
+        if (passwordBox != null && passwordBox.Password != textBox.Text)
+        {
+            passwordBox.Password = textBox.Text;
+        }
+    }
+
     private bool _SyncingProxy;
 
-    private void SetProxyPassword(string value)
+    private void ProxyPasswordBox_Loaded(object sender, RoutedEventArgs e)
     {
         _SyncingProxy = true;
         try
         {
-            pwdProxy.Password = value ?? string.Empty;
+            pwdProxy.Password = Controller.Proxy ?? string.Empty;
         }
         finally
         {
             _SyncingProxy = false;
         }
-    }
-
-    private void ProxyPasswordBox_Loaded(object sender, RoutedEventArgs e)
-    {
-        SetProxyPassword(Controller.Proxy);
     }
 
     private void ProxyPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
@@ -85,23 +150,6 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
         {
             Controller.Proxy = pwdProxy.Password;
         }
-    }
-
-    private void ShowProxy_Checked(object sender, RoutedEventArgs e)
-    {
-        txtProxy.Text = pwdProxy.Password;
-        pwdProxy.Visibility = Visibility.Collapsed;
-        txtProxy.Visibility = Visibility.Visible;
-        txtProxy.Focus();
-        txtProxy.CaretIndex = txtProxy.Text.Length;
-    }
-
-    private void ShowProxy_Unchecked(object sender, RoutedEventArgs e)
-    {
-        SetProxyPassword(txtProxy.Text);
-        txtProxy.Visibility = Visibility.Collapsed;
-        pwdProxy.Visibility = Visibility.Visible;
-        pwdProxy.Focus();
     }
 
     private void Browse_Click(object sender, RoutedEventArgs e)
