@@ -217,40 +217,53 @@ internal class WindowsCaret : ICaret
 
     private void EnsureCreated()
     {
-        if (!_created)
+        // The second attempt is for a caret another window took meanwhile; a window that cannot own a caret (it has
+        // no focus any more) must not be retried for ever.
+        for (int attempt = 0; attempt < 2; attempt++)
         {
-            int caretWidth = 0;
-            if (_width != 0)
+            if (!_created)
             {
-                caretWidth = _width;
+                CreateNow();
             }
-            else if (_overwriteMode || _underlineStyle)
+            if (ShowCaret(_control.Handle))
             {
-                caretWidth = (int)Graphics.FromHwnd(_control.Handle).MeasureString(new string('O', 10), _control.Font).Width / 10;
+                return;
             }
-            int caretHeight = _height;
-            if (caretHeight == 0)
-            {
-                caretHeight = _control.Font.Height;
-            }
-            if (_underlineStyle)
-            {
-                caretHeight = 2;
-                _yOffset = _control.Font.Height - caretHeight;
-            }
-            else
-            {
-                _yOffset = 0;
-            }
-            CreateCaret(_control.Handle, IntPtr.Zero, caretWidth, caretHeight);
-            SetCaretPos(_x, _y + _yOffset);
-            _created = true;
-        }
-        if (!ShowCaret(_control.Handle))
-        {
             DestroyCaret();
             _created = false;
-            EnsureCreated();
         }
+    }
+
+    private void CreateNow()
+    {
+        int caretWidth = 0;
+        if (_width != 0)
+        {
+            caretWidth = _width;
+        }
+        else if (_overwriteMode || _underlineStyle)
+        {
+            using (Graphics graphics = Graphics.FromHwnd(_control.Handle))
+            {
+                caretWidth = (int)graphics.MeasureString(new string('O', 10), _control.Font).Width / 10;
+            }
+        }
+        int caretHeight = _height;
+        if (caretHeight == 0)
+        {
+            caretHeight = _control.Font.Height;
+        }
+        if (_underlineStyle)
+        {
+            caretHeight = 2;
+            _yOffset = _control.Font.Height - caretHeight;
+        }
+        else
+        {
+            _yOffset = 0;
+        }
+        CreateCaret(_control.Handle, IntPtr.Zero, caretWidth, caretHeight);
+        SetCaretPos(_x, _y + _yOffset);
+        _created = true;
     }
 }

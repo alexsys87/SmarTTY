@@ -31,7 +31,7 @@ public class SuggestionController
     {
         if (_popup != null)
         {
-            _popup.Hide();
+            _popup.Dispose();
         }
         _popup = new SuggestionPopup(suggestionSource, _host, allowMultiSelect);
         _popup.BackColor = this.BackColor;
@@ -49,7 +49,7 @@ public class SuggestionController
     {
         if (_popup != null)
         {
-            _popup.Hide();
+            _popup.Dispose();
         }
         _popup = suggestionCatalog.CreatePopup(prefix, _host, allowMultiSelect);
         _popup.BackColor = this.BackColor;
@@ -81,5 +81,26 @@ public class SuggestionController
         {
             _popup.AcceptSelected();
         }
+    }
+
+    /// <summary>
+    /// Accepts the selected item only when it continues what was typed (<paramref name="typedWord"/>, case ignored);
+    /// otherwise the popup just closes. The list keeps an item selected even when nothing matches the word, and that
+    /// item must not replace a name the user is typing.
+    /// </summary>
+    public void AcceptSelectedIfMatches(string typedWord)
+    {
+        if (!IsVisible)
+        {
+            return;
+        }
+        ISuggestion selected = _popup.SelectedSuggestion;
+        if (selected == null || string.IsNullOrEmpty(typedWord) || selected.DisplayName == null
+            || !selected.DisplayName.StartsWith(typedWord, System.StringComparison.OrdinalIgnoreCase))
+        {
+            _popup.Hide();
+            return;
+        }
+        _popup.AcceptSelected();
     }
 }

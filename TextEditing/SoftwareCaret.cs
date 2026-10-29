@@ -115,6 +115,12 @@ internal class SoftwareCaret : ICaret
         _focusTimer.Interval = 100;
         _focusTimer.Enabled = true;
         _focusTimer.Tick += PollFocus;
+        // The timers keep running (and keep the control alive) unless they are stopped with the control.
+        _host.HostControl.Disposed += (sender, e) =>
+        {
+            _blinkTimer.Dispose();
+            _focusTimer.Dispose();
+        };
     }
 
     private void PollFocus(object sender, EventArgs e)
@@ -145,11 +151,21 @@ internal class SoftwareCaret : ICaret
 
     public void Enable()
     {
-        _enabled = true;
+        if (!_enabled)
+        {
+            _enabled = true;
+            // The font may have changed while the caret was off: take its size again.
+            UpdateGeometry();
+        }
     }
 
     public void Disable()
     {
+        if (_enabled)
+        {
+            _enabled = false;
+            _host.HostControl.Invalidate(_bounds);
+        }
     }
 
     public void MoveTo(int x, int y)
@@ -189,7 +205,10 @@ internal class SoftwareCaret : ICaret
         }
         else if (_overwriteMode || _underlineStyle)
         {
-            width = (int)Graphics.FromHwnd(_host.HostControl.Handle).MeasureString(new string('O', 10), _host.HostControl.Font).Width / 10;
+            using (Graphics graphics = Graphics.FromHwnd(_host.HostControl.Handle))
+            {
+                width = (int)graphics.MeasureString(new string('O', 10), _host.HostControl.Font).Width / 10;
+            }
         }
         int caretHeight = _height;
         if (caretHeight == 0)
@@ -218,7 +237,11 @@ internal class SoftwareCaret : ICaret
     {
         if (_enabled && (_focused || _showWhenUnfocused) && _blinkOn)
         {
-            e.Graphics.FillRectangle(Brushes.Black, _bounds);
+            // The text colour: a black caret would not be seen on a dark editor.
+            using (SolidBrush brush = new SolidBrush(_host.HostControl.ForeColor))
+            {
+                e.Graphics.FillRectangle(brush, _bounds);
+            }
         }
     }
 }
