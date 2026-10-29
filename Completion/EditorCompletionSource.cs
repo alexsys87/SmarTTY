@@ -12,8 +12,8 @@ namespace SmarTTY.Completion;
 /// </summary>
 public static class EditorCompletionSource
 {
-    // The popup is meant to help while typing, not to dump a whole file: keep the list short.
-    private const int MaxItems = 500;
+    // A large document can contain many identifiers; cap the list so the popup stays responsive.
+    private const int MaxItems = 10000;
 
     private const int MaxWordLength = 64;
 
