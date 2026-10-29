@@ -317,6 +317,8 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public bool EditorApiSymbolsMigrated { get; set; }
 
+    public bool AutoLinkExtensionsMigrated { get; set; }
+
     [XmlIgnore]
     public EditorSettingsWrapper EditorWrapper { get; }
 
@@ -494,6 +496,19 @@ public class GlobalSettings : INotifyPropertyChanged
             // as the feature is meant to be visible by default and can be switched off in Settings afterwards.
             Editor.ApiSymbols = true;
             EditorApiSymbolsMigrated = true;
+            Save();
+        }
+        if (!AutoLinkExtensionsMigrated)
+        {
+            // The list of extensions that are underlined in the terminal output used to be short (.c .cpp .h .sh .txt .js)
+            // and Settings.xml keeps it, so a new default would never reach existing configurations. A list that is still
+            // exactly the old default is replaced once; a list the user edited is left alone.
+            VirtualTerminal ??= new VirtualTerminalSettings();
+            if (string.Equals(VirtualTerminal.AutoLinkExtensions, VirtualTerminalSettings.OldDefaultAutoLinkExtensions, StringComparison.Ordinal))
+            {
+                VirtualTerminal.AutoLinkExtensions = VirtualTerminalSettings.DefaultAutoLinkExtensions;
+            }
+            AutoLinkExtensionsMigrated = true;
             Save();
         }
         if (!CompletionTriggersMigratedV2)

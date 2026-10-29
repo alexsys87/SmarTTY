@@ -1,4 +1,6 @@
 ﻿using SmarTTY.Utilities;
+using System;
+using System.Collections.Generic;
 
 namespace VisualTTY;
 
@@ -46,5 +48,30 @@ public class VirtualTerminalSettings
     /// </summary>
     public GlobalSettings.ByteOrientedLineEditingMode ByteOrientedLineEditing { get; set; }
 
-    public string AutoLinkExtensions { get; set; } = ".c;.cpp;.h;.sh;.txt;.js";
+    /// <summary>The list that older versions shipped as the default; settings that still hold it are upgraded once.</summary>
+    public const string OldDefaultAutoLinkExtensions = ".c;.cpp;.h;.sh;.txt;.js";
+
+    /// <summary>Text file extensions that are underlined in the output of commands such as "ls" and open in the editor on click.</summary>
+    public const string DefaultAutoLinkExtensions = ".txt;.log;.json;.html;.htm;.xml;.css;.js;.py;.sh;.bash;.c;.cpp;.cc;.h;.hpp;.md;.csv;.tsv;.yml;.yaml;.toml;.ini;.cfg;.conf;.cnf;.env;.properties;.sql;.php;.pl;.rb;.lua;.go;.rs;.java;.kt;.mk;.cmake;.diff;.patch;.service;.rules;.list;.repo;.desktop;.rst;.tex;.svg;.jsx;.tsx;.vue;.scss";
+
+    public string AutoLinkExtensions { get; set; } = DefaultAutoLinkExtensions;
+
+    /// <summary>
+    /// Splits the "AutoLinkExtensions" list (separated by semicolons, commas or spaces) into a case-insensitive set;
+    /// entries are written with or without the leading dot.
+    /// </summary>
+    public static HashSet<string> ParseAutoLinkExtensions(string list)
+    {
+        HashSet<string> result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string item in (list ?? "").Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string extension = item.Trim();
+            if (extension.Length == 0 || extension == ".")
+            {
+                continue;
+            }
+            result.Add(extension[0] == '.' ? extension : "." + extension);
+        }
+        return result;
+    }
 }

@@ -400,12 +400,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             _currentDirectory = initialDirectory;
         }
-        _linkExtensions = new HashSet<string>();
-        string[] parts = (terminalSessionContext.VTSettings.AutoLinkExtensions ?? "").Split(';');
-        foreach (string item in parts)
-        {
-            _linkExtensions.Add(item);
-        }
+        _linkExtensions = VirtualTerminalSettings.ParseAutoLinkExtensions(terminalSessionContext.VTSettings.AutoLinkExtensions);
         if (_homeDirectory == null)
         {
             throw new RemoteOperationException("Failed to query home directory. Please try disabling virtual mode.");
