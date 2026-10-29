@@ -4,7 +4,7 @@ using SmarTTY.Controls;
 using System.Drawing;
 using System.IO;
 
-namespace SmarTTY;
+namespace VisualTTY;
 
 public static class AppEnvironment
 {

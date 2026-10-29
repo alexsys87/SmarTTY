@@ -148,7 +148,7 @@
     <Compile Update="Forms\TextHintForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="SshConnector.cs">
+    <Compile Update="Ssh\Connection\SshConnector.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Update="Terminal\TerminalEventDispatcher.cs">
@@ -211,7 +211,7 @@
     <Compile Update="Forms\TextHintForm.Designer.cs">
       <DependentUpon>TextHintForm.cs</DependentUpon>
     </Compile>
-    <Compile Update="SshConnector.Designer.cs">
+    <Compile Update="Ssh\Connection\SshConnector.Designer.cs">
       <DependentUpon>SshConnector.cs</DependentUpon>
     </Compile>
     <Compile Update="Terminal\TerminalEventDispatcher.Designer.cs">

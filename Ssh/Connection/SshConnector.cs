@@ -1,7 +1,5 @@
-using SmarTTY.Ssh;
 using Renci.SshNet.Common;
 using SmarTTY.Controls;
-using SmarTTY.Forms;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -15,7 +13,7 @@ using System.Windows.Forms;
 using System.Windows.Threading;
 using VisualTTY;
 
-namespace SmarTTY;
+namespace SmarTTY.Ssh;
 
 public partial class SshConnector : Component
 {

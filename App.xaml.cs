@@ -6,6 +6,7 @@ using SmarTTY.GUI;
 using SmarTTY.GUI.Styles;
 using VisualTTY;
 using VisualTTY.Backend;
+using SmarTTY.Ssh;
 
 namespace SmarTTY;
 

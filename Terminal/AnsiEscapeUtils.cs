@@ -1,4 +1,4 @@
-namespace SmarTTY;
+namespace SmarTTY.Terminal;
 
 public static class AnsiEscapeUtils
 {

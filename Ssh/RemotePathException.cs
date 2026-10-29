@@ -1,4 +1,3 @@
-using SmarTTY;
 using SmarTTY.IO;
 using System;
 

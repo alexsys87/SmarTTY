@@ -5,6 +5,7 @@ using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using SmarTTY.Terminal;
 
 namespace SmarTTY.Sync;
 

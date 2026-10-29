@@ -15,7 +15,7 @@
     <Compile Include="../../PackageManagers/PortagePackageManagerClient.cs" Link="PortagePackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/YumPackageManagerClient.cs" Link="YumPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/ZypperPackageManagerClient.cs" Link="ZypperPackageManagerClient.cs" />
-    <Compile Include="../../PackageIndexUpdater.cs" Link="PackageIndexUpdater.cs" />
+    <Compile Include="../../PackageManagers/PackageIndexUpdater.cs" Link="PackageIndexUpdater.cs" />
     <Compile Include="../../VisualTTY/ILinuxPackageManagerClient.cs" Link="ILinuxPackageManagerClient.cs" />
     <Compile Include="../../VisualTTY/ISSHCommandRunner.cs" Link="ISSHCommandRunner.cs" />
     <Compile Include="../../VisualTTY/LinuxPackageInfo.cs" Link="LinuxPackageInfo.cs" />

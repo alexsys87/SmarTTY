@@ -17,6 +17,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
+using SmarTTY.Completion;
 
 namespace SmarTTY.GUI.Backend;
 

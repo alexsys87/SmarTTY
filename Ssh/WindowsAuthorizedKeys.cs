@@ -1,4 +1,3 @@
-using SmarTTY.Ssh;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace SmarTTY;
+namespace SmarTTY.Ssh;
 
 /// <summary>
 /// Installing, checking and removing a public key on a Windows host (Win32-OpenSSH). <see cref="AuthorizedKeysManager"/> does

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace SmarTTY;
+namespace SmarTTY.Ssh;
 
 /// <summary>
 /// Text-level operations on the lines of an OpenSSH authorized_keys file. A line is "[options] keytype base64 [comment]":

@@ -1,12 +1,10 @@
-using SmarTTY.Ssh;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using VisualTTY;
 
-namespace SmarTTY;
+namespace SmarTTY.Ssh;
 
 internal static class AuthorizedKeysManager
 {

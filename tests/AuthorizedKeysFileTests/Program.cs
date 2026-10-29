@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using SmarTTY;
+using SmarTTY.Ssh;
 
 // Regression harness for the authorized_keys text handling: finding a key, removing exactly that key without
 // touching anything else, and the home directory pick.

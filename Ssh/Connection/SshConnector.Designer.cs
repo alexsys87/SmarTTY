@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Windows.Threading;
 
-namespace SmarTTY;
+namespace SmarTTY.Ssh;
 
 public partial class SshConnector 
 {
