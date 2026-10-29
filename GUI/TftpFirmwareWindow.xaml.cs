@@ -67,7 +67,6 @@ public partial class TftpFirmwareWindow : Window, ITftpFirmwareWindow
     private const int QuietMs = 250;
     private const int PromptTimeoutMs = 4000;
     private const string AutoPrompt = "(auto)";
-    private const string RegistrySubKey = "Tftp";
 
     private static readonly Preset[] Presets =
     {
@@ -793,83 +792,102 @@ public partial class TftpFirmwareWindow : Window, ITftpFirmwareWindow
 
     private void LoadSettings()
     {
-        string savedServer = null;
-        string savedDevice = string.Empty;
-        string savedLoad = "${loadaddr}";
-        string savedPrompt = AutoPrompt;
-        string savedAfter = string.Empty;
-        string savedFileToSend = null;
-        bool restrict = true;
-        try
+        TftpFirmwareSettings settings = TftpFirmwareSettings.Load();
+        // The first run of a version that stores the settings in a file: carry over what an older version left in the registry.
+        if (!TftpFirmwareSettings.Exists())
         {
-            using (RegistryKey root = AppEnvironment.OpenSettingsKey())
-            using (RegistryKey key = root.OpenSubKey(RegistrySubKey))
+            TftpFirmwareSettings legacy = ReadLegacyRegistrySettings();
+            if (legacy != null)
             {
-                if (key != null)
-                {
-                    if (key.GetValue("Files") is string[] entries)
-                    {
-                        foreach (string entry in entries)
-                        {
-                            int tab = entry.IndexOf('\t');
-                            if (tab > 0 && File.Exists(entry.Substring(tab + 1)))
-                            {
-                                _files.Add(new ServedFile { Name = entry.Substring(0, tab), FullPath = entry.Substring(tab + 1) });
-                            }
-                        }
-                    }
-                    savedServer = key.GetValue("ServerIp") as string;
-                    savedDevice = key.GetValue("DeviceIp") as string ?? savedDevice;
-                    savedLoad = key.GetValue("LoadAddress") as string ?? savedLoad;
-                    savedPrompt = key.GetValue("Prompt") as string ?? savedPrompt;
-                    savedAfter = key.GetValue("After") as string ?? savedAfter;
-                    savedFileToSend = key.GetValue("FileToSend") as string;
-                    restrict = !(key.GetValue("RestrictClient") is int flag) || flag != 0;
-                }
+                settings = legacy;
+                settings.Save();
             }
         }
-        catch (Exception)
+
+        foreach (TftpFirmwareSettings.ServedFileEntry entry in settings.Files)
         {
-            // Nothing remembered: the defaults do.
+            if (File.Exists(entry.FullPath))
+            {
+                _files.Add(new ServedFile { Name = entry.Name, FullPath = entry.FullPath });
+            }
         }
 
+        string savedServer = settings.ServerIp;
         List<string> local = LocalAddresses();
         ServerIpBox.ItemsSource = local;
         ServerIpBox.Text = savedServer != null && local.Contains(savedServer) ? savedServer : (local.Count > 0 ? local[0] : savedServer ?? string.Empty);
-        DeviceIpBox.Text = savedDevice;
-        RestrictClientBox.IsChecked = restrict;
-        LoadAddressBox.Text = savedLoad;
-        PromptBox.Text = string.IsNullOrEmpty(savedPrompt) ? AutoPrompt : savedPrompt;
-        AfterBox.Text = savedAfter.Replace("\r\n", "\n").Replace("\n", "\r\n");
+        DeviceIpBox.Text = settings.DeviceIp ?? string.Empty;
+        RestrictClientBox.IsChecked = settings.RestrictClient;
+        LoadAddressBox.Text = string.IsNullOrEmpty(settings.LoadAddress) ? TftpFirmwareSettings.DefaultLoadAddress : settings.LoadAddress;
+        PromptBox.Text = string.IsNullOrEmpty(settings.Prompt) ? AutoPrompt : settings.Prompt;
+        AfterBox.Text = (settings.After ?? string.Empty).Replace("\r\n", "\n").Replace("\n", "\r\n");
         After_TextChanged(null, null);
-        RefreshFileViews(savedFileToSend);
+        RefreshFileViews(settings.FileToSend);
     }
 
     private void SaveSettings()
     {
         try
         {
-            using (RegistryKey root = AppEnvironment.OpenSettingsKey())
-            using (RegistryKey key = root.CreateSubKey(RegistrySubKey))
+            TftpFirmwareSettings settings = new TftpFirmwareSettings();
+            foreach (ServedFile file in _files)
             {
-                string[] entries = new string[_files.Count];
-                for (int i = 0; i < entries.Length; i++)
-                {
-                    entries[i] = _files[i].Name + "\t" + _files[i].FullPath;
-                }
-                key.SetValue("Files", entries, RegistryValueKind.MultiString);
-                key.SetValue("FileToSend", FileToSendBox.SelectedItem?.ToString() ?? string.Empty);
-                key.SetValue("ServerIp", ServerIpBox.Text.Trim());
-                key.SetValue("DeviceIp", DeviceIpBox.Text.Trim());
-                key.SetValue("LoadAddress", LoadAddressBox.Text.Trim());
-                key.SetValue("Prompt", PromptBox.Text.Trim());
-                key.SetValue("After", AfterBox.Text);
-                key.SetValue("RestrictClient", RestrictClientBox.IsChecked == true ? 1 : 0);
+                settings.Files.Add(new TftpFirmwareSettings.ServedFileEntry { Name = file.Name, FullPath = file.FullPath });
             }
+            settings.FileToSend = FileToSendBox.SelectedItem?.ToString();
+            settings.ServerIp = ServerIpBox.Text.Trim();
+            settings.DeviceIp = DeviceIpBox.Text.Trim();
+            settings.LoadAddress = LoadAddressBox.Text.Trim();
+            settings.Prompt = PromptBox.Text.Trim();
+            settings.After = AfterBox.Text;
+            settings.RestrictClient = RestrictClientBox.IsChecked == true;
+            settings.Save();
         }
         catch (Exception)
         {
             // Settings that cannot be saved are only forgotten.
+        }
+    }
+
+    /// <summary>
+    /// The settings an older version of SmarTTY kept in HKCU\SOFTWARE\Sysprogs\SmarTTY\Settings\Tftp. Read once, when the
+    /// settings file does not exist yet, so that an upgrade does not lose them; from then on only the file is used.
+    /// </summary>
+    private static TftpFirmwareSettings ReadLegacyRegistrySettings()
+    {
+        try
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Sysprogs\SmarTTY\Settings\Tftp"))
+            {
+                if (key == null)
+                {
+                    return null;
+                }
+                TftpFirmwareSettings settings = new TftpFirmwareSettings();
+                if (key.GetValue("Files") is string[] entries)
+                {
+                    foreach (string entry in entries)
+                    {
+                        int tab = entry.IndexOf('\t');
+                        if (tab > 0)
+                        {
+                            settings.Files.Add(new TftpFirmwareSettings.ServedFileEntry { Name = entry.Substring(0, tab), FullPath = entry.Substring(tab + 1) });
+                        }
+                    }
+                }
+                settings.ServerIp = key.GetValue("ServerIp") as string;
+                settings.DeviceIp = key.GetValue("DeviceIp") as string ?? string.Empty;
+                settings.LoadAddress = key.GetValue("LoadAddress") as string ?? TftpFirmwareSettings.DefaultLoadAddress;
+                settings.Prompt = key.GetValue("Prompt") as string ?? string.Empty;
+                settings.After = key.GetValue("After") as string ?? string.Empty;
+                settings.FileToSend = key.GetValue("FileToSend") as string;
+                settings.RestrictClient = !(key.GetValue("RestrictClient") is int flag) || flag != 0;
+                return settings;
+            }
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 }
