@@ -167,21 +167,40 @@ public partial class NewSSHConnectionWindow : Window, IComponentConnector, IStyl
         Controller.Passphrase = (sender as PasswordBox).Password;
     }
 
+    // A text box that still has the focus has not handed its text to the controller yet.
+    private static void CommitFocusedTextBox()
+    {
+        IInputElement focusedElement = Keyboard.FocusedElement;
+        TextBox textBox = focusedElement as TextBox;
+        if (textBox != null)
+        {
+            BindingExpression bindingExpression = ((FrameworkElement)textBox).GetBindingExpression(TextBox.TextProperty);
+            if (bindingExpression != null)
+            {
+                ((BindingExpressionBase)bindingExpression).UpdateSource();
+            }
+        }
+    }
+
     private void OK_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            IInputElement focusedElement = Keyboard.FocusedElement;
-            TextBox textBox = focusedElement as TextBox;
-            if (textBox != null)
-            {
-                BindingExpression bindingExpression = ((FrameworkElement)textBox).GetBindingExpression(TextBox.TextProperty);
-                if (bindingExpression != null)
-                {
-                    ((BindingExpressionBase)bindingExpression).UpdateSource();
-                }
-            }
+            CommitFocusedTextBox();
             Controller.Connect();
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void SaveOnly_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            CommitFocusedTextBox();
+            Controller.SaveWithoutConnecting();
         }
         catch (Exception exception)
         {

@@ -234,6 +234,7 @@
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <TextBlock VerticalAlignment="Center" Margin="5 0 0 0" Text="{Binding ProgressText}" />
       <ProgressBar IsIndeterminate="True" Grid.Column="1" Margin="5">
@@ -247,7 +248,19 @@
           </Style>
         </FrameworkElement.Style>
       </ProgressBar>
-      <Button Width="60" Grid.Column="2" Margin="5" IsDefault="True" Click="OK_Click">
+      <Button Grid.Column="2" MinWidth="60" Margin="5" Padding="8 2" Content="Save without connecting" ToolTip="Saves the connection as entered, without connecting to check it" Visibility="{Binding Path=Customization.SaveOnlyButtonVisibility}" Click="SaveOnly_Click">
+        <FrameworkElement.Style>
+          <Style TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="IsEnabled" Value="False" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding ProgressText}" Value="{x:Null}">
+                <Setter Property="IsEnabled" Value="True" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </FrameworkElement.Style>
+      </Button>
+      <Button Width="60" Grid.Column="3" Margin="5" IsDefault="True" Click="OK_Click">
         <AccessText Text="{Binding Path=Customization.ConnectButtonText}" />
         <FrameworkElement.Style>
           <Style TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
@@ -260,7 +273,7 @@
           </Style>
         </FrameworkElement.Style>
       </Button>
-      <Button Width="60" Grid.Column="3" Content="Cancel" Margin="5" Click="Cancel_Click" />
+      <Button Width="60" Grid.Column="4" Content="Cancel" Margin="5" Click="Cancel_Click" />
     </Grid>
   </StackPanel>
 </Window>
