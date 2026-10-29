@@ -315,7 +315,12 @@ public partial class SshConnector : Component
                         {
                         }
                     }
-                    if (session.Authenticate(sshConnectionSettings.UserName, password ?? ""))
+                    // Nothing typed and nothing saved (or the saved password cannot be decrypted): ask first. Sending an empty
+                    // password would be a failed login that the server logs and counts towards MaxAuthTries and fail2ban
+                    // before the user has typed anything. An account without a password still works: the prompt returns "".
+                    // Without a prompt handler there is nobody to ask, so the empty password is tried as before.
+                    string attemptedPassword = password ?? (CredentialsRequested == null ? "" : null);
+                    if (attemptedPassword != null && session.Authenticate(sshConnectionSettings.UserName, attemptedPassword))
                     {
                         if (passwordConfirmed && sshConnectionSettings.EncryptedSavedPassword != null && password != null)
                         {
@@ -334,6 +339,8 @@ public partial class SshConnector : Component
                         if (pwdConfirmed)
                         {
                             passwordConfirmed = true;
+                            // A confirmed prompt is an answer even when it is empty; null would ask again forever.
+                            password = password ?? "";
                             break;
                         }
                         throw new OperationCanceledException();
