@@ -41,6 +41,7 @@ internal static class Program
     private const string SettingsXml = "<?xml version=\"1.0\"?><GlobalSettings><AutoCloseTabs>true</AutoCloseTabs></GlobalSettings>";
     private const string KnownHostsXml = "<?xml version=\"1.0\"?><ArrayOfKnownHostKey><KnownHostKey><HostName>h</HostName><KeyType>ssh-rsa</KeyType><KeyBase64>AAAA</KeyBase64></KnownHostKey></ArrayOfKnownHostKey>";
     private const string GuiXml = "<?xml version=\"1.0\"?><CommonGUIPreferences><X>1</X></CommonGUIPreferences>";
+    private const string TftpXml = "<?xml version=\"1.0\"?><TftpFirmwareSettings><ServerIp>192.168.1.10</ServerIp><LoadAddress>0x80060000</LoadAddress></TftpFirmwareSettings>";
     private const string RawXml = "<?xml version=\"1.0\"?><RawConnectionSettings><Icon>a.png</Icon></RawConnectionSettings>";
 
     private static string Ssh(string host, string password)
@@ -76,6 +77,7 @@ internal static class Program
         Put(data, "SavedConnections/old.sshconnection.bak", "junk");
         Put(data, "unrelated.txt", "x");
         Put(local, "GUIPreferences.xml", GuiXml);
+        Put(local, "TftpFirmware.xml", TftpXml);
         Put(local, "other.dat", "x");
     }
 
@@ -165,7 +167,7 @@ internal static class Program
         var export = SettingsArchive.Export(archive, srcData, srcLocal, false);
         var entries = ReadArchive(archive);
         var names = entries.Select(e => e.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
-        Check(export.FileCount == 6 && names.Length == 6, "export writes exactly the 6 settings files");
+        Check(export.FileCount == 6 && names.Length == 6, "export writes exactly the 6 legacy settings files");
         Check(names.SequenceEqual(new[] {
             "KnownHosts.xml", "Local/GUIPreferences.xml", "SavedConnections/USB Serial Port_COM3.rawconnection",
             "SavedConnections/root@10.0.0.2.sshconnection", "SavedConnections/root@192.168.1.1.sshconnection", "Settings.xml" }, StringComparer.Ordinal),
@@ -396,6 +398,47 @@ internal static class Program
 
         RunSelectablePartsChecks();
         RunCompletionsGzipChecks();
+        RunTftpFirmwareChecks();
+    }
+
+    // The TFTP server / U-Boot upload window keeps its settings in %LOCALAPPDATA%\SmarTTY\TftpFirmware.xml.
+    private static void RunTftpFirmwareChecks()
+    {
+        string srcData = NewDir("tftp-srcdata"), srcLocal = NewDir("tftp-srclocal");
+        Put(srcLocal, "TftpFirmware.xml", TftpXml);
+        SettingsLocations src = MakeLocations(srcData, srcLocal, null, null, null);
+
+        Check((SettingsArchive.Describe(src).Available & SettingsParts.TftpFirmware) != SettingsParts.None, "describe finds the TFTP settings file");
+
+        string archive = Path.Combine(NewDir("tftp-out"), "tftp.tar.gz");
+        var exported = SettingsArchive.Export(archive, src, SettingsParts.TftpFirmware);
+        var entries = ReadArchive(archive);
+        Check(exported.FileCount == 1 && entries.Count == 1 && entries[0].Name == "Local/TftpFirmware.xml", "the TFTP settings go into the archive as Local/TftpFirmware.xml");
+        Check(Encoding.UTF8.GetString(entries[0].Data) == TftpXml, "the TFTP settings are stored as they are");
+        Check(SettingsArchive.Inspect(archive).Available == SettingsParts.TftpFirmware, "inspect offers the TFTP settings of an archive");
+
+        // selected by default, so a normal export carries them
+        Check((SettingsParts.Default & SettingsParts.TftpFirmware) != SettingsParts.None, "the TFTP settings are selected by default");
+
+        // import writes the file into the local directory (not %APPDATA%)
+        string dstData = NewDir("tftp-dstdata"), dstLocal = NewDir("tftp-dstlocal");
+        var imported = SettingsArchive.Import(archive, MakeLocations(dstData, dstLocal, null, null, null), SettingsParts.TftpFirmware, null);
+        Check(imported.TftpFirmwareImported && imported.FileCount == 1 && Read(dstLocal, "TftpFirmware.xml") == TftpXml, "import restores the TFTP settings into the local directory");
+        Check(!File.Exists(Path.Combine(dstData, "TftpFirmware.xml")), "the TFTP settings are not written to %APPDATA%");
+
+        // importing another part leaves the TFTP file alone
+        string keepLocal = NewDir("tftp-keeplocal");
+        Put(keepLocal, "TftpFirmware.xml", TftpXml);
+        Put(srcData, "Settings.xml", SettingsXml);
+        string mainArchive = Path.Combine(NewDir("tftp-out"), "main.tar.gz");
+        SettingsArchive.Export(mainArchive, src, SettingsParts.MainSettings);
+        SettingsArchive.Import(mainArchive, MakeLocations(NewDir("tftp-dstdata2"), keepLocal, null, null, null), SettingsParts.MainSettings, null);
+        Check(Read(keepLocal, "TftpFirmware.xml") == TftpXml, "importing another part does not touch the TFTP settings");
+
+        // a damaged TFTP entry is rejected before anything is written
+        string wrongRoot = Path.Combine(NewDir("tftp-out"), "wrong-root.tar.gz");
+        MakeArchive(wrongRoot, E("Local/TftpFirmware.xml", "<GlobalSettings/>"));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(wrongRoot, NewDir("tftp-x"), NewDir("tftp-y"), null), "a TFTP entry with another root element is rejected");
     }
 
     private static byte[] Gzip(string text)
