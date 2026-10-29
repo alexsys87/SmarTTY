@@ -908,13 +908,13 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                     Controller.MenuCommandHandlers.CreateNewEditorTab(Controller.ActiveSession, e.FullPath);
                     break;
                 case FileListControl.FileEvent.Download:
-                    Controller.MenuCommandHandlers.QuickDownload(e.FullPath);
+                    Controller.MenuCommandHandlers.QuickDownloadMany(e.FullPaths, archives: false);
                     break;
                 case FileListControl.FileEvent.Run:
                     Controller.MenuCommandHandlers.RunRemoteScript(e.FullPath);
                     break;
                 case FileListControl.FileEvent.DownloadArchive:
-                    Controller.MenuCommandHandlers.QuickDownloadArchive(e.FullPath);
+                    Controller.MenuCommandHandlers.QuickDownloadMany(e.FullPaths, archives: true);
                     break;
                 case FileListControl.FileEvent.InstallPackage:
                     Controller.MenuCommandHandlers.InstallRemotePackages(e.FullPaths);

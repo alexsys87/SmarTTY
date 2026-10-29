@@ -892,6 +892,11 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
                 try
                 {
                     string local = System.IO.Path.Combine(target, SafeLocalName(item.Name));
+                    if ((item.Entry.Flags & LsOutputParser.LsEntryFlags.Special) != 0)
+                    {
+                        // Devices, sockets and pipes have no content to copy (reading a pipe would never end).
+                        throw new RemoteOperationException("Not a regular file.");
+                    }
                     if (item.Entry.IsDirectory)
                     {
                         if (sftp != null)
@@ -994,7 +999,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             {
                 DownloadDirectory(sftp, remote, local);
             }
-            else
+            else if (attributes == null || attributes.Mode == null || attributes.IsRegularFile)
             {
                 DownloadFile(null, sftp, remote, local);
             }

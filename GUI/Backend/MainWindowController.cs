@@ -741,6 +741,48 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
+        /// <summary>
+        /// Downloads several remote files, or folders as .tar.gz archives, into the default download directory. The
+        /// directory is asked for once (when it is not set), not once per item.
+        /// </summary>
+        public void QuickDownloadMany(string[] remotePaths, bool archives)
+        {
+            try
+            {
+                if (remotePaths == null || remotePaths.Length == 0)
+                {
+                    return;
+                }
+                SessionWrapper activeSession = RequireSshSession("File transfer");
+                string text = _Controller.Settings.DefaultDownloadDirectory;
+                if (string.IsNullOrEmpty(text) || !Directory.Exists(text))
+                {
+                    text = LocalFolderBrowserWindow.Browse(text, "Select download directory");
+                    if (text == null)
+                    {
+                        return;
+                    }
+                }
+                for (int index = 0; index < remotePaths.Length; index++)
+                {
+                    // The download directory is opened once, for the last item, not once per item.
+                    bool openWhenDone = _Controller.Settings.OpenLocalDirAfterDownload && index == remotePaths.Length - 1;
+                    if (archives)
+                    {
+                        activeSession.DoDownloadArchive(remotePaths[index], text, openWhenDone);
+                    }
+                    else
+                    {
+                        activeSession.DoDownloadFile(remotePaths[index], text, openWhenDone);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
         public void QuickDownload(string fn = null)
         {
             try
