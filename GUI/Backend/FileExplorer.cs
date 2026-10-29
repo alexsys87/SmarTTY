@@ -884,7 +884,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             }
             catch
             {
-                // No SFTP on the host (Dropbear without the subsystem, for example): single files go over SCP.
+                // No SFTP on the host (Dropbear without the subsystem, for example): files go over SCP and folders over tar.
                 sftp = null;
             }
             foreach (ItemWrapper item in selected)
@@ -894,11 +894,15 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
                     string local = System.IO.Path.Combine(target, SafeLocalName(item.Name));
                     if (item.Entry.IsDirectory)
                     {
-                        if (sftp == null)
+                        if (sftp != null)
                         {
-                            throw new RemoteOperationException("Folders can be dragged out only when the host offers SFTP.");
+                            DownloadDirectory(sftp, item.FullPath, local);
                         }
-                        DownloadDirectory(sftp, item.FullPath, local);
+                        else
+                        {
+                            // No SFTP on the host: the directory copier works over SCP or tar.
+                            new SmarTTY.Sync.DirectoryCopier(session).Download(item.FullPath, local);
+                        }
                     }
                     else
                     {
