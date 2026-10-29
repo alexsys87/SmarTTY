@@ -255,6 +255,25 @@ internal static class Program
         Equal(Join(html.Tokens(1, SyntaxHighlighting.TypeComment)), "-->", "multi-line markup comment");
         Equal(Join(html.Tokens(1, SyntaxHighlighting.TypeKeyword)), "</p", "closing tag");
 
+        // Strings that go on over lines, and quotes that are not strings.
+        Highlighted multi = new Highlighted(L.CLike, "const a = `x ${y}\nsecond` + 'z';\nlet t = \"\"\"\nbody \"quote\"\n\"\"\";\nvar v = @\"a\"\"b\nc\";\nx = ['a b', 'c d'];");
+        Equal(Join(multi.Tokens(0, SyntaxHighlighting.TypeString)), "`x ${y}", "a template string starts");
+        Equal(Join(multi.Tokens(1, SyntaxHighlighting.TypeString)), "second`|'z'", "...goes on, and the code after it is highlighted");
+        Equal(Join(multi.Tokens(3, SyntaxHighlighting.TypeString)), "body \"quote\"", "the body of a \"\"\" string is text");
+        Equal(Join(multi.Tokens(4, SyntaxHighlighting.TypeString)), "\"\"\"", "the closing \"\"\"");
+        Equal(Join(multi.Tokens(5, SyntaxHighlighting.TypeString)), "@\"a\"\"b", "a verbatim string with a doubled quote");
+        Equal(Join(multi.Tokens(6, SyntaxHighlighting.TypeString)), "c\"", "...goes on to its closing quote");
+        Equal(Join(multi.Tokens(7, SyntaxHighlighting.TypeString)), "'a b'|'c d'", "strings in an array are not lifetimes");
+        Highlighted rust = new Highlighted(L.CLike, "fn f<'a>(x: &'a str) -> &'static str { 'outer: loop { break 'outer; } }\nlet c = 'x'; let r = r#\"a \"b\" c\"#;");
+        Equal(Join(rust.Tokens(0, SyntaxHighlighting.TypeString)), "", "lifetimes and labels are not strings");
+        Equal(Join(rust.Tokens(1, SyntaxHighlighting.TypeString)), "'x'|r#\"a \"b\" c\"#", "a character literal and a raw string");
+        Highlighted html2 = new Highlighted(L.Markup, "<p>He said \"hi</p>\n<a href=\"u\"\n   title=\"t\">x</a>\n<!DOCTYPE html>");
+        Equal(Join(html2.Tokens(0, SyntaxHighlighting.TypeString)), "", "a quote in the text between tags is not a string");
+        Equal(Join(html2.Tokens(1, SyntaxHighlighting.TypeString)), "\"u\"", "an attribute value is");
+        Equal(Join(html2.Tokens(2, SyntaxHighlighting.TypeString)), "\"t\"", "also on the next line of the same tag");
+        Equal(Join(html2.Tokens(2, SyntaxHighlighting.TypeKeyword)), "</a", "and the tag after it");
+        Equal(Join(html2.Tokens(3, SyntaxHighlighting.TypeKeyword)), "<!DOCTYPE", "the doctype");
+
         Highlighted make = new Highlighted(L.Script, "FROM alpine # base\nURL=http://example.com/a#b");
         Equal(Join(make.Tokens(0, SyntaxHighlighting.TypeKeyword)), "FROM", "Dockerfile instruction");
         Equal(Join(make.Tokens(0, SyntaxHighlighting.TypeComment)), "# base", "'#' comment after whitespace");
@@ -475,6 +494,15 @@ internal static class Program
         Equal(Join(yaml.Tokens(1, SyntaxHighlighting.TypeVariable)), "name", "YAML keys keep the config colors");
         Equal(Join(yaml.Tokens(1, SyntaxHighlighting.TypeComment)), "# note", "YAML comments keep the config colors");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yml"), L.Yaml, ".yml is YAML");
+
+        // The text of a block scalar is not YAML.
+        Highlighted scalar = new Highlighted(L.Yaml, "run: |\n  echo \"don't # stop\"\n  x: y\n\n  more\nnext: 'v'\n");
+        Equal(Join(scalar.Tokens(1, SyntaxHighlighting.TypeString)), "echo \"don't # stop\"", "a line of a block scalar is text");
+        Equal(Join(scalar.Tokens(1, SyntaxHighlighting.TypeComment)), "", "'#' in a block scalar is not a comment");
+        Equal(Join(scalar.Tokens(2, SyntaxHighlighting.TypeVariable)), "", "'x: y' in a block scalar is not a key");
+        Equal(Join(scalar.Tokens(4, SyntaxHighlighting.TypeString)), "more", "a blank line does not end the block scalar");
+        Equal(Join(scalar.Tokens(5, SyntaxHighlighting.TypeVariable)), "next", "a line that is not indented deeper ends it");
+        Equal(Join(scalar.Tokens(5, SyntaxHighlighting.TypeString)), "'v'", "and is YAML again");
     }
 
     private static void PairEditingChecks()
