@@ -876,6 +876,82 @@ namespace SmarTTY.CodeEditing
         private const int StBashDouble = 0x01;
         private const int StBashSingle = 0x02;
 
+        // Inside a here document: the lines up to the terminator are text, whatever quotes they hold. The state also
+        // carries a hash of the terminator word (from bit 4) and whether "<<-" lets the terminator be indented with tabs.
+        private const int StBashHeredoc = 0x04;
+        private const int StBashHeredocStrip = 0x08;
+        private const int BashHeredocHashShift = 4;
+
+        private static int BashHeredocHash(string word)
+        {
+            unchecked
+            {
+                int hash = 17;
+                foreach (char c in word)
+                {
+                    hash = hash * 31 + c;
+                }
+                return hash & 0x7FFFFFF;
+            }
+        }
+
+        /// <summary>
+        /// Reads a here document opener ("&lt;&lt;EOF", "&lt;&lt;-'EOF'") at <paramref name="start"/>. <paramref name="end"/> is
+        /// the index after it. A shift in arithmetic ("$((1 &lt;&lt; n))") or a here string is not an opener.
+        /// </summary>
+        private static bool TryParseBashHeredoc(string text, int start, out int end, out int state)
+        {
+            end = start + 2;
+            state = 0;
+            int arithmetic = text.LastIndexOf("((", start, StringComparison.Ordinal);
+            if (arithmetic >= 0 && text.IndexOf("))", arithmetic, start - arithmetic, StringComparison.Ordinal) < 0)
+            {
+                return false;
+            }
+            int j = start + 2;
+            bool strip = false;
+            if (j < text.Length && text[j] == '-')
+            {
+                strip = true;
+                j++;
+            }
+            j = SkipBlanks(text, j);
+            if (j < text.Length && text[j] == '\\')
+            {
+                j++;
+            }
+            string word;
+            bool quoted = false;
+            if (j < text.Length && (text[j] == '\'' || text[j] == '"'))
+            {
+                int close = text.IndexOf(text[j], j + 1);
+                if (close < 0)
+                {
+                    return false;
+                }
+                quoted = true;
+                word = text.Substring(j + 1, close - j - 1);
+                j = close + 1;
+            }
+            else
+            {
+                int wordStart = j;
+                while (j < text.Length && !IsBlank(text[j]) && ";|&<>()".IndexOf(text[j]) < 0)
+                {
+                    j++;
+                }
+                word = text.Substring(wordStart, j - wordStart);
+            }
+            // A word that is not quoted must look like a name: "<< 3" is a shift.
+            if (word.Length == 0 || (!quoted && !IsIdStart(word[0])))
+            {
+                return false;
+            }
+            end = j;
+            state = StBashHeredoc | (strip ? StBashHeredocStrip : 0) | (BashHeredocHash(word) << BashHeredocHashShift);
+            return true;
+        }
+
         private static readonly HashSet<string> BashKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
             "if", "then", "elif", "else", "fi", "for", "while", "until", "do", "done",
@@ -907,6 +983,26 @@ namespace SmarTTY.CodeEditing
             bool seenElif = false;
             int i = 0;
             int last = 0;
+            // A here document opened on this line starts with the next one.
+            int pendingHeredoc = 0;
+
+            if ((startState & StBashHeredoc) != 0)
+            {
+                string body = ((startState & StBashHeredocStrip) != 0) ? text.TrimStart('\t') : text;
+                if (BashHeredocHash(body) == (startState >> BashHeredocHashShift))
+                {
+                    // The terminator.
+                    sink.AddToken(TypeKeyword, 0, len);
+                    endState = 0;
+                    return true;
+                }
+                if (len > 0)
+                {
+                    sink.AddToken(TypeString, 0, len);
+                }
+                endState = startState;
+                return true;
+            }
 
             if (startState == StBashDouble || startState == StBashSingle)
             {
@@ -956,8 +1052,27 @@ namespace SmarTTY.CodeEditing
                 {
                     Normal(ref last, last, i, sink);
                     sink.AddToken(TypeComment, i, len);
-                    endState = 0;
+                    endState = pendingHeredoc;
                     return true;
+                }
+
+                // Here document: "<<EOF", "<<-EOF", "<<'EOF'". The lines that follow are text up to the terminator.
+                if (c == '<' && i + 1 < len && text[i + 1] == '<')
+                {
+                    if (i + 2 < len && text[i + 2] == '<')
+                    {
+                        // A here string, "<<<".
+                        i += 3;
+                        continue;
+                    }
+                    if (pendingHeredoc == 0 && TryParseBashHeredoc(text, i, out int openerEnd, out int heredocState))
+                    {
+                        pendingHeredoc = heredocState;
+                        i = openerEnd;
+                        continue;
+                    }
+                    i += 2;
+                    continue;
                 }
 
                 // Single quotes (no escapes inside, may span lines).
@@ -1135,7 +1250,7 @@ namespace SmarTTY.CodeEditing
             }
 
             Normal(ref last, last, Math.Min(i, len), sink);
-            endState = 0;
+            endState = pendingHeredoc;
             return true;
         }
 

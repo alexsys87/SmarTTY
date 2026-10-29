@@ -195,6 +195,20 @@ internal static class Program
         Equal(Join(sh.Tokens(7, SyntaxHighlighting.TypeString)), "\"a \\\" b\"", "escaped quote inside a string");
         Equal(Join(sh.Tokens(7, SyntaxHighlighting.TypeComment)), "# c", "comment after the string");
         Equal(Join(sh.Tokens(8, SyntaxHighlighting.TypeKeyword)), "if|then", "keywords; 'test' inside a path is not one");
+
+        // A here document is text up to its terminator: an apostrophe inside must not open a string.
+        Highlighted heredoc = new Highlighted(L.Bash, "cat <<EOF\ndon't stop\nEOF\necho 'a'");
+        Equal(Join(heredoc.Tokens(1, SyntaxHighlighting.TypeString)), "don't stop", "the body of a here document is text");
+        Equal(Join(heredoc.Tokens(2, SyntaxHighlighting.TypeKeyword)), "EOF", "the terminator ends it");
+        Equal(Join(heredoc.Tokens(3, SyntaxHighlighting.TypeString)), "'a'", "and the code after it is highlighted again");
+        Highlighted stripped = new Highlighted(L.Bash, "cat <<-'END'\n\t$x 'q\n\tEND\nx='b'");
+        Equal(Join(stripped.Tokens(1, SyntaxHighlighting.TypeVariable)), "", "a quoted here document has no variables");
+        Equal(Join(stripped.Tokens(2, SyntaxHighlighting.TypeKeyword)), "\tEND", "<<- accepts a terminator indented with tabs");
+        Equal(Join(stripped.Tokens(3, SyntaxHighlighting.TypeString)), "'b'", "text after a <<- here document");
+        Highlighted shift = new Highlighted(L.Bash, "echo $((1 << n))\nx='a'");
+        Equal(Join(shift.Tokens(1, SyntaxHighlighting.TypeString)), "'a'", "a shift in arithmetic is not a here document");
+        Highlighted hereString = new Highlighted(L.Bash, "cat <<< word\nx='a'");
+        Equal(Join(hereString.Tokens(1, SyntaxHighlighting.TypeString)), "'a'", "a here string is not a here document");
     }
 
     private static void PythonChecks()

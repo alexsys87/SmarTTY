@@ -665,7 +665,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     {
         if (_suggestionController != null && _suggestionController.IsVisible && IsWordSeparator(ch) && (Control.ModifierKeys & Keys.Control) == 0)
         {
-            _suggestionController.AcceptSelected();
+            _suggestionController.AcceptSelectedIfMatches(CurrentText);
         }
         base.OnCharTyping(ch, ref text, ref textPosition);
     }

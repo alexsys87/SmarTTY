@@ -61,6 +61,7 @@ internal partial class SuggestionListForm : Form
         InitializeComponent();
         listView1.Sorting = (allowSorting ? SortOrder.Ascending : SortOrder.None);
         listView1.Host = completionHost;
+        Disposed += (sender, e) => _hintForm.Dispose();
         if (!IsWindows())
         {
             listView1.StateImageList = null;
@@ -394,6 +395,9 @@ internal partial class SuggestionListForm : Form
         }
         Height = totalHeight + 20;
     }
+
+    /// <summary>The item that is selected in the list, or null.</summary>
+    internal ISuggestion SelectedSuggestion => (listView1.SelectedItems.Count > 0) ? listView1.SelectedItems[0].Tag as ISuggestion : null;
 
     public void AcceptSelected()
     {

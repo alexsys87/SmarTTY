@@ -1686,6 +1686,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
+        if (e.Button == MouseButtons.Left)
+        {
+            StartDragScroll();
+        }
         bool handledByMargin = false;
         if (_hoverTarget?.ClickAction != null && e.Button == MouseButtons.Left)
         {
@@ -3271,6 +3275,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected override void OnMouseUp(MouseEventArgs e)
     {
+        StopDragScroll();
         base.OnMouseUp(e);
         _lastMouseButton = MouseButtons.None;
     }

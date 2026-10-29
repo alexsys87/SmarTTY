@@ -119,6 +119,78 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
+    /// <summary>
+    /// Removes the selection, or the word on one side of the caret together with the spaces next to it; at the end or
+    /// the start of a line it removes the line break.
+    /// </summary>
+    private void DeleteWord(bool forward)
+    {
+        if (_hasSelection)
+        {
+            ReplaceText(SelectionEnd, SelectionStart, select: false, "");
+            UpdateMaxLineWidth(CaretPosition.Line);
+            return;
+        }
+        TextDocument.TextPosition caret = CaretPosition;
+        string text = base.EditableDocument.GetLineText(caret.Line);
+        TextDocument.TextPosition other = caret;
+        if (forward)
+        {
+            if (caret.Column >= text.Length)
+            {
+                if (caret.Line >= base.EditableDocument.LineCount - 1)
+                {
+                    return;
+                }
+                other = new TextDocument.TextPosition(0, caret.Line + 1);
+            }
+            else
+            {
+                int i = caret.Column;
+                while (i < text.Length && char.IsWhiteSpace(text[i]))
+                {
+                    i++;
+                }
+                if (i < text.Length)
+                {
+                    bool word = IsWordChar(text[i]);
+                    while (i < text.Length && !char.IsWhiteSpace(text[i]) && IsWordChar(text[i]) == word)
+                    {
+                        i++;
+                    }
+                }
+                other = new TextDocument.TextPosition(i, caret.Line);
+            }
+        }
+        else if (caret.Column == 0)
+        {
+            if (caret.Line == 0)
+            {
+                return;
+            }
+            other = new TextDocument.TextPosition(base.EditableDocument.GetLineText(caret.Line - 1).Length, caret.Line - 1);
+        }
+        else
+        {
+            int i = Math.Min(caret.Column, text.Length);
+            while (i > 0 && char.IsWhiteSpace(text[i - 1]))
+            {
+                i--;
+            }
+            if (i > 0)
+            {
+                bool word = IsWordChar(text[i - 1]);
+                while (i > 0 && !char.IsWhiteSpace(text[i - 1]) && IsWordChar(text[i - 1]) == word)
+                {
+                    i--;
+                }
+            }
+            other = new TextDocument.TextPosition(i, caret.Line);
+        }
+        ReplaceText(caret, other, select: false, "");
+        UpdateMaxLineWidth(CaretPosition.Line);
+    }
+
     /// <summary>Removes the lines together with their line breaks (the line break before them when they are the last ones).</summary>
     protected void RemoveLines(int first, int last)
     {
@@ -305,11 +377,23 @@ public partial class TextEditorControl : EditableTextBrowser
         {
             // Shift+Delete is Cut (handled below); deleting here first would lose the selection and
             // make Cut remove the whole caret line as well.
-            if (e.KeyCode == Keys.Delete && !e.Shift)
+            if (e.KeyCode == Keys.Back && e.Control && !e.Alt && !e.Shift)
+            {
+                // Ctrl+Backspace removes the word in front of the caret (the control character it types is ignored).
+                DeleteWord(forward: false);
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+            }
+            else if (e.KeyCode == Keys.Delete && !e.Shift)
             {
                 if (_hasSelection)
                 {
                     ReplaceText(SelectionEnd, SelectionStart, select: false, "");
+                }
+                else if (e.Control && !e.Alt)
+                {
+                    DeleteWord(forward: true);
+                    e.Handled = true;
                 }
                 else
                 {

@@ -66,14 +66,16 @@ internal class SuggestionPopup
         }
         if (autoSize)
         {
-            Graphics graphics = Graphics.FromHwnd(_form.Handle);
             int maxItemWidth = 0;
-            foreach (ISuggestion suggestion in _source.Items)
+            using (Graphics graphics = Graphics.FromHwnd(_form.Handle))
             {
-                SizeF sizeF = graphics.MeasureString(suggestion.DisplayName, _form.Font);
-                if ((int)sizeF.Width > maxItemWidth)
+                foreach (ISuggestion suggestion in _source.Items)
                 {
-                    maxItemWidth = (int)sizeF.Width;
+                    SizeF sizeF = graphics.MeasureString(suggestion.DisplayName, _form.Font);
+                    if ((int)sizeF.Width > maxItemWidth)
+                    {
+                        maxItemWidth = (int)sizeF.Width;
+                    }
                 }
             }
             if (maxItemWidth > _maxWidth)
@@ -105,6 +107,16 @@ internal class SuggestionPopup
             _form.NotifyHost(active: false);
         }
     }
+
+    /// <summary>Closes the window of the popup for good: every popup makes a new one, which would otherwise stay.</summary>
+    public void Dispose()
+    {
+        Hide();
+        _form.Dispose();
+    }
+
+    /// <summary>The item that is selected in the list, or null.</summary>
+    internal ISuggestion SelectedSuggestion => _form.SelectedSuggestion;
 
     private static int CommonPrefixLength(string first, string second)
     {
