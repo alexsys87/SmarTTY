@@ -17,8 +17,6 @@ internal sealed class ConnectionAttempt : IDisposable
     // does not depend on the SSH library.
     private IDisposable _session;
 
-    public Thread Thread;
-
     public volatile bool Cancelled;
 
     // Not closed in Dispose: the worker may still be waiting on it (SshSession's constructor does) and closing a wait
