@@ -2178,10 +2178,44 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         return _Analyzer;
     }
 
+    /// <summary>
+    /// Asks a host whose banner did not say what it is whether it runs Windows, and remembers the answer. The package manager
+    /// window calls it when no package manager of Linux answered, so that it does not depend on the OpenWrt probe being finished.
+    /// </summary>
+    internal bool DetectWindowsHost()
+    {
+        SshSession session = Session;
+        if (session == null)
+        {
+            return false;
+        }
+        if (session.RemoteOs == RemoteOsKind.Windows)
+        {
+            return true;
+        }
+        List<string> output = session.RunCommand(RemoteOsDetector.WindowsProbeCommand, out _, timeout: TimeSpan.FromSeconds(20));
+        if (RemoteOsDetector.FromWindowsProbe(output) != RemoteOsKind.Windows)
+        {
+            return false;
+        }
+        // The session knows at once, so the commands that follow are not wrapped in sh; the rest follows on the UI thread.
+        session.RemoteOs = RemoteOsKind.Windows;
+        _Controller.BeginInvoke(() =>
+        {
+            if (ReferenceEquals(Session, session))
+            {
+                SetRemoteOs(RemoteOsKind.Windows);
+            }
+        });
+        return true;
+    }
+
     public string[] RunCommand(string command)
     {
-        // The package manager probes and commands are POSIX shell: run them in sh whatever the login shell is.
-        string[] output = Session.RunCommandChecked(PosixShell.Wrap(command, addAdminDirectoriesToPath: true), requireSuccess: true)?.ToArray();
+        // The package manager probes and commands of Linux are POSIX shell: run them in sh whatever the login shell is.
+        // A Windows host has no sh: its commands (winget) go to its own shell as they are.
+        string line = Session.RemoteOs == RemoteOsKind.Windows ? command : PosixShell.Wrap(command, addAdminDirectoriesToPath: true);
+        string[] output = Session.RunCommandChecked(line, requireSuccess: true)?.ToArray();
         if (output == null)
         {
             // null means "the command failed" for the callers (a package manager that is not there); not so for a dropped connection.

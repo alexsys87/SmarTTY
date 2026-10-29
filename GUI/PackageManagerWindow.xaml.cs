@@ -1,4 +1,5 @@
 using SmarTTY.GUI.Backend;
+using SmarTTY.Ssh;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -32,6 +33,9 @@ public partial class PackageManagerWindow : Window
             new OpkgPackageManagerClient(),
             new ApkPackageManagerClient()
         };
+
+        // A Windows host has winget only: none of the package managers of Linux exists there.
+        private WingetPackageManagerClient _WingetClient = new WingetPackageManagerClient();
 
         private string _ProgressText;
 
@@ -240,12 +244,21 @@ public partial class PackageManagerWindow : Window
         {
             try
             {
-                if (_Session.IsWindowsHost)
-                {
-                    throw new Exception(PackageManagerSelector.WindowsHostMessage(_Clients));
-                }
                 // The package manager of a host does not change while the connection lasts: the window asks the host once.
-                ILinuxPackageManagerClient bestClient = _Session.PackageManagerClient ?? PackageManagerSelector.Pick(_Clients, _Session, () => _Closed);
+                ILinuxPackageManagerClient bestClient = _Session.PackageManagerClient;
+                if (bestClient == null && !_Session.IsWindowsHost)
+                {
+                    bestClient = PackageManagerSelector.Pick(_Clients, _Session, () => _Closed);
+                    if (bestClient == null && !_Closed && _Session.RemoteOs == RemoteOsKind.Unknown && _Session.DetectWindowsHost())
+                    {
+                        // The banner of the server did not say that it is Windows, and no package manager of Linux answered.
+                        bestClient = PickWinget();
+                    }
+                }
+                else if (bestClient == null)
+                {
+                    bestClient = PickWinget();
+                }
                 if (_Closed)
                 {
                     return;
@@ -254,11 +267,12 @@ public partial class PackageManagerWindow : Window
                 {
                     // Every probe failed because the connection went away: say so instead of "no package manager".
                     _Session.Session?.ThrowIfConnectionLost();
-                    throw new Exception(PackageManagerSelector.BuildNotFoundMessage(_Session, _Clients));
+                    throw new Exception(_Session.IsWindowsHost ? PackageManagerSelector.WindowsHostMessage() : PackageManagerSelector.BuildNotFoundMessage(_Session, _Clients));
                 }
                 _Session.PackageManagerClient = bestClient;
                 _Client = bestClient;
-                _IsRoot = PackageIndexUpdater.IsRoot(_Session);
+                // Windows has no root and no sudo: the commands run as they are.
+                _IsRoot = bestClient is WingetPackageManagerClient || PackageIndexUpdater.IsRoot(_Session);
                 LoadPackages(null);
             }
             catch (Exception exception)
@@ -269,6 +283,11 @@ public partial class PackageManagerWindow : Window
                     _Window.Close();
                 });
             }
+        }
+
+        private ILinuxPackageManagerClient PickWinget()
+        {
+            return PackageManagerSelector.Pick(new ILinuxPackageManagerClient[] { _WingetClient }, _Session, () => _Closed);
         }
 
         /// <summary>Queries the package list and replaces the current one; <paramref name="selection"/> restores pending marks.</summary>
@@ -452,7 +471,8 @@ public partial class PackageManagerWindow : Window
             {
                 list.Add(_Client.GetCommandLineForPackageOperation(entries, LinuxPackageInfo.PackageAction.Remove, Options));
             }
-            string text = string.Join(" && ", list.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
+            // winget runs in cmd.exe or PowerShell, which chain commands in their own ways.
+            string text = _Client is WingetPackageManagerClient winget ? winget.JoinCommands(list) : string.Join(" && ", list.Where((string value) => !string.IsNullOrEmpty(value)).ToArray());
             if (text.Length == 0)
             {
                 // Nothing was selected. The caller sends the command line to the terminal unless it is null: an empty

@@ -58,6 +58,15 @@ public static class PackageIndexUpdater
     public static void Run(ISSHCommandRunner runner, ILinuxPackageManagerClient client, bool isRoot)
     {
         string command = client.GetCommandLineForIndexUpdate();
+        if (client is WingetPackageManagerClient)
+        {
+            // The shell of a Windows host is not sh: no "{ ...; } 2>&1; echo", no sudo. The runner reports a failed command as null.
+            if (runner.RunCommand(command) == null)
+            {
+                throw new Exception("Failed to run '" + command + "' on the remote host.");
+            }
+            return;
+        }
         string[] lines = runner.RunCommand(BuildCommandLine(command, isRoot));
         CheckResult(lines, command, isRoot);
     }
