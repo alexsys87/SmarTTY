@@ -98,6 +98,15 @@ public partial class DirectoryTransferWindow : Window
         }
     }
 
+    /// <summary>Starts the transfer as if the user had pressed the start button (used for dropped folders).</summary>
+    public void StartTransfer()
+    {
+        if (StartButton.IsEnabled)
+        {
+            Start_Click(this, new RoutedEventArgs());
+        }
+    }
+
     private void Start_Click(object sender, RoutedEventArgs e)
     {
         string remoteDir = RemoteDirectory;

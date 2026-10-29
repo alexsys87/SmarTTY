@@ -1364,7 +1364,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// Uploads dropped files and folders into <paramref name="remoteDir"/> if given (a drop on the file panel), else into
     /// the current directory of <paramref name="targetTab"/> (or of the active tab), falling back to the default upload
     /// directory. Files go to the transfer queue after a single overwrite
-    /// question for all of them; each folder opens the directory upload window, ready to start. For dropped .sh files the user
+    /// question for all of them; each folder opens the directory upload window and starts uploading at once. For dropped .sh files the user
     /// is asked whether to convert their line endings to Unix and make them executable (chmod +x) once uploaded.
     /// </summary>
     public void UploadFiles(string[] files, ITabContext targetTab = null, string remoteDir = null)
@@ -1421,7 +1421,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             // A dropped drive root (D:\) has no name of its own: its contents go straight into the directory.
             string folderName = Path.GetFileName(folder.TrimEnd('\\', '/'));
-            ShowDirectoryUploadForm(folder, string.IsNullOrEmpty(folderName) ? remoteDir : remoteDir.TrimEnd('/') + "/" + folderName);
+            ShowDirectoryUploadForm(folder, string.IsNullOrEmpty(folderName) ? remoteDir : remoteDir.TrimEnd('/') + "/" + folderName, startNow: true);
         }
     }
 
@@ -1711,7 +1711,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// <summary>
     /// Opens the directory upload window for <paramref name="localDir"/>; the transfer starts when the user confirms it there.
     /// </summary>
-    public void ShowDirectoryUploadForm(string localDir, string remoteDir)
+    public void ShowDirectoryUploadForm(string localDir, string remoteDir, bool startNow = false)
     {
         DirectoryTransferWindow window = new DirectoryTransferWindow(Session, isUpload: true)
         {
@@ -1726,6 +1726,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         };
         WindowOwnership.Attach(window, WindowOwnership.ActiveWindow());
         window.Show();
+        if (startNow)
+        {
+            window.StartTransfer();
+        }
     }
 
     public string TryExtractCurrentDir(ITabContext activeTab = null)
