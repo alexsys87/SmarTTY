@@ -41,7 +41,7 @@
             <GridViewColumn Header="" Width="30">
               <GridViewColumn.CellTemplate>
                 <DataTemplate>
-                  <local:PackageCheckBox IsChecked="{Binding IsChecked}" IsThreeState="{Binding IsThreeState}" Checked="CheckBox_CheckChanged" Unchecked="CheckBox_CheckChanged" Indeterminate="CheckBox_CheckChanged" />
+                  <local:PackageCheckBox Style="{StaticResource {x:Type CheckBox}}" IsChecked="{Binding IsChecked}" IsThreeState="{Binding IsThreeState}" Checked="CheckBox_CheckChanged" Unchecked="CheckBox_CheckChanged" Indeterminate="CheckBox_CheckChanged" />
                 </DataTemplate>
               </GridViewColumn.CellTemplate>
             </GridViewColumn>

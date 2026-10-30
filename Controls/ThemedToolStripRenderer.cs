@@ -224,3 +224,29 @@ internal sealed class ThemedToolStripRenderer : ToolStripProfessionalRenderer
         public override Color ImageMarginGradientEnd => _palette.Popup;
     }
 }
+
+/// <summary>Paints a WinForms context menu (and the sub menus under it) in the colours of the current WPF theme.</summary>
+internal static class ThemedMenu
+{
+    /// <summary>Call it when the menu opens: the theme can have been changed since the last time.</summary>
+    public static void Apply(ToolStripDropDown menu)
+    {
+        ToolbarPalette palette = ToolbarPalette.FromCurrentTheme();
+        Apply(menu, palette, new ThemedToolStripRenderer(palette));
+    }
+
+    private static void Apply(ToolStripDropDown menu, ToolbarPalette palette, ToolStripRenderer renderer)
+    {
+        menu.Renderer = renderer;
+        menu.BackColor = palette.Popup;
+        menu.ForeColor = palette.Text;
+        foreach (ToolStripItem item in menu.Items)
+        {
+            item.ForeColor = palette.Text;
+            if (item is ToolStripDropDownItem { HasDropDownItems: true } subMenu)
+            {
+                Apply(subMenu.DropDown, palette, renderer);
+            }
+        }
+    }
+}
