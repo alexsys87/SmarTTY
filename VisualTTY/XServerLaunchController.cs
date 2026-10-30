@@ -34,11 +34,15 @@ public class XServerLaunchController : INotifyPropertyChanged
             _VcxsrvPath = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("VcxsrvPath"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsVcxsrvInstalled"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsVcxsrvMissing"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("VcxsrvStatusText"));
         }
     }
 
     public bool IsVcxsrvInstalled => _VcxsrvPath != null;
+
+    /// <summary>True when there is nothing to start: only then the download of VcXsrv is offered.</summary>
+    public bool IsVcxsrvMissing => _VcxsrvPath == null;
 
     public string VcxsrvStatusText => VcxsrvSetup.DescribeInstallation(_VcxsrvPath);
 

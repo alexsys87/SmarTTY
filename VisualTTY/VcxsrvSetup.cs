@@ -374,10 +374,17 @@ public static class VcxsrvSetup
 
     /// <summary>
     /// Finds the latest release, downloads its installer, runs it and returns the installed vcxsrv.exe.
-    /// <paramref name="progress"/> receives the text of the current step.
+    /// <paramref name="progress"/> receives the text of the current step. An installed VcXsrv is returned as it is, nothing
+    /// is downloaded (the buttons are disabled then, but a second window or the Tools menu may have started the same).
     /// </summary>
     public static string DownloadAndInstall(Action<string> progress, CancellationToken cancellation)
     {
+        string installed = FindExecutable();
+        if (installed != null)
+        {
+            progress(DescribeInstallation(installed));
+            return installed;
+        }
         progress("Looking for the latest VcXsrv release...");
         Release release = FindLatestRelease();
         string title = "Downloading VcXsrv " + release.Version;

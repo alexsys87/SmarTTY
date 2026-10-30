@@ -108,6 +108,27 @@ internal static class Program
         {
             Equal(null, VcxsrvSetup.FindExecutable(), "no VcXsrv is found outside Windows (the registry lookup does not throw)");
         }
+
+        // A copy next to the program counts as installed: nothing is downloaded (the offline run proves it).
+        string folder = Path.Combine(Path.GetDirectoryName(typeof(VcxsrvSetup).Assembly.Location), "vcxsrv");
+        string fake = Path.Combine(folder, VcxsrvSetup.ExecutableName);
+        bool createdFolder = !Directory.Exists(folder);
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(fake, "");
+        try
+        {
+            string step = null;
+            Equal(fake, VcxsrvSetup.DownloadAndInstall(text => step = text, CancellationToken.None), "an installed VcXsrv is returned without a download");
+            Check(step != null && step.Contains("is installed"), "the progress text says that VcXsrv is installed");
+        }
+        finally
+        {
+            File.Delete(fake);
+            if (createdFolder)
+            {
+                Directory.Delete(folder);
+            }
+        }
     }
 
     private static void Online()
