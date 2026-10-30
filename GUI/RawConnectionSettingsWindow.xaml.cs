@@ -349,10 +349,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 {
                     return SerialSettings;
                 }
-                SplitEndpoint(TCPEndpoint, out string host, out int? givenPort);
+                SplitEndpoint(TCPEndpoint, out string host, out int? givenPort, out bool schemeTls);
+                bool tls = TelnetTls || (IsTelnet && schemeTls);
                 // A telnet server is expected on the telnet port unless another one is given; a port that is not a
                 // number is 0, which makes the connection invalid instead of throwing while the window closes.
-                int port = givenPort ?? (IsTelnet ? (TelnetTls ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTlsPort : DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort) : 0);
+                int port = givenPort ?? (IsTelnet ? (tls ? DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTlsPort : DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort) : 0);
                 if (IsTelnet)
                 {
                     return new DeviceTerminalSettings.ConnectionSettings.Telnet
@@ -366,8 +367,8 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                         TerminalSpeed = string.IsNullOrWhiteSpace(TelnetTerminalSpeed) ? null : TelnetTerminalSpeed.Trim(),
                         XDisplayLocation = string.IsNullOrWhiteSpace(TelnetXDisplayLocation) ? null : TelnetXDisplayLocation.Trim(),
                         EnvironmentVariables = string.IsNullOrWhiteSpace(TelnetEnvironmentVariables) ? null : TelnetEnvironmentVariables.Trim(),
-                        Tls = TelnetTls,
-                        StartTls = TelnetTls ? DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Off : TelnetStartTls,
+                        Tls = tls,
+                        StartTls = tls ? DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Off : TelnetStartTls,
                         TlsAllowInvalidCertificate = TelnetTlsInUse && TelnetTlsAllowInvalidCertificate,
                         TlsClientCertificate = TelnetTlsInUse && !string.IsNullOrWhiteSpace(TelnetTlsClientCertificate) ? TelnetTlsClientCertificate.Trim() : null,
                         SendAutomaticValues = TelnetSendAutomaticValues,
@@ -390,18 +391,17 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         /// <summary>
         /// Reads "host", "host:port", "[ipv6]:port" or a bare IPv6 address (several colons, no port), with an optional
         /// telnet:// or telnets:// in front (the latter switches TLS on for a telnet connection). The port is null when
-        /// none is given and 0 when it is not a valid number.
+        /// none is given and 0 when it is not a valid number. <paramref name="schemeTls"/> tells whether the text asked
+        /// for TLS with telnets://; nothing is changed here, because this is also called just to validate the text.
         /// </summary>
-        private void SplitEndpoint(string endpoint, out string host, out int? port)
+        private static void SplitEndpoint(string endpoint, out string host, out int? port, out bool schemeTls)
         {
             endpoint = (endpoint ?? "").Trim();
+            schemeTls = false;
             if (endpoint.StartsWith("telnets://", StringComparison.OrdinalIgnoreCase))
             {
                 endpoint = endpoint.Substring("telnets://".Length).TrimEnd('/');
-                if (IsTelnet && !TelnetTls)
-                {
-                    TelnetTls = true;
-                }
+                schemeTls = true;
             }
             else if (endpoint.StartsWith("telnet://", StringComparison.OrdinalIgnoreCase))
             {
@@ -454,7 +454,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             {
                 return null;
             }
-            SplitEndpoint(TCPEndpoint, out string host, out int? port);
+            SplitEndpoint(TCPEndpoint, out string host, out int? port, out _);
+            if (host != null && host.StartsWith("[", StringComparison.Ordinal))
+            {
+                return "The IPv6 address is missing its closing ']' (write it as [address]:port).";
+            }
             if (string.IsNullOrWhiteSpace(host))
             {
                 return "Enter the host name or IP address to connect to.";
@@ -720,6 +724,12 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         {
             if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp)
             {
+                // The only place where the text may change another setting: the user has finished typing.
+                SplitEndpoint(TCPEndpoint, out _, out _, out bool schemeTls);
+                if (IsTelnet && schemeTls && !TelnetTls)
+                {
+                    TelnetTls = true;
+                }
                 Settings.Connection = EffectiveConnectionSettings;
             }
         }

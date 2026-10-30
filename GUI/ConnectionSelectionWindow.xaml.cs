@@ -42,43 +42,24 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             Failed
         }
 
-        private class Context : IDisposable
+        // A result is trusted this long: a device that appears later (or goes away) shows up at the next refresh after it.
+        private const long ResultLifetimeMs = 30000;
+
+        // A host that does not answer is given up after this long instead of waiting for the operating system.
+        private const int CheckTimeoutMs = 5000;
+
+        private static readonly System.Diagnostics.Stopwatch Clock = System.Diagnostics.Stopwatch.StartNew();
+
+        private class Context
         {
-            // A dual-stack socket: the parameterless TcpClient of .NET Framework is IPv4 only and could never reach a
-            // host that is given by (or resolves only to) an IPv6 address.
-            public readonly TcpClient Client = CreateClient();
+            // The result being shown; the previous one stays until a new check has an answer, so the list does not flicker.
+            public State State = State.Checking;
 
-            private static TcpClient CreateClient()
-            {
-                if (Socket.OSSupportsIPv6)
-                {
-                    try
-                    {
-                        TcpClient client = new TcpClient(AddressFamily.InterNetworkV6);
-                        client.Client.DualMode = true;
-                        return client;
-                    }
-                    catch (SocketException)
-                    {
-                    }
-                }
-                return new TcpClient();
-            }
+            public long CheckedAtMs;
 
-            public State State;
+            public bool InProgress;
 
-            public IAsyncResult Op;
-
-            public void Dispose()
-            {
-                try
-                {
-                    Client.Close();
-                }
-                catch
-                {
-                }
-            }
+            public TcpConnector Connector;
         }
 
         private struct Key
@@ -88,10 +69,20 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             public int Port;
         }
 
-        private Dictionary<Key, Context> _AllContexts = new Dictionary<Key, Context>();
+        private readonly object _lock = new object();
+
+        private readonly Dictionary<Key, Context> _AllContexts = new Dictionary<Key, Context>();
+
+        private bool _disposed;
 
         public event Action BackgroundCheckCompleted;
 
+        /// <summary>
+        /// The last known state of the port; a check that is due (never made, or older than <see cref="ResultLifetimeMs"/>)
+        /// is started in the background. The check opens the TCP connection and closes it at once: it cannot tell whether
+        /// a port listens without connecting, so a device that serves one client at a time may be busy for a moment
+        /// (the "Probe all connections in the background" option turns this off).
+        /// </summary>
         public State CheckMachine(string host, int port)
         {
             Key key = new Key
@@ -99,51 +90,83 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 Host = host,
                 Port = port
             };
-            if (_AllContexts.TryGetValue(key, out var value))
+            lock (_lock)
             {
-                return value.State;
+                if (_disposed)
+                {
+                    return State.Failed;
+                }
+                if (!_AllContexts.TryGetValue(key, out Context context))
+                {
+                    context = _AllContexts[key] = new Context();
+                }
+                if (!context.InProgress && (context.CheckedAtMs == 0 || Clock.ElapsedMilliseconds - context.CheckedAtMs >= ResultLifetimeMs))
+                {
+                    context.InProgress = true;
+                    ThreadPool.QueueUserWorkItem(_ => RunCheck(context, host, port));
+                }
+                return context.State;
             }
+        }
+
+        private void RunCheck(Context context, string host, int port)
+        {
+            TcpConnector connector = new TcpConnector();
+            lock (_lock)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+                context.Connector = connector;
+            }
+            State result;
             try
             {
-                value = (_AllContexts[key] = new Context());
-                value.Op = value.Client.BeginConnect(host, port, CheckCompleted, value);
+                connector.Connect(host, port, CheckTimeoutMs).Close();
+                result = State.Succeeded;
             }
             catch
             {
-                value.State = State.Failed;
+                result = State.Failed;
             }
-            return value.State;
-        }
-
-        private void CheckCompleted(IAsyncResult ar)
-        {
-            if (ar.AsyncState is Context context)
+            bool changed;
+            lock (_lock)
             {
-                try
+                if (_disposed)
                 {
-                    context.Client.EndConnect(ar);
-                    context.State = State.Succeeded;
-                    context.Client.Close();
+                    return;
                 }
-                catch
-                {
-                    context.State = State.Failed;
-                }
+                changed = context.CheckedAtMs == 0 || context.State != result;
+                context.State = result;
+                context.CheckedAtMs = Math.Max(1, Clock.ElapsedMilliseconds);
+                context.InProgress = false;
+                context.Connector = null;
+            }
+            if (changed)
+            {
                 BackgroundCheckCompleted?.Invoke();
             }
         }
 
         public void Dispose()
         {
-            foreach (Context value in _AllContexts.Values)
+            List<TcpConnector> running = new List<TcpConnector>();
+            lock (_lock)
             {
-                try
+                _disposed = true;
+                foreach (Context context in _AllContexts.Values)
                 {
-                    value.Dispose();
+                    if (context.Connector != null)
+                    {
+                        running.Add(context.Connector);
+                    }
                 }
-                catch
-                {
-                }
+            }
+            // Ends the checks that are still waiting for an answer; none of them reports back after this.
+            foreach (TcpConnector connector in running)
+            {
+                connector.Abort();
             }
         }
 

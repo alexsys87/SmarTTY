@@ -1115,13 +1115,17 @@ public partial class DeviceTerminalControl : DpiAwareControl
             // The connection was replaced (reconnect): the data belongs to a session that no longer exists.
             return false;
         }
-        // A connection that has already ended drops the data; the toolbar says it is closed.
-        if (!connection.Send(buffer, count, completed))
+        // Counted when the writer has handed the data to the transport: data that is dropped never was sent.
+        Action<bool> counted = written =>
         {
-            return false;
-        }
-        Interlocked.Add(ref _bytesSent, count);
-        return true;
+            if (written && ReferenceEquals(connection, _asyncTransportConnection))
+            {
+                Interlocked.Add(ref _bytesSent, count);
+            }
+            completed?.Invoke(written);
+        };
+        // A connection that has already ended drops the data; the toolbar says it is closed.
+        return connection.Send(buffer, count, counted);
     }
 
     /// <summary>Reopens the connection when it is closed or failed; an established connection is left alone.</summary>

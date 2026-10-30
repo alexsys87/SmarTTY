@@ -5,6 +5,8 @@ using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SmarTTY.Transport;
 
@@ -28,6 +30,9 @@ internal sealed class TcpConnector
 
     private volatile bool _aborted;
 
+    // Set by Abort(): wakes up a name lookup that is being waited for.
+    private readonly ManualResetEvent _abortSignal = new ManualResetEvent(false);
+
     /// <summary>
     /// Connects to <paramref name="host"/> (a name, an IPv4 or an IPv6 address) and returns the connected socket with
     /// Nagle's algorithm switched off: a terminal sends single key presses that must not wait for an acknowledgement.
@@ -49,13 +54,15 @@ internal sealed class TcpConnector
         {
             host = host.Substring(1, host.Length - 2);
         }
-        IPAddress[] addresses = IPAddress.TryParse(host, out IPAddress literal) ? new[] { literal } : Dns.GetHostAddresses(host);
+        IPAddress[] addresses = ParseLiteral(host, out IPAddress literal) ? new[] { literal } : Resolve(host, timeoutMs, elapsed);
         if (addresses.Length == 0)
         {
             throw new SocketException((int)SocketError.HostNotFound);
         }
+        // The last answer that was an error from the address itself (refused, unreachable), and whether the attempts
+        // ended without any answer. A refusal tells the user more than "no answer" from another address.
         Exception lastError = null;
-        // True when the last attempt ended because its time ran out (and not because it was refused or unreachable).
+        Exception timeoutError = null;
         bool timedOut = false;
         List<IPAddress> ordered = new List<IPAddress>(OrderAddresses(addresses));
         for (int index = 0; index < ordered.Count; index++)
@@ -125,12 +132,23 @@ internal sealed class TcpConnector
                 {
                     throw new ObjectDisposedException(nameof(TcpConnector), "The connection was closed while it was being made.");
                 }
-                lastError = ex;
-                timedOut = ex is SocketException { SocketErrorCode: SocketError.TimedOut };
+                if (ex is SocketException { SocketErrorCode: SocketError.TimedOut })
+                {
+                    timedOut = true;
+                    timeoutError = ex;
+                }
+                else
+                {
+                    lastError = ex;
+                }
             }
         }
-        if ((timedOut && timeoutMs > 0) || lastError == null)
+        if (lastError == null)
         {
+            if (timeoutMs <= 0 && timeoutError != null)
+            {
+                throw timeoutError; // the operating system's own timeout
+            }
             throw new TimeoutException("No answer from " + DescribeEndpoint(host, port) + " within " + (timeoutMs / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + " s.");
         }
         throw lastError;
@@ -143,6 +161,7 @@ internal sealed class TcpConnector
         lock (_lock)
         {
             _aborted = true;
+            _abortSignal.Set();
             pending = _pending;
             _pending = null;
         }
@@ -158,7 +177,8 @@ internal sealed class TcpConnector
     /// <summary>
     /// Switches on the TCP keep-alive of the operating system with the given idle time instead of its default (two
     /// hours on Windows), so a connection whose far end vanished (power loss, a pulled cable, a NAT timeout) is
-    /// noticed after about <paramref name="seconds"/> plus a few probes. Nothing is written into the data stream, so
+    /// noticed after about <paramref name="seconds"/> plus the probes (Windows sends a fixed ten of them, one per
+    /// interval, so up to about seconds + 10 x interval). Nothing is written into the data stream, so
     /// the device protocol is not disturbed. 0 or less does nothing.
     /// </summary>
     public static void EnableKeepAlive(Socket socket, int seconds)
@@ -190,13 +210,83 @@ internal sealed class TcpConnector
         try
         {
             // TCP_KEEPIDLE / TCP_KEEPINTVL (in seconds) where SIO_KEEPALIVE_VALS is not available.
-            socket.SetSocketOption(SocketOptionLevel.Tcp, (SocketOptionName)3, seconds);
-            socket.SetSocketOption(SocketOptionLevel.Tcp, (SocketOptionName)17, intervalSeconds);
+            // The option numbers differ per system: 3 and 17 are TCP_KEEPIDLE and TCP_KEEPINTVL on Windows only
+            // (on Linux they are TCP_CORK and TCP_THIN_DUPACK, which must not be touched).
+            SocketOptionName idle;
+            SocketOptionName interval;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                idle = (SocketOptionName)3;
+                interval = (SocketOptionName)17;
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                idle = (SocketOptionName)0x10; // TCP_KEEPALIVE
+                interval = (SocketOptionName)0x101; // TCP_KEEPINTVL
+            }
+            else
+            {
+                idle = (SocketOptionName)4; // TCP_KEEPIDLE
+                interval = (SocketOptionName)5; // TCP_KEEPINTVL
+            }
+            socket.SetSocketOption(SocketOptionLevel.Tcp, idle, seconds);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, interval, intervalSeconds);
         }
         catch (Exception ex) when (ex is SocketException || ex is PlatformNotSupportedException || ex is NotSupportedException)
         {
             // The operating system's own timing stays in force; the keep-alive itself is on.
         }
+    }
+
+    /// <summary>
+    /// An IP address written out in full. <c>IPAddress.TryParse</c> also takes "1" (0.0.0.1) and "192.168.1"
+    /// (192.168.0.1), which are typos and not addresses; a host of digits and dots that is not four numbers is refused
+    /// (a name cannot consist of digits only), and anything else that is not an address is a name for the resolver.
+    /// </summary>
+    internal static bool ParseLiteral(string host, out IPAddress address)
+    {
+        address = null;
+        if (host.IndexOf(':') >= 0)
+        {
+            return IPAddress.TryParse(host, out address);
+        }
+        bool digitsAndDots = host.Length > 0;
+        foreach (char c in host)
+        {
+            digitsAndDots &= c == '.' || (c >= '0' && c <= '9');
+        }
+        if (!digitsAndDots)
+        {
+            return false;
+        }
+        string[] parts = host.Split('.');
+        if (parts.Length != 4 || !IPAddress.TryParse(host, out address))
+        {
+            throw new ArgumentException("\"" + host + "\" is not a valid IPv4 address (four numbers 0-255 are expected).");
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Looks the name up without blocking longer than the connect timeout (the resolver itself has none) and without
+    /// outliving <see cref="Abort"/>: a lookup that is still running is left to finish on its own.
+    /// </summary>
+    private IPAddress[] Resolve(string host, int timeoutMs, Stopwatch elapsed)
+    {
+        Task<IPAddress[]> lookup = Dns.GetHostAddressesAsync(host);
+        // Nobody may be left to observe a failure of a lookup that was given up.
+        lookup.ContinueWith(task => { _ = task.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+        int waitMs = timeoutMs > 0 ? Math.Max(0, timeoutMs - (int)elapsed.ElapsedMilliseconds) : Timeout.Infinite;
+        int signaled = WaitHandle.WaitAny(new[] { ((IAsyncResult)lookup).AsyncWaitHandle, _abortSignal }, waitMs);
+        if (signaled == 1 || _aborted)
+        {
+            throw new ObjectDisposedException(nameof(TcpConnector), "The connection was closed while it was being made.");
+        }
+        if (signaled == WaitHandle.WaitTimeout)
+        {
+            throw new TimeoutException("The name " + host + " could not be resolved within " + (timeoutMs / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + " s.");
+        }
+        return lookup.GetAwaiter().GetResult();
     }
 
     /// <summary>"host:port", with an IPv6 address in brackets so the port can be told from it.</summary>
