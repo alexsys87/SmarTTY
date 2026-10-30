@@ -81,11 +81,17 @@ public static class PackageIndexUpdater
         List<string> output = new List<string>();
         foreach (string line in lines)
         {
-            if (line.StartsWith(ExitMarker, StringComparison.Ordinal))
+            // A command whose last output has no newline (a progress line) leaves the marker glued to that text.
+            int markerIndex = line.IndexOf(ExitMarker, StringComparison.Ordinal);
+            if (markerIndex >= 0)
             {
-                if (int.TryParse(line.Substring(ExitMarker.Length).Trim(), out int parsed))
+                if (int.TryParse(line.Substring(markerIndex + ExitMarker.Length).Trim(), out int parsed))
                 {
                     exitCode = parsed;
+                }
+                if (markerIndex > 0 && !string.IsNullOrWhiteSpace(line.Substring(0, markerIndex)))
+                {
+                    output.Add(line.Substring(0, markerIndex).TrimEnd());
                 }
             }
             else if (!string.IsNullOrWhiteSpace(line))
