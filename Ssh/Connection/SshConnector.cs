@@ -452,6 +452,7 @@ public partial class SshConnector : Component
                 {
                     sshConnectionParameters.ProxyHost = sshConnectionSettings.ProxyServer;
                     sshConnectionParameters.ProxyPort = sshConnectionSettings.ProxyPort;
+                    sshConnectionParameters.ProxyType = sshConnectionSettings.ProxyType;
                     SplitProxyCredentials(proxyCreds, out sshConnectionParameters.ProxyUserName, out sshConnectionParameters.ProxyPassword);
                 }
                 try
@@ -461,7 +462,7 @@ public partial class SshConnector : Component
                     connectionAttempt.SetSession(sshSession);
                     break;
                 }
-                catch (ProxyException exception) when (exception.Message.Contains("407"))
+                catch (ProxyException exception) when (SshSession.IsProxyAuthenticationFailure(exception))
                 {
                     bool proxyConfirmed = false;
                     InvokeOnUi(() =>

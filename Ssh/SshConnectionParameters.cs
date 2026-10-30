@@ -29,9 +29,11 @@ public class SshConnectionParameters
     public bool EnableOnTheFlyTar;
 
     /// <summary>
-    /// HTTP proxy used for the connection (HTTP CONNECT); null for a direct connection.
+    /// Proxy used for the connection (see <see cref="ProxyType"/>); null for a direct connection.
     /// </summary>
     public string ProxyHost;
+
+    public SshProxyType ProxyType;
 
     public int ProxyPort;
 

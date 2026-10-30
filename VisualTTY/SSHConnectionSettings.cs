@@ -106,6 +106,9 @@ public class SSHConnectionSettings
 
     public string ProxyServer { get; set; }
 
+    /// <summary>The kind of the proxy in <see cref="ProxyServer"/>; HTTP CONNECT in profiles of earlier versions.</summary>
+    public SshProxyType ProxyType { get; set; }
+
     public int ProxyPort { get; set; }
 
     public bool EnableCompression { get; set; }
@@ -245,6 +248,16 @@ public class SSHConnectionSettings
     /// </summary>
     public static bool TryParseProxy(string text, out string credentials, out string host, out int port)
     {
+        return TryParseProxy(text, out _, out credentials, out host, out port);
+    }
+
+    /// <summary>
+    /// Like the other overload, but also takes a proxy URL as VPN clients show it ("socks5://127.0.0.1:10808",
+    /// "socks5h://", "http://"): <paramref name="proxyType"/> is the type the scheme names, or null without a scheme.
+    /// </summary>
+    public static bool TryParseProxy(string text, out SshProxyType? proxyType, out string credentials, out string host, out int port)
+    {
+        proxyType = null;
         credentials = null;
         host = null;
         port = 0;
@@ -252,6 +265,24 @@ public class SSHConnectionSettings
         if (string.IsNullOrEmpty(text))
         {
             return false;
+        }
+        int schemeEnd = text.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd != -1)
+        {
+            string scheme = text.Substring(0, schemeEnd).ToLowerInvariant();
+            if (scheme == "socks5" || scheme == "socks5h" || scheme == "socks")
+            {
+                proxyType = SshProxyType.Socks5;
+            }
+            else if (scheme == "http")
+            {
+                proxyType = SshProxyType.Http;
+            }
+            else
+            {
+                return false;
+            }
+            text = text.Substring(schemeEnd + 3).TrimEnd('/');
         }
         string endpoint = text;
         string userAndPassword = null;
@@ -264,6 +295,7 @@ public class SSHConnectionSettings
         string proxyHost = SplitHostPort(endpoint, out int? proxyPort);
         if (proxyPort == null || string.IsNullOrEmpty(proxyHost))
         {
+            proxyType = null;
             return false;
         }
         credentials = userAndPassword;

@@ -166,7 +166,23 @@ public class NewConnectionController : INotifyPropertyChanged
         }
     }
 
-    public bool UseConnectProxy { get; set; }
+    public bool UseProxy { get; set; }
+
+    private SshProxyType _ProxyType;
+
+    /// <summary>HTTP CONNECT or SOCKS5; a scheme typed in the proxy field ("socks5://...") takes precedence when saving.</summary>
+    public SshProxyType ProxyType
+    {
+        get
+        {
+            return _ProxyType;
+        }
+        set
+        {
+            _ProxyType = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ProxyType"));
+        }
+    }
 
     public string Proxy { get; set; }
 
@@ -306,7 +322,8 @@ public class NewConnectionController : INotifyPropertyChanged
         {
             HostNameCaption = "Host name:";
         }
-        UseConnectProxy = !string.IsNullOrEmpty(_Settings.ProxyServer);
+        UseProxy = !string.IsNullOrEmpty(_Settings.ProxyServer);
+        ProxyType = _Settings.ProxyType;
         // The field shows what is saved (it was left empty, so a connection with a proxy had to be typed in again to be
         // changed or even connected from this window), in the same "[user:password@]host:port" form it is read from.
         Proxy = SSHConnectionSettings.FormatProxy(_Settings.ProxyAuth, _Settings.ProxyServer, _Settings.ProxyPort);
@@ -340,7 +357,7 @@ public class NewConnectionController : INotifyPropertyChanged
 
     private void UpdateSettingsFieldsOrThrow()
     {
-        if (UseConnectProxy)
+        if (UseProxy)
         {
             string text = Proxy;
             if (string.IsNullOrWhiteSpace(text))
@@ -350,9 +367,13 @@ public class NewConnectionController : INotifyPropertyChanged
             // "[user:password@]host:port", also with an IPv6 address in brackets. Without a valid port the proxy used to be
             // dropped silently and the connection went out directly, bypassing it; the credentials of an earlier entry
             // stayed in the settings when the new text had none.
-            if (!SSHConnectionSettings.TryParseProxy(text, out string proxyCredentials, out string proxyHost, out int proxyPort))
+            if (!SSHConnectionSettings.TryParseProxy(text, out SshProxyType? schemeType, out string proxyCredentials, out string proxyHost, out int proxyPort))
             {
-                throw new Exception("Please specify the proxy server as host:port (for example proxy.example.com:3128)");
+                throw new Exception("Please specify the proxy server as host:port (for example proxy.example.com:3128, or 127.0.0.1:10808 for the SOCKS5 inbound of xray)");
+            }
+            if (schemeType != null)
+            {
+                ProxyType = schemeType.Value;
             }
             // The credentials are saved encrypted, and the encryption takes at most 200 bytes.
             if (proxyCredentials != null && System.Text.Encoding.UTF8.GetByteCount(proxyCredentials) > 200)
@@ -362,12 +383,14 @@ public class NewConnectionController : INotifyPropertyChanged
             _Settings.ProxyAuth = proxyCredentials;
             _Settings.ProxyServer = proxyHost;
             _Settings.ProxyPort = proxyPort;
+            _Settings.ProxyType = ProxyType;
         }
         else
         {
             _Settings.ProxyAuth = null;
             _Settings.ProxyServer = null;
             _Settings.ProxyPort = 0;
+            _Settings.ProxyType = SshProxyType.Http;
         }
         if (HasAlias)
         {
