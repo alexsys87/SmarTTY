@@ -58,6 +58,19 @@ public static class RemoteFileTools
     /// </summary>
     public static RemoteFileInfo GetInfo(SshSession session, string path)
     {
+        if (session.RemoteOs == RemoteOsKind.Windows)
+        {
+            try
+            {
+                using SftpChannel sftp = SftpChannel.Open(session);
+                return WindowsRemoteFileTools.GetInfo(sftp, path);
+            }
+            catch (Exception exception) when (exception is RemoteOperationException || exception is SftpStatusException)
+            {
+                // Like a command that could not run: the upload goes straight to the target.
+                return null;
+            }
+        }
         List<string> output = session.RunCommand("test -L " + Quote(path) + " && echo L; ls -ldnL " + Quote(path) + "; echo .", out _);
         if (output == null || !output.Contains("."))
         {
@@ -125,6 +138,12 @@ public static class RemoteFileTools
 
     public static void Remove(SshSession session, string path)
     {
+        if (session.RemoteOs == RemoteOsKind.Windows)
+        {
+            using SftpChannel sftp = SftpChannel.Open(session);
+            WindowsRemoteFileTools.Remove(sftp, path);
+            return;
+        }
         Run(session, "rm -f " + Quote(path), "delete " + path);
     }
 
@@ -133,6 +152,12 @@ public static class RemoteFileTools
     /// </summary>
     public static void Replace(SshSession session, string source, string target)
     {
+        if (session.RemoteOs == RemoteOsKind.Windows)
+        {
+            using SftpChannel sftp = SftpChannel.Open(session);
+            WindowsRemoteFileTools.Replace(sftp, source, target);
+            return;
+        }
         Run(session, "mv -f " + Quote(source) + " " + Quote(target), "replace " + target);
     }
 
@@ -141,6 +166,11 @@ public static class RemoteFileTools
     /// </summary>
     public static void CopyAttributes(SshSession session, RemoteFileInfo from, string path)
     {
+        if (session.RemoteOs == RemoteOsKind.Windows)
+        {
+            // No chmod or chown there: a file replaced through a temporary one keeps the access rights of its folder.
+            return;
+        }
         Run(session, "chmod " + Convert.ToString(from.Permissions & 0xFFF, 8) + " " + Quote(path), "set the permissions of " + path);
         if (from.Owner != null && from.Group != null)
         {
@@ -155,6 +185,11 @@ public static class RemoteFileTools
     /// </summary>
     public static FileChecksum ComputeRemoteChecksum(SshSession session, string path)
     {
+        if (session.RemoteOs == RemoteOsKind.Windows)
+        {
+            string command = WindowsRemoteFileTools.ChecksumCommand(path);
+            return command == null ? null : WindowsRemoteFileTools.ParseChecksum(session.RunCommand(command, out _));
+        }
         // Reading from stdin keeps the file name out of the output, whatever characters it contains.
         List<string> output = session.RunCommand("sha256sum < " + Quote(path) + " || md5sum < " + Quote(path), out _);
         if (output == null)

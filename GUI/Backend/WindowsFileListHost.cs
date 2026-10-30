@@ -15,6 +15,8 @@ public sealed class WindowsFileListHost : IFileListHost
 
     private string _currentDirectory;
 
+    private string _lastTerminalDirectory;
+
     public WindowsFileListHost(Func<SshSession> sessionProvider)
     {
         _sessionProvider = sessionProvider;
@@ -72,6 +74,21 @@ public sealed class WindowsFileListHost : IFileListHost
             }
         }
         SetCurrentDirectory(target);
+    }
+
+    /// <summary>
+    /// The terminal of the tab has shown a prompt (or sent an escape sequence) naming its directory: the list follows it, but only
+    /// when the terminal has moved. Where the user has browsed to in the list stays until the next "cd".
+    /// </summary>
+    public void ReportTerminalDirectory(string path)
+    {
+        string directory = WindowsSftpPath.Normalize(path);
+        if (directory == _lastTerminalDirectory)
+        {
+            return;
+        }
+        _lastTerminalDirectory = directory;
+        SetCurrentDirectory(directory);
     }
 
     private void SetCurrentDirectory(string directory)

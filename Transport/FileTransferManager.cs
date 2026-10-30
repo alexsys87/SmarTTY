@@ -225,7 +225,7 @@ public class FileTransferManager : IDisposable
     {
         get
         {
-            if (_protocol != FileTransferProtocol.Sftp)
+            if (_protocol != FileTransferProtocol.Sftp && Session?.RemoteOs != RemoteOsKind.Windows)
             {
                 return "SCP";
             }
@@ -321,6 +321,10 @@ public class FileTransferManager : IDisposable
     /// </summary>
     public TransferJob EnqueueDirectoryArchiveDownload(string remoteDirectory, string localPath, object tag = null, bool openFolderWhenDone = false)
     {
+        if (Session.RemoteOs == RemoteOsKind.Windows)
+        {
+            throw new IOException("A folder is downloaded as a .tar.gz archive that tar makes on the host, which is not done for a Windows host. Select the files in it instead.");
+        }
         SplitArchivePath(remoteDirectory);
         RemotePathKind kind = Session.GetRemotePathKind(remoteDirectory);
         if (kind == RemotePathKind.File)
@@ -538,7 +542,9 @@ public class FileTransferManager : IDisposable
 
     private ITransferBackend CreateBackend()
     {
-        if (_protocol == FileTransferProtocol.Sftp && _sftpUnavailableReason == null)
+        // The SCP backend asks the host for stat, mv and tail; a Windows host has none of them, so it is always SFTP there.
+        bool windowsHost = Session.RemoteOs == RemoteOsKind.Windows;
+        if ((_protocol == FileTransferProtocol.Sftp || windowsHost) && _sftpUnavailableReason == null)
         {
             try
             {
@@ -549,6 +555,10 @@ public class FileTransferManager : IDisposable
                 // No SFTP on this server (OpenWrt without openssh-sftp-server): SCP does the job instead.
                 _sftpUnavailableReason = exception.Message;
             }
+        }
+        if (windowsHost)
+        {
+            throw new RemoteOperationException("Files are transferred to and from a Windows host over SFTP, which its SSH server does not provide: " + _sftpUnavailableReason);
         }
         return new ScpBackend(Session);
     }
@@ -855,7 +865,7 @@ public class FileTransferManager : IDisposable
             {
                 try
                 {
-                    Session.RunCommand("rm -f " + RemoteFileTools.Quote(writePath), out _);
+                    RemoteFileTools.Remove(Session, writePath);
                 }
                 catch
                 {
@@ -877,7 +887,7 @@ public class FileTransferManager : IDisposable
         FileChecksum remote = RemoteFileTools.ComputeRemoteChecksum(Session, remotePath);
         if (remote == null)
         {
-            job.Checksum = "not verified: the server has neither sha256sum nor md5sum";
+            job.Checksum = Session.RemoteOs == RemoteOsKind.Windows ? "not verified: certutil of the server did not give a checksum" : "not verified: the server has neither sha256sum nor md5sum";
             return;
         }
         FileChecksum local = RemoteFileTools.ComputeLocalChecksum(localPath, remote.Algorithm, () => CheckCancelled(job));

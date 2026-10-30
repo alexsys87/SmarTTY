@@ -44,6 +44,7 @@ internal static class SftpFileSystemTests
     {
         SftpFileSystem fileSystem = new SftpFileSystem(sftp);
         Test.Check(fileSystem.HomeDirectory().StartsWith("/"), "the start directory of the server is an absolute path");
+        Test.Equal(0, fileSystem.ListDrives().Count, "a Unix server has no drives, and asking for 24 of them is no error");
         fileSystem.CreateDirectory(workDirectory);
         try
         {
