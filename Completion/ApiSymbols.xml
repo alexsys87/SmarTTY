@@ -4160,77 +4160,697 @@
       <Summary>File offset type used by fseeko and ftello</Summary>
       <Description>File offset type used by fseeko, ftello and many POSIX interfaces. Include &lt;sys/types.h&gt; before using it.</Description>
     </Symbol>
-    <Symbol language="Bash" name="echo" signature="echo(args)">
-      <Summary>Write the arguments and a newline</Summary>
+    <Symbol language="Bash" name="alias" signature="alias(name, value)">
+      <Summary>Define an alias</Summary>
+      <Description>Define an alias. Bash builtin. With no arguments or with -p, prints the aliases; name=value defines an alias.</Description>
     </Symbol>
-    <Symbol language="Bash" name="printf" signature="printf(format, args)">
-      <Summary>Formatted output</Summary>
+    <Symbol language="Bash" name="bg" signature="bg(job)">
+      <Summary>Resume jobs in the background</Summary>
+      <Description>Resume jobs in the background. Bash builtin. Resumes each suspended job in the background; with no job specification, uses the current job.</Description>
     </Symbol>
-    <Symbol language="Bash" name="read" signature="read(variable)">
-      <Summary>Read a line into a variable</Summary>
+    <Symbol language="Bash" name="bind" signature="bind(keyseq, function)">
+      <Summary>Manage Readline key bindings</Summary>
+      <Description>Manage Readline key bindings. Bash builtin. Displays or changes Readline key bindings, macros and variables.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="break" signature="break(count)">
+      <Summary>Exit a loop</Summary>
+      <Description>Exit a loop. Bash builtin. Exits the innermost for, while, until or select loop; an optional count exits that many enclosing loops.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="builtin" signature="builtin(command, args)">
+      <Summary>Run a shell builtin directly</Summary>
+      <Description>Run a shell builtin directly. Bash builtin. Runs the named builtin, bypassing a shell function with the same name.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="caller" signature="caller(frame)">
+      <Summary>Show the call stack</Summary>
+      <Description>Show the call stack. Bash builtin. Prints the line number, function name and source file of a subroutine call.</Description>
     </Symbol>
     <Symbol language="Bash" name="cd" signature="cd(directory)">
       <Summary>Change the working directory</Summary>
+      <Description>Change the working directory. Bash builtin. Changes the current directory; with no argument, uses HOME, and '-' returns to OLDPWD.</Description>
     </Symbol>
-    <Symbol language="Bash" name="pwd" signature="pwd()">
-      <Summary>Print the working directory</Summary>
+    <Symbol language="Bash" name="command" signature="command(command, args)">
+      <Summary>Run a command without function lookup</Summary>
+      <Description>Run a command without function lookup. Bash builtin. Runs a command while ignoring shell functions with the same name; -v or -V describes how the name would be resolved.</Description>
     </Symbol>
-    <Symbol language="Bash" name="export" signature="export(variable)">
-      <Summary>Mark a variable for the environment</Summary>
+    <Symbol language="Bash" name="compgen" signature="compgen(option, word)">
+      <Summary>Generate completion matches</Summary>
+      <Description>Generate completion matches. Bash builtin. Generates possible completions for a word according to the selected completion action.</Description>
     </Symbol>
-    <Symbol language="Bash" name="unset" signature="unset(variable)">
-      <Summary>Remove a variable or function</Summary>
+    <Symbol language="Bash" name="complete" signature="complete(option, name)">
+      <Summary>Configure programmable completion</Summary>
+      <Description>Configure programmable completion. Bash builtin. Registers or displays completion specifications for commands.</Description>
     </Symbol>
-    <Symbol language="Bash" name="set" signature="set(options)">
-      <Summary>Set shell options or positional parameters</Summary>
+    <Symbol language="Bash" name="compopt" signature="compopt(option, name)">
+      <Summary>Change completion options</Summary>
+      <Description>Change completion options. Bash builtin. Modifies the options of the completion specification currently being executed.</Description>
     </Symbol>
-    <Symbol language="Bash" name="shift" signature="shift(count)">
-      <Summary>Drop positional parameters</Summary>
-    </Symbol>
-    <Symbol language="Bash" name="source" signature="source(file)">
-      <Summary>Run a file in the current shell</Summary>
-    </Symbol>
-    <Symbol language="Bash" name="test" signature="test(expression)">
-      <Summary>Evaluate a condition</Summary>
-    </Symbol>
-    <Symbol language="Bash" name="exit" signature="exit(status)">
-      <Summary>Leave the shell</Summary>
-    </Symbol>
-    <Symbol language="Bash" name="return" signature="return(status)">
-      <Summary>Return from a function</Summary>
-    </Symbol>
-    <Symbol language="Bash" name="trap" signature="trap(command, signal)">
-      <Summary>Handle a signal</Summary>
-    </Symbol>
-    <Symbol language="Bash" name="exec" signature="exec(command)">
-      <Summary>Replace the shell with a command</Summary>
-    </Symbol>
-    <Symbol language="Bash" name="eval" signature="eval(text)">
-      <Summary>Evaluate text as a command</Summary>
-    </Symbol>
-    <Symbol language="Bash" name="alias" signature="alias(name, value)">
-      <Summary>Define an alias</Summary>
-    </Symbol>
-    <Symbol language="Bash" name="local" signature="local(name)">
-      <Summary>Declare a local variable in a function</Summary>
+    <Symbol language="Bash" name="continue" signature="continue(count)">
+      <Summary>Resume a loop</Summary>
+      <Description>Resume a loop. Bash builtin. Resumes the next iteration of an enclosing for, while, until or select loop; an optional count selects an outer loop.</Description>
     </Symbol>
     <Symbol language="Bash" name="declare" signature="declare(name)">
       <Summary>Declare a variable</Summary>
+      <Description>Declare a variable. Bash builtin. Declares variables, sets attributes such as -i, -r, -x or -a, and displays existing values with -p.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="dirs" signature="dirs()">
+      <Summary>Show the directory stack</Summary>
+      <Description>Show the directory stack. Bash builtin. Displays the directory stack maintained by pushd and popd.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="disown" signature="disown(job)">
+      <Summary>Remove jobs from the job table</Summary>
+      <Description>Remove jobs from the job table. Bash builtin. Removes jobs from the active job table or marks them so SIGHUP is not sent.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="echo" signature="echo(args)">
+      <Summary>Write the arguments and a newline</Summary>
+      <Description>Write the arguments and a newline. Bash builtin. Writes its arguments separated by spaces; -n suppresses the newline and -e enables backslash escapes.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="enable" signature="enable(name)">
+      <Summary>Enable or disable builtins</Summary>
+      <Description>Enable or disable builtins. Bash builtin. Enables or disables shell builtins, and can load a builtin from a shared object.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="eval" signature="eval(text)">
+      <Summary>Evaluate text as a command</Summary>
+      <Description>Evaluate text as a command. Bash builtin. Concatenates its arguments and executes the result in the current shell.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="exec" signature="exec(command)">
+      <Summary>Replace the shell with a command</Summary>
+      <Description>Replace the shell with a command. Bash builtin. Replaces the shell process with the named command; without a command, applies redirections to the current shell.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="exit" signature="exit(status)">
+      <Summary>Leave the shell</Summary>
+      <Description>Leave the shell. Bash builtin. Exits the shell with the given status, or with the status of the last command.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="export" signature="export(variable)">
+      <Summary>Mark a variable for the environment</Summary>
+      <Description>Mark a variable for the environment. Bash builtin. Exports variables to subsequent commands; -n removes the export attribute and -f applies to functions.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="false" signature="false()">
+      <Summary>Return a failure status</Summary>
+      <Description>Return a failure status. Bash builtin. Does nothing and returns a non-zero status.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="fc" signature="fc(first, last)">
+      <Summary>Edit and re-run history commands</Summary>
+      <Description>Edit and re-run history commands. Bash builtin. Lists, edits or re-executes commands from the history list.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="fg" signature="fg(job)">
+      <Summary>Resume a job in the foreground</Summary>
+      <Description>Resume a job in the foreground. Bash builtin. Resumes the selected job in the foreground and makes it the current job.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="getopts" signature="getopts(optstring, name)">
+      <Summary>Parse command-line options</Summary>
+      <Description>Parse command-line options. Bash builtin. Parses positional parameters as options, storing the option in name and its argument in OPTARG.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="hash" signature="hash(name)">
+      <Summary>Manage the command hash table</Summary>
+      <Description>Manage the command hash table. Bash builtin. Remembers command paths to avoid repeated PATH searches; -r forgets them.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="help" signature="help(pattern)">
+      <Summary>Show help for builtins</Summary>
+      <Description>Show help for builtins. Bash builtin. Displays usage and documentation for shell builtins and compound commands.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="history" signature="history(count)">
+      <Summary>Manage the command history</Summary>
+      <Description>Manage the command history. Bash builtin. Displays, searches, reads or writes the command history list.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="jobs" signature="jobs(job)">
+      <Summary>List or control jobs</Summary>
+      <Description>List or control jobs. Bash builtin. Lists active jobs and their status; -l adds process IDs.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="kill" signature="kill(signal, pid)">
+      <Summary>Send a signal to processes</Summary>
+      <Description>Send a signal to processes. Bash builtin. Sends a signal to the named processes or jobs; -l lists signal names.</Description>
     </Symbol>
     <Symbol language="Bash" name="let" signature="let(expression)">
       <Summary>Arithmetic evaluation</Summary>
+      <Description>Arithmetic evaluation. Bash builtin. Evaluates each expression as shell arithmetic; the status is zero when the last value is non-zero.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="local" signature="local(name)">
+      <Summary>Declare a local variable in a function</Summary>
+      <Description>Declare a local variable in a function. Bash builtin. Creates variables local to the enclosing shell function; the options are those of declare.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="logout" signature="logout(status)">
+      <Summary>Leave a login shell</Summary>
+      <Description>Leave a login shell. Bash builtin. Exits a login shell with the given status.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="mapfile" signature="mapfile(array)">
+      <Summary>Read lines into an array</Summary>
+      <Description>Read lines into an array. Bash builtin. Reads lines from standard input or a file descriptor into an indexed array; readarray is a synonym.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="popd" signature="popd()">
+      <Summary>Remove a directory from the stack</Summary>
+      <Description>Remove a directory from the stack. Bash builtin. Removes entries from the directory stack and changes to the new top directory.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="printf" signature="printf(format, args)">
+      <Summary>Formatted output</Summary>
+      <Description>Formatted output. Bash builtin. Writes formatted arguments; -v stores the result in a variable instead of printing it.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="pushd" signature="pushd(directory)">
+      <Summary>Add or rotate the directory stack</Summary>
+      <Description>Add or rotate the directory stack. Bash builtin. Adds a directory to the stack or rotates it, then changes to the new top directory.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="pwd" signature="pwd()">
+      <Summary>Print the working directory</Summary>
+      <Description>Print the working directory. Bash builtin. Prints the absolute pathname of the current directory; -P resolves symbolic links.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="read" signature="read(variable)">
+      <Summary>Read a line into a variable</Summary>
+      <Description>Read a line into a variable. Bash builtin. Reads a line from standard input and splits it into variables using IFS.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="readarray" signature="readarray(array)">
+      <Summary>Read lines into an array</Summary>
+      <Description>Read lines into an array. Bash builtin. A synonym for mapfile.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="readonly" signature="readonly(name)">
+      <Summary>Mark variables as read-only</Summary>
+      <Description>Mark variables as read-only. Bash builtin. Prevents later assignment or unset of the named variables or functions.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="return" signature="return(status)">
+      <Summary>Return from a function</Summary>
+      <Description>Return from a function. Bash builtin. Stops the current function or sourced script and returns the given status.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="set" signature="set(options)">
+      <Summary>Set shell options or positional parameters</Summary>
+      <Description>Set shell options or positional parameters. Bash builtin. Sets shell options, positional parameters and displays variables.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="shift" signature="shift(count)">
+      <Summary>Drop positional parameters</Summary>
+      <Description>Drop positional parameters. Bash builtin. Renames positional parameters n+1 and later to $1 and later, dropping the first n.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="shopt" signature="shopt(option)">
+      <Summary>Set shell options</Summary>
+      <Description>Set shell options. Bash builtin. Enables, disables or lists the Bash-specific shell options.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="source" signature="source(file)">
+      <Summary>Run a file in the current shell</Summary>
+      <Description>Run a file in the current shell. Bash builtin. Reads and executes a file in the current shell; a synonym for '.'.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="suspend" signature="suspend()">
+      <Summary>Suspend the shell</Summary>
+      <Description>Suspend the shell. Bash builtin. Suspends the shell until it receives SIGCONT; -f forces suspension of a login shell.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="test" signature="test(expression)">
+      <Summary>Evaluate a condition</Summary>
+      <Description>Evaluate a condition. Bash builtin. Evaluates a conditional expression and returns zero for true or one for false; '[' is the same command.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="times" signature="times()">
+      <Summary>Print shell and child CPU times</Summary>
+      <Description>Print shell and child CPU times. Bash builtin. Prints the user and system time used by the shell and its children.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="trap" signature="trap(command, signal)">
+      <Summary>Handle a signal</Summary>
+      <Description>Handle a signal. Bash builtin. Sets or displays commands to run when a signal, EXIT, DEBUG, RETURN or ERR event occurs.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="true" signature="true()">
+      <Summary>Return a success status</Summary>
+      <Description>Return a success status. Bash builtin. Does nothing and returns a zero status.</Description>
     </Symbol>
     <Symbol language="Bash" name="type" signature="type(name)">
       <Summary>Describe how a command would be run</Summary>
+      <Description>Describe how a command would be run. Bash builtin. Reports whether a name is an alias, keyword, function, builtin or file.</Description>
     </Symbol>
-    <Symbol language="Bash" name="which" signature="which(name)">
-      <Summary>Path of a command</Summary>
+    <Symbol language="Bash" name="typeset" signature="typeset(name)">
+      <Summary>Declare variables and attributes</Summary>
+      <Description>Declare variables and attributes. Bash builtin. A synonym for declare, provided for Korn shell compatibility.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="ulimit" signature="ulimit(option, limit)">
+      <Summary>Control resource limits</Summary>
+      <Description>Control resource limits. Bash builtin. Reports or sets soft and hard resource limits for the shell and its children.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="umask" signature="umask(mode)">
+      <Summary>Set the file creation mask</Summary>
+      <Description>Set the file creation mask. Bash builtin. Sets or displays the file mode creation mask.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="unalias" signature="unalias(name)">
+      <Summary>Remove aliases</Summary>
+      <Description>Remove aliases. Bash builtin. Removes the named aliases; -a removes all aliases.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="unset" signature="unset(variable)">
+      <Summary>Remove a variable or function</Summary>
+      <Description>Remove a variable or function. Bash builtin. Removes shell variables or functions; -v, -f and -n select what is removed.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="wait" signature="wait(pid)">
+      <Summary>Wait for background jobs</Summary>
+      <Description>Wait for background jobs. Bash builtin. Waits for the named child processes or jobs and returns the last status.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="_">
+      <Summary>Last argument or command path</Summary>
+      <Description>Last argument or command path. Bash variable. Expands to the last argument of the previous command and to the path of the running command.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="auto_resume">
+      <Summary>Job auto-resume matching</Summary>
+      <Description>Job auto-resume matching. Bash variable. Controls whether a single-word command resumes a stopped job, by exact match, substring or prefix.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH">
+      <Summary>Path to the Bash executable</Summary>
+      <Description>Path to the Bash executable. Bash variable. The full pathname used to start the current Bash process.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_ALIASES">
+      <Summary>Alias table</Summary>
+      <Description>Alias table. Bash variable. An associative array that maps alias names to their definitions.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_ARGC">
+      <Summary>Call stack argument counts</Summary>
+      <Description>Call stack argument counts. Bash variable. An array with the number of arguments in each frame of the call stack.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_ARGV">
+      <Summary>Call stack arguments</Summary>
+      <Description>Call stack arguments. Bash variable. An array with the arguments of the current call stack.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_ARGV0">
+      <Summary>Name of the shell or script</Summary>
+      <Description>Name of the shell or script. Bash variable. Expands to $0; assigning it changes $0.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_CMDS">
+      <Summary>Command hash table</Summary>
+      <Description>Command hash table. Bash variable. An associative array that maps command names to their hashed paths.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_COMMAND">
+      <Summary>Command being executed</Summary>
+      <Description>Command being executed. Bash variable. The command currently being executed, or the command that triggered a trap.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_COMPAT">
+      <Summary>Compatibility level</Summary>
+      <Description>Compatibility level. Bash variable. Selects the shell compatibility level, such as 4.2 or 42.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_ENV">
+      <Summary>Startup file for non-interactive shells</Summary>
+      <Description>Startup file for non-interactive shells. Bash variable. A file read before executing a non-interactive shell script.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_EXECUTION_STRING">
+      <Summary>Command passed with -c</Summary>
+      <Description>Command passed with -c. Bash variable. The command string given to bash -c.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_LINENO">
+      <Summary>Call stack line numbers</Summary>
+      <Description>Call stack line numbers. Bash variable. An array with the source line numbers corresponding to FUNCNAME entries.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_LOADABLES_PATH">
+      <Summary>Search path for loadable builtins</Summary>
+      <Description>Search path for loadable builtins. Bash variable. A colon-separated list of directories searched by enable -f.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_MONOSECONDS">
+      <Summary>Monotonic clock time</Summary>
+      <Description>Monotonic clock time. Bash variable. Expands to the system monotonic clock value, or EPOCHSECONDS when unavailable.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_REMATCH">
+      <Summary>Regular expression matches</Summary>
+      <Description>Regular expression matches. Bash variable. An array with the matches of the last =~ test in [[ ]].</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_SOURCE">
+      <Summary>Call stack source files</Summary>
+      <Description>Call stack source files. Bash variable. An array with the source files corresponding to FUNCNAME entries.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_SUBSHELL">
+      <Summary>Subshell nesting level</Summary>
+      <Description>Subshell nesting level. Bash variable. Incremented in each subshell; zero in the original shell.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_TRAPSIG">
+      <Summary>Signal number for the current trap</Summary>
+      <Description>Signal number for the current trap. Bash variable. The signal number whose trap action is currently running.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_VERSINFO">
+      <Summary>Bash version components</Summary>
+      <Description>Bash version components. Bash variable. A read-only array with the major, minor, patch, build and platform version fields.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_VERSION">
+      <Summary>Bash version string</Summary>
+      <Description>Bash version string. Bash variable. A string such as 5.2.37(3)-release.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASH_XTRACEFD">
+      <Summary>File descriptor for xtrace output</Summary>
+      <Description>File descriptor for xtrace output. Bash variable. The descriptor that receives set -x trace output instead of standard error.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASHOPTS">
+      <Summary>Enabled shopt options</Summary>
+      <Description>Enabled shopt options. Bash variable. A colon-separated list of options enabled with shopt; read-only.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="BASHPID">
+      <Summary>Process ID of this Bash</Summary>
+      <Description>Process ID of this Bash. Bash variable. The process ID of the current Bash process, including subshells.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="CDPATH">
+      <Summary>Search path for cd</Summary>
+      <Description>Search path for cd. Bash variable. A colon-separated list of directories searched by cd for relative directory names.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="CHILD_MAX">
+      <Summary>Remembered child statuses</Summary>
+      <Description>Remembered child statuses. Bash variable. The number of exited child statuses the shell remembers.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COLUMNS">
+      <Summary>Terminal width</Summary>
+      <Description>Terminal width. Bash variable. Used by select and updated when the terminal size changes.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COMP_CWORD">
+      <Summary>Completion word index</Summary>
+      <Description>Completion word index. Bash variable. The index in COMP_WORDS of the word containing the cursor.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COMP_KEY">
+      <Summary>Completion key</Summary>
+      <Description>Completion key. Bash variable. The key that invoked the current completion function.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COMP_LINE">
+      <Summary>Completion command line</Summary>
+      <Description>Completion command line. Bash variable. The command line being completed.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COMP_POINT">
+      <Summary>Completion cursor position</Summary>
+      <Description>Completion cursor position. Bash variable. The cursor position within COMP_LINE.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COMP_TYPE">
+      <Summary>Completion type</Summary>
+      <Description>Completion type. Bash variable. A code describing the kind of completion that is running.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COMP_WORDBREAKS">
+      <Summary>Completion word separators</Summary>
+      <Description>Completion word separators. Bash variable. Characters Readline treats as word separators during completion.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COMP_WORDS">
+      <Summary>Completion words</Summary>
+      <Description>Completion words. Bash variable. An array of the words on the current command line during completion.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COMPREPLY">
+      <Summary>Completion results</Summary>
+      <Description>Completion results. Bash variable. An array from which Bash reads the results of a completion function.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="COPROC">
+      <Summary>Coprocess file descriptors</Summary>
+      <Description>Coprocess file descriptors. Bash variable. An array holding the file descriptors of an unnamed coprocess.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="DIRSTACK">
+      <Summary>Directory stack</Summary>
+      <Description>Directory stack. Bash variable. An array with the directories currently on the stack.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="EMACS">
+      <Summary>Emacs shell buffer flag</Summary>
+      <Description>Emacs shell buffer flag. Bash variable. If set to 't' at startup, Bash assumes it runs in an Emacs shell buffer.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="ENV">
+      <Summary>POSIX startup file</Summary>
+      <Description>POSIX startup file. Bash variable. A startup file read by interactive POSIX-mode shells.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="EPOCHREALTIME">
+      <Summary>Seconds since the epoch with microseconds</Summary>
+      <Description>Seconds since the epoch with microseconds. Bash variable. Expands to the current Unix time as a floating-point number.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="EPOCHSECONDS">
+      <Summary>Seconds since the epoch</Summary>
+      <Description>Seconds since the epoch. Bash variable. Expands to the current Unix time in whole seconds.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="EUID">
+      <Summary>Effective user ID</Summary>
+      <Description>Effective user ID. Bash variable. The numeric effective user ID of the current user; read-only.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="EXECIGNORE">
+      <Summary>Ignored executable patterns</Summary>
+      <Description>Ignored executable patterns. Bash variable. A colon-separated list of patterns for files ignored during PATH lookup and completion.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="FCEDIT">
+      <Summary>Editor for fc</Summary>
+      <Description>Editor for fc. Bash variable. The editor used by the fc builtin.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="FIGNORE">
+      <Summary>Ignored filename suffixes</Summary>
+      <Description>Ignored filename suffixes. Bash variable. A colon-separated list of suffixes excluded from filename completion.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="FUNCNAME">
+      <Summary>Function call stack</Summary>
+      <Description>Function call stack. Bash variable. An array with the names of the shell functions currently being executed.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="FUNCNEST">
+      <Summary>Maximum function nesting</Summary>
+      <Description>Maximum function nesting. Bash variable. A positive value limits how deeply shell functions may nest.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="GLOBIGNORE">
+      <Summary>Ignored filename patterns</Summary>
+      <Description>Ignored filename patterns. Bash variable. A colon-separated list of patterns excluded from filename expansion.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="GLOBSORT">
+      <Summary>Filename expansion sort order</Summary>
+      <Description>Filename expansion sort order. Bash variable. Controls how filename expansion results are sorted.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="GROUPS">
+      <Summary>User group IDs</Summary>
+      <Description>User group IDs. Bash variable. An array with the group IDs of which the current user is a member.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="histchars">
+      <Summary>History expansion characters</Summary>
+      <Description>History expansion characters. Bash variable. The characters used for history expansion, quick substitution and comments.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HISTCMD">
+      <Summary>Current history number</Summary>
+      <Description>Current history number. Bash variable. The history index of the current command.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HISTCONTROL">
+      <Summary>History recording control</Summary>
+      <Description>History recording control. Bash variable. A colon-separated list of values such as ignorespace, ignoredups and erasedups.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HISTFILE">
+      <Summary>History file</Summary>
+      <Description>History file. Bash variable. The file to which the command history is saved; the default is ~/.bash_history.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HISTFILESIZE">
+      <Summary>History file size limit</Summary>
+      <Description>History file size limit. Bash variable. The maximum number of lines kept in the history file.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HISTIGNORE">
+      <Summary>Ignored history patterns</Summary>
+      <Description>Ignored history patterns. Bash variable. A colon-separated list of patterns for command lines not saved in the history.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HISTSIZE">
+      <Summary>History list size</Summary>
+      <Description>History list size. Bash variable. The maximum number of commands kept in the history list.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HISTTIMEFORMAT">
+      <Summary>History timestamp format</Summary>
+      <Description>History timestamp format. Bash variable. A strftime format for timestamps shown by the history builtin.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HOME">
+      <Summary>Home directory</Summary>
+      <Description>Home directory. Bash variable. The current user's home directory; the default target of cd and the base for tilde expansion.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HOSTFILE">
+      <Summary>Hostname completion file</Summary>
+      <Description>Hostname completion file. Bash variable. A file in /etc/hosts format used for hostname completion.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HOSTNAME">
+      <Summary>Host name</Summary>
+      <Description>Host name. Bash variable. The name of the current host.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="HOSTTYPE">
+      <Summary>Host type</Summary>
+      <Description>Host type. Bash variable. A string describing the machine Bash is running on.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="IFS">
+      <Summary>Input field separators</Summary>
+      <Description>Input field separators. Bash variable. Characters that separate fields during word splitting and by the read builtin.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="IGNOREEOF">
+      <Summary>EOF handling</Summary>
+      <Description>EOF handling. Bash variable. Controls how many consecutive EOF characters an interactive shell accepts before exiting.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="INPUTRC">
+      <Summary>Readline initialization file</Summary>
+      <Description>Readline initialization file. Bash variable. The Readline initialization file, overriding ~/.inputrc.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="INSIDE_EMACS">
+      <Summary>Emacs environment flag</Summary>
+      <Description>Emacs environment flag. Bash variable. Set by Emacs; Bash may disable line editing depending on its value.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="LANG">
+      <Summary>Default locale</Summary>
+      <Description>Default locale. Bash variable. The locale used for categories not selected by an LC_ variable.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="LC_ALL">
+      <Summary>Locale override</Summary>
+      <Description>Locale override. Bash variable. Overrides LANG and all other LC_ locale variables.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="LC_COLLATE">
+      <Summary>Collation locale</Summary>
+      <Description>Collation locale. Bash variable. The locale that controls sorting and collation in filename expansion and pattern matching.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="LC_CTYPE">
+      <Summary>Character type locale</Summary>
+      <Description>Character type locale. Bash variable. The locale that controls character classes and multibyte interpretation.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="LC_MESSAGES">
+      <Summary>Message locale</Summary>
+      <Description>Message locale. Bash variable. The locale used to translate $-prefixed double-quoted strings.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="LC_NUMERIC">
+      <Summary>Numeric locale</Summary>
+      <Description>Numeric locale. Bash variable. The locale used for number formatting.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="LC_TIME">
+      <Summary>Time locale</Summary>
+      <Description>Time locale. Bash variable. The locale used for date and time formatting.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="LINENO">
+      <Summary>Current line number</Summary>
+      <Description>Current line number. Bash variable. The line number currently executing in a script or function.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="LINES">
+      <Summary>Terminal height</Summary>
+      <Description>Terminal height. Bash variable. Used by select and updated when the terminal size changes.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="MACHTYPE">
+      <Summary>Machine type</Summary>
+      <Description>Machine type. Bash variable. The GNU cpu-company-system description of the machine.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="MAIL">
+      <Summary>Mail file or directory</Summary>
+      <Description>Mail file or directory. Bash variable. A file or Maildir checked for new mail when MAILPATH is not set.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="MAILCHECK">
+      <Summary>Mail check interval</Summary>
+      <Description>Mail check interval. Bash variable. How often, in seconds, the shell checks MAIL or MAILPATH.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="MAILPATH">
+      <Summary>Mail files to check</Summary>
+      <Description>Mail files to check. Bash variable. A colon-separated list of mail files, optionally with a '?' message after each file.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="MAPFILE">
+      <Summary>Default mapfile array</Summary>
+      <Description>Default mapfile array. Bash variable. The array that receives lines read by mapfile when no name is given.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="OLDPWD">
+      <Summary>Previous working directory</Summary>
+      <Description>Previous working directory. Bash variable. The directory that was current before the last cd.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="OPTARG">
+      <Summary>Argument of the last option</Summary>
+      <Description>Argument of the last option. Bash variable. Set by getopts to the argument of the option being processed.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="OPTERR">
+      <Summary>getopts error reporting</Summary>
+      <Description>getopts error reporting. Bash variable. When set to 1, getopts prints error messages.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="OPTIND">
+      <Summary>Index of the next option</Summary>
+      <Description>Index of the next option. Bash variable. The index of the next positional parameter to process with getopts.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="OSTYPE">
+      <Summary>Operating system type</Summary>
+      <Description>Operating system type. Bash variable. A string describing the operating system Bash is running on.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PATH">
+      <Summary>Command search path</Summary>
+      <Description>Command search path. Bash variable. A colon-separated list of directories in which the shell looks for commands.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PIPESTATUS">
+      <Summary>Pipeline exit statuses</Summary>
+      <Description>Pipeline exit statuses. Bash variable. An array with the exit status of each command in the last foreground pipeline.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="POSIXLY_CORRECT">
+      <Summary>POSIX mode flag</Summary>
+      <Description>POSIX mode flag. Bash variable. When set in the environment, Bash starts in POSIX mode; setting it while running also enables POSIX mode.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PPID">
+      <Summary>Parent process ID</Summary>
+      <Description>Parent process ID. Bash variable. The process ID of the shell's parent; read-only.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PROMPT_COMMAND">
+      <Summary>Command before the prompt</Summary>
+      <Description>Command before the prompt. Bash variable. A command or array of commands executed before the primary prompt.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PROMPT_DIRTRIM">
+      <Summary>Prompt directory depth</Summary>
+      <Description>Prompt directory depth. Bash variable. The number of trailing directory components kept by the \w and \W prompt escapes.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PS0">
+      <Summary>Prompt before command execution</Summary>
+      <Description>Prompt before command execution. Bash variable. Expanded and displayed after a command is read and before it is executed.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PS1">
+      <Summary>Primary prompt</Summary>
+      <Description>Primary prompt. Bash variable. The prompt displayed before each interactive command; prompt escapes are expanded before display.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PS2">
+      <Summary>Secondary prompt</Summary>
+      <Description>Secondary prompt. Bash variable. The continuation prompt displayed when a command spans several lines.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PS3">
+      <Summary>Select prompt</Summary>
+      <Description>Select prompt. Bash variable. The prompt used by the select command.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PS4">
+      <Summary>Trace prompt</Summary>
+      <Description>Trace prompt. Bash variable. The prompt printed before each command when set -x is active.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="PWD">
+      <Summary>Current working directory</Summary>
+      <Description>Current working directory. Bash variable. The current directory as set by cd.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="RANDOM">
+      <Summary>Random number</Summary>
+      <Description>Random number. Bash variable. Expands to a random integer from 0 to 32767; assigning it seeds the generator.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="READLINE_ARGUMENT">
+      <Summary>Readline numeric argument</Summary>
+      <Description>Readline numeric argument. Bash variable. The numeric argument of a Readline command defined with bind -x.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="READLINE_LINE">
+      <Summary>Readline line buffer</Summary>
+      <Description>Readline line buffer. Bash variable. The contents of the Readline line buffer for bind -x commands.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="READLINE_MARK">
+      <Summary>Readline mark position</Summary>
+      <Description>Readline mark position. Bash variable. The position of the mark in the Readline line buffer.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="READLINE_POINT">
+      <Summary>Readline insertion point</Summary>
+      <Description>Readline insertion point. Bash variable. The position of the insertion point in the Readline line buffer.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="REPLY">
+      <Summary>Default read variable</Summary>
+      <Description>Default read variable. Bash variable. Receives the line read by read when no variable name is given.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="SECONDS">
+      <Summary>Seconds since shell start</Summary>
+      <Description>Seconds since shell start. Bash variable. Expands to the seconds since the shell started; assigning resets the count.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="SHELL">
+      <Summary>Login shell path</Summary>
+      <Description>Login shell path. Bash variable. The full pathname of the user's login shell.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="SHELLOPTS">
+      <Summary>Enabled set -o options</Summary>
+      <Description>Enabled set -o options. Bash variable. A colon-separated list of enabled shell options; read-only.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="SHLVL">
+      <Summary>Shell nesting level</Summary>
+      <Description>Shell nesting level. Bash variable. Incremented for each nested Bash instance.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="SRANDOM">
+      <Summary>Non-linear random number</Summary>
+      <Description>Non-linear random number. Bash variable. Expands to a 32-bit random number that cannot be seeded.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="TIMEFORMAT">
+      <Summary>Time output format</Summary>
+      <Description>Time output format. Bash variable. A format string for the timing information printed by the time reserved word.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="TMOUT">
+      <Summary>Input timeout</Summary>
+      <Description>Input timeout. Bash variable. A default timeout for read and the interactive primary prompt.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="TMPDIR">
+      <Summary>Temporary directory</Summary>
+      <Description>Temporary directory. Bash variable. The directory Bash uses for temporary files.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="UID">
+      <Summary>Real user ID</Summary>
+      <Description>Real user ID. Bash variable. The numeric real user ID of the current user; read-only.</Description>
     </Symbol>
     <Symbol language="Bash" name="basename" signature="basename(path, suffix)">
       <Summary>File name without the directory</Summary>
+      <Description>File name without the directory. Common shell command. Strips the directory and an optional suffix from a path.</Description>
     </Symbol>
     <Symbol language="Bash" name="dirname" signature="dirname(path)">
       <Summary>Directory part of a path</Summary>
+      <Description>Directory part of a path. Common shell command. Prints the directory part of a path.</Description>
+    </Symbol>
+    <Symbol language="Bash" name="which" signature="which(name)">
+      <Summary>Path of a command</Summary>
+      <Description>Path of a command. Common shell command. Prints the path that would be executed for a command.</Description>
     </Symbol>
     <Symbol language="Lua" name="print" signature="print(...)">
       <Summary>Write the arguments and a newline</Summary>
