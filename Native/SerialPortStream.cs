@@ -321,6 +321,13 @@ public class SerialPortStream : Stream, IDisposable
     // How long Close waits for a cancelled read or write to finish before closing the handle under it.
     private const int CloseWaitMs = 2000;
 
+    // Driver queues. The default (4 KB, about 45 ms at 921600 bps) overruns when the reader is delayed by a moment.
+    private const int ReceiveQueueBytes = 64 * 1024;
+
+    private const int TransmitQueueBytes = 16 * 1024;
+
+    private const int DefaultQueueBytes = 4096;
+
     private const sbyte XonCharacter = 0x11;
 
     private const sbyte XoffCharacter = 0x13;
@@ -346,6 +353,28 @@ public class SerialPortStream : Stream, IDisposable
     private ManualResetEvent _readEvent = new ManualResetEvent(initialState: false);
 
     private ManualResetEvent _writeEvent = new ManualResetEvent(initialState: false);
+
+    // The driver queue size in effect (the one asked for, or the default when the driver refused it).
+    private int _receiveQueueBytes = DefaultQueueBytes;
+
+    // Set by Close() so a break that is being held ends at once.
+    private readonly ManualResetEventSlim _closing = new ManualResetEventSlim();
+
+    // Unmanaged memory of the operations, allocated once and reused by every read and write (guarded by the two locks).
+    private IntPtr _readOverlapped;
+
+    private IntPtr _readBuffer;
+
+    private int _readBufferSize;
+
+    private IntPtr _writeOverlapped;
+
+    private IntPtr _writeBuffer;
+
+    private int _writeBufferSize;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetupComm(SafeFileHandle safeFileHandle, int inQueue, int outQueue);
 
     public override bool CanRead => true;
 
@@ -418,10 +447,16 @@ public class SerialPortStream : Stream, IDisposable
         if (_handle.IsInvalid)
         {
             int error = Marshal.GetLastWin32Error();
+            ReleaseEvents();
             throw new Win32Exception(error, "Cannot open " + portName + ": " + new Win32Exception(error).Message);
         }
         try
         {
+            // Not fatal: a driver that keeps its own queue sizes still works.
+            if (SetupComm(_handle, ReceiveQueueBytes, TransmitQueueBytes))
+            {
+                _receiveQueueBytes = ReceiveQueueBytes;
+            }
             if (advancedSerialPortSettings != null)
             {
                 _dtr = advancedSerialPortSettings.DtrOnOpen;
@@ -435,8 +470,17 @@ public class SerialPortStream : Stream, IDisposable
             // The port is opened exclusively: a handle left open by a failed setup would lock it until the finalizer runs
             // and every retry would then fail with "access denied".
             _handle.Dispose();
+            ReleaseEvents();
             throw;
         }
+    }
+
+    /// <summary>A failed open has no Close(): the events (kernel objects) would wait for the finalizer.</summary>
+    private void ReleaseEvents()
+    {
+        _readEvent.Dispose();
+        _writeEvent.Dispose();
+        _closing.Dispose();
     }
 
     /// <summary>
@@ -481,14 +525,26 @@ public class SerialPortStream : Stream, IDisposable
     /// <summary>Holds the transmit line in the break state for the given time (blocks the calling thread).</summary>
     public void SendBreak(int durationMs)
     {
-        EscapeFunction(CommFunction.SetBreak);
-        try
+        // The writer waits meanwhile: a character sent during a break would be garbled (and a close waits for this lock).
+        lock (_writeLock)
         {
-            Thread.Sleep(Math.Max(10, Math.Min(durationMs, 5000)));
-        }
-        finally
-        {
-            EscapeFunction(CommFunction.ClearBreak);
+            ThrowIfClosed();
+            EscapeFunction(CommFunction.SetBreak);
+            try
+            {
+                // Ends early when the port is closed.
+                _closing.Wait(Math.Max(10, Math.Min(durationMs, 5000)));
+            }
+            finally
+            {
+                try
+                {
+                    EscapeFunction(CommFunction.ClearBreak);
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            }
         }
     }
 
@@ -583,6 +639,10 @@ public class SerialPortStream : Stream, IDisposable
         dcb.TxContinueOnXoff = software;
         if (software)
         {
+            // XOFF goes out when less than XoffLim bytes of the queue are free, XON when less than XonLim are used;
+            // a driver that reports zero for both may refuse the settings.
+            dcb.XonLim = (ushort)Math.Min(ushort.MaxValue, _receiveQueueBytes / 4);
+            dcb.XoffLim = (ushort)Math.Min(ushort.MaxValue, _receiveQueueBytes / 4);
             // Some drivers report zero for both characters; SetCommState refuses XON/XOFF with equal characters.
             dcb.XonChar = XonCharacter;
             dcb.XoffChar = XoffCharacter;
@@ -743,8 +803,22 @@ public class SerialPortStream : Stream, IDisposable
             {
                 EventHandle = _readEvent.SafeWaitHandle.DangerousGetHandle()
             };
-            IntPtr overlappedPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
-            IntPtr bufferPtr = Marshal.AllocHGlobal(count);
+            if (_readOverlapped == IntPtr.Zero)
+            {
+                _readOverlapped = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
+            }
+            if (_readBufferSize < count)
+            {
+                // The previous buffer is not in the driver's hands: every earlier read has completed.
+                if (_readBuffer != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(_readBuffer);
+                }
+                _readBuffer = Marshal.AllocHGlobal(count);
+                _readBufferSize = count;
+            }
+            IntPtr overlappedPtr = _readOverlapped;
+            IntPtr bufferPtr = _readBuffer;
             bool ownedByDriver = false;
             try
             {
@@ -764,12 +838,13 @@ public class SerialPortStream : Stream, IDisposable
             }
             finally
             {
-                // Freeing memory the driver may still write into would corrupt the heap: leak it instead (only happens
-                // when a driver ignores the cancellation on close).
-                if (!ownedByDriver)
+                // The memory is kept for the next read. If the driver may still write into it (a driver that ignores the
+                // cancellation on close), it is forgotten instead of freed: reusing or freeing it would corrupt the heap.
+                if (ownedByDriver)
                 {
-                    Marshal.FreeHGlobal(overlappedPtr);
-                    Marshal.FreeHGlobal(bufferPtr);
+                    _readOverlapped = IntPtr.Zero;
+                    _readBuffer = IntPtr.Zero;
+                    _readBufferSize = 0;
                 }
             }
         }
@@ -784,8 +859,21 @@ public class SerialPortStream : Stream, IDisposable
             {
                 EventHandle = _writeEvent.SafeWaitHandle.DangerousGetHandle()
             };
-            IntPtr overlappedPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
-            IntPtr bufferPtr = Marshal.AllocHGlobal(count);
+            if (_writeOverlapped == IntPtr.Zero)
+            {
+                _writeOverlapped = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeOverlapped)));
+            }
+            if (_writeBufferSize < count)
+            {
+                if (_writeBuffer != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(_writeBuffer);
+                }
+                _writeBuffer = Marshal.AllocHGlobal(count);
+                _writeBufferSize = count;
+            }
+            IntPtr overlappedPtr = _writeOverlapped;
+            IntPtr bufferPtr = _writeBuffer;
             bool ownedByDriver = false;
             try
             {
@@ -799,10 +887,11 @@ public class SerialPortStream : Stream, IDisposable
             }
             finally
             {
-                if (!ownedByDriver)
+                if (ownedByDriver)
                 {
-                    Marshal.FreeHGlobal(overlappedPtr);
-                    Marshal.FreeHGlobal(bufferPtr);
+                    _writeOverlapped = IntPtr.Zero;
+                    _writeBuffer = IntPtr.Zero;
+                    _writeBufferSize = 0;
                 }
             }
         }
@@ -810,12 +899,30 @@ public class SerialPortStream : Stream, IDisposable
 
     private Win32Exception ReadFailure(int error)
     {
-        return new Win32Exception(error, "Cannot read from " + _portName + ": " + new Win32Exception(error).Message + " (the adapter may have been unplugged)");
+        return new Win32Exception(error, "Cannot read from " + _portName + ": " + new Win32Exception(error).Message + UnpluggedHint(error));
     }
 
     private Win32Exception WriteFailure(int error)
     {
-        return new Win32Exception(error, "Cannot write to " + _portName + ": " + new Win32Exception(error).Message + " (the adapter may have been unplugged)");
+        return new Win32Exception(error, "Cannot write to " + _portName + ": " + new Win32Exception(error).Message + UnpluggedHint(error));
+    }
+
+    /// <summary>The hint only for the errors a removed device gives; "access denied" or "invalid parameter" mean something else.</summary>
+    private static string UnpluggedHint(int error)
+    {
+        switch (error)
+        {
+            case 2:    // ERROR_FILE_NOT_FOUND
+            case 21:   // ERROR_NOT_READY
+            case 22:   // ERROR_BAD_COMMAND
+            case 31:   // ERROR_GEN_FAILURE
+            case 55:   // ERROR_DEV_NOT_EXIST
+            case 1117: // ERROR_IO_DEVICE
+            case 1167: // ERROR_DEVICE_NOT_CONNECTED
+                return " (the adapter may have been unplugged)";
+            default:
+                return string.Empty;
+        }
     }
 
     public override void Write(byte[] buffer, int offset, int count)
@@ -843,6 +950,7 @@ public class SerialPortStream : Stream, IDisposable
     {
         if (Interlocked.Exchange(ref _closed, 1) == 0)
         {
+            _closing.Set();
             bool readIdle = WaitUntilIdle(_readLock);
             bool writeIdle = WaitUntilIdle(_writeLock);
             try
@@ -852,6 +960,7 @@ public class SerialPortStream : Stream, IDisposable
                 {
                     _readEvent.Dispose();
                     _writeEvent.Dispose();
+                    FreeOperationMemory();
                 }
                 else
                 {
@@ -874,6 +983,18 @@ public class SerialPortStream : Stream, IDisposable
             }
         }
         base.Close();
+    }
+
+    private void FreeOperationMemory()
+    {
+        foreach (IntPtr memory in new[] { _readOverlapped, _readBuffer, _writeOverlapped, _writeBuffer })
+        {
+            if (memory != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(memory);
+            }
+        }
+        _readOverlapped = _readBuffer = _writeOverlapped = _writeBuffer = IntPtr.Zero;
     }
 
     /// <summary>Takes the lock of a read or write once its operation has ended, cancelling it meanwhile; false on timeout.</summary>

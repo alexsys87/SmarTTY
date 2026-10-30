@@ -438,6 +438,17 @@ internal static class Program
             Check(WaitFor(() => { lock (s.WriteFailures) return s.WriteFailures.Count > 0; }), "the user is told that data was lost");
         });
 
+        Run("an open that cannot succeed is not retried until the time is up", () =>
+        {
+            using Dispatcher ui = new Dispatcher();
+            using AsyncTransportConnection connection = new AsyncTransportConnection(new TcpTransport(Endpoint("1", 23)), ui, 10000);
+            ManualResetEventSlim failed = new ManualResetEventSlim();
+            connection.StateChanged += (sender, state, message) => { if (state == ConnectionStateEnum.Failed) failed.Set(); };
+            Stopwatch timer = Stopwatch.StartNew();
+            connection.Start();
+            Check(failed.Wait(3000) && timer.ElapsedMilliseconds < 3000, "failed at once: " + timer.ElapsedMilliseconds + " ms");
+        });
+
         Run("Dispose releases the transport and says so", () =>
         {
             using Server server = new Server(IPAddress.Loopback);
