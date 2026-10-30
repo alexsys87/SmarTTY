@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
@@ -234,6 +235,9 @@ public class SshSession : IDisposable
 
     private readonly SshClient _client;
 
+    // For the proxies SSH.NET does not offer (SOCKS4, HTTPS); null otherwise.
+    private ProxyRelay _proxyRelay;
+
     private readonly AuthenticationGate _authGate = new AuthenticationGate();
 
     private readonly ManualResetEvent _connectDone = new ManualResetEvent(initialState: false);
@@ -404,8 +408,9 @@ public class SshSession : IDisposable
     }
 
     /// <summary>
-    /// Whether the proxy refused the connection for missing or wrong credentials (HTTP "407 Proxy Authentication
-    /// Required", or a SOCKS5 proxy that rejected the user name and password or wants them), so asking for them can help.
+    /// Whether the proxy refused the connection for missing or wrong credentials (HTTP or HTTPS "407 Proxy Authentication
+    /// Required", a SOCKS5 proxy that rejected the user name and password or wants them, a SOCKS4 proxy that rejected the
+    /// user ID), so asking for them can help.
     /// </summary>
     public static bool IsProxyAuthenticationFailure(Exception exception)
     {
@@ -426,6 +431,12 @@ public class SshSession : IDisposable
         if (string.IsNullOrEmpty(parameters.ProxyHost))
         {
             connectionInfo = new ConnectionInfo(parameters.Host, parameters.Port, parameters.UserName, methods);
+        }
+        else if (ProxyRelay.IsNeeded(parameters.ProxyType))
+        {
+            // SSH.NET connects to the loopback end of the relay, which goes through the proxy to the server.
+            _proxyRelay = new ProxyRelay(parameters);
+            connectionInfo = new ConnectionInfo(IPAddress.Loopback.ToString(), _proxyRelay.LocalPort, parameters.UserName, methods);
         }
         else if (parameters.ProxyType == SshProxyType.Socks5)
         {
@@ -481,6 +492,8 @@ public class SshSession : IDisposable
     {
         try
         {
+            // The proxy handshake comes first, so that its refusal is the error of the connection.
+            _proxyRelay?.Open();
             _client.Connect();
             Session session = SshNetChannel.GetSession(_client);
             if (session != null)
@@ -1391,6 +1404,7 @@ public class SshSession : IDisposable
         catch
         {
         }
+        _proxyRelay?.Dispose();
         CloseAllChannels();
         _events.CompleteAdding();
         if (Thread.CurrentThread != _eventThread)

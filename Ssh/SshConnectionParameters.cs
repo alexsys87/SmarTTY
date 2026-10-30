@@ -35,6 +35,11 @@ public class SshConnectionParameters
 
     public SshProxyType ProxyType;
 
+    /// <summary>
+    /// Checks the certificate of an HTTPS proxy; null for the usual check against the trusted certificates of Windows.
+    /// </summary>
+    public System.Net.Security.RemoteCertificateValidationCallback ProxyCertificateValidation;
+
     public int ProxyPort;
 
     public string ProxyUserName;

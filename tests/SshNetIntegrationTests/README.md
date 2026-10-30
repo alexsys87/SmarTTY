@@ -92,6 +92,8 @@ the OpenSSH, PEM and PKCS#8 formats, and a PuTTY `.ppk` when `puttygen` is insta
 installing each key type in `authorized_keys` and logging in with it. A PuTTY key with a passphrase is also used to log
 in through the key file path when `puttygen` is installed.
 
-`Socks5ProxyTests` connect to the live server through a small SOCKS5 server inside the test (with and without a user
-name and password), as SmarTTY does through the SOCKS5 inbound of xray or v2ray: the server name must reach the proxy as
-a name, and a refused or missing proxy login must be recognized so that SmarTTY asks for the proxy credentials.
+`ProxyTests` connect to the live server through a small proxy server inside the test: SOCKS5 (as the inbound of xray
+or v2ray), SOCKS4/4a and HTTPS (HTTP CONNECT over TLS with a self-signed certificate), with and without credentials.
+The server name must reach the proxy as a name, a refused or missing proxy login must be recognized so that SmarTTY
+asks for the proxy credentials, an untrusted HTTPS proxy certificate must stop the connection, and bulk data must pass
+`Ssh/ProxyRelay.cs`, which carries the SOCKS4 and HTTPS connections for SSH.NET.

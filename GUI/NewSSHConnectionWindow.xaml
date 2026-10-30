@@ -213,14 +213,14 @@
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
-          <ComboBox Grid.Column="0" Margin="0 0 4 0" VerticalAlignment="Center" ItemsSource="{Binding ProxyType, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ProxyType}" ToolTip="HTTP CONNECT: an HTTP proxy (port 3128, 8080...). SOCKS5: a SOCKS5 proxy, such as the local inbound of xray, v2ray or sing-box (often 127.0.0.1:10808 or :1080); the server name is resolved by the proxy.">
+          <ComboBox Grid.Column="0" Margin="0 0 4 0" VerticalAlignment="Center" ItemsSource="{Binding ProxyType, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ProxyType}" ToolTip="HTTP CONNECT: an HTTP proxy (port 3128, 8080...). SOCKS5: a SOCKS5 proxy, such as the local inbound of xray, v2ray or sing-box (often 127.0.0.1:10808 or :1080); the server name is resolved by the proxy. SOCKS4/4a: an older SOCKS proxy (the user name is sent as the user ID, there is no password). HTTPS (TLS): an HTTP proxy reached over TLS, its certificate is checked.">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <TextBlock Text="{Binding Converter={StaticResource EnumValueConverter}}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ComboBox>
-          <PasswordBox Grid.Column="1" Name="pwdProxy" VerticalAlignment="Center" Loaded="ProxyPasswordBox_Loaded" PasswordChanged="ProxyPasswordBox_PasswordChanged" ToolTip="[user:password@]host:port, for example 127.0.0.1:10808. A URL such as socks5://127.0.0.1:10808 also selects the proxy type." />
+          <PasswordBox Grid.Column="1" Name="pwdProxy" VerticalAlignment="Center" Loaded="ProxyPasswordBox_Loaded" PasswordChanged="ProxyPasswordBox_PasswordChanged" ToolTip="[user:password@]host:port, for example 127.0.0.1:10808. A URL such as socks5://127.0.0.1:10808 (also socks4://, socks4a://, http://, https://) also selects the proxy type." />
           <TextBox Grid.Column="1" VerticalAlignment="Center" Visibility="Collapsed" TextChanged="RevealText_TextChanged" />
           <ToggleButton Grid.Column="2" Margin="4 0 0 0" VerticalAlignment="Center" ToolTip="Show or hide the proxy address and credentials (user:password@host:port)" Content="eye" ContentTemplate="{StaticResource RevealIconTemplate}" Checked="RevealButton_Checked" Unchecked="RevealButton_Unchecked" />
         </Grid>

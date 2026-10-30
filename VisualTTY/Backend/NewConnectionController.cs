@@ -170,7 +170,7 @@ public class NewConnectionController : INotifyPropertyChanged
 
     private SshProxyType _ProxyType;
 
-    /// <summary>HTTP CONNECT or SOCKS5; a scheme typed in the proxy field ("socks5://...") takes precedence when saving.</summary>
+    /// <summary>The kind of proxy; a scheme typed in the proxy field ("socks5://...") takes precedence when saving.</summary>
     public SshProxyType ProxyType
     {
         get
