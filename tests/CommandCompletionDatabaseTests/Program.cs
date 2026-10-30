@@ -124,15 +124,20 @@ internal static class Program
             Check(!File.Exists(path), "xml does not exist initially");
             CommandCompletionDatabase autoCreated = CommandCompletionDatabase.Load(path);
             Check(!File.Exists(path) && !File.Exists(path + ".gz"), "missing XML is not created: the built-in template is used");
-            Check(autoCreated != null && autoCreated.Completions != null && autoCreated.Completions.Length == 0 && autoCreated.LoadWarning == null, "the built-in template is valid (empty for now)");
+            CommandCompletionDatabase template = CommandCompletionDatabase.LoadTemplate();
+            Check(template != null && template.Completions != null && template.LoadWarning == null && template.Completions.Length > 0,
+                "the built-in template is valid and not empty");
+            Check(autoCreated != null && autoCreated.Completions != null && autoCreated.LoadWarning == null &&
+                  autoCreated.Completions.Length == template.Completions.Length,
+                "a missing XML loads the built-in template");
 
             // A file next to the exe wins over the template; the first save of the editor writes template + additions there.
-            CommandCompletionDatabase.LoadTemplate();
             CommandCompletionDatabase external = new CommandCompletionDatabase { Completions = new[] { new CommandCompletion { Command = "mytool" } } };
             external.SaveTo(path, compressed: false);
             Check(CommandCompletionDatabase.Load(path).Completions.Length == 1, "the file next to the exe takes priority over the template");
             File.Delete(path);
-            Check(CommandCompletionDatabase.Load(path).Completions.Length == 0 && !File.Exists(path), "without the file the template is used again, nothing is written");
+            Check(CommandCompletionDatabase.Load(path).Completions.Length == template.Completions.Length && !File.Exists(path),
+                "without the file the template is used again, nothing is written");
 
             // Places: the folder of the program first, then %APPDATA%\\SmarTTY, then the template; the first save goes next to the exe
             // and falls back to %APPDATA%\\SmarTTY when the folder of the program refuses.
@@ -143,7 +148,8 @@ internal static class Program
             CommandCompletionDatabase.UserDirectory = userDir;
             CommandCompletionDatabase one = new CommandCompletionDatabase { Completions = new[] { new CommandCompletion { Command = "one" } } };
             CommandCompletionDatabase two = new CommandCompletionDatabase { Completions = new[] { new CommandCompletion { Command = "two" }, new CommandCompletion { Command = "three" } } };
-            Check(CommandCompletionDatabase.FindExternalPath() == null && CommandCompletionDatabase.Load().Completions.Length == 0, "no file anywhere: the template");
+            Check(CommandCompletionDatabase.FindExternalPath() == null && CommandCompletionDatabase.Load().Completions.Length == template.Completions.Length,
+                "no file anywhere: the template");
             Check(CommandCompletionDatabase.PlannedPath() == CommandCompletionDatabase.DefaultPath, "a writable program folder is where the first save goes");
             Check(one.SaveToPreferredPlace(false) == CommandCompletionDatabase.DefaultPath && File.Exists(CommandCompletionDatabase.DefaultPath) && !Directory.Exists(userDir), "the first save goes next to the exe");
             two.SaveTo(CommandCompletionDatabase.UserPath, false);
@@ -165,7 +171,9 @@ internal static class Program
             Check(new CommandCompletionDatabase().LookupCommand("ls -") == null, "default database is safe");
             Check(new CommandCompletionDatabase { Completions = null }.LookupCommand("ls -") == null, "explicit null array is safe");
             Check(new CommandCompletionDatabase { Completions = new CommandCompletion[] { null } }.LookupCommand("ls -") == null, "null command is safe");
-            ExpectEmpty(directory, "a path without a file falls back to the template", warning: false);
+            CommandCompletionDatabase nonexistent = CommandCompletionDatabase.Load(directory);
+            Check(nonexistent.LoadWarning == null && nonexistent.Completions.Length == template.Completions.Length,
+                "a path without a file falls back to the template");
 
             foreach (string xml in new[] { "", "<CommandCompletionDatabase>", "<WrongRoot />", "<CommandCompletionDatabase xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\" />" })
             {
