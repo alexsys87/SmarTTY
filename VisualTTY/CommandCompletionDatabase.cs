@@ -19,7 +19,13 @@ public class CommandCompletionDatabase
     [XmlIgnore]
     public string LoadWarning { get; private set; }
 
-    /// <summary>CommandCompletions.xml next to the exe (also used by the settings export/import).</summary>
+    /// <summary>Name of the template built into the program: the dictionary that is used while there is no file next to the exe.</summary>
+    public const string TemplateResourceName = "VisualTTY.CommandCompletions.xml";
+
+    /// <summary>
+    /// CommandCompletions.xml next to the exe (also used by the settings export/import). The file is optional: it is created by
+    /// the editor on the first save and takes priority over the template built into the program.
+    /// </summary>
     public static string DefaultPath
     {
         get
@@ -71,9 +77,7 @@ public class CommandCompletionDatabase
                 }
                 else
                 {
-                    CommandCompletionDatabase defaultDb = new CommandCompletionDatabase();
-                    defaultDb.Save(path);
-                    return defaultDb;
+                    return LoadTemplate();
                 }
             }
             else if (compressed && !File.Exists(source))
@@ -86,9 +90,7 @@ public class CommandCompletionDatabase
                 }
                 else
                 {
-                    CommandCompletionDatabase defaultDb = new CommandCompletionDatabase();
-                    defaultDb.Save(uncompressedPath);
-                    return defaultDb;
+                    return LoadTemplate();
                 }
             }
 
@@ -112,6 +114,27 @@ public class CommandCompletionDatabase
                                    exception is SecurityException || exception is ArgumentException)
         {
             string warning = "Could not load command completions from '" + path + "': " + exception.Message;
+            Trace.TraceWarning(warning);
+            return new CommandCompletionDatabase { LoadWarning = warning };
+        }
+    }
+
+    /// <summary>
+    /// The dictionary built into the program (an empty one when this build has none). Nothing is written to disk: the editor
+    /// saves the template together with the user's additions into the file next to the exe, which then takes priority.
+    /// </summary>
+    public static CommandCompletionDatabase LoadTemplate()
+    {
+        try
+        {
+            using (Stream stream = typeof(CommandCompletionDatabase).Assembly.GetManifestResourceStream(TemplateResourceName))
+            {
+                return stream == null ? new CommandCompletionDatabase() : ReadDatabase(stream);
+            }
+        }
+        catch (Exception exception) when (exception is IOException || exception is InvalidOperationException || exception is XmlException)
+        {
+            string warning = "Could not load the built-in command completions: " + exception.Message;
             Trace.TraceWarning(warning);
             return new CommandCompletionDatabase { LoadWarning = warning };
         }

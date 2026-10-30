@@ -23,8 +23,6 @@ public partial class App : Application
         // The theme lives in Application.Resources, so it has to be there before the first window loads its XAML.
         ThemeManager.Apply(GlobalSettings.Load()?.Theme ?? SmarTTYTheme.Dark);
 
-        EnsureCommandCompletionsFile();
-
         // The message boxes of the harness-compiled controls become the themed WPF dialogs.
         ThemedMessageBoxAdapter.Install();
 
@@ -95,21 +93,6 @@ public partial class App : Application
             // Later, not from the Closed event: the window is still being disposed and its preferences saved there.
             Application.Current.Dispatcher.BeginInvoke((Action)(() => ShowLauncher(null)));
         };
-    }
-
-    // Creates CommandCompletions.xml next to the exe on startup if it is missing.
-    // CommandCompletionDatabase.Load() writes an empty database when the file is absent
-    // and never throws for I/O problems (e.g. a read-only install folder).
-    private static void EnsureCommandCompletionsFile()
-    {
-        try
-        {
-            CommandCompletionDatabase.Load();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Trace.TraceWarning("Could not prepare CommandCompletions.xml: " + ex.Message);
-        }
     }
 
     private static void OnSelectionWindowClosed(object sender, EventArgs e)

@@ -49,6 +49,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="VisualTTY\XTermKeys.xml" LogicalName="VisualTTY.XTermKeys.xml" />
+    <!-- The built-in command completions (CommandCompletions.xml next to the exe takes priority), see CommandCompletionDatabase. -->
+    <EmbeddedResource Include="VisualTTY\CommandCompletions.xml" LogicalName="VisualTTY.CommandCompletions.xml" />
     <EmbeddedResource Include="Completion\ApiSymbols.xml" LogicalName="SmarTTY.Completion.ApiSymbols.xml" />
     <!-- Window icons of the WinForms dialogs, loaded by Forms/FormIcons.cs. -->
     <EmbeddedResource Include="icons\forms\*.ico" LogicalName="SmarTTY.FormIcons.%(Filename).ico" />

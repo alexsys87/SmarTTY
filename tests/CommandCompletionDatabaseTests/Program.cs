@@ -123,13 +123,21 @@ internal static class Program
         {
             Check(!File.Exists(path), "xml does not exist initially");
             CommandCompletionDatabase autoCreated = CommandCompletionDatabase.Load(path);
-            Check(File.Exists(path), "missing XML auto-creates file");
-            Check(autoCreated != null && autoCreated.Completions != null && autoCreated.Completions.Length == 0 && autoCreated.LoadWarning == null, "auto-created database is valid and empty");
+            Check(!File.Exists(path) && !File.Exists(path + ".gz"), "missing XML is not created: the built-in template is used");
+            Check(autoCreated != null && autoCreated.Completions != null && autoCreated.Completions.Length == 0 && autoCreated.LoadWarning == null, "the built-in template is valid (empty for now)");
+
+            // A file next to the exe wins over the template; the first save of the editor writes template + additions there.
+            CommandCompletionDatabase.LoadTemplate();
+            CommandCompletionDatabase external = new CommandCompletionDatabase { Completions = new[] { new CommandCompletion { Command = "mytool" } } };
+            external.SaveTo(path, compressed: false);
+            Check(CommandCompletionDatabase.Load(path).Completions.Length == 1, "the file next to the exe takes priority over the template");
+            File.Delete(path);
+            Check(CommandCompletionDatabase.Load(path).Completions.Length == 0 && !File.Exists(path), "without the file the template is used again, nothing is written");
 
             Check(new CommandCompletionDatabase().LookupCommand("ls -") == null, "default database is safe");
             Check(new CommandCompletionDatabase { Completions = null }.LookupCommand("ls -") == null, "explicit null array is safe");
             Check(new CommandCompletionDatabase { Completions = new CommandCompletion[] { null } }.LookupCommand("ls -") == null, "null command is safe");
-            ExpectEmpty(directory, "unreadable source falls back safely");
+            ExpectEmpty(directory, "a path without a file falls back to the template", warning: false);
 
             foreach (string xml in new[] { "", "<CommandCompletionDatabase>", "<WrongRoot />", "<CommandCompletionDatabase xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\" />" })
             {
