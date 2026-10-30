@@ -973,7 +973,7 @@ namespace SmarTTY.CodeEditing
         private static readonly HashSet<string> BashKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
             "if", "then", "elif", "else", "fi", "for", "while", "until", "do", "done",
-            "case", "esac", "in", "function", "select", "time", "local", "export",
+            "case", "esac", "in", "function", "select", "time", "coproc", "local", "export",
             "readonly", "declare", "typeset", "return", "break", "continue", "source", "shift",
             "unset", "alias", "echo", "printf", "read", "trap", "exec", "exit", "set",
             "let", "eval", "test"

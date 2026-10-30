@@ -119,6 +119,25 @@ internal static class Program
             "the 'qsort_s' signature uses rsize_t bounds");
         Check(database.Find(L.CLike, "bsearch_s").Signature.Contains("rsize_t count"),
             "the 'bsearch_s' signature uses rsize_t bounds");
+
+        // The Bash set covers the shell builtins and the documented shell variables.
+        List<ApiSymbolDatabase.Symbol> bash = database.ForLanguage(L.Bash).ToList();
+        Check(bash.Count > 150, "the Bash set is complete (" + bash.Count + " symbols)");
+        Equal(bash.Count, bash.Select(s => s.Name).Distinct().Count(), "Bash names are unique");
+        Equal(bash.Count, bash.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every Bash symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "shopt", "mapfile", "compgen", "complete", "wait",
+                     "BASH_VERSION", "BASH_SOURCE", "PATH", "IFS", "PIPESTATUS"
+                 })
+        {
+            Check(database.Find(L.Bash, name) != null, "the Bash set includes '" + name + "'");
+        }
+        Check(database.Find(L.Bash, "shopt").Description.Contains("Bash builtin"),
+            "the description of 'shopt' names a Bash builtin");
+        Check(database.Find(L.Bash, "BASH_VERSION").Description.Contains("Bash variable"),
+            "the description of 'BASH_VERSION' names a Bash variable");
     }
 
     private static List<ISuggestion> Build(L language, string text, string prefix, ApiSymbolDatabase database)
@@ -154,6 +173,18 @@ internal static class Program
         // A "module.name" entry is offered under its plain name.
         List<ISuggestion> lua = Build(L.Lua, "", "sqr", database);
         Check(lua.Any(s => s.DisplayName == "sqrt"), "the 'math.sqrt' entry is offered as 'sqrt'");
+
+        // The Bash builtins and variables feed the completion list.
+        List<ISuggestion> bash = Build(L.Bash, "", "sho", database);
+        ISuggestion shopt = bash.FirstOrDefault(s => s.DisplayName == "shopt");
+        Check(shopt != null, "the completion list offers the Bash builtin 'shopt'");
+        Equal(shopt.DetailText, "Set shell options", "the Bash summary is the detail text");
+        Check(shopt.HintText.StartsWith("shopt("), "the Bash signature is the hint text");
+
+        // A shell variable is offered after the '$' (the popup filters on the identifier alone).
+        List<ISuggestion> variables = Build(L.Bash, "echo $PA\n", "PA", database);
+        ISuggestion path = variables.FirstOrDefault(s => s.DisplayName == "PATH");
+        Check(path != null && path.IsBold, "the completion list offers the Bash variable 'PATH'");
 
         // Without a database the list is what it always was: keywords and document words only.
         List<ISuggestion> plain = Build(L.Python, "", "pri", null);
