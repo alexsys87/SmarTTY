@@ -30,6 +30,9 @@ public partial class PublicKeyManagerWindow : Window
     public PublicKeyManagerWindow(SshSession sshSession, SSHConnectionSettings settings)
     {
         InitializeComponent();
+        // The window grows to fit the public key it shows, so cap it to the screen: a longer key on a shorter
+        // display would otherwise push the buttons off the bottom.
+        MaxHeight = SystemParameters.WorkArea.Height;
         _session = sshSession;
         _settings = settings;
         RemoteHostText.Text = sshSession.HostName;
