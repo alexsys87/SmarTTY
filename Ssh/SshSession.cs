@@ -1294,6 +1294,32 @@ public class SshSession : IDisposable
 
     #endregion
 
+    #region Port forwarding (Tools > Port forwarding)
+
+    /// <summary>
+    /// Listens on <paramref name="bindAddress"/>:<paramref name="bindPort"/> of this computer and carries every connection to
+    /// <paramref name="host"/>:<paramref name="port"/> as the SSH server sees them (the equivalent of "ssh -L"). Port 0 lets
+    /// the system choose a free port (see <see cref="SshPortForward.BoundPort"/>). Throws if the address cannot be bound.
+    /// </summary>
+    public SshPortForward OpenLocalForward(string bindAddress, uint bindPort, string host, uint port)
+    {
+        EnsureAuthenticated();
+        return SshPortForward.Start(_client, new ForwardedPortLocal(bindAddress, bindPort, host, port));
+    }
+
+    /// <summary>
+    /// Asks the SSH server to listen on <paramref name="bindAddress"/>:<paramref name="bindPort"/> and carries every connection
+    /// to <paramref name="host"/>:<paramref name="port"/> as this computer sees them (the equivalent of "ssh -R"). An address
+    /// other than the loopback one needs GatewayPorts on the server. Throws if the server refuses the request.
+    /// </summary>
+    public SshPortForward OpenRemoteForward(string bindAddress, uint bindPort, string host, uint port)
+    {
+        EnsureAuthenticated();
+        return SshPortForward.Start(_client, new ForwardedPortRemote(bindAddress, bindPort, host, port));
+    }
+
+    #endregion
+
     #region Dynamic port forwarding (SOCKS)
 
     private ForwardedPortDynamic _dynamicForward;

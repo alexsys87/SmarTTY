@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.PortForwardingWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Port forwarding" Width="820" Height="540" MinWidth="600" MinHeight="400" WindowStartupLocation="CenterOwner" FocusManager.FocusedElement="{Binding ElementName=ForwardList}">
+  <Grid Margin="8">
+    <FrameworkElement.Resources>
+      <ResourceDictionary>
+        <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
+          <Setter Property="Margin" Value="3" />
+          <Setter Property="Padding" Value="8 3 8 3" />
+          <Setter Property="MinWidth" Value="80" />
+        </Style>
+      </ResourceDictionary>
+    </FrameworkElement.Resources>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="2*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="3 0 3 8" Text="Forwards TCP ports through the SSH connection of this tab, like ssh -L and ssh -R. Local: a port of this computer leads to a host behind the SSH server. Remote: a port of the SSH server leads to a host reachable from this computer. Forwardings work while the connection is open and are restored after a reconnect; the list is saved with the profile. For a SOCKS proxy (ssh -D) use Tools &gt; SOCKS5 proxy over SSH." />
+    <ListView x:Name="ForwardList" Grid.Row="1" Margin="3" SelectionMode="Single" SelectionChanged="ForwardList_SelectionChanged" MouseDoubleClick="ForwardList_MouseDoubleClick" PreviewKeyDown="ForwardList_PreviewKeyDown">
+      <ListView.View>
+        <GridView>
+          <GridView.Columns>
+            <GridViewColumn Header="On connect" Width="80">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate>
+                  <CheckBox HorizontalAlignment="Center" IsChecked="{Binding StartOnConnect, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="Start this forwarding when the profile connects" />
+                </DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn Header="Direction" Width="90" DisplayMemberBinding="{Binding KindText}" />
+            <GridViewColumn Header="Listen" Width="170" DisplayMemberBinding="{Binding ListenText}" />
+            <GridViewColumn Header="Destination" Width="200" DisplayMemberBinding="{Binding TargetText}" />
+            <GridViewColumn Header="Description" Width="120" DisplayMemberBinding="{Binding Description}" />
+            <GridViewColumn Header="Status" Width="150">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding StatusText}" ToolTip="{Binding StatusText}" TextTrimming="CharacterEllipsis">
+                    <TextBlock.Style>
+                      <Style TargetType="{x:Type TextBlock}">
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding IsActive}" Value="True">
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource Theme.Error}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+          </GridView.Columns>
+        </GridView>
+      </ListView.View>
+    </ListView>
+    <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0 2 0 0">
+      <Button Content="_Add..." Click="Add_Click" ToolTip="Add a local or remote forwarding" />
+      <Button x:Name="EditButton" Content="_Edit..." Click="Edit_Click" ToolTip="Change the selected forwarding (a running one is restarted)" />
+      <Button x:Name="RemoveButton" Content="_Remove" Click="Remove_Click" ToolTip="Stop and delete the selected forwarding (Del)" />
+      <Button x:Name="StartButton" Content="_Start" Click="Start_Click" Margin="14 3 3 3" ToolTip="Start the selected forwarding on this connection" />
+      <Button x:Name="StopButton" Content="S_top" Click="Stop_Click" ToolTip="Stop the selected forwarding; connections it carries are closed" />
+      <Button x:Name="CopyButton" Content="_Copy as ssh option" Click="Copy_Click" Margin="14 3 3 3" ToolTip="Copy the selected forwarding as an ssh option (-L ... or -R ...)" />
+    </WrapPanel>
+    <TextBlock x:Name="StatusText" Grid.Row="3" Margin="3 4 3 2" TextWrapping="Wrap" Foreground="{DynamicResource Theme.TextSecondary}" />
+    <TextBox x:Name="LogBox" Grid.Row="4" Margin="3" IsReadOnly="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap" />
+    <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 4 0 0">
+      <Button Content="Close" IsCancel="True" Click="Close_Click" />
+    </StackPanel>
+  </Grid>
+</Window>

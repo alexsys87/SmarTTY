@@ -32,6 +32,7 @@ internal static class Program
         WindowsHostTests.Run();
         SmarTTYKeyTests.Run();
         ProxyTests.Run();
+        PortForwardTests.Run();
 
         if (TestEnvironment.IntegrationEnabled())
         {
@@ -42,6 +43,7 @@ internal static class Program
             SmarTTYKeyTests.RunLive(environment);
             SmarTTYKeyTests.RunLivePutty(environment);
             ProxyTests.RunLive(environment);
+            PortForwardTests.RunLive(environment);
             FileTransferManagerTests.Run(environment);
             SftpFileSystemTests.Run(environment);
             WindowsAuthorizedKeysTests.Run(environment);

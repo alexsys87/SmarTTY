@@ -97,3 +97,8 @@ or v2ray), SOCKS4/4a and HTTPS (HTTP CONNECT over TLS with a self-signed certifi
 The server name must reach the proxy as a name, a refused or missing proxy login must be recognized so that SmarTTY
 asks for the proxy credentials, an untrusted HTTPS proxy certificate must stop the connection, and bulk data must pass
 `Ssh/ProxyRelay.cs`, which carries the SOCKS4 and HTTPS connections for SSH.NET.
+
+`PortForwardTests` cover Tools > Port forwarding: a local forwarding (ssh -L) on a port chosen by the system, checked
+by logging in to the server again through it with bulk data; a remote forwarding (ssh -R) that a bash on the server uses
+to reach a listener of the test; the refusal of the second port (AllowTcpForwarding no); and the list of a session in
+`Ssh/PortForwardHost.cs`: "start on connect", start and stop, restore after a reconnect, editing and a taken port.
