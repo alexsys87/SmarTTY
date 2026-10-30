@@ -52,7 +52,8 @@ internal class AsyncTransportConnection : IDisposable
 
     private Queue<PendingWrite> _writeQueue = new Queue<PendingWrite>();
 
-    private Semaphore _writeSignal = new Semaphore(0, int.MaxValue);
+    // SemaphoreSlim holds no kernel object, so a connection that is replaced leaves nothing behind to be finalized.
+    private readonly SemaphoreSlim _writeSignal = new SemaphoreSlim(0);
 
     private volatile bool _writerIdle;
 
@@ -404,7 +405,7 @@ internal class AsyncTransportConnection : IDisposable
             {
                 SetWriterIdle(true);
             }
-            _writeSignal.WaitOne();
+            _writeSignal.Wait();
             if (_stopRequested || _finished)
             {
                 break;
@@ -584,7 +585,8 @@ internal class AsyncTransportConnection : IDisposable
     /// <summary>
     /// Queues data for the device. False when the connection has already ended (or was closed): the data is dropped
     /// instead of piling up in a queue that nobody writes any more, and <paramref name="completed"/> is not called.
-    /// Otherwise <paramref name="completed"/> is called once, on a worker thread, with whether the data was written.
+    /// Otherwise <paramref name="completed"/> is called once with whether the data was written: on the writer thread, or
+    /// on the thread that drops the data (the reader when the connection ends, the caller of Dispose).
     /// </summary>
     public bool Send(byte[] buffer, int count, Action<bool> completed = null)
     {
@@ -596,7 +598,8 @@ internal class AsyncTransportConnection : IDisposable
         {
             _writeQueue.Enqueue(new PendingWrite
             {
-                Buffer = buffer,
+                // Copied: the caller may reuse its array as soon as this returns.
+                Buffer = CopyOf(buffer, count),
                 Length = count,
                 Completed = completed
             });
@@ -608,6 +611,13 @@ internal class AsyncTransportConnection : IDisposable
             FailQueuedWrites();
         }
         return true;
+    }
+
+    private static byte[] CopyOf(byte[] buffer, int count)
+    {
+        byte[] copy = new byte[count];
+        Buffer.BlockCopy(buffer, 0, copy, 0, count);
+        return copy;
     }
 
     /// <summary>Tells the transport the current terminal size (used by telnet); other transports ignore it.</summary>

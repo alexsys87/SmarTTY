@@ -438,6 +438,38 @@ internal static class Program
             Check(WaitFor(() => { lock (s.WriteFailures) return s.WriteFailures.Count > 0; }), "the user is told that data was lost");
         });
 
+        Run("short numbers are not taken for IP addresses", () =>
+        {
+            Check(TcpConnector.ParseLiteral("192.168.0.5", out IPAddress four) && four.ToString() == "192.168.0.5", "a full IPv4 address is a literal");
+            Check(TcpConnector.ParseLiteral("::1", out IPAddress six) && six.AddressFamily == AddressFamily.InterNetworkV6, "an IPv6 address is a literal");
+            Check(!TcpConnector.ParseLiteral("device.local", out _), "a name is left to the resolver");
+            foreach (string bad in new[] { "1", "192.168.1", "10.0.0.1.5" })
+            {
+                bool refused = false;
+                try { TcpConnector.ParseLiteral(bad, out _); } catch (ArgumentException) { refused = true; }
+                Check(refused, "\"" + bad + "\" is refused");
+            }
+        });
+
+        Run("closing a transport leaves no stream for a late writer", () =>
+        {
+            using Server server = new Server(IPAddress.Loopback);
+            using TcpTransport transport = new TcpTransport(Endpoint("127.0.0.1", server.Port));
+            transport.Open(null);
+            Check(transport.GetStream() != null, "open");
+            transport.Close();
+            Check(transport.GetStream() == null, "no stream after Close");
+        });
+
+        Run("a refused connection is reported as a refusal", () =>
+        {
+            int closedPort;
+            using (Server probe = new Server(IPAddress.Loopback)) closedPort = probe.Port;
+            Exception error = null;
+            try { new TcpConnector().Connect("127.0.0.1", closedPort, 2000); } catch (Exception ex) { error = ex; }
+            Check(error is SocketException, "refused: " + error?.GetType().Name);
+        });
+
         Run("a name with several addresses connects to the one that works", () =>
         {
             using Server server = new Server(IPAddress.Loopback);

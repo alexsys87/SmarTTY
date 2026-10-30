@@ -244,7 +244,8 @@ public class SavedConnectionStore
     {
         for (int i = 0; i < _rawConnections.Count; i++)
         {
-            if (_rawConnections[i].Settings != null && _rawConnections[i].Settings.Connection.FileNameBase == rawConnectionSettings.Settings.Connection.FileNameBase)
+            // Host names are case-insensitive and so are file names on NTFS: "Device.local:23" and "device.local:23" are one profile.
+            if (_rawConnections[i].Settings != null && string.Equals(_rawConnections[i].Settings.Connection.FileNameBase, rawConnectionSettings.Settings.Connection.FileNameBase, StringComparison.OrdinalIgnoreCase))
             {
                 _rawConnections.RemoveAt(i--);
             }

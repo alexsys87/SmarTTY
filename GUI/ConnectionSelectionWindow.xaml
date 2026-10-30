@@ -116,7 +116,7 @@
               </ItemsControl.ItemTemplate>
             </ListBox>
             <CheckBox IsChecked="{Binding ProbeConnections}">
-              <TextBlock Text="Probe all connections in the background" ToolTip="SmarTTY will attempt connecting to the TCP port corresponding to each connection (no SSH handshake will be performed) and will show responding connections first." />
+              <TextBlock Text="Probe all connections in the background" ToolTip="SmarTTY will open and immediately close a TCP connection to the port of each saved connection (no SSH handshake will be performed), repeat it every 30 seconds, and show responding connections first. A device that serves one client at a time may be busy for a moment; switch this off for such devices." />
             </CheckBox>
           </StackPanel>
         </Border>

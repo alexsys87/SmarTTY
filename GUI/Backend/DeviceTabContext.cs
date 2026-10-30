@@ -160,7 +160,7 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                 {
                     continue;
                 }
-                if (!string.Equals(saved.Settings.Connection.FileNameBase, key, StringComparison.Ordinal))
+                if (!string.Equals(saved.Settings.Connection.FileNameBase, key, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }

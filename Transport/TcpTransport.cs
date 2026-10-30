@@ -62,25 +62,34 @@ internal class TcpTransport : IDeviceTransport, IDisposable
         }
         try
         {
-            // Only the operating system probes an idle connection: nothing is written into the data stream, which
-            // would corrupt the device protocol, so an idle raw TCP session is not disturbed.
-            TcpConnector.EnableKeepAlive(socket, _tcp.KeepAliveSeconds);
-        }
-        catch (SocketException)
-        {
-            // A connection without keep-alive is still usable.
-        }
-        NetworkStream stream = new NetworkStream(socket, ownsSocket: true);
-        lock (_lock)
-        {
-            if (_closed)
+            try
             {
-                stream.Dispose();
-                throw new ObjectDisposedException(nameof(TcpTransport), "The connection was closed while it was being made.");
+                // Only the operating system probes an idle connection: nothing is written into the data stream, which
+                // would corrupt the device protocol, so an idle raw TCP session is not disturbed.
+                TcpConnector.EnableKeepAlive(socket, _tcp.KeepAliveSeconds);
             }
-            _stream?.Dispose();
-            _socket = socket;
-            _stream = stream;
+            catch (SocketException)
+            {
+                // A connection without keep-alive is still usable.
+            }
+            NetworkStream stream = new NetworkStream(socket, ownsSocket: true);
+            lock (_lock)
+            {
+                if (_closed)
+                {
+                    stream.Dispose();
+                    throw new ObjectDisposedException(nameof(TcpTransport), "The connection was closed while it was being made.");
+                }
+                _stream?.Dispose();
+                _socket = socket;
+                _stream = stream;
+            }
+        }
+        catch
+        {
+            // Whatever went wrong after the connect, nobody else holds this socket.
+            socket.Close();
+            throw;
         }
     }
 
@@ -96,6 +105,9 @@ internal class TcpTransport : IDeviceTransport, IDisposable
             stream = _stream;
             socket = _socket;
             _connector = null;
+            // A writer that asks later is told that the connection is closed instead of getting a disposed stream.
+            _stream = null;
+            _socket = null;
         }
         connector?.Abort();
         try
