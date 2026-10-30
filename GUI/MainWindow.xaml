@@ -230,7 +230,7 @@
             <Image Source="../icons/MainWindow/archive16.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Process _manager..." Click="ProcessManager_Click" ToolTip="Lists the processes of the server with their processor and memory use, and ends or kills the selected one; works with any Linux, OpenWrt included" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+        <MenuItem Header="Process _manager..." Click="ProcessManager_Click" ToolTip="Lists the processes of the server with their processor and memory use, and ends or kills the selected one; works with any Linux, OpenWrt included" Visibility="{Binding Path=ActiveSession.UnixSshVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/chip.png" />
           </MenuItem.Icon>
@@ -250,12 +250,12 @@
             <Image Source="../icons/MainWindow/pubkey.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Run _script..." Click="RunScript_Click" ToolTip="Uploads a shell script (bash or ash) to /tmp on the server, makes it executable, runs it in the terminal and removes it afterwards" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+        <MenuItem Header="Run _script..." Click="RunScript_Click" ToolTip="Uploads a shell script (bash or ash) to /tmp on the server, makes it executable, runs it in the terminal and removes it afterwards" Visibility="{Binding Path=ActiveSession.UnixSshVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/terminal.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Check _X11 forwarding..." Click="CheckX11_Click" ToolTip="Shows whether X11 forwarding works for this connection: the server's answer, xauth and libX11 on the remote host, and VcXsrv on this computer" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+        <MenuItem Header="Check _X11 forwarding..." Click="CheckX11_Click" ToolTip="Shows whether X11 forwarding works for this connection: the server's answer, xauth and libX11 on the remote host, and VcXsrv on this computer" Visibility="{Binding Path=ActiveSession.UnixSshVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/x11.png" />
           </MenuItem.Icon>

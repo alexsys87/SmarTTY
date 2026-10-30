@@ -165,6 +165,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         _RemoteOs = kind;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RemoteOs)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsWindowsHost)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UnixSshVisibility)));
         if (kind == RemoteOsKind.Windows)
         {
             // df is a Unix command: the bar would only collect failed readings there.
@@ -194,6 +195,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     public System.Windows.Visibility DeviceOnlyVisibility => IsDevice ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
     public System.Windows.Visibility SshOnlyVisibility => IsDevice ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+
+    /// <summary>
+    /// Visible for SSH sessions to a Unix host only: the tools that rely on ps, sh, /tmp or xauth of the remote host
+    /// (process manager, run script, X11 check) are hidden for devices and for Windows hosts.
+    /// </summary>
+    public System.Windows.Visibility UnixSshVisibility => (IsDevice || IsWindowsHost) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
     /// <summary>
     /// Visibility of the "View -> File List" item: the file list only makes sense for SSH sessions, but the item
