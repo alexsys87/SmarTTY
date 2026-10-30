@@ -253,7 +253,8 @@ public class SSHConnectionSettings
 
     /// <summary>
     /// Like the other overload, but also takes a proxy URL as VPN clients show it ("socks5://127.0.0.1:10808",
-    /// "socks5h://", "http://"): <paramref name="proxyType"/> is the type the scheme names, or null without a scheme.
+    /// "socks5h://", "socks4://", "socks4a://", "http://", "https://"): <paramref name="proxyType"/> is the type the scheme
+    /// names, or null without a scheme.
     /// </summary>
     public static bool TryParseProxy(string text, out SshProxyType? proxyType, out string credentials, out string host, out int port)
     {
@@ -274,9 +275,17 @@ public class SSHConnectionSettings
             {
                 proxyType = SshProxyType.Socks5;
             }
+            else if (scheme == "socks4" || scheme == "socks4a")
+            {
+                proxyType = SshProxyType.Socks4;
+            }
             else if (scheme == "http")
             {
                 proxyType = SshProxyType.Http;
+            }
+            else if (scheme == "https")
+            {
+                proxyType = SshProxyType.Https;
             }
             else
             {

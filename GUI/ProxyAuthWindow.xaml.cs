@@ -3,8 +3,9 @@ using System.Windows;
 namespace SmarTTY.GUI;
 
 /// <summary>
-/// Asks for the credentials of the proxy that refused the connection without them: an HTTP proxy that answered with
-/// "407 Proxy Authentication Required", or a SOCKS5 proxy that rejected the user name and password.
+/// Asks for the credentials of the proxy that refused the connection without them: an HTTP or HTTPS proxy that answered
+/// with "407 Proxy Authentication Required", a SOCKS5 proxy that rejected the user name and password, or a SOCKS4 proxy
+/// that rejected the user ID.
 /// </summary>
 public partial class ProxyAuthWindow : Window
 {

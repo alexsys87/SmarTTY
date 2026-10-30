@@ -202,8 +202,11 @@ internal static class Program
         CheckProxyScheme("SOCKS5H://user:secret@localhost:1080/", SshProxyType.Socks5, "user:secret", "localhost", 1080);
         CheckProxyScheme("socks://[::1]:1080", SshProxyType.Socks5, null, "::1", 1080);
         CheckProxyScheme("http://proxy:3128", SshProxyType.Http, null, "proxy", 3128);
+        CheckProxyScheme("https://user:secret@proxy.example.com:443", SshProxyType.Https, "user:secret", "proxy.example.com", 443);
+        CheckProxyScheme("socks4://10.0.0.1:1080", SshProxyType.Socks4, null, "10.0.0.1", 1080);
+        CheckProxyScheme("socks4a://ident@proxy:1080", SshProxyType.Socks4, "ident", "proxy", 1080);
         CheckProxyScheme("127.0.0.1:10808", null, null, "127.0.0.1", 10808);
-        Check(!SSHConnectionSettings.TryParseProxy("socks4://127.0.0.1:1080", out SshProxyType? unsupported, out _, out _, out _) && unsupported == null, "proxy: an unsupported scheme is rejected");
+        Check(!SSHConnectionSettings.TryParseProxy("ftp://127.0.0.1:21", out SshProxyType? unsupported, out _, out _, out _) && unsupported == null, "proxy: an unsupported scheme is rejected");
         Check(!SSHConnectionSettings.TryParseProxy("socks5://127.0.0.1", out SshProxyType? noPort, out _, out _, out _) && noPort == null, "proxy: a URL without a port is rejected");
         Check(SSHConnectionSettings.TryParseProxy("socks5://127.0.0.1:10808", out string plainCredentials, out string plainHost, out int plainPort) && plainHost == "127.0.0.1" && plainPort == 10808 && plainCredentials == null,
             "proxy: the overload without the type also reads a URL");
