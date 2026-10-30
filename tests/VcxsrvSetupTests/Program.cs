@@ -109,6 +109,12 @@ internal static class Program
             Equal(null, VcxsrvSetup.FindExecutable(), "no VcXsrv is found outside Windows (the registry lookup does not throw)");
         }
 
+        // Folders from the registry: a quoted uninstaller with arguments, an icon with its index, a bare path.
+        Equal("C:\\Program Files\\VcXsrv", VcxsrvSetup.DirectoryOfCommand("\"C:\\Program Files\\VcXsrv\\uninstall.exe\" /S"), "a quoted uninstaller with arguments gives its folder");
+        Equal("C:\\Program Files\\VcXsrv", VcxsrvSetup.DirectoryOfCommand("C:\\Program Files\\VcXsrv\\vcxsrv.exe,0"), "an icon with its index gives the folder of the program");
+        Equal("C:\\Program Files\\VcXsrv", VcxsrvSetup.DirectoryOfCommand("C:\\Program Files\\VcXsrv\\uninstall.exe /S"), "an unquoted uninstaller with arguments gives its folder");
+        Equal(null, VcxsrvSetup.DirectoryOfCommand("  "), "an empty command gives no folder");
+
         // A copy next to the program counts as installed: nothing is downloaded (the offline run proves it).
         string folder = Path.Combine(Path.GetDirectoryName(typeof(VcxsrvSetup).Assembly.Location), "vcxsrv");
         string fake = Path.Combine(folder, VcxsrvSetup.ExecutableName);
