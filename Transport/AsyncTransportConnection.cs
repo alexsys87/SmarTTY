@@ -79,7 +79,9 @@ internal class AsyncTransportConnection : IDisposable
     private const int SerialReadBufferSize = 4096;
 
     // When the UI is this far behind, the reader stops reading: the far end is then slowed down by the flow control of
-    // the link (TCP window, RTS/CTS) instead of the backlog growing without bound and the window freezing.
+    // the link (TCP window, RTS/CTS) instead of the backlog growing without bound and the window freezing. A serial port
+    // without RTS/CTS or XON/XOFF has no such control: the driver's queue overruns and drops data silently (the status bar
+    // reports it as a line error), so only the large driver queue and a lower speed or flow control help there.
     internal const int MaxPendingReceiveBytes = 4 * 1024 * 1024;
 
     // The most one UI update gets, so drawing a backlog never holds the window for long; the rest follows at once.
@@ -126,6 +128,18 @@ internal class AsyncTransportConnection : IDisposable
         }
     }
 
+    private const int ErrorInvalidParameter = 87;
+
+    /// <summary>
+    /// Whether opening again can help. A port that is still being released or a device that has just started may open a
+    /// moment later; settings that are wrong, or a transport that was closed, will fail the same way every time.
+    /// </summary>
+    private static bool IsWorthRetrying(Exception exception)
+    {
+        return !(exception is ArgumentException || exception is ObjectDisposedException || exception is InvalidOperationException
+            || (exception is System.ComponentModel.Win32Exception win32 && win32.NativeErrorCode == ErrorInvalidParameter));
+    }
+
     private void ConnectAndReadLoop()
     {
         try
@@ -147,9 +161,9 @@ internal class AsyncTransportConnection : IDisposable
                 {
                     _transport.Open(_hostResolver);
                 }
-                catch
+                catch (Exception openException)
                 {
-                    if (elapsed.ElapsedMilliseconds >= _connectTimeoutMs || _stopRequested || _disposed)
+                    if (elapsed.ElapsedMilliseconds >= _connectTimeoutMs || _stopRequested || _disposed || !IsWorthRetrying(openException))
                     {
                         throw;
                     }

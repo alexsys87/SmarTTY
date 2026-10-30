@@ -402,6 +402,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             private readonly string _SerialNumber;
 
+            // A USB device may have no serial number, and is still a USB device.
+            private readonly bool _IsUsb;
+
             public Uri Image => MakeIconURI(Settings.Icon ?? "SerialPort.png");
 
             public long LastUseTime => 0L;
@@ -410,7 +413,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 get
                 {
-                    if (!string.IsNullOrEmpty(_SerialNumber))
+                    if (_IsUsb)
                     {
                         return SubtypeImage.USB;
                     }
@@ -418,7 +421,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 }
             }
 
-            public string Title => $"{_Port.Description} (COM{_Port.PortNumber})";
+            public string Title => $"{_Port.Description} ({_Port.PortName})";
 
             public string Detail1
             {
@@ -468,11 +471,12 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 }
             }
 
-            public SerialPort(SavedConnectionStore mgr, SetupApiDeviceSet.ComPortInfo port, RawConnectionSettings settings, string serialNumber)
+            public SerialPort(SavedConnectionStore mgr, SetupApiDeviceSet.ComPortInfo port, RawConnectionSettings settings, string serialNumber, bool isUsb)
                 : base(mgr, settings)
             {
                 _Port = port;
                 _SerialNumber = serialNumber;
+                _IsUsb = isUsb;
             }
 
             public bool MatchesFilter(string filter)
@@ -571,17 +575,22 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public int Number;
 
+            /// <summary>The upper-case name of a port that is not named COMn (a virtual port); null otherwise.</summary>
+            public string Name;
+
             public SerialPortKey(DeviceTerminalSettings.ConnectionSettings.Serial serConn)
             {
                 Description = serConn.DeviceDescription;
+                Name = null;
                 string comPortName = serConn.ComPortName;
-                if (comPortName != null && comPortName.StartsWith("COM", StringComparison.InvariantCultureIgnoreCase) && int.TryParse(serConn.ComPortName.Substring(3), out var comPortNumber))
+                if (comPortName != null && comPortName.StartsWith("COM", StringComparison.OrdinalIgnoreCase) && int.TryParse(serConn.ComPortName.Substring(3), out var comPortNumber))
                 {
                     Number = comPortNumber;
                 }
                 else
                 {
                     Number = 0;
+                    Name = comPortName?.ToUpperInvariant();
                 }
             }
 
@@ -589,6 +598,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 Description = port.Description;
                 Number = port.PortNumber;
+                Name = port.PortNumber > 0 ? null : port.PortName?.ToUpperInvariant();
             }
         }
 
@@ -816,11 +826,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 try
                 {
                     SetupApiDeviceSet.ComPortInfo[] items;
-                    // Checked twice a second: the device list must be freed every time, not left to pile up.
-                    using (SetupApiDeviceSet deviceSet = new SetupApiDeviceSet(new Guid("4d36e978-e325-11ce-bfc1-08002be10318")))
-                    {
-                        items = deviceSet.EnumerateComPorts().ToArray();
-                    }
+                    // Checked twice a second: the device lists must be freed every time, not left to pile up.
+                    items = SetupApiDeviceSet.EnumerateAllComPorts();
                     // The list is also rebuilt when the saved COM profiles changed, or an item would keep a deleted or
                     // outdated profile until a port is plugged in or out.
                     settingsChanged = Interlocked.Exchange(ref _KnownSerialPortSettingsChanged, 0) != 0;
@@ -834,8 +841,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     for (int portIndex = 0; portIndex < entries.Length; portIndex++)
                     {
                         SetupApiDeviceSet.ComPortInfo port = entries[portIndex];
-                        string serialNumber = SetupApiDeviceSet.GetUsbSerialNumber(port.InstanceId, out var item);
-                        if (!item)
+                        string serialNumber = SetupApiDeviceSet.GetUsbSerialNumber(port.InstanceId, out var isUsb);
+                        if (!isUsb)
                         {
                             serialNumber = null;
                         }
@@ -843,22 +850,21 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                         if (value == null)
                         {
                             // Profiles saved without the device description are keyed by the port number alone.
-                            knownSettings.TryGetValue(new SerialPortKey { Number = port.PortNumber }, out value);
+                            knownSettings.TryGetValue(port.PortNumber > 0 ? new SerialPortKey { Number = port.PortNumber } : new SerialPortKey { Name = port.PortName.ToUpperInvariant() }, out value);
                         }
                         if (value == null)
                         {
                             RawConnectionSettings rawConnectionSettings = new RawConnectionSettings();
                             DeviceTerminalSettings deviceTerminalSettings = new DeviceTerminalSettings();
                             DeviceTerminalSettings.ConnectionSettings.Serial serial = new DeviceTerminalSettings.ConnectionSettings.Serial();
-                            int portNumber = port.PortNumber;
-                            serial.ComPortName = "COM" + portNumber;
+                            serial.ComPortName = port.PortName;
                             // Saved with the profile (an icon, for instance), it lets the next scan find the profile again.
                             serial.DeviceDescription = port.Description;
                             deviceTerminalSettings.Connection = serial;
                             rawConnectionSettings.Settings = deviceTerminalSettings;
                             value = rawConnectionSettings;
                         }
-                        list.Add(new SettingsWrappers.SerialPort(_Connections, port, value, serialNumber));
+                        list.Add(new SettingsWrappers.SerialPort(_Connections, port, value, serialNumber, isUsb));
                     }
                     scanned = true;
                 }

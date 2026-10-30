@@ -156,6 +156,9 @@ public partial class DeviceTerminalControl
         }
     }
 
+    // 1 while a check is running on a worker thread: a driver that blocks in these calls must not pile up checks.
+    private int _lineStatusBusy;
+
     private void PollLineStatus()
     {
         SerialPortStream stream = OpenSerialStream();
@@ -163,13 +166,51 @@ public partial class DeviceTerminalControl
         {
             return;
         }
-        if (stream.TryReadLineStatus(out SerialModemLines lines, out uint errorFlags))
+        // The driver calls run on a worker: some virtual and hung drivers block in them, which must not freeze the window.
+        if (Interlocked.CompareExchange(ref _lineStatusBusy, 1, 0) == 0)
         {
-            SetModemLinesText(lines, known: true);
-            if (_lineErrors.Add(errorFlags))
+            ThreadPool.QueueUserWorkItem(state =>
             {
-                UpdatePortAlert();
-            }
+                bool ok = false;
+                SerialModemLines lines = default(SerialModemLines);
+                uint errorFlags = 0;
+                try
+                {
+                    ok = stream.TryReadLineStatus(out lines, out errorFlags);
+                }
+                catch (Exception)
+                {
+                    // Not worth reporting from a periodic check.
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _lineStatusBusy, 0);
+                }
+                if (!ok)
+                {
+                    return;
+                }
+                try
+                {
+                    BeginInvoke((Action)(() =>
+                    {
+                        // Only for the port that is open now: the result may belong to a connection that has been replaced.
+                        if (!ReferenceEquals(OpenSerialStream(), stream))
+                        {
+                            return;
+                        }
+                        SetModemLinesText(lines, known: true);
+                        if (_lineErrors.Add(errorFlags))
+                        {
+                            UpdatePortAlert();
+                        }
+                    }));
+                }
+                catch (InvalidOperationException)
+                {
+                    // The terminal was closed meanwhile (this also covers ObjectDisposedException).
+                }
+            });
         }
         if (_portProblemIsWrite && _portProblem != null && _asyncTransportConnection?.WriteError == null)
         {
@@ -195,7 +236,8 @@ public partial class DeviceTerminalControl
         {
             return;
         }
-        Connect(resetTerminal: _deviceTerminalSettings.ClearContentsWhenReconnecting, ReopenRetryMs);
+        // Automatic: an adapter that appears and disappears again must not wipe the history of failed attempts.
+        Connect(resetTerminal: _deviceTerminalSettings.ClearContentsWhenReconnecting, ReopenRetryMs, automatic: true);
     }
 
     private void OnWriteFailed(object sender, string message)
@@ -305,6 +347,10 @@ public partial class DeviceTerminalControl
             try
             {
                 stream.SendBreak(BreakDurationMs);
+            }
+            catch (ObjectDisposedException)
+            {
+                // The port was closed meanwhile: there is nothing to report.
             }
             catch (Exception exception)
             {

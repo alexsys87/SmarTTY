@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -9,7 +10,11 @@ public class SetupApiDeviceSet : IDisposable
 {
     public struct ComPortInfo
     {
+        /// <summary>The number of a port named COMn; 0 for a port with another name (a virtual port such as CNCA0).</summary>
         public int PortNumber;
+
+        /// <summary>The name the port is opened by ("COM3", "CNCA0"), as the device itself records it.</summary>
+        public string PortName;
 
         public string Description;
 
@@ -46,6 +51,91 @@ public class SetupApiDeviceSet : IDisposable
     }
 
     private IntPtr _deviceInfoSet;
+
+    /// <summary>The device classes that have serial ports: Ports (COM and LPT) and Modem (3G dongles, GSM modems).</summary>
+    private static readonly Guid[] PortClasses =
+    {
+        new Guid("4d36e978-e325-11ce-bfc1-08002be10318"),
+        new Guid("4d36e96d-e325-11ce-bfc1-08002be10318")
+    };
+
+    private const int DicsFlagGlobal = 1;
+
+    private const int DirefDev = 1;
+
+    private const int DirefDrv = 2;
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    private static extern IntPtr SetupDiOpenDevRegKey(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData, int scope, int hwProfile, int keyType, int samDesired);
+
+    /// <summary>All ports of all classes that have them, each name once.</summary>
+    public static ComPortInfo[] EnumerateAllComPorts()
+    {
+        List<ComPortInfo> ports = new List<ComPortInfo>();
+        HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (Guid portClass in PortClasses)
+        {
+            using (SetupApiDeviceSet deviceSet = new SetupApiDeviceSet(portClass))
+            {
+                foreach (ComPortInfo port in deviceSet.EnumerateComPorts())
+                {
+                    if (seen.Add(port.PortName))
+                    {
+                        ports.Add(port);
+                    }
+                }
+            }
+        }
+        return ports.ToArray();
+    }
+
+    /// <summary>
+    /// The port name a device records in its registry key ("PortName", or "AttachedTo" for a modem); only when that is
+    /// missing is it read from the friendly name ("USB Serial Port (COM3)"), which is shown to people and may be translated.
+    /// </summary>
+    private string ReadPortName(ref SpDevInfoData data, string friendlyName)
+    {
+        foreach (int keyType in new[] { DirefDev, DirefDrv })
+        {
+            IntPtr key = SetupDiOpenDevRegKey(_deviceInfoSet, ref data, DicsFlagGlobal, 0, keyType, 1 /* KEY_QUERY_VALUE */);
+            if (key == InvalidHandleValue || key == IntPtr.Zero)
+            {
+                continue;
+            }
+            try
+            {
+                using (Microsoft.Win32.RegistryKey registryKey = Microsoft.Win32.RegistryKey.FromHandle(new Microsoft.Win32.SafeHandles.SafeRegistryHandle(key, ownsHandle: true)))
+                {
+                    foreach (string valueName in new[] { "PortName", "AttachedTo" })
+                    {
+                        if (registryKey.GetValue(valueName) is string name && name.Trim().Length > 0)
+                        {
+                            return name.Trim();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException || ex is UnauthorizedAccessException || ex is IOException || ex is ObjectDisposedException)
+            {
+            }
+        }
+        int comIndex = friendlyName?.LastIndexOf("(COM", StringComparison.Ordinal) ?? -1;
+        if (comIndex != -1)
+        {
+            int closingParenIndex = friendlyName.IndexOf(')', comIndex);
+            if (closingParenIndex != -1)
+            {
+                string name = friendlyName.Substring(comIndex + 1, closingParenIndex - comIndex - 1);
+                return int.TryParse(name.Substring(3), out _) ? name : null;
+            }
+        }
+        return null;
+    }
+
+    private static int PortNumberOf(string portName)
+    {
+        return portName != null && portName.StartsWith("COM", StringComparison.OrdinalIgnoreCase) && int.TryParse(portName.Substring(3), out int number) && number > 0 ? number : 0;
+    }
 
     [DllImport("setupapi.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern bool SetupDiGetDeviceRegistryProperty(IntPtr deviceInfoSet, ref SpDevInfoData deviceInfoData, DeviceRegistryProperty property, out uint propertyRegDataType, StringBuilder propertyBuffer, uint propertyBufferSize, out uint requiredSize);
@@ -107,11 +197,11 @@ public class SetupApiDeviceSet : IDisposable
     public static string GetUsbSerialNumber(string deviceId, out bool isUsbDevice)
     {
         string currentDeviceId = deviceId;
-        if (currentDeviceId != null && !currentDeviceId.StartsWith("USB\\"))
+        if (currentDeviceId != null && !currentDeviceId.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase))
         {
             currentDeviceId = GetParentDeviceId(currentDeviceId);
         }
-        if (currentDeviceId != null && currentDeviceId.StartsWith("USB\\"))
+        if (currentDeviceId != null && currentDeviceId.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase))
         {
             isUsbDevice = true;
         }
@@ -119,7 +209,7 @@ public class SetupApiDeviceSet : IDisposable
         {
             isUsbDevice = false;
         }
-        while (currentDeviceId != null && currentDeviceId.Contains("&MI_"))
+        while (currentDeviceId != null && currentDeviceId.IndexOf("&MI_", StringComparison.OrdinalIgnoreCase) >= 0)
         {
             currentDeviceId = GetParentDeviceId(currentDeviceId);
         }
@@ -128,6 +218,12 @@ public class SetupApiDeviceSet : IDisposable
         if (slashIndex > 0)
         {
             text = currentDeviceId.Substring(slashIndex + 1);
+        }
+        // A device without a serial number gets an ID from Windows ("6&2a1b3c&0&2") that depends on the USB port it is
+        // plugged into: it identifies the socket, not the device, and is not shown as a serial number.
+        if (text != null && text.IndexOf('&') >= 0)
+        {
+            text = null;
         }
         return text;
     }
@@ -152,23 +248,17 @@ public class SetupApiDeviceSet : IDisposable
                 if (SetupDiGetDeviceInstanceId(_deviceInfoSet, ref spDevInfoData, stringBuilder, requiredSize, out requiredSize))
                 {
                     string friendlyName = GetRegistryProperty(_deviceInfoSet, ref spDevInfoData, DeviceRegistryProperty.FriendlyName);
-                    if (friendlyName != null)
+                    string portName = ReadPortName(ref spDevInfoData, friendlyName);
+                    if (portName != null)
                     {
                         string description = GetRegistryProperty(_deviceInfoSet, ref spDevInfoData, DeviceRegistryProperty.DeviceDescription);
-                        int comIndex = friendlyName.LastIndexOf("(COM");
-                        if (comIndex != -1)
+                        yield return new ComPortInfo
                         {
-                            int closingParenIndex = friendlyName.IndexOf(')', comIndex);
-                            if (closingParenIndex != -1 && int.TryParse(friendlyName.Substring(comIndex + 4, closingParenIndex - comIndex - 4), out var portNumber))
-                            {
-                                yield return new ComPortInfo
-                                {
-                                    Description = description,
-                                    PortNumber = portNumber,
-                                    InstanceId = stringBuilder.ToString()
-                                };
-                            }
-                        }
+                            Description = description ?? friendlyName,
+                            PortName = portName,
+                            PortNumber = PortNumberOf(portName),
+                            InstanceId = stringBuilder.ToString()
+                        };
                     }
                 }
             }
