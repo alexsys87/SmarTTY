@@ -47,9 +47,6 @@ public static class GzipBase64Transfer
         public string LocalPath;
         public string RemotePath;
         public Options Options;
-
-        /// <summary>Write a log of everything typed to the device and everything it answered (for finding out why a transfer fails).</summary>
-        public bool DebugLog;
     }
 
     public sealed class Options

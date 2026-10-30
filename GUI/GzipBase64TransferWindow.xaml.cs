@@ -22,7 +22,6 @@ public partial class GzipBase64TransferWindow : Window
     private static string _lastAttempts = "2";
     private static string _lastRate = "6000";
     private static string _lastBlock = "1024";
-    private static bool _lastDebug = true;
 
     private readonly bool _sending;
 
@@ -37,7 +36,6 @@ public partial class GzipBase64TransferWindow : Window
         AttemptsBox.Text = _lastAttempts;
         RateBox.Text = _lastRate;
         BlockBox.Text = _lastBlock;
-        DebugBox.IsChecked = _lastDebug;
         if (sending)
         {
             Title = "Send file via gzip + base64";
@@ -188,14 +186,13 @@ public partial class GzipBase64TransferWindow : Window
             NoEchoBytesPerSecond = rate,
             WindowBytes = block
         };
-        Request = new GzipBase64Transfer.Request { LocalPath = local, RemotePath = remote, Options = options, DebugLog = DebugBox.IsChecked == true };
+        Request = new GzipBase64Transfer.Request { LocalPath = local, RemotePath = remote, Options = options };
 
         _lastEncoding = EncodingBox.SelectedIndex;
         _lastChecksum = ChecksumBox.SelectedIndex;
         _lastAttempts = attempts.ToString(CultureInfo.InvariantCulture);
         _lastRate = rate.ToString(CultureInfo.InvariantCulture);
         _lastBlock = block.ToString(CultureInfo.InvariantCulture);
-        _lastDebug = DebugBox.IsChecked == true;
         _lastLocalFolder = Path.GetDirectoryName(Path.GetFullPath(local)) ?? string.Empty;
         if (_sending)
         {

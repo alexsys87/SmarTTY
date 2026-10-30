@@ -2,7 +2,6 @@ using SmarTTY.IO;
 using SmarTTY.Transport;
 using System;
 using System.IO;
-using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
@@ -80,65 +79,18 @@ public partial class DeviceTerminalControl
         if (sending)
         {
             StartLineTransfer("Send via gzip + base64 - " + Path.GetFileName(request.LocalPath), "gzip + base64", "send",
-                (sendData, progress, token) => RunWithDebugLog(request, "send",
-                    () => GzipBase64Transfer.SendFile(request.LocalPath, request.RemotePath, request.Options, sendData, ReadXModemByte, token, progress)),
+                (sendData, progress, token) =>
+                    GzipBase64Transfer.SendFile(request.LocalPath, request.RemotePath, request.Options, sendData, ReadXModemByte, token, progress),
                 () => "The file arrived on the device and its checksum matches the original:\r\n" + request.RemotePath,
                 AfterGzipBase64Transfer);
         }
         else
         {
             StartLineTransfer("Receive via gzip + base64 - " + Path.GetFileName(request.RemotePath), "gzip + base64", "receive",
-                (sendData, progress, token) => RunWithDebugLog(request, "receive",
-                    () => GzipBase64Transfer.ReceiveFile(request.RemotePath, request.LocalPath, request.Options, sendData, ReadXModemByte, token, progress)),
+                (sendData, progress, token) =>
+                    GzipBase64Transfer.ReceiveFile(request.RemotePath, request.LocalPath, request.Options, sendData, ReadXModemByte, token, progress),
                 () => "The file was saved and its checksum matches the original on the device:\r\n" + request.LocalPath,
                 AfterGzipBase64Transfer);
-        }
-    }
-
-    /// <summary>
-    /// Runs the transfer and, when the user asked for it, writes a log of it to the Temp folder (what was typed to the device,
-    /// what it answered, what was decided). A failure then carries the path of the log in its message, so that the final
-    /// message tells where to look.
-    /// </summary>
-    private static bool RunWithDebugLog(GzipBase64Transfer.Request request, string what, Func<bool> transfer)
-    {
-        StreamWriter log = null;
-        string logPath = null;
-        if (request.DebugLog)
-        {
-            try
-            {
-                logPath = Path.Combine(Path.GetTempPath(), "SmarTTY-gzip-base64-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".log");
-                log = new StreamWriter(logPath, false, new UTF8Encoding(false)) { AutoFlush = true };
-                log.WriteLine("SmarTTY gzip + base64 transfer (" + what + "), " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + ", " + Environment.OSVersion);
-                StreamWriter target = log;
-                request.Options.Log = line =>
-                {
-                    lock (target)
-                    {
-                        target.WriteLine(line);
-                    }
-                };
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                log?.Dispose();
-                log = null;
-                logPath = null;
-            }
-        }
-        try
-        {
-            return transfer();
-        }
-        catch (Exception ex) when (logPath != null)
-        {
-            throw new IOException(ex.Message + "\r\n\r\nDebug log: " + logPath, ex);
-        }
-        finally
-        {
-            request.Options.Log = null;
-            log?.Dispose();
         }
     }
 
