@@ -9,7 +9,24 @@ internal class SerialTransport : IDeviceTransport, IDisposable
 {
     private readonly DeviceTerminalSettings.ConnectionSettings.Serial _serial;
 
-    public SerialPortStream SerialStream { get; private set; }
+    // Close() runs from the UI thread and from the reader thread at the same time. _stateLock guards the field; the
+    // closing itself is done under _closeLock, so a second caller returns only when the port really is released.
+    private readonly object _stateLock = new object();
+
+    private readonly object _closeLock = new object();
+
+    private SerialPortStream _serialStream;
+
+    public SerialPortStream SerialStream
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _serialStream;
+            }
+        }
+    }
 
     public string PortName => _serial.ComPortName;
 
@@ -22,19 +39,25 @@ internal class SerialTransport : IDeviceTransport, IDisposable
 
     public void Open(IHostNameResolver hostNameResolver)
     {
-        if (SerialStream != null)
+        Close();
+        SerialPortStream stream = new SerialPortStream(hostNameResolver?.ResolveHostName(this._serial.ComPortName) ?? this._serial.ComPortName, this._serial.AdvancedSettings);
+        lock (_stateLock)
         {
-            SerialStream.Dispose();
+            _serialStream = stream;
         }
-        SerialStream = new SerialPortStream(hostNameResolver?.ResolveHostName(this._serial.ComPortName) ?? this._serial.ComPortName, this._serial.AdvancedSettings);
     }
 
     public void Close()
     {
-        if (SerialStream != null)
+        lock (_closeLock)
         {
-            SerialStream.Dispose();
-            SerialStream = null;
+            SerialPortStream stream;
+            lock (_stateLock)
+            {
+                stream = _serialStream;
+                _serialStream = null;
+            }
+            stream?.Dispose();
         }
     }
 

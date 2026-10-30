@@ -593,7 +593,6 @@ public class SerialPortStream : Stream, IDisposable
         dcb.DsrSensitivity = false;
         dcb.DtrControlMode = _dtr ? DtrControl.Enable : DtrControl.Disable;
         dcb.RtsControlMode = hardware ? RtsControl.Handshake : (_rts ? RtsControl.Enable : RtsControl.Disable);
-        _rtsIsAutomatic = hardware;
 
         if (!SetCommState(_handle, ref dcb))
         {
@@ -602,6 +601,39 @@ public class SerialPortStream : Stream, IDisposable
             throw new Win32Exception(error, "Cannot apply the settings to " + _portName + " (" + advancedSerialPortSettings.BaudRate + " baud, " + frame + "): "
                 + new Win32Exception(error).Message + ". The adapter or driver may not support them.");
         }
+        // Only now: while the driver still works by the old settings, the RTS state shown must be the old one, too.
+        _rtsIsAutomatic = hardware;
+    }
+
+    /// <summary>
+    /// The line settings the port works with now (read from the driver), for a port that was opened without explicit
+    /// settings: changing one value then keeps the rest instead of replacing it with defaults.
+    /// </summary>
+    public DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings ReadCurrentSettings()
+    {
+        Dcb dcb = new Dcb
+        {
+            DcbLength = (uint)Marshal.SizeOf(typeof(Dcb))
+        };
+        if (!GetCommState(_handle, ref dcb))
+        {
+            int error = Marshal.GetLastWin32Error();
+            throw new Win32Exception(error, "Cannot query the settings of " + _portName + ": " + new Win32Exception(error).Message);
+        }
+        bool hardware = dcb.OutxCtsFlow || dcb.RtsControlMode == RtsControl.Handshake;
+        bool software = dcb.InX || dcb.OutX;
+        Handshake flow = hardware ? (software ? Handshake.RequestToSendXOnXOff : Handshake.RequestToSend) : (software ? Handshake.XOnXOff : Handshake.None);
+        StopBits stopBits = dcb.StopBits == DcbStopBits.Two ? StopBits.Two : (dcb.StopBits == DcbStopBits.OnePointFive ? StopBits.OnePointFive : StopBits.One);
+        return new DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings
+        {
+            BaudRate = dcb.BaudRate > 0 ? (int)dcb.BaudRate : 115200,
+            DataBits = dcb.ByteSize > 0 ? dcb.ByteSize : 8,
+            Parity = (Parity)(int)dcb.Parity,
+            StopBits = stopBits,
+            FlowControl = flow,
+            DtrOnOpen = _dtr,
+            RtsOnOpen = _rts
+        };
     }
 
     /// <summary>

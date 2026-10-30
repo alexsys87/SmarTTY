@@ -438,6 +438,17 @@ internal static class Program
             Check(WaitFor(() => { lock (s.WriteFailures) return s.WriteFailures.Count > 0; }), "the user is told that data was lost");
         });
 
+        Run("Dispose releases the transport and says so", () =>
+        {
+            using Server server = new Server(IPAddress.Loopback);
+            using Session s = new Session(Endpoint("127.0.0.1", server.Port));
+            s.Connection.Start();
+            Check(s.Connected.Wait(5000), "connected");
+            s.Connection.Dispose();
+            Check(s.Connection.ClosedEvent.Wait(5000), "ClosedEvent is set");
+            Check(s.Connection.HasEnded, "the connection counts as ended");
+        });
+
         Run("short numbers are not taken for IP addresses", () =>
         {
             Check(TcpConnector.ParseLiteral("192.168.0.5", out IPAddress four) && four.ToString() == "192.168.0.5", "a full IPv4 address is a literal");

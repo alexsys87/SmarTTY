@@ -332,8 +332,9 @@ public partial class DeviceTerminalControl
     /// Puts new serial settings into effect. An open port is reconfigured in place, so the device does not see the port
     /// close and open (which restarts boards that reset on DTR); otherwise the connection is simply opened with them.
     /// Settings the driver rejects are reported and not kept. Returns whether the settings were taken.
+    /// A connection the user closed by hand is not opened again unless <paramref name="openWhenManuallyClosed"/>.
     /// </summary>
-    private bool TryApplySerialSettings(DeviceTerminalSettings.ConnectionSettings.Serial serial, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings candidate)
+    private bool TryApplySerialSettings(DeviceTerminalSettings.ConnectionSettings.Serial serial, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings candidate, bool openWhenManuallyClosed = true)
     {
         SerialPortStream stream = OpenSerialStream();
         if (stream != null && candidate != null)
@@ -355,7 +356,16 @@ public partial class DeviceTerminalControl
             return true;
         }
         serial.AdvancedSettings = candidate;
-        Connect(resetTerminal: false, 1000);
+        if (openWhenManuallyClosed || !_manualDisconnect)
+        {
+            Connect(resetTerminal: false, 1000);
+        }
+        else
+        {
+            // Disconnected by hand: the new speed is kept for the next connection, which the user opens.
+            _transportDisplayName = new SerialTransport(serial).GetDisplayName(includeParameters: true);
+            RaiseStatusChanged();
+        }
         return true;
     }
 }
