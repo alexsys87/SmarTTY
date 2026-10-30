@@ -1042,6 +1042,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // would go to the new session.
         _cancelLineTransfer?.Invoke();
         bool replacesConnection = _asyncTransportConnection != null;
+        System.Threading.ManualResetEventSlim previousClosed = _asyncTransportConnection?.ClosedEvent;
         if (replacesConnection)
         {
             _asyncTransportConnection.Dispose();
@@ -1074,7 +1075,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
             telnetTransport.Charset = _textEncoding?.WebName;
             AttachTelnet(telnetTransport, telnetSettings);
         }
-        _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, connectTimeoutMs);
+        _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, connectTimeoutMs)
+        {
+            WaitForPrevious = previousClosed
+        };
         _asyncTransportConnection.DataReceived += OnDataReceived;
         _asyncTransportConnection.StateChanged += OnConnectionStateChanged;
         _asyncTransportConnection.WriterIdleChanged += OnWriterIdleChanged;
@@ -2384,10 +2388,24 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             return;
         }
-        DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings candidate =
-            serial.AdvancedSettings?.Clone() ?? new DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings();
+        DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings candidate = serial.AdvancedSettings?.Clone();
+        if (candidate == null)
+        {
+            // "Use default settings": the driver's format and flow control are in force, so they are kept; only an
+            // unopened port has nothing to keep and starts from the defaults.
+            try
+            {
+                candidate = OpenSerialStream()?.ReadCurrentSettings();
+            }
+            catch (Exception exception)
+            {
+                ShowPortProblem("Baud rate: " + exception.Message);
+                return;
+            }
+            candidate = candidate ?? new DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings();
+        }
         candidate.BaudRate = baudRate;
-        if (!TryApplySerialSettings(serial, candidate) && currentBaudRate > 0)
+        if (!TryApplySerialSettings(serial, candidate, openWhenManuallyClosed: false) && currentBaudRate > 0)
         {
             cbBaudRate.Text = currentBaudRate.ToString();
         }

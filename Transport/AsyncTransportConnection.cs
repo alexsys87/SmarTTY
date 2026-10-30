@@ -139,6 +139,7 @@ internal class AsyncTransportConnection : IDisposable
                     StateChanged(this, ConnectionStateEnum.Connecting, _transport.ConnectingMessage);
                 }
             });
+            WaitForPrevious?.Wait(PreviousCloseWaitMs);
             System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
             while (true)
             {
@@ -428,6 +429,12 @@ internal class AsyncTransportConnection : IDisposable
                 Stream stream = _transport.GetStream();
                 if (stream == null)
                 {
+                    if (_stopRequested || _finished)
+                    {
+                        // Closed meanwhile, on purpose or by the end of the connection (which reports what it lost itself).
+                        NotifyCompleted(pendingWrite, false);
+                        continue;
+                    }
                     throw new IOException("The connection is closed.");
                 }
                 Volatile.Write(ref _writeStartedMs, WriteClock.ElapsedMilliseconds + 1);
@@ -571,6 +578,25 @@ internal class AsyncTransportConnection : IDisposable
             Monitor.PulseAll(_receiveLock);
         }
         FailQueuedWrites();
+        _disposed = true;
+        if (_transport is SerialTransport)
+        {
+            // Closing a serial port waits for the driver to cancel its operations (seconds, for a vanished adapter): not on
+            // the UI thread. The next connection to the port waits for <see cref="ClosedEvent"/> before it opens it.
+            new Thread(CloseTransport)
+            {
+                IsBackground = true,
+                Name = "Device transport closer"
+            }.Start();
+        }
+        else
+        {
+            CloseTransport();
+        }
+    }
+
+    private void CloseTransport()
+    {
         try
         {
             _transport.Close();
@@ -579,8 +605,22 @@ internal class AsyncTransportConnection : IDisposable
         catch
         {
         }
-        _disposed = true;
+        finally
+        {
+            _closedEvent.Set();
+        }
     }
+
+    private readonly ManualResetEventSlim _closedEvent = new ManualResetEventSlim();
+
+    /// <summary>Set once <see cref="Dispose"/> has released the transport (the serial port can be opened again).</summary>
+    internal ManualResetEventSlim ClosedEvent => _closedEvent;
+
+    /// <summary>The connection this one replaces: its port is released before this one opens it. Set before <see cref="Start"/>.</summary>
+    internal ManualResetEventSlim WaitForPrevious { get; set; }
+
+    // The longest a connection waits for the previous one to release the port (two cancellations of 2 s each, and a margin).
+    private const int PreviousCloseWaitMs = 5000;
 
     /// <summary>
     /// Queues data for the device. False when the connection has already ended (or was closed): the data is dropped

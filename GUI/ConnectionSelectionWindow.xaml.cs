@@ -810,6 +810,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             do
             {
                 List<IConnectionSettingsWrapper> list = new List<IConnectionSettingsWrapper>();
+                SetupApiDeviceSet.ComPortInfo[] previous = second;
+                bool settingsChanged = false;
+                bool scanned = false;
                 try
                 {
                     SetupApiDeviceSet.ComPortInfo[] items;
@@ -820,7 +823,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     }
                     // The list is also rebuilt when the saved COM profiles changed, or an item would keep a deleted or
                     // outdated profile until a port is plugged in or out.
-                    bool settingsChanged = Interlocked.Exchange(ref _KnownSerialPortSettingsChanged, 0) != 0;
+                    settingsChanged = Interlocked.Exchange(ref _KnownSerialPortSettingsChanged, 0) != 0;
                     if (items.SequenceEqual(second) && !settingsChanged)
                     {
                         continue;
@@ -857,9 +860,21 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                         }
                         list.Add(new SettingsWrappers.SerialPort(_Connections, port, value, serialNumber));
                     }
+                    scanned = true;
                 }
                 catch
                 {
+                }
+                if (!scanned)
+                {
+                    // A port that could not be read must not leave a shortened list behind that the next cycle takes for
+                    // up to date: forget this scan, so the next one starts over (the list shown stays as it was).
+                    second = previous;
+                    if (settingsChanged)
+                    {
+                        Interlocked.Exchange(ref _KnownSerialPortSettingsChanged, 1);
+                    }
+                    continue;
                 }
                 _DynamicItems = list;
                 _Dispatcher.BeginInvoke((Delegate)(Action)(() =>
