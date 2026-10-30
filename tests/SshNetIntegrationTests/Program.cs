@@ -31,6 +31,7 @@ internal static class Program
         X11ForwardingTests.Run();
         WindowsHostTests.Run();
         SmarTTYKeyTests.Run();
+        Socks5ProxyTests.Run();
 
         if (TestEnvironment.IntegrationEnabled())
         {
@@ -40,6 +41,7 @@ internal static class Program
             SshIntegrationTests.Run(environment);
             SmarTTYKeyTests.RunLive(environment);
             SmarTTYKeyTests.RunLivePutty(environment);
+            Socks5ProxyTests.RunLive(environment);
             FileTransferManagerTests.Run(environment);
             SftpFileSystemTests.Run(environment);
             WindowsAuthorizedKeysTests.Run(environment);

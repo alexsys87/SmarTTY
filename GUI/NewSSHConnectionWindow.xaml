@@ -206,15 +206,23 @@
             <Thickness x:Key="CheckBoxMargin">0 5 0 5</Thickness>
           </ResourceDictionary>
         </FrameworkElement.Resources>
-        <CheckBox Name="cbProxy" Content="Use HTTP CONNECT proxy:" Margin="{StaticResource CheckBoxMargin}" IsChecked="{Binding UseConnectProxy}" />
+        <CheckBox Name="cbProxy" Content="Use proxy:" Margin="{StaticResource CheckBoxMargin}" IsChecked="{Binding UseProxy}" />
         <Grid Grid.Column="1" VerticalAlignment="Center" IsEnabled="{Binding Path=IsChecked, ElementName=cbProxy}">
           <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
-          <PasswordBox Name="pwdProxy" VerticalAlignment="Center" Loaded="ProxyPasswordBox_Loaded" PasswordChanged="ProxyPasswordBox_PasswordChanged" />
-          <TextBox VerticalAlignment="Center" Visibility="Collapsed" TextChanged="RevealText_TextChanged" />
-          <ToggleButton Grid.Column="1" Margin="4 0 0 0" VerticalAlignment="Center" ToolTip="Show or hide the proxy address and credentials (user:password@host:port)" Content="eye" ContentTemplate="{StaticResource RevealIconTemplate}" Checked="RevealButton_Checked" Unchecked="RevealButton_Unchecked" />
+          <ComboBox Grid.Column="0" Margin="0 0 4 0" VerticalAlignment="Center" ItemsSource="{Binding ProxyType, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ProxyType}" ToolTip="HTTP CONNECT: an HTTP proxy (port 3128, 8080...). SOCKS5: a SOCKS5 proxy, such as the local inbound of xray, v2ray or sing-box (often 127.0.0.1:10808 or :1080); the server name is resolved by the proxy.">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Converter={StaticResource EnumValueConverter}}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ComboBox>
+          <PasswordBox Grid.Column="1" Name="pwdProxy" VerticalAlignment="Center" Loaded="ProxyPasswordBox_Loaded" PasswordChanged="ProxyPasswordBox_PasswordChanged" ToolTip="[user:password@]host:port, for example 127.0.0.1:10808. A URL such as socks5://127.0.0.1:10808 also selects the proxy type." />
+          <TextBox Grid.Column="1" VerticalAlignment="Center" Visibility="Collapsed" TextChanged="RevealText_TextChanged" />
+          <ToggleButton Grid.Column="2" Margin="4 0 0 0" VerticalAlignment="Center" ToolTip="Show or hide the proxy address and credentials (user:password@host:port)" Content="eye" ContentTemplate="{StaticResource RevealIconTemplate}" Checked="RevealButton_Checked" Unchecked="RevealButton_Unchecked" />
         </Grid>
         <CheckBox Content="Enable zlib compression (recommended for slow connections)" Grid.ColumnSpan="2" Grid.Row="1" Margin="{StaticResource CheckBoxMargin}" IsChecked="{Binding UseZlib}" />
         <ContentControl Margin="{StaticResource CheckBoxMargin}" Grid.Row="2">

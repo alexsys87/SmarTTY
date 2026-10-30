@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using SmarTTY.Ssh;
 using SmarTTY.Transport;
 using VisualTTY;
 
@@ -195,6 +196,25 @@ internal static class Program
             bool parsed = SSHConnectionSettings.TryParseProxy(text, out string parsedCredentials, out string parsedHost, out int parsedPort);
             Check(parsed && parsedCredentials == credentials && parsedHost == host && parsedPort == port, "format: '" + text + "' reads back unchanged");
         }
+
+        // A proxy URL as VPN clients (xray, v2ray, sing-box) show it: the scheme selects the proxy type.
+        CheckProxyScheme("socks5://127.0.0.1:10808", SshProxyType.Socks5, null, "127.0.0.1", 10808);
+        CheckProxyScheme("SOCKS5H://user:secret@localhost:1080/", SshProxyType.Socks5, "user:secret", "localhost", 1080);
+        CheckProxyScheme("socks://[::1]:1080", SshProxyType.Socks5, null, "::1", 1080);
+        CheckProxyScheme("http://proxy:3128", SshProxyType.Http, null, "proxy", 3128);
+        CheckProxyScheme("127.0.0.1:10808", null, null, "127.0.0.1", 10808);
+        Check(!SSHConnectionSettings.TryParseProxy("socks4://127.0.0.1:1080", out SshProxyType? unsupported, out _, out _, out _) && unsupported == null, "proxy: an unsupported scheme is rejected");
+        Check(!SSHConnectionSettings.TryParseProxy("socks5://127.0.0.1", out SshProxyType? noPort, out _, out _, out _) && noPort == null, "proxy: a URL without a port is rejected");
+        Check(SSHConnectionSettings.TryParseProxy("socks5://127.0.0.1:10808", out string plainCredentials, out string plainHost, out int plainPort) && plainHost == "127.0.0.1" && plainPort == 10808 && plainCredentials == null,
+            "proxy: the overload without the type also reads a URL");
+        Check(new SSHConnectionSettings().ProxyType == SshProxyType.Http, "proxy: profiles of earlier versions (no ProxyType) use HTTP CONNECT");
+    }
+
+    private static void CheckProxyScheme(string text, SshProxyType? expectedType, string expectedCredentials, string expectedHost, int expectedPort)
+    {
+        bool parsed = SSHConnectionSettings.TryParseProxy(text, out SshProxyType? proxyType, out string credentials, out string host, out int port);
+        Check(parsed && proxyType == expectedType && credentials == expectedCredentials && host == expectedHost && port == expectedPort,
+            "proxy: '" + text + "' gives " + (expectedType?.ToString() ?? "no type") + " " + expectedHost + ":" + expectedPort);
     }
 
     private static void CheckIpv6Hosts()

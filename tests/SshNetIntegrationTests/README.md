@@ -91,3 +91,7 @@ store instead of the DPAPI file of the application: generation, Reset, export an
 the OpenSSH, PEM and PKCS#8 formats, and a PuTTY `.ppk` when `puttygen` is installed), and, against the live server,
 installing each key type in `authorized_keys` and logging in with it. A PuTTY key with a passphrase is also used to log
 in through the key file path when `puttygen` is installed.
+
+`Socks5ProxyTests` connect to the live server through a small SOCKS5 server inside the test (with and without a user
+name and password), as SmarTTY does through the SOCKS5 inbound of xray or v2ray: the server name must reach the proxy as
+a name, and a refused or missing proxy login must be recognized so that SmarTTY asks for the proxy credentials.

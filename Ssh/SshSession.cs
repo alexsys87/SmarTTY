@@ -403,12 +403,40 @@ public class SshSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// Whether the proxy refused the connection for missing or wrong credentials (HTTP "407 Proxy Authentication
+    /// Required", or a SOCKS5 proxy that rejected the user name and password or wants them), so asking for them can help.
+    /// </summary>
+    public static bool IsProxyAuthenticationFailure(Exception exception)
+    {
+        if (!(exception is ProxyException))
+        {
+            return false;
+        }
+        string message = exception.Message ?? "";
+        return message.Contains("407") ||
+               message.IndexOf("authentication failed", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               message.IndexOf("No acceptable authentication methods", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
     private ConnectionInfo CreateConnectionInfo(SshConnectionParameters parameters)
     {
         AuthenticationMethod[] methods = _authGate.CreateMethods(parameters.UserName);
-        ConnectionInfo connectionInfo = string.IsNullOrEmpty(parameters.ProxyHost)
-            ? new ConnectionInfo(parameters.Host, parameters.Port, parameters.UserName, methods)
-            : new ConnectionInfo(parameters.Host, parameters.Port, parameters.UserName, ProxyTypes.Http, parameters.ProxyHost, parameters.ProxyPort, parameters.ProxyUserName, parameters.ProxyPassword, methods);
+        ConnectionInfo connectionInfo;
+        if (string.IsNullOrEmpty(parameters.ProxyHost))
+        {
+            connectionInfo = new ConnectionInfo(parameters.Host, parameters.Port, parameters.UserName, methods);
+        }
+        else if (parameters.ProxyType == SshProxyType.Socks5)
+        {
+            // SSH.NET fails with a NullReferenceException when a SOCKS5 proxy asks for a login and there is no user name;
+            // with empty ones the proxy refuses the login, which is reported as such and makes SmarTTY ask for it.
+            connectionInfo = new ConnectionInfo(parameters.Host, parameters.Port, parameters.UserName, ProxyTypes.Socks5, parameters.ProxyHost, parameters.ProxyPort, parameters.ProxyUserName ?? "", parameters.ProxyPassword ?? "", methods);
+        }
+        else
+        {
+            connectionInfo = new ConnectionInfo(parameters.Host, parameters.Port, parameters.UserName, ProxyTypes.Http, parameters.ProxyHost, parameters.ProxyPort, parameters.ProxyUserName, parameters.ProxyPassword, methods);
+        }
         connectionInfo.Timeout = parameters.ConnectTimeout;
         // Let the server limit concurrent channels (as with libssh2) instead of blocking in SSH.NET.
         connectionInfo.MaxSessions = 100;
