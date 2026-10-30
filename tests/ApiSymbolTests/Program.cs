@@ -81,11 +81,39 @@ internal static class Program
         Check(database.Find(L.CLike, "print") == null, "python's 'print' is not offered for C-like");
         Equal(database.Find(L.Python, "print").Summary, "Write objects to the text stream", "the summary is read");
 
+        // The Python set covers the builtins, the exceptions, the base classes and the common modules.
+        List<ApiSymbolDatabase.Symbol> python = database.ForLanguage(L.Python).ToList();
+        Check(python.Count > 550, "the Python set is broad (" + python.Count + " symbols)");
+        Equal(python.Count, python.Select(s => s.Name).Distinct().Count(), "Python names are unique");
+        Equal(python.Count, python.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every Python symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "object", "BaseException", "Exception", "ExceptionGroup", "Warning", "UnicodeDecodeError",
+                     "math.sqrt", "math.pi", "os.getcwd", "os.path.join", "sys.argv", "sys.version_info",
+                     "re.compile", "re.IGNORECASE", "json.loads", "json.JSONDecodeError",
+                     "pathlib.Path", "pathlib.Path.read_text", "datetime.datetime", "datetime.timedelta",
+                     "collections.Counter", "collections.abc.Mapping", "itertools.product", "functools.lru_cache"
+                 })
+        {
+            Check(database.Find(L.Python, name) != null, "the Python set includes '" + name + "'");
+        }
+        Check(database.Find(L.Python, "BaseException").Description.Contains("Python exception"),
+            "the description of 'BaseException' names a Python exception");
+        Check(database.Find(L.Python, "object").Description.Contains("Python base class"),
+            "the description of 'object' names a Python base class");
+        Check(database.Find(L.Python, "math.sqrt").Description.Contains("Python math module"),
+            "the description of 'math.sqrt' names the math module");
+
         // A "module.name" call is resolved to its last segment.
-        ParameterSignature sqrt = database.FindSignature(L.Lua, "math.sqrt");
-        Check(sqrt != null, "a 'math.sqrt' call resolves to the 'sqrt' symbol");
-        Equal(sqrt.ToString(), "math.sqrt(x)", "the resolved signature keeps the qualified name");
-        Check(database.FindSignature(L.Python, "sqrt") == null, "python has no bare 'sqrt' (it is math.sqrt)");
+        ParameterSignature pythonSqrt = database.FindSignature(L.Python, "math.sqrt");
+        Check(pythonSqrt != null, "a 'math.sqrt' call resolves to the Python symbol");
+        Equal(pythonSqrt.ToString(), "math.sqrt(x)", "the resolved Python signature keeps the qualified name");
+        Check(database.FindSignature(L.Python, "sqrt") != null,
+            "a bare 'sqrt' call also finds the Python math function");
+        ParameterSignature luaSqrt = database.FindSignature(L.Lua, "math.sqrt");
+        Check(luaSqrt != null, "a 'math.sqrt' call resolves to the 'sqrt' symbol");
+        Equal(luaSqrt.ToString(), "math.sqrt(x)", "the resolved signature keeps the qualified name");
         Check(database.FindSignature(L.Lua, "math.sqrt") != null, "lua has 'math.sqrt'");
 
         // A name that is not in the set resolves to nothing.
@@ -174,6 +202,17 @@ internal static class Program
         List<ISuggestion> lua = Build(L.Lua, "", "sqr", database);
         Check(lua.Any(s => s.DisplayName == "sqrt"), "the 'math.sqrt' entry is offered as 'sqrt'");
 
+        // The Python modules are offered under their plain names too.
+        List<ISuggestion> pythonMath = Build(L.Python, "", "sqr", database);
+        ISuggestion pythonSqrt = pythonMath.FirstOrDefault(s => s.DisplayName == "sqrt");
+        Check(pythonSqrt != null, "the completion list offers 'sqrt' from 'math.sqrt'");
+        Equal(pythonSqrt.DetailText, "Square root", "the Python module summary is the detail text");
+        Check(pythonSqrt.HintText.StartsWith("math.sqrt("), "the qualified Python signature is the hint text");
+        Check(Build(L.Python, "", "loads", database).Any(s => s.DisplayName == "loads"),
+            "the completion list offers 'json.loads' as 'loads'");
+        Check(Build(L.Python, "", "read_te", database).Any(s => s.DisplayName == "read_text"),
+            "the completion list offers 'Path.read_text' as 'read_text'");
+
         // The Bash builtins and variables feed the completion list.
         List<ISuggestion> bash = Build(L.Bash, "", "sho", database);
         ISuggestion shopt = bash.FirstOrDefault(s => s.DisplayName == "shopt");
@@ -211,6 +250,12 @@ internal static class Program
         ParameterSignature lua = EditorSignatureSource.FindSignature(
             L.Lua, "sqrt(\n", 0, 5, database, out int luaActive);
         Check(lua != null, "a bare 'sqrt(' call finds the 'math.sqrt' symbol");
+        Check(lua.Name == "math.sqrt", "the Lua hint keeps the qualified name");
+
+        ParameterSignature python = EditorSignatureSource.FindSignature(
+            L.Python, "sqrt(\n", 0, 5, database, out int pythonActive);
+        Check(python != null, "a bare 'sqrt(' call finds the Python 'math.sqrt' symbol");
+        Check(python.Name == "math.sqrt", "the Python hint keeps the qualified name");
 
         // Without a database the unknown call shows nothing.
         Check(EditorSignatureSource.FindSignature(L.Python, "print(\n", 0, 6, null, out _) == null,

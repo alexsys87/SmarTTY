@@ -1,176 +1,2517 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ApiSymbols>
   <Symbols>
-    <Symbol language="Python" name="print" signature="print(value, sep=&#x27; &#x27;, end=&#x27;\n&#x27;, file=sys.stdout, flush=False)">
+    <Symbol language="Python" name="print" signature="print(value, sep=' ', end='\n', file=sys.stdout, flush=False)">
       <Summary>Write objects to the text stream</Summary>
+      <Description>Write objects to the text stream. Python builtin. Writes the objects to a text stream, separated by sep and followed by end.</Description>
     </Symbol>
     <Symbol language="Python" name="len" signature="len(obj)">
       <Summary>Number of items in an object</Summary>
+      <Description>Number of items in an object. Python builtin. Returns the number of items in a sequence or collection.</Description>
     </Symbol>
     <Symbol language="Python" name="range" signature="range(start, stop, step)">
       <Summary>Arithmetic progression of integers</Summary>
+      <Description>Arithmetic progression of integers. Python builtin. Returns an immutable sequence of integers from start to stop.</Description>
     </Symbol>
-    <Symbol language="Python" name="open" signature="open(file, mode=&#x27;r&#x27;, encoding=None, errors=None, newline=None)">
+    <Symbol language="Python" name="open" signature="open(file, mode='r', encoding=None, errors=None, newline=None)">
       <Summary>Open a file and return a file object</Summary>
+      <Description>Open a file and return a file object. Python builtin. Opens a file and returns a text or binary file object.</Description>
     </Symbol>
-    <Symbol language="Python" name="input" signature="input(prompt=&#x27;&#x27;)">
+    <Symbol language="Python" name="input" signature="input(prompt='')">
       <Summary>Read a line from the standard input</Summary>
+      <Description>Read a line from the standard input. Python builtin. Reads a line from standard input, optionally after writing a prompt.</Description>
     </Symbol>
-    <Symbol language="Python" name="str" signature="str(object=&#x27;&#x27;)">
+    <Symbol language="Python" name="str" signature="str(object='')">
       <Summary>Text representation of an object</Summary>
+      <Description>Text representation of an object. Python builtin. Creates a text string from an object.</Description>
     </Symbol>
     <Symbol language="Python" name="int" signature="int(x, base=10)">
       <Summary>Integer number</Summary>
+      <Description>Integer number. Python builtin. Creates an integer from a number or from a string in the given base.</Description>
     </Symbol>
     <Symbol language="Python" name="float" signature="float(x)">
       <Summary>Floating point number</Summary>
+      <Description>Floating point number. Python builtin. Creates a floating-point number from a number or a string.</Description>
     </Symbol>
     <Symbol language="Python" name="complex" signature="complex(real, imag)">
       <Summary>Complex number</Summary>
+      <Description>Complex number. Python builtin. Creates a complex number from real and imaginary parts.</Description>
     </Symbol>
     <Symbol language="Python" name="bool" signature="bool(x=False)">
       <Summary>Boolean value</Summary>
+      <Description>Boolean value. Python builtin. Returns True or False for the truth value of x.</Description>
     </Symbol>
     <Symbol language="Python" name="list" signature="list(iterable=())">
       <Summary>New list</Summary>
+      <Description>New list. Python builtin. Creates a list from an iterable.</Description>
     </Symbol>
     <Symbol language="Python" name="tuple" signature="tuple(iterable=())">
       <Summary>New tuple</Summary>
+      <Description>New tuple. Python builtin. Creates a tuple from an iterable.</Description>
     </Symbol>
     <Symbol language="Python" name="dict" signature="dict(**kwargs)">
       <Summary>New dictionary</Summary>
+      <Description>New dictionary. Python builtin. Creates a dictionary from keyword arguments or an iterable of pairs.</Description>
     </Symbol>
     <Symbol language="Python" name="set" signature="set(iterable=())">
       <Summary>New set</Summary>
+      <Description>New set. Python builtin. Creates a set from an iterable.</Description>
     </Symbol>
     <Symbol language="Python" name="frozenset" signature="frozenset(iterable=())">
       <Summary>New immutable set</Summary>
+      <Description>New immutable set. Python builtin. Creates an immutable set from an iterable.</Description>
     </Symbol>
     <Symbol language="Python" name="bytes" signature="bytes(source, encoding, errors)">
       <Summary>Immutable sequence of bytes</Summary>
+      <Description>Immutable sequence of bytes. Python builtin. Creates an immutable sequence of bytes from a source.</Description>
     </Symbol>
     <Symbol language="Python" name="bytearray" signature="bytearray(source, encoding, errors)">
       <Summary>Mutable sequence of bytes</Summary>
+      <Description>Mutable sequence of bytes. Python builtin. Creates a mutable sequence of bytes from a source.</Description>
     </Symbol>
     <Symbol language="Python" name="enumerate" signature="enumerate(iterable, start=0)">
       <Summary>Index and value pairs</Summary>
+      <Description>Index and value pairs. Python builtin. Returns index and value pairs for an iterable.</Description>
     </Symbol>
     <Symbol language="Python" name="zip" signature="zip(*iterables)">
       <Summary>Pair the items of the iterables</Summary>
+      <Description>Pair the items of the iterables. Python builtin. Iterates over several iterables in parallel.</Description>
     </Symbol>
     <Symbol language="Python" name="map" signature="map(function, *iterables)">
       <Summary>Apply a function to every item</Summary>
+      <Description>Apply a function to every item. Python builtin. Applies a function to every item of the iterables.</Description>
     </Symbol>
     <Symbol language="Python" name="filter" signature="filter(function, iterable)">
       <Summary>Keep the items the function accepts</Summary>
+      <Description>Keep the items the function accepts. Python builtin. Returns the items for which the function is true.</Description>
     </Symbol>
     <Symbol language="Python" name="reversed" signature="reversed(sequence)">
       <Summary>Iterate in reverse order</Summary>
+      <Description>Iterate in reverse order. Python builtin. Returns an iterator over a sequence in reverse order.</Description>
     </Symbol>
     <Symbol language="Python" name="sorted" signature="sorted(iterable, key=None, reverse=False)">
       <Summary>New sorted list</Summary>
+      <Description>New sorted list. Python builtin. Returns a new sorted list of the items.</Description>
     </Symbol>
     <Symbol language="Python" name="sum" signature="sum(iterable, start=0)">
       <Summary>Sum of the items</Summary>
+      <Description>Sum of the items. Python builtin. Returns the sum of the items plus start.</Description>
     </Symbol>
     <Symbol language="Python" name="min" signature="min(iterable, key=None, default=None)">
       <Summary>Smallest item</Summary>
+      <Description>Smallest item. Python builtin. Returns the smallest item or the smallest key result.</Description>
     </Symbol>
     <Symbol language="Python" name="max" signature="max(iterable, key=None, default=None)">
       <Summary>Largest item</Summary>
+      <Description>Largest item. Python builtin. Returns the largest item or the largest key result.</Description>
     </Symbol>
     <Symbol language="Python" name="abs" signature="abs(x)">
       <Summary>Absolute value</Summary>
+      <Description>Absolute value. Python builtin. Returns the absolute value of a number.</Description>
     </Symbol>
     <Symbol language="Python" name="round" signature="round(number, ndigits=None)">
       <Summary>Round to the nearest value</Summary>
+      <Description>Round to the nearest value. Python builtin. Rounds a number to ndigits decimal places.</Description>
     </Symbol>
     <Symbol language="Python" name="pow" signature="pow(base, exp, mod=None)">
       <Summary>Raise to a power</Summary>
+      <Description>Raise to a power. Python builtin. Returns base raised to exp, optionally modulo mod.</Description>
     </Symbol>
     <Symbol language="Python" name="divmod" signature="divmod(a, b)">
       <Summary>Quotient and remainder</Summary>
+      <Description>Quotient and remainder. Python builtin. Returns the quotient and remainder of a division.</Description>
     </Symbol>
     <Symbol language="Python" name="repr" signature="repr(obj)">
       <Summary>String representation for debugging</Summary>
+      <Description>String representation for debugging. Python builtin. Returns a string representation intended for debugging.</Description>
     </Symbol>
     <Symbol language="Python" name="type" signature="type(object)">
       <Summary>Type of an object</Summary>
+      <Description>Type of an object. Python builtin. Returns the type of an object or creates a new class.</Description>
     </Symbol>
     <Symbol language="Python" name="isinstance" signature="isinstance(object, classinfo)">
       <Summary>Type test</Summary>
+      <Description>Type test. Python builtin. Tests whether an object is an instance of a class or tuple of classes.</Description>
     </Symbol>
     <Symbol language="Python" name="issubclass" signature="issubclass(cls, classinfo)">
       <Summary>Subclass test</Summary>
+      <Description>Subclass test. Python builtin. Tests whether a class is a subclass of another class or tuple.</Description>
     </Symbol>
     <Symbol language="Python" name="hasattr" signature="hasattr(object, name)">
       <Summary>Attribute test</Summary>
+      <Description>Attribute test. Python builtin. Tests whether an object has an attribute.</Description>
     </Symbol>
     <Symbol language="Python" name="getattr" signature="getattr(object, name, default)">
       <Summary>Read an attribute</Summary>
+      <Description>Read an attribute. Python builtin. Returns an attribute value, or default when it is missing.</Description>
     </Symbol>
     <Symbol language="Python" name="setattr" signature="setattr(object, name, value)">
       <Summary>Set an attribute</Summary>
+      <Description>Set an attribute. Python builtin. Sets an attribute on an object.</Description>
     </Symbol>
     <Symbol language="Python" name="delattr" signature="delattr(object, name)">
       <Summary>Delete an attribute</Summary>
+      <Description>Delete an attribute. Python builtin. Deletes an attribute from an object.</Description>
     </Symbol>
     <Symbol language="Python" name="callable" signature="callable(object)">
       <Summary>Callable test</Summary>
+      <Description>Callable test. Python builtin. Tests whether an object can be called.</Description>
     </Symbol>
     <Symbol language="Python" name="iter" signature="iter(object)">
       <Summary>Iterator of an object</Summary>
+      <Description>Iterator of an object. Python builtin. Returns an iterator for an object.</Description>
     </Symbol>
     <Symbol language="Python" name="next" signature="next(iterator, default)">
       <Summary>Next item of an iterator</Summary>
+      <Description>Next item of an iterator. Python builtin. Returns the next item from an iterator.</Description>
     </Symbol>
     <Symbol language="Python" name="format" signature="format(value, format_spec)">
       <Summary>Format a value as text</Summary>
+      <Description>Format a value as text. Python builtin. Formats a value according to a format specification.</Description>
     </Symbol>
     <Symbol language="Python" name="chr" signature="chr(i)">
       <Summary>Character of a code point</Summary>
+      <Description>Character of a code point. Python builtin. Returns the character for a Unicode code point.</Description>
     </Symbol>
     <Symbol language="Python" name="ord" signature="ord(c)">
       <Summary>Code point of a character</Summary>
+      <Description>Code point of a character. Python builtin. Returns the Unicode code point of a character.</Description>
     </Symbol>
     <Symbol language="Python" name="hex" signature="hex(number)">
       <Summary>Hexadecimal text of an integer</Summary>
+      <Description>Hexadecimal text of an integer. Python builtin. Returns the hexadecimal representation of an integer.</Description>
     </Symbol>
     <Symbol language="Python" name="oct" signature="oct(number)">
       <Summary>Octal text of an integer</Summary>
+      <Description>Octal text of an integer. Python builtin. Returns the octal representation of an integer.</Description>
     </Symbol>
     <Symbol language="Python" name="bin" signature="bin(number)">
       <Summary>Binary text of an integer</Summary>
+      <Description>Binary text of an integer. Python builtin. Returns the binary representation of an integer.</Description>
     </Symbol>
     <Symbol language="Python" name="id" signature="id(object)">
       <Summary>Identity of an object</Summary>
+      <Description>Identity of an object. Python builtin. Returns the identity of an object.</Description>
     </Symbol>
     <Symbol language="Python" name="hash" signature="hash(object)">
       <Summary>Hash value</Summary>
+      <Description>Hash value. Python builtin. Returns the hash value of an object.</Description>
     </Symbol>
     <Symbol language="Python" name="dir" signature="dir(object)">
       <Summary>Names of the attributes of an object</Summary>
+      <Description>Names of the attributes of an object. Python builtin. Returns the names of an object's attributes.</Description>
     </Symbol>
     <Symbol language="Python" name="vars" signature="vars(object)">
       <Summary>__dict__ of an object</Summary>
+      <Description>__dict__ of an object. Python builtin. Returns the __dict__ of an object.</Description>
     </Symbol>
     <Symbol language="Python" name="globals" signature="globals()">
       <Summary>Dictionary of the global namespace</Summary>
+      <Description>Dictionary of the global namespace. Python builtin. Returns the dictionary of the global namespace.</Description>
     </Symbol>
     <Symbol language="Python" name="locals" signature="locals()">
       <Summary>Dictionary of the local namespace</Summary>
+      <Description>Dictionary of the local namespace. Python builtin. Returns the dictionary of the local namespace.</Description>
     </Symbol>
     <Symbol language="Python" name="super" signature="super()">
       <Summary>Proxy to the base class</Summary>
+      <Description>Proxy to the base class. Python builtin. Returns a proxy that delegates to the base class.</Description>
     </Symbol>
     <Symbol language="Python" name="exit" signature="exit(code=0)">
       <Summary>Exit the interpreter</Summary>
+      <Description>Exit the interpreter. Python builtin. Raises SystemExit to exit the interpreter.</Description>
     </Symbol>
     <Symbol language="Python" name="any" signature="any(iterable)">
       <Summary>True when any item is true</Summary>
+      <Description>True when any item is true. Python builtin. Returns True when any item is true.</Description>
     </Symbol>
     <Symbol language="Python" name="all" signature="all(iterable)">
       <Summary>True when every item is true</Summary>
+      <Description>True when every item is true. Python builtin. Returns True when every item is true.</Description>
+    </Symbol>
+    <Symbol language="Python" name="object" signature="object()">
+      <Summary>Base class of all objects</Summary>
+      <Description>Base class of all objects. Python base class. Every class inherits from object, which supplies identity, equality and attribute access.</Description>
+    </Symbol>
+    <Symbol language="Python" name="property" signature="property(fget=None, fset=None, fdel=None, doc=None)">
+      <Summary>Property descriptor</Summary>
+      <Description>Property descriptor. Python base class. Turns getter, setter and deleter functions into a managed attribute.</Description>
+    </Symbol>
+    <Symbol language="Python" name="classmethod" signature="classmethod(function)">
+      <Summary>Class method descriptor</Summary>
+      <Description>Class method descriptor. Python base class. Wraps a function so that it receives the class instead of an instance.</Description>
+    </Symbol>
+    <Symbol language="Python" name="staticmethod" signature="staticmethod(function)">
+      <Summary>Static method descriptor</Summary>
+      <Description>Static method descriptor. Python base class. Wraps a function so that it receives neither the instance nor the class.</Description>
+    </Symbol>
+    <Symbol language="Python" name="slice" signature="slice(start, stop, step)">
+      <Summary>Slice object</Summary>
+      <Description>Slice object. Python base class. Stores the start, stop and step that select part of a sequence.</Description>
+    </Symbol>
+    <Symbol language="Python" name="memoryview" signature="memoryview(object)">
+      <Summary>Memory view of a buffer</Summary>
+      <Description>Memory view of a buffer. Python base class. Exposes the bytes of a buffer object without copying them.</Description>
+    </Symbol>
+    <Symbol language="Python" name="BaseException" signature="BaseException(*args)">
+      <Summary>Base class of all exceptions</Summary>
+      <Description>Base class of all exceptions. Python exception. The root of the exception hierarchy; it is rarely raised directly.</Description>
+    </Symbol>
+    <Symbol language="Python" name="Exception" signature="Exception(*args)">
+      <Summary>Base class of ordinary exceptions</Summary>
+      <Description>Base class of ordinary exceptions. Python exception. The base class of the exceptions that are not system-exiting.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ArithmeticError" signature="ArithmeticError(*args)">
+      <Summary>Base class of arithmetic errors</Summary>
+      <Description>Base class of arithmetic errors. Python exception. The base class of errors raised by numeric operations.</Description>
+    </Symbol>
+    <Symbol language="Python" name="FloatingPointError" signature="FloatingPointError(*args)">
+      <Summary>Floating-point operation failed</Summary>
+      <Description>Floating-point operation failed. Python exception. Raised when a floating-point operation fails.</Description>
+    </Symbol>
+    <Symbol language="Python" name="OverflowError" signature="OverflowError(*args)">
+      <Summary>Result too large to represent</Summary>
+      <Description>Result too large to represent. Python exception. Raised when an arithmetic result is too large for the result type.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ZeroDivisionError" signature="ZeroDivisionError(*args)">
+      <Summary>Division by zero</Summary>
+      <Description>Division by zero. Python exception. Raised when a division or modulo operation has a zero divisor.</Description>
+    </Symbol>
+    <Symbol language="Python" name="AssertionError" signature="AssertionError(*args)">
+      <Summary>Assertion failed</Summary>
+      <Description>Assertion failed. Python exception. Raised when an assert statement fails.</Description>
+    </Symbol>
+    <Symbol language="Python" name="AttributeError" signature="AttributeError(*args)">
+      <Summary>Attribute not found</Summary>
+      <Description>Attribute not found. Python exception. Raised when an attribute reference or assignment fails.</Description>
+    </Symbol>
+    <Symbol language="Python" name="BufferError" signature="BufferError(*args)">
+      <Summary>Buffer operation failed</Summary>
+      <Description>Buffer operation failed. Python exception. Raised when a buffer-related operation cannot be performed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="EOFError" signature="EOFError(*args)">
+      <Summary>End of file reached</Summary>
+      <Description>End of file reached. Python exception. Raised when input reaches the end of a file without any data.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ImportError" signature="ImportError(*args)">
+      <Summary>Import failed</Summary>
+      <Description>Import failed. Python exception. Raised when an import statement cannot find or load a module.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ModuleNotFoundError" signature="ModuleNotFoundError(*args)">
+      <Summary>Module not found</Summary>
+      <Description>Module not found. Python exception. Raised when an imported module cannot be located.</Description>
+    </Symbol>
+    <Symbol language="Python" name="LookupError" signature="LookupError(*args)">
+      <Summary>Base class of lookup errors</Summary>
+      <Description>Base class of lookup errors. Python exception. The base class of IndexError and KeyError.</Description>
+    </Symbol>
+    <Symbol language="Python" name="IndexError" signature="IndexError(*args)">
+      <Summary>Sequence index out of range</Summary>
+      <Description>Sequence index out of range. Python exception. Raised when a sequence subscript is outside the valid range.</Description>
+    </Symbol>
+    <Symbol language="Python" name="KeyError" signature="KeyError(*args)">
+      <Summary>Mapping key not found</Summary>
+      <Description>Mapping key not found. Python exception. Raised when a dictionary key is not present.</Description>
+    </Symbol>
+    <Symbol language="Python" name="MemoryError" signature="MemoryError(*args)">
+      <Summary>Memory allocation failed</Summary>
+      <Description>Memory allocation failed. Python exception. Raised when an operation runs out of memory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="NameError" signature="NameError(*args)">
+      <Summary>Name not found</Summary>
+      <Description>Name not found. Python exception. Raised when a local or global name is not defined.</Description>
+    </Symbol>
+    <Symbol language="Python" name="UnboundLocalError" signature="UnboundLocalError(*args)">
+      <Summary>Local variable used before assignment</Summary>
+      <Description>Local variable used before assignment. Python exception. Raised when a local variable is referenced before it has a value.</Description>
+    </Symbol>
+    <Symbol language="Python" name="OSError" signature="OSError(*args)">
+      <Summary>Operating system error</Summary>
+      <Description>Operating system error. Python exception. Raised by operating system operations; it carries an errno and a message.</Description>
+    </Symbol>
+    <Symbol language="Python" name="BlockingIOError" signature="BlockingIOError(*args)">
+      <Summary>Operation would block</Summary>
+      <Description>Operation would block. Python exception. Raised when a non-blocking operation cannot complete immediately.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ChildProcessError" signature="ChildProcessError(*args)">
+      <Summary>Child process operation failed</Summary>
+      <Description>Child process operation failed. Python exception. Raised when an operation on a child process fails.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ConnectionError" signature="ConnectionError(*args)">
+      <Summary>Base class of connection errors</Summary>
+      <Description>Base class of connection errors. Python exception. The base class of the errors related to network connections.</Description>
+    </Symbol>
+    <Symbol language="Python" name="BrokenPipeError" signature="BrokenPipeError(*args)">
+      <Summary>Broken pipe</Summary>
+      <Description>Broken pipe. Python exception. Raised when writing to a pipe whose reading end is closed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ConnectionAbortedError" signature="ConnectionAbortedError(*args)">
+      <Summary>Connection aborted</Summary>
+      <Description>Connection aborted. Python exception. Raised when a connection is aborted by the local end.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ConnectionRefusedError" signature="ConnectionRefusedError(*args)">
+      <Summary>Connection refused</Summary>
+      <Description>Connection refused. Python exception. Raised when a connection attempt is refused by the peer.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ConnectionResetError" signature="ConnectionResetError(*args)">
+      <Summary>Connection reset</Summary>
+      <Description>Connection reset. Python exception. Raised when a connection is reset by the peer.</Description>
+    </Symbol>
+    <Symbol language="Python" name="FileExistsError" signature="FileExistsError(*args)">
+      <Summary>File already exists</Summary>
+      <Description>File already exists. Python exception. Raised when creating a file or directory that already exists.</Description>
+    </Symbol>
+    <Symbol language="Python" name="FileNotFoundError" signature="FileNotFoundError(*args)">
+      <Summary>File or directory not found</Summary>
+      <Description>File or directory not found. Python exception. Raised when a requested file or directory does not exist.</Description>
+    </Symbol>
+    <Symbol language="Python" name="InterruptedError" signature="InterruptedError(*args)">
+      <Summary>System call interrupted</Summary>
+      <Description>System call interrupted. Python exception. Raised when a system call is interrupted by a signal.</Description>
+    </Symbol>
+    <Symbol language="Python" name="IsADirectoryError" signature="IsADirectoryError(*args)">
+      <Summary>Operation expected a file</Summary>
+      <Description>Operation expected a file. Python exception. Raised when a file operation is applied to a directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="NotADirectoryError" signature="NotADirectoryError(*args)">
+      <Summary>Operation expected a directory</Summary>
+      <Description>Operation expected a directory. Python exception. Raised when a directory operation is applied to a non-directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="PermissionError" signature="PermissionError(*args)">
+      <Summary>Operation not permitted</Summary>
+      <Description>Operation not permitted. Python exception. Raised when the operating system denies an operation.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ProcessLookupError" signature="ProcessLookupError(*args)">
+      <Summary>Process not found</Summary>
+      <Description>Process not found. Python exception. Raised when a process does not exist.</Description>
+    </Symbol>
+    <Symbol language="Python" name="TimeoutError" signature="TimeoutError(*args)">
+      <Summary>Operation timed out</Summary>
+      <Description>Operation timed out. Python exception. Raised when a system operation times out.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ReferenceError" signature="ReferenceError(*args)">
+      <Summary>Weak reference used after collection</Summary>
+      <Description>Weak reference used after collection. Python exception. Raised when a weak reference is used after its object was collected.</Description>
+    </Symbol>
+    <Symbol language="Python" name="RuntimeError" signature="RuntimeError(*args)">
+      <Summary>Runtime error</Summary>
+      <Description>Runtime error. Python exception. Raised when an error does not fall into another category.</Description>
+    </Symbol>
+    <Symbol language="Python" name="NotImplementedError" signature="NotImplementedError(*args)">
+      <Summary>Abstract method not implemented</Summary>
+      <Description>Abstract method not implemented. Python exception. Raised by abstract methods that a subclass must override.</Description>
+    </Symbol>
+    <Symbol language="Python" name="RecursionError" signature="RecursionError(*args)">
+      <Summary>Maximum recursion depth exceeded</Summary>
+      <Description>Maximum recursion depth exceeded. Python exception. Raised when the interpreter exceeds its recursion limit.</Description>
+    </Symbol>
+    <Symbol language="Python" name="StopIteration" signature="StopIteration(value=None)">
+      <Summary>Iterator has no more items</Summary>
+      <Description>Iterator has no more items. Python exception. Signals that an iterator is exhausted; it can carry a return value.</Description>
+    </Symbol>
+    <Symbol language="Python" name="StopAsyncIteration" signature="StopAsyncIteration(*args)">
+      <Summary>Async iterator has no more items</Summary>
+      <Description>Async iterator has no more items. Python exception. Signals that an asynchronous iterator is exhausted.</Description>
+    </Symbol>
+    <Symbol language="Python" name="SyntaxError" signature="SyntaxError(msg, details)">
+      <Summary>Invalid Python syntax</Summary>
+      <Description>Invalid Python syntax. Python exception. Raised when the parser encounters invalid Python code.</Description>
+    </Symbol>
+    <Symbol language="Python" name="IndentationError" signature="IndentationError(*args)">
+      <Summary>Invalid indentation</Summary>
+      <Description>Invalid indentation. Python exception. Raised when indentation is not consistent with the surrounding code.</Description>
+    </Symbol>
+    <Symbol language="Python" name="TabError" signature="TabError(*args)">
+      <Summary>Inconsistent tab and space indentation</Summary>
+      <Description>Inconsistent tab and space indentation. Python exception. Raised when tabs and spaces are mixed inconsistently.</Description>
+    </Symbol>
+    <Symbol language="Python" name="SystemError" signature="SystemError(*args)">
+      <Summary>Internal interpreter error</Summary>
+      <Description>Internal interpreter error. Python exception. Raised when the interpreter detects an internal error.</Description>
+    </Symbol>
+    <Symbol language="Python" name="SystemExit" signature="SystemExit(code=None)">
+      <Summary>Request to exit the interpreter</Summary>
+      <Description>Request to exit the interpreter. Python exception. Raised by sys.exit to terminate the interpreter with a status.</Description>
+    </Symbol>
+    <Symbol language="Python" name="TypeError" signature="TypeError(*args)">
+      <Summary>Operation on an object of the wrong type</Summary>
+      <Description>Operation on an object of the wrong type. Python exception. Raised when an operation is applied to an object of an unsuitable type.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ValueError" signature="ValueError(*args)">
+      <Summary>Operation received an invalid value</Summary>
+      <Description>Operation received an invalid value. Python exception. Raised when an operation receives an argument of the right type but a bad value.</Description>
+    </Symbol>
+    <Symbol language="Python" name="UnicodeError" signature="UnicodeError(*args)">
+      <Summary>Base class of Unicode errors</Summary>
+      <Description>Base class of Unicode errors. Python exception. The base class of the errors raised while encoding or decoding text.</Description>
+    </Symbol>
+    <Symbol language="Python" name="UnicodeDecodeError" signature="UnicodeDecodeError(encoding, object, start, end, reason)">
+      <Summary>Unicode decoding failed</Summary>
+      <Description>Unicode decoding failed. Python exception. Raised when bytes cannot be decoded with the requested encoding.</Description>
+    </Symbol>
+    <Symbol language="Python" name="UnicodeEncodeError" signature="UnicodeEncodeError(encoding, object, start, end, reason)">
+      <Summary>Unicode encoding failed</Summary>
+      <Description>Unicode encoding failed. Python exception. Raised when text cannot be encoded with the requested encoding.</Description>
+    </Symbol>
+    <Symbol language="Python" name="UnicodeTranslateError" signature="UnicodeTranslateError(encoding, object, start, end, reason)">
+      <Summary>Unicode translation failed</Summary>
+      <Description>Unicode translation failed. Python exception. Raised when text cannot be translated with the requested mapping.</Description>
+    </Symbol>
+    <Symbol language="Python" name="Warning" signature="Warning(*args)">
+      <Summary>Base class of warning categories</Summary>
+      <Description>Base class of warning categories. Python exception. The base class of the warnings issued by the warnings module.</Description>
+    </Symbol>
+    <Symbol language="Python" name="UserWarning" signature="UserWarning(*args)">
+      <Summary>User-defined warning</Summary>
+      <Description>User-defined warning. Python exception. The default category for warnings created by user code.</Description>
+    </Symbol>
+    <Symbol language="Python" name="DeprecationWarning" signature="DeprecationWarning(*args)">
+      <Summary>Deprecated feature warning</Summary>
+      <Description>Deprecated feature warning. Python exception. Warns about a feature that is deprecated for other developers.</Description>
+    </Symbol>
+    <Symbol language="Python" name="PendingDeprecationWarning" signature="PendingDeprecationWarning(*args)">
+      <Summary>Feature planned for deprecation</Summary>
+      <Description>Feature planned for deprecation. Python exception. Warns about a feature that will be deprecated in the future.</Description>
+    </Symbol>
+    <Symbol language="Python" name="SyntaxWarning" signature="SyntaxWarning(*args)">
+      <Summary>Suspicious syntax warning</Summary>
+      <Description>Suspicious syntax warning. Python exception. Warns about syntax that is valid but probably not intended.</Description>
+    </Symbol>
+    <Symbol language="Python" name="RuntimeWarning" signature="RuntimeWarning(*args)">
+      <Summary>Suspicious runtime behaviour</Summary>
+      <Description>Suspicious runtime behaviour. Python exception. Warns about suspicious behaviour at run time.</Description>
+    </Symbol>
+    <Symbol language="Python" name="FutureWarning" signature="FutureWarning(*args)">
+      <Summary>Warning about a future change</Summary>
+      <Description>Warning about a future change. Python exception. Warns end users about a change that will affect them in the future.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ImportWarning" signature="ImportWarning(*args)">
+      <Summary>Suspicious import</Summary>
+      <Description>Suspicious import. Python exception. Warns about a suspicious import operation.</Description>
+    </Symbol>
+    <Symbol language="Python" name="UnicodeWarning" signature="UnicodeWarning(*args)">
+      <Summary>Unicode-related warning</Summary>
+      <Description>Unicode-related warning. Python exception. Warns about Unicode-related problems.</Description>
+    </Symbol>
+    <Symbol language="Python" name="BytesWarning" signature="BytesWarning(*args)">
+      <Summary>Bytes and text mixing warning</Summary>
+      <Description>Bytes and text mixing warning. Python exception. Warns about mixing bytes and text in comparisons and operations.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ResourceWarning" signature="ResourceWarning(*args)">
+      <Summary>Resource leak warning</Summary>
+      <Description>Resource leak warning. Python exception. Warns about an unclosed resource such as a file or socket.</Description>
+    </Symbol>
+    <Symbol language="Python" name="EncodingWarning" signature="EncodingWarning(*args)">
+      <Summary>Encoding selection warning</Summary>
+      <Description>Encoding selection warning. Python exception. Warns when the default text encoding is used where it may be wrong.</Description>
+    </Symbol>
+    <Symbol language="Python" name="GeneratorExit" signature="GeneratorExit(*args)">
+      <Summary>Generator or coroutine closed</Summary>
+      <Description>Generator or coroutine closed. Python exception. Raised inside a generator or coroutine when it is closed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="KeyboardInterrupt" signature="KeyboardInterrupt(*args)">
+      <Summary>Keyboard interrupt</Summary>
+      <Description>Keyboard interrupt. Python exception. Raised when the user interrupts execution, usually with Ctrl+C.</Description>
+    </Symbol>
+    <Symbol language="Python" name="BaseExceptionGroup" signature="BaseExceptionGroup(message, exceptions)">
+      <Summary>Base class of exception groups</Summary>
+      <Description>Base class of exception groups. Python exception. Wraps several exceptions so they can be raised and handled together.</Description>
+    </Symbol>
+    <Symbol language="Python" name="ExceptionGroup" signature="ExceptionGroup(message, exceptions)">
+      <Summary>Group of exceptions</Summary>
+      <Description>Group of exceptions. Python exception. An exception group that contains only instances of Exception.</Description>
+    </Symbol>
+    <Symbol language="Python" name="EnvironmentError" signature="EnvironmentError(*args)">
+      <Summary>Alias of OSError</Summary>
+      <Description>Alias of OSError. Python exception. A historical name for OSError, kept for compatibility.</Description>
+    </Symbol>
+    <Symbol language="Python" name="IOError" signature="IOError(*args)">
+      <Summary>Alias of OSError</Summary>
+      <Description>Alias of OSError. Python exception. A historical name for OSError, kept for compatibility.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.pi">
+      <Summary>Ratio of a circle's circumference to its diameter</Summary>
+      <Description>Ratio of a circle's circumference to its diameter. Python math module. The mathematical constant pi, approximately 3.141592653589793.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.e">
+      <Summary>Base of the natural logarithm</Summary>
+      <Description>Base of the natural logarithm. Python math module. The mathematical constant e, approximately 2.718281828459045.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.tau">
+      <Summary>Ratio of a circle's circumference to its radius</Summary>
+      <Description>Ratio of a circle's circumference to its radius. Python math module. The mathematical constant tau, equal to two times pi.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.inf">
+      <Summary>Positive infinity</Summary>
+      <Description>Positive infinity. Python math module. A floating-point positive infinity.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.nan">
+      <Summary>Not a number</Summary>
+      <Description>Not a number. Python math module. A floating-point NaN value.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.acos" signature="math.acos(x)">
+      <Summary>Arc cosine</Summary>
+      <Description>Arc cosine. Python math module. Returns the arc cosine of x in radians.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.acosh" signature="math.acosh(x)">
+      <Summary>Inverse hyperbolic cosine</Summary>
+      <Description>Inverse hyperbolic cosine. Python math module. Returns the inverse hyperbolic cosine of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.asin" signature="math.asin(x)">
+      <Summary>Arc sine</Summary>
+      <Description>Arc sine. Python math module. Returns the arc sine of x in radians.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.asinh" signature="math.asinh(x)">
+      <Summary>Inverse hyperbolic sine</Summary>
+      <Description>Inverse hyperbolic sine. Python math module. Returns the inverse hyperbolic sine of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.atan" signature="math.atan(x)">
+      <Summary>Arc tangent</Summary>
+      <Description>Arc tangent. Python math module. Returns the arc tangent of x in radians.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.atan2" signature="math.atan2(y, x)">
+      <Summary>Arc tangent of y/x</Summary>
+      <Description>Arc tangent of y/x. Python math module. Returns the arc tangent of y/x using the signs of both arguments.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.atanh" signature="math.atanh(x)">
+      <Summary>Inverse hyperbolic tangent</Summary>
+      <Description>Inverse hyperbolic tangent. Python math module. Returns the inverse hyperbolic tangent of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.cbrt" signature="math.cbrt(x)">
+      <Summary>Cube root</Summary>
+      <Description>Cube root. Python math module. Returns the cube root of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.ceil" signature="math.ceil(x)">
+      <Summary>Smallest integer greater than or equal</Summary>
+      <Description>Smallest integer greater than or equal. Python math module. Returns the smallest integer greater than or equal to x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.comb" signature="math.comb(n, k)">
+      <Summary>Number of combinations</Summary>
+      <Description>Number of combinations. Python math module. Returns the number of ways to choose k items from n without repetition.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.copysign" signature="math.copysign(x, y)">
+      <Summary>Magnitude with the sign of another value</Summary>
+      <Description>Magnitude with the sign of another value. Python math module. Returns the magnitude of x with the sign of y.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.cos" signature="math.cos(x)">
+      <Summary>Cosine</Summary>
+      <Description>Cosine. Python math module. Returns the cosine of x radians.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.cosh" signature="math.cosh(x)">
+      <Summary>Hyperbolic cosine</Summary>
+      <Description>Hyperbolic cosine. Python math module. Returns the hyperbolic cosine of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.degrees" signature="math.degrees(x)">
+      <Summary>Radians to degrees</Summary>
+      <Description>Radians to degrees. Python math module. Converts an angle from radians to degrees.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.dist" signature="math.dist(p, q)">
+      <Summary>Euclidean distance</Summary>
+      <Description>Euclidean distance. Python math module. Returns the Euclidean distance between two points given as sequences.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.erf" signature="math.erf(x)">
+      <Summary>Error function</Summary>
+      <Description>Error function. Python math module. Returns the error function at x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.erfc" signature="math.erfc(x)">
+      <Summary>Complementary error function</Summary>
+      <Description>Complementary error function. Python math module. Returns the complementary error function at x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.exp" signature="math.exp(x)">
+      <Summary>Exponential of x</Summary>
+      <Description>Exponential of x. Python math module. Returns e raised to the power x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.exp2" signature="math.exp2(x)">
+      <Summary>Two raised to x</Summary>
+      <Description>Two raised to x. Python math module. Returns 2 raised to the power x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.expm1" signature="math.expm1(x)">
+      <Summary>Exponential minus one</Summary>
+      <Description>Exponential minus one. Python math module. Returns e raised to x minus one, accurate for small x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.fabs" signature="math.fabs(x)">
+      <Summary>Absolute value as a float</Summary>
+      <Description>Absolute value as a float. Python math module. Returns the absolute value of x as a floating-point number.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.factorial" signature="math.factorial(n)">
+      <Summary>Factorial</Summary>
+      <Description>Factorial. Python math module. Returns the factorial of the non-negative integer n.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.floor" signature="math.floor(x)">
+      <Summary>Largest integer less than or equal</Summary>
+      <Description>Largest integer less than or equal. Python math module. Returns the largest integer less than or equal to x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.fmod" signature="math.fmod(x, y)">
+      <Summary>Floating-point remainder</Summary>
+      <Description>Floating-point remainder. Python math module. Returns the floating-point remainder of x divided by y.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.frexp" signature="math.frexp(x)">
+      <Summary>Mantissa and exponent</Summary>
+      <Description>Mantissa and exponent. Python math module. Returns the mantissa and exponent of x as a pair.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.fsum" signature="math.fsum(iterable)">
+      <Summary>Accurate sum of floats</Summary>
+      <Description>Accurate sum of floats. Python math module. Returns an accurate floating-point sum of the values.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.gamma" signature="math.gamma(x)">
+      <Summary>Gamma function</Summary>
+      <Description>Gamma function. Python math module. Returns the gamma function at x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.gcd" signature="math.gcd(*integers)">
+      <Summary>Greatest common divisor</Summary>
+      <Description>Greatest common divisor. Python math module. Returns the greatest common divisor of the integer arguments.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.hypot" signature="math.hypot(*coordinates)">
+      <Summary>Euclidean norm</Summary>
+      <Description>Euclidean norm. Python math module. Returns the Euclidean norm of the coordinates.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.isclose" signature="math.isclose(a, b, rel_tol=1e-09, abs_tol=0.0)">
+      <Summary>Test whether two floats are close</Summary>
+      <Description>Test whether two floats are close. Python math module. Tests whether a and b are close within the given tolerances.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.isfinite" signature="math.isfinite(x)">
+      <Summary>Test for a finite value</Summary>
+      <Description>Test for a finite value. Python math module. Returns True when x is neither infinite nor NaN.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.isinf" signature="math.isinf(x)">
+      <Summary>Test for infinity</Summary>
+      <Description>Test for infinity. Python math module. Returns True when x is positive or negative infinity.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.isnan" signature="math.isnan(x)">
+      <Summary>Test for NaN</Summary>
+      <Description>Test for NaN. Python math module. Returns True when x is NaN.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.isqrt" signature="math.isqrt(n)">
+      <Summary>Integer square root</Summary>
+      <Description>Integer square root. Python math module. Returns the integer square root of the non-negative integer n.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.lcm" signature="math.lcm(*integers)">
+      <Summary>Least common multiple</Summary>
+      <Description>Least common multiple. Python math module. Returns the least common multiple of the integer arguments.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.ldexp" signature="math.ldexp(x, i)">
+      <Summary>x times two to the power i</Summary>
+      <Description>x times two to the power i. Python math module. Returns x multiplied by 2 raised to the power i.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.lgamma" signature="math.lgamma(x)">
+      <Summary>Logarithm of the gamma function</Summary>
+      <Description>Logarithm of the gamma function. Python math module. Returns the natural logarithm of the absolute value of gamma(x).</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.log" signature="math.log(x, base=math.e)">
+      <Summary>Natural logarithm</Summary>
+      <Description>Natural logarithm. Python math module. Returns the logarithm of x in the given base.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.log10" signature="math.log10(x)">
+      <Summary>Base-10 logarithm</Summary>
+      <Description>Base-10 logarithm. Python math module. Returns the base-10 logarithm of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.log1p" signature="math.log1p(x)">
+      <Summary>Logarithm of one plus x</Summary>
+      <Description>Logarithm of one plus x. Python math module. Returns the natural logarithm of 1+x, accurate for small x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.log2" signature="math.log2(x)">
+      <Summary>Base-2 logarithm</Summary>
+      <Description>Base-2 logarithm. Python math module. Returns the base-2 logarithm of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.modf" signature="math.modf(x)">
+      <Summary>Fractional and integer parts</Summary>
+      <Description>Fractional and integer parts. Python math module. Returns the fractional and integer parts of x as a pair.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.nextafter" signature="math.nextafter(x, y, steps=1)">
+      <Summary>Next float after x toward y</Summary>
+      <Description>Next float after x toward y. Python math module. Returns the floating-point value steps steps after x toward y.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.perm" signature="math.perm(n, k=None)">
+      <Summary>Number of permutations</Summary>
+      <Description>Number of permutations. Python math module. Returns the number of ways to choose and order k items from n.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.pow" signature="math.pow(x, y)">
+      <Summary>x raised to y</Summary>
+      <Description>x raised to y. Python math module. Returns x raised to the power y as a float.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.prod" signature="math.prod(iterable, start=1)">
+      <Summary>Product of the items</Summary>
+      <Description>Product of the items. Python math module. Returns the product of the items plus the start value.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.radians" signature="math.radians(x)">
+      <Summary>Degrees to radians</Summary>
+      <Description>Degrees to radians. Python math module. Converts an angle from degrees to radians.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.remainder" signature="math.remainder(x, y)">
+      <Summary>IEEE 754 remainder</Summary>
+      <Description>IEEE 754 remainder. Python math module. Returns the IEEE 754 remainder of x divided by y.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.sin" signature="math.sin(x)">
+      <Summary>Sine</Summary>
+      <Description>Sine. Python math module. Returns the sine of x radians.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.sinh" signature="math.sinh(x)">
+      <Summary>Hyperbolic sine</Summary>
+      <Description>Hyperbolic sine. Python math module. Returns the hyperbolic sine of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.sqrt" signature="math.sqrt(x)">
+      <Summary>Square root</Summary>
+      <Description>Square root. Python math module. Returns the square root of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.sumprod" signature="math.sumprod(p, q)">
+      <Summary>Sum of pairwise products</Summary>
+      <Description>Sum of pairwise products. Python math module. Returns the sum of the products of the corresponding items of p and q.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.tan" signature="math.tan(x)">
+      <Summary>Tangent</Summary>
+      <Description>Tangent. Python math module. Returns the tangent of x radians.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.tanh" signature="math.tanh(x)">
+      <Summary>Hyperbolic tangent</Summary>
+      <Description>Hyperbolic tangent. Python math module. Returns the hyperbolic tangent of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.trunc" signature="math.trunc(x)">
+      <Summary>Integer part</Summary>
+      <Description>Integer part. Python math module. Returns the integer part of x, discarding its fraction.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.ulp" signature="math.ulp(x)">
+      <Summary>Unit in the last place</Summary>
+      <Description>Unit in the last place. Python math module. Returns the value of the least significant bit of x.</Description>
+    </Symbol>
+    <Symbol language="Python" name="math.fma" signature="math.fma(x, y, z)">
+      <Summary>Fused multiply-add</Summary>
+      <Description>Fused multiply-add. Python math module. Returns x*y+z with a single rounding step.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.name">
+      <Summary>Name of the operating system</Summary>
+      <Description>Name of the operating system. Python os module. A short name such as 'posix' or 'nt'.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.environ">
+      <Summary>Environment variables</Summary>
+      <Description>Environment variables. Python os module. A mapping of the environment variable names to their values.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.environb">
+      <Summary>Environment variables as bytes</Summary>
+      <Description>Environment variables as bytes. Python os module. A bytes version of environ, available on platforms that support it.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getenv" signature="os.getenv(key, default=None)">
+      <Summary>Read an environment variable</Summary>
+      <Description>Read an environment variable. Python os module. Returns the value of an environment variable, or default when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.putenv" signature="os.putenv(key, value)">
+      <Summary>Set an environment variable</Summary>
+      <Description>Set an environment variable. Python os module. Sets an environment variable for the current process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.unsetenv" signature="os.unsetenv(key)">
+      <Summary>Remove an environment variable</Summary>
+      <Description>Remove an environment variable. Python os module. Removes an environment variable from the current process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.get_exec_path" signature="os.get_exec_path(env=None)">
+      <Summary>Search path for executables</Summary>
+      <Description>Search path for executables. Python os module. Returns the list of directories in which the shell looks for executables.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getpid" signature="os.getpid()">
+      <Summary>Process ID of the current process</Summary>
+      <Description>Process ID of the current process. Python os module. Returns the process ID of the current process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getppid" signature="os.getppid()">
+      <Summary>Process ID of the parent process</Summary>
+      <Description>Process ID of the parent process. Python os module. Returns the process ID of the parent process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getuid" signature="os.getuid()">
+      <Summary>Real user ID</Summary>
+      <Description>Real user ID. Python os module. Returns the real user ID of the current process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.geteuid" signature="os.geteuid()">
+      <Summary>Effective user ID</Summary>
+      <Description>Effective user ID. Python os module. Returns the effective user ID of the current process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getgid" signature="os.getgid()">
+      <Summary>Real group ID</Summary>
+      <Description>Real group ID. Python os module. Returns the real group ID of the current process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getegid" signature="os.getegid()">
+      <Summary>Effective group ID</Summary>
+      <Description>Effective group ID. Python os module. Returns the effective group ID of the current process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getgroups" signature="os.getgroups()">
+      <Summary>Supplementary group IDs</Summary>
+      <Description>Supplementary group IDs. Python os module. Returns the list of supplementary group IDs of the current process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getlogin" signature="os.getlogin()">
+      <Summary>Login name of the user</Summary>
+      <Description>Login name of the user. Python os module. Returns the name of the user logged in on the controlling terminal.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getloadavg" signature="os.getloadavg()">
+      <Summary>System load average</Summary>
+      <Description>System load average. Python os module. Returns the one, five and fifteen minute load averages.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.cpu_count" signature="os.cpu_count()">
+      <Summary>Number of CPUs</Summary>
+      <Description>Number of CPUs. Python os module. Returns the number of logical CPUs available to the process.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.urandom" signature="os.urandom(size)">
+      <Summary>Random bytes</Summary>
+      <Description>Random bytes. Python os module. Returns size random bytes suitable for cryptographic use.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.system" signature="os.system(command)">
+      <Summary>Run a shell command</Summary>
+      <Description>Run a shell command. Python os module. Runs a command through the system shell and returns its exit status.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.popen" signature="os.popen(cmd, mode='r', buffering=-1)">
+      <Summary>Pipe to or from a command</Summary>
+      <Description>Pipe to or from a command. Python os module. Opens a pipe to or from a shell command.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.abort" signature="os.abort()">
+      <Summary>Abort the process</Summary>
+      <Description>Abort the process. Python os module. Terminates the process immediately with an abort signal.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os._exit" signature="os._exit(status)">
+      <Summary>Exit without cleanup</Summary>
+      <Description>Exit without cleanup. Python os module. Terminates the process immediately without flushing buffers or running handlers.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.kill" signature="os.kill(pid, sig)">
+      <Summary>Send a signal to a process</Summary>
+      <Description>Send a signal to a process. Python os module. Sends a signal to the process with the given ID.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.killpg" signature="os.killpg(pgid, sig)">
+      <Summary>Send a signal to a process group</Summary>
+      <Description>Send a signal to a process group. Python os module. Sends a signal to the process group with the given ID.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.wait" signature="os.wait()">
+      <Summary>Wait for a child process</Summary>
+      <Description>Wait for a child process. Python os module. Waits for a child process to finish and returns its ID and status.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.waitpid" signature="os.waitpid(pid, options)">
+      <Summary>Wait for a specific child process</Summary>
+      <Description>Wait for a specific child process. Python os module. Waits for the child process with the given ID and returns its status.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.waitstatus_to_exitcode" signature="os.waitstatus_to_exitcode(status)">
+      <Summary>Convert a wait status to an exit code</Summary>
+      <Description>Convert a wait status to an exit code. Python os module. Converts a status returned by wait or waitpid to an exit code.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getcwd" signature="os.getcwd()">
+      <Summary>Current working directory</Summary>
+      <Description>Current working directory. Python os module. Returns the current working directory as a string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.getcwdb" signature="os.getcwdb()">
+      <Summary>Current working directory as bytes</Summary>
+      <Description>Current working directory as bytes. Python os module. Returns the current working directory as a bytes object.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.chdir" signature="os.chdir(path)">
+      <Summary>Change the working directory</Summary>
+      <Description>Change the working directory. Python os module. Changes the current working directory to path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.chmod" signature="os.chmod(path, mode)">
+      <Summary>Change file permissions</Summary>
+      <Description>Change file permissions. Python os module. Changes the permission bits of a file or directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.chown" signature="os.chown(path, uid, gid)">
+      <Summary>Change file ownership</Summary>
+      <Description>Change file ownership. Python os module. Changes the owner and group of a file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.close" signature="os.close(fd)">
+      <Summary>Close a file descriptor</Summary>
+      <Description>Close a file descriptor. Python os module. Closes the file descriptor fd.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.closerange" signature="os.closerange(fd_low, fd_high)">
+      <Summary>Close a range of file descriptors</Summary>
+      <Description>Close a range of file descriptors. Python os module. Closes all file descriptors from fd_low up to but not including fd_high.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.dup" signature="os.dup(fd)">
+      <Summary>Duplicate a file descriptor</Summary>
+      <Description>Duplicate a file descriptor. Python os module. Returns a new file descriptor that refers to the same file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.dup2" signature="os.dup2(fd, fd2)">
+      <Summary>Duplicate a file descriptor to a given number</Summary>
+      <Description>Duplicate a file descriptor to a given number. Python os module. Makes fd2 a copy of fd, closing fd2 first when necessary.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.fdopen" signature="os.fdopen(fd, mode='r', buffering=-1)">
+      <Summary>Open a file descriptor as a file object</Summary>
+      <Description>Open a file descriptor as a file object. Python os module. Wraps an existing file descriptor in a file object.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.fsync" signature="os.fsync(fd)">
+      <Summary>Flush a file descriptor to disk</Summary>
+      <Description>Flush a file descriptor to disk. Python os module. Forces the operating system to write the buffered data of fd to disk.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.ftruncate" signature="os.ftruncate(fd, length)">
+      <Summary>Truncate a file descriptor</Summary>
+      <Description>Truncate a file descriptor. Python os module. Truncates the file referred to by fd to the given length.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.lseek" signature="os.lseek(fd, pos, whence)">
+      <Summary>Set the file position</Summary>
+      <Description>Set the file position. Python os module. Moves the read/write position of fd and returns the new position.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.open" signature="os.open(path, flags, mode=0o777)">
+      <Summary>Open a file descriptor</Summary>
+      <Description>Open a file descriptor. Python os module. Opens a file and returns a low-level file descriptor.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.openpty" signature="os.openpty()">
+      <Summary>Open a pseudo-terminal</Summary>
+      <Description>Open a pseudo-terminal. Python os module. Returns a pair of file descriptors for the master and slave ends of a pseudo-terminal.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.pipe" signature="os.pipe()">
+      <Summary>Create a pipe</Summary>
+      <Description>Create a pipe. Python os module. Returns a pair of file descriptors for the read and write ends of a pipe.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.read" signature="os.read(fd, n)">
+      <Summary>Read bytes from a file descriptor</Summary>
+      <Description>Read bytes from a file descriptor. Python os module. Reads up to n bytes from fd and returns them as a bytes object.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.write" signature="os.write(fd, data)">
+      <Summary>Write bytes to a file descriptor</Summary>
+      <Description>Write bytes to a file descriptor. Python os module. Writes the bytes data to fd and returns the number of bytes written.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.remove" signature="os.remove(path)">
+      <Summary>Remove a file</Summary>
+      <Description>Remove a file. Python os module. Removes the file at path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.unlink" signature="os.unlink(path)">
+      <Summary>Remove a file</Summary>
+      <Description>Remove a file. Python os module. Removes the file at path; a synonym for remove.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.rename" signature="os.rename(src, dst)">
+      <Summary>Rename a file or directory</Summary>
+      <Description>Rename a file or directory. Python os module. Renames src to dst.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.replace" signature="os.replace(src, dst)">
+      <Summary>Replace a file or directory</Summary>
+      <Description>Replace a file or directory. Python os module. Renames src to dst, replacing an existing destination.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.rmdir" signature="os.rmdir(path)">
+      <Summary>Remove an empty directory</Summary>
+      <Description>Remove an empty directory. Python os module. Removes the empty directory at path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.mkdir" signature="os.mkdir(path, mode=0o777)">
+      <Summary>Create a directory</Summary>
+      <Description>Create a directory. Python os module. Creates a directory with the given permission bits.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.makedirs" signature="os.makedirs(name, mode=0o777, exist_ok=False)">
+      <Summary>Create directories recursively</Summary>
+      <Description>Create directories recursively. Python os module. Creates all intermediate directories and the final directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.removedirs" signature="os.removedirs(name)">
+      <Summary>Remove empty directories recursively</Summary>
+      <Description>Remove empty directories recursively. Python os module. Removes the named directory and then its empty parents.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.listdir" signature="os.listdir(path='.')">
+      <Summary>List a directory</Summary>
+      <Description>List a directory. Python os module. Returns the names of the entries in the given directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.scandir" signature="os.scandir(path='.')">
+      <Summary>Iterate over directory entries</Summary>
+      <Description>Iterate over directory entries. Python os module. Returns an iterator of DirEntry objects for the given directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.stat" signature="os.stat(path, dir_fd=None, follow_symlinks=True)">
+      <Summary>Status of a file</Summary>
+      <Description>Status of a file. Python os module. Returns status information about a file or directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.lstat" signature="os.lstat(path)">
+      <Summary>Status of a symbolic link</Summary>
+      <Description>Status of a symbolic link. Python os module. Returns status information about a symbolic link itself.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.fstat" signature="os.fstat(fd)">
+      <Summary>Status of an open file</Summary>
+      <Description>Status of an open file. Python os module. Returns status information about the file descriptor fd.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.statvfs" signature="os.statvfs(path)">
+      <Summary>File system statistics</Summary>
+      <Description>File system statistics. Python os module. Returns information about the file system that contains path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.access" signature="os.access(path, mode)">
+      <Summary>Test access permissions</Summary>
+      <Description>Test access permissions. Python os module. Tests whether the process can access path in the given mode.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.link" signature="os.link(src, dst)">
+      <Summary>Create a hard link</Summary>
+      <Description>Create a hard link. Python os module. Creates a hard link at dst that refers to src.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.symlink" signature="os.symlink(src, dst)">
+      <Summary>Create a symbolic link</Summary>
+      <Description>Create a symbolic link. Python os module. Creates a symbolic link at dst that points to src.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.readlink" signature="os.readlink(path)">
+      <Summary>Target of a symbolic link</Summary>
+      <Description>Target of a symbolic link. Python os module. Returns the path that the symbolic link refers to.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.pathconf" signature="os.pathconf(path, name)">
+      <Summary>File system configuration value</Summary>
+      <Description>File system configuration value. Python os module. Returns a system configuration value for the file or directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.fwalk" signature="os.fwalk(top='.', topdown=True, onerror=None, follow_symlinks=False)">
+      <Summary>Walk a directory tree with file descriptors</Summary>
+      <Description>Walk a directory tree with file descriptors. Python os module. Yields directory names, subdirectories, files and a file descriptor for each directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.walk" signature="os.walk(top, topdown=True, onerror=None, followlinks=False)">
+      <Summary>Walk a directory tree</Summary>
+      <Description>Walk a directory tree. Python os module. Yields directory names, subdirectories and files for a directory tree.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.mknod" signature="os.mknod(path, mode=0o600, device=0)">
+      <Summary>Create a file system node</Summary>
+      <Description>Create a file system node. Python os module. Creates a file system node such as a device file or a named pipe.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.mkfifo" signature="os.mkfifo(path, mode=0o666)">
+      <Summary>Create a named pipe</Summary>
+      <Description>Create a named pipe. Python os module. Creates a FIFO special file at path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.execv" signature="os.execv(path, args)">
+      <Summary>Replace the process with a program</Summary>
+      <Description>Replace the process with a program. Python os module. Executes the program at path with the argument list args.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.execve" signature="os.execve(path, args, env)">
+      <Summary>Replace the process with a program and environment</Summary>
+      <Description>Replace the process with a program and environment. Python os module. Executes the program at path with args and the environment env.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.execvp" signature="os.execvp(file, args)">
+      <Summary>Replace the process, searching PATH</Summary>
+      <Description>Replace the process, searching PATH. Python os module. Executes a program found on PATH with the argument list args.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.execvpe" signature="os.execvpe(file, args, env)">
+      <Summary>Replace the process, searching PATH with an environment</Summary>
+      <Description>Replace the process, searching PATH with an environment. Python os module. Executes a program found on PATH with args and the environment env.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.spawnv" signature="os.spawnv(mode, path, args)">
+      <Summary>Spawn a program</Summary>
+      <Description>Spawn a program. Python os module. Runs the program at path with args and returns its exit status.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.spawnve" signature="os.spawnve(mode, path, args, env)">
+      <Summary>Spawn a program with an environment</Summary>
+      <Description>Spawn a program with an environment. Python os module. Runs the program at path with args and the environment env.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.spawnvp" signature="os.spawnvp(mode, file, args)">
+      <Summary>Spawn a program found on PATH</Summary>
+      <Description>Spawn a program found on PATH. Python os module. Runs a program found on PATH with the argument list args.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.spawnvpe" signature="os.spawnvpe(mode, file, args, env)">
+      <Summary>Spawn a program found on PATH with an environment</Summary>
+      <Description>Spawn a program found on PATH with an environment. Python os module. Runs a program found on PATH with args and the environment env.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.posix_spawn" signature="os.posix_spawn(path, argv, env)">
+      <Summary>Spawn a process with posix_spawn</Summary>
+      <Description>Spawn a process with posix_spawn. Python os module. Starts a process with the POSIX spawn interface and returns its process ID.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.posix_spawnp" signature="os.posix_spawnp(file, args, env)">
+      <Summary>Spawn a process found on PATH</Summary>
+      <Description>Spawn a process found on PATH. Python os module. Starts a process found on PATH with the POSIX spawn interface.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.sep">
+      <Summary>Separator between path components</Summary>
+      <Description>Separator between path components. Python os module. The character that separates components of a path on this platform.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.altsep">
+      <Summary>Alternative path separator</Summary>
+      <Description>Alternative path separator. Python os module. An alternative path separator, or None when the platform has only one.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.pathsep">
+      <Summary>Separator between search path entries</Summary>
+      <Description>Separator between search path entries. Python os module. The character that separates entries in PATH-like variables.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.linesep">
+      <Summary>Line separator of the platform</Summary>
+      <Description>Line separator of the platform. Python os module. The string that ends a line in text files on this platform.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.devnull">
+      <Summary>Path of the null device</Summary>
+      <Description>Path of the null device. Python os module. The path of the device that discards all data written to it.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.curdir">
+      <Summary>Name of the current directory</Summary>
+      <Description>Name of the current directory. Python os module. The symbolic name of the current directory, normally '.'.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.pardir">
+      <Summary>Name of the parent directory</Summary>
+      <Description>Name of the parent directory. Python os module. The symbolic name of the parent directory, normally '..'.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.extsep">
+      <Summary>Separator before a filename extension</Summary>
+      <Description>Separator before a filename extension. Python os module. The character that separates a filename from its extension, normally '.'.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.defpath">
+      <Summary>Default executable search path</Summary>
+      <Description>Default executable search path. Python os module. The default search path used when PATH is not set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.F_OK">
+      <Summary>Test whether a path exists</Summary>
+      <Description>Test whether a path exists. Python os module. The mode value for os.access that tests only for the existence of a path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.R_OK">
+      <Summary>Test whether a path is readable</Summary>
+      <Description>Test whether a path is readable. Python os module. The mode value for os.access that tests read permission.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.W_OK">
+      <Summary>Test whether a path is writable</Summary>
+      <Description>Test whether a path is writable. Python os module. The mode value for os.access that tests write permission.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.X_OK">
+      <Summary>Test whether a path is executable</Summary>
+      <Description>Test whether a path is executable. Python os module. The mode value for os.access that tests execute permission.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.O_RDONLY">
+      <Summary>Open for reading only</Summary>
+      <Description>Open for reading only. Python os module. The flag for os.open that opens a file for reading.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.O_WRONLY">
+      <Summary>Open for writing only</Summary>
+      <Description>Open for writing only. Python os module. The flag for os.open that opens a file for writing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.O_RDWR">
+      <Summary>Open for reading and writing</Summary>
+      <Description>Open for reading and writing. Python os module. The flag for os.open that opens a file for both reading and writing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.O_APPEND">
+      <Summary>Append on every write</Summary>
+      <Description>Append on every write. Python os module. The flag for os.open that writes at the end of the file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.O_CREAT">
+      <Summary>Create the file when missing</Summary>
+      <Description>Create the file when missing. Python os module. The flag for os.open that creates the file when it does not exist.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.O_EXCL">
+      <Summary>Fail when the file already exists</Summary>
+      <Description>Fail when the file already exists. Python os module. The flag for os.open that makes creation fail when the file exists.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.O_TRUNC">
+      <Summary>Truncate the file when opening</Summary>
+      <Description>Truncate the file when opening. Python os module. The flag for os.open that truncates an existing file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.O_NONBLOCK">
+      <Summary>Open in non-blocking mode</Summary>
+      <Description>Open in non-blocking mode. Python os module. The flag for os.open that requests non-blocking input and output.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.O_CLOEXEC">
+      <Summary>Close the descriptor on exec</Summary>
+      <Description>Close the descriptor on exec. Python os module. The flag for os.open that closes the descriptor when a new program is executed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.SEEK_SET">
+      <Summary>Seek from the start of the file</Summary>
+      <Description>Seek from the start of the file. Python os module. The whence value for os.lseek that measures the position from the start.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.SEEK_CUR">
+      <Summary>Seek from the current position</Summary>
+      <Description>Seek from the current position. Python os module. The whence value for os.lseek that measures the position from the current one.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.SEEK_END">
+      <Summary>Seek from the end of the file</Summary>
+      <Description>Seek from the end of the file. Python os module. The whence value for os.lseek that measures the position from the end.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.abspath" signature="os.path.abspath(path)">
+      <Summary>Absolute path</Summary>
+      <Description>Absolute path. Python os.path module. Returns the absolute form of a path without resolving symbolic links.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.basename" signature="os.path.basename(path)">
+      <Summary>Final component of a path</Summary>
+      <Description>Final component of a path. Python os.path module. Returns the final component of a path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.commonpath" signature="os.path.commonpath(paths)">
+      <Summary>Common directory of paths</Summary>
+      <Description>Common directory of paths. Python os.path module. Returns the longest common sub-path of the given paths.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.commonprefix" signature="os.path.commonprefix(list)">
+      <Summary>Common prefix of strings</Summary>
+      <Description>Common prefix of strings. Python os.path module. Returns the longest common prefix of the strings.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.dirname" signature="os.path.dirname(path)">
+      <Summary>Directory part of a path</Summary>
+      <Description>Directory part of a path. Python os.path module. Returns the directory part of a path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.exists" signature="os.path.exists(path)">
+      <Summary>Test whether a path exists</Summary>
+      <Description>Test whether a path exists. Python os.path module. Returns True when path refers to an existing file or directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.expanduser" signature="os.path.expanduser(path)">
+      <Summary>Expand a home directory</Summary>
+      <Description>Expand a home directory. Python os.path module. Replaces a leading ~ or ~user with the user's home directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.expandvars" signature="os.path.expandvars(path)">
+      <Summary>Expand environment variables</Summary>
+      <Description>Expand environment variables. Python os.path module. Replaces $name and ${name} references with environment values.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.getatime" signature="os.path.getatime(path)">
+      <Summary>Last access time</Summary>
+      <Description>Last access time. Python os.path module. Returns the last access time of path as a timestamp.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.getctime" signature="os.path.getctime(path)">
+      <Summary>Creation or change time</Summary>
+      <Description>Creation or change time. Python os.path module. Returns the creation time on Windows or the last metadata change time elsewhere.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.getmtime" signature="os.path.getmtime(path)">
+      <Summary>Last modification time</Summary>
+      <Description>Last modification time. Python os.path module. Returns the last modification time of path as a timestamp.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.getsize" signature="os.path.getsize(path)">
+      <Summary>Size of a file</Summary>
+      <Description>Size of a file. Python os.path module. Returns the size of path in bytes.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.isabs" signature="os.path.isabs(path)">
+      <Summary>Test for an absolute path</Summary>
+      <Description>Test for an absolute path. Python os.path module. Returns True when path is absolute.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.isdir" signature="os.path.isdir(path)">
+      <Summary>Test for a directory</Summary>
+      <Description>Test for a directory. Python os.path module. Returns True when path refers to an existing directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.isfile" signature="os.path.isfile(path)">
+      <Summary>Test for a regular file</Summary>
+      <Description>Test for a regular file. Python os.path module. Returns True when path refers to an existing regular file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.islink" signature="os.path.islink(path)">
+      <Summary>Test for a symbolic link</Summary>
+      <Description>Test for a symbolic link. Python os.path module. Returns True when path refers to a symbolic link.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.ismount" signature="os.path.ismount(path)">
+      <Summary>Test for a mount point</Summary>
+      <Description>Test for a mount point. Python os.path module. Returns True when path is a mount point.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.join" signature="os.path.join(path, *paths)">
+      <Summary>Join path components</Summary>
+      <Description>Join path components. Python os.path module. Joins path components with the platform separator.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.normcase" signature="os.path.normcase(path)">
+      <Summary>Normalize path case</Summary>
+      <Description>Normalize path case. Python os.path module. Normalizes the case and separators of a path for the platform.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.normpath" signature="os.path.normpath(path)">
+      <Summary>Normalize a path</Summary>
+      <Description>Normalize a path. Python os.path module. Collapses redundant separators and up-level references in a path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.realpath" signature="os.path.realpath(path, strict=False)">
+      <Summary>Canonical path</Summary>
+      <Description>Canonical path. Python os.path module. Resolves symbolic links and returns the canonical path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.relpath" signature="os.path.relpath(path, start=os.curdir)">
+      <Summary>Relative path</Summary>
+      <Description>Relative path. Python os.path module. Returns a path relative to start.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.samefile" signature="os.path.samefile(path1, path2)">
+      <Summary>Test whether two paths name the same file</Summary>
+      <Description>Test whether two paths name the same file. Python os.path module. Returns True when both paths refer to the same file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.sameopenfile" signature="os.path.sameopenfile(fp1, fp2)">
+      <Summary>Test whether two file objects share a file</Summary>
+      <Description>Test whether two file objects share a file. Python os.path module. Returns True when both file objects refer to the same file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.samestat" signature="os.path.samestat(stat1, stat2)">
+      <Summary>Test whether two stat results describe the same file</Summary>
+      <Description>Test whether two stat results describe the same file. Python os.path module. Returns True when both stat results refer to the same file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.split" signature="os.path.split(path)">
+      <Summary>Split a path into directory and name</Summary>
+      <Description>Split a path into directory and name. Python os.path module. Returns the directory and final component of a path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.splitdrive" signature="os.path.splitdrive(path)">
+      <Summary>Split a path into drive and tail</Summary>
+      <Description>Split a path into drive and tail. Python os.path module. Returns the drive and the rest of a path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.splitext" signature="os.path.splitext(path)">
+      <Summary>Split a path into name and extension</Summary>
+      <Description>Split a path into name and extension. Python os.path module. Returns the path without its extension and the extension itself.</Description>
+    </Symbol>
+    <Symbol language="Python" name="os.path.supports_unicode_filenames">
+      <Summary>Unicode filename support</Summary>
+      <Description>Unicode filename support. Python os.path module. True when the platform accepts Unicode file names.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.argv">
+      <Summary>Command-line arguments</Summary>
+      <Description>Command-line arguments. Python sys module. The list of command-line arguments passed to the script.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.path">
+      <Summary>Module search path</Summary>
+      <Description>Module search path. Python sys module. The list of directories in which Python looks for modules.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.modules">
+      <Summary>Loaded modules</Summary>
+      <Description>Loaded modules. Python sys module. A dictionary that maps module names to the loaded module objects.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.stdin">
+      <Summary>Standard input stream</Summary>
+      <Description>Standard input stream. Python sys module. The file object used for standard input.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.stdout">
+      <Summary>Standard output stream</Summary>
+      <Description>Standard output stream. Python sys module. The file object used for standard output.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.stderr">
+      <Summary>Standard error stream</Summary>
+      <Description>Standard error stream. Python sys module. The file object used for standard error.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.__stdin__">
+      <Summary>Original standard input stream</Summary>
+      <Description>Original standard input stream. Python sys module. The original value of sys.stdin, before any redirection.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.__stdout__">
+      <Summary>Original standard output stream</Summary>
+      <Description>Original standard output stream. Python sys module. The original value of sys.stdout, before any redirection.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.__stderr__">
+      <Summary>Original standard error stream</Summary>
+      <Description>Original standard error stream. Python sys module. The original value of sys.stderr, before any redirection.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.version">
+      <Summary>Python version string</Summary>
+      <Description>Python version string. Python sys module. A string that describes the Python interpreter version and build.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.version_info">
+      <Summary>Python version components</Summary>
+      <Description>Python version components. Python sys module. A named tuple with the major, minor, micro, release level and serial.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.api_version">
+      <Summary>C API version</Summary>
+      <Description>C API version. Python sys module. The version of the Python C API used by this interpreter.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.platform">
+      <Summary>Platform identifier</Summary>
+      <Description>Platform identifier. Python sys module. A string that identifies the operating system, such as 'linux' or 'win32'.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.executable">
+      <Summary>Path to the Python interpreter</Summary>
+      <Description>Path to the Python interpreter. Python sys module. The absolute path of the Python executable.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.prefix">
+      <Summary>Installation prefix</Summary>
+      <Description>Installation prefix. Python sys module. The directory prefix under which Python is installed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.exec_prefix">
+      <Summary>Platform-specific installation prefix</Summary>
+      <Description>Platform-specific installation prefix. Python sys module. The directory prefix for platform-specific files.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.base_prefix">
+      <Summary>Base installation prefix</Summary>
+      <Description>Base installation prefix. Python sys module. The installation prefix of the base Python, before any virtual environment.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.base_exec_prefix">
+      <Summary>Base platform-specific prefix</Summary>
+      <Description>Base platform-specific prefix. Python sys module. The platform-specific prefix of the base Python, before any virtual environment.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.byteorder">
+      <Summary>Native byte order</Summary>
+      <Description>Native byte order. Python sys module. The native byte order, either 'little' or 'big'.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.maxsize">
+      <Summary>Largest integer supported</Summary>
+      <Description>Largest integer supported. Python sys module. The largest value an integer can have on this platform.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.maxunicode">
+      <Summary>Largest Unicode code point</Summary>
+      <Description>Largest Unicode code point. Python sys module. The largest Unicode code point supported by this build.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.float_info">
+      <Summary>Floating-point information</Summary>
+      <Description>Floating-point information. Python sys module. A named tuple that describes the floating-point implementation.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.int_info">
+      <Summary>Integer representation information</Summary>
+      <Description>Integer representation information. Python sys module. A named tuple that describes the internal representation of integers.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.hash_info">
+      <Summary>Hash algorithm information</Summary>
+      <Description>Hash algorithm information. Python sys module. A named tuple that describes the hash algorithm.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.thread_info">
+      <Summary>Thread implementation information</Summary>
+      <Description>Thread implementation information. Python sys module. A named tuple that describes the thread implementation.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.flags">
+      <Summary>Interpreter flags</Summary>
+      <Description>Interpreter flags. Python sys module. A named tuple with the command-line flags of the interpreter.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.orig_argv">
+      <Summary>Original command line</Summary>
+      <Description>Original command line. Python sys module. The original command-line arguments before Python processed them.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.getrecursionlimit" signature="sys.getrecursionlimit()">
+      <Summary>Current recursion limit</Summary>
+      <Description>Current recursion limit. Python sys module. Returns the maximum depth of the Python call stack.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.setrecursionlimit" signature="sys.setrecursionlimit(limit)">
+      <Summary>Set the recursion limit</Summary>
+      <Description>Set the recursion limit. Python sys module. Sets the maximum depth of the Python call stack.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.getrefcount" signature="sys.getrefcount(object)">
+      <Summary>Reference count</Summary>
+      <Description>Reference count. Python sys module. Returns the reference count of an object.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.getsizeof" signature="sys.getsizeof(object, default=None)">
+      <Summary>Size of an object</Summary>
+      <Description>Size of an object. Python sys module. Returns the size of an object in bytes.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.exc_info" signature="sys.exc_info()">
+      <Summary>Exception being handled</Summary>
+      <Description>Exception being handled. Python sys module. Returns the type, value and traceback of the current exception.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.exception" signature="sys.exception()">
+      <Summary>Exception instance being handled</Summary>
+      <Description>Exception instance being handled. Python sys module. Returns the exception instance currently being handled.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.exit" signature="sys.exit(status=None)">
+      <Summary>Exit the interpreter</Summary>
+      <Description>Exit the interpreter. Python sys module. Raises SystemExit to terminate the interpreter with the given status.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.getdefaultencoding" signature="sys.getdefaultencoding()">
+      <Summary>Default text encoding</Summary>
+      <Description>Default text encoding. Python sys module. Returns the default encoding used for text.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.getfilesystemencoding" signature="sys.getfilesystemencoding()">
+      <Summary>File system encoding</Summary>
+      <Description>File system encoding. Python sys module. Returns the encoding used for file names.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.getwindowsversion" signature="sys.getwindowsversion()">
+      <Summary>Windows version</Summary>
+      <Description>Windows version. Python sys module. Returns the version of Windows on which Python is running.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.intern" signature="sys.intern(string)">
+      <Summary>Intern a string</Summary>
+      <Description>Intern a string. Python sys module. Adds a string to the interned string table and returns it.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.is_finalizing" signature="sys.is_finalizing()">
+      <Summary>Interpreter shutdown test</Summary>
+      <Description>Interpreter shutdown test. Python sys module. Returns True when the interpreter is shutting down.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.settrace" signature="sys.settrace(tracefunc)">
+      <Summary>Set the trace function</Summary>
+      <Description>Set the trace function. Python sys module. Sets the function called by the interpreter for tracing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.gettrace" signature="sys.gettrace()">
+      <Summary>Current trace function</Summary>
+      <Description>Current trace function. Python sys module. Returns the trace function set by settrace, or None.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.setprofile" signature="sys.setprofile(profilefunc)">
+      <Summary>Set the profile function</Summary>
+      <Description>Set the profile function. Python sys module. Sets the function called by the interpreter for profiling.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.getprofile" signature="sys.getprofile()">
+      <Summary>Current profile function</Summary>
+      <Description>Current profile function. Python sys module. Returns the profile function set by setprofile, or None.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.audit" signature="sys.audit(event, *args)">
+      <Summary>Raise an audit event</Summary>
+      <Description>Raise an audit event. Python sys module. Calls the active audit hooks with an event name and arguments.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.addaudithook" signature="sys.addaudithook(hook)">
+      <Summary>Add an audit hook</Summary>
+      <Description>Add an audit hook. Python sys module. Registers a function that is called for every audit event.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.displayhook" signature="sys.displayhook(value)">
+      <Summary>Display a value in the REPL</Summary>
+      <Description>Display a value in the REPL. Python sys module. Prints the value of an expression in an interactive session.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.excepthook" signature="sys.excepthook(type, value, traceback)">
+      <Summary>Handle an uncaught exception</Summary>
+      <Description>Handle an uncaught exception. Python sys module. Prints an uncaught exception and its traceback.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.unraisablehook" signature="sys.unraisablehook(unraisable)">
+      <Summary>Handle an unraisable exception</Summary>
+      <Description>Handle an unraisable exception. Python sys module. Handles an exception that cannot be propagated, such as one in a destructor.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.breakpointhook" signature="sys.breakpointhook(*args, **kws)">
+      <Summary>Handle a breakpoint call</Summary>
+      <Description>Handle a breakpoint call. Python sys module. Called by breakpoint to enter the configured debugger.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.set_int_max_str_digits" signature="sys.set_int_max_str_digits(maxdigits)">
+      <Summary>Limit integer string conversion</Summary>
+      <Description>Limit integer string conversion. Python sys module. Sets the maximum number of digits used when converting between integers and strings.</Description>
+    </Symbol>
+    <Symbol language="Python" name="sys.get_int_max_str_digits" signature="sys.get_int_max_str_digits()">
+      <Summary>Integer string conversion limit</Summary>
+      <Description>Integer string conversion limit. Python sys module. Returns the maximum number of digits used for integer string conversion.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.compile" signature="re.compile(pattern, flags=0)">
+      <Summary>Compile a regular expression</Summary>
+      <Description>Compile a regular expression. Python re module. Compiles a pattern into a reusable Pattern object.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.search" signature="re.search(pattern, string, flags=0)">
+      <Summary>Search for a match anywhere</Summary>
+      <Description>Search for a match anywhere. Python re module. Returns the first match of the pattern anywhere in the string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.match" signature="re.match(pattern, string, flags=0)">
+      <Summary>Match at the start</Summary>
+      <Description>Match at the start. Python re module. Returns a match when the pattern matches at the start of the string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.fullmatch" signature="re.fullmatch(pattern, string, flags=0)">
+      <Summary>Match the whole string</Summary>
+      <Description>Match the whole string. Python re module. Returns a match when the pattern matches the whole string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.split" signature="re.split(pattern, string, maxsplit=0, flags=0)">
+      <Summary>Split a string</Summary>
+      <Description>Split a string. Python re module. Splits the string at the matches of the pattern.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.findall" signature="re.findall(pattern, string, flags=0)">
+      <Summary>Find all matches</Summary>
+      <Description>Find all matches. Python re module. Returns a list of all non-overlapping matches.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.finditer" signature="re.finditer(pattern, string, flags=0)">
+      <Summary>Iterate over all matches</Summary>
+      <Description>Iterate over all matches. Python re module. Returns an iterator over all non-overlapping matches.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.sub" signature="re.sub(pattern, repl, string, count=0, flags=0)">
+      <Summary>Replace matches</Summary>
+      <Description>Replace matches. Python re module. Replaces the matches of the pattern and returns the new string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.subn" signature="re.subn(pattern, repl, string, count=0, flags=0)">
+      <Summary>Replace matches and count them</Summary>
+      <Description>Replace matches and count them. Python re module. Replaces the matches and returns the new string and the number of replacements.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.escape" signature="re.escape(pattern)">
+      <Summary>Escape a literal string</Summary>
+      <Description>Escape a literal string. Python re module. Escapes the characters of a string so it can be used as a literal pattern.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.purge" signature="re.purge()">
+      <Summary>Clear the regular expression cache</Summary>
+      <Description>Clear the regular expression cache. Python re module. Clears the cache of compiled regular expressions.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.Pattern">
+      <Summary>Compiled regular expression</Summary>
+      <Description>Compiled regular expression. Python re module. The type of the objects returned by re.compile.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.Match">
+      <Summary>Regular expression match</Summary>
+      <Description>Regular expression match. Python re module. The type of the objects returned by a successful match.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.error">
+      <Summary>Regular expression error</Summary>
+      <Description>Regular expression error. Python re module. The exception raised for an invalid regular expression or flag.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.A">
+      <Summary>ASCII matching flag</Summary>
+      <Description>ASCII matching flag. Python re module. Makes character classes match only ASCII characters.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.ASCII">
+      <Summary>ASCII matching flag</Summary>
+      <Description>ASCII matching flag. Python re module. Makes character classes match only ASCII characters.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.DEBUG">
+      <Summary>Debug flag</Summary>
+      <Description>Debug flag. Python re module. Prints the compiled expression to standard output.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.I">
+      <Summary>Ignore case flag</Summary>
+      <Description>Ignore case flag. Python re module. Makes matching case-insensitive.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.IGNORECASE">
+      <Summary>Ignore case flag</Summary>
+      <Description>Ignore case flag. Python re module. Makes matching case-insensitive.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.L">
+      <Summary>Locale flag</Summary>
+      <Description>Locale flag. Python re module. Makes character classes depend on the current locale.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.LOCALE">
+      <Summary>Locale flag</Summary>
+      <Description>Locale flag. Python re module. Makes character classes depend on the current locale.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.M">
+      <Summary>Multiline flag</Summary>
+      <Description>Multiline flag. Python re module. Makes ^ and $ match at the start and end of every line.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.MULTILINE">
+      <Summary>Multiline flag</Summary>
+      <Description>Multiline flag. Python re module. Makes ^ and $ match at the start and end of every line.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.NOFLAG">
+      <Summary>No flag</Summary>
+      <Description>No flag. Python re module. The value zero, used when no regular expression flag is requested.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.S">
+      <Summary>Dot matches newline flag</Summary>
+      <Description>Dot matches newline flag. Python re module. Makes the dot match any character, including a newline.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.DOTALL">
+      <Summary>Dot matches newline flag</Summary>
+      <Description>Dot matches newline flag. Python re module. Makes the dot match any character, including a newline.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.U">
+      <Summary>Unicode matching flag</Summary>
+      <Description>Unicode matching flag. Python re module. Makes character classes depend on Unicode properties.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.UNICODE">
+      <Summary>Unicode matching flag</Summary>
+      <Description>Unicode matching flag. Python re module. Makes character classes depend on Unicode properties.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.X">
+      <Summary>Verbose flag</Summary>
+      <Description>Verbose flag. Python re module. Allows whitespace and comments in the pattern.</Description>
+    </Symbol>
+    <Symbol language="Python" name="re.VERBOSE">
+      <Summary>Verbose flag</Summary>
+      <Description>Verbose flag. Python re module. Allows whitespace and comments in the pattern.</Description>
+    </Symbol>
+    <Symbol language="Python" name="json.dumps" signature="json.dumps(obj, *, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, default=None, sort_keys=False)">
+      <Summary>Encode an object as JSON text</Summary>
+      <Description>Encode an object as JSON text. Python json module. Serializes an object to a JSON string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="json.dump" signature="json.dump(obj, fp, *, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, default=None, sort_keys=False)">
+      <Summary>Write an object as JSON</Summary>
+      <Description>Write an object as JSON. Python json module. Serializes an object as JSON to a file object.</Description>
+    </Symbol>
+    <Symbol language="Python" name="json.loads" signature="json.loads(s, *, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, object_pairs_hook=None, **kw)">
+      <Summary>Decode JSON text</Summary>
+      <Description>Decode JSON text. Python json module. Deserializes a JSON string into Python objects.</Description>
+    </Symbol>
+    <Symbol language="Python" name="json.load" signature="json.load(fp, *, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, object_pairs_hook=None, **kw)">
+      <Summary>Read JSON from a file</Summary>
+      <Description>Read JSON from a file. Python json module. Deserializes JSON from a file object.</Description>
+    </Symbol>
+    <Symbol language="Python" name="json.JSONEncoder">
+      <Summary>JSON encoder</Summary>
+      <Description>JSON encoder. Python json module. The class that implements JSON serialization.</Description>
+    </Symbol>
+    <Symbol language="Python" name="json.JSONDecoder">
+      <Summary>JSON decoder</Summary>
+      <Description>JSON decoder. Python json module. The class that implements JSON deserialization.</Description>
+    </Symbol>
+    <Symbol language="Python" name="json.JSONDecodeError">
+      <Summary>JSON decoding error</Summary>
+      <Description>JSON decoding error. Python json module. The exception raised when JSON text is invalid.</Description>
+    </Symbol>
+    <Symbol language="Python" name="json.detect_encoding" signature="json.detect_encoding(b)">
+      <Summary>Detect the encoding of JSON bytes</Summary>
+      <Description>Detect the encoding of JSON bytes. Python json module. Returns the encoding declared by a JSON byte string or used by default.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath" signature="pathlib.PurePath(*pathsegments)">
+      <Summary>Platform-independent path</Summary>
+      <Description>Platform-independent path. Python pathlib module. A path that supports purely lexical operations without touching the file system.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePosixPath" signature="pathlib.PurePosixPath(*pathsegments)">
+      <Summary>POSIX path</Summary>
+      <Description>POSIX path. Python pathlib module. A pure path that uses POSIX path syntax on any platform.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PureWindowsPath" signature="pathlib.PureWindowsPath(*pathsegments)">
+      <Summary>Windows path</Summary>
+      <Description>Windows path. Python pathlib module. A pure path that uses Windows path syntax on any platform.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path" signature="pathlib.Path(*pathsegments)">
+      <Summary>Concrete path</Summary>
+      <Description>Concrete path. Python pathlib module. A path that also provides file system operations.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PosixPath" signature="pathlib.PosixPath(*pathsegments)">
+      <Summary>Concrete POSIX path</Summary>
+      <Description>Concrete POSIX path. Python pathlib module. The concrete path class used on POSIX systems.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.WindowsPath" signature="pathlib.WindowsPath(*pathsegments)">
+      <Summary>Concrete Windows path</Summary>
+      <Description>Concrete Windows path. Python pathlib module. The concrete path class used on Windows.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.parts">
+      <Summary>Path components</Summary>
+      <Description>Path components. Python pathlib module. A tuple with the individual components of the path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.drive">
+      <Summary>Drive of a path</Summary>
+      <Description>Drive of a path. Python pathlib module. The drive part of the path, or an empty string when there is none.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.root">
+      <Summary>Root of a path</Summary>
+      <Description>Root of a path. Python pathlib module. The root part of the path, such as '/' or '\\'.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.anchor">
+      <Summary>Anchor of a path</Summary>
+      <Description>Anchor of a path. Python pathlib module. The drive and root combined.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.parents">
+      <Summary>Parent directories</Summary>
+      <Description>Parent directories. Python pathlib module. A sequence of the logical parents of the path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.parent">
+      <Summary>Parent directory</Summary>
+      <Description>Parent directory. Python pathlib module. The logical parent of the path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.name">
+      <Summary>Final component of a path</Summary>
+      <Description>Final component of a path. Python pathlib module. The final component of the path, without its directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.suffix">
+      <Summary>File extension</Summary>
+      <Description>File extension. Python pathlib module. The extension of the final component, including the leading dot.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.suffixes">
+      <Summary>File extensions</Summary>
+      <Description>File extensions. Python pathlib module. A list of the extensions of the final component.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.stem">
+      <Summary>File name without its extension</Summary>
+      <Description>File name without its extension. Python pathlib module. The final component without its suffix.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.as_posix" signature="pathlib.PurePath.as_posix()">
+      <Summary>Path with forward slashes</Summary>
+      <Description>Path with forward slashes. Python pathlib module. Returns the path as a string with forward slashes.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.as_uri" signature="pathlib.PurePath.as_uri()">
+      <Summary>Path as a file URI</Summary>
+      <Description>Path as a file URI. Python pathlib module. Returns the absolute path as a file URI.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.is_absolute" signature="pathlib.PurePath.is_absolute()">
+      <Summary>Test for an absolute path</Summary>
+      <Description>Test for an absolute path. Python pathlib module. Returns True when the path is absolute.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.is_relative_to" signature="pathlib.PurePath.is_relative_to(other)">
+      <Summary>Test whether a path is below another</Summary>
+      <Description>Test whether a path is below another. Python pathlib module. Returns True when the path is relative to other.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.joinpath" signature="pathlib.PurePath.joinpath(*pathsegments)">
+      <Summary>Join path components</Summary>
+      <Description>Join path components. Python pathlib module. Returns a new path with the given components appended.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.match" signature="pathlib.PurePath.match(pattern, *, case_sensitive=None)">
+      <Summary>Match a path pattern</Summary>
+      <Description>Match a path pattern. Python pathlib module. Tests the path against a glob pattern from the right.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.relative_to" signature="pathlib.PurePath.relative_to(other, *, walk_up=False)">
+      <Summary>Relative path</Summary>
+      <Description>Relative path. Python pathlib module. Returns the path relative to other.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.with_name" signature="pathlib.PurePath.with_name(name)">
+      <Summary>Change the final component</Summary>
+      <Description>Change the final component. Python pathlib module. Returns a path with the final component replaced by name.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.with_stem" signature="pathlib.PurePath.with_stem(stem)">
+      <Summary>Change the file name stem</Summary>
+      <Description>Change the file name stem. Python pathlib module. Returns a path with the final component's stem replaced.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.with_suffix" signature="pathlib.PurePath.with_suffix(suffix)">
+      <Summary>Change the file extension</Summary>
+      <Description>Change the file extension. Python pathlib module. Returns a path with the final component's suffix replaced.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.PurePath.full_match" signature="pathlib.PurePath.full_match(pattern, *, case_sensitive=None)">
+      <Summary>Match the whole path</Summary>
+      <Description>Match the whole path. Python pathlib module. Tests whether the whole path matches a glob pattern.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.cwd" signature="pathlib.Path.cwd()">
+      <Summary>Current working directory</Summary>
+      <Description>Current working directory. Python pathlib module. Returns a Path for the current working directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.home" signature="pathlib.Path.home()">
+      <Summary>Home directory</Summary>
+      <Description>Home directory. Python pathlib module. Returns a Path for the current user's home directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.stat" signature="pathlib.Path.stat()">
+      <Summary>Status of the path</Summary>
+      <Description>Status of the path. Python pathlib module. Returns status information about the file or directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.lstat" signature="pathlib.Path.lstat()">
+      <Summary>Status of a symbolic link</Summary>
+      <Description>Status of a symbolic link. Python pathlib module. Returns status information without following a symbolic link.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.exists" signature="pathlib.Path.exists()">
+      <Summary>Test whether the path exists</Summary>
+      <Description>Test whether the path exists. Python pathlib module. Returns True when the path exists.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.is_dir" signature="pathlib.Path.is_dir()">
+      <Summary>Test for a directory</Summary>
+      <Description>Test for a directory. Python pathlib module. Returns True when the path is a directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.is_file" signature="pathlib.Path.is_file()">
+      <Summary>Test for a regular file</Summary>
+      <Description>Test for a regular file. Python pathlib module. Returns True when the path is a regular file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.is_symlink" signature="pathlib.Path.is_symlink()">
+      <Summary>Test for a symbolic link</Summary>
+      <Description>Test for a symbolic link. Python pathlib module. Returns True when the path is a symbolic link.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.is_socket" signature="pathlib.Path.is_socket()">
+      <Summary>Test for a socket</Summary>
+      <Description>Test for a socket. Python pathlib module. Returns True when the path is a Unix socket.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.is_fifo" signature="pathlib.Path.is_fifo()">
+      <Summary>Test for a FIFO</Summary>
+      <Description>Test for a FIFO. Python pathlib module. Returns True when the path is a named pipe.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.is_block_device" signature="pathlib.Path.is_block_device()">
+      <Summary>Test for a block device</Summary>
+      <Description>Test for a block device. Python pathlib module. Returns True when the path is a block device.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.is_char_device" signature="pathlib.Path.is_char_device()">
+      <Summary>Test for a character device</Summary>
+      <Description>Test for a character device. Python pathlib module. Returns True when the path is a character device.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.is_mount" signature="pathlib.Path.is_mount()">
+      <Summary>Test for a mount point</Summary>
+      <Description>Test for a mount point. Python pathlib module. Returns True when the path is a mount point.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.iterdir" signature="pathlib.Path.iterdir()">
+      <Summary>Iterate over a directory</Summary>
+      <Description>Iterate over a directory. Python pathlib module. Yields the entries of the directory as Path objects.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.glob" signature="pathlib.Path.glob(pattern, *, case_sensitive=None)">
+      <Summary>Find paths by pattern</Summary>
+      <Description>Find paths by pattern. Python pathlib module. Yields the paths in the directory that match a glob pattern.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.rglob" signature="pathlib.Path.rglob(pattern, *, case_sensitive=None)">
+      <Summary>Find paths recursively</Summary>
+      <Description>Find paths recursively. Python pathlib module. Yields the paths below the directory that match a glob pattern.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.walk" signature="pathlib.Path.walk(top_down=True, on_error=None, follow_symlinks=False)">
+      <Summary>Walk a directory tree</Summary>
+      <Description>Walk a directory tree. Python pathlib module. Yields the directory, its subdirectories and its files.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.mkdir" signature="pathlib.Path.mkdir(mode=0o777, parents=False, exist_ok=False)">
+      <Summary>Create a directory</Summary>
+      <Description>Create a directory. Python pathlib module. Creates the directory, optionally with its parents.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.rmdir" signature="pathlib.Path.rmdir()">
+      <Summary>Remove an empty directory</Summary>
+      <Description>Remove an empty directory. Python pathlib module. Removes the empty directory.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.unlink" signature="pathlib.Path.unlink(missing_ok=False)">
+      <Summary>Remove a file or link</Summary>
+      <Description>Remove a file or link. Python pathlib module. Removes the file or symbolic link.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.rename" signature="pathlib.Path.rename(target)">
+      <Summary>Rename the path</Summary>
+      <Description>Rename the path. Python pathlib module. Renames the file or directory to target.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.replace" signature="pathlib.Path.replace(target)">
+      <Summary>Replace the path</Summary>
+      <Description>Replace the path. Python pathlib module. Renames the file or directory to target, replacing an existing one.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.resolve" signature="pathlib.Path.resolve(strict=False)">
+      <Summary>Canonical path</Summary>
+      <Description>Canonical path. Python pathlib module. Resolves symbolic links and returns the absolute path.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.absolute" signature="pathlib.Path.absolute()">
+      <Summary>Absolute path</Summary>
+      <Description>Absolute path. Python pathlib module. Returns an absolute path without resolving symbolic links.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.expanduser" signature="pathlib.Path.expanduser()">
+      <Summary>Expand a home directory</Summary>
+      <Description>Expand a home directory. Python pathlib module. Returns a path with ~ and ~user expanded.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.read_text" signature="pathlib.Path.read_text(encoding=None, errors=None)">
+      <Summary>Read text from a file</Summary>
+      <Description>Read text from a file. Python pathlib module. Reads the file and returns its contents as text.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.write_text" signature="pathlib.Path.write_text(data, encoding=None, errors=None, newline=None)">
+      <Summary>Write text to a file</Summary>
+      <Description>Write text to a file. Python pathlib module. Writes text to the file and returns the number of characters written.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.read_bytes" signature="pathlib.Path.read_bytes()">
+      <Summary>Read bytes from a file</Summary>
+      <Description>Read bytes from a file. Python pathlib module. Reads the file and returns its contents as bytes.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.write_bytes" signature="pathlib.Path.write_bytes(data)">
+      <Summary>Write bytes to a file</Summary>
+      <Description>Write bytes to a file. Python pathlib module. Writes bytes to the file and returns the number of bytes written.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.open" signature="pathlib.Path.open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)">
+      <Summary>Open the file</Summary>
+      <Description>Open the file. Python pathlib module. Opens the file and returns a file object.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.touch" signature="pathlib.Path.touch(mode=0o666, exist_ok=True)">
+      <Summary>Create or update a file</Summary>
+      <Description>Create or update a file. Python pathlib module. Creates the file when it is missing or updates its modification time.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.samefile" signature="pathlib.Path.samefile(other_path)">
+      <Summary>Test whether two paths name the same file</Summary>
+      <Description>Test whether two paths name the same file. Python pathlib module. Returns True when the path and other_path refer to the same file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.chmod" signature="pathlib.Path.chmod(mode, *, follow_symlinks=True)">
+      <Summary>Change permissions</Summary>
+      <Description>Change permissions. Python pathlib module. Changes the permission bits of the file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.lchmod" signature="pathlib.Path.lchmod(mode)">
+      <Summary>Change permissions of a symbolic link</Summary>
+      <Description>Change permissions of a symbolic link. Python pathlib module. Changes the permission bits of a symbolic link itself.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.owner" signature="pathlib.Path.owner()">
+      <Summary>Owner of the file</Summary>
+      <Description>Owner of the file. Python pathlib module. Returns the user name of the file owner.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.group" signature="pathlib.Path.group()">
+      <Summary>Group of the file</Summary>
+      <Description>Group of the file. Python pathlib module. Returns the group name of the file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.symlink_to" signature="pathlib.Path.symlink_to(target, target_is_directory=False)">
+      <Summary>Create a symbolic link</Summary>
+      <Description>Create a symbolic link. Python pathlib module. Creates a symbolic link at the path that points to target.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.hardlink_to" signature="pathlib.Path.hardlink_to(target)">
+      <Summary>Create a hard link</Summary>
+      <Description>Create a hard link. Python pathlib module. Creates a hard link at the path that refers to target.</Description>
+    </Symbol>
+    <Symbol language="Python" name="pathlib.Path.readlink" signature="pathlib.Path.readlink()">
+      <Summary>Target of a symbolic link</Summary>
+      <Description>Target of a symbolic link. Python pathlib module. Returns the path that the symbolic link refers to.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date" signature="datetime.date(year, month, day)">
+      <Summary>Calendar date</Summary>
+      <Description>Calendar date. Python datetime module. A date with a year, a month and a day.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.time" signature="datetime.time(hour=0, minute=0, second=0, microsecond=0, tzinfo=None, *, fold=0)">
+      <Summary>Time of day</Summary>
+      <Description>Time of day. Python datetime module. A time of day with an optional time zone.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime" signature="datetime.datetime(year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, *, fold=0)">
+      <Summary>Date and time</Summary>
+      <Description>Date and time. Python datetime module. A date and a time of day with an optional time zone.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.timedelta" signature="datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0, weeks=0)">
+      <Summary>Duration</Summary>
+      <Description>Duration. Python datetime module. A duration expressed in days, seconds and microseconds.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.tzinfo">
+      <Summary>Time zone base class</Summary>
+      <Description>Time zone base class. Python datetime module. The base class of the objects that describe a time zone.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.timezone" signature="datetime.timezone(offset, name=None)">
+      <Summary>Fixed time zone</Summary>
+      <Description>Fixed time zone. Python datetime module. A time zone with a fixed offset from UTC.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.MINYEAR">
+      <Summary>Smallest supported year</Summary>
+      <Description>Smallest supported year. Python datetime module. The smallest year accepted by the date and datetime classes.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.MAXYEAR">
+      <Summary>Largest supported year</Summary>
+      <Description>Largest supported year. Python datetime module. The largest year accepted by the date and datetime classes.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.UTC">
+      <Summary>UTC time zone</Summary>
+      <Description>UTC time zone. Python datetime module. The time zone object for Coordinated Universal Time.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.timezone.utc">
+      <Summary>UTC time zone</Summary>
+      <Description>UTC time zone. Python datetime module. The time zone object for Coordinated Universal Time.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.timezone.min">
+      <Summary>Smallest time zone offset</Summary>
+      <Description>Smallest time zone offset. Python datetime module. The time zone with the smallest possible offset.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.timezone.max">
+      <Summary>Largest time zone offset</Summary>
+      <Description>Largest time zone offset. Python datetime module. The time zone with the largest possible offset.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.today" signature="datetime.date.today()">
+      <Summary>Current local date</Summary>
+      <Description>Current local date. Python datetime module. Returns the current local date.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.fromtimestamp" signature="datetime.date.fromtimestamp(timestamp)">
+      <Summary>Date from a timestamp</Summary>
+      <Description>Date from a timestamp. Python datetime module. Returns the local date for a POSIX timestamp.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.fromordinal" signature="datetime.date.fromordinal(ordinal)">
+      <Summary>Date from an ordinal</Summary>
+      <Description>Date from an ordinal. Python datetime module. Returns the date for a proleptic Gregorian ordinal.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.fromisoformat" signature="datetime.date.fromisoformat(date_string)">
+      <Summary>Date from ISO text</Summary>
+      <Description>Date from ISO text. Python datetime module. Parses a date in ISO 8601 format.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.fromisocalendar" signature="datetime.date.fromisocalendar(year, week, day)">
+      <Summary>Date from an ISO week date</Summary>
+      <Description>Date from an ISO week date. Python datetime module. Returns the date for an ISO year, week and weekday.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.isoformat" signature="datetime.date.isoformat()">
+      <Summary>Date as ISO text</Summary>
+      <Description>Date as ISO text. Python datetime module. Returns the date in ISO 8601 format.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.strftime" signature="datetime.date.strftime(format)">
+      <Summary>Format a date</Summary>
+      <Description>Format a date. Python datetime module. Formats the date with strftime-style directives.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.replace" signature="datetime.date.replace(year, month, day)">
+      <Summary>Replace date fields</Summary>
+      <Description>Replace date fields. Python datetime module. Returns a date with the selected fields replaced.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.weekday" signature="datetime.date.weekday()">
+      <Summary>Weekday number</Summary>
+      <Description>Weekday number. Python datetime module. Returns the day of the week, where Monday is 0.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.isoweekday" signature="datetime.date.isoweekday()">
+      <Summary>ISO weekday number</Summary>
+      <Description>ISO weekday number. Python datetime module. Returns the day of the week, where Monday is 1.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.isocalendar" signature="datetime.date.isocalendar()">
+      <Summary>ISO calendar date</Summary>
+      <Description>ISO calendar date. Python datetime module. Returns the ISO year, week and weekday.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.ctime" signature="datetime.date.ctime()">
+      <Summary>Date as ctime text</Summary>
+      <Description>Date as ctime text. Python datetime module. Returns the date in ctime format.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.timetuple" signature="datetime.date.timetuple()">
+      <Summary>Date as a time tuple</Summary>
+      <Description>Date as a time tuple. Python datetime module. Returns the date as a struct_time-like tuple.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.date.toordinal" signature="datetime.date.toordinal()">
+      <Summary>Proleptic Gregorian ordinal</Summary>
+      <Description>Proleptic Gregorian ordinal. Python datetime module. Returns the ordinal of the date.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.now" signature="datetime.datetime.now(tz=None)">
+      <Summary>Current date and time</Summary>
+      <Description>Current date and time. Python datetime module. Returns the current local date and time, optionally in a time zone.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.utcnow" signature="datetime.datetime.utcnow()">
+      <Summary>Current UTC date and time</Summary>
+      <Description>Current UTC date and time. Python datetime module. Returns the current UTC date and time without a time zone.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.today" signature="datetime.datetime.today()">
+      <Summary>Current local date and time</Summary>
+      <Description>Current local date and time. Python datetime module. Returns the current local date and time.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.fromtimestamp" signature="datetime.datetime.fromtimestamp(timestamp, tz=None)">
+      <Summary>Date and time from a timestamp</Summary>
+      <Description>Date and time from a timestamp. Python datetime module. Returns the local date and time for a POSIX timestamp.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.utcfromtimestamp" signature="datetime.datetime.utcfromtimestamp(timestamp)">
+      <Summary>UTC date and time from a timestamp</Summary>
+      <Description>UTC date and time from a timestamp. Python datetime module. Returns the UTC date and time for a POSIX timestamp.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.strptime" signature="datetime.datetime.strptime(date_string, format)">
+      <Summary>Parse a date and time</Summary>
+      <Description>Parse a date and time. Python datetime module. Parses text according to strftime-style directives.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.fromisoformat" signature="datetime.datetime.fromisoformat(date_string)">
+      <Summary>Date and time from ISO text</Summary>
+      <Description>Date and time from ISO text. Python datetime module. Parses a date and time in ISO 8601 format.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.fromisocalendar" signature="datetime.datetime.fromisocalendar(year, week, day)">
+      <Summary>Date and time from an ISO week date</Summary>
+      <Description>Date and time from an ISO week date. Python datetime module. Returns the date and time for an ISO year, week and weekday.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.combine" signature="datetime.datetime.combine(date, time, tzinfo=time.tzinfo)">
+      <Summary>Combine a date and a time</Summary>
+      <Description>Combine a date and a time. Python datetime module. Returns a datetime from a date and a time.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.isoformat" signature="datetime.datetime.isoformat(sep='T', timespec='auto')">
+      <Summary>Date and time as ISO text</Summary>
+      <Description>Date and time as ISO text. Python datetime module. Returns the date and time in ISO 8601 format.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.strftime" signature="datetime.datetime.strftime(format)">
+      <Summary>Format a date and time</Summary>
+      <Description>Format a date and time. Python datetime module. Formats the date and time with strftime-style directives.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.timestamp" signature="datetime.datetime.timestamp()">
+      <Summary>POSIX timestamp</Summary>
+      <Description>POSIX timestamp. Python datetime module. Returns the date and time as a POSIX timestamp.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.date" signature="datetime.datetime.date()">
+      <Summary>Date part</Summary>
+      <Description>Date part. Python datetime module. Returns the date part as a date object.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.time" signature="datetime.datetime.time()">
+      <Summary>Time part</Summary>
+      <Description>Time part. Python datetime module. Returns the time part without time zone information.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.timetz" signature="datetime.datetime.timetz()">
+      <Summary>Time part with time zone</Summary>
+      <Description>Time part with time zone. Python datetime module. Returns the time part with its time zone information.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.astimezone" signature="datetime.datetime.astimezone(tz=None)">
+      <Summary>Convert to another time zone</Summary>
+      <Description>Convert to another time zone. Python datetime module. Returns the date and time in another time zone.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.replace" signature="datetime.datetime.replace(year, month, day, hour, minute, second, microsecond, tzinfo, *, fold=0)">
+      <Summary>Replace date and time fields</Summary>
+      <Description>Replace date and time fields. Python datetime module. Returns a datetime with the selected fields replaced.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.weekday" signature="datetime.datetime.weekday()">
+      <Summary>Weekday number</Summary>
+      <Description>Weekday number. Python datetime module. Returns the day of the week, where Monday is 0.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.isoweekday" signature="datetime.datetime.isoweekday()">
+      <Summary>ISO weekday number</Summary>
+      <Description>ISO weekday number. Python datetime module. Returns the day of the week, where Monday is 1.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.isocalendar" signature="datetime.datetime.isocalendar()">
+      <Summary>ISO calendar date</Summary>
+      <Description>ISO calendar date. Python datetime module. Returns the ISO year, week and weekday.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.ctime" signature="datetime.datetime.ctime()">
+      <Summary>Date and time as ctime text</Summary>
+      <Description>Date and time as ctime text. Python datetime module. Returns the date and time in ctime format.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.datetime.timetuple" signature="datetime.datetime.timetuple()">
+      <Summary>Date and time as a time tuple</Summary>
+      <Description>Date and time as a time tuple. Python datetime module. Returns the date and time as a struct_time-like tuple.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.time.fromisoformat" signature="datetime.time.fromisoformat(time_string)">
+      <Summary>Time from ISO text</Summary>
+      <Description>Time from ISO text. Python datetime module. Parses a time in ISO 8601 format.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.time.isoformat" signature="datetime.time.isoformat(timespec='auto')">
+      <Summary>Time as ISO text</Summary>
+      <Description>Time as ISO text. Python datetime module. Returns the time in ISO 8601 format.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.time.strftime" signature="datetime.time.strftime(format)">
+      <Summary>Format a time</Summary>
+      <Description>Format a time. Python datetime module. Formats the time with strftime-style directives.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.time.replace" signature="datetime.time.replace(hour, minute, second, microsecond, tzinfo, *, fold=0)">
+      <Summary>Replace time fields</Summary>
+      <Description>Replace time fields. Python datetime module. Returns a time with the selected fields replaced.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.time.utcoffset" signature="datetime.time.utcoffset()">
+      <Summary>UTC offset</Summary>
+      <Description>UTC offset. Python datetime module. Returns the UTC offset of the time, or None.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.time.dst" signature="datetime.time.dst()">
+      <Summary>Daylight saving offset</Summary>
+      <Description>Daylight saving offset. Python datetime module. Returns the daylight saving offset of the time, or None.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.timedelta.total_seconds" signature="datetime.timedelta.total_seconds()">
+      <Summary>Duration in seconds</Summary>
+      <Description>Duration in seconds. Python datetime module. Returns the total duration in seconds.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.timedelta.days">
+      <Summary>Whole days of a duration</Summary>
+      <Description>Whole days of a duration. Python datetime module. The number of whole days in the duration.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.timedelta.seconds">
+      <Summary>Whole seconds of a duration</Summary>
+      <Description>Whole seconds of a duration. Python datetime module. The number of whole seconds in the duration, from 0 to 86399.</Description>
+    </Symbol>
+    <Symbol language="Python" name="datetime.timedelta.microseconds">
+      <Summary>Microseconds of a duration</Summary>
+      <Description>Microseconds of a duration. Python datetime module. The number of microseconds in the duration, from 0 to 999999.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.Counter" signature="collections.Counter(iterable=None, **kwds)">
+      <Summary>Count occurrences of values</Summary>
+      <Description>Count occurrences of values. Python collections module. A dictionary that counts how often each value occurs.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.deque" signature="collections.deque(iterable=(), maxlen=None)">
+      <Summary>Double-ended queue</Summary>
+      <Description>Double-ended queue. Python collections module. A list-like sequence with fast appends and pops at both ends.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.defaultdict" signature="collections.defaultdict(default_factory=None, **kwargs)">
+      <Summary>Dictionary with default values</Summary>
+      <Description>Dictionary with default values. Python collections module. A dictionary that creates a missing value with a factory function.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.OrderedDict" signature="collections.OrderedDict(items=None)">
+      <Summary>Dictionary with a remembered order</Summary>
+      <Description>Dictionary with a remembered order. Python collections module. A dictionary that preserves the insertion order of its keys.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.namedtuple" signature="collections.namedtuple(typename, field_names, *, rename=False, defaults=None, module=None)">
+      <Summary>Tuple with named fields</Summary>
+      <Description>Tuple with named fields. Python collections module. Creates a tuple subclass whose fields can be accessed by name.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.ChainMap" signature="collections.ChainMap(*maps)">
+      <Summary>Chain of dictionaries</Summary>
+      <Description>Chain of dictionaries. Python collections module. A mapping that searches several dictionaries in order.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.UserDict" signature="collections.UserDict(initialdata=None)">
+      <Summary>Dictionary wrapper for subclassing</Summary>
+      <Description>Dictionary wrapper for subclassing. Python collections module. A dictionary-like class designed to be subclassed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.UserList" signature="collections.UserList(initlist=None)">
+      <Summary>List wrapper for subclassing</Summary>
+      <Description>List wrapper for subclassing. Python collections module. A list-like class designed to be subclassed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.UserString" signature="collections.UserString(seq='')">
+      <Summary>String wrapper for subclassing</Summary>
+      <Description>String wrapper for subclassing. Python collections module. A string-like class designed to be subclassed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.Counter.most_common" signature="collections.Counter.most_common(n=None)">
+      <Summary>Most common values</Summary>
+      <Description>Most common values. Python collections module. Returns the n most common values and their counts.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.Counter.elements" signature="collections.Counter.elements()">
+      <Summary>Elements repeated by count</Summary>
+      <Description>Elements repeated by count. Python collections module. Iterates over the elements, repeating each one by its count.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.Counter.update" signature="collections.Counter.update(iterable=None, **kwds)">
+      <Summary>Add counts</Summary>
+      <Description>Add counts. Python collections module. Adds the counts of another iterable or mapping.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.Counter.subtract" signature="collections.Counter.subtract(iterable=None, **kwds)">
+      <Summary>Subtract counts</Summary>
+      <Description>Subtract counts. Python collections module. Subtracts the counts of another iterable or mapping.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.Counter.total" signature="collections.Counter.total()">
+      <Summary>Total of all counts</Summary>
+      <Description>Total of all counts. Python collections module. Returns the sum of all counts.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.deque.append" signature="collections.deque.append(x)">
+      <Summary>Add to the right end</Summary>
+      <Description>Add to the right end. Python collections module. Adds x to the right end of the deque.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.deque.appendleft" signature="collections.deque.appendleft(x)">
+      <Summary>Add to the left end</Summary>
+      <Description>Add to the left end. Python collections module. Adds x to the left end of the deque.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.deque.extend" signature="collections.deque.extend(iterable)">
+      <Summary>Extend the right end</Summary>
+      <Description>Extend the right end. Python collections module. Adds the items of the iterable to the right end.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.deque.extendleft" signature="collections.deque.extendleft(iterable)">
+      <Summary>Extend the left end</Summary>
+      <Description>Extend the left end. Python collections module. Adds the items of the iterable to the left end in reverse order.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.deque.pop" signature="collections.deque.pop()">
+      <Summary>Remove from the right end</Summary>
+      <Description>Remove from the right end. Python collections module. Removes and returns the rightmost item.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.deque.popleft" signature="collections.deque.popleft()">
+      <Summary>Remove from the left end</Summary>
+      <Description>Remove from the left end. Python collections module. Removes and returns the leftmost item.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.deque.rotate" signature="collections.deque.rotate(n=1)">
+      <Summary>Rotate the deque</Summary>
+      <Description>Rotate the deque. Python collections module. Rotates the deque n steps to the right, or to the left when n is negative.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.deque.maxlen">
+      <Summary>Maximum length of the deque</Summary>
+      <Description>Maximum length of the deque. Python collections module. The maximum number of items the deque can hold, or None.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.defaultdict.default_factory">
+      <Summary>Factory for missing values</Summary>
+      <Description>Factory for missing values. Python collections module. The function called to create a value for a missing key.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.OrderedDict.move_to_end" signature="collections.OrderedDict.move_to_end(key, last=True)">
+      <Summary>Move a key to an end</Summary>
+      <Description>Move a key to an end. Python collections module. Moves an existing key to the right end, or to the left when last is false.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.OrderedDict.popitem" signature="collections.OrderedDict.popitem(last=True)">
+      <Summary>Remove an item from an end</Summary>
+      <Description>Remove an item from an end. Python collections module. Removes and returns a key-value pair from the right or left end.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.ChainMap.maps">
+      <Summary>Dictionaries of the chain</Summary>
+      <Description>Dictionaries of the chain. Python collections module. The list of dictionaries searched by the chain.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.ChainMap.new_child" signature="collections.ChainMap.new_child(m=None, **kwargs)">
+      <Summary>Add a dictionary to the front</Summary>
+      <Description>Add a dictionary to the front. Python collections module. Returns a new chain with a dictionary added at the front.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.ChainMap.parents">
+      <Summary>Chain without its first dictionary</Summary>
+      <Description>Chain without its first dictionary. Python collections module. A new chain that contains all dictionaries except the first one.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Iterable">
+      <Summary>Iterable abstract base class</Summary>
+      <Description>Iterable abstract base class. Python collections.abc module. The abstract base class of objects that can return an iterator.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Iterator">
+      <Summary>Iterator abstract base class</Summary>
+      <Description>Iterator abstract base class. Python collections.abc module. The abstract base class of objects that return items one at a time.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Reversible">
+      <Summary>Reversible abstract base class</Summary>
+      <Description>Reversible abstract base class. Python collections.abc module. The abstract base class of iterables that can be iterated in reverse.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Generator">
+      <Summary>Generator abstract base class</Summary>
+      <Description>Generator abstract base class. Python collections.abc module. The abstract base class of generator objects.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Container">
+      <Summary>Container abstract base class</Summary>
+      <Description>Container abstract base class. Python collections.abc module. The abstract base class of objects that support the in operator.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Collection">
+      <Summary>Collection abstract base class</Summary>
+      <Description>Collection abstract base class. Python collections.abc module. The abstract base class of sized iterable containers.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Sized">
+      <Summary>Sized abstract base class</Summary>
+      <Description>Sized abstract base class. Python collections.abc module. The abstract base class of objects that have a length.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Callable">
+      <Summary>Callable abstract base class</Summary>
+      <Description>Callable abstract base class. Python collections.abc module. The abstract base class of objects that can be called.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Hashable">
+      <Summary>Hashable abstract base class</Summary>
+      <Description>Hashable abstract base class. Python collections.abc module. The abstract base class of objects that can be used as dictionary keys.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Mapping">
+      <Summary>Mapping abstract base class</Summary>
+      <Description>Mapping abstract base class. Python collections.abc module. The abstract base class of read-only key-value mappings.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.MutableMapping">
+      <Summary>Mutable mapping abstract base class</Summary>
+      <Description>Mutable mapping abstract base class. Python collections.abc module. The abstract base class of mappings that can be changed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Sequence">
+      <Summary>Sequence abstract base class</Summary>
+      <Description>Sequence abstract base class. Python collections.abc module. The abstract base class of indexable ordered collections.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.MutableSequence">
+      <Summary>Mutable sequence abstract base class</Summary>
+      <Description>Mutable sequence abstract base class. Python collections.abc module. The abstract base class of sequences that can be changed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Set">
+      <Summary>Set abstract base class</Summary>
+      <Description>Set abstract base class. Python collections.abc module. The abstract base class of unordered collections of unique items.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.MutableSet">
+      <Summary>Mutable set abstract base class</Summary>
+      <Description>Mutable set abstract base class. Python collections.abc module. The abstract base class of sets that can be changed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.MappingView">
+      <Summary>Mapping view abstract base class</Summary>
+      <Description>Mapping view abstract base class. Python collections.abc module. The abstract base class of the views of a mapping.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.ItemsView">
+      <Summary>Items view abstract base class</Summary>
+      <Description>Items view abstract base class. Python collections.abc module. The abstract base class of the item views of a mapping.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.KeysView">
+      <Summary>Keys view abstract base class</Summary>
+      <Description>Keys view abstract base class. Python collections.abc module. The abstract base class of the key views of a mapping.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.ValuesView">
+      <Summary>Values view abstract base class</Summary>
+      <Description>Values view abstract base class. Python collections.abc module. The abstract base class of the value views of a mapping.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Awaitable">
+      <Summary>Awaitable abstract base class</Summary>
+      <Description>Awaitable abstract base class. Python collections.abc module. The abstract base class of objects that can be used with await.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Coroutine">
+      <Summary>Coroutine abstract base class</Summary>
+      <Description>Coroutine abstract base class. Python collections.abc module. The abstract base class of coroutine objects.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.AsyncIterable">
+      <Summary>Async iterable abstract base class</Summary>
+      <Description>Async iterable abstract base class. Python collections.abc module. The abstract base class of objects that can be used with async for.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.AsyncIterator">
+      <Summary>Async iterator abstract base class</Summary>
+      <Description>Async iterator abstract base class. Python collections.abc module. The abstract base class of asynchronous iterators.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.AsyncGenerator">
+      <Summary>Async generator abstract base class</Summary>
+      <Description>Async generator abstract base class. Python collections.abc module. The abstract base class of asynchronous generators.</Description>
+    </Symbol>
+    <Symbol language="Python" name="collections.abc.Buffer">
+      <Summary>Buffer abstract base class</Summary>
+      <Description>Buffer abstract base class. Python collections.abc module. The abstract base class of objects that expose a memory buffer.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.count" signature="itertools.count(start=0, step=1)">
+      <Summary>Count without end</Summary>
+      <Description>Count without end. Python itertools module. Returns an iterator of evenly spaced values starting at start.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.cycle" signature="itertools.cycle(iterable)">
+      <Summary>Repeat an iterable</Summary>
+      <Description>Repeat an iterable. Python itertools module. Returns an iterator that repeats the items of the iterable forever.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.repeat" signature="itertools.repeat(object, times=None)">
+      <Summary>Repeat one value</Summary>
+      <Description>Repeat one value. Python itertools module. Returns an iterator that yields object repeatedly.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.accumulate" signature="itertools.accumulate(iterable, func=None, *, initial=None)">
+      <Summary>Running totals</Summary>
+      <Description>Running totals. Python itertools module. Yields accumulated sums or the results of another binary function.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.chain" signature="itertools.chain(*iterables)">
+      <Summary>Concatenate iterables</Summary>
+      <Description>Concatenate iterables. Python itertools module. Returns an iterator over the items of the iterables in sequence.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.chain.from_iterable" signature="itertools.chain.from_iterable(iterable)">
+      <Summary>Concatenate an iterable of iterables</Summary>
+      <Description>Concatenate an iterable of iterables. Python itertools module. Returns an iterator over the items of the nested iterables.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.compress" signature="itertools.compress(data, selectors)">
+      <Summary>Filter by a selector</Summary>
+      <Description>Filter by a selector. Python itertools module. Yields the items of data whose corresponding selector is true.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.dropwhile" signature="itertools.dropwhile(predicate, iterable)">
+      <Summary>Skip a prefix</Summary>
+      <Description>Skip a prefix. Python itertools module. Drops items while the predicate is true, then yields the rest.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.filterfalse" signature="itertools.filterfalse(predicate, iterable)">
+      <Summary>Keep false items</Summary>
+      <Description>Keep false items. Python itertools module. Yields the items for which the predicate is false.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.groupby" signature="itertools.groupby(iterable, key=None)">
+      <Summary>Group consecutive items</Summary>
+      <Description>Group consecutive items. Python itertools module. Groups adjacent items that have the same key.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.islice" signature="itertools.islice(iterable, start, stop, step)">
+      <Summary>Slice an iterator</Summary>
+      <Description>Slice an iterator. Python itertools module. Yields selected items from an iterator without copying it.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.starmap" signature="itertools.starmap(function, iterable)">
+      <Summary>Map over argument tuples</Summary>
+      <Description>Map over argument tuples. Python itertools module. Calls the function with the arguments unpacked from each item.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.takewhile" signature="itertools.takewhile(predicate, iterable)">
+      <Summary>Take a prefix</Summary>
+      <Description>Take a prefix. Python itertools module. Yields items while the predicate is true, then stops.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.tee" signature="itertools.tee(iterable, n=2)">
+      <Summary>Split an iterator</Summary>
+      <Description>Split an iterator. Python itertools module. Returns n independent iterators that share the source iterator.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.zip_longest" signature="itertools.zip_longest(*iterables, fillvalue=None)">
+      <Summary>Zip the longest iterable</Summary>
+      <Description>Zip the longest iterable. Python itertools module. Zips iterables until the longest one is exhausted, filling missing items.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.product" signature="itertools.product(*iterables, repeat=1)">
+      <Summary>Cartesian product</Summary>
+      <Description>Cartesian product. Python itertools module. Returns the Cartesian product of the input iterables.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.permutations" signature="itertools.permutations(iterable, r=None)">
+      <Summary>Permutations</Summary>
+      <Description>Permutations. Python itertools module. Yields the r-length permutations of the items.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.combinations" signature="itertools.combinations(iterable, r)">
+      <Summary>Combinations</Summary>
+      <Description>Combinations. Python itertools module. Yields the r-length combinations of the items in sorted order.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.combinations_with_replacement" signature="itertools.combinations_with_replacement(iterable, r)">
+      <Summary>Combinations with repetition</Summary>
+      <Description>Combinations with repetition. Python itertools module. Yields the r-length combinations that may repeat an item.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.pairwise" signature="itertools.pairwise(iterable)">
+      <Summary>Adjacent pairs</Summary>
+      <Description>Adjacent pairs. Python itertools module. Yields overlapping pairs of consecutive items.</Description>
+    </Symbol>
+    <Symbol language="Python" name="itertools.batched" signature="itertools.batched(iterable, n, *, strict=False)">
+      <Summary>Batches of items</Summary>
+      <Description>Batches of items. Python itertools module. Yields tuples of up to n items from the iterable.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.partial" signature="functools.partial(func, *args, **keywords)">
+      <Summary>Partially applied function</Summary>
+      <Description>Partially applied function. Python functools module. Creates a callable with some arguments already bound.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.partialmethod" signature="functools.partialmethod(func, *args, **keywords)">
+      <Summary>Partially applied method</Summary>
+      <Description>Partially applied method. Python functools module. Creates a method descriptor with some arguments already bound.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.reduce" signature="functools.reduce(function, iterable, initializer=None)">
+      <Summary>Fold an iterable</Summary>
+      <Description>Fold an iterable. Python functools module. Applies a two-argument function cumulatively to the items.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.wraps" signature="functools.wraps(wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES)">
+      <Summary>Copy wrapper metadata</Summary>
+      <Description>Copy wrapper metadata. Python functools module. A decorator that copies the metadata of the wrapped function to a wrapper.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.update_wrapper" signature="functools.update_wrapper(wrapper, wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES)">
+      <Summary>Update wrapper metadata</Summary>
+      <Description>Update wrapper metadata. Python functools module. Copies the metadata of the wrapped function to a wrapper function.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.lru_cache" signature="functools.lru_cache(maxsize=128, typed=False)">
+      <Summary>Least-recently-used cache</Summary>
+      <Description>Least-recently-used cache. Python functools module. Caches the results of a function and evicts the least recently used ones.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.cache" signature="functools.cache(user_function)">
+      <Summary>Unbounded cache</Summary>
+      <Description>Unbounded cache. Python functools module. Caches every result of a function without a size limit.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.cached_property" signature="functools.cached_property(func)">
+      <Summary>Cached property</Summary>
+      <Description>Cached property. Python functools module. Computes a property once and stores its value on the instance.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.total_ordering" signature="functools.total_ordering(cls)">
+      <Summary>Fill in comparison methods</Summary>
+      <Description>Fill in comparison methods. Python functools module. Adds the remaining comparison methods to a class that defines some of them.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.cmp_to_key" signature="functools.cmp_to_key(mycmp)">
+      <Summary>Comparison function as a key</Summary>
+      <Description>Comparison function as a key. Python functools module. Converts an old-style comparison function into a sorting key function.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.singledispatch" signature="functools.singledispatch(func)">
+      <Summary>Single-dispatch generic function</Summary>
+      <Description>Single-dispatch generic function. Python functools module. Creates a generic function that dispatches on the type of its first argument.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.singledispatchmethod" signature="functools.singledispatchmethod(func)">
+      <Summary>Single-dispatch generic method</Summary>
+      <Description>Single-dispatch generic method. Python functools module. Creates a generic method that dispatches on the type of its first argument.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.methodcaller" signature="functools.methodcaller(name, *args, **kwargs)">
+      <Summary>Call a method by name</Summary>
+      <Description>Call a method by name. Python functools module. Creates a function that calls the named method with the given arguments.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.WRAPPER_ASSIGNMENTS">
+      <Summary>Attributes copied by wraps</Summary>
+      <Description>Attributes copied by wraps. Python functools module. The function attributes copied by update_wrapper by default.</Description>
+    </Symbol>
+    <Symbol language="Python" name="functools.WRAPPER_UPDATES">
+      <Summary>Attributes updated by wraps</Summary>
+      <Description>Attributes updated by wraps. Python functools module. The function attributes updated by update_wrapper by default.</Description>
     </Symbol>
     <Symbol language="CLike" name="printf" signature="printf(format, ...)">
       <Summary>Formatted output to stdout</Summary>
