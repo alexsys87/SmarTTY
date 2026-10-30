@@ -108,7 +108,7 @@ public partial class PublicKeyManagerWindow : Window
         {
             return;
         }
-        string keyFile = LocalFileDialogWindow.SaveFile(this, "Export the public key", "SSH keys (*.sshkey)|*.sshkey", fileName: "id_sshkey.sshkey", addExtension: true);
+        string keyFile = LocalFileDialogWindow.SaveFile(this, "Export the private key", _keyPair.ExportFileFilter, fileName: _keyPair.DefaultKeyFileName, addExtension: true);
         if (keyFile == null)
         {
             return;
@@ -130,7 +130,7 @@ public partial class PublicKeyManagerWindow : Window
         {
             return;
         }
-        string keyFile = LocalFileDialogWindow.OpenFile(this, "Import a public key", "SSH keys (*.sshkey)|*.sshkey");
+        string keyFile = LocalFileDialogWindow.OpenFile(this, "Import a private key (" + _keyPair.Algorithm + ")", _keyPair.ImportFileFilter);
         if (keyFile == null)
         {
             return;

@@ -21,7 +21,7 @@
         <Image Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Source="pack://application:,,,/icons/dialog-public-key.png" Width="128" Height="128" VerticalAlignment="Top" />
         <TextBlock Grid.Row="0" Grid.Column="1" Margin="8 0 0 4" TextWrapping="Wrap" Text="SmarTTY has generated a keypair to automatically logon to SSH servers. Here is the public key in OpenSSH format:" />
         <TextBox Grid.Row="1" Grid.Column="1" Name="PublicKeyText" Margin="8 4 0 4" MinHeight="120" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" />
-        <TextBlock Grid.Row="2" Grid.Column="1" Margin="8 4 0 0" TextWrapping="Wrap" Text="The key is stored in the following container under your user profile:" />
+        <TextBlock Grid.Row="2" Grid.Column="1" Margin="8 4 0 0" TextWrapping="Wrap" Text="The key is stored in the following key container or file under your user profile:" />
         <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="KeyContainerText" Margin="0 2 0 0" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
         <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="8 6 0 0">
           <Button Name="ExportButton" Content="_Export key" MinWidth="150" Margin="0 0 5 0" Click="Export_Click" />

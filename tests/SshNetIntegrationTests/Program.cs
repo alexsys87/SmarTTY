@@ -30,6 +30,7 @@ internal static class Program
         ShellChannelStateTests.Run();
         X11ForwardingTests.Run();
         WindowsHostTests.Run();
+        SmarTTYKeyTests.Run();
 
         if (TestEnvironment.IntegrationEnabled())
         {
@@ -37,6 +38,8 @@ internal static class Program
             Console.WriteLine();
             Console.WriteLine("Using the test server at " + environment.Host + ":" + environment.Port + " as " + environment.User);
             SshIntegrationTests.Run(environment);
+            SmarTTYKeyTests.RunLive(environment);
+            SmarTTYKeyTests.RunLivePutty(environment);
             FileTransferManagerTests.Run(environment);
             SftpFileSystemTests.Run(environment);
             WindowsAuthorizedKeysTests.Run(environment);

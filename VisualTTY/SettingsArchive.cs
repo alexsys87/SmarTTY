@@ -22,7 +22,10 @@ public enum SettingsParts
     RawProfiles = 16,
     /// <summary>Saved passwords inside SSH and COM/TCP/Telnet profiles (encrypted with the password key of the Windows user).</summary>
     SavedPasswords = 32,
-    /// <summary>The SmarTTY public key authentication key (RSA, stored in a CSP key container of the Windows user).</summary>
+    /// <summary>
+    /// The SmarTTY public key authentication keys: RSA (stored in a CSP key container of the Windows user) and the
+    /// Ed25519 / ECDSA keys (DPAPI-protected files of the Windows user).
+    /// </summary>
     SshKey = 64,
     /// <summary>The key that encrypts saved passwords. Needed to make exported saved passwords usable on another computer.</summary>
     PasswordKey = 128,
@@ -41,9 +44,10 @@ public enum SettingsParts
 }
 
 /// <summary>
-/// Access to the keys that live in Windows CSP key containers. It is an interface so that
+/// Access to the keys that the Windows user protects (CSP key containers, DPAPI). It is an interface so that
 /// <see cref="SettingsArchive"/> stays free of platform-specific code and can be tested anywhere.
-/// A key is exchanged as the XML of <c>RSAParameters</c>, the same format as the .sshkey files of the key manager.
+/// An RSA key is exchanged as the XML of <c>RSAParameters</c>, the same format as the .sshkey files of the key manager;
+/// an Ed25519 or ECDSA key as an OpenSSH private key without a passphrase.
 /// </summary>
 public interface ISettingsKeyStore
 {
@@ -58,6 +62,13 @@ public interface ISettingsKeyStore
     void ImportSshKey(byte[] data);
 
     void ImportPasswordKey(byte[] data);
+
+    /// <summary>Whether the SmarTTY key named <paramref name="keyName"/> (one of <see cref="SettingsArchive.OpenSshFormatKeyNames"/>) exists.</summary>
+    bool HasOpenSshFormatKey(string keyName);
+
+    byte[] ExportOpenSshFormatKey(string keyName);
+
+    void ImportOpenSshFormatKey(string keyName, byte[] data);
 }
 
 /// <summary>Where the exportable files live. Paths and the key store are passed in, which also covers portable mode.</summary>
@@ -102,6 +113,8 @@ public sealed class SettingsContents
 ///   CommandCompletions.xml               &lt;- CommandCompletions.xml next to SmarTTY.exe, or
 ///   CommandCompletions.xml.gz            &lt;- CommandCompletions.xml.gz (gzip) when that is the file SmarTTY uses; stored as it is
 ///   Keys/SmarTTY-ssh-key.xml             &lt;- the SmarTTY public key authentication key (CSP container, RSAParameters XML)
+///   Keys/SmarTTY-ssh-key-ed25519, -ecdsa-nistp256, -ecdsa-nistp384, -ecdsa-nistp521
+///                                        &lt;- the Ed25519 / ECDSA keys of SmarTTY (DPAPI files, OpenSSH private key)
 ///   Keys/SmarTTY-password-key.xml        &lt;- the key that protects saved passwords (CSP container, RSAParameters XML)
 ///   OpenSSH/id_ed25519[.pub], id_ecdsa[.pub], id_rsa[.pub]   &lt;- the .ssh folder of the user
 ///
@@ -123,6 +136,11 @@ public static class SettingsArchive
     public const string RawConnectionExtension = ".rawconnection";
     public const string SshKeyEntryName = "Keys/SmarTTY-ssh-key.xml";
     public const string PasswordKeyEntryName = "Keys/SmarTTY-password-key.xml";
+    /// <summary>Followed by one of <see cref="OpenSshFormatKeyNames"/>.</summary>
+    public const string OpenSshFormatKeyEntryPrefix = "Keys/SmarTTY-ssh-key-";
+
+    /// <summary>The SmarTTY keys besides the RSA one, by the names of SshKeyFactory.GetKeyName.</summary>
+    public static readonly string[] OpenSshFormatKeyNames = { "ed25519", "ecdsa-nistp256", "ecdsa-nistp384", "ecdsa-nistp521" };
 
     private const string LocalPrefix = "Local/";
     private const string ConnectionsPrefix = "SavedConnections/";
@@ -208,6 +226,8 @@ public static class SettingsArchive
         public string FileName;
         /// <summary>Null for entries that are not XML (OpenSSH key files).</summary>
         public string RootElement;
+        /// <summary>For an Ed25519 / ECDSA key of SmarTTY: its name (one of <see cref="OpenSshFormatKeyNames"/>).</summary>
+        public string KeyName;
         /// <summary>The entry is gzip data that holds the XML (CommandCompletions.xml.gz).</summary>
         public bool Compressed;
     }
@@ -293,7 +313,7 @@ public static class SettingsArchive
         // Asking whether a key exists does not read the private key.
         if (locations.KeyStore != null)
         {
-            if (locations.KeyStore.HasSshKey)
+            if (locations.KeyStore.HasSshKey || OpenSshFormatKeyNames.Any(locations.KeyStore.HasOpenSshFormatKey))
             {
                 contents.Available |= SettingsParts.SshKey;
             }
@@ -503,7 +523,20 @@ public static class SettingsArchive
 
         if (Has(parts, SettingsParts.SshKey))
         {
-            AddKey(items, report, "SmarTTY SSH key", SshKeyEntryName, locations.KeyStore == null ? (Func<bool>)null : () => locations.KeyStore.HasSshKey, () => locations.KeyStore.ExportSshKey());
+            bool otherKeys = false;
+            if (locations.KeyStore != null)
+            {
+                foreach (string keyName in OpenSshFormatKeyNames.Where(locations.KeyStore.HasOpenSshFormatKey))
+                {
+                    otherKeys = true;
+                    AddKey(items, report, "SmarTTY " + keyName + " key", OpenSshFormatKeyEntryPrefix + keyName, () => true, () => locations.KeyStore.ExportOpenSshFormatKey(keyName));
+                }
+            }
+            // Without an RSA key, the part is still found when one of the other keys is there.
+            if (!otherKeys || locations.KeyStore.HasSshKey)
+            {
+                AddKey(items, report, "SmarTTY SSH key", SshKeyEntryName, locations.KeyStore == null ? (Func<bool>)null : () => locations.KeyStore.HasSshKey, () => locations.KeyStore.ExportSshKey());
+            }
         }
         if (Has(parts, SettingsParts.PasswordKey))
         {
@@ -814,6 +847,10 @@ public static class SettingsArchive
                     WriteFileReplacing(Path.Combine(locations.UserSshDirectory, item.Target.FileName), data);
                     result.OpenSshKeyFiles++;
                     break;
+                case EntryKind.SshKey when item.Target.KeyName != null:
+                    ImportKey(() => locations.KeyStore.ImportOpenSshFormatKey(item.Target.KeyName, data));
+                    result.SshKeyImported = true;
+                    break;
                 case EntryKind.SshKey:
                     ImportKey(() => locations.KeyStore.ImportSshKey(data));
                     result.SshKeyImported = true;
@@ -881,6 +918,15 @@ public static class SettingsArchive
         else if (name == PasswordKeyEntryName)
         {
             target = new Target { Kind = EntryKind.PasswordKey, Part = SettingsParts.PasswordKey, FileName = name.Substring(KeysPrefix.Length), RootElement = "RSAParameters" };
+        }
+        else if (name.StartsWith(OpenSshFormatKeyEntryPrefix, StringComparison.Ordinal))
+        {
+            // Only the fixed list of key names; the entry holds an OpenSSH private key, checked like the .ssh files.
+            string keyName = name.Substring(OpenSshFormatKeyEntryPrefix.Length);
+            if (Array.IndexOf(OpenSshFormatKeyNames, keyName) >= 0)
+            {
+                target = new Target { Kind = EntryKind.SshKey, Part = SettingsParts.SshKey, FileName = name.Substring(KeysPrefix.Length), RootElement = null, KeyName = keyName };
+            }
         }
         else if (name.StartsWith(OpenSshPrefix, StringComparison.Ordinal))
         {

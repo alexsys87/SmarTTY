@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
 using VisualTTY;
@@ -9,9 +10,10 @@ using VisualTTY;
 namespace SmarTTY.GUI;
 
 /// <summary>
-/// Reads and writes the RSA keys that SmarTTY keeps in the CSP key containers of the Windows user, for
-/// <see cref="SettingsArchive"/>. A key is exchanged as the XML of <see cref="RSAParameters"/>, the same format
-/// as the *.sshkey files of the public key manager, so an exported key can also be imported there.
+/// Reads and writes the RSA keys that SmarTTY keeps in the CSP key containers of the Windows user, and its Ed25519 and
+/// ECDSA keys in DPAPI-protected files, for <see cref="SettingsArchive"/>. An RSA key is exchanged as the XML of
+/// <see cref="RSAParameters"/>, the same format as the *.sshkey files of the public key manager; an Ed25519 or ECDSA key
+/// as an OpenSSH private key, as the key manager exports it. So an exported key can also be imported there.
 /// </summary>
 internal sealed class CspSettingsKeyStore : ISettingsKeyStore
 {
@@ -41,6 +43,29 @@ internal sealed class CspSettingsKeyStore : ISettingsKeyStore
     public void ImportPasswordKey(byte[] data)
     {
         Import(PasswordContainerName, data);
+    }
+
+    public bool HasOpenSshFormatKey(string keyName)
+    {
+        return File.Exists(KeyFile(keyName).Location);
+    }
+
+    public byte[] ExportOpenSshFormatKey(string keyName)
+    {
+        return KeyFile(keyName).Read();
+    }
+
+    public void ImportOpenSshFormatKey(string keyName, byte[] data)
+    {
+        PublicKeyType keyType = SshKeyFactory.FromKeyName(keyName) ?? throw new InvalidDataException("Unknown SSH key type: " + keyName);
+        string privateKey = OpenSshKeyPair.ConvertPrivateKey(Encoding.UTF8.GetString(data), SshKeyFactory.GetAlgorithm(keyType));
+        KeyFile(keyName).Write(Encoding.ASCII.GetBytes(privateKey));
+    }
+
+    private static DpapiPrivateKeyFile KeyFile(string keyName)
+    {
+        PublicKeyType keyType = SshKeyFactory.FromKeyName(keyName) ?? throw new ArgumentException("Unknown SSH key type: " + keyName);
+        return new DpapiPrivateKeyFile(AppEnvironment.KeyFactory.GetKeyFilePath(keyType));
     }
 
     private static bool Exists(string containerName)

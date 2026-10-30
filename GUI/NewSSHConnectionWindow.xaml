@@ -66,9 +66,19 @@
             </local:AuthTemplateSelector.Password>
             <local:AuthTemplateSelector.PublicKey>
               <DataTemplate>
-                <StackPanel Orientation="Horizontal">
-                  <RadioButton Content="Public key in Windows key store (associated with your user account):" VerticalAlignment="Center" Margin="0 0 5 0" IsChecked="{Binding IsSelected, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type ListBoxItem}}}" />
-                  <ListBox Style="{DynamicResource HorizontalListBox}" VerticalAlignment="Center" ItemsSource="{Binding Path=DataContext.KeyType, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:NewSSHConnectionWindow}}, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding Path=DataContext.KeyType, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:NewSSHConnectionWindow}}}" IsEnabled="{Binding IsSelected, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type ListBoxItem}}}" />
+                <StackPanel>
+                  <RadioButton Content="Public key in Windows key store (associated with your user account)" VerticalAlignment="Center" Margin="0 0 5 0" IsChecked="{Binding IsSelected, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type ListBoxItem}}}" />
+                  <!-- On a line of its own: the key types do not fit beside the long label. -->
+                  <StackPanel Orientation="Horizontal" Margin="20 4 0 2" IsEnabled="{Binding IsSelected, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type ListBoxItem}}}">
+                    <TextBlock Text="Key type:" VerticalAlignment="Center" Margin="0 0 6 0" />
+                    <ListBox Style="{DynamicResource HorizontalListBox}" VerticalAlignment="Center" ItemsSource="{Binding Path=DataContext.KeyType, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:NewSSHConnectionWindow}}, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding Path=DataContext.KeyType, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:NewSSHConnectionWindow}}}" ToolTip="Auto uses the RSA key. Each type is a separate key: after changing the type, the server has to accept the new key (Tools &gt; Public key authentication).">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <TextBlock Text="{Binding Converter={StaticResource EnumValueConverter}}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ListBox>
+                  </StackPanel>
                 </StackPanel>
               </DataTemplate>
             </local:AuthTemplateSelector.PublicKey>

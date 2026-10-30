@@ -1,5 +1,6 @@
 using SmarTTY.Ssh;
 using SmarTTY.Controls;
+using System;
 using System.Drawing;
 using System.IO;
 
@@ -7,7 +8,9 @@ namespace VisualTTY;
 
 public static class AppEnvironment
 {
-    public static readonly SshKeyFactory KeyFactory = new SshKeyFactory("com.sysprogs.smartty.");
+    // The RSA key lives in a CSP key container, the Ed25519 and ECDSA keys in DPAPI-protected files under %APPDATA%:
+    // like the key containers, they belong to the Windows user, also for a portable copy of SmarTTY.
+    public static readonly SshKeyFactory KeyFactory = new SshKeyFactory("com.sysprogs.smartty.", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SmarTTY", "Keys"));
 
     public const string PasswordContainerName = "com.sysprogs.smartty.passwords";
 

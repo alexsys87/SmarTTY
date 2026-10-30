@@ -85,3 +85,9 @@ connection hangs.
 
 These checks need Linux and an OpenSSH server. They are not a Windows/WPF application build or a
 UI test, and `RsaSshKey` (the Windows CSP key store) is compiled but not exercised.
+
+`SmarTTYKeyTests` cover the Ed25519 and ECDSA keys of SmarTTY (`Ssh/OpenSshKeyPair.cs`) with an in-memory key
+store instead of the DPAPI file of the application: generation, Reset, export and import (keys made by `ssh-keygen` in
+the OpenSSH, PEM and PKCS#8 formats, and a PuTTY `.ppk` when `puttygen` is installed), and, against the live server,
+installing each key type in `authorized_keys` and logging in with it. A PuTTY key with a passphrase is also used to log
+in through the key file path when `puttygen` is installed.

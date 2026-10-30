@@ -4,7 +4,7 @@ using System.Text;
 using SmarTTY.Ssh;
 
 // Checks that an encrypted private key (the passphrase is what is needed) is told from a file that cannot be loaded for
-// another reason (damaged, not a private key, a PuTTY key), so that only the first one is answered with a passphrase prompt.
+// another reason (damaged, not a private key), so that only the first one is answered with a passphrase prompt.
 // The keys are built here: only the headers matter, not the key material.
 // Run with: dotnet run --project tests/PrivateKeyFileFormatTests
 internal static class Program
@@ -101,8 +101,12 @@ internal static class Program
         Check(Kind("-----BEGIN RSA PRIVATE KEY-----\n" + legacyBody) == PrivateKeyFileKind.NotAPrivateKey, "a key without its end line (cut off file)");
         Check(Kind(Pem("RSA PRIVATE KEY", legacyBody, "\n", "EC PRIVATE KEY")) == PrivateKeyFileKind.NotAPrivateKey, "begin and end of different kinds");
         Check(Kind("\0\0\0binary\u0001\u0002 data") == PrivateKeyFileKind.NotAPrivateKey, "binary data");
-        Check(Kind("PuTTY-User-Key-File-3: ssh-ed25519\nEncryption: aes256-cbc\nComment: me\n") == PrivateKeyFileKind.PuttyKey, "putty ppk v3");
-        Check(Kind("\uFEFFPuTTY-User-Key-File-2: ssh-rsa\nEncryption: none\n") == PrivateKeyFileKind.PuttyKey, "putty ppk v2 with a byte order mark");
+
+        // PuTTY keys, which SSH.NET reads: the Encryption header tells whether the passphrase is needed.
+        Check(Kind("PuTTY-User-Key-File-3: ssh-ed25519\nEncryption: aes256-cbc\nComment: me\n") == PrivateKeyFileKind.Encrypted, "putty ppk v3 with a passphrase");
+        Check(Kind("PuTTY-User-Key-File-3: ecdsa-sha2-nistp256\r\nEncryption: aes256-cbc\r\nComment: me\r\n") == PrivateKeyFileKind.Encrypted, "putty ppk with CRLF line ends");
+        Check(Kind("\uFEFFPuTTY-User-Key-File-2: ssh-rsa\nEncryption: none\n") == PrivateKeyFileKind.Plain, "putty ppk v2 without a passphrase, with a byte order mark");
+        Check(Kind("PuTTY-User-Key-File-3: ssh-ed25519\nComment: me\n") == PrivateKeyFileKind.NotAPrivateKey, "putty ppk without the Encryption header");
 
         // From a file.
         string directory = Path.Combine(Path.GetTempPath(), "smartty-key-test-" + Guid.NewGuid().ToString("N"));

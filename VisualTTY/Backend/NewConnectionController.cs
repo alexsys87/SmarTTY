@@ -331,7 +331,7 @@ public class NewConnectionController : INotifyPropertyChanged
 
     public void BrowseForKeyFile()
     {
-        string keyFile = ThemedFileDialog.OpenFile(null, "Select an OpenSSH private key file", "OpenSSH keys|id_dsa;id_rsa|All files (*.*)|*.*");
+        string keyFile = ThemedFileDialog.OpenFile(null, "Select a private key file", "Private keys (id_*, *.ppk)|id_ed25519;id_ecdsa;id_rsa;*.ppk|All files (*.*)|*.*");
         if (keyFile != null)
         {
             CustomSSHKeyFile = keyFile;

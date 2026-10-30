@@ -811,7 +811,7 @@ public class SshSession : IDisposable
     }
 
     /// <summary>
-    /// Authenticates with an OpenSSH private key file (RSA, ECDSA or Ed25519).
+    /// Authenticates with a private key file (RSA, ECDSA or Ed25519) in the OpenSSH, PEM, PKCS#8 or PuTTY (.ppk) format.
     /// If no file is specified, the first of id_ed25519, id_ecdsa and id_rsa found in <see cref="UserSshDirectory"/> is used.
     /// <paramref name="passphraseRequired"/> is set if the key is encrypted and could not be loaded with the given passphrase.
     /// A key that cannot be loaded for another reason (damaged, not a private key, unsupported format) is an error.
@@ -869,10 +869,8 @@ public class SshSession : IDisposable
         {
             case PrivateKeyFileKind.Encrypted:
                 return;
-            case PrivateKeyFileKind.PuttyKey:
-                throw new InvalidDataException(keyFile + " is a PuTTY key (.ppk), which is not supported. Export it as an OpenSSH key with PuTTYgen (Conversions > Export OpenSSH key).", loadError);
             case PrivateKeyFileKind.NotAPrivateKey:
-                throw new InvalidDataException(keyFile + " is not a PEM or OpenSSH private key (" + loadError.Message + ")", loadError);
+                throw new InvalidDataException(keyFile + " is not a PEM, OpenSSH or PuTTY private key (" + loadError.Message + ")", loadError);
             default:
                 throw new InvalidDataException("The private key " + keyFile + " cannot be loaded: " + loadError.Message, loadError);
         }

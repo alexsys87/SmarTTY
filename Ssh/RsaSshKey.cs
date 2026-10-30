@@ -51,6 +51,12 @@ public class RsaSshKey : SshKeyEncoding, ISshKeyPair
 
     public string ContainerName { get; }
 
+    public string ExportFileFilter => "SSH keys (*.sshkey)|*.sshkey";
+
+    public string DefaultKeyFileName => "id_sshkey.sshkey";
+
+    public string ImportFileFilter => ExportFileFilter;
+
     public RsaSshKey(string containerName, int keySize, bool create = true)
     {
         ContainerName = containerName;

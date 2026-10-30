@@ -12,6 +12,7 @@
     <Compile Include="../../VisualTTY/SSHConnectionSettings.cs" Link="SSHConnectionSettings.cs" />
     <Compile Include="../../VisualTTY/AuthType.cs" Link="AuthType.cs" />
     <Compile Include="../../Ssh/PublicKeyType.cs" Link="PublicKeyType.cs" />
+    <Compile Include="../../Utilities/EnumDisplayText.cs" Link="EnumDisplayText.cs" />
     <Compile Include="../../Utilities/XmlStorage.cs" Link="XmlStorage.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/RawConnectionSettings.cs" Link="RawConnectionSettings.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/DeviceTerminalSettings.cs" Link="DeviceTerminalSettings.cs" />
