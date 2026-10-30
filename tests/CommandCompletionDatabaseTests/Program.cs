@@ -123,13 +123,49 @@ internal static class Program
         {
             Check(!File.Exists(path), "xml does not exist initially");
             CommandCompletionDatabase autoCreated = CommandCompletionDatabase.Load(path);
-            Check(File.Exists(path), "missing XML auto-creates file");
-            Check(autoCreated != null && autoCreated.Completions != null && autoCreated.Completions.Length == 0 && autoCreated.LoadWarning == null, "auto-created database is valid and empty");
+            Check(!File.Exists(path) && !File.Exists(path + ".gz"), "missing XML is not created: the built-in template is used");
+            Check(autoCreated != null && autoCreated.Completions != null && autoCreated.Completions.Length == 0 && autoCreated.LoadWarning == null, "the built-in template is valid (empty for now)");
+
+            // A file next to the exe wins over the template; the first save of the editor writes template + additions there.
+            CommandCompletionDatabase.LoadTemplate();
+            CommandCompletionDatabase external = new CommandCompletionDatabase { Completions = new[] { new CommandCompletion { Command = "mytool" } } };
+            external.SaveTo(path, compressed: false);
+            Check(CommandCompletionDatabase.Load(path).Completions.Length == 1, "the file next to the exe takes priority over the template");
+            File.Delete(path);
+            Check(CommandCompletionDatabase.Load(path).Completions.Length == 0 && !File.Exists(path), "without the file the template is used again, nothing is written");
+
+            // Places: the folder of the program first, then %APPDATA%\\SmarTTY, then the template; the first save goes next to the exe
+            // and falls back to %APPDATA%\\SmarTTY when the folder of the program refuses.
+            string programDir = Path.Combine(directory, "program");
+            string userDir = Path.Combine(directory, "user");
+            Directory.CreateDirectory(programDir);
+            CommandCompletionDatabase.ProgramDirectory = programDir;
+            CommandCompletionDatabase.UserDirectory = userDir;
+            CommandCompletionDatabase one = new CommandCompletionDatabase { Completions = new[] { new CommandCompletion { Command = "one" } } };
+            CommandCompletionDatabase two = new CommandCompletionDatabase { Completions = new[] { new CommandCompletion { Command = "two" }, new CommandCompletion { Command = "three" } } };
+            Check(CommandCompletionDatabase.FindExternalPath() == null && CommandCompletionDatabase.Load().Completions.Length == 0, "no file anywhere: the template");
+            Check(CommandCompletionDatabase.PlannedPath() == CommandCompletionDatabase.DefaultPath, "a writable program folder is where the first save goes");
+            Check(one.SaveToPreferredPlace(false) == CommandCompletionDatabase.DefaultPath && File.Exists(CommandCompletionDatabase.DefaultPath) && !Directory.Exists(userDir), "the first save goes next to the exe");
+            two.SaveTo(CommandCompletionDatabase.UserPath, false);
+            Check(CommandCompletionDatabase.FindExternalPath() == CommandCompletionDatabase.DefaultPath && CommandCompletionDatabase.Load().Completions.Length == 1, "the file next to the exe has priority over %APPDATA%");
+            File.Delete(CommandCompletionDatabase.DefaultPath);
+            Check(CommandCompletionDatabase.FindExternalPath() == CommandCompletionDatabase.UserPath && CommandCompletionDatabase.Load().Completions.Length == 2, "without the file next to the exe the one in %APPDATA% is read");
+            Check(one.SaveToPreferredPlace(false) == CommandCompletionDatabase.UserPath && !File.Exists(CommandCompletionDatabase.DefaultPath) && CommandCompletionDatabase.Load().Completions.Length == 1, "a file in %APPDATA% is saved in place");
+            File.Delete(CommandCompletionDatabase.UserPath);
+            Directory.Delete(userDir);
+            string blockedProgram = Path.Combine(directory, "blocked");
+            File.WriteAllText(blockedProgram, "not a folder");
+            CommandCompletionDatabase.ProgramDirectory = blockedProgram;
+            Check(CommandCompletionDatabase.PlannedPath() == CommandCompletionDatabase.UserPath, "a program folder that cannot be written plans the %APPDATA% place");
+            Check(two.SaveToPreferredPlace(false) == CommandCompletionDatabase.UserPath && File.Exists(CommandCompletionDatabase.UserPath), "an unwritable program folder: the first save falls back to %APPDATA% (folder created)");
+            Check(CommandCompletionDatabase.Load().Completions.Length == 2, "the fallback file is found on the next start");
+            CommandCompletionDatabase.ProgramDirectory = null;
+            CommandCompletionDatabase.UserDirectory = null;
 
             Check(new CommandCompletionDatabase().LookupCommand("ls -") == null, "default database is safe");
             Check(new CommandCompletionDatabase { Completions = null }.LookupCommand("ls -") == null, "explicit null array is safe");
             Check(new CommandCompletionDatabase { Completions = new CommandCompletion[] { null } }.LookupCommand("ls -") == null, "null command is safe");
-            ExpectEmpty(directory, "unreadable source falls back safely");
+            ExpectEmpty(directory, "a path without a file falls back to the template", warning: false);
 
             foreach (string xml in new[] { "", "<CommandCompletionDatabase>", "<WrongRoot />", "<CommandCompletionDatabase xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\" />" })
             {

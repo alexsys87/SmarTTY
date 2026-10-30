@@ -21,7 +21,8 @@ public partial class CommandCompletionsEditorWindow : Window
 {
     private const string Caption = "Command completions";
 
-    private readonly string _path = CommandCompletionDatabase.DefaultPath;
+    // The file in use, else the place where the first save will put it (next to the exe, or %APPDATA%\SmarTTY when that is protected).
+    private string _path = CommandCompletionDatabase.PlannedPath();
 
     private CompletionEditModel _model = new CompletionEditModel();
 
@@ -52,7 +53,7 @@ public partial class CommandCompletionsEditorWindow : Window
 
     private bool LoadFromDisk(Window owner)
     {
-        CommandCompletionDatabase database = CommandCompletionDatabase.Load(_path);
+        CommandCompletionDatabase database = CommandCompletionDatabase.Load();
         if (database.LoadWarning != null)
         {
             // Load() answers a damaged file with an empty database: saving that would destroy what the user may still repair by hand.
@@ -386,12 +387,13 @@ public partial class CommandCompletionsEditorWindow : Window
         bool compressed = CompressBox.IsChecked == true;
         try
         {
-            _model.ToDatabase().SaveTo(_path, compressed);
+            _path = _model.ToDatabase().SaveToPreferredPlace(compressed);
+            PathText.Text = _path + (compressed ? ".gz" : "");
         }
         catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is SecurityException)
         {
             MessageDialog.Show("Could not save the command completions to:\n" + _path + (compressed ? ".gz" : "") + "\n\n" + ex.Message +
-                               "\n\nThe file is next to SmarTTY.exe: if the program is installed in a protected folder (Program Files), start SmarTTY with the right to write there.",
+                               "\n\nThe file is saved next to SmarTTY.exe, or in %APPDATA%\\SmarTTY when that folder is protected; neither could be written.",
                 Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: this);
             return false;
         }

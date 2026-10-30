@@ -6,6 +6,9 @@
     <Nullable>disable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../../VisualTTY/CommandCompletions.xml" LogicalName="VisualTTY.CommandCompletions.xml" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="../../VisualTTY/CommandCompletion.cs" Link="CommandCompletion.cs" />
     <Compile Include="../../VisualTTY/CommandCompletionDatabase.cs" Link="CommandCompletionDatabase.cs" />
     <Compile Include="../../VisualTTY/CompletionEditModel.cs" Link="CompletionEditModel.cs" />
