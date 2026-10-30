@@ -354,6 +354,12 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     public event TerminalDataHandler DataEntered;
 
     /// <summary>
+    /// Raised with every chunk of output as it arrives, escape sequences included, before it is drawn. The chunk may end in the
+    /// middle of an escape sequence.
+    /// </summary>
+    public event Action<string> OutputReceived;
+
+    /// <summary>
     /// The user chose to send a very large paste as a file instead of typing it: the text to upload to the current directory
     /// of the terminal (raised on the UI thread).
     /// </summary>
@@ -396,6 +402,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public void ProcessOutput(string output)
     {
+        OutputReceived?.Invoke(output);
         if (_incompleteEscape != null)
         {
             output = _incompleteEscape + output;

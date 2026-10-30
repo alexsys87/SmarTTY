@@ -40,6 +40,8 @@ internal static class Program
             FileTransferManagerTests.Run(environment);
             SftpFileSystemTests.Run(environment);
             WindowsAuthorizedKeysTests.Run(environment);
+            WindowsTransferTests.Run(environment);
+            WindowsEditingTests.Run(environment);
             HostToHostCopyTests.Run(environment);
             X11ForwardingTests.RunLive(environment);
         }

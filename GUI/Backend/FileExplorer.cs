@@ -104,7 +104,14 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
             {
                 list.Add(new LsOutputParser.LsEntry { Name = "..", Flags = LsOutputParser.LsEntryFlags.Directory });
             }
-            foreach (SftpDirectoryEntry entry in new SftpFileSystem(sftp).List(_Directory))
+            SftpFileSystem fileSystem = new SftpFileSystem(sftp);
+            // Above the drives there is nothing to list but the drives; a server that has none found is asked about "/" itself.
+            List<SftpDirectoryEntry> entries = WindowsSftpPath.IsRoot(_Directory) ? fileSystem.ListDrives() : fileSystem.List(_Directory);
+            if (entries.Count == 0 && WindowsSftpPath.IsRoot(_Directory))
+            {
+                entries = fileSystem.List(_Directory);
+            }
+            foreach (SftpDirectoryEntry entry in entries)
             {
                 SftpFileAttributes attributes = entry.Attributes;
                 if (attributes.IsSymbolicLink)

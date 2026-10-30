@@ -674,10 +674,10 @@ public partial class RemoteFileEditor : CodeEditorPP
             // Only the text of the preview is decoded as it arrives; the file is decoded once it is complete.
             StringBuilder content = new StringBuilder();
             bool showPreview = !_reloading;
-            using (ScpDownloadStream scpDownloadStream = _context.Session.OpenDownload(RemotePath))
+            using (Stream scpDownloadStream = OpenForReading(out long remoteLength))
             {
-                // The size is known from the first SCP header, before any data is read.
-                long limit = _reloading ? (IsPreview ? EditorFilePolicy.PreviewBytes : 0) : ChooseLoadLimit(scpDownloadStream.Length);
+                // The size is known from the first SCP header (or from SFTP), before any data is read.
+                long limit = _reloading ? (IsPreview ? EditorFilePolicy.PreviewBytes : 0) : ChooseLoadLimit(remoteLength);
                 long received = 0;
                 Utf8StreamDecoder utf8StreamDecoder = new Utf8StreamDecoder();
                 byte[] bytes = new byte[65536];
@@ -771,6 +771,23 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
     }
 
+    private bool IsWindowsHost => _context.Session.RemoteOs == SmarTTY.Ssh.RemoteOsKind.Windows;
+
+    /// <summary>
+    /// The file on the server as a stream, and its size: over SCP for a Unix host, over SFTP for a Windows host, which has none
+    /// of the commands that the rest of the editor uses either (test, stat, cat, cp, rm, sudo).
+    /// </summary>
+    private Stream OpenForReading(out long length)
+    {
+        if (IsWindowsHost)
+        {
+            return SmarTTY.Transport.WindowsRemoteFileEditing.OpenRead(_context.Session, RemotePath, out length);
+        }
+        ScpDownloadStream stream = _context.Session.OpenDownload(RemotePath);
+        length = stream.Length;
+        return stream;
+    }
+
     /// <summary>Shows a question from the loading thread; the answer of a closed editor is "cancel".</summary>
     private DialogResult Ask(string text, MessageBoxButtons buttons)
     {
@@ -787,6 +804,11 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// </summary>
     private void CheckWriteAccess(string target, bool forNewFile)
     {
+        if (IsWindowsHost)
+        {
+            // SFTP cannot ask whether a Windows file is writable; a save that is refused says so then (and there is no sudo).
+            return;
+        }
         if (_context.Session.RunCommandChecked("test -w " + RemotePathUtils.ShellQuote(target), requireSuccess: true) != null)
         {
             return;
@@ -862,6 +884,10 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private bool RemotePathExists(string path)
     {
+        if (IsWindowsHost)
+        {
+            return SmarTTY.Transport.WindowsRemoteFileEditing.Exists(_context.Session, path);
+        }
         if (_context.Session.RunCommandChecked("test -e " + RemotePathUtils.ShellQuote(path), requireSuccess: true) != null)
         {
             return true;
@@ -1116,6 +1142,10 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         try
         {
+            if (IsWindowsHost)
+            {
+                return SmarTTY.Transport.WindowsRemoteFileEditing.Signature(_context.Session, RemotePath);
+            }
             string path = RemotePathUtils.ShellQuote(RemotePath);
             System.Collections.Generic.List<string> output = _context.Session.RunCommandChecked("stat -c '%Y %s' " + path + " 2>/dev/null || md5sum " + path, requireSuccess: true);
             if (output == null || output.Count == 0)
@@ -1545,6 +1575,14 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// </summary>
     private bool UploadAndReplace(SaveJob job)
     {
+        if (IsWindowsHost)
+        {
+            // Written over SFTP straight into the file (with the "~" backup if the job asks for one): there is no temporary file
+            // in /tmp and no cat, and a refused write is an error, not a question about sudo.
+            SmarTTY.Transport.WindowsRemoteFileEditing.Save(_context.Session, RemotePath, job.Bytes, job.IncludesBackup);
+            job.NewSignature = FetchSignature();
+            return true;
+        }
         using (ScpChannelStream scpChannelStream = _context.Session.OpenUpload(job.TemporaryPath, job.Bytes.Length, mode: TemporaryFileMode))
         {
             scpChannelStream.Write(job.Bytes, 0, job.Bytes.Length);
@@ -1630,6 +1668,11 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private void RemoveTemporaryFile(SaveJob job)
     {
+        if (IsWindowsHost)
+        {
+            // Nothing was uploaded to a temporary file.
+            return;
+        }
         try
         {
             _context.Session.RunCommandChecked("rm -f " + RemotePathUtils.ShellQuote(job.TemporaryPath), requireSuccess: true);

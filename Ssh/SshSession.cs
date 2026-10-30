@@ -1068,6 +1068,19 @@ public class SshSession : IDisposable
     /// </summary>
     public RemotePathKind[] GetRemotePathKinds(IList<string> paths)
     {
+        if (RemoteOs == RemoteOsKind.Windows)
+        {
+            // test -d / test -e do not exist there: ask SFTP.
+            try
+            {
+                using SftpChannel sftp = SftpChannel.Open(this);
+                return SftpFileSystem.PathKinds(sftp, paths);
+            }
+            catch (RemoteOperationException)
+            {
+                return paths.Select(path => RemotePathKind.Unknown).ToArray();
+            }
+        }
         const int BatchSize = 32;
         RemotePathKind[] kinds = new RemotePathKind[paths.Count];
         for (int start = 0; start < paths.Count; start += BatchSize)

@@ -91,6 +91,10 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                 IsVisible = sessionWrapper.VTSettings.ShowFileExplorer
             };
             fileListHost.Start();
+            // cmd.exe and PowerShell do not report their directory: it is read from their prompt, so the list follows a "cd".
+            SmarTTY.Terminal.TerminalDirectoryWatcher directoryWatcher = new SmarTTY.Terminal.TerminalDirectoryWatcher();
+            directoryWatcher.DirectoryReported += fileListHost.ReportTerminalDirectory;
+            term.OutputReceived += directoryWatcher.Observe;
         }
         _Session = sessionWrapper;
         Terminal = term;

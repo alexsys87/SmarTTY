@@ -31,6 +31,34 @@ public sealed class SftpFileSystem
         return _sftp.ListDirectory(WindowsSftpPath.ForServer(directory)).Where(entry => entry.Name != "." && entry.Name != "..").ToList();
     }
 
+    /// <summary>
+    /// The drives of a Windows host, as folders named "C:", "D:"... SFTP has no call for them (what "/" lists depends on the
+    /// server), so each letter is asked for: a drive is there when its root can be examined. A and B (floppy disks) are
+    /// not asked.
+    /// </summary>
+    public List<SftpDirectoryEntry> ListDrives()
+    {
+        List<SftpDirectoryEntry> drives = new List<SftpDirectoryEntry>();
+        for (char letter = 'C'; letter <= 'Z'; letter++)
+        {
+            SftpFileAttributes attributes;
+            try
+            {
+                attributes = _sftp.Stat("/" + letter + ":/");
+            }
+            catch (SftpStatusException)
+            {
+                // A drive that is not ready (an empty CD drive) or not allowed is not listed.
+                continue;
+            }
+            if (attributes != null && attributes.IsDirectory)
+            {
+                drives.Add(new SftpDirectoryEntry { Name = letter + ":", Attributes = attributes });
+            }
+        }
+        return drives;
+    }
+
     public void CreateDirectory(string path)
     {
         _sftp.MakeDirectory(WindowsSftpPath.ForServer(path));
@@ -127,6 +155,28 @@ public sealed class SftpFileSystem
         using Stream input = _sftp.OpenRead(source, 0);
         using Stream output = _sftp.OpenWrite(destination, 0, truncate: true, mode: attributes.Mode == null ? 0x1A4 : attributes.Mode.Value & 0xFFF);
         input.CopyTo(output);
+    }
+
+    /// <summary>
+    /// What each path is, like <see cref="SshSession.GetRemotePathKinds"/> does with "test" for a Unix host: a path whose
+    /// status the server refuses to give is <see cref="RemotePathKind.Unknown"/>, not missing.
+    /// </summary>
+    public static RemotePathKind[] PathKinds(SftpChannel sftp, IList<string> paths)
+    {
+        RemotePathKind[] kinds = new RemotePathKind[paths.Count];
+        for (int index = 0; index < paths.Count; index++)
+        {
+            try
+            {
+                SftpFileAttributes attributes = sftp.Stat(WindowsSftpPath.ForServer(paths[index]));
+                kinds[index] = attributes == null ? RemotePathKind.Missing : (attributes.IsDirectory ? RemotePathKind.Directory : RemotePathKind.File);
+            }
+            catch (SftpStatusException)
+            {
+                kinds[index] = RemotePathKind.Unknown;
+            }
+        }
+        return kinds;
     }
 
     /// <summary>The path of <paramref name="name"/> in <paramref name="directory"/>.</summary>

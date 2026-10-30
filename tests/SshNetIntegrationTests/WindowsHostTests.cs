@@ -17,6 +17,9 @@ internal static class WindowsHostTests
         SshdConfig();
         Icacls();
         Lines();
+        ProgramData();
+        Prompts();
+        Certutil();
     }
 
     private static void Paths()
@@ -117,6 +120,71 @@ internal static class WindowsHostTests
         Test.Equal("icacls \"C:\\ProgramData\\ssh\\administrators_authorized_keys\" /inheritance:r /grant *S-1-5-32-544:F /grant *S-1-5-18:F", WindowsAuthorizedKeys.RestrictAccessCommand("/C:/ProgramData/ssh/administrators_authorized_keys"), "icacls removes the inherited rights and leaves Administrators and SYSTEM, by SID");
         Test.Equal("icacls \"D:\\My Keys\\admins\" /inheritance:r /grant *S-1-5-32-544:F /grant *S-1-5-18:F", WindowsAuthorizedKeys.RestrictAccessCommand("/D:/My Keys/admins"), "a path with a space is in double quotes");
         Test.Throws<ArgumentException>(() => WindowsAuthorizedKeys.RestrictAccessCommand("/home/user/keys"), "a path without a drive is refused");
+    }
+
+    private static void ProgramData()
+    {
+        Test.Equal("/C:/ProgramData", WindowsAuthorizedKeys.ParseProgramData(new[] { "C:\\ProgramData $env:ProgramData" }), "ProgramData from cmd.exe (it prints the path, and the PowerShell word as it was typed)");
+        Test.Equal("/C:/ProgramData", WindowsAuthorizedKeys.ParseProgramData(new[] { "%ProgramData% C:\\ProgramData" }), "ProgramData from PowerShell");
+        Test.Equal("/D:/Program Data/x", WindowsAuthorizedKeys.ParseProgramData(new[] { "", "D:\\Program Data\\x $env:ProgramData" }), "a ProgramData on another drive, with a space in it");
+        Test.Equal("/E:/PD", WindowsAuthorizedKeys.ParseProgramData(new[] { "%ProgramData% E:\\PD\\" }), "a trailing backslash goes");
+        Test.Check(WindowsAuthorizedKeys.ParseProgramData(new[] { "%ProgramData% $env:ProgramData" }) == null, "neither shell expanded it: no path");
+        Test.Check(WindowsAuthorizedKeys.ParseProgramData(new[] { "'echo' is not recognized as an internal or external command," }) == null && WindowsAuthorizedKeys.ParseProgramData(null) == null, "an error message and no output: no path");
+        Test.Check(WindowsAuthorizedKeys.ParseProgramData(new[] { "/usr/share $env:ProgramData" }) == null, "a path without a drive is not taken");
+    }
+
+    private static string[] Reports(params string[] chunks)
+    {
+        System.Collections.Generic.List<string> reported = new System.Collections.Generic.List<string>();
+        SmarTTY.Terminal.TerminalDirectoryWatcher watcher = new SmarTTY.Terminal.TerminalDirectoryWatcher();
+        watcher.DirectoryReported += reported.Add;
+        foreach (string chunk in chunks)
+        {
+            watcher.Observe(chunk);
+        }
+        return reported.ToArray();
+    }
+
+    private static void Prompts()
+    {
+        string esc = "\u001b";
+        Test.Equal(@"C:\Users\me", string.Join("|", Reports("Microsoft Windows [Version 10.0.19045.3693]\r\n(c) Microsoft Corporation. All rights reserved.\r\n\r\nC:\\Users\\me>")), "the prompt of cmd.exe");
+        Test.Equal(@"C:\Windows\System32", string.Join("|", Reports("PS C:\\Windows\\System32> ")), "the prompt of PowerShell");
+        Test.Equal(@"C:\Program Files (x86)\App", string.Join("|", Reports(esc + "[32mPS " + esc + "[0mC:\\Program Files (x86)\\App" + esc + "[0m> " + esc + "[?25h")), "colours and cursor sequences in the prompt, a path with spaces and brackets");
+        Test.Equal(@"C:\", string.Join("|", Reports("C:\\>")), "the root of a drive");
+        Test.Equal(@"C:\Users\me", string.Join("|", Reports("C:\\Us", "ers\\me>")), "a prompt split between two chunks");
+        Test.Equal(@"C:\x", string.Join("|", Reports("hello\r\n" + esc + "[3", "2mC:\\x>")), "an escape sequence split between two chunks");
+        Test.Equal(@"D:\two", string.Join("|", Reports("C:\\one>dir\r\n volume...\r\n\r\nC:\\one>cd /d D:\\two\r\n\r\nD:\\two>")), "of several prompts in one chunk the last one counts");
+        Test.Equal(@"C:\one|D:\two", string.Join("|", Reports("C:\\one>dir\r\n volume...\r\n\r\nC:\\one>", "cd /d D:\\two\r\n\r\nD:\\two>")), "the prompt that is shown again is reported once, a new directory is reported");
+        Test.Equal(@"C:\one", string.Join("|", Reports("C:\\one>", "dir", "\r\nDirectory of stuff\r\n")), "typing after a prompt, and output after it, report nothing more");
+        Test.Equal(@"C:\a|C:\b|C:\a", string.Join("|", Reports("C:\\a>", "\r\nC:\\b>", "\r\nC:\\a>")), "going back to a directory is reported again");
+        Test.Equal(@"C:\a|C:\b", string.Join("|", Reports("C:\\a>cls", esc + "[2J" + esc + "[HC:\\b>")), "after cls the prompt is at the top of the screen, with no newline before it");
+        Test.Equal(@"C:\a|C:\b", string.Join("|", Reports("C:\\a>", esc + "[1;1HC:\\b>")), "a cursor move to another line starts a new line");
+        Test.Equal("", string.Join("|", Reports("PS HKLM:\\SOFTWARE> ", "PS Microsoft.PowerShell.Core\\FileSystem::\\\\server\\share> ", "echo hi > C:\\x\r\n", "see C:\\x> not at the start\r\n")), "providers, UNC paths and text that is not at the start of a line are not prompts");
+        Test.Equal(@"D:\Projects", string.Join("|", Reports(esc + "]9;9;\"D:\\Projects\"" + esc + "\\")), "OSC 9;9 of Windows Terminal, in quotes, ended with ESC \\");
+        Test.Equal(@"D:\Projects", string.Join("|", Reports(esc + "]9;9;D:\\Projects\u0007")), "OSC 9;9 without quotes, ended with BEL");
+        Test.Equal(@"D:\Projects", string.Join("|", Reports(esc + "]9;9;\"D:\\Proj", "ects\"" + esc, "\\")), "OSC 9;9 cut in the middle, also between ESC and the backslash");
+        Test.Equal("/C:/Users/me x", string.Join("|", Reports(esc + "]7;file://PC/C:/Users/me%20x\u0007")), "OSC 7 with a file URL");
+        Test.Equal("", string.Join("|", Reports(esc + "]7;file://host/home/user\u0007", esc + "]9;9;/not/windows\u0007", esc + "]0;C:\\Windows\\system32\\cmd.exe\u0007")), "a Unix OSC 7, a path without a drive and a window title are not directories");
+        Test.Equal(@"C:\", string.Join("|", Reports(esc + "]0;C:\\Windows\\system32\\cmd.exe\u0007C:\\>")), "a title with a path in it does not hide the prompt after it");
+        Test.Equal("", string.Join("|", Reports("", null, "plain output\r\n")), "empty chunks and plain output report nothing");
+    }
+
+    private static void Certutil()
+    {
+        string hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        Test.Equal("SHA-256 " + hash, Format(Transport.WindowsRemoteFileTools.ParseChecksum(new[] { "SHA256 hash of C:\\x\\file.bin:", hash, "CertUtil: -hashfile command completed successfully." })), "the hash line of certutil is found among the words");
+        Test.Equal("SHA-256 " + hash, Format(Transport.WindowsRemoteFileTools.ParseChecksum(new[] { "SHA256-Hash von Datei C:\\x:", hash.ToUpperInvariant(), "CertUtil: Der Befehl -hashfile wurde erfolgreich ausgef\u00fchrt." })), "also in another language, with capital letters");
+        Test.Equal("SHA-256 " + hash, Format(Transport.WindowsRemoteFileTools.ParseChecksum(new[] { "SHA256 hash of file:", string.Join(" ", Enumerable.Range(0, 32).Select(index => hash.Substring(index * 2, 2))), "CertUtil: -hashfile command completed successfully." })), "the older output with a space between every two digits");
+        Test.Check(Transport.WindowsRemoteFileTools.ParseChecksum(new[] { "CertUtil: -hashfile command failed: 0x80070002 (WIN32: 2 ERROR_FILE_NOT_FOUND)", "The system cannot find the file specified." }) == null && Transport.WindowsRemoteFileTools.ParseChecksum(null) == null, "an error is no checksum");
+        Test.Check(Transport.WindowsRemoteFileTools.ParseChecksum(new[] { hash.Substring(1) }) == null && Transport.WindowsRemoteFileTools.ParseChecksum(new[] { hash + "00" }) == null, "a hash of the wrong length is not one");
+        Test.Equal("certutil -hashfile \"C:\\Users\\me\\a b.txt\" SHA256", Transport.WindowsRemoteFileTools.ChecksumCommand("/C:/Users/me/a b.txt"), "the certutil command, the path in double quotes");
+        Test.Check(Transport.WindowsRemoteFileTools.ChecksumCommand("/home/user/x") == null, "no command for a path without a drive");
+    }
+
+    private static string Format(Transport.FileChecksum checksum)
+    {
+        return checksum == null ? null : checksum.Algorithm + " " + checksum.Value;
     }
 
     private static void Lines()

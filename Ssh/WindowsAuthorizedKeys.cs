@@ -38,6 +38,12 @@ internal static class WindowsAuthorizedKeys
         return SftpFileSystem.Child(programData, "ssh/sshd_config");
     }
 
+    /// <summary>
+    /// Prints %ProgramData% as cmd.exe expands it, and as PowerShell does: each shell takes the other's spelling as text, so one of
+    /// the two words is the path and the other is left as it was typed. See <see cref="ParseProgramData"/>.
+    /// </summary>
+    public const string ProgramDataCommand = "echo %ProgramData% $env:ProgramData";
+
     /// <summary>A key file and whether the server wants it closed to everybody but Administrators and SYSTEM.</summary>
     internal sealed class KeyFile
     {
@@ -98,6 +104,36 @@ internal static class WindowsAuthorizedKeys
             string file = match.Groups["files"].Value.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim('"');
             file = file.Replace("__PROGRAMDATA__", programData.TrimStart('/'));
             return WindowsSftpPath.Normalize(file);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// ProgramData as SFTP shows it ("/C:/ProgramData"), from the output of <see cref="ProgramDataCommand"/>: "C:\ProgramData
+    /// $env:ProgramData" from cmd.exe, "%ProgramData% C:\ProgramData" from PowerShell. The path may have spaces in it. Null when
+    /// neither shape is there.
+    /// </summary>
+    public static string ParseProgramData(IEnumerable<string> output)
+    {
+        const string powerShellWord = "$env:ProgramData";
+        const string cmdWord = "%ProgramData%";
+        foreach (string rawLine in output ?? new string[0])
+        {
+            string line = (rawLine ?? "").Trim();
+            string candidate = null;
+            if (line.EndsWith(" " + powerShellWord, StringComparison.Ordinal))
+            {
+                candidate = line.Substring(0, line.Length - powerShellWord.Length - 1);
+            }
+            else if (line.StartsWith(cmdWord + " ", StringComparison.Ordinal))
+            {
+                candidate = line.Substring(cmdWord.Length + 1);
+            }
+            candidate = candidate?.Trim().Trim('"');
+            if (candidate != null && Regex.IsMatch(candidate, @"^[A-Za-z]:\\"))
+            {
+                return WindowsSftpPath.Normalize(candidate);
+            }
         }
         return null;
     }
@@ -338,6 +374,38 @@ internal static class WindowsAuthorizedKeys
         }
     }
 
+    /// <summary>
+    /// Where ProgramData is: asked of the shell; when that cannot be read, on the drive of the profile (the SFTP server starts
+    /// there) if it has an ssh directory in ProgramData; and only then assumed to be on C:.
+    /// </summary>
+    internal static string ResolveProgramData(SshSession session, SftpChannel sftp)
+    {
+        List<string> output = session.RunCommandChecked(ProgramDataCommand, requireSuccess: true);
+        string programData = ParseProgramData(output);
+        if (programData != null)
+        {
+            return programData;
+        }
+        session.ThrowIfConnectionLost();
+        string home = WindowsSftpPath.Normalize(sftp.RealPath("."));
+        if (home.Length >= 3 && home[2] == ':')
+        {
+            string onProfileDrive = "/" + home.Substring(1, 2) + "/ProgramData";
+            if (sftp.Stat(WindowsSftpPath.Parent(DefaultAdminKeysFile(onProfileDrive))) != null)
+            {
+                return onProfileDrive;
+            }
+        }
+        return DefaultProgramData;
+    }
+
+    /// <summary>The key files of the logged in user: the common file of the administrators needs to know where ProgramData is.</summary>
+    private static List<KeyFile> FindKeyFiles(SshSession session, SftpChannel sftp)
+    {
+        bool administrator = IsAdministrator(session);
+        return FindKeyFiles(sftp, administrator, administrator ? ResolveProgramData(session, sftp) : DefaultProgramData);
+    }
+
     private static void RestrictAccess(SshSession session, string path)
     {
         List<string> output = session.RunCommandChecked(RestrictAccessCommand(path), requireSuccess: true);
@@ -353,7 +421,7 @@ internal static class WindowsAuthorizedKeys
         try
         {
             using SftpChannel sftp = SftpChannel.Open(session);
-            return FindKeyFiles(sftp, IsAdministrator(session)).All(file => FileHoldsKey(sftp, file.Path, keyBlob));
+            return FindKeyFiles(session, sftp).All(file => FileHoldsKey(sftp, file.Path, keyBlob));
         }
         catch (IOException) when (session.IsConnectionClosed)
         {
@@ -369,13 +437,13 @@ internal static class WindowsAuthorizedKeys
     public static void Append(SshSession session, string keyLine, byte[] keyBlob)
     {
         using SftpChannel sftp = SftpChannel.Open(session);
-        AppendToFiles(sftp, FindKeyFiles(sftp, IsAdministrator(session)), keyLine, keyBlob, path => RestrictAccess(session, path));
+        AppendToFiles(sftp, FindKeyFiles(session, sftp), keyLine, keyBlob, path => RestrictAccess(session, path));
     }
 
     public static void Remove(SshSession session, byte[] keyBlob)
     {
         using SftpChannel sftp = SftpChannel.Open(session);
-        RemoveFromFiles(sftp, FindKeyFiles(sftp, IsAdministrator(session)), keyBlob, path => RestrictAccess(session, path));
+        RemoveFromFiles(sftp, FindKeyFiles(session, sftp), keyBlob, path => RestrictAccess(session, path));
     }
 
     #endregion
