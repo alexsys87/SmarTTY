@@ -34,7 +34,7 @@ internal static class SettingsArchiveDialogs
         {
             DataDirectory = GlobalSettings.DataDirectory,
             LocalDataDirectory = LocalDataDirectory,
-            CommandCompletionsPath = CommandCompletionDatabase.DefaultPath,
+            CommandCompletionsPath = CommandCompletionDatabase.PlannedPath(),
             UserSshDirectory = SshSession.UserSshDirectory,
             KeyStore = new CspSettingsKeyStore()
         };

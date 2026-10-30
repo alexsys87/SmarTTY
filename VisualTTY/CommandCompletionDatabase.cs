@@ -22,15 +22,120 @@ public class CommandCompletionDatabase
     /// <summary>Name of the template built into the program: the dictionary that is used while there is no file next to the exe.</summary>
     public const string TemplateResourceName = "VisualTTY.CommandCompletions.xml";
 
+    private const string FileName = "CommandCompletions.xml";
+
+    private static string _programDirectory;
+
+    private static string _userDirectory;
+
+    /// <summary>The folder of the program; settable for the tests.</summary>
+    public static string ProgramDirectory
+    {
+        get { return _programDirectory ?? Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location); }
+        set { _programDirectory = value; }
+    }
+
+    /// <summary>%APPDATA%\SmarTTY, where the file goes when the folder of the program cannot be written; settable for the tests.</summary>
+    public static string UserDirectory
+    {
+        get { return _userDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SmarTTY"); }
+        set { _userDirectory = value; }
+    }
+
     /// <summary>
-    /// CommandCompletions.xml next to the exe (also used by the settings export/import). The file is optional: it is created by
-    /// the editor on the first save and takes priority over the template built into the program.
+    /// CommandCompletions.xml next to the exe. The file is optional: it is created by the editor on the first save and takes
+    /// priority over the file in <see cref="UserPath"/> and over the template built into the program.
     /// </summary>
     public static string DefaultPath
     {
         get
         {
-            return Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "CommandCompletions.xml");
+            return Path.Combine(ProgramDirectory, FileName);
+        }
+    }
+
+    /// <summary>CommandCompletions.xml in %APPDATA%\SmarTTY: used while there is no file next to the exe.</summary>
+    public static string UserPath
+    {
+        get
+        {
+            return Path.Combine(UserDirectory, FileName);
+        }
+    }
+
+    private static bool ExistsAsXmlOrGzip(string xmlPath)
+    {
+        return File.Exists(xmlPath) || File.Exists(xmlPath + ".gz");
+    }
+
+    /// <summary>
+    /// The file that is in use (its plain XML name; it may exist as .gz only): next to the exe first, then in %APPDATA%\SmarTTY.
+    /// Null while there is neither, which means the built-in template.
+    /// </summary>
+    public static string FindExternalPath()
+    {
+        if (ExistsAsXmlOrGzip(DefaultPath))
+        {
+            return DefaultPath;
+        }
+        return ExistsAsXmlOrGzip(UserPath) ? UserPath : null;
+    }
+
+    /// <summary>
+    /// Where the next save goes: the file in use, else next to the exe when that folder can be written, else
+    /// %APPDATA%\SmarTTY. Also the place the settings import writes to.
+    /// </summary>
+    public static string PlannedPath()
+    {
+        string existing = FindExternalPath();
+        if (existing != null)
+        {
+            return existing;
+        }
+        return CanWriteTo(ProgramDirectory) ? DefaultPath : UserPath;
+    }
+
+    private static bool CanWriteTo(string directory)
+    {
+        try
+        {
+            if (!Directory.Exists(directory))
+            {
+                return false;
+            }
+            string probe = Path.Combine(directory, Path.GetRandomFileName() + ".tmp");
+            using (new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose))
+            {
+            }
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is SecurityException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Saves the database to the file in use, or, when there is none yet, next to the exe and, if that folder refuses the
+    /// write, to %APPDATA%\SmarTTY. Returns the path (plain XML name) that was written.
+    /// </summary>
+    public string SaveToPreferredPlace(bool compressed)
+    {
+        string path = FindExternalPath();
+        if (path != null)
+        {
+            SaveTo(path, compressed);
+            return path;
+        }
+        try
+        {
+            SaveTo(DefaultPath, compressed);
+            return DefaultPath;
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is SecurityException)
+        {
+            SaveTo(UserPath, compressed);
+            return UserPath;
         }
     }
 
@@ -56,9 +161,11 @@ public class CommandCompletionDatabase
         return !File.Exists(xmlPath) && File.Exists(xmlPath + ".gz");
     }
 
+    /// <summary>The file next to the exe, else the one in %APPDATA%\SmarTTY, else the built-in template.</summary>
     public static CommandCompletionDatabase Load()
     {
-        return Load(DefaultPath);
+        string path = FindExternalPath();
+        return path == null ? LoadTemplate() : Load(path);
     }
 
     public static CommandCompletionDatabase Load(string path)
