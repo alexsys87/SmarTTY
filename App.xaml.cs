@@ -21,7 +21,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         // The theme lives in Application.Resources, so it has to be there before the first window loads its XAML.
-        ThemeManager.Apply(GlobalSettings.Load()?.Theme ?? SmarTTYTheme.Dark);
+        ThemeManager.Apply(GlobalSettings.Load());
 
         // The message boxes of the harness-compiled controls become the themed WPF dialogs.
         ThemedMessageBoxAdapter.Install();

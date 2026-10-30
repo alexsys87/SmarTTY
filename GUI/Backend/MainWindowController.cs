@@ -1468,7 +1468,7 @@ public class MainWindowController : INotifyPropertyChanged
 
     private void ApplyEditorSettings(RemoteFileEditor edit)
     {
-        GlobalSettings.EditorColors effectiveColors = Settings.Editor.GetEffectiveColors(Settings.Theme);
+        GlobalSettings.EditorColors effectiveColors = Settings.Editor.GetEffectiveColors(Settings.IsLightTheme);
         edit.BackColor = effectiveColors.BackColor;
         edit.ForeColor = effectiveColors.TextColor;
         edit.Brush = new SolidBrush(effectiveColors.LineNumberBackground);
@@ -1510,7 +1510,7 @@ public class MainWindowController : INotifyPropertyChanged
 
     private void ApplySyntaxHighlighting(RemoteFileEditor edit)
     {
-        GlobalSettings.EditorColors effectiveColors = Settings.Editor.GetEffectiveColors(Settings.Theme);
+        GlobalSettings.EditorColors effectiveColors = Settings.Editor.GetEffectiveColors(Settings.IsLightTheme);
         TokenCache.LineTokenizer tokenizer = null;
         SyntaxHighlighting.Language language = SyntaxHighlighting.Language.Plain;
         // A syntax chosen by hand works even when the automatic highlighting is switched off in the settings.
@@ -1628,7 +1628,7 @@ public class MainWindowController : INotifyPropertyChanged
     {
         TabHeaderLocation = HeaderOrientationToDock(Settings.TabHeaderOrientation);
         SessionHeaderLocation = HeaderOrientationToDock(Settings.SessionHeaderOrientation);
-        ThemeManager.Apply(Settings.Theme);
+        ThemeManager.Apply(Settings);
     }
 
     private void CloseActivePage()

@@ -1,0 +1,75 @@
+# SmarTTY custom theme: a full template.
+#
+# Copy this file into the "Themes" folder next to SmarTTY.exe (create the folder if it is not there), change the
+# colours and pick the theme under Settings - Application theme. Without the Themes folder only the built-in themes exist.
+#
+# Format: one "name = value" per line. Lines that start with # or ; or // are comments.
+#   Name  - the title in the theme list (the file name when left out)
+#   Light - true for a theme with dark text on light surfaces (it selects the light editor colours); default: as Base
+#   Base  - the built-in theme that supplies every colour this file leaves out (Dark by default, Light if Light = true)
+# Every other line sets one palette colour as #RGB, #ARGB, #RRGGBB, #AARRGGBB or Transparent. The Theme. prefix of the
+# key may be left out ("Accent = #FF9F43" works). A key that does not exist is ignored, and so is a line that cannot
+# be read (the tool tip of the theme in the list names it). You only need the lines you want to change.
+# Keep the text readable: primary text needs a contrast of 7:1 against the surfaces, secondary text 4.5:1.
+
+Name = Template (copy of Dark)
+Light = false
+Base = Dark
+
+# Surfaces
+Theme.WindowBackground = #1E1F22
+Theme.SurfaceBackground = #2B2D30
+Theme.SurfaceAltBackground = #26282B
+Theme.ContentBackground = #1E1F22
+Theme.TabStripBackground = #2B2D30
+Theme.InputBackground = #16171A
+Theme.PopupBackground = #2B2D30
+
+# Buttons and other clickable controls
+Theme.ControlBackground = #35373C
+Theme.ControlHoverBackground = #404349
+Theme.ControlPressedBackground = #4A4D54
+Theme.ControlDisabledBackground = #2A2B2E
+
+# List items, menu items, tabs
+Theme.ItemHoverBackground = #33363B
+Theme.TabHoverBackground = #36393E
+Theme.ItemSelectedBackground = #264F86
+Theme.ItemSelectedInactiveBackground = #3A3D43
+Theme.ItemSelectedForeground = #FFFFFF
+
+# Accent: default buttons, checked boxes, progress, the active tab marker
+Theme.Accent = #4C8DFF
+Theme.AccentBackground = #2E6AD6
+Theme.AccentHoverBackground = #2A60C4
+Theme.AccentPressedBackground = #1F57C0
+Theme.AccentForeground = #FFFFFF
+
+# Lines
+Theme.Border = #4A4D53
+Theme.BorderStrong = #6B7079
+Theme.FocusBorder = #4C8DFF
+Theme.Divider = #393B40
+
+# Text
+Theme.Text = #ECEEF1
+Theme.TextSecondary = #B5BAC1
+Theme.TextDisabled = #8F949C
+Theme.Link = #6CB4FF
+Theme.LinkHover = #A8D3FF
+Theme.Error = #FF7B72
+Theme.TextSelection = #3D7BE6
+
+# File list: names coloured by access permissions
+Theme.Permission.ReadOnly = #9AA0A8
+Theme.Permission.Executable = #7EE787
+Theme.Permission.SetId = #FFB454
+Theme.Permission.WorldWritable = #FF7B72
+
+# Scroll bars
+Theme.ScrollTrack = Transparent
+Theme.ScrollThumb = #55585F
+Theme.ScrollThumbHover = #6E727A
+Theme.ScrollThumbPressed = #8A8F98
+
+# System colours, for the parts of the stock control templates that still refer to them

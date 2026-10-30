@@ -115,9 +115,14 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public EditorColors GetEffectiveColors(SmarTTYTheme theme)
         {
+            return GetEffectiveColors(theme.IsLight());
+        }
+
+        public EditorColors GetEffectiveColors(bool lightTheme)
+        {
             // The editor colours come in a dark and a light family, not one per palette: the dark themes edit with
-            // the dark family, the light ones (Light, Solarized Light, Sepia) with the light family.
-            if (theme.IsLight())
+            // the dark family, the light ones (Light, Solarized Light, Sepia, a custom light theme) with the light family.
+            if (lightTheme)
             {
                 return LightColors;
             }
@@ -297,6 +302,37 @@ public class GlobalSettings : INotifyPropertyChanged
     public bool ShowUnrecognizedCharactersAsHex { get; set; }
 
     public SmarTTYTheme Theme { get; set; }
+
+    /// <summary>
+    /// The file name of the custom theme (a <c>*.theme</c> file in the <c>Themes</c> folder next to the program) that is
+    /// selected, or empty for a built-in theme. When the file is gone the built-in <see cref="Theme"/> is used, which a
+    /// custom theme keeps set to its base theme.
+    /// </summary>
+    public string CustomTheme { get; set; }
+
+    /// <summary>The selected theme, built-in or custom; the settings window binds its theme list to it.</summary>
+    [XmlIgnore]
+    public ThemeChoice ThemeChoice
+    {
+        get => ThemeLibrary.Find(Theme, CustomTheme);
+        set
+        {
+            if (value == null)
+            {
+                return;
+            }
+            Theme = value.BuiltIn;
+            CustomTheme = value.IsCustom ? value.FileName : null;
+        }
+    }
+
+    /// <summary>Every theme the program offers (the built-in ones and those in the themes folder).</summary>
+    [XmlIgnore]
+    public System.Collections.Generic.IReadOnlyList<ThemeChoice> AvailableThemes => ThemeLibrary.All;
+
+    /// <summary>Whether the selected theme is a light one; it picks the light or the dark editor colours.</summary>
+    [XmlIgnore]
+    public bool IsLightTheme => ThemeChoice.IsLight;
 
     public HeaderOrientation TabHeaderOrientation { get; set; } = HeaderOrientation.Bottom;
 

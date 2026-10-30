@@ -38,6 +38,8 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
 
     public GlobalSettingsWindow(GlobalSettings settings)
     {
+        // A theme file added to the Themes folder since the program started is offered at once.
+        ThemeLibrary.Reload();
         InitializeComponent();
         // The window keeps one height for every tab (it no longer sizes itself to the current tab), so cap it to
         // the screen: a shorter display would otherwise push the OK/Cancel buttons off the bottom.
@@ -167,7 +169,7 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
     private void ResetEditorColors_Click(object sender, RoutedEventArgs e)
     {
         GlobalSettings.EditorColors colors = _ClonedSettings.EditorWrapper.Colors;
-        GlobalSettings.EditorColors defaults = _ClonedSettings.Theme.IsLight() ? GlobalSettings.EditorColors.LightColors : GlobalSettings.EditorColors.DarkColors;
+        GlobalSettings.EditorColors defaults = _ClonedSettings.IsLightTheme ? GlobalSettings.EditorColors.LightColors : GlobalSettings.EditorColors.DarkColors;
         foreach (PropertyInfo property in typeof(GlobalSettings.EditorColors).GetProperties())
         {
             if (property.CanWrite && property.PropertyType == typeof(DeviceTerminalSettings.ColorWrapper))

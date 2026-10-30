@@ -1333,8 +1333,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     public ConnectionSelectionWindow(bool showRawConnections, string defaultItemNameOrCmdLine)
     {
         InitializeComponent();
-        _Theme = GlobalSettings.Load()?.Theme ?? SmarTTYTheme.Dark;
-        ThemeManager.Apply(_Theme);
+        GlobalSettings savedSettings = GlobalSettings.Load();
+        _Theme = savedSettings?.Theme ?? SmarTTYTheme.Dark;
+        ThemeManager.Apply(savedSettings);
         this.DataContext = (Controller = new ControllerImpl(this.Dispatcher, showRawConnections, defaultItemNameOrCmdLine, GuiPreferencesStore.Current));
         Controller.SessionCreated += Controller_SessionCreated;
         if (Controller.PendingRawConnectionSettings != null)

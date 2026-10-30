@@ -8,14 +8,14 @@ using VisualTTY;
 namespace SmarTTY.GUI;
 
 /// <summary>
-/// Turns a <see cref="SmarTTYTheme"/> into one of the colours of its palette (the palette key is the converter
+/// Turns a <see cref="ThemeChoice"/> into one of the colours of its palette (the palette key is the converter
 /// parameter, for example "Theme.Accent"), so the theme list can show a small preview of every theme.
 /// </summary>
 public class ThemeSwatchConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        if (value is SmarTTYTheme theme && parameter is string key)
+        if (value is ThemeChoice theme && parameter is string key)
         {
             return ThemeManager.GetPaletteBrush(theme, key, Brushes.Transparent);
         }

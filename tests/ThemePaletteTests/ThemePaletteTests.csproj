@@ -9,5 +9,8 @@
     <!-- The theme enum and its metadata (VisualTTY/SmarTTYTheme.cs) plus the display-name attribute it uses. -->
     <Compile Include="../../VisualTTY/SmarTTYTheme.cs" Link="SmarTTYTheme.cs" />
     <Compile Include="../../Utilities/EnumDisplayText.cs" Link="EnumDisplayText.cs" />
+    <!-- The custom themes: the entry of the theme list and the reader of the Themes folder (both free of WPF). -->
+    <Compile Include="../../VisualTTY/ThemeChoice.cs" Link="ThemeChoice.cs" />
+    <Compile Include="../../VisualTTY/ThemeLibrary.cs" Link="ThemeLibrary.cs" />
   </ItemGroup>
 </Project>

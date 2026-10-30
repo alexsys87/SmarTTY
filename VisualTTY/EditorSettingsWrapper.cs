@@ -141,7 +141,7 @@ public class EditorSettingsWrapper
     {
         get
         {
-            if (_Settings.Theme.IsLight())
+            if (_Settings.IsLightTheme)
             {
                 return _Settings.Editor.LightColors;
             }
