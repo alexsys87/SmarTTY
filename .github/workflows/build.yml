@@ -181,6 +181,9 @@ jobs:
       - name: Run icon resource checks (every Icons.Load name is embedded, no .resx left)
         run: dotnet run --project tests/IconResourceTests -c Release
 
+      - name: Run XAML encoding checks (non-ASCII markup keeps its UTF-8 BOM)
+        run: dotnet run --project tests/XamlEncodingTests -c Release
+
       - name: Run local folder browser checks (roots, child folders, ordering, path normalization)
         run: dotnet run --project tests/LocalFolderTreeTests -c Release
 
