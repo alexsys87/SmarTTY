@@ -68,6 +68,8 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
             }
         }
         txtVcxsrvStatus.Text = VcxsrvSetup.DescribeInstallation(VcxsrvSetup.FindExecutable());
+        // An installed VcXsrv has nothing to download.
+        btnInstallVcxsrv.IsEnabled = VcxsrvSetup.FindExecutable() == null;
         _Initialized = true;
     }
 
@@ -98,7 +100,7 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
                 Dispatcher.BeginInvoke((Action)(() =>
                 {
                     txtVcxsrvStatus.Text = status;
-                    btnInstallVcxsrv.IsEnabled = true;
+                    btnInstallVcxsrv.IsEnabled = VcxsrvSetup.FindExecutable() == null;
                 }));
             }
         });

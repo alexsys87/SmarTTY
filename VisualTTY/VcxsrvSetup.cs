@@ -109,6 +109,10 @@ public static class VcxsrvSetup
             }
         }
         directories.Add(DefaultInstallDirectory);
+        foreach (string pathEntry in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
+        {
+            directories.Add(pathEntry.Trim().Trim('"'));
+        }
         string localPrograms = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (!string.IsNullOrEmpty(localPrograms))
         {
@@ -117,7 +121,9 @@ public static class VcxsrvSetup
         return directories.Where((string directory) => !string.IsNullOrEmpty(directory)).Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
-    // The installer records its folder as HKLM\SOFTWARE\VcXsrv\Install_Dir and in its uninstall entry.
+    // The installer records its folder as HKLM\SOFTWARE\VcXsrv\Install_Dir, in its uninstall entry (under the key name VcXsrv
+    // or another one: the entries are also looked up by their DisplayName) and as an "App Paths" entry. Every key is read
+    // on its own, so that one that cannot be opened does not hide the rest.
     private static IEnumerable<string> RegisteredDirectories()
     {
         List<string> directories = new List<string>();
@@ -128,19 +134,30 @@ public static class VcxsrvSetup
                 try
                 {
                     using RegistryKey root = RegistryKey.OpenBaseKey(hive, view);
-                    using (RegistryKey key = root.OpenSubKey("SOFTWARE\\VcXsrv"))
+                    ReadKey(root, "SOFTWARE\\VcXsrv", key => AddDirectory(directories, key.GetValue("Install_Dir") as string));
+                    ReadKey(root, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\" + ExecutableName, key =>
                     {
-                        AddDirectory(directories, key?.GetValue("Install_Dir") as string);
-                    }
-                    using (RegistryKey key = root.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\VcXsrv"))
+                        AddDirectory(directories, key.GetValue("Path") as string);
+                        AddDirectory(directories, DirectoryOfCommand(key.GetValue(null) as string));
+                    });
+                    const string uninstallPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+                    ReadKey(root, uninstallPath, uninstall =>
                     {
-                        AddDirectory(directories, key?.GetValue("InstallLocation") as string);
-                        string uninstaller = (key?.GetValue("UninstallString") as string)?.Trim().Trim('"');
-                        if (!string.IsNullOrEmpty(uninstaller))
+                        foreach (string name in uninstall.GetSubKeyNames())
                         {
-                            AddDirectory(directories, Path.GetDirectoryName(uninstaller));
+                            ReadKey(uninstall, name, entry =>
+                            {
+                                string displayName = entry.GetValue("DisplayName") as string;
+                                if (!name.Equals("VcXsrv", StringComparison.OrdinalIgnoreCase) && (displayName == null || !displayName.StartsWith("VcXsrv", StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    return;
+                                }
+                                AddDirectory(directories, entry.GetValue("InstallLocation") as string);
+                                AddDirectory(directories, DirectoryOfCommand(entry.GetValue("UninstallString") as string));
+                                AddDirectory(directories, DirectoryOfCommand(entry.GetValue("DisplayIcon") as string));
+                            });
                         }
-                    }
+                    });
                 }
                 catch
                 {
@@ -150,12 +167,56 @@ public static class VcxsrvSetup
         return directories;
     }
 
+    private static void ReadKey(RegistryKey parent, string path, Action<RegistryKey> read)
+    {
+        try
+        {
+            using RegistryKey key = parent.OpenSubKey(path);
+            if (key != null)
+            {
+                read(key);
+            }
+        }
+        catch
+        {
+        }
+    }
+
     private static void AddDirectory(List<string> directories, string directory)
     {
         if (!string.IsNullOrWhiteSpace(directory))
         {
             directories.Add(directory.Trim().Trim('"'));
         }
+    }
+
+    /// <summary>
+    /// The folder of the program in a command line from the registry: "C:\Program Files\VcXsrv\uninstall.exe" /S,
+    /// C:\Program Files\VcXsrv\vcxsrv.exe,0 (an icon with its index) or a bare path. Null if there is none.
+    /// </summary>
+    internal static string DirectoryOfCommand(string command)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return null;
+        }
+        string text = command.Trim();
+        string program;
+        if (text[0] == '"')
+        {
+            int end = text.IndexOf('"', 1);
+            program = end > 0 ? text.Substring(1, end - 1) : text.Substring(1);
+        }
+        else
+        {
+            // Without quotes the program ends at its extension; arguments and the icon index follow it.
+            Match match = Regex.Match(text, "^.*?\\.(exe|com)", RegexOptions.IgnoreCase);
+            program = match.Success ? match.Value : text;
+        }
+        // Cut at the last separator by hand: a registry value is a Windows path whatever system reads it.
+        program = program.Trim();
+        int separator = program.LastIndexOfAny(new[] { '\\', '/' });
+        return separator > 0 ? program.Substring(0, separator) : null;
     }
 
     /// <summary>Full path of the installed vcxsrv.exe, or null if VcXsrv is not installed.</summary>
@@ -374,10 +435,17 @@ public static class VcxsrvSetup
 
     /// <summary>
     /// Finds the latest release, downloads its installer, runs it and returns the installed vcxsrv.exe.
-    /// <paramref name="progress"/> receives the text of the current step.
+    /// <paramref name="progress"/> receives the text of the current step. An installed VcXsrv is returned as it is, nothing
+    /// is downloaded (the buttons are disabled then, but a second window or the Tools menu may have started the same).
     /// </summary>
     public static string DownloadAndInstall(Action<string> progress, CancellationToken cancellation)
     {
+        string installed = FindExecutable();
+        if (installed != null)
+        {
+            progress(DescribeInstallation(installed));
+            return installed;
+        }
         progress("Looking for the latest VcXsrv release...");
         Release release = FindLatestRelease();
         string title = "Downloading VcXsrv " + release.Version;

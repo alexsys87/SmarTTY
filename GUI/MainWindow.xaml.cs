@@ -316,15 +316,62 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         System.Threading.ThreadPool.QueueUserWorkItem(delegate
         {
             string report;
+            bool offerInstall = false;
             try
             {
                 report = activeSession.DescribeX11Forwarding();
+                // Forwarded programs need an X server on this computer: offer to get it when it is not there.
+                offerInstall = VcxsrvSetup.FindExecutable() == null;
             }
             catch (Exception exception)
             {
                 report = "The X11 check failed: " + exception.Message;
             }
-            Controller.BeginInvoke(() => MessageBoxes.Info(report));
+            Controller.BeginInvoke(() =>
+            {
+                if (offerInstall && MessageBoxes.Ask(report + "\n\nVcXsrv is not installed. Download and install the latest version now? The download runs in the background; the installer then asks for administrator rights."))
+                {
+                    InstallVcxsrvInBackground();
+                }
+                else
+                {
+                    MessageBoxes.Info(report);
+                }
+            });
+        });
+    }
+
+    private void InstallVcxsrvInBackground()
+    {
+        System.Threading.ThreadPool.QueueUserWorkItem(delegate
+        {
+            string result;
+            bool failed = false;
+            try
+            {
+                result = VcxsrvSetup.DescribeInstallation(VcxsrvSetup.DownloadAndInstall(step => { }, System.Threading.CancellationToken.None));
+            }
+            catch (OperationCanceledException exception)
+            {
+                result = exception.Message;
+                failed = true;
+            }
+            catch (Exception exception)
+            {
+                result = exception.Message + " You can download VcXsrv manually from " + VcxsrvSetup.ReleasesPage + ".";
+                failed = true;
+            }
+            Controller.BeginInvoke(() =>
+            {
+                if (failed)
+                {
+                    MessageBoxes.Error(result);
+                }
+                else
+                {
+                    MessageBoxes.Info(result);
+                }
+            });
         });
     }
 

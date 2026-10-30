@@ -1128,8 +1128,23 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         text.AppendLine();
         text.AppendLine("This computer:");
         text.AppendLine(VcxsrvSetup.DescribeInstallation(VcxsrvSetup.FindExecutable()));
+        text.AppendLine("X server type in Settings: " + DescribeXServerSetting(_Controller.Settings));
         text.Append("X server on localhost:6000 (display :0): ").Append(IsLocalXServerRunning() ? "running" : "not running (it is started when a remote program connects)");
         return text.ToString();
+    }
+
+    // The window "X Server Required" appears only for "Ask on first use": it is the explanation the check gives for it.
+    private static string DescribeXServerSetting(GlobalSettings settings)
+    {
+        switch (settings.XServer)
+        {
+            case XServerType.Vcxsrv:
+                return "VcXsrv, started automatically when a remote program connects";
+            case XServerType.Custom:
+                return "custom (" + settings.CustomXServerPath + "), started automatically when a remote program connects";
+            default:
+                return "Ask on first use: the \"X Server Required\" window appears when a remote program needs an X server and nothing listens on localhost:6000";
+        }
     }
 
     private static bool IsLocalXServerRunning()
