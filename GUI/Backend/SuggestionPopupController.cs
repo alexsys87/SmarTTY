@@ -85,7 +85,7 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
 
     private const int PageSize = 10;
 
-    public bool IsDarkTheme => !_Controller.Settings.Theme.IsLight();
+    public bool IsDarkTheme => !_Controller.Settings.IsLightTheme;
 
     public string NoItemsHint
     {

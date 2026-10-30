@@ -1,0 +1,22 @@
+# SmarTTY custom theme: a short example. Only the colours that differ from the base theme are listed.
+# Copy it to the "Themes" folder next to SmarTTY.exe; see Template.theme for the full list of keys.
+
+Name = Sunset
+Base = Dark
+
+Theme.WindowBackground = #1F1A1A
+Theme.ContentBackground = #1F1A1A
+Theme.SurfaceBackground = #2D2524
+Theme.TabStripBackground = #2D2524
+Theme.PopupBackground = #2D2524
+Theme.InputBackground = #171212
+
+Theme.Accent = #FF9F43
+Theme.AccentBackground = #B84E00
+Theme.AccentHoverBackground = #A34500
+Theme.AccentPressedBackground = #8F3D00
+Theme.FocusBorder = #FF9F43
+Theme.ItemSelectedBackground = #7A3B14
+Theme.TextSelection = #A8501C
+Theme.Link = #FFB86B
+Theme.LinkHover = #FFD3A1
