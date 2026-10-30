@@ -125,8 +125,9 @@ internal static class Program
             CommandCompletionDatabase autoCreated = CommandCompletionDatabase.Load(path);
             Check(!File.Exists(path) && !File.Exists(path + ".gz"), "missing XML is not created: the built-in template is used");
             CommandCompletionDatabase template = CommandCompletionDatabase.LoadTemplate();
-            Check(template != null && template.Completions != null && template.LoadWarning == null && template.Completions.Length > 0,
-                "the built-in template is valid and not empty");
+            Check(template != null && template.Completions != null && template.LoadWarning == null && template.Completions.Length > 0 &&
+                  template.LookupCommand("ls -") != null,
+                "the built-in template is valid, not empty and holds the ls command");
             Check(autoCreated != null && autoCreated.Completions != null && autoCreated.LoadWarning == null &&
                   autoCreated.Completions.Length == template.Completions.Length,
                 "a missing XML loads the built-in template");
