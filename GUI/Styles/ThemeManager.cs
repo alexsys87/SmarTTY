@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Media;
@@ -37,6 +38,33 @@ public static class ThemeManager
         {
             Color color = brush.Color;
             return System.Drawing.Color.FromArgb(color.A, color.R, color.G, color.B);
+        }
+        return fallback;
+    }
+
+    private static readonly Dictionary<SmarTTYTheme, ResourceDictionary> _Previews = new Dictionary<SmarTTYTheme, ResourceDictionary>();
+
+    /// <summary>
+    /// A brush of the palette of <paramref name="theme"/> (a "Theme.*" key) without applying that theme: the theme list
+    /// of the settings shows what each theme looks like. Returns <paramref name="fallback"/> when the palette or the key
+    /// cannot be read.
+    /// </summary>
+    public static Brush GetPaletteBrush(SmarTTYTheme theme, string key, Brush fallback)
+    {
+        try
+        {
+            if (!_Previews.TryGetValue(theme, out ResourceDictionary palette))
+            {
+                palette = new ResourceDictionary { Source = PaletteUri(theme) };
+                _Previews[theme] = palette;
+            }
+            if (palette.Contains(key) && palette[key] is Brush brush)
+            {
+                return brush;
+            }
+        }
+        catch
+        {
         }
         return fallback;
     }

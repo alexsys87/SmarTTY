@@ -25,6 +25,8 @@
             <sys:Boolean>false</sys:Boolean>
           </coll:ArrayList>
           <local:EnumValueFetcher x:Key="EnumValueFetcher" />
+          <local:ThemeSwatchConverter x:Key="ThemeSwatchConverter" />
+          <local:EnumValueConverter x:Key="EnumValueConverter" />
           <local:ColorWrapperConverter x:Key="ColorWrapperConverter" />
           <Style x:Key="TrueFalseListBox" TargetType="{x:Type ListBox}" BasedOn="{StaticResource LightHorizontalListBox}">
             <Setter Property="ItemTemplate">
@@ -72,18 +74,6 @@
                     </TextBlock.Text>
                   </TextBlock>
                 </DataTemplate>
-              </Setter.Value>
-            </Setter>
-          </Style>
-          <!-- Same choices, but wrapped into rows: the theme list is longer than a single line fits. -->
-          <Style x:Key="EnumWrapListBox" TargetType="{x:Type ListBox}" BasedOn="{StaticResource EnumListBox}">
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="VerticalAlignment" Value="Top" />
-            <Setter Property="ItemsPanel">
-              <Setter.Value>
-                <ItemsPanelTemplate>
-                  <WrapPanel Orientation="Horizontal" />
-                </ItemsPanelTemplate>
               </Setter.Value>
             </Setter>
           </Style>
@@ -374,7 +364,22 @@
               <TextBlock Text="Session header position:" Grid.Row="3" />
               <ListBox Grid.Column="1" Grid.Row="3" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=SessionHeaderOrientation, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding SessionHeaderOrientation}" />
               <TextBlock Text="Application theme:" Grid.Row="4" />
-              <ListBox Grid.Column="1" Grid.Row="4" Style="{StaticResource EnumWrapListBox}" ItemsSource="{Binding Path=Theme, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding Theme}" />
+              <!-- The themes are chosen from a drop-down list: each entry shows its colours (window, text and accent) beside the name. -->
+              <ComboBox Grid.Column="1" Grid.Row="4" HorizontalAlignment="Left" MinWidth="240" MaxDropDownHeight="360" ItemsSource="{Binding Path=Theme, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding Theme}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                      <Border Width="42" Height="18" Margin="0 0 10 0" VerticalAlignment="Center" CornerRadius="3" BorderThickness="1" SnapsToDevicePixels="True" BorderBrush="{DynamicResource Theme.BorderStrong}" Background="{Binding Converter={StaticResource ThemeSwatchConverter}, ConverterParameter=Theme.WindowBackground}">
+                        <Grid>
+                          <TextBlock Text="Aa" Margin="6 0 0 0" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="10" FontWeight="SemiBold" Foreground="{Binding Converter={StaticResource ThemeSwatchConverter}, ConverterParameter=Theme.Text}" />
+                          <Rectangle Width="8" Height="8" Margin="0 0 6 0" HorizontalAlignment="Right" VerticalAlignment="Center" RadiusX="2" RadiusY="2" Fill="{Binding Converter={StaticResource ThemeSwatchConverter}, ConverterParameter=Theme.Accent}" />
+                        </Grid>
+                      </Border>
+                      <TextBlock VerticalAlignment="Center" Text="{Binding Converter={StaticResource EnumValueConverter}}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
             </Grid>
           </GroupBox>
           <GroupBox Header="Other Settings">

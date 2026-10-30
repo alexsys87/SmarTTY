@@ -1584,6 +1584,8 @@ public class MainWindowController : INotifyPropertyChanged
             // Only the Smart Terminal knows when a command has ended.
             pasteLineByLineItem.Enabled = ((_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal) is SshTerminalControl;
         };
+        // Painted when it opens, so that it follows the theme chosen in the settings like the other menus.
+        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) => ThemedMenu.Apply(_TerminalContextMenu);
         _TerminalContextMenu.Items.Add("Copy All", Icons.Load("copy"), (object _, EventArgs e) =>
         {
             CopyAll();
