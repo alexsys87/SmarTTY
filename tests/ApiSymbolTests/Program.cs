@@ -90,6 +90,35 @@ internal static class Program
 
         // A name that is not in the set resolves to nothing.
         Check(database.FindSignature(L.Python, "definitelyNotAFunction") == null, "an unknown name has no signature");
+
+        // Every C-like entry has a summary for the completion list and a longer description for the hint.
+        List<ApiSymbolDatabase.Symbol> cLike = database.ForLanguage(L.CLike).ToList();
+        Check(cLike.Count > 900, "the C library set is broad (" + cLike.Count + " symbols)");
+        Equal(cLike.Count, cLike.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every C-like symbol has a summary and a description");
+
+        // The descriptions carry the full prototype and the header that provides the symbol.
+        ApiSymbolDatabase.Symbol printf = database.Find(L.CLike, "printf");
+        Check(printf.Description.Contains("Standard prototype: int printf(const char *format, ...);"),
+            "the description of 'printf' has the full prototype");
+        Check(printf.Description.Contains("<stdio.h>"), "the description of 'printf' names its header");
+
+        // The headers added for real-world C code are represented in the shared C-like set.
+        foreach (string name in new[]
+                 {
+                     "va_list", "va_start", "int8_t", "SIZE_MAX", "errno", "EINVAL", "CHAR_BIT", "FLT_MAX",
+                     "setlocale", "LC_ALL", "jmp_buf", "setjmp", "signal", "sigaction", "SIGINT", "wint_t",
+                     "wcslen", "iswalpha", "off_t"
+                 })
+        {
+            Check(database.Find(L.CLike, name) != null, "the C set includes '" + name + "'");
+        }
+
+        // The Annex K sorting signatures use rsize_t, not size_t, for their bounds.
+        Check(database.Find(L.CLike, "qsort_s").Signature.Contains("rsize_t count"),
+            "the 'qsort_s' signature uses rsize_t bounds");
+        Check(database.Find(L.CLike, "bsearch_s").Signature.Contains("rsize_t count"),
+            "the 'bsearch_s' signature uses rsize_t bounds");
     }
 
     private static List<ISuggestion> Build(L language, string text, string prefix, ApiSymbolDatabase database)
