@@ -5,7 +5,7 @@ namespace SmarTTY.GUI;
 
 /// <summary>
 /// The "About SmarTTY" dialog, with the version, the copyright, the credits (the SSH.NET library and the Oxygen
-/// icon set) and the links to the home page and the SSH.NET project.
+/// icon set) and the links to the home page, the SSH.NET project and the Oxygen icon set.
 /// </summary>
 public partial class AboutWindow : Window
 {
@@ -29,6 +29,11 @@ public partial class AboutWindow : Window
     private void SshNet_Click(object sender, RoutedEventArgs e)
     {
         OpenUrl("https://github.com/sshnet/SSH.NET");
+    }
+
+    private void Oxygen_Click(object sender, RoutedEventArgs e)
+    {
+        OpenUrl("https://invent.kde.org/frameworks/oxygen-icons");
     }
 
     private static void OpenUrl(string url)

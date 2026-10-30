@@ -15,7 +15,8 @@
       <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Content="http://sysprogs.com/" Padding="0" Margin="0 4 0 0" Click="Homepage_Click" />
       <TextBlock Text="Uses the SSH.NET library for SSH and SCP (MIT license)." FontSize="11" TextWrapping="Wrap" Margin="0 10 0 0" />
       <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Content="https://github.com/sshnet/SSH.NET" Padding="0" Margin="0 2 0 0" Click="SshNet_Click" />
-      <TextBlock Text="Uses Oxygen icon set (see oxygen.txt)" FontSize="11" TextWrapping="Wrap" Margin="0 10 0 0" />
+      <TextBlock Text="Uses the Oxygen icon set (LGPL license)." FontSize="11" TextWrapping="Wrap" Margin="0 10 0 0" />
+      <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Content="https://invent.kde.org/frameworks/oxygen-icons" Padding="0" Margin="0 2 0 0" Click="Oxygen_Click" />
       <Button Content="Close" IsDefault="True" IsCancel="True" MinWidth="80" HorizontalAlignment="Right" Margin="0 16 0 0" />
     </StackPanel>
   </Grid>
