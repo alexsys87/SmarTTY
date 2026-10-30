@@ -119,6 +119,28 @@ internal static class WingetTests
         PackageIndexUpdater.Run(refresh, cmd, isRoot: true);
         Check(refresh.Commands.SequenceEqual(new[] { "winget source update" }), "refresh: the command is sent as it is");
         Check(throws(() => PackageIndexUpdater.Run(new FakeRunner(), cmd, isRoot: true)), "refresh: a failed command is an error");
+        // The exit marker glued to the last output line (no newline after a progress line) still gives the exit code.
+        PackageIndexUpdater.CheckResult(new[] { "Reading package lists... Done__SMARTTY_EXIT__=0" }, "apt-get update", true);
+        string glued = null;
+        try
+        {
+            PackageIndexUpdater.CheckResult(new[] { "E: Failed to fetch__SMARTTY_EXIT__=100" }, "apt-get update", true);
+        }
+        catch (Exception exception)
+        {
+            glued = exception.Message;
+        }
+        Check(glued != null && glued.Contains("exit code 100") && glued.Contains("E: Failed to fetch") && !glued.Contains("__SMARTTY_EXIT__"), "refresh: a marker glued to the last line is still read");
+
+        // apt lists a package of two architectures twice.
+        LinuxPackageInfo[] multiArch = AptPackageManagerClient.ParsePackageList(new[]
+        {
+            "libc6/stable,now 2.36-9 i386 [installed]",
+            "libc6/stable,now 2.36-9 amd64 [installed]",
+            "libfoo/stable 1.0 i386",
+            "libfoo/stable,now 1.0 amd64 [installed]"
+        });
+        Check(multiArch.Length == 2 && multiArch.Single(p => p.ID == "libfoo").State == LinuxPackageInfo.PackageState.Installed, "apt: one row per package name, the installed one wins");
         return _passed;
     }
 

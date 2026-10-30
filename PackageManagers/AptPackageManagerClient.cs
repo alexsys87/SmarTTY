@@ -102,7 +102,17 @@ public class AptPackageManagerClient : ILinuxPackageManagerClient
                     linuxPackageInfo.State = LinuxPackageInfo.PackageState.Installed;
                 }
             }
-            packagesList.Add(linuxPackageInfo);
+            // A package of two architectures (libc6 amd64 and i386) is listed twice under one name; one row is enough
+            // for apt-get, which takes the name. The installed one wins over the one that is not installed.
+            int sameName = packagesList.FindIndex(existing => existing.ID == linuxPackageInfo.ID);
+            if (sameName < 0)
+            {
+                packagesList.Add(linuxPackageInfo);
+            }
+            else if (packagesList[sameName].State == LinuxPackageInfo.PackageState.Available && linuxPackageInfo.State != LinuxPackageInfo.PackageState.Available)
+            {
+                packagesList[sameName] = linuxPackageInfo;
+            }
         }
         return packagesList.ToArray();
     }
