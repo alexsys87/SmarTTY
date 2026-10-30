@@ -6,7 +6,6 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace SmarTTY.IO;
 
@@ -48,9 +47,6 @@ public static class GzipBase64Transfer
         public string LocalPath;
         public string RemotePath;
         public Options Options;
-
-        /// <summary>Write a log of everything typed to the device and everything it answered (for finding out why a transfer fails).</summary>
-        public bool DebugLog;
     }
 
     public sealed class Options
@@ -95,29 +91,6 @@ public static class GzipBase64Transfer
 
     private const int UuBytesPerLine = 45;       // 61 characters per line, as uuencode writes them
     private const string MarkerStart = "SMTTY:";
-
-    /// <summary>What a folder on the device holds, as listed by its shell.</summary>
-    public sealed class DirectoryListing
-    {
-        /// <summary>The absolute path of the folder (links resolved by the shell's pwd).</summary>
-        public string Path;
-        public readonly List<string> Directories = new List<string>();
-        public readonly List<string> Files = new List<string>();
-    }
-
-    /// <summary>Lists a folder of the device; the task fails with an <see cref="IOException"/> when the folder cannot be read.</summary>
-    public delegate Task<DirectoryListing> DirectoryLister(string path);
-
-    /// <summary>
-    /// Lists the folder <paramref name="path"/> ("." is the shell's current folder, "~" the home folder) with <c>ls</c> in the
-    /// device's shell. The shell's own folder is not changed. Failures throw <see cref="IOException"/>.
-    /// </summary>
-    public static DirectoryListing ListDirectory(string path, Options options,
-        XModemTransfer.SendDataHandler send, ReadByteHandler readByte, CancellationToken token)
-    {
-        Session session = new Session(options ?? new Options(), send, readByte, token, null);
-        return session.ListDirectory(path);
-    }
 
     /// <summary>Sends <paramref name="localPath"/> to <paramref name="remotePath"/> (a file name, or an existing directory) on the device.</summary>
     /// <returns>True when the file arrived and the checksums matched; false when the user cancelled. Failures throw <see cref="IOException"/>.</returns>
@@ -590,62 +563,6 @@ public static class GzipBase64Transfer
             // Ctrl-U clears whatever was typed on the prompt and not sent; Enter then shows a fresh prompt to wait for.
             SendBytes(new byte[] { 0x15, (byte)'\r' });
             Drain(300, 3000);
-        }
-
-        // ----- browsing -----
-
-        public DirectoryListing ListDirectory(string path)
-        {
-            string target = string.IsNullOrWhiteSpace(path) ? "." : path.Trim();
-            Trace("LIST " + target);
-            StartShell();
-            // The subshell keeps the shell's own folder as it is. -L makes a link to a folder look like a folder, -p marks the folders
-            // with a slash, and the errors of links that lead nowhere are dropped.
-            TypeLines("( cd " + ShellPath(target) + " 2>/dev/null && { printf " + Say("LSDIR:%s") + " \"$(pwd)\"; ls -1pLA 2>/dev/null; printf "
-                + Say("LSEND") + "; } ) || printf " + Say("LSFAIL"));
-            DirectoryListing listing = null;
-            while (true)
-            {
-                string line = ReadLine(15000);
-                if (line == null)
-                {
-                    throw new IOException("The device did not list the folder. Is a shell prompt waiting there, and is the line free?" + RecentOutput());
-                }
-                int at = line.IndexOf(_marker, StringComparison.Ordinal);
-                if (at >= 0)
-                {
-                    string tag = line.Substring(at + _marker.Length);
-                    if (tag.StartsWith("LSFAIL", StringComparison.Ordinal))
-                    {
-                        throw new IOException("The folder cannot be opened on the device: " + target);
-                    }
-                    if (tag.StartsWith("LSDIR:", StringComparison.Ordinal))
-                    {
-                        listing = new DirectoryListing { Path = tag.Substring(6).Trim() };
-                    }
-                    else if (tag.StartsWith("LSEND", StringComparison.Ordinal))
-                    {
-                        if (listing != null)
-                        {
-                            return listing;
-                        }
-                    }
-                    continue;
-                }
-                string name = line.Trim();
-                if (listing == null || name.Length == 0)
-                {
-                    continue; // the echo of the command, or a prompt
-                }
-                if (name.EndsWith("/", StringComparison.Ordinal))
-                {
-                    listing.Directories.Add(name.Substring(0, name.Length - 1));
-                }
-                else
-                {
-                    listing.Files.Add(name);
-                }
-            }
         }
 
         // ----- what the device can do -----

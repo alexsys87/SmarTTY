@@ -2,9 +2,7 @@ using SmarTTY.IO;
 using SmarTTY.Transport;
 using System;
 using System.IO;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
@@ -20,10 +18,10 @@ namespace SmarTTY.Controls;
 public partial class DeviceTerminalControl
 {
     /// <summary>
-    /// Asks what to transfer: the first argument is true to send a file, false to receive one; the second lists a folder of the
-    /// device for the window's browse button. Returns null when the user cancelled. Injected by <c>App</c> (the window is WPF).
+    /// Asks what to transfer: the argument is true to send a file, false to receive one. Returns null when the user
+    /// cancelled. Injected by <c>App</c> (the window is WPF).
     /// </summary>
-    public static Func<bool, GzipBase64Transfer.DirectoryLister, GzipBase64Transfer.Request> GzipBase64RequestPrompt;
+    public static Func<bool, GzipBase64Transfer.Request> GzipBase64RequestPrompt;
 
     // A transfer that had to stop after its connection was gone (a reconnect, a cable pulled) leaves the device's console in the
     // middle of it: the shell script there waits for the rest of the data and eats whatever is typed next. What ends that is kept
@@ -63,13 +61,13 @@ public partial class DeviceTerminalControl
             ThemedMessageBox.Show("Please connect first before using gzip + base64 transfer.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        Func<bool, GzipBase64Transfer.DirectoryLister, GzipBase64Transfer.Request> prompt = GzipBase64RequestPrompt;
+        Func<bool, GzipBase64Transfer.Request> prompt = GzipBase64RequestPrompt;
         if (prompt == null)
         {
             ThemedMessageBox.Show("The gzip + base64 transfer window is not available.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        GzipBase64Transfer.Request request = prompt(sending, ListDeviceDirectory);
+        GzipBase64Transfer.Request request = prompt(sending);
         if (request == null)
         {
             return;
@@ -81,137 +79,18 @@ public partial class DeviceTerminalControl
         if (sending)
         {
             StartLineTransfer("Send via gzip + base64 - " + Path.GetFileName(request.LocalPath), "gzip + base64", "send",
-                (sendData, progress, token) => RunWithDebugLog(request, "send",
-                    () => GzipBase64Transfer.SendFile(request.LocalPath, request.RemotePath, request.Options, sendData, ReadXModemByte, token, progress)),
+                (sendData, progress, token) =>
+                    GzipBase64Transfer.SendFile(request.LocalPath, request.RemotePath, request.Options, sendData, ReadXModemByte, token, progress),
                 () => "The file arrived on the device and its checksum matches the original:\r\n" + request.RemotePath,
                 AfterGzipBase64Transfer);
         }
         else
         {
             StartLineTransfer("Receive via gzip + base64 - " + Path.GetFileName(request.RemotePath), "gzip + base64", "receive",
-                (sendData, progress, token) => RunWithDebugLog(request, "receive",
-                    () => GzipBase64Transfer.ReceiveFile(request.RemotePath, request.LocalPath, request.Options, sendData, ReadXModemByte, token, progress)),
+                (sendData, progress, token) =>
+                    GzipBase64Transfer.ReceiveFile(request.RemotePath, request.LocalPath, request.Options, sendData, ReadXModemByte, token, progress),
                 () => "The file was saved and its checksum matches the original on the device:\r\n" + request.LocalPath,
                 AfterGzipBase64Transfer);
-        }
-    }
-
-    /// <summary>
-    /// Lists a folder of the device through its shell, for the browse button of the transfer window. The line is claimed only
-    /// while the listing runs (a transfer or another listing in progress makes it fail). Must be called on the UI thread.
-    /// </summary>
-    private Task<GzipBase64Transfer.DirectoryListing> ListDeviceDirectory(string path)
-    {
-        TaskCompletionSource<GzipBase64Transfer.DirectoryListing> completion =
-            new TaskCompletionSource<GzipBase64Transfer.DirectoryListing>(TaskCreationOptions.RunContinuationsAsynchronously);
-        AsyncTransportConnection owner = _asyncTransportConnection;
-        if (IsLineClaimed || _connectionState != ConnectionStateEnum.Connected || owner == null)
-        {
-            completion.SetException(new IOException("The connection is closed or the line is busy with a file transfer."));
-            return completion.Task;
-        }
-
-        // The same claim as a transfer makes: what the device sends goes to the listing and not to the screen.
-        while (_xmodemRxQueue.TryTake(out _)) { }
-        CancellationTokenSource cancel = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        _lineOwner = owner;
-        _cancelLineTransfer = cancel.Cancel;
-        _isXModemActive = true;
-
-        ThreadPool.QueueUserWorkItem(state =>
-        {
-            GzipBase64Transfer.DirectoryListing listing = null;
-            Exception error = null;
-            try
-            {
-                XModemTransfer.SendDataHandler sendData = (data, offset, length) =>
-                {
-                    string writeError = owner.WriteError;
-                    if (writeError != null)
-                    {
-                        throw new IOException(writeError);
-                    }
-                    byte[] copy = new byte[length];
-                    Array.Copy(data, offset, copy, 0, length);
-                    if (!SendToConnection(owner, copy, length))
-                    {
-                        throw new IOException("The connection is closed.");
-                    }
-                };
-                listing = GzipBase64Transfer.ListDirectory(path, null, sendData, ReadXModemByte, cancel.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                error = new IOException("The device did not answer in time.");
-            }
-            catch (Exception ex)
-            {
-                error = ex;
-            }
-            finally
-            {
-                _isXModemActive = false;
-                _lineOwner = null;
-                _cancelLineTransfer = null;
-                while (_xmodemRxQueue.TryTake(out _)) { }
-                cancel.Dispose();
-            }
-            if (error != null)
-            {
-                completion.SetException(error);
-            }
-            else
-            {
-                completion.SetResult(listing);
-            }
-        });
-        return completion.Task;
-    }
-
-    /// <summary>
-    /// Runs the transfer and, when the user asked for it, writes a log of it to the Temp folder (what was typed to the device,
-    /// what it answered, what was decided). A failure then carries the path of the log in its message, so that the final
-    /// message tells where to look.
-    /// </summary>
-    private static bool RunWithDebugLog(GzipBase64Transfer.Request request, string what, Func<bool> transfer)
-    {
-        StreamWriter log = null;
-        string logPath = null;
-        if (request.DebugLog)
-        {
-            try
-            {
-                logPath = Path.Combine(Path.GetTempPath(), "SmarTTY-gzip-base64-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".log");
-                log = new StreamWriter(logPath, false, new UTF8Encoding(false)) { AutoFlush = true };
-                log.WriteLine("SmarTTY gzip + base64 transfer (" + what + "), " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + ", " + Environment.OSVersion);
-                StreamWriter target = log;
-                request.Options.Log = line =>
-                {
-                    lock (target)
-                    {
-                        target.WriteLine(line);
-                    }
-                };
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                log?.Dispose();
-                log = null;
-                logPath = null;
-            }
-        }
-        try
-        {
-            return transfer();
-        }
-        catch (Exception ex) when (logPath != null)
-        {
-            throw new IOException(ex.Message + "\r\n\r\nDebug log: " + logPath, ex);
-        }
-        finally
-        {
-            request.Options.Log = null;
-            log?.Dispose();
         }
     }
 

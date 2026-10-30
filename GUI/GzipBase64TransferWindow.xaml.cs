@@ -22,26 +22,20 @@ public partial class GzipBase64TransferWindow : Window
     private static string _lastAttempts = "2";
     private static string _lastRate = "6000";
     private static string _lastBlock = "1024";
-    private static bool _lastDebug = true;
 
     private readonly bool _sending;
 
-    private readonly GzipBase64Transfer.DirectoryLister _listDirectory;
-
     internal GzipBase64Transfer.Request Request { get; private set; }
 
-    private GzipBase64TransferWindow(bool sending, GzipBase64Transfer.DirectoryLister listDirectory)
+    private GzipBase64TransferWindow(bool sending)
     {
         InitializeComponent();
         _sending = sending;
-        _listDirectory = listDirectory;
-        RemoteBrowseButton.IsEnabled = listDirectory != null;
         EncodingBox.SelectedIndex = _lastEncoding;
         ChecksumBox.SelectedIndex = _lastChecksum;
         AttemptsBox.Text = _lastAttempts;
         RateBox.Text = _lastRate;
         BlockBox.Text = _lastBlock;
-        DebugBox.IsChecked = _lastDebug;
         if (sending)
         {
             Title = "Send file via gzip + base64";
@@ -67,20 +61,20 @@ public partial class GzipBase64TransferWindow : Window
     }
 
     /// <summary>Returns the request, or null when the user cancelled.</summary>
-    internal static GzipBase64Transfer.Request ShowSend(Window owner, GzipBase64Transfer.DirectoryLister listDirectory)
+    internal static GzipBase64Transfer.Request ShowSend(Window owner)
     {
-        return Show(owner, sending: true, listDirectory);
+        return Show(owner, sending: true);
     }
 
     /// <summary>Returns the request, or null when the user cancelled.</summary>
-    internal static GzipBase64Transfer.Request ShowReceive(Window owner, GzipBase64Transfer.DirectoryLister listDirectory)
+    internal static GzipBase64Transfer.Request ShowReceive(Window owner)
     {
-        return Show(owner, sending: false, listDirectory);
+        return Show(owner, sending: false);
     }
 
-    private static GzipBase64Transfer.Request Show(Window owner, bool sending, GzipBase64Transfer.DirectoryLister listDirectory)
+    private static GzipBase64Transfer.Request Show(Window owner, bool sending)
     {
-        GzipBase64TransferWindow window = new GzipBase64TransferWindow(sending, listDirectory);
+        GzipBase64TransferWindow window = new GzipBase64TransferWindow(sending);
         WindowOwnership.Attach(window, owner ?? WindowOwnership.ActiveWindow());
         return window.ShowDialog() == true ? window.Request : null;
     }
@@ -111,15 +105,6 @@ public partial class GzipBase64TransferWindow : Window
                 // The dialog has already asked about replacing an existing file.
                 OverwriteBox.IsChecked = true;
             }
-        }
-    }
-
-    private void BrowseRemote_Click(object sender, RoutedEventArgs e)
-    {
-        string chosen = RemoteDevicePathWindow.Browse(this, _listDirectory, forReceive: !_sending, RemoteBox.Text.Trim());
-        if (chosen != null)
-        {
-            RemoteBox.Text = chosen;
         }
     }
 
@@ -201,14 +186,13 @@ public partial class GzipBase64TransferWindow : Window
             NoEchoBytesPerSecond = rate,
             WindowBytes = block
         };
-        Request = new GzipBase64Transfer.Request { LocalPath = local, RemotePath = remote, Options = options, DebugLog = DebugBox.IsChecked == true };
+        Request = new GzipBase64Transfer.Request { LocalPath = local, RemotePath = remote, Options = options };
 
         _lastEncoding = EncodingBox.SelectedIndex;
         _lastChecksum = ChecksumBox.SelectedIndex;
         _lastAttempts = attempts.ToString(CultureInfo.InvariantCulture);
         _lastRate = rate.ToString(CultureInfo.InvariantCulture);
         _lastBlock = block.ToString(CultureInfo.InvariantCulture);
-        _lastDebug = DebugBox.IsChecked == true;
         _lastLocalFolder = Path.GetDirectoryName(Path.GetFullPath(local)) ?? string.Empty;
         if (_sending)
         {
