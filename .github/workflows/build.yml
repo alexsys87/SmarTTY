@@ -184,6 +184,9 @@ jobs:
       - name: Run XAML encoding checks (non-ASCII markup keeps its UTF-8 BOM)
         run: dotnet run --project tests/XamlEncodingTests -c Release
 
+      - name: Run public key window layout checks (the window grows to the key, capped to the screen)
+        run: dotnet run --project tests/PublicKeyWindowLayoutTests -c Release
+
       - name: Run local folder browser checks (roots, child folders, ordering, path normalization)
         run: dotnet run --project tests/LocalFolderTreeTests -c Release
 

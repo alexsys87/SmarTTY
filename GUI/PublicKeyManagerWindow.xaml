@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.PublicKeyManagerWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Manage Public Key" Width="660" Height="500" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+<Window x:Class="SmarTTY.GUI.PublicKeyManagerWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Manage Public Key" Width="660" SizeToContent="Height" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Grid Margin="12">
     <Grid.RowDefinitions>
       <RowDefinition Height="*" />
@@ -20,7 +20,7 @@
         </Grid.RowDefinitions>
         <Image Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Source="pack://application:,,,/icons/dialog-public-key.png" Width="128" Height="128" VerticalAlignment="Top" />
         <TextBlock Grid.Row="0" Grid.Column="1" Margin="8 0 0 4" TextWrapping="Wrap" Text="SmarTTY has generated a keypair to automatically logon to SSH servers. Here is the public key in OpenSSH format:" />
-        <TextBox Grid.Row="1" Grid.Column="1" Name="PublicKeyText" Margin="8 4 0 4" MinHeight="120" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" />
+        <TextBox Grid.Row="1" Grid.Column="1" Name="PublicKeyText" Margin="8 4 0 4" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" />
         <TextBlock Grid.Row="2" Grid.Column="1" Margin="8 4 0 0" TextWrapping="Wrap" Text="The key is stored in the following key container or file under your user profile:" />
         <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="KeyContainerText" Margin="0 2 0 0" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
         <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="8 6 0 0">
