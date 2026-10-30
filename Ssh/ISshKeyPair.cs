@@ -7,7 +7,16 @@ public interface ISshKeyPair
 {
     string Algorithm { get; }
 
+    /// <summary>Where the private key is kept: a CSP key container name or a file path.</summary>
     string ContainerName { get; }
+
+    /// <summary>The file dialog filter and the suggested file name for <see cref="ExportPrivateKey"/>.</summary>
+    string ExportFileFilter { get; }
+
+    string DefaultKeyFileName { get; }
+
+    /// <summary>The file dialog filter for <see cref="ImportPrivateKey"/>.</summary>
+    string ImportFileFilter { get; }
 
     byte[] GetPublicKeyBlob();
 

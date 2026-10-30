@@ -406,6 +406,7 @@ internal static class Program
         Check(Read(telnetData2, "SavedConnections/USB Serial Port_COM3.rawconnection") == RawXml, "a raw profile without a password is imported unchanged");
 
         RunSelectablePartsChecks();
+        RunOpenSshFormatKeyChecks();
         RunCompletionsGzipChecks();
         RunTftpFirmwareChecks();
     }
@@ -553,6 +554,54 @@ internal static class Program
         public byte[] ExportPasswordKey() { return PasswordKey; }
         public void ImportSshKey(byte[] data) { SshKey = data; }
         public void ImportPasswordKey(byte[] data) { PasswordKey = data; }
+
+        public Dictionary<string, byte[]> OtherKeys = new Dictionary<string, byte[]>();
+        public bool HasOpenSshFormatKey(string keyName) { return OtherKeys.ContainsKey(keyName); }
+        public byte[] ExportOpenSshFormatKey(string keyName) { return OtherKeys[keyName]; }
+        public void ImportOpenSshFormatKey(string keyName, byte[] data) { OtherKeys[keyName] = data; }
+    }
+
+    // The Ed25519 / ECDSA keys of SmarTTY go into the SshKey part beside the RSA key, or without it.
+    private static void RunOpenSshFormatKeyChecks()
+    {
+        string data = NewDir("okey-data"), local = NewDir("okey-local");
+        Put(data, "Settings.xml", SettingsXml);
+        string ed25519 = OpenSshPrivate.Replace("AAAA", "ED25519");
+        string ecdsa = OpenSshPrivate.Replace("AAAA", "ECDSA384");
+        FakeKeyStore onlyOther = new FakeKeyStore();
+        onlyOther.OtherKeys["ed25519"] = Encoding.UTF8.GetBytes(ed25519);
+        onlyOther.OtherKeys["ecdsa-nistp384"] = Encoding.UTF8.GetBytes(ecdsa);
+        SettingsLocations src = MakeLocations(data, local, null, null, onlyOther);
+
+        Check(SettingsArchive.Describe(src).Available.HasFlag(SettingsParts.SshKey), "an Ed25519 / ECDSA key without an RSA key is a SmarTTY SSH key to export");
+        string archive = Path.Combine(NewDir("out"), "other-keys.tar.gz");
+        var exported = SettingsArchive.Export(archive, src, SettingsParts.SshKey);
+        var names = ReadArchive(archive).Select(e => e.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
+        Check(exported.FileCount == 2 && exported.NotFound.Count == 0 && names.SequenceEqual(new[] { "Keys/SmarTTY-ssh-key-ecdsa-nistp384", "Keys/SmarTTY-ssh-key-ed25519" }, StringComparer.Ordinal),
+            "the Ed25519 and ECDSA keys are exported, and the missing RSA key is not reported as a missing part");
+
+        FakeKeyStore all = new FakeKeyStore { SshKey = Encoding.UTF8.GetBytes(RsaKeyXml) };
+        all.OtherKeys["ecdsa-nistp256"] = Encoding.UTF8.GetBytes(ecdsa);
+        string allArchive = Path.Combine(NewDir("out"), "all-keys.tar.gz");
+        SettingsArchive.Export(allArchive, MakeLocations(data, local, null, null, all), SettingsParts.SshKey);
+        Check(ReadArchive(allArchive).Select(e => e.Name).OrderBy(n => n, StringComparer.Ordinal).SequenceEqual(new[] { "Keys/SmarTTY-ssh-key-ecdsa-nistp256", "Keys/SmarTTY-ssh-key.xml" }, StringComparer.Ordinal),
+            "the RSA key and the other keys are exported together");
+        Check(SettingsArchive.Inspect(archive).Available == SettingsParts.SshKey, "an archive with only Ed25519 / ECDSA keys offers the SmarTTY SSH key part");
+
+        FakeKeyStore dstKeys = new FakeKeyStore();
+        dstKeys.OtherKeys["ed25519"] = Encoding.UTF8.GetBytes(OpenSshPrivate.Replace("AAAA", "OLDKEY"));
+        string backupPath = Path.Combine(NewDir("okey-backup"), "backup.tar.gz");
+        var imported = SettingsArchive.Import(archive, MakeLocations(NewDir("okey-dst"), NewDir("okey-dstlocal"), null, null, dstKeys), SettingsParts.SshKey, backupPath);
+        Check(imported.SshKeyImported && Encoding.UTF8.GetString(dstKeys.OtherKeys["ed25519"]) == ed25519 && Encoding.UTF8.GetString(dstKeys.OtherKeys["ecdsa-nistp384"]) == ecdsa,
+            "the keys are handed to the key store by name");
+        Check(ReadArchive(backupPath).Any(e => e.Name == "Keys/SmarTTY-ssh-key-ed25519" && Encoding.UTF8.GetString(e.Data).Contains("OLDKEY")), "the replaced Ed25519 key is saved in the backup first");
+
+        string unknown = Path.Combine(NewDir("out"), "unknown-key.tar.gz");
+        MakeArchive(unknown, E("Settings.xml", SettingsXml), E("Keys/SmarTTY-ssh-key-dsa", OpenSshPrivate), E("Keys/SmarTTY-ssh-key-../x", OpenSshPrivate));
+        Check(SettingsArchive.Import(unknown, MakeLocations(NewDir("okey-u"), NewDir("okey-ul"), null, null, new FakeKeyStore()), SettingsParts.All, null).Ignored.Count == 2, "key names outside the fixed list are ignored");
+        string notAKey = Path.Combine(NewDir("out"), "not-a-key.tar.gz");
+        MakeArchive(notAKey, E("Keys/SmarTTY-ssh-key-ed25519", RsaKeyXml));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(notAKey, MakeLocations(NewDir("okey-n"), NewDir("okey-nl"), null, null, new FakeKeyStore()), SettingsParts.All, null), "an Ed25519 entry that is not a private key is rejected");
     }
 
     private const string RsaKeyXml = "<?xml version=\"1.0\"?><RSAParameters><Exponent>AQAB</Exponent><Modulus>AAAA</Modulus><D>BBBB</D></RSAParameters>";

@@ -9,11 +9,8 @@ namespace SmarTTY.Ssh;
 /// <summary>What a private key file holds, as far as can be told without loading the key.</summary>
 internal enum PrivateKeyFileKind
 {
-    /// <summary>No PEM or OpenSSH private key block (an empty or damaged file, a public key, some other format).</summary>
+    /// <summary>No PEM, OpenSSH or PuTTY private key (an empty or damaged file, a public key, some other format).</summary>
     NotAPrivateKey,
-
-    /// <summary>A PuTTY .ppk file, which SSH.NET does not read.</summary>
-    PuttyKey,
 
     /// <summary>A key that needs no passphrase.</summary>
     Plain,
@@ -39,6 +36,11 @@ internal static class PrivateKeyFileFormat
         @"^\s*Proc-Type:\s*4\s*,\s*ENCRYPTED",
         RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    // The header of a PuTTY .ppk file (versions 2 and 3) that names its cipher ("none" for a key without a passphrase).
+    private static readonly Regex PuttyEncryptionHeader = new Regex(
+        @"^Encryption:[ \t]*(?<cipher>\S+)[ \t]*\r?$",
+        RegexOptions.Multiline | RegexOptions.CultureInvariant);
+
     private static readonly byte[] OpenSshMagic = Encoding.ASCII.GetBytes("openssh-key-v1\0");
 
     public static PrivateKeyFileKind Inspect(string path)
@@ -58,7 +60,12 @@ internal static class PrivateKeyFileFormat
         }
         if (text.TrimStart('\uFEFF', ' ', '\t', '\r', '\n').StartsWith("PuTTY-User-Key-File-", StringComparison.Ordinal))
         {
-            return PrivateKeyFileKind.PuttyKey;
+            Match encryption = PuttyEncryptionHeader.Match(text);
+            if (!encryption.Success)
+            {
+                return PrivateKeyFileKind.NotAPrivateKey;
+            }
+            return encryption.Groups["cipher"].Value == "none" ? PrivateKeyFileKind.Plain : PrivateKeyFileKind.Encrypted;
         }
         Match match = Block.Match(text);
         if (!match.Success)

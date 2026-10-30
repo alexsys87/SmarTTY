@@ -5,6 +5,7 @@ using Renci.SshNet.Security;
 using Renci.SshNet.Security.Cryptography;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -110,6 +111,15 @@ internal static class SshNetContractTests
         Test.Check(HasConstructor(typeof(RsaDigitalSignature), typeof(RsaKey), typeof(HashAlgorithmName)), "RsaDigitalSignature(RsaKey, HashAlgorithmName) exists");
         Test.Check(typeof(HostAlgorithm).IsAssignableFrom(typeof(KeyHostAlgorithm)), "KeyHostAlgorithm is a HostAlgorithm");
         Test.Check(typeof(IPrivateKeySource).GetProperty("HostKeyAlgorithms") != null, "IPrivateKeySource.HostKeyAlgorithms exists");
+
+        Test.Section("SSH.NET pieces used by OpenSshKeyPair (Ed25519 and ECDSA keys)");
+        Test.Check(HasConstructor(typeof(ED25519Key), typeof(byte[])), "ED25519Key(byte[]) exists (derives the public key from the private seed)");
+        Test.Check(GetPropertyType(typeof(ED25519Key), "PublicKey") == typeof(byte[]) && GetPropertyType(typeof(ED25519Key), "PrivateKey") == typeof(byte[]), "ED25519Key exposes PublicKey and PrivateKey");
+        Test.Check(GetPropertyType(typeof(EcdsaKey), "PrivateKey") == typeof(byte[]), "EcdsaKey exposes PrivateKey");
+        Test.Check(HasConstructor(typeof(PrivateKeyFile), typeof(Stream)), "PrivateKeyFile(Stream) exists (keys stored and imported as text)");
+        Test.Check(typeof(PrivateKeyFile).GetProperty("Key") != null && GetPropertyType(typeof(Key), "Comment") == typeof(string), "PrivateKeyFile.Key and Key.Comment exist");
+        Test.Check(GetPropertyType(typeof(KeyHostAlgorithm), "Data") == typeof(byte[]), "KeyHostAlgorithm.Data (the public key blob) exists");
+        Test.Check(typeof(SshException).IsAssignableFrom(typeof(SshPassPhraseNullOrEmptyException)), "SshPassPhraseNullOrEmptyException reports a key that needs a passphrase");
 
         Test.Section("SshNetChannel behaviour without a connection");
         using (SshClient client = new SshClient("127.0.0.1", 1, "user", "password"))

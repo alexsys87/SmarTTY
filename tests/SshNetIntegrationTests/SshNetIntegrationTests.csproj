@@ -7,7 +7,8 @@
     <Nullable>disable</Nullable>
     <RootNamespace>SmarTTY.Ssh.Tests</RootNamespace>
     <AssemblyName>SshNetIntegrationTests</AssemblyName>
-    <!-- RsaSshKey.cs uses the Windows CSP; the linked production sources also compile on non-Windows test runners. -->
+    <!-- RsaSshKey.cs uses the Windows CSP, OpenSshKeyPair.cs CNG and DpapiPrivateKeyFile.cs DPAPI; the linked production
+         sources also compile on non-Windows test runners. -->
     <NoWarn>$(NoWarn);CA1416;CS0649</NoWarn>
     <!--
       SmarTTY.csproj is the single place that declares the SSH.NET version, so the tests always
@@ -24,6 +25,8 @@
 
   <ItemGroup>
     <PackageReference Include="SSH.NET" Version="$(SmarTTY_SshNetVersion)" />
+    <!-- Ssh/DpapiPrivateKeyFile.cs uses the Windows data protection, part of .NET Framework but a package on .NET 8. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
