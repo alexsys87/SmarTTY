@@ -132,6 +132,15 @@ public class SetupApiDeviceSet : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// The class Ports also holds the parallel (printer) ports, which have a PortName of their own ("LPT1") and cannot be
+    /// opened as a serial port: only the names of serial ports are taken.
+    /// </summary>
+    internal static bool IsSerialPortName(string portName)
+    {
+        return !string.IsNullOrWhiteSpace(portName) && !portName.StartsWith("LPT", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static int PortNumberOf(string portName)
     {
         return portName != null && portName.StartsWith("COM", StringComparison.OrdinalIgnoreCase) && int.TryParse(portName.Substring(3), out int number) && number > 0 ? number : 0;
@@ -249,7 +258,7 @@ public class SetupApiDeviceSet : IDisposable
                 {
                     string friendlyName = GetRegistryProperty(_deviceInfoSet, ref spDevInfoData, DeviceRegistryProperty.FriendlyName);
                     string portName = ReadPortName(ref spDevInfoData, friendlyName);
-                    if (portName != null)
+                    if (IsSerialPortName(portName))
                     {
                         string description = GetRegistryProperty(_deviceInfoSet, ref spDevInfoData, DeviceRegistryProperty.DeviceDescription);
                         yield return new ComPortInfo
