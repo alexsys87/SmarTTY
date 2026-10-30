@@ -108,6 +108,7 @@ internal static class Program
         public readonly ManualResetEventSlim Connected = new ManualResetEventSlim();
         public readonly ManualResetEventSlim Ended = new ManualResetEventSlim();
         public int WriterIdleEvents;
+        public readonly List<string> WriteFailures = new List<string>();
 
         public Session(DeviceTerminalSettings.ConnectionSettings.Tcp endpoint)
         {
@@ -119,6 +120,7 @@ internal static class Program
                 if (state == ConnectionStateEnum.Disconnected || state == ConnectionStateEnum.Failed) Ended.Set();
             };
             Connection.WriterIdleChanged += (sender, args) => Interlocked.Increment(ref WriterIdleEvents);
+            Connection.WriteFailed += (sender, message) => { lock (WriteFailures) WriteFailures.Add(message); };
         }
 
         public (ConnectionStateEnum State, string Message) LastState
@@ -397,6 +399,51 @@ internal static class Program
             Check(got == 50, "50 bytes reached the device");
             Check(WaitFor(() => s.Connection.IsWriterIdle), "idle again");
             Check(Volatile.Read(ref s.WriterIdleEvents) <= 101, "no more than a busy/idle pair per write: " + s.WriterIdleEvents);
+        });
+
+        Run("a busy UI still sees every state once, as it was when it was posted", () =>
+        {
+            using Server server = new Server(IPAddress.Loopback);
+            using Session s = new Session(Endpoint("127.0.0.1", server.Port));
+            ManualResetEventSlim release = new ManualResetEventSlim();
+            s.Ui.BeginInvoke((Action)(() => release.Wait(5000)), new object[0]);
+            s.Connection.Start();
+            Socket peer = server.Client;
+            peer.Shutdown(SocketShutdown.Both);
+            peer.Close();
+            Thread.Sleep(300);
+            release.Set();
+            Check(s.Ended.Wait(5000), "disconnected");
+            ConnectionStateEnum[] states;
+            lock (s.States) states = s.States.Select(x => x.State).ToArray();
+            Check(states.SequenceEqual(new[] { ConnectionStateEnum.Connecting, ConnectionStateEnum.Connecting, ConnectionStateEnum.Connected, ConnectionStateEnum.Disconnected }),
+                "Connecting, Connecting, Connected, Disconnected: " + string.Join(", ", states));
+        });
+
+        Run("a peer that stops reading ends the connection instead of blocking the writer for ever", () =>
+        {
+            using Server server = new Server(IPAddress.Loopback);
+            using Session s = new Session(Endpoint("127.0.0.1", server.Port));
+            s.Connection.WriteTimeoutMs = 500;
+            s.Connection.Start();
+            Check(s.Connected.Wait(5000), "connected");
+            Socket peer = server.Client; // accepted, but never read from
+            byte[] chunk = new byte[1024 * 1024];
+            for (int i = 0; i < 256 && !s.Connection.HasEnded; i++)
+            {
+                s.Connection.Send(chunk, chunk.Length);
+            }
+            Check(s.Ended.Wait(10000), "the connection ended");
+            Check(s.LastState.State == ConnectionStateEnum.Disconnected && !string.IsNullOrEmpty(s.LastState.Message), "with a reason: " + s.LastState.Message);
+            Check(WaitFor(() => { lock (s.WriteFailures) return s.WriteFailures.Count > 0; }), "the user is told that data was lost");
+        });
+
+        Run("a name with several addresses connects to the one that works", () =>
+        {
+            using Server server = new Server(IPAddress.Loopback);
+            using TcpTransport transport = new TcpTransport(Endpoint("localhost", server.Port)) { ConnectTimeoutMs = 3000 };
+            transport.Open(null);
+            Check(transport.GetStream() != null, "connected");
         });
 
         Console.WriteLine();

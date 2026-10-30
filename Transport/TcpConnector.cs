@@ -19,6 +19,9 @@ internal sealed class TcpConnector
     /// <summary>The longest keep-alive time that is passed to the operating system (one day).</summary>
     public const int MaxKeepAliveSeconds = 24 * 60 * 60;
 
+    /// <summary>How long one connect may take, over all addresses, unless a transport says otherwise.</summary>
+    public const int DefaultConnectTimeoutMs = 10000;
+
     private readonly object _lock = new object();
 
     private Socket _pending;
@@ -52,10 +55,14 @@ internal sealed class TcpConnector
             throw new SocketException((int)SocketError.HostNotFound);
         }
         Exception lastError = null;
+        // True when the last attempt ended because its time ran out (and not because it was refused or unreachable).
         bool timedOut = false;
-        foreach (IPAddress address in OrderAddresses(addresses))
+        List<IPAddress> ordered = new List<IPAddress>(OrderAddresses(addresses));
+        for (int index = 0; index < ordered.Count; index++)
         {
+            IPAddress address = ordered[index];
             int remainingMs = -1;
+            int attemptMs = -1;
             if (timeoutMs > 0)
             {
                 remainingMs = timeoutMs - (int)elapsed.ElapsedMilliseconds;
@@ -64,6 +71,9 @@ internal sealed class TcpConnector
                     timedOut = true;
                     break;
                 }
+                // An address that does not answer gets its share only, so the ones behind it (an IPv4 address behind a
+                // dead IPv6 route) are still tried; the last address may use whatever is left.
+                attemptMs = remainingMs / (ordered.Count - index);
             }
             Socket socket;
             try
@@ -89,9 +99,8 @@ internal sealed class TcpConnector
             {
                 socket.NoDelay = true;
                 IAsyncResult connect = socket.BeginConnect(new IPEndPoint(address, port), null, null);
-                if (!connect.AsyncWaitHandle.WaitOne(remainingMs))
+                if (!connect.AsyncWaitHandle.WaitOne(attemptMs))
                 {
-                    timedOut = true;
                     throw new SocketException((int)SocketError.TimedOut);
                 }
                 socket.EndConnect(connect);
@@ -117,9 +126,10 @@ internal sealed class TcpConnector
                     throw new ObjectDisposedException(nameof(TcpConnector), "The connection was closed while it was being made.");
                 }
                 lastError = ex;
+                timedOut = ex is SocketException { SocketErrorCode: SocketError.TimedOut };
             }
         }
-        if (timedOut || lastError == null)
+        if ((timedOut && timeoutMs > 0) || lastError == null)
         {
             throw new TimeoutException("No answer from " + DescribeEndpoint(host, port) + " within " + (timeoutMs / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + " s.");
         }
