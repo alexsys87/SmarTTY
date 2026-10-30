@@ -7195,144 +7195,731 @@
     </Symbol>
     <Symbol language="Lua" name="print" signature="print(...)">
       <Summary>Write the arguments and a newline</Summary>
+      <Description>Write the arguments and a newline. Lua base function. Calls tostring on each argument, writes them separated by tabs, and adds a newline.</Description>
     </Symbol>
     <Symbol language="Lua" name="type" signature="type(value)">
       <Summary>Type name of a value</Summary>
+      <Description>Type name of a value. Lua base function. Returns the type of value as a string, or nil when there is no value.</Description>
     </Symbol>
     <Symbol language="Lua" name="tostring" signature="tostring(value)">
       <Summary>Text representation</Summary>
+      <Description>Text representation. Lua base function. Converts value to a string using its __tostring metamethod when present.</Description>
     </Symbol>
     <Symbol language="Lua" name="tonumber" signature="tonumber(value, base)">
       <Summary>Convert to a number</Summary>
+      <Description>Convert to a number. Lua base function. Converts value to a number in the given base, or returns nil when it cannot.</Description>
     </Symbol>
     <Symbol language="Lua" name="ipairs" signature="ipairs(table)">
       <Summary>Iterate the array part</Summary>
+      <Description>Iterate the array part. Lua base function. Iterates over the consecutive integer keys of a table starting at 1.</Description>
     </Symbol>
     <Symbol language="Lua" name="pairs" signature="pairs(table)">
       <Summary>Iterate all keys</Summary>
+      <Description>Iterate all keys. Lua base function. Iterates over all keys of a table using the next function.</Description>
     </Symbol>
     <Symbol language="Lua" name="next" signature="next(table, key)">
       <Summary>Next key of a table</Summary>
+      <Description>Next key of a table. Lua base function. Returns the next key and value of a table, or nil at the end.</Description>
     </Symbol>
     <Symbol language="Lua" name="select" signature="select(index, ...)">
       <Summary>Arguments from an index</Summary>
+      <Description>Arguments from an index. Lua base function. Returns the arguments after the given index, or their count when index is '#'.</Description>
     </Symbol>
     <Symbol language="Lua" name="rawget" signature="rawget(table, key)">
       <Summary>Read without metatables</Summary>
+      <Description>Read without metatables. Lua base function. Reads a table entry without invoking the __index metamethod.</Description>
     </Symbol>
     <Symbol language="Lua" name="rawset" signature="rawset(table, key, value)">
       <Summary>Write without metatables</Summary>
+      <Description>Write without metatables. Lua base function. Writes a table entry without invoking the __newindex metamethod.</Description>
     </Symbol>
     <Symbol language="Lua" name="setmetatable" signature="setmetatable(table, metatable)">
       <Summary>Set the metatable</Summary>
+      <Description>Set the metatable. Lua base function. Sets the metatable of a table and returns the table.</Description>
     </Symbol>
     <Symbol language="Lua" name="getmetatable" signature="getmetatable(object)">
       <Summary>Read the metatable</Summary>
+      <Description>Read the metatable. Lua base function. Returns the metatable of an object, or nil when it has none.</Description>
     </Symbol>
     <Symbol language="Lua" name="assert" signature="assert(value, message)">
       <Summary>Raise when the value is false</Summary>
+      <Description>Raise when the value is false. Lua base function. Raises an error with message when value is false or nil; returns the arguments otherwise.</Description>
     </Symbol>
     <Symbol language="Lua" name="error" signature="error(message, level)">
       <Summary>Raise an error</Summary>
+      <Description>Raise an error. Lua base function. Raises an error with message at the given stack level.</Description>
     </Symbol>
     <Symbol language="Lua" name="pcall" signature="pcall(function, ...)">
       <Summary>Protected call</Summary>
+      <Description>Protected call. Lua base function. Calls a function in protected mode and returns true plus results, or false plus the error.</Description>
     </Symbol>
     <Symbol language="Lua" name="xpcall" signature="xpcall(function, handler)">
       <Summary>Protected call with a handler</Summary>
+      <Description>Protected call with a handler. Lua base function. Calls a function in protected mode with a message handler.</Description>
     </Symbol>
     <Symbol language="Lua" name="unpack" signature="unpack(list, i, j)">
       <Summary>Table elements as values</Summary>
+      <Description>Table elements as values. Lua base function. Returns the elements of a list from i to j as multiple results.</Description>
     </Symbol>
     <Symbol language="Lua" name="require" signature="require(module)">
       <Summary>Load a module</Summary>
+      <Description>Load a module. Lua base function. Loads a module and returns the value stored in package.loaded.</Description>
     </Symbol>
     <Symbol language="Lua" name="collectgarbage" signature="collectgarbage(option, arg)">
       <Summary>Control the garbage collector</Summary>
+      <Description>Control the garbage collector. Lua base function. Controls the garbage collector and returns the requested statistic.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="dofile" signature="dofile(filename)">
+      <Summary>Run a Lua file</Summary>
+      <Description>Run a Lua file. Lua base function. Loads and runs the file, returning the values returned by the chunk.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="load" signature="load(chunk, chunkname, mode, env)">
+      <Summary>Load a chunk from a string</Summary>
+      <Description>Load a chunk from a string. Lua base function. Compiles a string or reader function into a function without running it.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="loadfile" signature="loadfile(filename, mode, env)">
+      <Summary>Load a chunk from a file</Summary>
+      <Description>Load a chunk from a file. Lua base function. Compiles a file into a function without running it.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="rawequal" signature="rawequal(value1, value2)">
+      <Summary>Compare without metamethods</Summary>
+      <Description>Compare without metamethods. Lua base function. Tests whether two values are equal without invoking __eq.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="rawlen" signature="rawlen(value)">
+      <Summary>Length without metamethods</Summary>
+      <Description>Length without metamethods. Lua base function. Returns the length of a table or string without invoking __len.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="warn" signature="warn(message, ...)">
+      <Summary>Emit a warning</Summary>
+      <Description>Emit a warning. Lua base function. Writes a warning message to the standard error stream when warnings are enabled.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="_G">
+      <Summary>Global environment table</Summary>
+      <Description>Global environment table. Lua base variable. The table that holds all global variables.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="_VERSION">
+      <Summary>Lua version string</Summary>
+      <Description>Lua version string. Lua base variable. A string that identifies the running Lua version.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="arg">
+      <Summary>Command-line arguments</Summary>
+      <Description>Command-line arguments. Lua base variable. The table of command-line arguments in the standalone interpreter.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="coroutine.create" signature="coroutine.create(function)">
+      <Summary>Create a coroutine</Summary>
+      <Description>Create a coroutine. Lua coroutine library. Creates a new coroutine from a function.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="coroutine.resume" signature="coroutine.resume(co, ...)">
+      <Summary>Start or continue a coroutine</Summary>
+      <Description>Start or continue a coroutine. Lua coroutine library. Resumes a coroutine and returns true plus its results, or false plus an error.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="coroutine.running" signature="coroutine.running()">
+      <Summary>Running coroutine</Summary>
+      <Description>Running coroutine. Lua coroutine library. Returns the running coroutine and whether it is the main one.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="coroutine.status" signature="coroutine.status(co)">
+      <Summary>Coroutine status</Summary>
+      <Description>Coroutine status. Lua coroutine library. Returns the status of a coroutine: suspended, running, normal or dead.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="coroutine.wrap" signature="coroutine.wrap(function)">
+      <Summary>Wrap a coroutine as a function</Summary>
+      <Description>Wrap a coroutine as a function. Lua coroutine library. Creates a coroutine and returns a function that resumes it.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="coroutine.yield" signature="coroutine.yield(...)">
+      <Summary>Suspend a coroutine</Summary>
+      <Description>Suspend a coroutine. Lua coroutine library. Suspends the running coroutine and passes its arguments to the resumer.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="coroutine.isyieldable" signature="coroutine.isyieldable()">
+      <Summary>Test whether the coroutine can yield</Summary>
+      <Description>Test whether the coroutine can yield. Lua coroutine library. Returns true when the running coroutine can yield.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="coroutine.close" signature="coroutine.close(co)">
+      <Summary>Close a coroutine</Summary>
+      <Description>Close a coroutine. Lua coroutine library. Closes a suspended or dead coroutine and releases its resources.</Description>
     </Symbol>
     <Symbol language="Lua" name="string.format" signature="string.format(format, ...)">
       <Summary>Formatted string</Summary>
+      <Description>Formatted string. Lua string library. Formats the arguments according to a printf-style format string.</Description>
     </Symbol>
     <Symbol language="Lua" name="string.sub" signature="string.sub(text, i, j)">
       <Summary>Substring</Summary>
+      <Description>Substring. Lua string library. Returns the substring from index i to j.</Description>
     </Symbol>
     <Symbol language="Lua" name="string.len" signature="string.len(text)">
       <Summary>Length of a string</Summary>
+      <Description>Length of a string. Lua string library. Returns the length of a string in bytes.</Description>
     </Symbol>
     <Symbol language="Lua" name="string.find" signature="string.find(text, pattern)">
       <Summary>Find a pattern</Summary>
+      <Description>Find a pattern. Lua string library. Finds the first occurrence of a pattern and returns its start and end.</Description>
     </Symbol>
     <Symbol language="Lua" name="string.match" signature="string.match(text, pattern)">
       <Summary>Match a pattern</Summary>
+      <Description>Match a pattern. Lua string library. Returns the captures of the first match of a pattern.</Description>
     </Symbol>
     <Symbol language="Lua" name="string.gsub" signature="string.gsub(text, pattern, replacement)">
       <Summary>Replace a pattern</Summary>
+      <Description>Replace a pattern. Lua string library. Replaces the matches of a pattern and returns the new string and count.</Description>
     </Symbol>
     <Symbol language="Lua" name="string.rep" signature="string.rep(text, count)">
       <Summary>Repeat a string</Summary>
+      <Description>Repeat a string. Lua string library. Returns a string with the text repeated count times.</Description>
     </Symbol>
     <Symbol language="Lua" name="string.upper" signature="string.upper(text)">
       <Summary>Upper case</Summary>
+      <Description>Upper case. Lua string library. Returns the string converted to upper case.</Description>
     </Symbol>
     <Symbol language="Lua" name="string.lower" signature="string.lower(text)">
       <Summary>Lower case</Summary>
+      <Description>Lower case. Lua string library. Returns the string converted to lower case.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="string.byte" signature="string.byte(text, i, j)">
+      <Summary>Character codes</Summary>
+      <Description>Character codes. Lua string library. Returns the byte values of the characters from i to j.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="string.char" signature="string.char(...)">
+      <Summary>String from character codes</Summary>
+      <Description>String from character codes. Lua string library. Returns a string with the characters for the given byte values.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="string.dump" signature="string.dump(function)">
+      <Summary>Binary representation of a function</Summary>
+      <Description>Binary representation of a function. Lua string library. Returns a binary chunk for a Lua function.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="string.gmatch" signature="string.gmatch(text, pattern)">
+      <Summary>Iterate over matches</Summary>
+      <Description>Iterate over matches. Lua string library. Returns an iterator over all matches of a pattern.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="string.pack" signature="string.pack(format, ...)">
+      <Summary>Pack values into a binary string</Summary>
+      <Description>Pack values into a binary string. Lua string library. Packs the values according to a binary format string.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="string.packsize" signature="string.packsize(format)">
+      <Summary>Size of a packed format</Summary>
+      <Description>Size of a packed format. Lua string library. Returns the number of bytes produced by a pack format.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="string.reverse" signature="string.reverse(text)">
+      <Summary>Reverse a string</Summary>
+      <Description>Reverse a string. Lua string library. Returns the string with its bytes in reverse order.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="string.unpack" signature="string.unpack(format, data, pos)">
+      <Summary>Unpack values from a binary string</Summary>
+      <Description>Unpack values from a binary string. Lua string library. Unpacks values from data according to a binary format string.</Description>
     </Symbol>
     <Symbol language="Lua" name="table.insert" signature="table.insert(list, value)">
       <Summary>Insert an element</Summary>
+      <Description>Insert an element. Lua table library. Inserts a value at the given position, or appends it at the end.</Description>
     </Symbol>
     <Symbol language="Lua" name="table.remove" signature="table.remove(list, index)">
       <Summary>Remove an element</Summary>
+      <Description>Remove an element. Lua table library. Removes and returns the element at the given position.</Description>
     </Symbol>
     <Symbol language="Lua" name="table.sort" signature="table.sort(list, compare)">
       <Summary>Sort a table</Summary>
+      <Description>Sort a table. Lua table library. Sorts the list in place, optionally with a comparison function.</Description>
     </Symbol>
     <Symbol language="Lua" name="table.concat" signature="table.concat(list, separator)">
       <Summary>Join the elements</Summary>
+      <Description>Join the elements. Lua table library. Joins the elements of a list with a separator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="table.move" signature="table.move(a1, f, e, t, a2)">
+      <Summary>Move elements between tables</Summary>
+      <Description>Move elements between tables. Lua table library. Copies the range from f to e into another table at position t.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="table.pack" signature="table.pack(...)">
+      <Summary>Pack arguments into a table</Summary>
+      <Description>Pack arguments into a table. Lua table library. Returns a table with the arguments and a field n.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="table.unpack" signature="table.unpack(list, i, j)">
+      <Summary>Unpack a table into values</Summary>
+      <Description>Unpack a table into values. Lua table library. Returns the elements of a list from i to j as multiple results.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="table.maxn" signature="table.maxn(table)">
+      <Summary>Largest numeric key (Lua 5.1)</Summary>
+      <Description>Largest numeric key (Lua 5.1). Lua table library. Returns the largest positive numeric key of a table.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="table.getn" signature="table.getn(table)">
+      <Summary>Length of a table (Lua 5.1)</Summary>
+      <Description>Length of a table (Lua 5.1). Lua table library. Returns the length of a table.</Description>
     </Symbol>
     <Symbol language="Lua" name="math.floor" signature="math.floor(x)">
       <Summary>Round down</Summary>
+      <Description>Round down. Lua math library. Returns the largest integer less than or equal to x.</Description>
     </Symbol>
     <Symbol language="Lua" name="math.ceil" signature="math.ceil(x)">
       <Summary>Round up</Summary>
+      <Description>Round up. Lua math library. Returns the smallest integer greater than or equal to x.</Description>
     </Symbol>
     <Symbol language="Lua" name="math.abs" signature="math.abs(x)">
       <Summary>Absolute value</Summary>
+      <Description>Absolute value. Lua math library. Returns the absolute value of x.</Description>
     </Symbol>
     <Symbol language="Lua" name="math.max" signature="math.max(...)">
       <Summary>Largest value</Summary>
+      <Description>Largest value. Lua math library. Returns the largest of the arguments.</Description>
     </Symbol>
     <Symbol language="Lua" name="math.min" signature="math.min(...)">
       <Summary>Smallest value</Summary>
+      <Description>Smallest value. Lua math library. Returns the smallest of the arguments.</Description>
     </Symbol>
     <Symbol language="Lua" name="math.sqrt" signature="math.sqrt(x)">
       <Summary>Square root</Summary>
+      <Description>Square root. Lua math library. Returns the square root of x.</Description>
     </Symbol>
     <Symbol language="Lua" name="math.random" signature="math.random(m, n)">
       <Summary>Pseudo-random number</Summary>
+      <Description>Pseudo-random number. Lua math library. Returns a pseudo-random number in the given range.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.acos" signature="math.acos(x)">
+      <Summary>Arc cosine</Summary>
+      <Description>Arc cosine. Lua math library. Returns the arc cosine of x in radians.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.asin" signature="math.asin(x)">
+      <Summary>Arc sine</Summary>
+      <Description>Arc sine. Lua math library. Returns the arc sine of x in radians.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.atan" signature="math.atan(y, x)">
+      <Summary>Arc tangent</Summary>
+      <Description>Arc tangent. Lua math library. Returns the arc tangent of y, or of y/x when x is given.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.cos" signature="math.cos(x)">
+      <Summary>Cosine</Summary>
+      <Description>Cosine. Lua math library. Returns the cosine of x radians.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.deg" signature="math.deg(x)">
+      <Summary>Radians to degrees</Summary>
+      <Description>Radians to degrees. Lua math library. Converts an angle from radians to degrees.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.exp" signature="math.exp(x)">
+      <Summary>Exponential</Summary>
+      <Description>Exponential. Lua math library. Returns e raised to the power x.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.fmod" signature="math.fmod(x, y)">
+      <Summary>Remainder of a division</Summary>
+      <Description>Remainder of a division. Lua math library. Returns the remainder of x divided by y.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.huge">
+      <Summary>Positive infinity</Summary>
+      <Description>Positive infinity. Lua math library. A value larger than any other number.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.log" signature="math.log(x, base)">
+      <Summary>Logarithm</Summary>
+      <Description>Logarithm. Lua math library. Returns the logarithm of x in the given base, natural by default.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.maxinteger">
+      <Summary>Largest integer</Summary>
+      <Description>Largest integer. Lua math library. The largest value of the integer subtype.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.mininteger">
+      <Summary>Smallest integer</Summary>
+      <Description>Smallest integer. Lua math library. The smallest value of the integer subtype.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.modf" signature="math.modf(x)">
+      <Summary>Integer and fractional parts</Summary>
+      <Description>Integer and fractional parts. Lua math library. Returns the integral and fractional parts of x.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.pi">
+      <Summary>Ratio of a circle's circumference to its diameter</Summary>
+      <Description>Ratio of a circle's circumference to its diameter. Lua math library. The constant pi, approximately 3.141592653589793.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.rad" signature="math.rad(x)">
+      <Summary>Degrees to radians</Summary>
+      <Description>Degrees to radians. Lua math library. Converts an angle from degrees to radians.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.randomseed" signature="math.randomseed(x, y)">
+      <Summary>Seed the random generator</Summary>
+      <Description>Seed the random generator. Lua math library. Sets the seed of the pseudo-random number generator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.sin" signature="math.sin(x)">
+      <Summary>Sine</Summary>
+      <Description>Sine. Lua math library. Returns the sine of x radians.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.tan" signature="math.tan(x)">
+      <Summary>Tangent</Summary>
+      <Description>Tangent. Lua math library. Returns the tangent of x radians.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.tointeger" signature="math.tointeger(x)">
+      <Summary>Convert to an integer</Summary>
+      <Description>Convert to an integer. Lua math library. Returns x as an integer when it has an exact integer value, or nil.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.type" signature="math.type(x)">
+      <Summary>Number subtype</Summary>
+      <Description>Number subtype. Lua math library. Returns integer or float for a number, or nil.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.ult" signature="math.ult(m, n)">
+      <Summary>Unsigned comparison</Summary>
+      <Description>Unsigned comparison. Lua math library. Compares two integers as unsigned values.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.atan2" signature="math.atan2(y, x)">
+      <Summary>Arc tangent of y/x (Lua 5.3)</Summary>
+      <Description>Arc tangent of y/x (Lua 5.3). Lua math library. Returns the arc tangent of y/x using the signs of both arguments.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.pow" signature="math.pow(x, y)">
+      <Summary>Power (Lua 5.3)</Summary>
+      <Description>Power (Lua 5.3). Lua math library. Returns x raised to the power y.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.cosh" signature="math.cosh(x)">
+      <Summary>Hyperbolic cosine (Lua 5.3)</Summary>
+      <Description>Hyperbolic cosine (Lua 5.3). Lua math library. Returns the hyperbolic cosine of x.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.sinh" signature="math.sinh(x)">
+      <Summary>Hyperbolic sine (Lua 5.3)</Summary>
+      <Description>Hyperbolic sine (Lua 5.3). Lua math library. Returns the hyperbolic sine of x.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.tanh" signature="math.tanh(x)">
+      <Summary>Hyperbolic tangent (Lua 5.3)</Summary>
+      <Description>Hyperbolic tangent (Lua 5.3). Lua math library. Returns the hyperbolic tangent of x.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.ldexp" signature="math.ldexp(x, e)">
+      <Summary>Scale by a power of two (Lua 5.3)</Summary>
+      <Description>Scale by a power of two (Lua 5.3). Lua math library. Returns x multiplied by 2 raised to the power e.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="math.frexp" signature="math.frexp(x)">
+      <Summary>Mantissa and exponent (Lua 5.3)</Summary>
+      <Description>Mantissa and exponent (Lua 5.3). Lua math library. Returns the mantissa and exponent of x.</Description>
     </Symbol>
     <Symbol language="Lua" name="io.open" signature="io.open(path, mode)">
       <Summary>Open a file</Summary>
+      <Description>Open a file. Lua I/O library. Opens a file and returns a file handle, or nil and an error message.</Description>
     </Symbol>
     <Symbol language="Lua" name="io.read" signature="io.read(format)">
       <Summary>Read from the standard input</Summary>
+      <Description>Read from the standard input. Lua I/O library. Reads from the standard input according to the given formats.</Description>
     </Symbol>
     <Symbol language="Lua" name="io.write" signature="io.write(...)">
       <Summary>Write to the standard output</Summary>
+      <Description>Write to the standard output. Lua I/O library. Writes the arguments to the standard output.</Description>
     </Symbol>
     <Symbol language="Lua" name="io.lines" signature="io.lines(path)">
       <Summary>Iterate the lines of a file</Summary>
+      <Description>Iterate the lines of a file. Lua I/O library. Returns an iterator over the lines of a file.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.close" signature="io.close(file)">
+      <Summary>Close a file</Summary>
+      <Description>Close a file. Lua I/O library. Closes a file handle or the default output file.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.flush" signature="io.flush()">
+      <Summary>Flush the output</Summary>
+      <Description>Flush the output. Lua I/O library. Writes the buffered output to the default output file.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.input" signature="io.input(file)">
+      <Summary>Default input file</Summary>
+      <Description>Default input file. Lua I/O library. Returns or sets the default input file.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.output" signature="io.output(file)">
+      <Summary>Default output file</Summary>
+      <Description>Default output file. Lua I/O library. Returns or sets the default output file.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.popen" signature="io.popen(program, mode)">
+      <Summary>Pipe to a program</Summary>
+      <Description>Pipe to a program. Lua I/O library. Starts a program and returns a file handle connected to it.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.tmpfile" signature="io.tmpfile()">
+      <Summary>Temporary file</Summary>
+      <Description>Temporary file. Lua I/O library. Returns a handle for a temporary file that is removed on close.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.type" signature="io.type(object)">
+      <Summary>File handle type</Summary>
+      <Description>File handle type. Lua I/O library. Returns file, closed file or nil for an object.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.stdin">
+      <Summary>Standard input file</Summary>
+      <Description>Standard input file. Lua I/O library. The file handle for standard input.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.stdout">
+      <Summary>Standard output file</Summary>
+      <Description>Standard output file. Lua I/O library. The file handle for standard output.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="io.stderr">
+      <Summary>Standard error file</Summary>
+      <Description>Standard error file. Lua I/O library. The file handle for standard error.</Description>
     </Symbol>
     <Symbol language="Lua" name="os.time" signature="os.time()">
       <Summary>Current time</Summary>
+      <Description>Current time. Lua os library. Returns the current time as a number, or the time for a date table.</Description>
     </Symbol>
     <Symbol language="Lua" name="os.date" signature="os.date(format)">
       <Summary>Formatted date and time</Summary>
+      <Description>Formatted date and time. Lua os library. Formats a time according to a strftime-style format.</Description>
     </Symbol>
     <Symbol language="Lua" name="os.getenv" signature="os.getenv(name)">
       <Summary>Environment variable</Summary>
+      <Description>Environment variable. Lua os library. Returns the value of an environment variable, or nil.</Description>
     </Symbol>
     <Symbol language="Lua" name="os.exit" signature="os.exit(code)">
       <Summary>End the program</Summary>
+      <Description>End the program. Lua os library. Terminates the program with the given status.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="os.clock" signature="os.clock()">
+      <Summary>CPU time</Summary>
+      <Description>CPU time. Lua os library. Returns the CPU time used by the program in seconds.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="os.difftime" signature="os.difftime(t2, t1)">
+      <Summary>Difference between times</Summary>
+      <Description>Difference between times. Lua os library. Returns the number of seconds from t1 to t2.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="os.execute" signature="os.execute(command)">
+      <Summary>Run a shell command</Summary>
+      <Description>Run a shell command. Lua os library. Runs a command through the system shell and returns its status.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="os.remove" signature="os.remove(filename)">
+      <Summary>Remove a file</Summary>
+      <Description>Remove a file. Lua os library. Removes the file or empty directory with the given name.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="os.rename" signature="os.rename(oldname, newname)">
+      <Summary>Rename a file</Summary>
+      <Description>Rename a file. Lua os library. Renames a file or directory.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="os.setlocale" signature="os.setlocale(locale, category)">
+      <Summary>Set the locale</Summary>
+      <Description>Set the locale. Lua os library. Sets the current locale and returns its name.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="os.tmpname" signature="os.tmpname()">
+      <Summary>Temporary file name</Summary>
+      <Description>Temporary file name. Lua os library. Returns a name for a temporary file.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="package.config">
+      <Summary>Package configuration</Summary>
+      <Description>Package configuration. Lua package library. A string with the directory and path separators used by the package system.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="package.cpath">
+      <Summary>C module search path</Summary>
+      <Description>C module search path. Lua package library. The search path for C modules loaded by require.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="package.loaded">
+      <Summary>Loaded modules</Summary>
+      <Description>Loaded modules. Lua package library. A table of the modules already loaded by require.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="package.loadlib" signature="package.loadlib(libname, funcname)">
+      <Summary>Load a C library</Summary>
+      <Description>Load a C library. Lua package library. Dynamically loads a C library and returns its initialization function.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="package.path">
+      <Summary>Lua module search path</Summary>
+      <Description>Lua module search path. Lua package library. The search path for Lua modules loaded by require.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="package.preload">
+      <Summary>Preloaded modules</Summary>
+      <Description>Preloaded modules. Lua package library. A table of loaders for modules that are not on disk.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="package.searchers">
+      <Summary>Module searchers</Summary>
+      <Description>Module searchers. Lua package library. The table of functions that require uses to find modules.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="package.searchpath" signature="package.searchpath(name, path, sep, rep)">
+      <Summary>Search a module path</Summary>
+      <Description>Search a module path. Lua package library. Looks for a module in a path template and returns the file name.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="package.seeall" signature="package.seeall(module)">
+      <Summary>Set a module's metatable (Lua 5.1)</Summary>
+      <Description>Set a module's metatable (Lua 5.1). Lua package library. Makes a module fall back to the global environment.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="utf8.char" signature="utf8.char(...)">
+      <Summary>String from code points</Summary>
+      <Description>String from code points. Lua utf8 library. Returns a string with the characters for the given code points.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="utf8.charpattern">
+      <Summary>UTF-8 character pattern</Summary>
+      <Description>UTF-8 character pattern. Lua utf8 library. A pattern that matches exactly one UTF-8 byte sequence.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="utf8.codes" signature="utf8.codes(text)">
+      <Summary>Iterate over UTF-8 characters</Summary>
+      <Description>Iterate over UTF-8 characters. Lua utf8 library. Returns an iterator over the code points and positions of a string.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="utf8.codepoint" signature="utf8.codepoint(text, i, j)">
+      <Summary>Code points of characters</Summary>
+      <Description>Code points of characters. Lua utf8 library. Returns the code points of the characters from i to j.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="utf8.len" signature="utf8.len(text, i, j)">
+      <Summary>Length in characters</Summary>
+      <Description>Length in characters. Lua utf8 library. Returns the number of UTF-8 characters in a string.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="utf8.offset" signature="utf8.offset(text, n, i)">
+      <Summary>Byte offset of a character</Summary>
+      <Description>Byte offset of a character. Lua utf8 library. Returns the byte position of the n-th character from position i.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.debug" signature="debug.debug()">
+      <Summary>Interactive debug prompt</Summary>
+      <Description>Interactive debug prompt. Lua debug library. Starts a simple interactive prompt for running debug commands.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.gethook" signature="debug.gethook(thread)">
+      <Summary>Current debug hook</Summary>
+      <Description>Current debug hook. Lua debug library. Returns the current hook function, mask and count.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.getinfo" signature="debug.getinfo(thread, function, what)">
+      <Summary>Information about a function</Summary>
+      <Description>Information about a function. Lua debug library. Returns a table with information about a function or stack level.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.getlocal" signature="debug.getlocal(thread, level, index)">
+      <Summary>Local variable</Summary>
+      <Description>Local variable. Lua debug library. Returns the name and value of a local variable.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.getmetatable" signature="debug.getmetatable(value)">
+      <Summary>Metatable without protection</Summary>
+      <Description>Metatable without protection. Lua debug library. Returns the metatable of a value even when it is protected.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.getregistry" signature="debug.getregistry()">
+      <Summary>Registry table</Summary>
+      <Description>Registry table. Lua debug library. Returns the registry table of the interpreter.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.getupvalue" signature="debug.getupvalue(function, index)">
+      <Summary>Upvalue</Summary>
+      <Description>Upvalue. Lua debug library. Returns the name and value of an upvalue of a function.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.getuservalue" signature="debug.getuservalue(value, index)">
+      <Summary>User value</Summary>
+      <Description>User value. Lua debug library. Returns the user value associated with a value.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.sethook" signature="debug.sethook(thread, hook, mask, count)">
+      <Summary>Set a debug hook</Summary>
+      <Description>Set a debug hook. Lua debug library. Sets a function called for the selected debug events.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.setlocal" signature="debug.setlocal(thread, level, index, value)">
+      <Summary>Set a local variable</Summary>
+      <Description>Set a local variable. Lua debug library. Assigns a value to a local variable.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.setmetatable" signature="debug.setmetatable(value, metatable)">
+      <Summary>Set a metatable without protection</Summary>
+      <Description>Set a metatable without protection. Lua debug library. Sets the metatable of a value even when it is protected.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.setupvalue" signature="debug.setupvalue(function, index, value)">
+      <Summary>Set an upvalue</Summary>
+      <Description>Set an upvalue. Lua debug library. Assigns a value to an upvalue of a function.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.setuservalue" signature="debug.setuservalue(value, uservalue, index)">
+      <Summary>Set a user value</Summary>
+      <Description>Set a user value. Lua debug library. Associates a user value with a value.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.traceback" signature="debug.traceback(thread, message, level)">
+      <Summary>Stack traceback</Summary>
+      <Description>Stack traceback. Lua debug library. Returns a string with the call stack traceback.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.upvalueid" signature="debug.upvalueid(function, index)">
+      <Summary>Upvalue identity</Summary>
+      <Description>Upvalue identity. Lua debug library. Returns a unique identifier for an upvalue.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="debug.upvaluejoin" signature="debug.upvaluejoin(function1, index1, function2, index2)">
+      <Summary>Share an upvalue</Summary>
+      <Description>Share an upvalue. Lua debug library. Makes one upvalue refer to another.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__index">
+      <Summary>Index metamethod</Summary>
+      <Description>Index metamethod. Lua metamethod. Called when a missing key is read from a table.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__newindex">
+      <Summary>New index metamethod</Summary>
+      <Description>New index metamethod. Lua metamethod. Called when a missing key is assigned in a table.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__call">
+      <Summary>Call metamethod</Summary>
+      <Description>Call metamethod. Lua metamethod. Called when a table or userdata is used as a function.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__add">
+      <Summary>Addition metamethod</Summary>
+      <Description>Addition metamethod. Lua metamethod. Called for the + operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__sub">
+      <Summary>Subtraction metamethod</Summary>
+      <Description>Subtraction metamethod. Lua metamethod. Called for the - operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__mul">
+      <Summary>Multiplication metamethod</Summary>
+      <Description>Multiplication metamethod. Lua metamethod. Called for the * operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__div">
+      <Summary>Division metamethod</Summary>
+      <Description>Division metamethod. Lua metamethod. Called for the / operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__mod">
+      <Summary>Modulo metamethod</Summary>
+      <Description>Modulo metamethod. Lua metamethod. Called for the % operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__pow">
+      <Summary>Power metamethod</Summary>
+      <Description>Power metamethod. Lua metamethod. Called for the ^ operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__unm">
+      <Summary>Unary minus metamethod</Summary>
+      <Description>Unary minus metamethod. Lua metamethod. Called for the unary - operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__idiv">
+      <Summary>Floor division metamethod</Summary>
+      <Description>Floor division metamethod. Lua metamethod. Called for the // operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__band">
+      <Summary>Bitwise and metamethod</Summary>
+      <Description>Bitwise and metamethod. Lua metamethod. Called for the &amp; operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__bor">
+      <Summary>Bitwise or metamethod</Summary>
+      <Description>Bitwise or metamethod. Lua metamethod. Called for the | operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__bxor">
+      <Summary>Bitwise exclusive or metamethod</Summary>
+      <Description>Bitwise exclusive or metamethod. Lua metamethod. Called for the ~ operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__bnot">
+      <Summary>Bitwise not metamethod</Summary>
+      <Description>Bitwise not metamethod. Lua metamethod. Called for the unary ~ operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__shl">
+      <Summary>Left shift metamethod</Summary>
+      <Description>Left shift metamethod. Lua metamethod. Called for the &lt;&lt; operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__shr">
+      <Summary>Right shift metamethod</Summary>
+      <Description>Right shift metamethod. Lua metamethod. Called for the &gt;&gt; operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__concat">
+      <Summary>Concatenation metamethod</Summary>
+      <Description>Concatenation metamethod. Lua metamethod. Called for the .. operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__len">
+      <Summary>Length metamethod</Summary>
+      <Description>Length metamethod. Lua metamethod. Called for the # operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__eq">
+      <Summary>Equality metamethod</Summary>
+      <Description>Equality metamethod. Lua metamethod. Called for the == operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__lt">
+      <Summary>Less than metamethod</Summary>
+      <Description>Less than metamethod. Lua metamethod. Called for the &lt; operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__le">
+      <Summary>Less or equal metamethod</Summary>
+      <Description>Less or equal metamethod. Lua metamethod. Called for the &lt;= operator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__tostring">
+      <Summary>String conversion metamethod</Summary>
+      <Description>String conversion metamethod. Lua metamethod. Called by tostring and print to convert an object to text.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__metatable">
+      <Summary>Protected metatable marker</Summary>
+      <Description>Protected metatable marker. Lua metamethod. Hides the real metatable from getmetatable.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__pairs">
+      <Summary>Pairs metamethod</Summary>
+      <Description>Pairs metamethod. Lua metamethod. Called by pairs to provide a custom iterator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__ipairs">
+      <Summary>Ipairs metamethod</Summary>
+      <Description>Ipairs metamethod. Lua metamethod. Called by ipairs to provide a custom iterator.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__gc">
+      <Summary>Garbage collection metamethod</Summary>
+      <Description>Garbage collection metamethod. Lua metamethod. Called when the object is collected.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__mode">
+      <Summary>Weak table mode</Summary>
+      <Description>Weak table mode. Lua metamethod. Controls which keys and values of a table are weak.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__close">
+      <Summary>Close metamethod</Summary>
+      <Description>Close metamethod. Lua metamethod. Called when a to-be-closed variable goes out of scope.</Description>
+    </Symbol>
+    <Symbol language="Lua" name="__name">
+      <Summary>Type name metamethod</Summary>
+      <Description>Type name metamethod. Lua metamethod. Provides the name used for the object in error messages.</Description>
     </Symbol>
     <Symbol language="Sql" name="COUNT" signature="COUNT(expression)">
       <Summary>Number of rows</Summary>

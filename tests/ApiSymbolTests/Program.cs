@@ -105,6 +105,41 @@ internal static class Program
         Check(database.Find(L.Python, "math.sqrt").Description.Contains("Python math module"),
             "the description of 'math.sqrt' names the math module");
 
+        // The Lua set covers the base library, the standard modules and the metamethods.
+        List<ApiSymbolDatabase.Symbol> luaSymbols = database.ForLanguage(L.Lua).ToList();
+        Check(luaSymbols.Count >= 180, "the Lua set is broad (" + luaSymbols.Count + " symbols)");
+        Equal(luaSymbols.Count, luaSymbols.Select(s => s.Name).Distinct().Count(), "Lua names are unique");
+        Equal(luaSymbols.Count, luaSymbols.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every Lua symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "dofile", "load", "loadfile", "rawequal", "rawlen", "warn", "_G", "_VERSION", "arg",
+                     "coroutine.create", "coroutine.resume", "coroutine.close",
+                     "string.gmatch", "string.pack", "string.unpack",
+                     "table.move", "table.pack", "table.unpack",
+                     "math.pi", "math.huge", "math.tointeger", "math.type",
+                     "io.popen", "io.tmpfile", "io.stdin",
+                     "os.clock", "os.execute", "os.tmpname",
+                     "package.searchpath", "package.searchers",
+                     "utf8.codepoint", "utf8.charpattern",
+                     "debug.traceback", "debug.upvaluejoin",
+                     "__index", "__newindex", "__close"
+                 })
+        {
+            Check(database.Find(L.Lua, name) != null, "the Lua set includes '" + name + "'");
+        }
+        Check(database.Find(L.Lua, "coroutine.create").Description.Contains("Lua coroutine library"),
+            "the description of 'coroutine.create' names the coroutine library");
+        Check(database.Find(L.Lua, "string.gmatch").Description.Contains("Lua string library"),
+            "the description of 'string.gmatch' names the string library");
+        Check(database.Find(L.Lua, "__index").Description.Contains("Lua metamethod"),
+            "the description of '__index' names a Lua metamethod");
+
+        ParameterSignature luaGsub = database.FindSignature(L.Lua, "string.gsub");
+        Check(luaGsub != null, "a 'string.gsub' call resolves to the Lua symbol");
+        Equal(luaGsub.ToString(), "string.gsub(text, pattern, replacement)",
+            "the resolved Lua signature keeps the qualified name");
+
         // A "module.name" call is resolved to its last segment.
         ParameterSignature pythonSqrt = database.FindSignature(L.Python, "math.sqrt");
         Check(pythonSqrt != null, "a 'math.sqrt' call resolves to the Python symbol");
@@ -202,6 +237,17 @@ internal static class Program
         List<ISuggestion> lua = Build(L.Lua, "", "sqr", database);
         Check(lua.Any(s => s.DisplayName == "sqrt"), "the 'math.sqrt' entry is offered as 'sqrt'");
 
+        // The Lua standard library entries are offered under their plain names too.
+        List<ISuggestion> luaPatterns = Build(L.Lua, "", "gmat", database);
+        ISuggestion gmatch = luaPatterns.FirstOrDefault(s => s.DisplayName == "gmatch");
+        Check(gmatch != null, "the completion list offers 'gmatch' from 'string.gmatch'");
+        Equal(gmatch.DetailText, "Iterate over matches", "the Lua library summary is the detail text");
+        Check(gmatch.HintText.StartsWith("string.gmatch("), "the qualified Lua signature is the hint text");
+        Check(Build(L.Lua, "", "isyi", database).Any(s => s.DisplayName == "isyieldable"),
+            "the completion list offers 'coroutine.isyieldable' as 'isyieldable'");
+        Check(Build(L.Lua, "", "codepo", database).Any(s => s.DisplayName == "codepoint"),
+            "the completion list offers 'utf8.codepoint' as 'codepoint'");
+
         // The Python modules are offered under their plain names too.
         List<ISuggestion> pythonMath = Build(L.Python, "", "sqr", database);
         ISuggestion pythonSqrt = pythonMath.FirstOrDefault(s => s.DisplayName == "sqrt");
@@ -251,6 +297,12 @@ internal static class Program
             L.Lua, "sqrt(\n", 0, 5, database, out int luaActive);
         Check(lua != null, "a bare 'sqrt(' call finds the 'math.sqrt' symbol");
         Check(lua.Name == "math.sqrt", "the Lua hint keeps the qualified name");
+
+        ParameterSignature luaGsubHint = EditorSignatureSource.FindSignature(
+            L.Lua, "gsub(\n", 0, 5, database, out int luaGsubActive);
+        Check(luaGsubHint != null, "a bare 'gsub(' call finds the 'string.gsub' symbol");
+        Check(luaGsubHint.Name == "string.gsub", "the Lua string hint keeps the qualified name");
+        Equal(luaGsubHint.ParameterCount, 3, "the Lua string hint has its parameters");
 
         ParameterSignature python = EditorSignatureSource.FindSignature(
             L.Python, "sqrt(\n", 0, 5, database, out int pythonActive);
