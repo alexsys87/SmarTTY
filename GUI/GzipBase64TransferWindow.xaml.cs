@@ -26,12 +26,16 @@ public partial class GzipBase64TransferWindow : Window
 
     private readonly bool _sending;
 
+    private readonly GzipBase64Transfer.DirectoryLister _listDirectory;
+
     internal GzipBase64Transfer.Request Request { get; private set; }
 
-    private GzipBase64TransferWindow(bool sending)
+    private GzipBase64TransferWindow(bool sending, GzipBase64Transfer.DirectoryLister listDirectory)
     {
         InitializeComponent();
         _sending = sending;
+        _listDirectory = listDirectory;
+        RemoteBrowseButton.IsEnabled = listDirectory != null;
         EncodingBox.SelectedIndex = _lastEncoding;
         ChecksumBox.SelectedIndex = _lastChecksum;
         AttemptsBox.Text = _lastAttempts;
@@ -63,20 +67,20 @@ public partial class GzipBase64TransferWindow : Window
     }
 
     /// <summary>Returns the request, or null when the user cancelled.</summary>
-    internal static GzipBase64Transfer.Request ShowSend(Window owner)
+    internal static GzipBase64Transfer.Request ShowSend(Window owner, GzipBase64Transfer.DirectoryLister listDirectory)
     {
-        return Show(owner, sending: true);
+        return Show(owner, sending: true, listDirectory);
     }
 
     /// <summary>Returns the request, or null when the user cancelled.</summary>
-    internal static GzipBase64Transfer.Request ShowReceive(Window owner)
+    internal static GzipBase64Transfer.Request ShowReceive(Window owner, GzipBase64Transfer.DirectoryLister listDirectory)
     {
-        return Show(owner, sending: false);
+        return Show(owner, sending: false, listDirectory);
     }
 
-    private static GzipBase64Transfer.Request Show(Window owner, bool sending)
+    private static GzipBase64Transfer.Request Show(Window owner, bool sending, GzipBase64Transfer.DirectoryLister listDirectory)
     {
-        GzipBase64TransferWindow window = new GzipBase64TransferWindow(sending);
+        GzipBase64TransferWindow window = new GzipBase64TransferWindow(sending, listDirectory);
         WindowOwnership.Attach(window, owner ?? WindowOwnership.ActiveWindow());
         return window.ShowDialog() == true ? window.Request : null;
     }
@@ -107,6 +111,15 @@ public partial class GzipBase64TransferWindow : Window
                 // The dialog has already asked about replacing an existing file.
                 OverwriteBox.IsChecked = true;
             }
+        }
+    }
+
+    private void BrowseRemote_Click(object sender, RoutedEventArgs e)
+    {
+        string chosen = RemoteDevicePathWindow.Browse(this, _listDirectory, forReceive: !_sending, RemoteBox.Text.Trim());
+        if (chosen != null)
+        {
+            RemoteBox.Text = chosen;
         }
     }
 
