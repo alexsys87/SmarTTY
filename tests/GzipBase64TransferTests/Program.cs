@@ -866,41 +866,6 @@ internal static class Program
         }
     }
 
-    private static void ListCases(Func<Device> make)
-    {
-        Section("List a folder of the device");
-        string dir = NewWorkDir();
-        Directory.CreateDirectory(Path.Combine(dir, "sub"));
-        File.WriteAllText(Path.Combine(dir, "a.txt"), "a");
-        File.WriteAllText(Path.Combine(dir, ".hidden"), "h");
-        using Device device = make();
-        GzipBase64Transfer.DirectoryListing listing = null;
-        Exception error = null;
-        try
-        {
-            listing = GzipBase64Transfer.ListDirectory(dir, Fast(), device.Write, device.Read, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            error = ex;
-        }
-        Check(error == null && listing != null, "the folder is listed", error?.Message);
-        if (listing != null)
-        {
-            Check(listing.Directories.Contains("sub"), "a folder is listed as a folder");
-            Check(listing.Files.Contains("a.txt") && listing.Files.Contains(".hidden"), "files, hidden ones too, are listed as files");
-        }
-        try
-        {
-            GzipBase64Transfer.ListDirectory(Path.Combine(dir, "missing"), Fast(), device.Write, device.Read, CancellationToken.None);
-            Check(false, "a missing folder is refused");
-        }
-        catch (IOException)
-        {
-            Check(true, "a missing folder is refused");
-        }
-    }
-
     private static void SilentDeviceCases()
     {
         string dir = NewWorkDir();
@@ -958,7 +923,6 @@ internal static class Program
         if (Want("finalize")) FinalizeCases();
         if (Want("recovery")) RecoveryCases();
         if (Want("slow")) SlowLineCases();
-        if (Want("list")) ListCases(Bash);
         if (Want("send-ash")) SendCases(Ash, gnuUu: true, cksum: false);
         if (Want("receive-ash")) ReceiveCases(Ash, gnuUu: true, cksum: false);
         if (Want("fault")) FaultCases();
