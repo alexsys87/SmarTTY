@@ -63,7 +63,6 @@ internal sealed class TcpConnector
         // ended without any answer. A refusal tells the user more than "no answer" from another address.
         Exception lastError = null;
         Exception timeoutError = null;
-        bool timedOut = false;
         List<IPAddress> ordered = new List<IPAddress>(OrderAddresses(addresses));
         for (int index = 0; index < ordered.Count; index++)
         {
@@ -75,7 +74,6 @@ internal sealed class TcpConnector
                 remainingMs = timeoutMs - (int)elapsed.ElapsedMilliseconds;
                 if (remainingMs <= 0)
                 {
-                    timedOut = true;
                     break;
                 }
                 // An address that does not answer gets its share only, so the ones behind it (an IPv4 address behind a
@@ -134,7 +132,6 @@ internal sealed class TcpConnector
                 }
                 if (ex is SocketException { SocketErrorCode: SocketError.TimedOut })
                 {
-                    timedOut = true;
                     timeoutError = ex;
                 }
                 else
@@ -209,28 +206,11 @@ internal sealed class TcpConnector
         }
         try
         {
-            // TCP_KEEPIDLE / TCP_KEEPINTVL (in seconds) where SIO_KEEPALIVE_VALS is not available.
-            // The option numbers differ per system: 3 and 17 are TCP_KEEPIDLE and TCP_KEEPINTVL on Windows only
-            // (on Linux they are TCP_CORK and TCP_THIN_DUPACK, which must not be touched).
-            SocketOptionName idle;
-            SocketOptionName interval;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                idle = (SocketOptionName)3;
-                interval = (SocketOptionName)17;
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                idle = (SocketOptionName)0x10; // TCP_KEEPALIVE
-                interval = (SocketOptionName)0x101; // TCP_KEEPINTVL
-            }
-            else
-            {
-                idle = (SocketOptionName)4; // TCP_KEEPIDLE
-                interval = (SocketOptionName)5; // TCP_KEEPINTVL
-            }
-            socket.SetSocketOption(SocketOptionLevel.Tcp, idle, seconds);
-            socket.SetSocketOption(SocketOptionLevel.Tcp, interval, intervalSeconds);
+            // 3 and 17 are the cross-platform SocketOptionName values TcpKeepAliveTime and TcpKeepAliveInterval,
+            // which the runtime maps to the option of the running system (TCP_KEEPIDLE and TCP_KEEPINTVL, or
+            // TCP_KEEPALIVE on macOS). .NET Framework has no names for them, hence the cast.
+            socket.SetSocketOption(SocketOptionLevel.Tcp, (SocketOptionName)3, seconds);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, (SocketOptionName)17, intervalSeconds);
         }
         catch (Exception ex) when (ex is SocketException || ex is PlatformNotSupportedException || ex is NotSupportedException)
         {

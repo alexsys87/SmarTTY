@@ -48,8 +48,6 @@ internal class AsyncTransportConnection : IDisposable
 
     private Thread _writerThread;
 
-    private volatile ConnectionStateEnum _state;
-
     private Queue<PendingWrite> _writeQueue = new Queue<PendingWrite>();
 
     // SemaphoreSlim holds no kernel object, so a connection that is replaced leaves nothing behind to be finalized.
@@ -144,8 +142,7 @@ internal class AsyncTransportConnection : IDisposable
     {
         try
         {
-            _state = ConnectionStateEnum.Connecting;
-            // Each callback carries the state it was posted for: _state may have moved on by the time the UI runs it.
+            // Each callback carries the state it was posted for: it may have moved on by the time the UI runs it.
             PostToUi(() =>
             {
                 if (StateChanged != null && !_disposed)
@@ -173,7 +170,6 @@ internal class AsyncTransportConnection : IDisposable
                 }
                 break;
             }
-            _state = ConnectionStateEnum.Connected;
             PostToUi(() =>
             {
                 if (StateChanged != null && !_disposed)
@@ -186,7 +182,6 @@ internal class AsyncTransportConnection : IDisposable
         {
             Exception connectEx = exception;
             _finished = true;
-            _state = ConnectionStateEnum.Failed;
             PostToUi(() =>
             {
                 if (StateChanged != null && !_disposed)
@@ -241,7 +236,6 @@ internal class AsyncTransportConnection : IDisposable
         catch
         {
         }
-        _state = ConnectionStateEnum.Disconnected;
         // After the last received data: the UI must not see the end before the data that came before it.
         PostAfterReceived(() =>
         {
