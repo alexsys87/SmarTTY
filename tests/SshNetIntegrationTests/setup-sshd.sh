@@ -71,7 +71,8 @@ KbdInteractiveAuthentication yes
 UsePAM yes
 PermitRootLogin no
 AllowUsers $user
-AllowTcpForwarding no
+# Tools > Port forwarding (ssh -L / -R) is checked on the main port; the second port refuses it.
+AllowTcpForwarding yes
 # X11 forwarding also needs xauth on the server; without it sshd refuses x11-req and the X11 checks are skipped.
 X11Forwarding yes
 X11UseLocalhost yes
@@ -80,6 +81,7 @@ LogLevel VERBOSE
 Subsystem sftp internal-sftp
 Match LocalPort $no_x11_port
     X11Forwarding no
+    AllowTcpForwarding no
 CONF
 
 # sshd needs its privilege separation directory even for a config test; it can be missing on a fresh runner.

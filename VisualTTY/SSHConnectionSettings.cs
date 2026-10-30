@@ -2,6 +2,7 @@
 using SmarTTY.Transport;
 using SmarTTY.Utilities;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml.Serialization;
 
@@ -118,6 +119,9 @@ public class SSHConnectionSettings
 
     /// <summary>Starts the SOCKS5 proxy through the SSH connection as soon as it is established (see Tools > SOCKS5 proxy over SSH for its address and port).</summary>
     public bool AutoStartSocksProxy { get; set; }
+
+    /// <summary>The port forwardings of Tools > Port forwarding (ssh -L / -R), like LocalForward / RemoteForward in ssh_config.</summary>
+    public List<PortForwardRule> PortForwards = new List<PortForwardRule>();
 
     public bool EnableOnTheFlyTAR { get; set; } = true;
 

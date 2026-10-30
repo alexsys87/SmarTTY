@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using SmarTTY.Ssh;
 using SmarTTY.Transport;
+using SmarTTY.Utilities;
 using VisualTTY;
 
 // Regression harness for the saved-connection lookup used by the command line (Transport/SavedConnectionStore.cs):
@@ -41,6 +42,7 @@ internal static class Program
             CheckHostPortSplitting();
             CheckIpv6Hosts();
             CheckProxyParsing();
+            CheckPortForwardsInProfile();
             Console.WriteLine($"All {_passed} checks passed.");
             return 0;
         }
@@ -49,6 +51,24 @@ internal static class Program
             Console.WriteLine(exception.Message);
             return 1;
         }
+    }
+
+    // Tools > Port forwarding saves its list with the profile; a profile of an earlier version has none.
+    private static void CheckPortForwardsInProfile()
+    {
+        SSHConnectionSettings settings = new SSHConnectionSettings { HostName = "server", UserName = "root" };
+        settings.PortForwards.Add(new PortForwardRule { Kind = PortForwardKind.Local, BindAddress = "127.0.0.1", BindPort = 8080, TargetHost = "db.internal", TargetPort = 5432, StartOnConnect = true, Description = "database" });
+        settings.PortForwards.Add(new PortForwardRule { Kind = PortForwardKind.Remote, BindAddress = "127.0.0.1", BindPort = 9000, TargetHost = "localhost", TargetPort = 3000 });
+        string xml = XmlStorage.Serialize(settings);
+        SSHConnectionSettings read = XmlStorage.Deserialize<SSHConnectionSettings>(xml);
+        Check(read.PortForwards.Count == 2, "forwardings: both are read back from the profile");
+        PortForwardRule local = read.PortForwards[0];
+        Check(local.Kind == PortForwardKind.Local && local.BindPort == 8080 && local.TargetHost == "db.internal" && local.TargetPort == 5432 && local.StartOnConnect && local.Description == "database",
+            "forwardings: a local forwarding keeps every field");
+        Check(read.PortForwards[1].Kind == PortForwardKind.Remote && read.PortForwards[1].SshOption == "-R 127.0.0.1:9000:localhost:3000", "forwardings: a remote forwarding keeps its direction");
+        Check(!xml.Contains("SshOption") && !xml.Contains("ListenText"), "forwardings: only the settings are saved, not the texts made from them");
+        SSHConnectionSettings old = XmlStorage.Deserialize<SSHConnectionSettings>("<?xml version=\"1.0\"?><SSHConnectionSettings><HostName>h</HostName></SSHConnectionSettings>");
+        Check(old.PortForwards != null && old.PortForwards.Count == 0, "forwardings: a profile of an earlier version has an empty list");
     }
 
     private static void CheckSplitting()

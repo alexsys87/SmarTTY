@@ -284,6 +284,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// <summary>The SOCKS5 proxy through this session's SSH connection (Tools > SOCKS5 proxy over SSH).</summary>
     public SocksProxyHost SocksProxy { get; } = new SocksProxyHost();
 
+    /// <summary>The local and remote port forwardings of this session (Tools > Port forwarding), loaded from the profile.</summary>
+    public PortForwardHost PortForwards { get; } = new PortForwardHost();
+
     /// <summary>The free disk space of this session's SSH host (<c>df -h</c> every 10 seconds), shown below the terminal.</summary>
     public DiskSpaceMonitor DiskSpace { get; } = new DiskSpaceMonitor();
 
@@ -564,11 +567,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         Session = session;
         if (oldSession != null)
         {
-            if (SocksProxy.IsRunning)
+            if (SocksProxy.IsRunning || PortForwards.HasActive)
             {
-                // Closing a connection that carries the SOCKS proxy waits (up to the connection timeout, 30 s) for the programs
-                // that still use it to close their connections, so it must not block the UI thread. The listener is released
-                // at once, and SocksProxy.Reattach below retries until the new connection can take its port.
+                // Closing a connection that carries the SOCKS proxy or forwarded ports waits (up to the connection timeout, 30 s)
+                // for the programs that still use them to close their connections, so it must not block the UI thread. The
+                // listeners are released at once, and SocksProxy.Reattach / PortForwards.OnConnected below retry until the new
+                // connection can take their ports.
                 ThreadPool.QueueUserWorkItem((object state) =>
                 {
                     try
@@ -605,6 +609,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             // The listener belonged to the old connection: open it again on the new one, off the UI thread.
             ThreadPool.QueueUserWorkItem((object state) => SocksProxy.Reattach((SshSession)state), session);
         }
+        if (firstConnection)
+        {
+            PortForwards.Load(Settings?.PortForwards);
+        }
+        // Restores the forwardings that ran on the old connection and starts those marked "start on connect", off the UI thread.
+        ThreadPool.QueueUserWorkItem((object state) => PortForwards.OnConnected((SshSession)state), session);
         TransferManager?.Dispose();
         TransferManager = new FileTransferManager
         {
@@ -1184,6 +1194,23 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// <summary>
     /// Saves the unfinished transfers, so that they come back the next time SmarTTY connects to this server.
     /// </summary>
+    /// <summary>
+    /// Saves the list of Tools > Port forwarding with the profile, so that the next connection has it. A quick connection
+    /// without a profile file keeps the list only while the session lives.
+    /// </summary>
+    public void SavePortForwards()
+    {
+        if (Settings == null)
+        {
+            return;
+        }
+        Settings.PortForwards = PortForwards.Rules;
+        if (!string.IsNullOrEmpty(Settings.FileName))
+        {
+            Settings.Save();
+        }
+    }
+
     public void SaveTransferQueue()
     {
         string file = TransferQueueFile;
@@ -2111,14 +2138,22 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         SshSession sessionToClose = Session;
         DiskSpace.Dispose();
-        if (SocksProxy.IsRunning)
+        if (SocksProxy.IsRunning || PortForwards.HasActive)
         {
-            // Stopping the proxy waits (up to 30 s) for the programs that still use it to close their connections: not on the UI thread.
+            // Stopping the proxy and the forwardings waits (up to 30 s) for the programs that still use them to close their
+            // connections: not on the UI thread.
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
                 {
                     SocksProxy.Stop();
+                }
+                catch
+                {
+                }
+                try
+                {
+                    PortForwards.StopAll();
                 }
                 catch
                 {

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.PortForwardEditWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Port forwarding" Width="560" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FocusManager.FocusedElement="{Binding ElementName=BindPortBox}">
+  <StackPanel Margin="12">
+    <TextBlock Text="Direction" FontWeight="SemiBold" Margin="0 0 0 4" />
+    <RadioButton x:Name="LocalRadio" GroupName="Kind" Margin="0 2 0 2" Checked="Kind_Changed">
+      <TextBlock TextWrapping="Wrap" Text="Local (-L): a port of this computer leads to a host and port reachable from the SSH server, e.g. a database or web interface on the server's network." />
+    </RadioButton>
+    <RadioButton x:Name="RemoteRadio" GroupName="Kind" Margin="0 2 0 8" Checked="Kind_Changed">
+      <TextBlock TextWrapping="Wrap" Text="Remote (-R): a port of the SSH server leads to a host and port reachable from this computer, e.g. to show a local web server to the server." />
+    </RadioButton>
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="70" />
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <TextBlock x:Name="BindLabel" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0 3 8 3" Text="Listen on this computer:" />
+      <TextBox x:Name="BindAddressBox" Grid.Row="0" Grid.Column="1" Margin="0 3 0 3" VerticalContentAlignment="Center" MaxLength="255" TextChanged="Field_Changed" ToolTip="The address that listens. 127.0.0.1 keeps the port to this computer (local) or to the server itself (remote). 0.0.0.0 opens it to the network: for a remote forwarding the server must allow it (GatewayPorts)." />
+      <TextBlock Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="8 3 6 3" Text="Port:" />
+      <TextBox x:Name="BindPortBox" Grid.Row="0" Grid.Column="3" Margin="0 3 0 3" VerticalContentAlignment="Center" MaxLength="5" TextChanged="Field_Changed" ToolTip="The port that listens. For a local forwarding 0 lets Windows choose a free port, shown in the list once it runs." />
+      <TextBlock x:Name="TargetLabel" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0 3 8 3" Text="Destination (from the server):" />
+      <TextBox x:Name="TargetHostBox" Grid.Row="1" Grid.Column="1" Margin="0 3 0 3" VerticalContentAlignment="Center" MaxLength="255" TextChanged="Field_Changed" />
+      <TextBlock Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="8 3 6 3" Text="Port:" />
+      <TextBox x:Name="TargetPortBox" Grid.Row="1" Grid.Column="3" Margin="0 3 0 3" VerticalContentAlignment="Center" MaxLength="5" TextChanged="Field_Changed" />
+      <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0 3 8 3" Text="Description:" />
+      <TextBox x:Name="DescriptionBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Margin="0 3 0 3" VerticalContentAlignment="Center" MaxLength="200" ToolTip="Optional: what the forwarding is for, shown in the list." />
+    </Grid>
+    <CheckBox x:Name="StartOnConnectBox" Margin="0 8 0 0" Content="Start when this profile connects" ToolTip="Like LocalForward / RemoteForward in ssh_config: the forwarding starts with the connection. It is saved with the profile." />
+    <TextBlock Margin="0 10 0 0" Foreground="{DynamicResource Theme.TextSecondary}" Text="The same with ssh:" />
+    <TextBox x:Name="PreviewBox" Margin="0 2 0 0" IsReadOnly="True" FontFamily="Consolas" BorderThickness="0" Background="Transparent" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 12 0 0">
+      <Button Content="OK" IsDefault="True" MinWidth="80" Margin="0 0 6 0" Click="Ok_Click" />
+      <Button Content="Cancel" IsCancel="True" MinWidth="80" />
+    </StackPanel>
+  </StackPanel>
+</Window>
