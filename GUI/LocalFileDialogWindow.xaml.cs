@@ -195,6 +195,15 @@ public partial class LocalFileDialogWindow : Window
             DirectoryCombo.Items.Add(current);
             current = Path.GetDirectoryName(current.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         }
+        // The chain above only reaches the root of the current drive, so list the other drives to switch to them.
+        foreach (DriveInfo drive in LocalFolderTree.GetReadyDrives())
+        {
+            string root = drive.RootDirectory.FullName;
+            if (!DirectoryCombo.Items.Contains(root))
+            {
+                DirectoryCombo.Items.Add(root);
+            }
+        }
         DirectoryCombo.Text = directory;
         _updatingDirectoryCombo = false;
     }
