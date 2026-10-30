@@ -1041,12 +1041,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // A transfer belongs to the connection that is being replaced: stop it instead of letting it wait for retries that
         // would go to the new session.
         _cancelLineTransfer?.Invoke();
-        if (_asyncTransportConnection != null)
+        bool replacesConnection = _asyncTransportConnection != null;
+        if (replacesConnection)
         {
-            // Closing waits for the port to be released; if the driver still holds it for a moment, the new connection
-            // retries on its own thread instead of the UI thread sleeping here.
             _asyncTransportConnection.Dispose();
-            connectTimeoutMs = Math.Max(connectTimeoutMs, ReopenRetryMs);
         }
         _asyncTransportConnection = null;
         if (resetTerminal)
@@ -1057,6 +1055,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _textDecoder.Reset();
         _logWriter?.ResetDecoder();
         IDeviceTransport deviceTransport = this._transportFactory.CreateTransport();
+        if (replacesConnection && deviceTransport is SerialTransport)
+        {
+            // Closing waits for the port to be released; if the driver still holds it for a moment, the new connection
+            // retries on its own thread instead of the UI thread sleeping here. A network connection is not retried
+            // this way: a refusal is final for this attempt, and the reconnect policy decides when to try again.
+            connectTimeoutMs = Math.Max(connectTimeoutMs, ReopenRetryMs);
+        }
         _transportDisplayName = deviceTransport.GetDisplayName(includeParameters: true);
         lblConnection.Text = "Connected to " + _transportDisplayName;
         Interlocked.Exchange(ref _bytesSent, 0L);

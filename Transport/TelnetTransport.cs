@@ -38,7 +38,7 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
     public string ConnectingMessage => "Connecting to " + _telnet + " (" + DescribeKind() + ")...";
 
     /// <summary>How long one <see cref="Open"/> may take to reach the server, in milliseconds; 0 leaves it to the operating system.</summary>
-    public int ConnectTimeoutMs { get; set; }
+    public int ConnectTimeoutMs { get; set; } = TcpConnector.DefaultConnectTimeoutMs;
 
     /// <summary>
     /// The character set of the terminal ("utf-8", "koi8-r", ...), accepted when the server proposes it (option

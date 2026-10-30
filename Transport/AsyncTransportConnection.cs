@@ -108,6 +108,7 @@ internal class AsyncTransportConnection : IDisposable
     public AsyncTransportConnection(IDeviceTransport deviceTransport, Dispatcher dispatcher, int connectTimeoutMs = 0, IHostNameResolver hostNameResolver = null)
     {
         _transport = deviceTransport;
+        WriteTimeoutMs = deviceTransport is SerialTransport ? 0 : DefaultNetworkWriteTimeoutMs;
         _dispatcher = dispatcher;
         _connectTimeoutMs = connectTimeoutMs;
         _hostResolver = hostNameResolver;
@@ -129,11 +130,12 @@ internal class AsyncTransportConnection : IDisposable
         try
         {
             _state = ConnectionStateEnum.Connecting;
+            // Each callback carries the state it was posted for: _state may have moved on by the time the UI runs it.
             PostToUi(() =>
             {
                 if (StateChanged != null && !_disposed)
                 {
-                    StateChanged(this, _state, _transport.ConnectingMessage);
+                    StateChanged(this, ConnectionStateEnum.Connecting, _transport.ConnectingMessage);
                 }
             });
             System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
@@ -149,7 +151,8 @@ internal class AsyncTransportConnection : IDisposable
                     {
                         throw;
                     }
-                    Thread.Sleep(100);
+                    // Woken by Dispose, so closing the tab does not wait for the pause.
+                    _stopSignal.Wait(100);
                     continue;
                 }
                 break;
@@ -159,7 +162,7 @@ internal class AsyncTransportConnection : IDisposable
             {
                 if (StateChanged != null && !_disposed)
                 {
-                    StateChanged(this, _state, null);
+                    StateChanged(this, ConnectionStateEnum.Connected, null);
                 }
             });
         }
@@ -172,7 +175,7 @@ internal class AsyncTransportConnection : IDisposable
             {
                 if (StateChanged != null && !_disposed)
                 {
-                    StateChanged(this, _state, connectEx.Message);
+                    StateChanged(this, ConnectionStateEnum.Failed, connectEx.Message);
                 }
             });
             return;
@@ -184,6 +187,7 @@ internal class AsyncTransportConnection : IDisposable
             Name = "Device transport writer"
         };
         _writerThread.Start();
+        StartWriteWatchdog();
         string disconnectReason = null;
         try
         {
@@ -204,13 +208,16 @@ internal class AsyncTransportConnection : IDisposable
             // Closing the connection on purpose also ends the read with an error; only an unexpected one is a reason to show.
             if (!_stopRequested && !_disposed)
             {
-                disconnectReason = readException.Message;
+                disconnectReason = _writeTimeoutReason ?? readException.Message;
             }
         }
+        disconnectReason = disconnectReason ?? _writeTimeoutReason;
         // The writer has nothing to write to any more: let it end instead of waiting for data until Dispose.
         _finished = true;
         _writeSignal.Release();
-        FailQueuedWrites();
+        StopWriteWatchdog();
+        // Typed or pasted data that never left must not vanish without a word.
+        ReportLostWrites("The connection was closed.");
         try
         {
             _transport.Close();
@@ -224,7 +231,7 @@ internal class AsyncTransportConnection : IDisposable
         {
             if (StateChanged != null && !_disposed)
             {
-                StateChanged(this, _state, disconnectReason);
+                StateChanged(this, ConnectionStateEnum.Disconnected, disconnectReason);
             }
         });
     }
@@ -326,6 +333,64 @@ internal class AsyncTransportConnection : IDisposable
         }
     }
 
+    /// <summary>
+    /// A network write that makes no progress for this long (the peer is alive but reads nothing, TCP window zero)
+    /// ends the connection: a blocked write never fails by itself, and keep-alive does not help while the peer answers.
+    /// A serial port is left alone: a stopped line by flow control is a normal state there.
+    /// </summary>
+    internal const int DefaultNetworkWriteTimeoutMs = 30000;
+
+    private static readonly System.Diagnostics.Stopwatch WriteClock = System.Diagnostics.Stopwatch.StartNew();
+
+    private readonly ManualResetEventSlim _stopSignal = new ManualResetEventSlim();
+
+    // WriteClock time + 1 when the write in progress began; 0 while no write is in progress.
+    private long _writeStartedMs;
+
+    private volatile string _writeTimeoutReason;
+
+    private Timer _writeWatchdog;
+
+    /// <summary>How long one write may block, in milliseconds; 0 switches the limit off. Set before <see cref="Start"/>.</summary>
+    internal int WriteTimeoutMs { get; set; }
+
+    private void StartWriteWatchdog()
+    {
+        int timeoutMs = WriteTimeoutMs;
+        if (timeoutMs <= 0)
+        {
+            return;
+        }
+        _writeWatchdog = new Timer(_ => CheckWriteTimeout(timeoutMs), null, Math.Max(10, Math.Min(1000, timeoutMs / 4)), Math.Max(10, Math.Min(1000, timeoutMs / 4)));
+    }
+
+    private void StopWriteWatchdog()
+    {
+        _writeWatchdog?.Dispose();
+    }
+
+    private void CheckWriteTimeout(int timeoutMs)
+    {
+        long started = Volatile.Read(ref _writeStartedMs);
+        if (started == 0 || _stopRequested || _finished || _writeTimeoutReason != null)
+        {
+            return;
+        }
+        if (WriteClock.ElapsedMilliseconds + 1 - started < timeoutMs)
+        {
+            return;
+        }
+        _writeTimeoutReason = "The device did not accept data for " + (timeoutMs / 1000.0).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " s; the connection was closed.";
+        try
+        {
+            // Wakes up the blocked write and the read; the connection then ends like any other.
+            _transport.Close();
+        }
+        catch
+        {
+        }
+    }
+
     private void WriterLoop()
     {
         while (!_stopRequested && !_finished)
@@ -364,14 +429,19 @@ internal class AsyncTransportConnection : IDisposable
                 {
                     throw new IOException("The connection is closed.");
                 }
+                Volatile.Write(ref _writeStartedMs, WriteClock.ElapsedMilliseconds + 1);
                 stream.Write(pendingWrite.Buffer, 0, pendingWrite.Length);
                 _writeError = null;
             }
             catch (Exception writeException)
             {
                 NotifyCompleted(pendingWrite, false);
-                ReportWriteFailure(writeException);
+                ReportWriteFailure(_writeTimeoutReason != null ? new IOException(_writeTimeoutReason, writeException) : writeException);
                 continue;
+            }
+            finally
+            {
+                Volatile.Write(ref _writeStartedMs, 0);
             }
             NotifyCompleted(pendingWrite, true);
         }
@@ -411,6 +481,30 @@ internal class AsyncTransportConnection : IDisposable
         {
             message += " " + discarded + " queued write" + (discarded == 1 ? " was" : "s were") + " discarded.";
         }
+        _writeError = message;
+        PostToUi(() =>
+        {
+            if (WriteFailed != null && !_disposed)
+            {
+                WriteFailed(this, message);
+            }
+        });
+    }
+
+    /// <summary>Drops what is still queued; if there was something, tells the UI that it was lost (unless the close was on purpose).</summary>
+    private void ReportLostWrites(string reason)
+    {
+        if (_stopRequested || _disposed)
+        {
+            FailQueuedWrites();
+            return;
+        }
+        int discarded = FailQueuedWrites();
+        if (discarded == 0)
+        {
+            return;
+        }
+        string message = reason + " " + discarded + " queued write" + (discarded == 1 ? " was" : "s were") + " discarded.";
         _writeError = message;
         PostToUi(() =>
         {
@@ -467,6 +561,8 @@ internal class AsyncTransportConnection : IDisposable
     public void Dispose()
     {
         _stopRequested = true;
+        _stopSignal.Set();
+        StopWriteWatchdog();
         _writeSignal.Release();
         lock (_receiveLock)
         {
