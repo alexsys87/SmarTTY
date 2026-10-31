@@ -282,6 +282,8 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             return;
         }
+        // The messages are rows of the text view, so they do not belong in the hex view.
+        ClearMessages();
         if (_hexMode)
         {
             ExitHexMode();
@@ -1215,6 +1217,8 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             return;
         }
+        // The messages name lines of the text that is about to be replaced.
+        ClearMessages();
         _reloading = true;
         _restoreCaret = true;
         _caretToRestore = CaretPosition;
@@ -1536,26 +1540,47 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
     }
 
+    /// <summary>Gives the inline messages the colours of the current theme (dark or light).</summary>
+    public void RefreshMessageColors()
+    {
+        if (_settings == null)
+        {
+            return;
+        }
+        GlobalSettings.EditorColors colors = _settings.Editor.GetEffectiveColors(_settings.IsLightTheme);
+        ApplyMessageColors(colors.LineNumberBackground, colors.ErrorColor, colors.WarningColor, colors.LineNumberForeground);
+    }
+
     /// <summary>
     /// The check found problems in the text, so the file on the server was not replaced. Says what was found and
     /// either saves anyway (the next save skips the check) or puts the caret on the first problem (UI thread).
     /// </summary>
     private void HandleValidationFailure(SaveJob job)
     {
-        const int MaxShown = 8;
+        // How many problems get an inline message; ParseIssues caps the list at the same number.
+        const int MaxInline = 50;
         List<ValidationIssue> issues = job.Validation.Issues;
-        StringBuilder text = new StringBuilder();
-        text.Append("The check (").Append(job.Validator.Name).Append(") found problems in ").Append(RemotePath).Append(":\n\n");
-        for (int i = 0; i < issues.Count && i < MaxShown; i++)
+        // The messages sit in the rows of the text view; the wrapped rows and the hex view have no such rows.
+        bool showInText = !WordWrap && !IsHexMode;
+        if (showInText)
         {
-            text.Append("Line ").Append(issues[i].Line).Append(": ").Append(issues[i].Message).Append('\n');
+            RefreshMessageColors();
+            List<InlineMessageProvider.MessageRequest> messages = new List<InlineMessageProvider.MessageRequest>();
+            for (int i = 0; i < issues.Count && i < MaxInline; i++)
+            {
+                messages.Add(new InlineMessageProvider.MessageRequest
+                {
+                    Line = issues[i].Line,
+                    Severity = InlineMessageProvider.MessageSeverity.Error,
+                    Text = issues[i].Message,
+                    Column = issues[i].Column
+                });
+            }
+            AddMessages(messages);
         }
-        if (issues.Count > MaxShown)
-        {
-            text.Append("... and ").Append(issues.Count - MaxShown).Append(" more\n");
-        }
-        text.Append("\nThe file on the server has not been changed.\n\nYes: save it anyway.\nNo: do not save, go to line ").Append(issues[0].Line).Append('.');
-        if (ThemedMessageBox.Show(text.ToString(), "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+        string text = "The check (" + job.Validator.Name + ") found " + issues.Count + (issues.Count == 1 ? " problem" : " problems")
+            + " in " + RemotePath + (showInText ? ", they are shown in the text" : "") + ".\n\nThe file on the server has not been changed.\n\nYes: save it anyway.\nNo: do not save, go to line " + issues[0].Line + ".";
+        if (ThemedMessageBox.Show(text, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
         {
             _skipValidation = true;
             _saveRequestedWhileSaving = true;
@@ -1677,6 +1702,8 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// </summary>
     private SaveJob PrepareSave()
     {
+        // The problems the previous check named are about the text as it was: the check runs again now.
+        ClearMessages();
         bool hexMode = _hexMode && _hexDocument != null;
         object version;
         byte[] bytes;

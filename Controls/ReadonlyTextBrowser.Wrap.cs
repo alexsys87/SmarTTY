@@ -74,7 +74,13 @@ public partial class ReadonlyTextBrowser
             }
             UpdateLayout();
             Redraw();
+            OnWordWrapChanged();
         }
+    }
+
+    /// <summary>The text is now wrapped (or no longer is): the rows changed and whatever sits between them may not fit.</summary>
+    protected virtual void OnWordWrapChanged()
+    {
     }
 
     internal bool IsWrapping => _wordWrap && !_singleLine && !_terminalMode;

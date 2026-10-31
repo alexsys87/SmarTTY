@@ -1573,6 +1573,8 @@ public class MainWindowController : INotifyPropertyChanged
         edit.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;
         edit.ApiSymbols = Settings.Editor.ApiSymbols ? ApiSymbols : null;
         ApplySyntaxHighlighting(edit);
+        // The inline messages of a check follow the editor theme.
+        edit.RefreshMessageColors();
         // The settings window can switch the character marks too, so the tool bar and the menu show the new state.
         if (edit.Tag is EditorTabContext editorTab)
         {

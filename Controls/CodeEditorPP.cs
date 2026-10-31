@@ -369,9 +369,65 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         base.OnSelectionChanged(previousCaret, currentCaret, hasSelection, selectionChangeSource);
     }
 
+    /// <summary>
+    /// Adds one message under its line (line from 1, column from 1; a column of 0 means "not known" and centres the
+    /// message in its row).
+    /// </summary>
     public void AddMessage(int line, InlineMessageProvider.MessageSeverity messageSeverity, string text, int column)
     {
-        _inlineMessageProvider.AddMessage(line - 1, messageSeverity, text, column);
+        _inlineMessageProvider.AddMessage(line - 1, messageSeverity, text, column - 1);
+        RefreshMessages();
+    }
+
+    /// <summary>
+    /// Adds several messages (line from 1, column from 1, or 0 when it is not known) and rebuilds the rows once, so
+    /// that a whole list of problems does not redraw the editor for each of them.
+    /// </summary>
+    public void AddMessages(IEnumerable<InlineMessageProvider.MessageRequest> messages)
+    {
+        foreach (InlineMessageProvider.MessageRequest message in messages)
+        {
+            // A message is drawn as a row under its line: the line is 1-based here, the provider counts from 0.
+            // The column is 1-based too, and 0 means "not known": -1 makes the message centre in the row.
+            _inlineMessageProvider.AddMessage(message.Line - 1, message.Severity, message.Text, message.Column - 1);
+        }
+        RefreshMessages();
+    }
+
+    /// <summary>Removes the messages shown under the lines (they were answered or the text changed under them).</summary>
+    public void ClearMessages()
+    {
+        _inlineMessageProvider.Clear();
+        RefreshMessages();
+    }
+
+    /// <summary>The theme sets the colours the inline messages are drawn with.</summary>
+    public void ApplyMessageColors(Color background, Color error, Color warning, Color border)
+    {
+        _inlineMessageProvider.BackColor = background;
+        _inlineMessageProvider.ErrorColor = error;
+        _inlineMessageProvider.WarningColor = warning;
+        _inlineMessageProvider.BorderColor = border;
+        RefreshMessages();
+    }
+
+    private void RefreshMessages()
+    {
+        if (!IsHandleCreated)
+        {
+            // Nothing is laid out yet: the messages are drawn on the first paint.
+            return;
+        }
+        RebuildDisplayRows();
+        UpdateLayout();
+        Redraw();
+    }
+
+    protected override void OnWordWrapChanged()
+    {
+        // A message is a row of its own under a line; the wrapped rows have no such rows, so the messages are
+        // dropped when the wrapping is switched on or off (the provider does not take part in wrapped layout).
+        ClearMessages();
     }
 
     public void GoToPosition(int line, int column)
