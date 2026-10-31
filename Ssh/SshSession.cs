@@ -622,7 +622,15 @@ public class SshSession : IDisposable
 
     private void RaiseConnectionLost()
     {
-        CloseAllChannels();
+        // Runs on SSH.NET's own threads (a server that drops the connection after a refused login): an exception here
+        // would end the whole program.
+        try
+        {
+            CloseAllChannels();
+        }
+        catch
+        {
+        }
         // Do not leave the connect thread waiting for credentials on a connection that is already gone.
         _authGate.Stop();
         EventHandler handlers;
@@ -639,7 +647,14 @@ public class SshSession : IDisposable
         {
             ThreadPool.QueueUserWorkItem(delegate
             {
-                handlers(this, EventArgs.Empty);
+                try
+                {
+                    handlers(this, EventArgs.Empty);
+                }
+                catch
+                {
+                    // A handler of the lost connection must not take the process down from the thread pool.
+                }
             });
         }
     }

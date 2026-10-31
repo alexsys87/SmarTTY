@@ -20,6 +20,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        CrashLog.Install(this);
         // The theme lives in Application.Resources, so it has to be there before the first window loads its XAML.
         ThemeManager.Apply(GlobalSettings.Load());
         // The device terminals (WinForms) show the very same "connection closed" popup as the SSH sessions.
