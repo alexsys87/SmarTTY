@@ -1993,6 +1993,16 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    /// <summary>
+    /// Follows a log file on the server (like tail -f) in a new terminal tab: the last <paramref name="lines"/> lines, then the
+    /// lines that are added, with an optional filter. The tab colours the lines by their level (ERROR, WARN, ...).
+    /// </summary>
+    public void FollowLog(string remotePath, int lines, string filter, bool filterIsRegex, bool ignoreCase)
+    {
+        string command = RemoteLogFollow.BuildCommand(remotePath, lines, filter, filterIsRegex, ignoreCase);
+        CreateNewTerminalPage(virtualMode: false, new InitialCommand(command, echoInitialCommand: false, highlightLogLevels: true));
+    }
+
     public EditorTabContext AddNewFileEditorOrThrow(RemoteFileEditor editor, string filePath)
     {
         try

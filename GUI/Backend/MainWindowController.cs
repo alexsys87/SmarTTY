@@ -382,6 +382,7 @@ public class MainWindowController : INotifyPropertyChanged
             newTab.EditorPanel.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
             newTab.EditorPanel.ShowChangesRequested += (object sender, EventArgs e) => ShowChanges(editor);
             newTab.EditorPanel.RunRequested += (object sender, EventArgs e) => RunInTerminal(editor, session);
+            newTab.EditorPanel.FollowLogRequested += (object sender, EventArgs e) => FollowLog(editor.RemotePath);
             newTab.EditorPanel.ShowAllCharactersChanged += (object sender, EventArgs e) =>
             {
                 // The switch on the tool bar and in the context menu is the same setting as in the settings window.
@@ -895,6 +896,30 @@ public class MainWindowController : INotifyPropertyChanged
                     }
                 }
                 activeSession.DoDownloadArchive(remoteDirectory, text, _Controller.Settings.OpenLocalDirAfterDownload);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
+        }
+
+        /// <summary>
+        /// Asks how to follow a log file on the server (the last lines, a filter) and follows it like tail -f in a new
+        /// terminal tab.
+        /// </summary>
+        public void FollowLog(string remotePath)
+        {
+            try
+            {
+                SessionWrapper session = RequireSshSession("Following a log");
+                FollowLogWindow window = new FollowLogWindow(RemotePathUtils.GetFileName(remotePath))
+                {
+                    Owner = _Controller._Window
+                };
+                if (window.ShowDialog() == true)
+                {
+                    session.FollowLog(remotePath, window.Lines, window.Filter, window.FilterIsRegex, window.IgnoreCase);
+                }
             }
             catch (Exception exception)
             {
@@ -1853,6 +1878,7 @@ public class MainWindowController : INotifyPropertyChanged
         else
         {
             terminalEmulatorControl = new TerminalEmulatorControl();
+            terminalEmulatorControl.HighlightLogLevels = initialCommand.HighlightLogLevels;
             // Decided before the shell starts: the PTY of a byte-counting shell is opened without IUTF8.
             terminalEmulatorControl.ByteOrientedLineEditing = session.UsesByteOrientedLineEditing(smartTerminal: false);
             SshShellChannel sshShellChannel = session.Session.OpenShellChannel(initialCommand.Command, "xterm", ExtendedDataMode.Normal, utf8Tty: !terminalEmulatorControl.ByteOrientedLineEditing);

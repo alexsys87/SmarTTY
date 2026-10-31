@@ -212,10 +212,16 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
 
     private readonly bool _highlight;
 
+    // Mark the log levels of a log line (ERROR, WARN, ...) from the level to the end of the line.
+    private readonly bool _logLevels;
+
     // The text of the line so far, for the words of errors and warnings, which are told by what stands in front of them.
     private readonly StringBuilder _line = new StringBuilder();
 
     private bool _lineTooLong;
+
+    // The log level found in the line so far (0: none yet): the rest of the line gets it without looking again.
+    private byte _lineLevel;
 
     private LinkCandidate _current;
 
@@ -229,11 +235,13 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
     /// <param name="commandText">The command line; where it says the build works in another directory, the names are relative to that.</param>
     /// <param name="links">Make links of the file names.</param>
     /// <param name="highlight">Mark the words of errors, warnings and notes.</param>
-    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText, bool links = true, bool highlight = false)
+    /// <param name="logLevels">Mark the lines of a log from their level (ERROR, WARN, [error], level=warn) to the end.</param>
+    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText, bool links = true, bool highlight = false, bool logLevels = false)
     {
         _host = host;
         _links = links;
         _highlight = highlight;
+        _logLevels = logLevels;
         _startDirectory = BuildDirectories.Analyze(commandText, workingDirectory, out _shellDirectory) ?? workingDirectory;
     }
 
@@ -329,7 +337,7 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
                 cells[i].Target = candidateArray[i];
             }
         }
-        if (_highlight)
+        if (_highlight || _logLevels)
         {
             MarkDiagnostics(text, column, cells);
         }
@@ -342,6 +350,21 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         {
             _line.Clear();
             _lineTooLong = false;
+            _lineLevel = 0;
+        }
+        if (_logLevels && _lineLevel != 0)
+        {
+            for (int i = 0; i < cells.Length; i++)
+            {
+                if (cells[i].Severity == 0)
+                {
+                    cells[i].Severity = _lineLevel;
+                }
+            }
+            if (!_highlight)
+            {
+                return;
+            }
         }
         if (_lineTooLong)
         {
@@ -354,14 +377,29 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             return;
         }
         _line.Append(text);
-        foreach (DiagnosticHighlighter.Span span in DiagnosticHighlighter.FindSpans(_line.ToString()))
+        if (_highlight)
         {
-            // Only the part of the span that is in this piece: the earlier part has been written already.
-            int from = Math.Max(span.Start, offset) - offset;
-            int to = Math.Min(span.Start + span.Length, offset + text.Length) - offset;
-            for (int i = from; i < to; i++)
+            foreach (DiagnosticHighlighter.Span span in DiagnosticHighlighter.FindSpans(_line.ToString()))
             {
-                cells[i].Severity = span.Severity;
+                // Only the part of the span that is in this piece: the earlier part has been written already.
+                int from = Math.Max(span.Start, offset) - offset;
+                int to = Math.Min(span.Start + span.Length, offset + text.Length) - offset;
+                for (int i = from; i < to; i++)
+                {
+                    cells[i].Severity = span.Severity;
+                }
+            }
+        }
+        if (_logLevels && _lineLevel == 0 && DiagnosticHighlighter.TryFindLogLevel(_line.ToString(), out int levelStart, out byte level))
+        {
+            _lineLevel = level;
+            // From the level to the end of the line: the pieces that follow it in the same line are covered too.
+            for (int i = Math.Max(0, levelStart - offset); i < text.Length; i++)
+            {
+                if (cells[i].Severity == 0)
+                {
+                    cells[i].Severity = level;
+                }
             }
         }
     }

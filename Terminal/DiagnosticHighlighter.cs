@@ -49,7 +49,53 @@ internal static class DiagnosticHighlighter
         @"\]\s+(?<what>Error\s+\d+)\s*$|^\s*make(?:\[\d+\])?:\s+(?<what>\*\*\*)|^(?<what>FAILED:)",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    // Log levels written in capitals: ERROR, WARN, FATAL, ... A longer word (ERROR_CODE) is not a level.
+    private static readonly Regex LogWord = new Regex(
+        @"(?<!\w)(?<w>FATAL|CRITICAL|CRIT|SEVERE|EMERG|ALERT|ERROR|ERR|WARNING|WARN|NOTICE)(?!\w)",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    // Log levels written in lower case where a log puts them: nginx's [error], logfmt's level=warn, a syslog tag's "sshd[12]: error".
+    private static readonly Regex LogMarked = new Regex(
+        @"\[(?<w>emerg|alert|crit|error|err|warn|warning|notice)\]|\blevel=(?<w>error|fatal|panic|warn|warning)\b|(?<=\]: )(?<w>error|warning|warn|fatal|critical)\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly string[] ErrorPhrases = { "undefined reference to", "multiple definition of" };
+
+    /// <summary>
+    /// The first log level in <paramref name="line"/> (ERROR, WARN, [error], level=warn, ...): where it starts, and how bad it is.
+    /// A log line is coloured from there to its end, so the timestamp in front of the level stays as it is.
+    /// </summary>
+    public static bool TryFindLogLevel(string line, out int index, out byte severity)
+    {
+        index = -1;
+        severity = None;
+        if (string.IsNullOrEmpty(line))
+        {
+            return false;
+        }
+        Match word = LogWord.Match(line);
+        Match marked = LogMarked.Match(line);
+        Match first = word.Success && (!marked.Success || word.Index <= marked.Index) ? word : (marked.Success ? marked : null);
+        if (first == null)
+        {
+            return false;
+        }
+        index = first.Index;
+        switch (first.Groups["w"].Value.ToLowerInvariant())
+        {
+            case "warn":
+            case "warning":
+                severity = Warning;
+                break;
+            case "notice":
+                severity = Note;
+                break;
+            default:
+                severity = Error;
+                break;
+        }
+        return true;
+    }
 
     /// <summary>The spans of <paramref name="line"/> that mark an error, a warning or a note, in order, without overlap.</summary>
     public static List<Span> FindSpans(string line)

@@ -960,6 +960,9 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                 case FileListControl.FileEvent.Run:
                     Controller.MenuCommandHandlers.RunRemoteScript(e.FullPath);
                     break;
+                case FileListControl.FileEvent.Follow:
+                    Controller.MenuCommandHandlers.FollowLog(e.FullPath);
+                    break;
                 case FileListControl.FileEvent.DownloadArchive:
                     Controller.MenuCommandHandlers.QuickDownloadMany(e.FullPaths, archives: true);
                     break;

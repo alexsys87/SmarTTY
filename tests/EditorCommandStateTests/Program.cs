@@ -111,6 +111,12 @@ internal static class Program
         Check(!new EditorCommandState { CanRun = true, HexMode = true }.IsEnabled(EditorToolbarCommand.RunFile), "hex view: Run in Terminal is off");
         Check(EditorCommandCatalog.Describe(EditorToolbarCommand.RunFile).Shortcut == "F5", "Run in Terminal is on F5");
 
+        // Follow Log follows the file on the server, so a modified or read-only editor does not matter; the hex view does.
+        Check(!clean.IsEnabled(EditorToolbarCommand.FollowLog), "file not loaded or new: Follow Log is off");
+        Check(new EditorCommandState { CanFollow = true }.IsEnabled(EditorToolbarCommand.FollowLog), "opened file: Follow Log is on");
+        Check(new EditorCommandState { CanFollow = true, IsModified = true, ReadOnly = true, IsSaving = true }.IsEnabled(EditorToolbarCommand.FollowLog), "modified, read-only or saving: Follow Log is still on");
+        Check(!new EditorCommandState { CanFollow = true, HexMode = true }.IsEnabled(EditorToolbarCommand.FollowLog), "hex view: Follow Log is off");
+
         // The hex view: it can be opened once the file is loaded, and Replace belongs to the text view.
         Check(new EditorCommandState { CanUseHex = true }.IsEnabled(EditorToolbarCommand.ToggleHex), "loaded file: Hex Editor is on");
         Check(!new EditorCommandState { CanUseHex = false }.IsEnabled(EditorToolbarCommand.ToggleHex), "not loaded: Hex Editor is off");
@@ -153,7 +159,7 @@ internal static class Program
         // Every command has a rule (an unknown value is off).
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {
-            bool everythingOn = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true, CanUseHex = true, CanRun = true }.IsEnabled(command);
+            bool everythingOn = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true, CanUseHex = true, CanRun = true, CanFollow = true }.IsEnabled(command);
             Check(everythingOn, "all conditions met: " + command + " is on");
         }
         Check(!empty.IsEnabled((EditorToolbarCommand)999), "unknown command is off");

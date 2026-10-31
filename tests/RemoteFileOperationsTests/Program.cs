@@ -383,6 +383,75 @@ internal static class Program
     }
 
     // The process list of the Process manager (read from the local /proc by this shell) and the commands that stop a process.
+    // Follow Log: the command that follows a log file in a terminal tab (tail -F, an optional grep).
+    private static void LogFollowChecks(string root)
+    {
+        string plain = RemoteLogFollow.BuildCommand("/var/log/syslog", 200);
+        Check(plain.StartsWith("sh -c '", StringComparison.Ordinal), "follow log: the command is one sh -c, whatever the login shell is");
+        Check(plain.Contains("tail -n 200 -F -- "), "follow log: tail -F with the number of lines");
+        Check(plain.Contains("tail -n 200 -f -- "), "follow log: a tail without -F falls back to -f");
+        Check(plain.Contains("[ $rc -eq 1 ]"), "follow log: only a tail that could not start is replaced, not one ended by Ctrl+C");
+        Check(!plain.Contains("grep"), "follow log: no filter, no grep");
+        Check(RemoteLogFollow.BuildCommand("/a", -5).Contains("tail -n 0 -F"), "follow log: a negative number of lines is 0");
+        Check(RemoteLogFollow.BuildCommand("/a", 10000000).Contains("tail -n " + RemoteLogFollow.MaxLines + " -F"), "follow log: too many lines are cut to the maximum");
+        string filtered = RemoteLogFollow.BuildCommand("/a", 10, "a b", filterIsRegex: false, ignoreCase: true);
+        Check(filtered.Contains("grep $lb -i -F -e "), "follow log: a plain filter is grep -i -F");
+        Check(filtered.Contains("--line-buffered"), "follow log: grep is asked for line buffering where it knows the option");
+        Check(RemoteLogFollow.BuildCommand("/a", 10, "x", filterIsRegex: true, ignoreCase: false).Contains("grep $lb -E -e "), "follow log: a regular expression is grep -E, case matters");
+        bool threw = false;
+        try
+        {
+            RemoteLogFollow.BuildCommand("", 10);
+        }
+        catch (ArgumentException)
+        {
+            threw = true;
+        }
+        Check(threw, "follow log: no file is an error");
+        int lines;
+        Check(RemoteLogFollow.TryParseLines("200", out lines) && lines == 200 && RemoteLogFollow.TryParseLines(" 0 ", out lines) && lines == 0 && RemoteLogFollow.TryParseLines("100000", out lines), "follow log: numbers of lines are read");
+        Check(!RemoteLogFollow.TryParseLines("-1", out lines) && !RemoteLogFollow.TryParseLines("100001", out lines) && !RemoteLogFollow.TryParseLines("12x", out lines) && !RemoteLogFollow.TryParseLines("", out lines) && !RemoteLogFollow.TryParseLines(null, out lines), "follow log: other texts are not");
+
+        // Run for real: the command follows without end, so timeout ends it after it has printed what it has.
+        if (RunOutput("command -v timeout >/dev/null 2>&1 && command -v tail >/dev/null 2>&1 && command -v grep >/dev/null 2>&1 && echo yes").Trim() != "yes")
+        {
+            Console.WriteLine("SKIP: timeout, tail or grep is missing, the follow log command is not run");
+            return;
+        }
+        string directory = Path.Combine(root, "log dir");
+        Directory.CreateDirectory(directory);
+        string log = Path.Combine(directory, "-it's.log");
+        File.WriteAllText(log, "one\nTWO error\nthree\nfour Error x\nfive\n");
+        string[] Follow(string command)
+        {
+            return RunOutput("timeout 1 " + command).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        }
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(log, 2))), "four Error x|five", "follow log, run: the last 2 lines of a file whose name has a space, a quote and starts with '-'");
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(log, 100))), "one|TWO error|three|four Error x|five", "follow log, run: all lines when there are fewer than asked");
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(log, 0))), "", "follow log, run: 0 lines shows only what is added");
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(log, 100, "error", false, true))), "TWO error|four Error x", "follow log, run: a filter that ignores case");
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(log, 100, "error", false, false))), "TWO error", "follow log, run: a filter that does not");
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(log, 100, "^(one|five)$", true, true))), "one|five", "follow log, run: a regular expression");
+        string special = Path.Combine(directory, "special.log");
+        File.WriteAllText(special, "a.c\nabc\nhas -x flag\n");
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(special, 100, "a.c", false, true))), "a.c", "follow log, run: a plain filter is not a regular expression");
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(special, 100, "a.c", true, true))), "a.c|abc", "follow log, run: a regular expression is one");
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(special, 100, "-x", false, true))), "has -x flag", "follow log, run: a filter that starts with '-' is not an option");
+        Equal(string.Join("|", Follow(RemoteLogFollow.BuildCommand(special, 100, "'; echo hacked; '", false, true))), "", "follow log, run: a filter with quotes is only text");
+
+        // What is added to the file while it is followed shows up, also through a filter.
+        string growing = Path.Combine(directory, "growing.log");
+        File.WriteAllText(growing, "old line\n");
+        string quoted = RemotePathUtils.ShellQuote(growing);
+        string[] grown = RunOutput("(timeout 2 " + RemoteLogFollow.BuildCommand(growing, 1) + ") & sleep 0.7; echo 'new ERROR line' >> " + quoted + "; wait")
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        Equal(string.Join("|", grown), "old line|new ERROR line", "follow log, run: a line added to the file is shown");
+        File.WriteAllText(growing, "old line\n");
+        string[] filteredGrown = RunOutput("(timeout 2 " + RemoteLogFollow.BuildCommand(growing, 1, "error", false, true) + ") & sleep 0.7; echo 'quiet line' >> " + quoted + "; echo 'new ERROR line' >> " + quoted + "; wait")
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        Equal(string.Join("|", filteredGrown), "new ERROR line", "follow log, run: a line added to the file goes through the filter");
+    }
+
     private static void ProcessChecks()
     {
         Process busy = StartHelper("while :; do :; done");
@@ -811,6 +880,9 @@ internal static class Program
                     ProcessChecks();
                 }
             }
+            _shell = "/bin/sh";
+            _appletPath = null;
+            LogFollowChecks(root);
             EditorChecks(root);
         }
         catch (Exception exception)

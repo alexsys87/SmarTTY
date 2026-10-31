@@ -17,6 +17,21 @@ namespace SmarTTY.Controls;
 
 public partial class TerminalEmulatorControl : TerminalEmulatorBase
 {
+    /// <summary>
+    /// The terminal shows a log (tail -F): the lines are coloured from their level (ERROR, WARN, [error], level=warn) to the
+    /// end, unless the program wrote them in colours of its own.
+    /// </summary>
+    public bool HighlightLogLevels { get; set; }
+
+    internal override ILinkScanner CreateLinkScanner()
+    {
+        if (HighlightLogLevels)
+        {
+            return new SmarTTY.Terminal.OutputLinkScanner(null, "/", null, links: false, highlight: false, logLevels: true);
+        }
+        return base.CreateLinkScanner();
+    }
+
     public enum BeepMode
     {
         None,
