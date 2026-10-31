@@ -274,6 +274,73 @@ public partial class SshConnector : Component
         return problem;
     }
 
+    // Whether the user closed a question of the server (a verification code) instead of answering it.
+    private sealed class PromptState
+    {
+        public bool Declined;
+    }
+
+    // A server with two-factor authentication asks for more than the password in the same login: the user answers those
+    // prompts (the verification code) here, the password answers its own prompt. Null without a window for them.
+    private SshSession.KeyboardInteractiveHandler CreatePromptsForUser(ConnectionAttempt connectionAttempt, SSHConnectionSettings sshConnectionSettings, PromptState state)
+    {
+        if (KeyboardInteractivePrompt == null)
+        {
+            return null;
+        }
+        return (string name, string instruction, SshSession.KeyboardInteractivePrompt[] prompts, string[] responses) =>
+        {
+            string[] answers = null;
+            InvokeOnUi(() =>
+            {
+                if (!connectionAttempt.Cancelled)
+                {
+                    answers = KeyboardInteractivePrompt(sshConnectionSettings, name, instruction, prompts);
+                }
+            });
+            if (answers == null)
+            {
+                state.Declined = true;
+                return;
+            }
+            Array.Copy(answers, responses, Math.Min(answers.Length, responses.Length));
+        };
+    }
+
+    // The password of the account for the step that follows a key in a chain of methods (AuthenticationMethods
+    // publickey,password): the saved one, otherwise asked from the user. Called only when the server asks for it.
+    private string AskAccountPassword(ConnectionAttempt connectionAttempt, SSHConnectionSettings sshConnectionSettings)
+    {
+        if (sshConnectionSettings.EncryptedSavedPassword != null)
+        {
+            try
+            {
+                return PasswordProtector.Decrypt(sshConnectionSettings.EncryptedSavedPassword, "com.sysprogs.smartty.passwords");
+            }
+            catch
+            {
+            }
+        }
+        if (CredentialsRequested == null)
+        {
+            return "";
+        }
+        string entered = null;
+        bool confirmed = false;
+        InvokeOnUi(() =>
+        {
+            if (!connectionAttempt.Cancelled)
+            {
+                CredentialsRequested(this, sshConnectionSettings, ref entered, ref confirmed, isKeyPassphrase: false);
+            }
+        });
+        if (!confirmed)
+        {
+            throw new OperationCanceledException();
+        }
+        return entered ?? "";
+    }
+
     private void Authenticate(ConnectionAttempt connectionAttempt, SshSession session, SSHConnectionSettings sshConnectionSettings, string password, ref bool forcePasswordAuth)
     {
         bool passwordConfirmed = false;
@@ -286,7 +353,16 @@ public partial class SshConnector : Component
                 case AuthType.PublicKey:
                     {
                         SshKeyFactory sshKeyFactory = AppEnvironment.KeyFactory;
-                        bool authSuccess = session.AuthenticateWithPublicKey(sshConnectionSettings.UserName, sshKeyFactory.CreateKey(sshConnectionSettings.KeyType.ResolveAuto(PublicKeyType.RSA)));
+                        PromptState keyPromptState = new PromptState();
+                        bool authSuccess = session.AuthenticateWithPublicKey(
+                            sshConnectionSettings.UserName,
+                            sshKeyFactory.CreateKey(sshConnectionSettings.KeyType.ResolveAuto(PublicKeyType.RSA)),
+                            () => AskAccountPassword(connectionAttempt, sshConnectionSettings),
+                            CreatePromptsForUser(connectionAttempt, sshConnectionSettings, keyPromptState));
+                        if (keyPromptState.Declined)
+                        {
+                            throw new OperationCanceledException();
+                        }
                         if ((sshConnectionSettings.KeyType == PublicKeyType.Auto) & authSuccess)
                         {
                             sshConnectionSettings.KeyType = PublicKeyType.RSA;
@@ -306,7 +382,19 @@ public partial class SshConnector : Component
                 case AuthType.OpenSSHKey:
                     {
                         bool isKeyPassphrase = false;
-                        if (session.AuthenticateWithKeyFile(sshConnectionSettings.UserName, out isKeyPassphrase, sshConnectionSettings.ExplicitKeyFile, password))
+                        PromptState filePromptState = new PromptState();
+                        bool fileAuthSuccess = session.AuthenticateWithKeyFile(
+                            sshConnectionSettings.UserName,
+                            out isKeyPassphrase,
+                            sshConnectionSettings.ExplicitKeyFile,
+                            password,
+                            () => AskAccountPassword(connectionAttempt, sshConnectionSettings),
+                            CreatePromptsForUser(connectionAttempt, sshConnectionSettings, filePromptState));
+                        if (filePromptState.Declined)
+                        {
+                            throw new OperationCanceledException();
+                        }
+                        if (fileAuthSuccess)
                         {
                             return;
                         }
@@ -355,28 +443,9 @@ public partial class SshConnector : Component
                     // before the user has typed anything. An account without a password still works: the prompt returns "".
                     // Without a prompt handler there is nobody to ask, so the empty password is tried as before.
                     string attemptedPassword = ConnectionRules.FirstPasswordToTry(password, canAskUser: CredentialsRequested != null);
-                    // A server with two-factor authentication asks for more than the password in the same login: the
-                    // user answers those prompts (the verification code) here, the password answers its own prompt.
-                    bool promptDeclined = false;
-                    SshSession.KeyboardInteractiveHandler promptsForUser = KeyboardInteractivePrompt == null ? null : (string name, string instruction, SshSession.KeyboardInteractivePrompt[] prompts, string[] responses) =>
-                    {
-                        string[] answers = null;
-                        InvokeOnUi(() =>
-                        {
-                            if (!connectionAttempt.Cancelled)
-                            {
-                                answers = KeyboardInteractivePrompt(sshConnectionSettings, name, instruction, prompts);
-                            }
-                        });
-                        if (answers == null)
-                        {
-                            promptDeclined = true;
-                            return;
-                        }
-                        Array.Copy(answers, responses, Math.Min(answers.Length, responses.Length));
-                    };
-                    bool passwordAccepted = attemptedPassword != null && session.Authenticate(sshConnectionSettings.UserName, attemptedPassword, promptsForUser);
-                    if (promptDeclined)
+                    PromptState promptState = new PromptState();
+                    bool passwordAccepted = attemptedPassword != null && session.Authenticate(sshConnectionSettings.UserName, attemptedPassword, CreatePromptsForUser(connectionAttempt, sshConnectionSettings, promptState));
+                    if (promptState.Declined)
                     {
                         // The user closed the question of the server: that is giving up, not a wrong password.
                         throw new OperationCanceledException();
