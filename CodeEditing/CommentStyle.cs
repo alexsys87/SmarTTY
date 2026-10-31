@@ -25,6 +25,9 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Python:
                 case SyntaxHighlighting.Language.Bash:
                 case SyntaxHighlighting.Language.Config:
+                case SyntaxHighlighting.Language.Systemd:
+                case SyntaxHighlighting.Language.Nginx:
+                case SyntaxHighlighting.Language.SshConfig:
                 case SyntaxHighlighting.Language.Script:
                     return new CommentStyle("# ");
                 case SyntaxHighlighting.Language.CLike:

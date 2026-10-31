@@ -103,8 +103,8 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Dockerfile"), L.Script, "Dockerfile (capitalized) is recognized");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Makefile"), L.Makefile, "Makefile (capitalized) is recognized");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/.bashrc"), L.Bash, ".bashrc is bash");
-        Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/sshd_config"), L.Config, "sshd_config is a config file");
-        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service"), L.Config, "systemd units are config files");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/sshd_config"), L.SshConfig, "sshd_config is an ssh config file");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service"), L.Systemd, "systemd units are systemd files");
         Equal(SyntaxHighlighting.DetectLanguage("/src/main.c"), L.CLike, "C sources are C-like");
         Equal(SyntaxHighlighting.DetectLanguage("/src/main.cpp"), L.Cpp, "C++ sources are C++");
         Equal(SyntaxHighlighting.DetectLanguage("/src/main.cxx"), L.Cpp, ".cxx is C++");
@@ -130,7 +130,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/src/Makefile.am"), L.Makefile, "Makefile.am is a makefile");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/bin/busybox sh"), L.Bash, "#!/bin/busybox sh is shell");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/env node"), L.CLike, "#!/usr/bin/env node is JavaScript");
-        Equal(SyntaxHighlighting.DetectLanguage("/var/log/syslog.log"), L.Plain, "logs are not highlighted");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/syslog.log"), L.Log, "logs get the colours of their timestamps and levels");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.txt"), L.Plain, "text files are not highlighted");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/README.md"), L.Plain, "markdown is not highlighted");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/fix.patch"), L.Diff, "patches are diffs");
@@ -439,6 +439,130 @@ internal static class Program
         }
     }
 
+    private static void AdminFormatDetectionChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/ssh_config"), L.SshConfig, "ssh_config");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/SSHD_CONFIG"), L.SshConfig, "the name is matched without regard to case");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/.ssh/config"), L.SshConfig, "~/.ssh/config is the client configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/config"), L.Config, "a file called config elsewhere is a plain config");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/sshd_config.d/10-hardening.conf"), L.SshConfig, "a drop-in of sshd_config.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/ssh_config.d/50-x.conf"), L.SshConfig, "a drop-in of ssh_config.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nginx/nginx.conf"), L.Nginx, "nginx.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/opt/web/nginx.conf"), L.Nginx, "nginx.conf anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nginx/conf.d/site.conf"), L.Nginx, "conf.d of nginx");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nginx/sites-available/default"), L.Nginx, "sites-available has no extension");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nginx/snippets/ssl.conf"), L.Nginx, "snippets of nginx");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nginx/mime.types"), L.Plain, "mime.types is not a configuration of directives");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/nginx/readme"), L.Plain, "a folder called nginx somewhere else says nothing");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/etc/nginx/nginx.conf"), L.Nginx, "the BSD place of nginx.conf");
+        foreach (string unit in new[] { "a.service", "a.socket", "a.timer", "a.mount", "a.automount", "a.swap", "a.target", "a.path", "a.slice", "a.scope" })
+        {
+            Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/" + unit), L.Systemd, unit + " is a systemd unit");
+        }
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service.d/override.conf"), L.Systemd, "a drop-in of a unit");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/journald.conf"), L.Systemd, "journald.conf is systemd's");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/foo.conf"), L.Config, "an ordinary .conf stays a config");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.network"), L.Config, "networkd files are not units");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/crontab"), L.Config, "crontab stays a config");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/.env"), L.Config, ".env stays a config");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pyproject.toml"), L.Config, "toml stays a config");
+
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/syslog"), L.Log, "syslog");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/messages"), L.Log, "messages");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/auth.log"), L.Log, "auth.log");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/nginx/access.log"), L.Log, "a log in a folder of /var/log");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/syslog.1"), L.Log, "a rotated log");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/app.log.2"), L.Log, "a rotated .log");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/app.log"), L.Log, ".log anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/app.log.3"), L.Log, "a rotated .log anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/wtmp"), L.Plain, "wtmp is binary");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/README.md"), L.Plain, "a markdown file in /var/log is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.txt"), L.Plain, "prose stays plain");
+        Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
+
+        // The status bar and the syntax menu offer them, with names of their own.
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Log })
+        {
+            Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
+            Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
+            Check(SyntaxHighlighting.GetTokenizer(language) != null, language + " has a tokenizer");
+            Check(ReferenceEquals(SyntaxHighlighting.GetTokenizer(language), SyntaxHighlighting.GetTokenizer(language)), language + ": the tokenizer is the same object every time");
+        }
+        Check(CommentStyle.ForLanguage(L.Systemd) != null && CommentStyle.ForLanguage(L.Nginx) != null && CommentStyle.ForLanguage(L.SshConfig) != null, "# comments in systemd, nginx and ssh files");
+        Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
+    }
+
+    private static void AdminFormatTokenChecks()
+    {
+        // systemd: the directives are keywords, an unknown key is a plain key, sections and comments as in Config.
+        Highlighted unit = new Highlighted(L.Systemd, "[Service]\nExecStart=/usr/bin/app --verbose\nRestart=on-failure\nExecStartt=/typo\n# note\n; also a note\n  User = www-data\nEnvironment=\"A=1\" B=2\n[Install]\nWantedBy=multi-user.target");
+        Equal(Join(unit.Tokens(0, SyntaxHighlighting.TypeSection)), "[Service]", "systemd: the section");
+        Equal(Join(unit.Tokens(1, SyntaxHighlighting.TypeKeyword)), "ExecStart", "systemd: ExecStart is a keyword");
+        Equal(Join(unit.Tokens(2, SyntaxHighlighting.TypeKeyword)), "Restart", "systemd: Restart is a keyword");
+        Equal(Join(unit.Tokens(3, SyntaxHighlighting.TypeKeyword)), "", "systemd: a misspelt directive is not a keyword");
+        Equal(Join(unit.Tokens(3, SyntaxHighlighting.TypeVariable)), "ExecStartt", "systemd: ...it is a plain key");
+        Equal(Join(unit.Tokens(4, SyntaxHighlighting.TypeComment)), "# note", "systemd: # comment");
+        Equal(Join(unit.Tokens(5, SyntaxHighlighting.TypeComment)), "; also a note", "systemd: ; comment");
+        Equal(Join(unit.Tokens(6, SyntaxHighlighting.TypeKeyword)), "User", "systemd: an indented directive with spaces around =");
+        Equal(Join(unit.Tokens(7, SyntaxHighlighting.TypeString)), "\"A=1\"", "systemd: a quoted value");
+        Equal(Join(unit.Tokens(9, SyntaxHighlighting.TypeKeyword)), "WantedBy", "systemd: WantedBy");
+        Check(!SyntaxHighlighting.GetKeywords(L.Systemd).Contains("execstart"), "systemd: directives are case sensitive");
+
+        // nginx
+        Highlighted site = new Highlighted(L.Nginx, "server {\n    listen 80;\n    server_name example.org;\n    location /api/ {\n        proxy_pass http://127.0.0.1:8080;\n        proxy_set_header Host $host;\n        my_unknown_directive on;\n    }\n}\n# comment");
+        Equal(Join(site.Tokens(0, SyntaxHighlighting.TypeKeyword)), "server", "nginx: server is a directive");
+        Equal(Join(site.Tokens(1, SyntaxHighlighting.TypeKeyword)), "listen", "nginx: listen");
+        Equal(Join(site.Tokens(1, SyntaxHighlighting.TypeNumber)), "80", "nginx: the port is a number");
+        Equal(Join(site.Tokens(3, SyntaxHighlighting.TypeKeyword)), "location", "nginx: location");
+        Equal(Join(site.Tokens(4, SyntaxHighlighting.TypeKeyword)), "proxy_pass", "nginx: proxy_pass");
+        Equal(Join(site.Tokens(5, SyntaxHighlighting.TypeKeyword)), "proxy_set_header", "nginx: proxy_set_header");
+        Equal(Join(site.Tokens(5, SyntaxHighlighting.TypeVariable)), "$host", "nginx: the variable $host");
+        Equal(Join(site.Tokens(6, SyntaxHighlighting.TypeKeyword)), "on", "nginx: an unknown directive is not a keyword (only 'on' is, as a constant)");
+        Equal(Join(site.Tokens(6, SyntaxHighlighting.TypeVariable)), "my_unknown_directive", "nginx: ...it is a plain key");
+        Equal(Join(site.Tokens(9, SyntaxHighlighting.TypeComment)), "# comment", "nginx: comment");
+
+        // ssh: the options are case insensitive
+        Highlighted ssh = new Highlighted(L.SshConfig, "Host *\n    permitrootlogin no\n    PasswordAuthentication no\nPermitRootLogn yes\n# a comment");
+        Equal(Join(ssh.Tokens(0, SyntaxHighlighting.TypeKeyword)), "Host", "ssh: Host");
+        Equal(Join(ssh.Tokens(1, SyntaxHighlighting.TypeKeyword)), "permitrootlogin|no", "ssh: an option in lower case; no is a constant");
+        Equal(Join(ssh.Tokens(2, SyntaxHighlighting.TypeKeyword)), "PasswordAuthentication|no", "ssh: PasswordAuthentication");
+        Equal(Join(ssh.Tokens(3, SyntaxHighlighting.TypeKeyword)), "yes", "ssh: a misspelt option is not a keyword (yes is a constant)");
+        Equal(Join(ssh.Tokens(3, SyntaxHighlighting.TypeVariable)), "PermitRootLogn", "ssh: ...it is a plain key");
+        Check(SyntaxHighlighting.GetKeywords(L.SshConfig).Contains("PermitRootLogin"), "ssh: completion offers PermitRootLogin");
+
+        // logs
+        Highlighted log = new Highlighted(L.Log, string.Join("\n", new[]
+        {
+            "2026-10-31 07:00:01,123 ERROR db: connection refused",
+            "2026-10-31T07:00:02.5Z WARN slow request",
+            "2026-10-31T07:00:03+03:00 INFO started",
+            "Oct 31 07:00:04 host sshd[12]: DEBUG details",
+            "Oct  1 07:00:05 host app: ERROR_CODE=5 retry",
+            "127.0.0.1 - - [31/Oct/2026:07:00:06 +0000] \"GET / HTTP/1.1\" 200 12",
+            "2026/10/31 07:00:07 [error] 12#12: *1 open() failed",
+            "ts=1 level=warn msg=slow",
+            "an ordinary sentence with error and Warning in it",
+            "07:00:09 FATAL out of memory"
+        }));
+        Equal(Join(log.Tokens(0, SyntaxHighlighting.TypeSection)), "2026-10-31 07:00:01,123", "log: a timestamp with a comma fraction");
+        Equal(Join(log.Tokens(0, SyntaxHighlighting.TypeString)), "ERROR", "log: ERROR");
+        Equal(Join(log.Tokens(1, SyntaxHighlighting.TypeSection)), "2026-10-31T07:00:02.5Z", "log: ISO time with Z");
+        Equal(Join(log.Tokens(1, SyntaxHighlighting.TypeNumber)), "WARN", "log: WARN");
+        Equal(Join(log.Tokens(2, SyntaxHighlighting.TypeSection)), "2026-10-31T07:00:03+03:00", "log: ISO time with an offset");
+        Equal(Join(log.Tokens(2, SyntaxHighlighting.TypeKeyword)), "INFO", "log: INFO");
+        Equal(Join(log.Tokens(3, SyntaxHighlighting.TypeSection)), "Oct 31 07:00:04", "log: the syslog time");
+        Equal(Join(log.Tokens(3, SyntaxHighlighting.TypeComment)), "DEBUG", "log: DEBUG");
+        Equal(Join(log.Tokens(4, SyntaxHighlighting.TypeSection)), "Oct  1 07:00:05", "log: the syslog time with a padded day");
+        Equal(Join(log.Tokens(4, SyntaxHighlighting.TypeString)), "", "log: ERROR_CODE is not a level");
+        Equal(Join(log.Tokens(5, SyntaxHighlighting.TypeSection)), "[31/Oct/2026:07:00:06 +0000]", "log: the time of an access log");
+        Equal(Join(log.Tokens(6, SyntaxHighlighting.TypeSection)), "2026/10/31 07:00:07", "log: the time of nginx's error log (slashes)");
+        Equal(Join(log.Tokens(6, SyntaxHighlighting.TypeString)), "[error]", "log: [error]");
+        Equal(Join(log.Tokens(7, SyntaxHighlighting.TypeNumber)), "warn", "log: level=warn");
+        Equal(Join(log.Tokens(8, SyntaxHighlighting.TypeString)) + Join(log.Tokens(8, SyntaxHighlighting.TypeNumber)), "", "log: the words in a sentence are left alone");
+        Equal(Join(log.Tokens(9, SyntaxHighlighting.TypeSection)), "07:00:09", "log: a time of the day alone");
+        Equal(Join(log.Tokens(9, SyntaxHighlighting.TypeString)), "FATAL", "log: FATAL");
+    }
+
     private static void FoldChecks()
     {
         // Bash: then...fi, do...done, case...esac, function bodies.
@@ -724,7 +848,9 @@ internal static class Program
             ConfigChecks();
             BashChecks();
             OpenWrtDetectionChecks();
-            FoldChecks();
+            AdminFormatDetectionChecks();
+        AdminFormatTokenChecks();
+        FoldChecks();
             PythonChecks();
             CppChecks();
             GenericChecks();
