@@ -196,6 +196,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     {
         // OnTextReplaced may run from the base constructor, before the folding manager exists.
         _foldingManager?.Clear();
+        // The cursors were in the old text.
+        ClearExtraCursors();
         base.OnTextReplaced();
         _tokenCache.SetDocument(base.EditableDocument, Tokenizing);
     }
@@ -253,6 +255,10 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     protected override void OnLineChanged(int line, int column, int addedLength, int removedLength)
     {
+        if (!_applyingMultiCursor)
+        {
+            ClearExtraCursors();
+        }
         DateTime now = DateTime.Now;
         int linesRetokenized = _tokenCache.RetokenizeLine(line, Tokenizing);
         Value = (DateTime.Now - now).TotalMilliseconds;
@@ -272,6 +278,10 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     protected override void OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
+        if (!_applyingMultiCursor)
+        {
+            ClearExtraCursors();
+        }
         int changeStartLine = start.Line;
         int removedLineCount = oldEnd.Line - start.Line;
         int addedLineCount = newEnd.Line - start.Line;
@@ -298,6 +308,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     protected override void OnSelectionChanged(TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool hasSelection, SelectionChangeSource selectionChangeSource)
     {
+        if (!_applyingMultiCursor)
+        {
+            // The caret was moved by something that knows of one cursor only (a find, a go to line, a click).
+            ClearExtraCursors();
+        }
         CancelHover();
         if (!hasSelection)
         {
@@ -463,9 +478,18 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     {
         if (_keyBindingMap.Bindings.TryGetValue(new KeyBindingMap.KeyShortcut(e), out var value))
         {
+            if (HasMultipleCursors && !IsMultiCursorCommand(value))
+            {
+                // A command that works on lines or on the view is for one cursor.
+                ClearExtraCursors();
+            }
             value.Execute(this);
             e.Handled = true;
             e.SuppressKeyPress = true;
+            return;
+        }
+        if (HasMultipleCursors && HandleCursorKeyDown(e))
+        {
             return;
         }
         if (e.KeyCode == Keys.Escape)
@@ -764,6 +788,10 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
+        if (HasMultipleCursors && HandleCursorKeyPress(e))
+        {
+            return;
+        }
         if (e.KeyChar == '\t' && _tabHandler != null)
         {
             bool popupActive = false;
@@ -799,7 +827,20 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
+        if (HandleCursorMouseDown(e))
+        {
+            return;
+        }
+        if (e.Button == MouseButtons.Left)
+        {
+            // A click puts the caret in one place.
+            ClearExtraCursors();
+        }
         base.OnMouseDown(e);
+        if (e.Button == MouseButtons.Left)
+        {
+            _columnAnchor = new SmarTTY.CodeEditing.TextPoint(CaretPosition.Line, CaretPosition.Column);
+        }
         if (!IsWindows())
         {
             Focus();
