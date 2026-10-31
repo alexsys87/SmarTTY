@@ -597,6 +597,20 @@ internal static class Program
         Equal(Join(json.Tokens(2, SyntaxHighlighting.TypeKeyword)), "true|null", "JSON constants");
         Equal(Join(json.Tokens(4, SyntaxHighlighting.TypeComment)), "// note", "JSON comments are tolerated");
 
+        // nginx: the blocks fold, the braces of comments, strings and regular expressions do not count.
+        Highlighted nginx = new Highlighted(L.Nginx,
+            "http {\n    upstream app {\n        server 10.0.0.1:8080;\n    }\n    server {\n        listen 80;\n        location ~ ^/a{2}/ {\n            return 200 \"ok {\";\n        }\n        # comment {\n        location / { return 404; }\n    }\n}");
+        Equal(Folds(nginx), "0:12,1:3,4:11,6:8", "nginx http, upstream, server and location blocks fold");
+        Equal(nginx.At(0, 5).Partner?.LineNumber, 12, "the { of http is paired with the last }");
+        Highlighted nginxAllman = new Highlighted(L.Nginx, "server\n{\n    listen 80;\n}\n");
+        Equal(Folds(nginxAllman), "1:3", "a { alone on its line folds");
+        Highlighted nginxLua = new Highlighted(L.Nginx, "location /x {\n    content_by_lua_block {\n        local t = {}\n        ngx.say(\"}\")\n    }\n}");
+        Equal(Folds(nginxLua), "0:5,1:4", "braces of a Lua block inside nginx pair up, and {} on one line does not fold");
+        Equal(Join(nginx.Tokens(0, SyntaxHighlighting.TypeKeyword)), "http", "the directive before the { is still a keyword");
+        Equal(nginx.TypeAt(9, 10), SyntaxHighlighting.TypeComment, "a { in a comment is a comment");
+        Equal(Folds(new Highlighted(L.Systemd, "[Service]\nExecStart=/bin/echo {\n}")), "", "systemd units do not fold on braces");
+        Equal(Folds(new Highlighted(L.SshConfig, "Host x {\n}")), "", "ssh configuration does not fold on braces");
+
         // Makefile.
         Highlighted mk = new Highlighted(L.Makefile,
             "include $(TOPDIR)/rules.mk\nPKG_NAME:=foo # name\nifeq ($(CONFIG_X),y)\n  EXTRA=1\nelse\n  EXTRA=0\nendif\ndefine Package/foo/install\n\t$(INSTALL_BIN) $(PKG_BUILD_DIR)/foo $(1)/bin/\nendef\nall: build\n\t@echo done $@ # c");

@@ -1405,9 +1405,10 @@ namespace SmarTTY.CodeEditing
 
         /// <summary>
         /// The tokenizer of Config. With <paramref name="directives"/> (systemd, nginx, ssh) the key at the start of a line is a
-        /// keyword when it is one of them, and stays a plain key otherwise.
+        /// keyword when it is one of them, and stays a plain key otherwise. With <paramref name="foldBraces"/> (nginx) the { } of the
+        /// blocks are paired brackets that fold: "server {...}".
         /// </summary>
-        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false)
         {
             int len = text.Length;
             int last = 0;
@@ -1563,6 +1564,15 @@ namespace SmarTTY.CodeEditing
                         sink.AddToken(TypeKeyword, s, i);
                         last = i;
                     }
+                    continue;
+                }
+
+                // The braces of a block. Comments, quoted strings and ${name} were taken above, so what is left is a block
+                // ("server {", "}") or a quantifier of a regular expression ("{2,3}"), which opens and closes in its own line.
+                if (foldBraces && (c == '{' || c == '}'))
+                {
+                    TryAddBracket(text, i, ref last, sink, foldCurlyBraces: true);
+                    i++;
                     continue;
                 }
 
