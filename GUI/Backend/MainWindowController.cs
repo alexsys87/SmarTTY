@@ -380,6 +380,7 @@ public class MainWindowController : INotifyPropertyChanged
             // The tool bar and the context menu of the editor.
             newTab.EditorPanel.SaveRequested += (object sender, EventArgs e) => SaveFile();
             newTab.EditorPanel.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
+            newTab.EditorPanel.ShowChangesRequested += (object sender, EventArgs e) => ShowChanges(editor);
             newTab.EditorPanel.ShowAllCharactersChanged += (object sender, EventArgs e) =>
             {
                 // The switch on the tool bar and in the context menu is the same setting as in the settings window.
@@ -436,6 +437,21 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 editor.GoToPosition(window.Line - 1, Math.Max(0, window.Column - 1));
             }
+            editor.FocusActiveView();
+        }
+
+        /// <summary>Shows what has been changed in the editor against the file on the server (Show Changes).</summary>
+        private void ShowChanges(RemoteFileEditor editor)
+        {
+            if (editor == null || editor.IsHexMode)
+            {
+                return;
+            }
+            ChangesWindow window = new ChangesWindow(RemotePathUtils.GetFileName(editor.RemotePath), editor.GetChanges())
+            {
+                Owner = _Controller._Window
+            };
+            window.ShowDialog();
             editor.FocusActiveView();
         }
 

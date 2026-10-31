@@ -482,6 +482,8 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -525,6 +527,8 @@
             <CheckBox Content="Open the completion list automatically while typing" Grid.Row="14" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.AutocompletionOnTyping}" ToolTip="Opens the list after two letters of a word were typed." />
             <CheckBox Content="Offer the standard functions of the language (API symbols)" Grid.Row="15" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ApiSymbols}" ToolTip="Adds the standard functions of the language (Python builtins, the C library, the shell builtins, ...) with their description and parameter hint. The set lives in ApiSymbols.xml." />
             <CheckBox Content="Wrap long lines (word wrap)" Grid.Row="16" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.WordWrap}" ToolTip="Long lines continue on the next row instead of scrolling sideways. The same switch is on the editor tool bar. Folding is not available while the lines are wrapped." />
+            <CheckBox Content="Check the file before saving it (syntax, sshd -t, nginx -t, ...)" Grid.Row="17" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.ValidateBeforeSave}" ToolTip="Runs a check on the server on the text to be saved, before the file is replaced: sh -n or bash -n for scripts, a Python syntax check, JSON, YAML and XML checks, sshd -t, nginx -t and visudo. When it names a line it rejects, you can save anyway or go to that line. A check that is not installed or cannot run never stops the save." />
+            <CheckBox Content="Offer to reload the service after saving its configuration" Grid.Row="18" Grid.ColumnSpan="4" Margin="{StaticResource GridLabelPadding}" IsChecked="{Binding EditorWrapper.OfferServiceReload}" ToolTip="After sshd_config or a file in /etc/nginx is saved, asks whether to reload sshd or nginx (the configuration is tested first; sudo is asked for when the user is not allowed to reload it)." />
           </Grid>
         </GroupBox>
         </ScrollViewer>

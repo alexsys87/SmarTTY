@@ -136,6 +136,12 @@ jobs:
       - name: Run editor parameter hint checks
         run: dotnet run --project tests/EditorSignatureTests -c Release
 
+      - name: Run editor file check (validation before save) checks
+        run: dotnet run --project tests/ConfigValidationTests -c Release
+
+      - name: Run editor Show Changes (line diff) checks
+        run: dotnet run --project tests/TextDiffTests -c Release
+
       - name: Run API symbol checks
         run: dotnet run --project tests/ApiSymbolTests -c Release
 

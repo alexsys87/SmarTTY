@@ -51,6 +51,9 @@ public partial class RemoteFileEditor : CodeEditorPP
     // encoding" decodes them again.
     private byte[] _rawBytes;
 
+    // The encoding _rawBytes (the file as it is on the server) is read with.
+    private TextFileEncoding _rawEncoding = TextFileEncodings.Utf8;
+
     // The hex view: its bytes, its undo history and the bytes it saved. The text document is kept apart, so that the
     // two views can be switched back and forth without saving one into the other (see ToggleHexMode).
     private HexEditorControl _hexEditor;
@@ -90,6 +93,9 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     // The conflict question was answered "overwrite": the next save does not check the server again.
     private bool _forceOverwrite;
+
+    // The user chose to save although the check of the file found problems: the next save does not run the check.
+    private bool _skipValidation;
 
     // The conflict question was answered "reload": the server version is loaded once the save has ended.
     private bool _pendingReload;
@@ -1005,6 +1011,7 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         ResetHexMode();
         _rawBytes = file;
+        _rawEncoding = encoding;
         FileEncoding = encoding;
         LineEndings = LineEndingDetector.Detect(text);
         EditableTextDocument document = new EditableTextDocument
@@ -1322,6 +1329,14 @@ public partial class RemoteFileEditor : CodeEditorPP
 
         // The file on the server after the save (FetchSignature).
         public string NewSignature;
+
+        // The encoding the bytes were made with: they become the file as it is on the server.
+        public TextFileEncoding Encoding;
+
+        // The check run on the uploaded file before it replaces the target (null: none), and what it found if it failed.
+        public ConfigValidator Validator;
+
+        public ValidationResult Validation;
     }
 
     private int _saveGeneration;
@@ -1347,6 +1362,8 @@ public partial class RemoteFileEditor : CodeEditorPP
         // A background save of an older version must not overwrite this one afterwards.
         _backgroundUploadDone?.WaitOne();
         SaveJob job = PrepareSave();
+        // Saving on close does not run the check: the user is leaving and cannot act on what it finds.
+        job.Validator = null;
         try
         {
             if (!job.SkipConflictCheck && HasServerChanged()
@@ -1425,6 +1442,7 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private void FinishBackgroundSave(SaveJob job, bool replaced, bool conflict, Exception error, ManualResetEvent uploadDone)
     {
+        ServiceReload reloadToOffer = null;
         try
         {
             // Superseded by a synchronous save of a newer version: only clean up.
@@ -1447,6 +1465,10 @@ public partial class RemoteFileEditor : CodeEditorPP
                             break;
                     }
                 }
+                else if (job.Validation != null)
+                {
+                    HandleValidationFailure(job);
+                }
                 else
                 {
                     if (!replaced)
@@ -1457,6 +1479,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                     if (job.Generation == _saveGeneration)
                     {
                         CompleteSave(job);
+                        reloadToOffer = ReloadToOffer();
                     }
                 }
             }
@@ -1482,6 +1505,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                 _pendingReload = false;
                 _saveRequestedWhileSaving = false;
                 _forceOverwrite = false;
+                _skipValidation = false;
                 if (IsNewFile)
                 {
                     // Somebody created the file this new one was going to be: there is a version to load now.
@@ -1492,12 +1516,137 @@ public partial class RemoteFileEditor : CodeEditorPP
             else if (_saveRequestedWhileSaving)
             {
                 _saveRequestedWhileSaving = false;
-                if (IsModified || _forceOverwrite)
+                if (IsModified || _forceOverwrite || _skipValidation)
                 {
                     SaveInBackground();
                 }
             }
+            // A save queued meanwhile will offer it again once it is written.
+            if (reloadToOffer != null && !IsSaving)
+            {
+                try
+                {
+                    OfferReload(reloadToOffer);
+                }
+                catch (Exception exception)
+                {
+                    ReportError(exception);
+                }
+            }
         }
+    }
+
+    /// <summary>
+    /// The check found problems in the text, so the file on the server was not replaced. Says what was found and
+    /// either saves anyway (the next save skips the check) or puts the caret on the first problem (UI thread).
+    /// </summary>
+    private void HandleValidationFailure(SaveJob job)
+    {
+        const int MaxShown = 8;
+        List<ValidationIssue> issues = job.Validation.Issues;
+        StringBuilder text = new StringBuilder();
+        text.Append("The check (").Append(job.Validator.Name).Append(") found problems in ").Append(RemotePath).Append(":\n\n");
+        for (int i = 0; i < issues.Count && i < MaxShown; i++)
+        {
+            text.Append("Line ").Append(issues[i].Line).Append(": ").Append(issues[i].Message).Append('\n');
+        }
+        if (issues.Count > MaxShown)
+        {
+            text.Append("... and ").Append(issues.Count - MaxShown).Append(" more\n");
+        }
+        text.Append("\nThe file on the server has not been changed.\n\nYes: save it anyway.\nNo: do not save, go to line ").Append(issues[0].Line).Append('.');
+        if (ThemedMessageBox.Show(text.ToString(), "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+        {
+            _skipValidation = true;
+            _saveRequestedWhileSaving = true;
+            return;
+        }
+        GoToPosition(Math.Max(0, issues[0].Line - 1), Math.Max(0, issues[0].Column - 1));
+        FocusActiveView();
+    }
+
+    /// <summary>What to offer after a successful save so that the service reads the file again, or null.</summary>
+    private ServiceReload ReloadToOffer()
+    {
+        if (IsWindowsHost || _settings.Editor.DisableServiceReloadOffer)
+        {
+            return null;
+        }
+        return ConfigValidators.FindReload(RemotePath);
+    }
+
+    /// <summary>Asks whether to reload the service that reads the file just saved, and does so (UI thread).</summary>
+    private void OfferReload(ServiceReload reload)
+    {
+        if (ThemedMessageBox.Show(RemotePath + " was saved.\n\nReload " + reload.Name + " now so that the change takes effect?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        {
+            return;
+        }
+        ThreadPool.QueueUserWorkItem((object state) =>
+        {
+            List<string> output = null;
+            int? exitStatus = null;
+            try
+            {
+                output = _context.Session.RunCommand(reload.Command, out exitStatus, timeout: TimeSpan.FromSeconds(30));
+            }
+            catch
+            {
+            }
+            try
+            {
+                BeginInvoke((ThreadStart)(() => FinishReload(reload, output, exitStatus)));
+            }
+            catch
+            {
+                // The editor was closed meanwhile.
+            }
+        });
+    }
+
+    private void FinishReload(ServiceReload reload, List<string> output, int? exitStatus)
+    {
+        try
+        {
+            if (exitStatus == 0)
+            {
+                ThemedMessageBox.Show(reload.Name + " reloaded.", "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            // A lost connection is not a refused reload: do not offer sudo for it.
+            _context.Session.ThrowIfConnectionLost();
+            StringBuilder details = new StringBuilder();
+            if (output != null)
+            {
+                for (int i = 0; i < output.Count && i < 8; i++)
+                {
+                    details.Append(output[i]).Append('\n');
+                }
+            }
+            if (ThemedMessageBox.Show("Could not reload " + reload.Name + (exitStatus.HasValue ? " (exit code " + exitStatus.Value + ")" : "") + ":\n\n" + details + "\nTry again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            {
+                return;
+            }
+            RunSudoCommand(reload.Command);
+            ThemedMessageBox.Show(reload.Name + " reloaded.", "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            ReportError(exception);
+        }
+    }
+
+    /// <summary>
+    /// The differences between the file on the server (as it was opened, or last saved) and the text in the editor,
+    /// for the Show Changes window.
+    /// </summary>
+    public TextDiff.Result GetChanges()
+    {
+        string original = _rawBytes == null ? "" : TextFileEncodings.Decode(_rawBytes, _rawEncoding);
+        return TextDiff.Compare(original, base.EditableDocument.GetText(), RemotePath + " (on the server)", RemotePath + " (in the editor)");
     }
 
     private void SetSaving(bool saving)
@@ -1566,6 +1715,12 @@ public partial class RemoteFileEditor : CodeEditorPP
             // A failed copy does not stop the save (cat decides the result), as with the "~" files of other editors.
             replaceCommand = "[ ! -e " + quotedTarget + " ] || cp -p " + quotedTarget + " " + RemotePathUtils.ShellQuote(RemotePath + "~") + "; " + replaceCommand;
         }
+        // The check of the file runs on the text; the bytes of the hex view are saved as they are.
+        ConfigValidator validator = null;
+        if (!hexMode && !IsWindowsHost && !_skipValidation && !_settings.Editor.DisableConfigCheck)
+        {
+            validator = ConfigValidators.Find(RemotePath, DetectSyntax(), base.EditableDocument.GetLineText(0));
+        }
         SaveJob job = new SaveJob
         {
             Bytes = bytes,
@@ -1575,9 +1730,12 @@ public partial class RemoteFileEditor : CodeEditorPP
             HexMode = hexMode,
             Generation = ++_saveGeneration,
             SkipConflictCheck = _forceOverwrite,
-            IncludesBackup = backup
+            IncludesBackup = backup,
+            Encoding = FileEncoding,
+            Validator = validator
         };
         _forceOverwrite = false;
+        _skipValidation = false;
         return job;
     }
 
@@ -1599,6 +1757,16 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             scpChannelStream.Write(job.Bytes, 0, job.Bytes.Length);
         }
+        if (job.Validator != null)
+        {
+            // The target is still the old file: a text that the check rejects never replaces it.
+            ValidationResult validation = RunValidation(job);
+            if (validation.Outcome == ValidationOutcome.Failed)
+            {
+                job.Validation = validation;
+                return false;
+            }
+        }
         if (_sudoOnSave)
         {
             // The user said at opening that this file is written with sudo: no failing plain attempt first.
@@ -1614,6 +1782,17 @@ public partial class RemoteFileEditor : CodeEditorPP
         return false;
     }
 
+    /// <summary>
+    /// Runs the check of the file on the uploaded copy (any thread). A check that cannot run, or that finds nothing it
+    /// can point to, does not stop the save.
+    /// </summary>
+    private ValidationResult RunValidation(SaveJob job)
+    {
+        string command = job.Validator.BuildCommand(RemotePathUtils.ShellQuote(job.TemporaryPath));
+        List<string> output = _context.Session.RunCommand(command, out int? exitStatus, timeout: TimeSpan.FromSeconds(20));
+        return job.Validator.Interpret(output, exitStatus, job.TemporaryPath);
+    }
+
     /// <summary>Asks whether to retry with sudo and does so (UI thread).</summary>
     private void SaveWithSudo(SaveJob job)
     {
@@ -1621,7 +1800,13 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             throw new OperationCanceledException();
         }
-        string sudoCommand = "sudo sh -c " + RemotePathUtils.ShellQuote(job.ReplaceCommand);
+        RunSudoCommand(job.ReplaceCommand);
+    }
+
+    /// <summary>Runs a command through sudo on a shell channel, with the password prompt of the editor (UI thread).</summary>
+    private void RunSudoCommand(string command)
+    {
+        string sudoCommand = "sudo sh -c " + RemotePathUtils.ShellQuote(command);
         SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(sudoCommand, "xterm");
         SudoConfirmationPrompt?.Invoke(sshShellChannel, sudoCommand);
         try
@@ -1648,6 +1833,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         // A save through sudo has no signature yet.
         _remoteSignature = job.NewSignature ?? FetchSignature();
         _rawBytes = job.Bytes;
+        _rawEncoding = job.Encoding ?? FileEncoding;
         if (job.IncludesBackup)
         {
             _backupDone = true;

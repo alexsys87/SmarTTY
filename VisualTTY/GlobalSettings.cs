@@ -109,6 +109,14 @@ public class GlobalSettings : INotifyPropertyChanged
         // The first save of a file copies the old one to file~ on the server.
         public bool BackupBeforeSave;
 
+        // The editor checks a file before it replaces it on the server (sh -n, python syntax, sshd -t, ...). The two
+        // flags are "off" switches so that the old settings files, which lack them, get the checks (the struct has no
+        // field initializers, so a missing element reads as false).
+        public bool DisableConfigCheck;
+
+        // After saving the configuration of a service (sshd, nginx) the editor does not ask to reload it.
+        public bool DisableServiceReloadOffer;
+
         public EditorColors DarkColors;
 
         public EditorColors LightColors;

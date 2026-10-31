@@ -43,6 +43,9 @@ internal sealed class RemoteFileEditorPanel : UserControl
 
     public event EventHandler GoToLineRequested;
 
+    /// <summary>The Show Changes button or menu item was used: the window with the differences is the main window's.</summary>
+    public event EventHandler ShowChangesRequested;
+
     /// <summary>The toolbar or the context menu switched the invisible-character marks on or off.</summary>
     public event EventHandler ShowAllCharactersChanged;
 
@@ -173,6 +176,10 @@ internal sealed class RemoteFileEditorPanel : UserControl
                     {
                         _editor.Reload();
                     }
+                    break;
+                case EditorToolbarCommand.ShowChanges:
+                    focusEditor = false;
+                    ShowChangesRequested?.Invoke(this, EventArgs.Empty);
                     break;
                 case EditorToolbarCommand.Find:
                     focusEditor = false;
