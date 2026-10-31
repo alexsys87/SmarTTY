@@ -529,6 +529,538 @@
       <Summary>Alias of OSError</Summary>
       <Description>Alias of OSError. Python exception. A historical name for OSError, kept for compatibility.</Description>
     </Symbol>
+    <Symbol language="Python" name="str.capitalize" signature="str.capitalize()">
+      <Summary>Capitalize the first character</Summary>
+      <Description>Capitalize the first character. Python str method. Returns a copy with the first character capitalized and the rest lower case.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.casefold" signature="str.casefold()">
+      <Summary>Case-folded copy</Summary>
+      <Description>Case-folded copy. Python str method. Returns a case-folded copy for caseless matching.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.center" signature="str.center(width, fillchar=' ')">
+      <Summary>Center a string</Summary>
+      <Description>Center a string. Python str method. Returns the string centered in a field of the given width.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.count" signature="str.count(sub, start=0, end=None)">
+      <Summary>Count occurrences</Summary>
+      <Description>Count occurrences. Python str method. Returns the number of non-overlapping occurrences of a substring.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.encode" signature="str.encode(encoding='utf-8', errors='strict')">
+      <Summary>Encode to bytes</Summary>
+      <Description>Encode to bytes. Python str method. Returns a bytes representation using the given encoding.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.endswith" signature="str.endswith(suffix, start=0, end=None)">
+      <Summary>Suffix test</Summary>
+      <Description>Suffix test. Python str method. Returns true when the string ends with the given suffix.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.expandtabs" signature="str.expandtabs(tabsize=8)">
+      <Summary>Expand tabs</Summary>
+      <Description>Expand tabs. Python str method. Returns a copy with tab characters expanded to spaces.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.find" signature="str.find(sub, start=0, end=None)">
+      <Summary>Find a substring</Summary>
+      <Description>Find a substring. Python str method. Returns the lowest index of a substring, or -1 when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.format" signature="str.format(*args, **kwargs)">
+      <Summary>Format a string</Summary>
+      <Description>Format a string. Python str method. Formats the string with the given arguments and keyword arguments.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.format_map" signature="str.format_map(mapping)">
+      <Summary>Format from a mapping</Summary>
+      <Description>Format from a mapping. Python str method. Formats the string with values from a mapping.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.index" signature="str.index(sub, start=0, end=None)">
+      <Summary>Index of a substring</Summary>
+      <Description>Index of a substring. Python str method. Returns the lowest index of a substring, raising ValueError when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isalnum" signature="str.isalnum()">
+      <Summary>Alphanumeric test</Summary>
+      <Description>Alphanumeric test. Python str method. Returns true when every character is alphanumeric.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isalpha" signature="str.isalpha()">
+      <Summary>Alphabetic test</Summary>
+      <Description>Alphabetic test. Python str method. Returns true when every character is alphabetic.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isascii" signature="str.isascii()">
+      <Summary>ASCII test</Summary>
+      <Description>ASCII test. Python str method. Returns true when every character is ASCII.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isdecimal" signature="str.isdecimal()">
+      <Summary>Decimal test</Summary>
+      <Description>Decimal test. Python str method. Returns true when every character is a decimal digit.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isdigit" signature="str.isdigit()">
+      <Summary>Digit test</Summary>
+      <Description>Digit test. Python str method. Returns true when every character is a digit.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isidentifier" signature="str.isidentifier()">
+      <Summary>Identifier test</Summary>
+      <Description>Identifier test. Python str method. Returns true when the string is a valid Python identifier.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.islower" signature="str.islower()">
+      <Summary>Lower-case test</Summary>
+      <Description>Lower-case test. Python str method. Returns true when every cased character is lower case.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isnumeric" signature="str.isnumeric()">
+      <Summary>Numeric test</Summary>
+      <Description>Numeric test. Python str method. Returns true when every character is numeric.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isprintable" signature="str.isprintable()">
+      <Summary>Printable test</Summary>
+      <Description>Printable test. Python str method. Returns true when every character is printable.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isspace" signature="str.isspace()">
+      <Summary>Whitespace test</Summary>
+      <Description>Whitespace test. Python str method. Returns true when every character is whitespace.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.istitle" signature="str.istitle()">
+      <Summary>Title-case test</Summary>
+      <Description>Title-case test. Python str method. Returns true when the string is in title case.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.isupper" signature="str.isupper()">
+      <Summary>Upper-case test</Summary>
+      <Description>Upper-case test. Python str method. Returns true when every cased character is upper case.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.join" signature="str.join(iterable)">
+      <Summary>Join strings</Summary>
+      <Description>Join strings. Python str method. Joins the items of an iterable with the string as the separator.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.ljust" signature="str.ljust(width, fillchar=' ')">
+      <Summary>Pad on the right</Summary>
+      <Description>Pad on the right. Python str method. Returns the string left-justified in a field of the given width.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.lower" signature="str.lower()">
+      <Summary>Lower case</Summary>
+      <Description>Lower case. Python str method. Returns a copy with all characters in lower case.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.lstrip" signature="str.lstrip(chars=None)">
+      <Summary>Trim the left side</Summary>
+      <Description>Trim the left side. Python str method. Returns a copy with leading characters removed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.partition" signature="str.partition(sep)">
+      <Summary>Split at a separator</Summary>
+      <Description>Split at a separator. Python str method. Splits the string at the first separator into a three-part tuple.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.removeprefix" signature="str.removeprefix(prefix)">
+      <Summary>Remove a prefix</Summary>
+      <Description>Remove a prefix. Python str method. Returns a copy without the given prefix.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.removesuffix" signature="str.removesuffix(suffix)">
+      <Summary>Remove a suffix</Summary>
+      <Description>Remove a suffix. Python str method. Returns a copy without the given suffix.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.replace" signature="str.replace(old, new, count=-1)">
+      <Summary>Replace occurrences</Summary>
+      <Description>Replace occurrences. Python str method. Returns a copy with occurrences of a substring replaced.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.rfind" signature="str.rfind(sub, start=0, end=None)">
+      <Summary>Find from the right</Summary>
+      <Description>Find from the right. Python str method. Returns the highest index of a substring, or -1 when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.rindex" signature="str.rindex(sub, start=0, end=None)">
+      <Summary>Index from the right</Summary>
+      <Description>Index from the right. Python str method. Returns the highest index of a substring, raising ValueError when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.rjust" signature="str.rjust(width, fillchar=' ')">
+      <Summary>Pad on the left</Summary>
+      <Description>Pad on the left. Python str method. Returns the string right-justified in a field of the given width.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.rpartition" signature="str.rpartition(sep)">
+      <Summary>Split at the last separator</Summary>
+      <Description>Split at the last separator. Python str method. Splits the string at the last separator into a three-part tuple.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.rsplit" signature="str.rsplit(sep=None, maxsplit=-1)">
+      <Summary>Split from the right</Summary>
+      <Description>Split from the right. Python str method. Splits the string from the right into a list of parts.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.rstrip" signature="str.rstrip(chars=None)">
+      <Summary>Trim the right side</Summary>
+      <Description>Trim the right side. Python str method. Returns a copy with trailing characters removed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.split" signature="str.split(sep=None, maxsplit=-1)">
+      <Summary>Split a string</Summary>
+      <Description>Split a string. Python str method. Splits the string into a list of parts.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.splitlines" signature="str.splitlines(keepends=False)">
+      <Summary>Split into lines</Summary>
+      <Description>Split into lines. Python str method. Splits the string at line boundaries.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.startswith" signature="str.startswith(prefix, start=0, end=None)">
+      <Summary>Prefix test</Summary>
+      <Description>Prefix test. Python str method. Returns true when the string starts with the given prefix.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.strip" signature="str.strip(chars=None)">
+      <Summary>Trim both sides</Summary>
+      <Description>Trim both sides. Python str method. Returns a copy with leading and trailing characters removed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.swapcase" signature="str.swapcase()">
+      <Summary>Swap case</Summary>
+      <Description>Swap case. Python str method. Returns a copy with upper-case characters converted to lower case and vice versa.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.title" signature="str.title()">
+      <Summary>Title case</Summary>
+      <Description>Title case. Python str method. Returns a copy with the first character of each word capitalized.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.translate" signature="str.translate(table)">
+      <Summary>Translate characters</Summary>
+      <Description>Translate characters. Python str method. Returns a copy with characters mapped through a translation table.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.upper" signature="str.upper()">
+      <Summary>Upper case</Summary>
+      <Description>Upper case. Python str method. Returns a copy with all characters in upper case.</Description>
+    </Symbol>
+    <Symbol language="Python" name="str.zfill" signature="str.zfill(width)">
+      <Summary>Pad with zeros</Summary>
+      <Description>Pad with zeros. Python str method. Returns a copy padded with zeros on the left to the given width.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.append" signature="list.append(item)">
+      <Summary>Append an item</Summary>
+      <Description>Append an item. Python list method. Adds an item to the end of the list.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.clear" signature="list.clear()">
+      <Summary>Remove all items</Summary>
+      <Description>Remove all items. Python list method. Removes every item from the list.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.copy" signature="list.copy()">
+      <Summary>Shallow copy</Summary>
+      <Description>Shallow copy. Python list method. Returns a shallow copy of the list.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.count" signature="list.count(value)">
+      <Summary>Count occurrences</Summary>
+      <Description>Count occurrences. Python list method. Returns the number of times a value appears in the list.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.extend" signature="list.extend(iterable)">
+      <Summary>Extend the list</Summary>
+      <Description>Extend the list. Python list method. Adds the items of an iterable to the end of the list.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.index" signature="list.index(value, start=0, stop=None)">
+      <Summary>Index of a value</Summary>
+      <Description>Index of a value. Python list method. Returns the first index of a value, raising ValueError when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.insert" signature="list.insert(index, item)">
+      <Summary>Insert an item</Summary>
+      <Description>Insert an item. Python list method. Inserts an item before the given index.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.pop" signature="list.pop(index=-1)">
+      <Summary>Remove and return an item</Summary>
+      <Description>Remove and return an item. Python list method. Removes the item at the given index and returns it.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.remove" signature="list.remove(value)">
+      <Summary>Remove a value</Summary>
+      <Description>Remove a value. Python list method. Removes the first occurrence of a value.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.reverse" signature="list.reverse()">
+      <Summary>Reverse the list</Summary>
+      <Description>Reverse the list. Python list method. Reverses the list in place.</Description>
+    </Symbol>
+    <Symbol language="Python" name="list.sort" signature="list.sort(*, key=None, reverse=False)">
+      <Summary>Sort the list</Summary>
+      <Description>Sort the list. Python list method. Sorts the list in place.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.clear" signature="dict.clear()">
+      <Summary>Remove all items</Summary>
+      <Description>Remove all items. Python dict method. Removes every key and value from the dictionary.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.copy" signature="dict.copy()">
+      <Summary>Shallow copy</Summary>
+      <Description>Shallow copy. Python dict method. Returns a shallow copy of the dictionary.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.fromkeys" signature="dict.fromkeys(iterable, value=None)">
+      <Summary>Dictionary from keys</Summary>
+      <Description>Dictionary from keys. Python dict method. Creates a dictionary with the given keys and a common value.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.get" signature="dict.get(key, default=None)">
+      <Summary>Read a value</Summary>
+      <Description>Read a value. Python dict method. Returns the value for a key, or the default when the key is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.items" signature="dict.items()">
+      <Summary>Key and value pairs</Summary>
+      <Description>Key and value pairs. Python dict method. Returns a view of the key and value pairs of the dictionary.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.keys" signature="dict.keys()">
+      <Summary>Keys of the dictionary</Summary>
+      <Description>Keys of the dictionary. Python dict method. Returns a view of the keys of the dictionary.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.pop" signature="dict.pop(key, default=None)">
+      <Summary>Remove and return a value</Summary>
+      <Description>Remove and return a value. Python dict method. Removes a key and returns its value.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.popitem" signature="dict.popitem()">
+      <Summary>Remove the last pair</Summary>
+      <Description>Remove the last pair. Python dict method. Removes and returns the most recently added key and value pair.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.setdefault" signature="dict.setdefault(key, default=None)">
+      <Summary>Read or insert a value</Summary>
+      <Description>Read or insert a value. Python dict method. Returns the value for a key, inserting the default when the key is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.update" signature="dict.update(other)">
+      <Summary>Update the dictionary</Summary>
+      <Description>Update the dictionary. Python dict method. Adds the key and value pairs of another mapping or iterable.</Description>
+    </Symbol>
+    <Symbol language="Python" name="dict.values" signature="dict.values()">
+      <Summary>Values of the dictionary</Summary>
+      <Description>Values of the dictionary. Python dict method. Returns a view of the values of the dictionary.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.add" signature="set.add(item)">
+      <Summary>Add an item</Summary>
+      <Description>Add an item. Python set method. Adds an item to the set when it is not already present.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.clear" signature="set.clear()">
+      <Summary>Remove all items</Summary>
+      <Description>Remove all items. Python set method. Removes every item from the set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.copy" signature="set.copy()">
+      <Summary>Shallow copy</Summary>
+      <Description>Shallow copy. Python set method. Returns a shallow copy of the set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.difference" signature="set.difference(*others)">
+      <Summary>Difference of sets</Summary>
+      <Description>Difference of sets. Python set method. Returns the items of the set that are absent from the other sets.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.difference_update" signature="set.difference_update(*others)">
+      <Summary>Remove other items</Summary>
+      <Description>Remove other items. Python set method. Removes the items found in the other sets from this set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.discard" signature="set.discard(item)">
+      <Summary>Discard an item</Summary>
+      <Description>Discard an item. Python set method. Removes an item from the set when it is present.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.intersection" signature="set.intersection(*others)">
+      <Summary>Intersection of sets</Summary>
+      <Description>Intersection of sets. Python set method. Returns the items shared by the set and the other sets.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.intersection_update" signature="set.intersection_update(*others)">
+      <Summary>Keep shared items</Summary>
+      <Description>Keep shared items. Python set method. Keeps only the items shared with the other sets.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.isdisjoint" signature="set.isdisjoint(other)">
+      <Summary>Disjoint test</Summary>
+      <Description>Disjoint test. Python set method. Returns true when the set has no items in common with another set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.issubset" signature="set.issubset(other)">
+      <Summary>Subset test</Summary>
+      <Description>Subset test. Python set method. Returns true when every item of the set is in another set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.issuperset" signature="set.issuperset(other)">
+      <Summary>Superset test</Summary>
+      <Description>Superset test. Python set method. Returns true when the set contains every item of another set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.pop" signature="set.pop()">
+      <Summary>Remove and return an item</Summary>
+      <Description>Remove and return an item. Python set method. Removes an arbitrary item from the set and returns it.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.remove" signature="set.remove(item)">
+      <Summary>Remove an item</Summary>
+      <Description>Remove an item. Python set method. Removes an item from the set, raising KeyError when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.symmetric_difference" signature="set.symmetric_difference(other)">
+      <Summary>Symmetric difference</Summary>
+      <Description>Symmetric difference. Python set method. Returns the items that are in exactly one of the two sets.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.symmetric_difference_update" signature="set.symmetric_difference_update(other)">
+      <Summary>Keep the symmetric difference</Summary>
+      <Description>Keep the symmetric difference. Python set method. Replaces the set with its symmetric difference with another set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.union" signature="set.union(*others)">
+      <Summary>Union of sets</Summary>
+      <Description>Union of sets. Python set method. Returns the items of the set and the other sets.</Description>
+    </Symbol>
+    <Symbol language="Python" name="set.update" signature="set.update(*others)">
+      <Summary>Add other items</Summary>
+      <Description>Add other items. Python set method. Adds the items of the other sets to this set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="frozenset.copy" signature="frozenset.copy()">
+      <Summary>Shallow copy</Summary>
+      <Description>Shallow copy. Python frozenset method. Returns the frozenset itself, since it is immutable.</Description>
+    </Symbol>
+    <Symbol language="Python" name="frozenset.difference" signature="frozenset.difference(*others)">
+      <Summary>Difference of sets</Summary>
+      <Description>Difference of sets. Python frozenset method. Returns the items of the frozenset that are absent from the other sets.</Description>
+    </Symbol>
+    <Symbol language="Python" name="frozenset.intersection" signature="frozenset.intersection(*others)">
+      <Summary>Intersection of sets</Summary>
+      <Description>Intersection of sets. Python frozenset method. Returns the items shared by the frozenset and the other sets.</Description>
+    </Symbol>
+    <Symbol language="Python" name="frozenset.isdisjoint" signature="frozenset.isdisjoint(other)">
+      <Summary>Disjoint test</Summary>
+      <Description>Disjoint test. Python frozenset method. Returns true when the frozenset has no items in common with another set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="frozenset.issubset" signature="frozenset.issubset(other)">
+      <Summary>Subset test</Summary>
+      <Description>Subset test. Python frozenset method. Returns true when every item of the frozenset is in another set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="frozenset.issuperset" signature="frozenset.issuperset(other)">
+      <Summary>Superset test</Summary>
+      <Description>Superset test. Python frozenset method. Returns true when the frozenset contains every item of another set.</Description>
+    </Symbol>
+    <Symbol language="Python" name="frozenset.symmetric_difference" signature="frozenset.symmetric_difference(other)">
+      <Summary>Symmetric difference</Summary>
+      <Description>Symmetric difference. Python frozenset method. Returns the items that are in exactly one of the two sets.</Description>
+    </Symbol>
+    <Symbol language="Python" name="frozenset.union" signature="frozenset.union(*others)">
+      <Summary>Union of sets</Summary>
+      <Description>Union of sets. Python frozenset method. Returns the items of the frozenset and the other sets.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.decode" signature="bytes.decode(encoding='utf-8', errors='strict')">
+      <Summary>Decode to text</Summary>
+      <Description>Decode to text. Python bytes method. Returns a string decoded from the bytes.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.hex" signature="bytes.hex(sep=None, bytes_per_sep=1)">
+      <Summary>Hexadecimal text</Summary>
+      <Description>Hexadecimal text. Python bytes method. Returns the bytes as a hexadecimal string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.count" signature="bytes.count(sub, start=0, end=None)">
+      <Summary>Count occurrences</Summary>
+      <Description>Count occurrences. Python bytes method. Returns the number of non-overlapping occurrences of a byte substring.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.find" signature="bytes.find(sub, start=0, end=None)">
+      <Summary>Find a byte substring</Summary>
+      <Description>Find a byte substring. Python bytes method. Returns the lowest index of a byte substring, or -1 when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.index" signature="bytes.index(sub, start=0, end=None)">
+      <Summary>Index of a byte substring</Summary>
+      <Description>Index of a byte substring. Python bytes method. Returns the lowest index of a byte substring, raising ValueError when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.join" signature="bytes.join(iterable)">
+      <Summary>Join byte strings</Summary>
+      <Description>Join byte strings. Python bytes method. Joins the byte strings of an iterable with these bytes as the separator.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.replace" signature="bytes.replace(old, new, count=-1)">
+      <Summary>Replace occurrences</Summary>
+      <Description>Replace occurrences. Python bytes method. Returns a copy with occurrences of a byte substring replaced.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.split" signature="bytes.split(sep=None, maxsplit=-1)">
+      <Summary>Split bytes</Summary>
+      <Description>Split bytes. Python bytes method. Splits the bytes into a list of parts.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.startswith" signature="bytes.startswith(prefix, start=0, end=None)">
+      <Summary>Prefix test</Summary>
+      <Description>Prefix test. Python bytes method. Returns true when the bytes start with the given prefix.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.endswith" signature="bytes.endswith(suffix, start=0, end=None)">
+      <Summary>Suffix test</Summary>
+      <Description>Suffix test. Python bytes method. Returns true when the bytes end with the given suffix.</Description>
+    </Symbol>
+    <Symbol language="Python" name="bytes.strip" signature="bytes.strip(chars=None)">
+      <Summary>Trim both sides</Summary>
+      <Description>Trim both sides. Python bytes method. Returns a copy with leading and trailing bytes removed.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.close" signature="file.close()">
+      <Summary>Close the file</Summary>
+      <Description>Close the file. Python file object. Closes the file and releases its resources.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.detach" signature="file.detach()">
+      <Summary>Detach the binary buffer</Summary>
+      <Description>Detach the binary buffer. Python file object. Separates the binary buffer from the text wrapper and returns it.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.fileno" signature="file.fileno()">
+      <Summary>File descriptor</Summary>
+      <Description>File descriptor. Python file object. Returns the integer file descriptor of the file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.flush" signature="file.flush()">
+      <Summary>Flush the buffers</Summary>
+      <Description>Flush the buffers. Python file object. Writes the buffered data to the underlying file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.isatty" signature="file.isatty()">
+      <Summary>Terminal test</Summary>
+      <Description>Terminal test. Python file object. Returns true when the file is connected to a terminal.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.readable" signature="file.readable()">
+      <Summary>Readable test</Summary>
+      <Description>Readable test. Python file object. Returns true when the file supports reading.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.readline" signature="file.readline(size=-1)">
+      <Summary>Read one line</Summary>
+      <Description>Read one line. Python file object. Reads and returns one line from the file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.readlines" signature="file.readlines(hint=-1)">
+      <Summary>Read all lines</Summary>
+      <Description>Read all lines. Python file object. Reads the remaining lines and returns them as a list.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.read" signature="file.read(size=-1)">
+      <Summary>Read the file</Summary>
+      <Description>Read the file. Python file object. Reads and returns up to size characters or bytes.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.reconfigure" signature="file.reconfigure(*, encoding=None, errors=None, newline=None, line_buffering=None, write_through=None)">
+      <Summary>Reconfigure the text stream</Summary>
+      <Description>Reconfigure the text stream. Python file object. Changes the encoding, error handling and buffering of a text stream.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.seek" signature="file.seek(offset, whence=0)">
+      <Summary>Move the file position</Summary>
+      <Description>Move the file position. Python file object. Moves the file position to the given offset.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.seekable" signature="file.seekable()">
+      <Summary>Seekable test</Summary>
+      <Description>Seekable test. Python file object. Returns true when the file supports random access.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.tell" signature="file.tell()">
+      <Summary>Current file position</Summary>
+      <Description>Current file position. Python file object. Returns the current position in the file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.truncate" signature="file.truncate(size=None)">
+      <Summary>Truncate the file</Summary>
+      <Description>Truncate the file. Python file object. Resizes the file to the given size.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.writable" signature="file.writable()">
+      <Summary>Writable test</Summary>
+      <Description>Writable test. Python file object. Returns true when the file supports writing.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.write" signature="file.write(text)">
+      <Summary>Write to the file</Summary>
+      <Description>Write to the file. Python file object. Writes text or bytes to the file and returns the number of items written.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.writelines" signature="file.writelines(lines)">
+      <Summary>Write several lines</Summary>
+      <Description>Write several lines. Python file object. Writes an iterable of lines to the file.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.name">
+      <Summary>Name of the file</Summary>
+      <Description>Name of the file. Python file object. The name of the file passed to open().</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.mode">
+      <Summary>Mode of the file</Summary>
+      <Description>Mode of the file. Python file object. The mode in which the file was opened.</Description>
+    </Symbol>
+    <Symbol language="Python" name="file.encoding">
+      <Summary>Encoding of the text stream</Summary>
+      <Description>Encoding of the text stream. Python file object. The encoding used by a text stream.</Description>
+    </Symbol>
+    <Symbol language="Python" name="int.bit_length" signature="int.bit_length()">
+      <Summary>Bit length</Summary>
+      <Description>Bit length. Python int method. Returns the number of bits needed to represent the integer.</Description>
+    </Symbol>
+    <Symbol language="Python" name="int.bit_count" signature="int.bit_count()">
+      <Summary>Number of set bits</Summary>
+      <Description>Number of set bits. Python int method. Returns the number of ones in the binary representation of the integer.</Description>
+    </Symbol>
+    <Symbol language="Python" name="int.to_bytes" signature="int.to_bytes(length=1, byteorder='big', signed=False)">
+      <Summary>Integer to bytes</Summary>
+      <Description>Integer to bytes. Python int method. Returns the integer as a byte string of the given length.</Description>
+    </Symbol>
+    <Symbol language="Python" name="int.from_bytes" signature="int.from_bytes(bytes, byteorder='big', signed=False)">
+      <Summary>Integer from bytes</Summary>
+      <Description>Integer from bytes. Python int method. Creates an integer from a byte string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="int.as_integer_ratio" signature="int.as_integer_ratio()">
+      <Summary>Integer ratio</Summary>
+      <Description>Integer ratio. Python int method. Returns the integer as a numerator and denominator pair.</Description>
+    </Symbol>
+    <Symbol language="Python" name="float.hex" signature="float.hex()">
+      <Summary>Hexadecimal representation</Summary>
+      <Description>Hexadecimal representation. Python float method. Returns the float as a hexadecimal string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="float.fromhex" signature="float.fromhex(string)">
+      <Summary>Float from hexadecimal</Summary>
+      <Description>Float from hexadecimal. Python float method. Creates a float from a hexadecimal string.</Description>
+    </Symbol>
+    <Symbol language="Python" name="float.is_integer" signature="float.is_integer()">
+      <Summary>Integer test</Summary>
+      <Description>Integer test. Python float method. Returns true when the float has no fractional part.</Description>
+    </Symbol>
+    <Symbol language="Python" name="float.as_integer_ratio" signature="float.as_integer_ratio()">
+      <Summary>Exact ratio</Summary>
+      <Description>Exact ratio. Python float method. Returns the exact numerator and denominator of the float.</Description>
+    </Symbol>
     <Symbol language="Python" name="math.pi">
       <Summary>Ratio of a circle's circumference to its diameter</Summary>
       <Description>Ratio of a circle's circumference to its diameter. Python math module. The mathematical constant pi, approximately 3.141592653589793.</Description>
@@ -2512,538 +3044,6 @@
     <Symbol language="Python" name="functools.WRAPPER_UPDATES">
       <Summary>Attributes updated by wraps</Summary>
       <Description>Attributes updated by wraps. Python functools module. The function attributes updated by update_wrapper by default.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.capitalize" signature="str.capitalize()">
-      <Summary>Capitalize the first character</Summary>
-      <Description>Capitalize the first character. Python str method. Returns a copy with the first character capitalized and the rest lower case.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.casefold" signature="str.casefold()">
-      <Summary>Case-folded copy</Summary>
-      <Description>Case-folded copy. Python str method. Returns a case-folded copy for caseless matching.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.center" signature="str.center(width, fillchar=' ')">
-      <Summary>Center a string</Summary>
-      <Description>Center a string. Python str method. Returns the string centered in a field of the given width.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.count" signature="str.count(sub, start=0, end=None)">
-      <Summary>Count occurrences</Summary>
-      <Description>Count occurrences. Python str method. Returns the number of non-overlapping occurrences of a substring.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.encode" signature="str.encode(encoding='utf-8', errors='strict')">
-      <Summary>Encode to bytes</Summary>
-      <Description>Encode to bytes. Python str method. Returns a bytes representation using the given encoding.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.endswith" signature="str.endswith(suffix, start=0, end=None)">
-      <Summary>Suffix test</Summary>
-      <Description>Suffix test. Python str method. Returns true when the string ends with the given suffix.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.expandtabs" signature="str.expandtabs(tabsize=8)">
-      <Summary>Expand tabs</Summary>
-      <Description>Expand tabs. Python str method. Returns a copy with tab characters expanded to spaces.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.find" signature="str.find(sub, start=0, end=None)">
-      <Summary>Find a substring</Summary>
-      <Description>Find a substring. Python str method. Returns the lowest index of a substring, or -1 when it is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.format" signature="str.format(*args, **kwargs)">
-      <Summary>Format a string</Summary>
-      <Description>Format a string. Python str method. Formats the string with the given arguments and keyword arguments.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.format_map" signature="str.format_map(mapping)">
-      <Summary>Format from a mapping</Summary>
-      <Description>Format from a mapping. Python str method. Formats the string with values from a mapping.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.index" signature="str.index(sub, start=0, end=None)">
-      <Summary>Index of a substring</Summary>
-      <Description>Index of a substring. Python str method. Returns the lowest index of a substring, raising ValueError when it is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isalnum" signature="str.isalnum()">
-      <Summary>Alphanumeric test</Summary>
-      <Description>Alphanumeric test. Python str method. Returns true when every character is alphanumeric.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isalpha" signature="str.isalpha()">
-      <Summary>Alphabetic test</Summary>
-      <Description>Alphabetic test. Python str method. Returns true when every character is alphabetic.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isascii" signature="str.isascii()">
-      <Summary>ASCII test</Summary>
-      <Description>ASCII test. Python str method. Returns true when every character is ASCII.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isdecimal" signature="str.isdecimal()">
-      <Summary>Decimal test</Summary>
-      <Description>Decimal test. Python str method. Returns true when every character is a decimal digit.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isdigit" signature="str.isdigit()">
-      <Summary>Digit test</Summary>
-      <Description>Digit test. Python str method. Returns true when every character is a digit.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isidentifier" signature="str.isidentifier()">
-      <Summary>Identifier test</Summary>
-      <Description>Identifier test. Python str method. Returns true when the string is a valid Python identifier.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.islower" signature="str.islower()">
-      <Summary>Lower-case test</Summary>
-      <Description>Lower-case test. Python str method. Returns true when every cased character is lower case.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isnumeric" signature="str.isnumeric()">
-      <Summary>Numeric test</Summary>
-      <Description>Numeric test. Python str method. Returns true when every character is numeric.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isprintable" signature="str.isprintable()">
-      <Summary>Printable test</Summary>
-      <Description>Printable test. Python str method. Returns true when every character is printable.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isspace" signature="str.isspace()">
-      <Summary>Whitespace test</Summary>
-      <Description>Whitespace test. Python str method. Returns true when every character is whitespace.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.istitle" signature="str.istitle()">
-      <Summary>Title-case test</Summary>
-      <Description>Title-case test. Python str method. Returns true when the string is in title case.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.isupper" signature="str.isupper()">
-      <Summary>Upper-case test</Summary>
-      <Description>Upper-case test. Python str method. Returns true when every cased character is upper case.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.join" signature="str.join(iterable)">
-      <Summary>Join strings</Summary>
-      <Description>Join strings. Python str method. Joins the items of an iterable with the string as the separator.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.ljust" signature="str.ljust(width, fillchar=' ')">
-      <Summary>Pad on the right</Summary>
-      <Description>Pad on the right. Python str method. Returns the string left-justified in a field of the given width.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.lower" signature="str.lower()">
-      <Summary>Lower case</Summary>
-      <Description>Lower case. Python str method. Returns a copy with all characters in lower case.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.lstrip" signature="str.lstrip(chars=None)">
-      <Summary>Trim the left side</Summary>
-      <Description>Trim the left side. Python str method. Returns a copy with leading characters removed.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.partition" signature="str.partition(sep)">
-      <Summary>Split at a separator</Summary>
-      <Description>Split at a separator. Python str method. Splits the string at the first separator into a three-part tuple.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.removeprefix" signature="str.removeprefix(prefix)">
-      <Summary>Remove a prefix</Summary>
-      <Description>Remove a prefix. Python str method. Returns a copy without the given prefix.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.removesuffix" signature="str.removesuffix(suffix)">
-      <Summary>Remove a suffix</Summary>
-      <Description>Remove a suffix. Python str method. Returns a copy without the given suffix.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.replace" signature="str.replace(old, new, count=-1)">
-      <Summary>Replace occurrences</Summary>
-      <Description>Replace occurrences. Python str method. Returns a copy with occurrences of a substring replaced.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.rfind" signature="str.rfind(sub, start=0, end=None)">
-      <Summary>Find from the right</Summary>
-      <Description>Find from the right. Python str method. Returns the highest index of a substring, or -1 when it is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.rindex" signature="str.rindex(sub, start=0, end=None)">
-      <Summary>Index from the right</Summary>
-      <Description>Index from the right. Python str method. Returns the highest index of a substring, raising ValueError when it is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.rjust" signature="str.rjust(width, fillchar=' ')">
-      <Summary>Pad on the left</Summary>
-      <Description>Pad on the left. Python str method. Returns the string right-justified in a field of the given width.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.rpartition" signature="str.rpartition(sep)">
-      <Summary>Split at the last separator</Summary>
-      <Description>Split at the last separator. Python str method. Splits the string at the last separator into a three-part tuple.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.rsplit" signature="str.rsplit(sep=None, maxsplit=-1)">
-      <Summary>Split from the right</Summary>
-      <Description>Split from the right. Python str method. Splits the string from the right into a list of parts.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.rstrip" signature="str.rstrip(chars=None)">
-      <Summary>Trim the right side</Summary>
-      <Description>Trim the right side. Python str method. Returns a copy with trailing characters removed.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.split" signature="str.split(sep=None, maxsplit=-1)">
-      <Summary>Split a string</Summary>
-      <Description>Split a string. Python str method. Splits the string into a list of parts.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.splitlines" signature="str.splitlines(keepends=False)">
-      <Summary>Split into lines</Summary>
-      <Description>Split into lines. Python str method. Splits the string at line boundaries.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.startswith" signature="str.startswith(prefix, start=0, end=None)">
-      <Summary>Prefix test</Summary>
-      <Description>Prefix test. Python str method. Returns true when the string starts with the given prefix.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.strip" signature="str.strip(chars=None)">
-      <Summary>Trim both sides</Summary>
-      <Description>Trim both sides. Python str method. Returns a copy with leading and trailing characters removed.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.swapcase" signature="str.swapcase()">
-      <Summary>Swap case</Summary>
-      <Description>Swap case. Python str method. Returns a copy with upper-case characters converted to lower case and vice versa.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.title" signature="str.title()">
-      <Summary>Title case</Summary>
-      <Description>Title case. Python str method. Returns a copy with the first character of each word capitalized.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.translate" signature="str.translate(table)">
-      <Summary>Translate characters</Summary>
-      <Description>Translate characters. Python str method. Returns a copy with characters mapped through a translation table.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.upper" signature="str.upper()">
-      <Summary>Upper case</Summary>
-      <Description>Upper case. Python str method. Returns a copy with all characters in upper case.</Description>
-    </Symbol>
-    <Symbol language="Python" name="str.zfill" signature="str.zfill(width)">
-      <Summary>Pad with zeros</Summary>
-      <Description>Pad with zeros. Python str method. Returns a copy padded with zeros on the left to the given width.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.append" signature="list.append(item)">
-      <Summary>Append an item</Summary>
-      <Description>Append an item. Python list method. Adds an item to the end of the list.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.clear" signature="list.clear()">
-      <Summary>Remove all items</Summary>
-      <Description>Remove all items. Python list method. Removes every item from the list.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.copy" signature="list.copy()">
-      <Summary>Shallow copy</Summary>
-      <Description>Shallow copy. Python list method. Returns a shallow copy of the list.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.count" signature="list.count(value)">
-      <Summary>Count occurrences</Summary>
-      <Description>Count occurrences. Python list method. Returns the number of times a value appears in the list.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.extend" signature="list.extend(iterable)">
-      <Summary>Extend the list</Summary>
-      <Description>Extend the list. Python list method. Adds the items of an iterable to the end of the list.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.index" signature="list.index(value, start=0, stop=None)">
-      <Summary>Index of a value</Summary>
-      <Description>Index of a value. Python list method. Returns the first index of a value, raising ValueError when it is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.insert" signature="list.insert(index, item)">
-      <Summary>Insert an item</Summary>
-      <Description>Insert an item. Python list method. Inserts an item before the given index.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.pop" signature="list.pop(index=-1)">
-      <Summary>Remove and return an item</Summary>
-      <Description>Remove and return an item. Python list method. Removes the item at the given index and returns it.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.remove" signature="list.remove(value)">
-      <Summary>Remove a value</Summary>
-      <Description>Remove a value. Python list method. Removes the first occurrence of a value.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.reverse" signature="list.reverse()">
-      <Summary>Reverse the list</Summary>
-      <Description>Reverse the list. Python list method. Reverses the list in place.</Description>
-    </Symbol>
-    <Symbol language="Python" name="list.sort" signature="list.sort(*, key=None, reverse=False)">
-      <Summary>Sort the list</Summary>
-      <Description>Sort the list. Python list method. Sorts the list in place.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.clear" signature="dict.clear()">
-      <Summary>Remove all items</Summary>
-      <Description>Remove all items. Python dict method. Removes every key and value from the dictionary.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.copy" signature="dict.copy()">
-      <Summary>Shallow copy</Summary>
-      <Description>Shallow copy. Python dict method. Returns a shallow copy of the dictionary.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.fromkeys" signature="dict.fromkeys(iterable, value=None)">
-      <Summary>Dictionary from keys</Summary>
-      <Description>Dictionary from keys. Python dict method. Creates a dictionary with the given keys and a common value.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.get" signature="dict.get(key, default=None)">
-      <Summary>Read a value</Summary>
-      <Description>Read a value. Python dict method. Returns the value for a key, or the default when the key is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.items" signature="dict.items()">
-      <Summary>Key and value pairs</Summary>
-      <Description>Key and value pairs. Python dict method. Returns a view of the key and value pairs of the dictionary.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.keys" signature="dict.keys()">
-      <Summary>Keys of the dictionary</Summary>
-      <Description>Keys of the dictionary. Python dict method. Returns a view of the keys of the dictionary.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.pop" signature="dict.pop(key, default=None)">
-      <Summary>Remove and return a value</Summary>
-      <Description>Remove and return a value. Python dict method. Removes a key and returns its value.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.popitem" signature="dict.popitem()">
-      <Summary>Remove the last pair</Summary>
-      <Description>Remove the last pair. Python dict method. Removes and returns the most recently added key and value pair.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.setdefault" signature="dict.setdefault(key, default=None)">
-      <Summary>Read or insert a value</Summary>
-      <Description>Read or insert a value. Python dict method. Returns the value for a key, inserting the default when the key is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.update" signature="dict.update(other)">
-      <Summary>Update the dictionary</Summary>
-      <Description>Update the dictionary. Python dict method. Adds the key and value pairs of another mapping or iterable.</Description>
-    </Symbol>
-    <Symbol language="Python" name="dict.values" signature="dict.values()">
-      <Summary>Values of the dictionary</Summary>
-      <Description>Values of the dictionary. Python dict method. Returns a view of the values of the dictionary.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.add" signature="set.add(item)">
-      <Summary>Add an item</Summary>
-      <Description>Add an item. Python set method. Adds an item to the set when it is not already present.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.clear" signature="set.clear()">
-      <Summary>Remove all items</Summary>
-      <Description>Remove all items. Python set method. Removes every item from the set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.copy" signature="set.copy()">
-      <Summary>Shallow copy</Summary>
-      <Description>Shallow copy. Python set method. Returns a shallow copy of the set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.difference" signature="set.difference(*others)">
-      <Summary>Difference of sets</Summary>
-      <Description>Difference of sets. Python set method. Returns the items of the set that are absent from the other sets.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.difference_update" signature="set.difference_update(*others)">
-      <Summary>Remove other items</Summary>
-      <Description>Remove other items. Python set method. Removes the items found in the other sets from this set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.discard" signature="set.discard(item)">
-      <Summary>Discard an item</Summary>
-      <Description>Discard an item. Python set method. Removes an item from the set when it is present.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.intersection" signature="set.intersection(*others)">
-      <Summary>Intersection of sets</Summary>
-      <Description>Intersection of sets. Python set method. Returns the items shared by the set and the other sets.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.intersection_update" signature="set.intersection_update(*others)">
-      <Summary>Keep shared items</Summary>
-      <Description>Keep shared items. Python set method. Keeps only the items shared with the other sets.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.isdisjoint" signature="set.isdisjoint(other)">
-      <Summary>Disjoint test</Summary>
-      <Description>Disjoint test. Python set method. Returns true when the set has no items in common with another set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.issubset" signature="set.issubset(other)">
-      <Summary>Subset test</Summary>
-      <Description>Subset test. Python set method. Returns true when every item of the set is in another set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.issuperset" signature="set.issuperset(other)">
-      <Summary>Superset test</Summary>
-      <Description>Superset test. Python set method. Returns true when the set contains every item of another set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.pop" signature="set.pop()">
-      <Summary>Remove and return an item</Summary>
-      <Description>Remove and return an item. Python set method. Removes an arbitrary item from the set and returns it.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.remove" signature="set.remove(item)">
-      <Summary>Remove an item</Summary>
-      <Description>Remove an item. Python set method. Removes an item from the set, raising KeyError when it is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.symmetric_difference" signature="set.symmetric_difference(other)">
-      <Summary>Symmetric difference</Summary>
-      <Description>Symmetric difference. Python set method. Returns the items that are in exactly one of the two sets.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.symmetric_difference_update" signature="set.symmetric_difference_update(other)">
-      <Summary>Keep the symmetric difference</Summary>
-      <Description>Keep the symmetric difference. Python set method. Replaces the set with its symmetric difference with another set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.union" signature="set.union(*others)">
-      <Summary>Union of sets</Summary>
-      <Description>Union of sets. Python set method. Returns the items of the set and the other sets.</Description>
-    </Symbol>
-    <Symbol language="Python" name="set.update" signature="set.update(*others)">
-      <Summary>Add other items</Summary>
-      <Description>Add other items. Python set method. Adds the items of the other sets to this set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="frozenset.copy" signature="frozenset.copy()">
-      <Summary>Shallow copy</Summary>
-      <Description>Shallow copy. Python frozenset method. Returns the frozenset itself, since it is immutable.</Description>
-    </Symbol>
-    <Symbol language="Python" name="frozenset.difference" signature="frozenset.difference(*others)">
-      <Summary>Difference of sets</Summary>
-      <Description>Difference of sets. Python frozenset method. Returns the items of the frozenset that are absent from the other sets.</Description>
-    </Symbol>
-    <Symbol language="Python" name="frozenset.intersection" signature="frozenset.intersection(*others)">
-      <Summary>Intersection of sets</Summary>
-      <Description>Intersection of sets. Python frozenset method. Returns the items shared by the frozenset and the other sets.</Description>
-    </Symbol>
-    <Symbol language="Python" name="frozenset.isdisjoint" signature="frozenset.isdisjoint(other)">
-      <Summary>Disjoint test</Summary>
-      <Description>Disjoint test. Python frozenset method. Returns true when the frozenset has no items in common with another set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="frozenset.issubset" signature="frozenset.issubset(other)">
-      <Summary>Subset test</Summary>
-      <Description>Subset test. Python frozenset method. Returns true when every item of the frozenset is in another set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="frozenset.issuperset" signature="frozenset.issuperset(other)">
-      <Summary>Superset test</Summary>
-      <Description>Superset test. Python frozenset method. Returns true when the frozenset contains every item of another set.</Description>
-    </Symbol>
-    <Symbol language="Python" name="frozenset.symmetric_difference" signature="frozenset.symmetric_difference(other)">
-      <Summary>Symmetric difference</Summary>
-      <Description>Symmetric difference. Python frozenset method. Returns the items that are in exactly one of the two sets.</Description>
-    </Symbol>
-    <Symbol language="Python" name="frozenset.union" signature="frozenset.union(*others)">
-      <Summary>Union of sets</Summary>
-      <Description>Union of sets. Python frozenset method. Returns the items of the frozenset and the other sets.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.decode" signature="bytes.decode(encoding='utf-8', errors='strict')">
-      <Summary>Decode to text</Summary>
-      <Description>Decode to text. Python bytes method. Returns a string decoded from the bytes.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.hex" signature="bytes.hex(sep=None, bytes_per_sep=1)">
-      <Summary>Hexadecimal text</Summary>
-      <Description>Hexadecimal text. Python bytes method. Returns the bytes as a hexadecimal string.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.count" signature="bytes.count(sub, start=0, end=None)">
-      <Summary>Count occurrences</Summary>
-      <Description>Count occurrences. Python bytes method. Returns the number of non-overlapping occurrences of a byte substring.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.find" signature="bytes.find(sub, start=0, end=None)">
-      <Summary>Find a byte substring</Summary>
-      <Description>Find a byte substring. Python bytes method. Returns the lowest index of a byte substring, or -1 when it is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.index" signature="bytes.index(sub, start=0, end=None)">
-      <Summary>Index of a byte substring</Summary>
-      <Description>Index of a byte substring. Python bytes method. Returns the lowest index of a byte substring, raising ValueError when it is missing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.join" signature="bytes.join(iterable)">
-      <Summary>Join byte strings</Summary>
-      <Description>Join byte strings. Python bytes method. Joins the byte strings of an iterable with these bytes as the separator.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.replace" signature="bytes.replace(old, new, count=-1)">
-      <Summary>Replace occurrences</Summary>
-      <Description>Replace occurrences. Python bytes method. Returns a copy with occurrences of a byte substring replaced.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.split" signature="bytes.split(sep=None, maxsplit=-1)">
-      <Summary>Split bytes</Summary>
-      <Description>Split bytes. Python bytes method. Splits the bytes into a list of parts.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.startswith" signature="bytes.startswith(prefix, start=0, end=None)">
-      <Summary>Prefix test</Summary>
-      <Description>Prefix test. Python bytes method. Returns true when the bytes start with the given prefix.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.endswith" signature="bytes.endswith(suffix, start=0, end=None)">
-      <Summary>Suffix test</Summary>
-      <Description>Suffix test. Python bytes method. Returns true when the bytes end with the given suffix.</Description>
-    </Symbol>
-    <Symbol language="Python" name="bytes.strip" signature="bytes.strip(chars=None)">
-      <Summary>Trim both sides</Summary>
-      <Description>Trim both sides. Python bytes method. Returns a copy with leading and trailing bytes removed.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.close" signature="file.close()">
-      <Summary>Close the file</Summary>
-      <Description>Close the file. Python file object. Closes the file and releases its resources.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.detach" signature="file.detach()">
-      <Summary>Detach the binary buffer</Summary>
-      <Description>Detach the binary buffer. Python file object. Separates the binary buffer from the text wrapper and returns it.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.fileno" signature="file.fileno()">
-      <Summary>File descriptor</Summary>
-      <Description>File descriptor. Python file object. Returns the integer file descriptor of the file.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.flush" signature="file.flush()">
-      <Summary>Flush the buffers</Summary>
-      <Description>Flush the buffers. Python file object. Writes the buffered data to the underlying file.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.isatty" signature="file.isatty()">
-      <Summary>Terminal test</Summary>
-      <Description>Terminal test. Python file object. Returns true when the file is connected to a terminal.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.readable" signature="file.readable()">
-      <Summary>Readable test</Summary>
-      <Description>Readable test. Python file object. Returns true when the file supports reading.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.readline" signature="file.readline(size=-1)">
-      <Summary>Read one line</Summary>
-      <Description>Read one line. Python file object. Reads and returns one line from the file.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.readlines" signature="file.readlines(hint=-1)">
-      <Summary>Read all lines</Summary>
-      <Description>Read all lines. Python file object. Reads the remaining lines and returns them as a list.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.read" signature="file.read(size=-1)">
-      <Summary>Read the file</Summary>
-      <Description>Read the file. Python file object. Reads and returns up to size characters or bytes.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.reconfigure" signature="file.reconfigure(*, encoding=None, errors=None, newline=None, line_buffering=None, write_through=None)">
-      <Summary>Reconfigure the text stream</Summary>
-      <Description>Reconfigure the text stream. Python file object. Changes the encoding, error handling and buffering of a text stream.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.seek" signature="file.seek(offset, whence=0)">
-      <Summary>Move the file position</Summary>
-      <Description>Move the file position. Python file object. Moves the file position to the given offset.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.seekable" signature="file.seekable()">
-      <Summary>Seekable test</Summary>
-      <Description>Seekable test. Python file object. Returns true when the file supports random access.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.tell" signature="file.tell()">
-      <Summary>Current file position</Summary>
-      <Description>Current file position. Python file object. Returns the current position in the file.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.truncate" signature="file.truncate(size=None)">
-      <Summary>Truncate the file</Summary>
-      <Description>Truncate the file. Python file object. Resizes the file to the given size.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.writable" signature="file.writable()">
-      <Summary>Writable test</Summary>
-      <Description>Writable test. Python file object. Returns true when the file supports writing.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.write" signature="file.write(text)">
-      <Summary>Write to the file</Summary>
-      <Description>Write to the file. Python file object. Writes text or bytes to the file and returns the number of items written.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.writelines" signature="file.writelines(lines)">
-      <Summary>Write several lines</Summary>
-      <Description>Write several lines. Python file object. Writes an iterable of lines to the file.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.name">
-      <Summary>Name of the file</Summary>
-      <Description>Name of the file. Python file object. The name of the file passed to open().</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.mode">
-      <Summary>Mode of the file</Summary>
-      <Description>Mode of the file. Python file object. The mode in which the file was opened.</Description>
-    </Symbol>
-    <Symbol language="Python" name="file.encoding">
-      <Summary>Encoding of the text stream</Summary>
-      <Description>Encoding of the text stream. Python file object. The encoding used by a text stream.</Description>
-    </Symbol>
-    <Symbol language="Python" name="int.bit_length" signature="int.bit_length()">
-      <Summary>Bit length</Summary>
-      <Description>Bit length. Python int method. Returns the number of bits needed to represent the integer.</Description>
-    </Symbol>
-    <Symbol language="Python" name="int.bit_count" signature="int.bit_count()">
-      <Summary>Number of set bits</Summary>
-      <Description>Number of set bits. Python int method. Returns the number of ones in the binary representation of the integer.</Description>
-    </Symbol>
-    <Symbol language="Python" name="int.to_bytes" signature="int.to_bytes(length=1, byteorder='big', signed=False)">
-      <Summary>Integer to bytes</Summary>
-      <Description>Integer to bytes. Python int method. Returns the integer as a byte string of the given length.</Description>
-    </Symbol>
-    <Symbol language="Python" name="int.from_bytes" signature="int.from_bytes(bytes, byteorder='big', signed=False)">
-      <Summary>Integer from bytes</Summary>
-      <Description>Integer from bytes. Python int method. Creates an integer from a byte string.</Description>
-    </Symbol>
-    <Symbol language="Python" name="int.as_integer_ratio" signature="int.as_integer_ratio()">
-      <Summary>Integer ratio</Summary>
-      <Description>Integer ratio. Python int method. Returns the integer as a numerator and denominator pair.</Description>
-    </Symbol>
-    <Symbol language="Python" name="float.hex" signature="float.hex()">
-      <Summary>Hexadecimal representation</Summary>
-      <Description>Hexadecimal representation. Python float method. Returns the float as a hexadecimal string.</Description>
-    </Symbol>
-    <Symbol language="Python" name="float.fromhex" signature="float.fromhex(string)">
-      <Summary>Float from hexadecimal</Summary>
-      <Description>Float from hexadecimal. Python float method. Creates a float from a hexadecimal string.</Description>
-    </Symbol>
-    <Symbol language="Python" name="float.is_integer" signature="float.is_integer()">
-      <Summary>Integer test</Summary>
-      <Description>Integer test. Python float method. Returns true when the float has no fractional part.</Description>
-    </Symbol>
-    <Symbol language="Python" name="float.as_integer_ratio" signature="float.as_integer_ratio()">
-      <Summary>Exact ratio</Summary>
-      <Description>Exact ratio. Python float method. Returns the exact numerator and denominator of the float.</Description>
     </Symbol>
     <Symbol language="Python" name="subprocess.run" signature="subprocess.run(args, *, stdin=None, input=None, stdout=None, stderr=None, capture_output=False, shell=False, cwd=None, timeout=None, check=False, encoding=None, errors=None, text=None, env=None)">
       <Summary>Run a command</Summary>

@@ -319,6 +319,14 @@ internal static class Program
         Check(dictGet != null, "the completion list offers 'dict.get' as 'get'");
         Equal(dictGet.DetailText, "Read a value", "the dict method summary is the detail text");
         Check(dictGet.HintText.StartsWith("dict.get("), "the qualified dict method signature is the hint text");
+        ISuggestion append = Build(L.Python, "", "append", database).FirstOrDefault(s => s.DisplayName == "append");
+        Check(append != null, "the completion list offers 'list.append' as 'append'");
+        Equal(append.DetailText, "Append an item", "the built-in method wins over the deque method");
+        Check(append.HintText.StartsWith("list.append("), "the list method signature is the hint text");
+        ISuggestion read = Build(L.Python, "", "read", database).FirstOrDefault(s => s.DisplayName == "read");
+        Check(read != null, "the completion list offers 'file.read' as 'read'");
+        Equal(read.DetailText, "Read the file", "the file method wins over the os function");
+        Check(read.HintText.StartsWith("file.read("), "the file method signature is the hint text");
         ISuggestion connect = Build(L.Python, "", "create_conn", database).FirstOrDefault(s => s.DisplayName == "create_connection");
         Check(connect != null, "the completion list offers 'socket.create_connection' as 'create_connection'");
         Equal(connect.DetailText, "Connect to a host", "the socket summary is the detail text");
@@ -385,6 +393,18 @@ internal static class Program
         Check(getHint != null, "a bare 'get(' call finds the 'dict.get' method");
         Equal(getHint.Name, "dict.get", "the dict method hint keeps the qualified name");
         Equal(getHint.ParameterCount, 2, "the dict method hint has its parameters");
+
+        ParameterSignature appendHint = EditorSignatureSource.FindSignature(
+            L.Python, "append(\n", 0, 7, database, out int appendActive);
+        Check(appendHint != null, "a bare 'append(' call finds the 'list.append' method");
+        Equal(appendHint.Name, "list.append", "the list method hint keeps the qualified name");
+        Equal(appendHint.ParameterCount, 1, "the list method hint has its parameter");
+
+        ParameterSignature readHint = EditorSignatureSource.FindSignature(
+            L.Python, "read(\n", 0, 5, database, out int readActive);
+        Check(readHint != null, "a bare 'read(' call finds the 'file.read' method");
+        Equal(readHint.Name, "file.read", "the file method hint keeps the qualified name");
+        Equal(readHint.ParameterCount, 1, "the file method hint has its parameter");
 
         ParameterSignature runHint = EditorSignatureSource.FindSignature(
             L.Python, "subprocess.run(\n", 0, 15, database, out int runActive);
