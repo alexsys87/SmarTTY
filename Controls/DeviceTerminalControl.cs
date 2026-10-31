@@ -436,22 +436,29 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private System.Windows.Forms.Integration.ElementHost _connectionPromptHost;
 
+    /// <summary>
+    /// Creates the WPF element that shows a connection prompt (the application sets it to the ConnectionClosedPopup
+    /// that the SSH sessions show too). It is a hook because this control is also compiled without the WPF part of the
+    /// application, in the test programs; without it the control shows no prompt.
+    /// </summary>
+    public static Func<SmarTTY.GUI.Backend.IConnectionPrompt, System.Windows.UIElement> ConnectionPromptElementFactory;
+
     private void CreateConnectionPrompt()
     {
         _connectionPrompt = new SmarTTY.GUI.Backend.ConnectionPromptModel(
             reconnect: () => Connect(),
             close: () => CloseTabRequested?.Invoke(this, EventArgs.Empty),
             ignore: IgnoreConnectionPrompt);
-        _connectionPromptHost = new System.Windows.Forms.Integration.ElementHost
+        if (ConnectionPromptElementFactory != null)
         {
-            AutoSize = true,
-            Dock = DockStyle.None,
-            Child = new SmarTTY.GUI.ConnectionClosedPopup
+            _connectionPromptHost = new System.Windows.Forms.Integration.ElementHost
             {
-                DataContext = _connectionPrompt
-            }
-        };
-        pnlConnectionInProgress.Controls.Add(_connectionPromptHost);
+                AutoSize = true,
+                Dock = DockStyle.None,
+                Child = ConnectionPromptElementFactory(_connectionPrompt)
+            };
+            pnlConnectionInProgress.Controls.Add(_connectionPromptHost);
+        }
         // The panel is as big as the popup and sits in the middle of the terminal area, as the popup of an SSH session does.
         pnlConnectionInProgress.SizeChanged += (sender, e) => CenterConnectionCard();
         Resize += (sender, e) => CenterConnectionCard();
@@ -1395,7 +1402,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 }
         }
         // The texts decide how big the popup is.
-        _connectionPromptHost.PerformLayout();
+        _connectionPromptHost?.PerformLayout();
         CenterConnectionCard();
     }
 

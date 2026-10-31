@@ -3,7 +3,7 @@ using System.ComponentModel;
 namespace SmarTTY.GUI.Backend;
 
 /// <summary>
-/// What <see cref="ConnectionClosedPopup"/> shows and does. The same popup serves the SSH sessions
+/// What ConnectionClosedPopup shows and does. The same popup serves the SSH sessions
 /// (<see cref="SessionWrapper.SessionFixer"/>) and the device terminals (COM, TCP, netconsole), so the two never differ.
 /// </summary>
 public interface IConnectionPrompt : INotifyPropertyChanged
