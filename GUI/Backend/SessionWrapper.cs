@@ -21,7 +21,7 @@ using SmarTTY.Completion;
 
 namespace SmarTTY.GUI.Backend;
 
-public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableElement, ITerminalSessionContext, ISSHCommandRunner
+public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableElement, ITerminalSessionContext, ISSHCommandRunnerWithTimeout
 {
     public class SessionFixer : IDisposable, INotifyPropertyChanged
     {
@@ -2590,10 +2590,20 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public string[] RunCommand(string command)
     {
+        return RunCommandCore(command, null);
+    }
+
+    public string[] RunCommand(string command, TimeSpan timeout)
+    {
+        return RunCommandCore(command, timeout);
+    }
+
+    private string[] RunCommandCore(string command, TimeSpan? timeout)
+    {
         // The package manager probes and commands of Linux are POSIX shell: run them in sh whatever the login shell is.
         // A Windows host has no sh: its commands (winget) go to its own shell as they are.
         string line = Session.RemoteOs == RemoteOsKind.Windows ? command : PosixShell.Wrap(command, addAdminDirectoriesToPath: true);
-        string[] output = Session.RunCommandChecked(line, requireSuccess: true)?.ToArray();
+        string[] output = Session.RunCommandChecked(line, requireSuccess: true, timeout: timeout)?.ToArray();
         if (output == null)
         {
             // null means "the command failed" for the callers (a package manager that is not there); not so for a dropped connection.
