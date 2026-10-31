@@ -23,13 +23,22 @@ namespace SmarTTY.GUI.Backend;
 
 public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableElement, ITerminalSessionContext, ISSHCommandRunnerWithTimeout
 {
-    public class SessionFixer : IDisposable, INotifyPropertyChanged
+    public class SessionFixer : IDisposable, IConnectionPrompt
     {
         private SessionWrapper _Session;
 
         private ConnectionSelectionWindow.ControllerImpl _ReconnectionController;
 
         public string HostName => _Session.Title;
+
+        public string Title => "Connection closed";
+
+        public string Message => "The connection to " + HostName + " has been closed. Please select an action:";
+
+        public bool ShowActions => true;
+
+        /// <summary>The progress of the reconnection that is under way (null when there is none).</summary>
+        public string ProgressText => _ReconnectionController?.ProgressText;
 
         public ConnectionSelectionWindow.ControllerImpl Reconnector => _ReconnectionController;
 
@@ -60,9 +69,17 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     ProbeConnections = false
                 }, suppressUpdateThread: true);
                 _ReconnectionController.SessionCreated += _MainController_SessionCreated;
+                _ReconnectionController.PropertyChanged += (sender, e) =>
+                {
+                    if (e.PropertyName == "ProgressText")
+                    {
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ProgressText"));
+                    }
+                };
             }
             _ReconnectionController.BeginSSHConnection(_Session.Settings);
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Reconnector"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ProgressText"));
         }
 
         private void _MainController_SessionCreated()

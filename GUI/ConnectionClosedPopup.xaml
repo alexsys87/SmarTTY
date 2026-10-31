@@ -21,11 +21,17 @@
           <Setter Property="Padding" Value="5 2 5 2" />
           <Setter Property="Margin" Value="3" />
           <Setter Property="MinHeight" Value="26" />
+          <Style.Triggers>
+            <!-- While a connection is being opened there is nothing to choose. -->
+            <DataTrigger Binding="{Binding ShowActions}" Value="False">
+              <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+          </Style.Triggers>
         </Style>
       </ResourceDictionary>
     </FrameworkElement.Resources>
-    <TextBlock Text="Connection closed" Grid.ColumnSpan="2" HorizontalAlignment="Center" FontSize="24" FontWeight="Bold" Margin="3 0 3 6" />
-    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" TextWrapping="Wrap" Margin="3 0 3 6" Text="{Binding HostName, StringFormat=The connection to {0} has been closed. Please select an action:}" />
+    <TextBlock Text="{Binding Title}" Grid.ColumnSpan="2" HorizontalAlignment="Center" FontSize="24" FontWeight="Bold" Margin="3 0 3 6" />
+    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" TextWrapping="Wrap" Margin="3 0 3 6" Text="{Binding Message}" />
     <Image Width="64" Height="64" Grid.Row="2" Grid.RowSpan="3" Source="../icons/MainWindow/busy.png" Margin="8" />
     <Button Content="Try reconnecting" Grid.Column="1" Grid.Row="2" Click="Reconnect" />
     <Button Content="Close tab" Grid.Column="1" Grid.Row="3" Click="Close" />
@@ -38,16 +44,16 @@
       <FrameworkElement.Style>
         <Style TargetType="{x:Type Grid}">
           <Style.Triggers>
-            <DataTrigger Binding="{Binding Path=Reconnector.ProgressText}" Value="{x:Null}">
+            <DataTrigger Binding="{Binding Path=ProgressText}" Value="{x:Null}">
               <Setter Property="Visibility" Value="Hidden" />
             </DataTrigger>
-            <DataTrigger Value="Error" Binding="{Binding Path=Reconnector.ProgressText}">
+            <DataTrigger Value="Error" Binding="{Binding Path=ProgressText}">
               <Setter Property="Visibility" Value="Hidden" />
             </DataTrigger>
           </Style.Triggers>
         </Style>
       </FrameworkElement.Style>
-      <TextBlock VerticalAlignment="Center" Text="{Binding Path=Reconnector.ProgressText}" />
+      <TextBlock VerticalAlignment="Center" Text="{Binding Path=ProgressText}" />
       <ProgressBar IsIndeterminate="True" Margin="5 0 0 0" Grid.Column="1" />
     </Grid>
   </Grid>
