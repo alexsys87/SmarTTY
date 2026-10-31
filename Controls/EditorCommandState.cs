@@ -1,3 +1,4 @@
+using SmarTTY.CodeEditing;
 using System;
 
 namespace SmarTTY.Controls;
@@ -61,6 +62,9 @@ internal struct EditorCommandState
     /// <summary>The editor shows the bytes in the hex view.</summary>
     public bool HexMode { get; set; }
 
+    /// <summary>The selection covers two lines or more: they can be sorted.</summary>
+    public bool HasLineSelection { get; set; }
+
     /// <summary>The file is on the server and the host has tail: it can be followed in a terminal tab.</summary>
     public bool CanFollow { get; set; }
 
@@ -118,6 +122,15 @@ internal struct EditorCommandState
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Whether a Text menu command can be used: the text can be changed and is shown as text, and sorting and removing duplicates
+    /// have lines selected.
+    /// </summary>
+    public bool IsEnabled(LineTransformKind kind)
+    {
+        return !ReadOnly && !HexMode && (!LineTransforms.NeedsSelection(kind) || HasLineSelection);
     }
 
     /// <summary>Whether a command that switches something on is currently on.</summary>

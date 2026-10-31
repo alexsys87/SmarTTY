@@ -1,6 +1,7 @@
 using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 using System;
+using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
@@ -62,6 +63,122 @@ public partial class CodeEditorPP
         caret.Line += lineShift;
         SetSelection(hadSelection, anchor);
         SetCaret(caret);
+    }
+
+    /// <summary>The selection covers two lines or more (what sorting and removing duplicates work on).</summary>
+    public bool HasLineSelection
+    {
+        get
+        {
+            if (!HasSelection)
+            {
+                return false;
+            }
+            GetCommandLines(out int first, out int last);
+            return last > first;
+        }
+    }
+
+    /// <summary>
+    /// Rewrites lines as <paramref name="kind"/> says (the Text menu): the selected lines, or the whole text when nothing is
+    /// selected; sorting and removing duplicates need two lines or more selected. One undo step. Returns false when nothing
+    /// could be done (the editor is read-only, or lines were needed and not selected).
+    /// </summary>
+    public bool ApplyLineTransform(LineTransformKind kind)
+    {
+        if (!CanEditLines)
+        {
+            return false;
+        }
+        if (kind == LineTransformKind.EnsureFinalNewline)
+        {
+            int lastLine = LineCount - 1;
+            // An empty last line means the text already ends with a line break (or is empty).
+            if (lastLine < 0 || EditableDocument.GetLineText(lastLine).Length == 0)
+            {
+                return true;
+            }
+            ExecuteAsSingleUndoStep(() =>
+            {
+                ReplaceText(EndOfLine(lastLine), EndOfLine(lastLine), select: false, LineEnd(lastLine));
+            });
+            UpdateMaxLineWidth(-1);
+            return true;
+        }
+        int first;
+        int last;
+        if (LineTransforms.NeedsSelection(kind))
+        {
+            if (!HasLineSelection)
+            {
+                return false;
+            }
+            GetCommandLines(out first, out last);
+        }
+        else if (HasSelection)
+        {
+            GetCommandLines(out first, out last);
+        }
+        else
+        {
+            first = 0;
+            last = LineCount - 1;
+        }
+        string[] oldLines = new string[last - first + 1];
+        for (int i = 0; i < oldLines.Length; i++)
+        {
+            oldLines[i] = EditableDocument.GetLineText(first + i);
+        }
+        string[] newLines = LineTransforms.Apply(kind, oldLines, TabSize);
+        if (newLines.Length == oldLines.Length && newLines.SequenceEqual(oldLines))
+        {
+            return true;
+        }
+        ReplaceLineTexts(first, oldLines, newLines);
+        return true;
+    }
+
+    /// <summary>Puts <paramref name="newLines"/> in the place of <paramref name="oldLines"/> (which start at line <paramref name="first"/>) in one undo step.</summary>
+    private void ReplaceLineTexts(int first, string[] oldLines, string[] newLines)
+    {
+        bool hadSelection = HasSelection;
+        TextDocument.TextPosition anchor = SelectionStart;
+        TextDocument.TextPosition caret = CaretPosition;
+        if (newLines.Length == oldLines.Length)
+        {
+            ExecuteAsSingleUndoStep(() =>
+            {
+                for (int i = 0; i < oldLines.Length; i++)
+                {
+                    if (oldLines[i] == newLines[i])
+                    {
+                        continue;
+                    }
+                    // Only the part that differs is replaced.
+                    string before = oldLines[i];
+                    string after = newLines[i];
+                    int prefix = CommonPrefixLength(before, after);
+                    int suffix = CommonSuffixLength(before, after, prefix);
+                    ReplaceText(new TextDocument.TextPosition(prefix, first + i), new TextDocument.TextPosition(before.Length - suffix, first + i), select: false,
+                        after.Substring(prefix, after.Length - suffix - prefix));
+                }
+            });
+            anchor.Column = ShiftColumn(anchor, first, oldLines, newLines);
+            caret.Column = ShiftColumn(caret, first, oldLines, newLines);
+            RestoreAfterEdit(hadSelection, anchor, caret, 0);
+        }
+        else
+        {
+            // Lines were removed: the whole block is replaced, and the new block is selected.
+            int last = first + oldLines.Length - 1;
+            string lineEnd = LineEnd(first);
+            ExecuteAsSingleUndoStep(() =>
+            {
+                ReplaceText(new TextDocument.TextPosition(0, first), EndOfLine(last), select: false, string.Join(lineEnd, newLines));
+            });
+            RestoreAfterEdit(true, new TextDocument.TextPosition(0, first), EndOfLine(first + newLines.Length - 1), 0);
+        }
+        UpdateMaxLineWidth(-1);
     }
 
     /// <summary>Inserts a copy of the selected lines (or of the caret line) below them.</summary>
