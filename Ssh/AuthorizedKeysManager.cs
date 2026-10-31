@@ -311,6 +311,49 @@ internal static class AuthorizedKeysManager
         }
     }
 
+    /// <summary>
+    /// Installs the key unless it is already authorized and then proves that the server lets the key in: reading it back
+    /// from authorized_keys only shows that the line is there, not that sshd accepts it (a home directory that is writable
+    /// by others, a server that does not take this key type, a different file in AuthorizedKeysFile). When the login does
+    /// not work the key that this call added is taken out again, a key that was there before is left alone, and the call
+    /// throws, so that the caller keeps the password authentication of the profile.
+    /// </summary>
+    /// <param name="checkLogin">
+    /// Signs in with the new key on a fresh connection: returns null when the server accepted it, otherwise the reason.
+    /// </param>
+    public static void InstallKeyAndVerifyLogin(SshSession sshSession, string keyString, Func<string> checkLogin, Func<string, bool> confirmCleanup = null)
+    {
+        byte[] keyBlob = AuthorizedKeysFile.ParseKeyBlob(keyString)
+            ?? throw new ArgumentException("The line is not a public key", nameof(keyString));
+        bool added = !IsKeyAuthorized(sshSession, keyBlob);
+        if (added)
+        {
+            AppendAuthorizedKey(sshSession, keyString, confirmCleanup);
+        }
+        string problem = checkLogin();
+        if (problem == null)
+        {
+            return;
+        }
+        // The verification may have failed because the main connection dropped too: then nothing can be cleaned up.
+        sshSession.ThrowIfConnectionLost();
+        string note = string.Empty;
+        if (added)
+        {
+            try
+            {
+                RemoveAuthorizedKey(sshSession, keyBlob);
+                note = Environment.NewLine + "The key was removed from the server again.";
+            }
+            catch (Exception exception)
+            {
+                sshSession.ThrowIfConnectionLost();
+                note = Environment.NewLine + "The key could not be removed from the server again: " + exception.Message;
+            }
+        }
+        throw new RemoteOperationException("The server does not accept the key for login: " + problem + note);
+    }
+
     private static void InstallKey(SshSession sshSession, string keyString, byte[] keyBlob, List<string> touchedFiles)
     {
         string homeDir = GetHomeDirectory(sshSession);

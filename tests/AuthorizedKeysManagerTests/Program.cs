@@ -269,6 +269,60 @@ internal static class Program
         error = Catch(() => AuthorizedKeysManager.RemoveAuthorizedKey(session, key));
         Check(error is RemoteOperationException && error.Message.Contains("Timed out") && session.Files[home] == both, "remove: a hanging script is reported");
 
+        // Login verification after the installation: the key must work on a fresh connection, or it does not stay.
+        session = new SshSession();
+        session.Files[home] = KeyLine(other) + "\n";
+        int logins = 0;
+        bool keyThereDuringCheck = false;
+        error = Catch(() => AuthorizedKeysManager.InstallKeyAndVerifyLogin(session, line, () =>
+        {
+            logins++;
+            keyThereDuringCheck = AuthorizedKeysManager.IsKeyAuthorized(session, key);
+            return null;
+        }));
+        Check(error == null && logins == 1 && keyThereDuringCheck, "verify: the login is tried once, with the key already installed");
+        Check(session.Files[home] == KeyLine(other) + "\n" + line + "\n", "verify: a key that works stays next to the others");
+
+        session = new SshSession();
+        session.Files[home] = KeyLine(other) + "\n";
+        error = Catch(() => AuthorizedKeysManager.InstallKeyAndVerifyLogin(session, line, () => "the server rejected the key"));
+        Check(error is RemoteOperationException && error.Message.Contains("does not accept the key") && error.Message.Contains("rejected the key"), "verify: a rejected login is an error with the reason");
+        Check(error.Message.Contains("removed from the server again"), "verify: the error says the key was taken out again");
+        Check(session.Files[home] == KeyLine(other) + "\n", "verify: the key that did not work is removed, the others stay");
+
+        session = new SshSession();
+        session.Files[home] = line + "\n";
+        error = Catch(() => AuthorizedKeysManager.InstallKeyAndVerifyLogin(session, line, () => "the server rejected the key"));
+        Check(error is RemoteOperationException && session.Files[home] == line + "\n", "verify: a key that was there before is not removed when the login fails");
+        Check(session.AppendedPaths.Count == 0 && !error.Message.Contains("removed"), "verify: a key that was there before is not appended again");
+
+        session = new SshSession();
+        session.Files[home] = KeyLine(other) + "\n";
+        error = Catch(() => AuthorizedKeysManager.InstallKeyAndVerifyLogin(session, line, () =>
+        {
+            session.AppendOutcome = AppendOutcome.DiskFull;
+            return "the server rejected the key";
+        }));
+        Check(error is RemoteOperationException && error.Message.Contains("could not be removed") && error.Message.Contains("No space left on device"), "verify: a key that cannot be taken out again is reported");
+
+        session = new SshSession();
+        error = Catch(() => AuthorizedKeysManager.InstallKeyAndVerifyLogin(session, line, () =>
+        {
+            session.IsConnectionClosed = true;
+            return "the connection was closed";
+        }));
+        Check(error is IOException && error.Message.Contains("lost"), "verify: a lost connection is reported as such, not as a rejected key");
+
+        session = new SshSession { AppendOutcome = AppendOutcome.DiskFull };
+        logins = 0;
+        error = Catch(() => AuthorizedKeysManager.InstallKeyAndVerifyLogin(session, line, () => { logins++; return null; }));
+        Check(error != null && error.Message.Contains("No space left on device") && logins == 0, "verify: no login is tried when the installation failed");
+
+        session = new SshSession();
+        logins = 0;
+        error = Catch(() => AuthorizedKeysManager.InstallKeyAndVerifyLogin(session, "not a key", () => { logins++; return null; }));
+        Check(error is ArgumentException && logins == 0 && session.Files.Count == 0, "verify: a line that is not a key is refused before anything happens");
+
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed");
         return 0;

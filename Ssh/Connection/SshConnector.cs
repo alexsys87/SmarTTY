@@ -258,6 +258,14 @@ public partial class SshConnector : Component
         return confirmed;
     }
 
+    // A failure of the new connection that comes from the cancelling of the attempt is a cancel, not a rejected key.
+    private static string CheckKeyLogin(ConnectionAttempt connectionAttempt, SshSession sshSession, ISshKeyPair sshKeyPair)
+    {
+        string problem = sshSession.CheckPublicKeyLogin(sshKeyPair, connectionAttempt.CancelEvent);
+        connectionAttempt.ThrowIfCancelled();
+        return problem;
+    }
+
     private void Authenticate(ConnectionAttempt connectionAttempt, SshSession session, SSHConnectionSettings sshConnectionSettings, string password, ref bool forcePasswordAuth)
     {
         bool passwordConfirmed = false;
@@ -527,10 +535,15 @@ public partial class SshConnector : Component
                 bool keyInstalled = false;
                 try
                 {
-                    if (!AuthorizedKeysManager.IsKeyAuthorized(sshSession, sshKeyPair.GetPublicKeyBlob()))
-                    {
-                        AuthorizedKeysManager.AppendAuthorizedKey(sshSession, sshKeyPair.ToAuthorizedKeysLine(Environment.UserName + "@" + Environment.MachineName), message => Confirm(connectionAttempt, PromptKind.YesNoWarning, message));
-                    }
+                    // The key line is not enough to go on: a fresh connection has to sign in with the key (the server may
+                    // ignore the file, refuse the key type or the permissions of the home directory).
+                    ReportStatus(connectionAttempt, "Checking key login...");
+                    AuthorizedKeysManager.InstallKeyAndVerifyLogin(
+                        sshSession,
+                        sshKeyPair.ToAuthorizedKeysLine(Environment.UserName + "@" + Environment.MachineName),
+                        () => CheckKeyLogin(connectionAttempt, sshSession, sshKeyPair),
+                        message => Confirm(connectionAttempt, PromptKind.YesNoWarning, message));
+                    connectionAttempt.ThrowIfCancelled();
                     keyInstalled = true;
                 }
                 catch (Exception exception) when (!(exception is OperationCanceledException) && !sshSession.IsConnectionClosed)
