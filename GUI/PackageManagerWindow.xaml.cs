@@ -253,7 +253,8 @@ public partial class PackageManagerWindow : Window
             {
                 RunOnUIThread(() =>
                 {
-                    MessageBoxes.Exception(exception);
+                    // A window with selectable text, so that the output of the failed command can be copied.
+                    ErrorDetailsWindow.Show(exception.Message, _Window);
                     _Window.Close();
                 });
             }
@@ -328,7 +329,7 @@ public partial class PackageManagerWindow : Window
                     ProgressText = null;
                     // Bring back the previous list, the refresh did not replace it.
                     ApplyFilter();
-                    MessageBoxes.Exception(exception);
+                    ErrorDetailsWindow.Show(exception.Message, _Window);
                 });
             }
         }

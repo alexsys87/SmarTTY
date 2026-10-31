@@ -707,6 +707,44 @@ public class SshShellChannel : IAsyncChannel, IDisposable
         }
     }
 
+    /// <summary>
+    /// Gives up on the channel without waiting for the server: the readers and <see cref="WaitClosed"/> are released
+    /// at once and the SSH.NET channel is closed on a background thread. Disposing it directly sends a close request
+    /// and waits for the answer, which a server does not give while the command is still running (a package manager
+    /// waiting for a network that is not there), so a timeout built on <see cref="Dispose"/> would hang with it.
+    /// </summary>
+    public void Abandon()
+    {
+        lock (_sync)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+            _polling = false;
+            _eofReceived = true;
+            _closed = true;
+            Monitor.PulseAll(_sync);
+        }
+        _session.UnregisterChannel(this);
+        RaiseFinished();
+        new Thread(() =>
+        {
+            try
+            {
+                _channel.Dispose();
+            }
+            catch
+            {
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "Close abandoned SSH channel"
+        }.Start();
+    }
+
     public virtual void Dispose()
     {
         lock (_sync)
