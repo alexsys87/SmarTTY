@@ -116,6 +116,20 @@ internal static class NegotiationChecks
             }
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // Like a closed socket: a read that waits returns.
+                lock (_chunks)
+                {
+                    _ended = true;
+                    Monitor.PulseAll(_chunks);
+                }
+            }
+            base.Dispose(disposing);
+        }
+
         public byte[] TakeWritten()
         {
             lock (_written)
@@ -311,6 +325,46 @@ internal static class NegotiationChecks
             Wire off = new Wire(Cat(B(IAC, DO, TLS), Text(".")));
             ReadText(new TelnetStream(off, new TelnetOptions { UpgradeToTls = raw => raw }));
             CheckBytes(off.TakeWritten(), B(IAC, WONT, TLS), "starttls: refused unless switched on");
+        }
+        {
+            // required, and the server says nothing: the connection is given up with the reason, and the typed text is bounded
+            Wire silent = Wire.Open();
+            TelnetStream stream = new TelnetStream(silent, new TelnetOptions { StartTls = TelnetStartTlsMode.Require, UpgradeToTls = raw => raw, StartTlsTimeoutMs = 300 });
+            stream.Start();
+            bool refused = false;
+            try
+            {
+                stream.SendCommand(TelnetStream.NOP);
+            }
+            catch (InvalidOperationException)
+            {
+                refused = true;
+            }
+            check(refused, "starttls required: a command is not sent in clear text before the handshake");
+            bool capped = false;
+            try
+            {
+                byte[] block = new byte[16 * 1024];
+                for (int i = 0; i < 8; i++)
+                {
+                    stream.Write(block, 0, block.Length);
+                }
+            }
+            catch (IOException)
+            {
+                capped = true;
+            }
+            check(capped, "starttls required: what is typed while waiting is limited");
+            string message = null;
+            try
+            {
+                ReadText(stream);
+            }
+            catch (IOException exception)
+            {
+                message = exception.Message;
+            }
+            check(message != null && message.Contains("did not start STARTTLS"), "starttls required: a silent server ends the connection with a reason: " + message);
         }
         {
             // required: offered at once, a refusal ends the connection

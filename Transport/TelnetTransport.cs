@@ -46,6 +46,9 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
     /// </summary>
     public string Charset { get; set; }
 
+    /// <summary>How long the server may take to start STARTTLS before the connection is given up, in milliseconds.</summary>
+    public int StartTlsTimeoutMs { get; set; } = 15000;
+
     /// <summary>The server answered a status request (<see cref="RequestRemoteStatus"/>). Raised on the reading thread.</summary>
     public event EventHandler RemoteStatusReceived;
 
@@ -133,6 +136,8 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
             _socket = client;
         }
         TelnetStream stream;
+        int columns;
+        int rows;
         try
         {
             try
@@ -144,13 +149,6 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
             {
                 // The NOP timer below still keeps the connection busy.
             }
-            int columns;
-            int rows;
-            lock (_sizeLock)
-            {
-                columns = _columns;
-                rows = _rows;
-            }
             // Loaded for every attempt, before anything is sent: a missing certificate is reported as the reason the
             // connection cannot be made.
             X509Certificate2 clientCertificate = _telnet.UsesTls ? TelnetTls.LoadClientCertificate(_telnet.TlsClientCertificate) : null;
@@ -161,6 +159,12 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 wire = TelnetTls.Authenticate(wire, _telnet.Host, _telnet.TlsAllowInvalidCertificate, clientCertificate: clientCertificate);
             }
             TelnetAutoLogin autoLogin = CreateAutoLogin();
+            // Read only now: the TLS handshake above may take a while, and the window may have been resized meanwhile.
+            lock (_sizeLock)
+            {
+                columns = _columns;
+                rows = _rows;
+            }
             stream = new TelnetStream(wire, new TelnetOptions
             {
                 TerminalType = _telnet.TerminalType,
@@ -176,6 +180,7 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 Charset = Charset,
                 // telnets is TLS already: the in-band option is not needed (and refused).
                 StartTls = _telnet.Tls ? TelnetStartTlsMode.Off : ToStreamMode(_telnet.StartTls),
+                StartTlsTimeoutMs = StartTlsTimeoutMs,
                 UpgradeToTls = _telnet.Tls || _telnet.StartTls == DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Off
                     ? null
                     : (Func<Stream, Stream>)(raw => TelnetTls.Authenticate(raw, _telnet.Host, _telnet.TlsAllowInvalidCertificate, clientCertificate: clientCertificate))
@@ -189,6 +194,8 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
             client.Close();
             throw;
         }
+        int latestColumns;
+        int latestRows;
         lock (_sizeLock)
         {
             if (_closed)
@@ -199,6 +206,21 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
             StopKeepAlive();
             _stream = stream;
             StartKeepAlive(stream);
+            latestColumns = _columns;
+            latestRows = _rows;
+        }
+        if (latestColumns != columns || latestRows != rows)
+        {
+            // Resized after the size was read and before the stream was known to SetTerminalSize: the server was told
+            // (or will be, by NAWS) the old size, and nothing else would correct it.
+            try
+            {
+                stream.SetWindowSize(latestColumns, latestRows);
+            }
+            catch
+            {
+                // The connection is gone; the reading side reports that.
+            }
         }
     }
 
@@ -366,8 +388,12 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
         {
             try
             {
-                // A NOP is ignored by every telnet server but keeps NAT tables and idle timers alive.
-                stream.SendCommand(TelnetStream.NOP);
+                // A NOP is ignored by every telnet server but keeps NAT tables and idle timers alive. Not before a
+                // required STARTTLS is done: nothing about the session is said in clear text until then.
+                if (!stream.IsAwaitingRequiredTls)
+                {
+                    stream.SendCommand(TelnetStream.NOP);
+                }
             }
             catch
             {

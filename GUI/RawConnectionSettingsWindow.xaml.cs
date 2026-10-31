@@ -292,6 +292,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         // it still works.
         private byte[] _UnreadableEncryptedPassword;
 
+        // The password of a quick connection (user:password@host): it lives in memory only and is never saved, but it is
+        // shown in the password box and kept for as long as the box is left alone.
+        private string _QuickConnectPassword;
+
         // Why the password that was typed in could not be saved (too long, no key container), or null.
         private string _PasswordNotSavedReason;
 
@@ -375,6 +379,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                         KeepAliveSeconds = TelnetKeepAliveSeconds,
                         AutoLoginUserName = string.IsNullOrWhiteSpace(TelnetAutoLoginUserName) ? null : TelnetAutoLoginUserName.Trim(),
                         EncryptedSavedPassword = EncryptTelnetPassword(),
+                        AutoLoginPassword = !string.IsNullOrEmpty(_QuickConnectPassword) && TelnetPassword == _QuickConnectPassword ? _QuickConnectPassword : null,
                         LoginPrompts = string.IsNullOrWhiteSpace(TelnetLoginPrompts) ? null : TelnetLoginPrompts.Trim(),
                         PasswordPrompts = string.IsNullOrWhiteSpace(TelnetPasswordPrompts) ? null : TelnetPasswordPrompts.Trim()
                     };
@@ -592,6 +597,13 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     TelnetAutoLoginUserName = telnet.AutoLoginUserName;
                     TelnetLoginPrompts = telnet.LoginPrompts;
                     TelnetPasswordPrompts = telnet.PasswordPrompts;
+                    if (telnet.EncryptedSavedPassword == null && !string.IsNullOrEmpty(telnet.AutoLoginPassword))
+                    {
+                        // Marked as "encrypted for" itself, so it is not turned into a saved password unless it is edited.
+                        TelnetPassword = telnet.AutoLoginPassword;
+                        _QuickConnectPassword = telnet.AutoLoginPassword;
+                        _EncryptedFor = TelnetPassword;
+                    }
                     if (telnet.EncryptedSavedPassword != null)
                     {
                         try
