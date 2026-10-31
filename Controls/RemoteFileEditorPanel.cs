@@ -1,3 +1,4 @@
+using SmarTTY.CodeEditing;
 using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using System;
@@ -20,6 +21,11 @@ internal sealed class RemoteFileEditorPanel : UserControl
     private readonly ContextMenuStrip _contextMenu;
 
     private readonly Dictionary<EditorToolbarCommand, ToolStripMenuItem> _menuItems = new Dictionary<EditorToolbarCommand, ToolStripMenuItem>();
+
+    // The Text submenu of the context menu: trailing blanks, sorting, duplicates, indentation, the final newline.
+    private readonly ToolStripMenuItem _textMenu;
+
+    private readonly Dictionary<LineTransformKind, ToolStripMenuItem> _transformItems = new Dictionary<LineTransformKind, ToolStripMenuItem>();
 
     // The unscaled menu font, and the font for the current monitor (null until the menu is opened).
     private readonly Font _menuFont;
@@ -73,6 +79,26 @@ internal sealed class RemoteFileEditorPanel : UserControl
         {
             _contextMenu.Items.Add(command.HasValue ? (ToolStripItem)CreateMenuItem(command.Value) : new ToolStripSeparator());
         }
+        _textMenu = new ToolStripMenuItem("Text");
+        foreach (LineTransformKind kind in new[]
+        {
+            LineTransformKind.TrimTrailingWhitespace,
+            LineTransformKind.EnsureFinalNewline,
+            LineTransformKind.SortAscending,
+            LineTransformKind.SortDescending,
+            LineTransformKind.RemoveDuplicateLines,
+            LineTransformKind.IndentationToSpaces,
+            LineTransformKind.IndentationToTabs
+        })
+        {
+            LineTransformKind current = kind;
+            ToolStripMenuItem item = new ToolStripMenuItem(LineTransforms.Title(kind));
+            item.Click += (sender, e) => RunTransform(current);
+            _transformItems[kind] = item;
+            _textMenu.DropDownItems.Add(item);
+        }
+        // After Word Wrap, with the other commands about how the text looks and is laid out.
+        _contextMenu.Items.Insert(_contextMenu.Items.IndexOf(_menuItems[EditorToolbarCommand.WordWrap]) + 1, _textMenu);
         _menuFont = _contextMenu.Font;
         _contextMenu.Opening += (sender, e) =>
         {
@@ -122,6 +148,26 @@ internal sealed class RemoteFileEditorPanel : UserControl
         menuItem.Click += (sender, e) => RunCommand(command);
         _menuItems[command] = menuItem;
         return menuItem;
+    }
+
+    /// <summary>Runs a command of the Text menu.</summary>
+    private void RunTransform(LineTransformKind kind)
+    {
+        if (!CaptureState().IsEnabled(kind))
+        {
+            RefreshState();
+            return;
+        }
+        try
+        {
+            _editor.ApplyLineTransform(kind);
+        }
+        catch (Exception exception)
+        {
+            ThemedMessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+        }
+        _editor.FocusActiveView();
+        RefreshState();
     }
 
     /// <summary>Runs a command from the tool bar or the context menu.</summary>
@@ -259,6 +305,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         return new EditorCommandState
         {
             ReadOnly = _editor.ReadOnly,
+            HasLineSelection = _editor.HasLineSelection,
             HasSelection = _editor.HasSelection && _editor.SelectionStart != _editor.SelectionEnd,
             HasText = lineCount > 1 || (lineCount == 1 && _editor.EditableDocument.GetLineText(0).Length > 0),
             CanUndo = _editor.CanUndo,
@@ -287,6 +334,11 @@ internal sealed class RemoteFileEditorPanel : UserControl
         {
             pair.Value.Enabled = CommandState.IsEnabled(pair.Key);
             pair.Value.Checked = CommandState.IsChecked(pair.Key);
+        }
+        _textMenu.Enabled = !CommandState.ReadOnly && !CommandState.HexMode;
+        foreach (KeyValuePair<LineTransformKind, ToolStripMenuItem> pair in _transformItems)
+        {
+            pair.Value.Enabled = CommandState.IsEnabled(pair.Key);
         }
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -351,6 +403,8 @@ internal sealed class RemoteFileEditorPanel : UserControl
         Font previousFont = _scaledMenuFont;
         _scaledMenuFont = font;
         _contextMenu.Font = font;
+        _textMenu.DropDown.Font = font;
+        _textMenu.DropDown.ImageScalingSize = new Size(imageSize, imageSize);
         previousFont?.Dispose();
     }
 
@@ -365,6 +419,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         _palette = ToolbarPalette.FromCurrentTheme();
         _renderer = new ThemedToolStripRenderer(_palette);
         ApplyMenuTheme(_contextMenu);
+        ApplyMenuTheme(_textMenu.DropDown);
     }
 
     private void ApplyMenuTheme(ToolStripDropDown menu)

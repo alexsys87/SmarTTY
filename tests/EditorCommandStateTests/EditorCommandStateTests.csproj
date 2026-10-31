@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Controls/EditorCommandState.cs" Link="EditorCommandState.cs" />
+    <Compile Include="../../CodeEditing/LineTransforms.cs" Link="LineTransforms.cs" />
   </ItemGroup>
 </Project>

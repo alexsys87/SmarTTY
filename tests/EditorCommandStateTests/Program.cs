@@ -156,6 +156,17 @@ internal static class Program
         Check(EditorStatusText.State(false, false, false, false, true) == "New file", "status: a new empty file");
         Check(EditorStatusText.State(false, false, false, false, false) == "Saved", "status: nothing to save");
 
+        // The Text menu: it needs text that can be changed; sorting and removing duplicates need lines selected.
+        foreach (SmarTTY.CodeEditing.LineTransformKind kind in Enum.GetValues(typeof(SmarTTY.CodeEditing.LineTransformKind)))
+        {
+            bool needsLines = SmarTTY.CodeEditing.LineTransforms.NeedsSelection(kind);
+            Check(new EditorCommandState { HasLineSelection = true }.IsEnabled(kind), "text menu: " + kind + " is on for an editable text with lines selected");
+            Check(new EditorCommandState().IsEnabled(kind) == !needsLines, "text menu: " + kind + (needsLines ? " needs lines selected" : " works without a selection"));
+            Check(!new EditorCommandState { ReadOnly = true, HasLineSelection = true }.IsEnabled(kind), "text menu: " + kind + " is off in a read-only editor");
+            Check(!new EditorCommandState { HexMode = true, HasLineSelection = true }.IsEnabled(kind), "text menu: " + kind + " is off in the hex view");
+            Check(SmarTTY.CodeEditing.LineTransforms.Title(kind).Length > 0, "text menu: " + kind + " has a title");
+        }
+
         // Every command has a rule (an unknown value is off).
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {
