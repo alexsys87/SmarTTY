@@ -1960,6 +1960,33 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         return null;
     }
 
+    /// <summary>
+    /// Works out again what is under the mouse pointer, for a hover target that depends on more than the pointer (a modifier key
+    /// that was pressed or released while the mouse stood still).
+    /// </summary>
+    protected void RefreshHoverTarget()
+    {
+        if (!IsHandleCreated)
+        {
+            return;
+        }
+        Point location = PointToClient(Control.MousePosition);
+        HoverTarget target = null;
+        if (_textArea.Contains(location))
+        {
+            int line = YToLine(location.Y);
+            if (line != -1)
+            {
+                target = GetHoverTarget(line, location);
+            }
+        }
+        _hoverTarget = target;
+        if (_textArea.Contains(location))
+        {
+            Cursor = target?.Cursor ?? Cursors.IBeam;
+        }
+    }
+
     protected TextDocument.TextPosition GetMovedPosition(CaretMove caretMove, bool extendSelection = false)
     {
         return ComputeMovedPosition(caretMove, Control.ModifierKeys, CaretPosition, extendSelection);

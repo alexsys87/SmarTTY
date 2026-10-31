@@ -176,6 +176,39 @@ public sealed class TerminalDirectoryWatcher
         return null;
     }
 
+    /// <summary>
+    /// The directory a Unix shell names with OSC 7 ("file://host/home/me/src", percent-encoded): the path, or null for anything else,
+    /// a Windows drive path ("/C:/Users", see <see cref="DirectoryOfOsc"/>) included. Many distributions set it in the prompt of bash
+    /// and zsh (/etc/profile.d/vte.sh), and it is what a link in the output of a command is resolved against.
+    /// </summary>
+    internal static string UnixDirectoryOfOsc(int code, string text)
+    {
+        if (code != 7 || text == null)
+        {
+            return null;
+        }
+        Match match = FileUrl.Match(text.Trim());
+        if (!match.Success)
+        {
+            return null;
+        }
+        string path;
+        try
+        {
+            path = Uri.UnescapeDataString(match.Groups["path"].Value);
+        }
+        catch (UriFormatException)
+        {
+            return null;
+        }
+        if (path.Length == 0 || path[0] != '/' || Regex.IsMatch(path, "^/[A-Za-z]:") || path.IndexOf('\0') >= 0)
+        {
+            return null;
+        }
+        string trimmed = path.TrimEnd('/');
+        return trimmed.Length == 0 ? "/" : trimmed;
+    }
+
     private static bool HasOscTerminator(string text, int from)
     {
         for (int index = from; index < text.Length; index++)

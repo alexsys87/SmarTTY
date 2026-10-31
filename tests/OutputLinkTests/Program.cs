@@ -57,8 +57,13 @@ internal static class Program
         public readonly Host Host = new Host();
 
         public Output(string workingDirectory, string command, params string[] pieces)
+            : this(workingDirectory, command, false, pieces)
         {
-            OutputLinkScanner scanner = new OutputLinkScanner(Host, workingDirectory, command);
+        }
+
+        public Output(string workingDirectory, string command, bool strictAbsolute, params string[] pieces)
+        {
+            OutputLinkScanner scanner = new OutputLinkScanner(Host, workingDirectory, command, strictAbsolute: strictAbsolute);
             StringBuilder text = new StringBuilder();
             List<TerminalEmulatorBase.LinkCell> cells = new List<TerminalEmulatorBase.LinkCell>();
             foreach (string piece in pieces)
@@ -174,6 +179,58 @@ internal static class Program
         Output gcc = new Output("/w", "gcc a.c", "a.c:3:17: error: x\n");
         Equal(gcc.Click(0), "/w/a.c|2|16", "the column is passed on as it was printed, minus one");
         Equal(gcc.Host.Units[0], ColumnUnit.TabStops, "...with the unit");
+    }
+
+    // A classic terminal tab knows neither the command nor, until the shell reports it with OSC 7, the directory.
+    private static void ClassicTerminalChecks()
+    {
+        Output unknown = new Output("", null, true, "src/main.c:12:5: error: x\n", "see ./util.h:3 and ../lib/a.c\n", "/etc/passwd:3:x\n");
+        Equal(unknown.Covered.Count, 4, "no command and no directory: the names are still links");
+        Equal(unknown.Click(0), "src/main.c|11|4", "a relative name stays relative for the control to resolve");
+        Equal(unknown.Click(1), "util.h|2|-", "'./' is dropped");
+        Equal(unknown.Click(2), "../lib/a.c|-|-", "'..' is kept");
+        Equal(unknown.Click(3), "/etc/passwd|2|-", "an absolute name is as it is");
+        Equal(unknown.Host.Units[0], ColumnUnit.Characters, "no command to tell the compiler from: columns count characters");
+
+        Output reported = new Output("/home/u/proj", null, true, "main.c:7:1: warning: y\n");
+        Equal(reported.Click(0), "/home/u/proj/main.c|6|0", "a directory reported by the shell is put in front");
+
+        Output listing = new Output("", null, true, "drwxr-xr-x 2 u u 4096 Oct 31 08:00 src\n", "-rw-r--r-- 1 u u   12 Oct 31 08:00 notes.txt\n", "user@host:~/proj$ ");
+        Equal(listing.Covered.Count, 1, "ls -l: the file with a known extension is a link, the directory and the prompt are not");
+        Equal(listing.Covered[0], "notes.txt", "...and only the name is");
+
+        // Absolute names: in a classic tab a prompt and a directory must not be links.
+        Output prompts = new Output("", null, true, "me@host:/var/log$ ", "me@host:~/proj/src# ", "me@host:~/notes.txt$ ", "[me@host proj]$ ");
+        Equal(prompts.Covered.Count, 0, "prompts: neither the directory behind the colon nor the one behind '~' is a link");
+
+        Output absolute = new Output("", null, true, "/etc/hosts\n", "/var/log/syslog\n", "/etc/passwd:3:x\n", "/usr/include/stdio.h:10:5: note: y\n", "cat ~/a.txt\n", "(/opt/app/run.sh)\n", "/srv/Makefile\n");
+        Equal(absolute.Covered.Count, 4, "a known file or a position makes an absolute name a link, a bare file of an unknown kind does not");
+        Equal(absolute.Click(0), "/etc/passwd|2|-", "/etc/passwd:3 opens line 3");
+        Equal(absolute.Click(1), "/usr/include/stdio.h|9|4", "/usr/include/stdio.h:10:5");
+        Equal(absolute.Click(2), "/opt/app/run.sh|-|-", "a name in parentheses");
+        Equal(absolute.Click(3), "/srv/Makefile|-|-", "a name that is known without an extension");
+
+        // The same text in a Smart Terminal tab (the command is known there): every absolute name is a link, but "~/" never is.
+        Output smart = new Output("/w", "find /etc -name 'h*'", "/etc/hosts\n", "/etc/hostname\n", "~/b.txt\n", "dir/~/c.txt\n");
+        Equal(smart.Covered.Count, 2, "not strict: every absolute name is a link, but nothing behind a '~/'");
+        Equal(smart.Click(1), "/etc/hostname|-|-", "...and the one after it is the next one");
+    }
+
+    private static void OscDirectoryChecks()
+    {
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file://host/home/u/proj"), "/home/u/proj", "OSC 7: the path");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file:///var/log/"), "/var/log", "...without a trailing slash");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file://host/"), "/", "...except for the root");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file://host//"), "/", "...also when it is only slashes");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file://host/home/u/my%20dir"), "/home/u/my dir", "percent-encoded characters");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file://host/home/%D0%BF"), "/home/\u043f", "UTF-8 in percent-encoding");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file://host/C:/Users/me"), null, "a drive path is the business of the Windows watcher");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file://host/a%00b"), null, "a NUL in the path");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "http://host/x"), null, "not a file URL");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file://host"), null, "no path");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, null), null, "no text");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(9, "file://host/home"), null, "another OSC");
+        Equal(TerminalDirectoryWatcher.UnixDirectoryOfOsc(7, "file://host/%E0%A4%A"), "/%E0%A4%A", "a broken escape is left as it is");
     }
 
     private static void NameWithoutExtensionChecks()
@@ -463,6 +520,8 @@ internal static class Program
         ColoredOutputChecks();
         NameWithoutExtensionChecks();
         ColumnUnitChecks();
+        ClassicTerminalChecks();
+        OscDirectoryChecks();
         DirectoryChecks();
         CommandHintChecks();
         MessageChecks();

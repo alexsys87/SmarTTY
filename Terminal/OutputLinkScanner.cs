@@ -69,6 +69,10 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
 
         private readonly ColumnUnit _unit;
 
+        // A name that starts with "/" is a link only when it is a file that is known by its extension or name, or when a position
+        // follows it (see the constructor of the scanner).
+        private readonly bool _strictAbsolute;
+
         private StringBuilder _extension;
 
         private int? _line;
@@ -87,11 +91,21 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             State = CandidateState.Rejected;
         }
 
-        public LinkCandidate(IOutputLinkHost host, string directory, ColumnUnit unit, char firstChar)
+        /// <summary>The name is no link, and the rest of it (up to a character that cannot be in a name) is not looked at either.</summary>
+        public void Swallow()
+        {
+            State = CandidateState.Rejected;
+            _swallow = true;
+        }
+
+        private bool _swallow;
+
+        public LinkCandidate(IOutputLinkHost host, string directory, ColumnUnit unit, bool strictAbsolute, char firstChar)
         {
             _host = host;
             _directory = directory;
             _unit = unit;
+            _strictAbsolute = strictAbsolute;
             _path.Append(firstChar);
             State = (firstChar == '/') ? CandidateState.AbsolutePath : CandidateState.Word;
         }
@@ -141,7 +155,7 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         {
             if (State == CandidateState.Rejected)
             {
-                return false;
+                return _swallow && IsPathChar(ch);
             }
             if (State == CandidateState.Position)
             {
@@ -157,7 +171,7 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
                 _extension?.Append(ch);
                 return true;
             }
-            Complete();
+            Complete(ch == ':');
             if (ch == ':')
             {
                 return true;
@@ -165,7 +179,7 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             return false;
         }
 
-        public void Complete()
+        public void Complete(bool positionMayFollow = false)
         {
             if (State == CandidateState.Position)
             {
@@ -180,7 +194,7 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             }
             if (State == CandidateState.AbsolutePath)
             {
-                State = CandidateState.Position;
+                State = (_strictAbsolute && !positionMayFollow && !IsKnownFile()) ? CandidateState.Rejected : CandidateState.Position;
             }
             else if (State == CandidateState.Word && (IsKnownFile()))
             {
@@ -240,6 +254,11 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
 
     private char _previousChar;
 
+    // For a terminal that shows more than the output of one command (a classic tab, with its prompts and its listings): a name
+    // that starts with "/" is a link only when it is a file known by its extension or name, or a position follows it. Without
+    // that, the directory in a prompt ("me@host:/var/log$") and the ones that "ls -d" prints would be links.
+    private readonly bool _strictAbsolute;
+
     /// <param name="host">The terminal.</param>
     /// <param name="workingDirectory">Where the command was typed.</param>
     /// <param name="commandText">The command line; where it says the build works in another directory, the names are relative to that.</param>
@@ -247,9 +266,11 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
     /// <param name="highlight">Mark the words of errors, warnings and notes.</param>
     /// <param name="logLevels">Mark the lines of a log from their level (ERROR, WARN, [error], level=warn) to the end.</param>
     /// <param name="columnSetting">What the columns count, or Auto to tell it from the command line.</param>
-    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText, bool links = true, bool highlight = false, bool logLevels = false, ColumnUnit columnSetting = ColumnUnit.Auto)
+    /// <param name="strictAbsolute">An absolute name is a link only when it is a known kind of file or has a position (a classic terminal tab).</param>
+    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText, bool links = true, bool highlight = false, bool logLevels = false, ColumnUnit columnSetting = ColumnUnit.Auto, bool strictAbsolute = false)
     {
         _host = host;
+        _strictAbsolute = strictAbsolute;
         _columnUnit = CompilerColumns.Resolve(columnSetting, commandText);
         _links = links;
         _highlight = highlight;
@@ -306,10 +327,15 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         {
             if (IsPathChar(ch) && prevChar != '/')
             {
-                _current = new LinkCandidate(_host, CurrentDirectory, _columnUnit, ch);
+                _current = new LinkCandidate(_host, CurrentDirectory, _columnUnit, _strictAbsolute, ch);
                 if (ch == '/')
                 {
                     _lastAbsolute = _current;
+                    // "~/notes.txt": the shell expands the "~", and the scanner cannot, so there is no name to make a link of.
+                    if (prevChar == '~')
+                    {
+                        _current.Swallow();
+                    }
                 }
                 return _current;
             }

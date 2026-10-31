@@ -10,6 +10,7 @@
     <Compile Include="../../Terminal/BuildDirectories.cs" Link="BuildDirectories.cs" />
     <Compile Include="../../Terminal/DiagnosticHighlighter.cs" Link="DiagnosticHighlighter.cs" />
     <Compile Include="../../Terminal/OutputLinkScanner.cs" Link="OutputLinkScanner.cs" />
+    <Compile Include="../../Terminal/TerminalDirectoryWatcher.cs" Link="TerminalDirectoryWatcher.cs" />
     <Compile Include="../../CodeEditing/CompilerColumns.cs" Link="CompilerColumns.cs" />
     <Compile Include="../../Utilities/EnumDisplayText.cs" Link="EnumDisplayText.cs" />
   </ItemGroup>

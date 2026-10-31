@@ -1884,6 +1884,11 @@ public class MainWindowController : INotifyPropertyChanged
             terminalEmulatorControl.HighlightLogLevels = initialCommand.HighlightLogLevels;
             // Decided before the shell starts: the PTY of a byte-counting shell is opened without IUTF8.
             terminalEmulatorControl.ByteOrientedLineEditing = session.UsesByteOrientedLineEditing(smartTerminal: false);
+            // Ctrl+click on a file name in the output opens it in the editor; relative names are resolved against the directory
+            // the shell reports (OSC 7) or, failing that, the one read from the title or the prompt.
+            terminalEmulatorControl.FileLinks = session.VTSettings.ClassicTerminalLinks && !session.IsWindowsHost && !session.IsDevice;
+            terminalEmulatorControl.DirectoryFallback = () => session.TryExtractCurrentDir();
+            terminalEmulatorControl.FileLinkClicked += Vt_FileOpenRequested;
             SshShellChannel sshShellChannel = session.Session.OpenShellChannel(initialCommand.Command, "xterm", ExtendedDataMode.Normal, utf8Tty: !terminalEmulatorControl.ByteOrientedLineEditing);
             sshShellChannel.ExtendedDataMode = ExtendedDataMode.Merge;
             terminalEmulatorControl.DataEntered += terminalEmulatorControl1_HandleTerminalInput;
