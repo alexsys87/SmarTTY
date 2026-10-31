@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
     <Compile Include="../../Terminal/BuildDirectories.cs" Link="BuildDirectories.cs" />
+    <Compile Include="../../Terminal/DiagnosticHighlighter.cs" Link="DiagnosticHighlighter.cs" />
     <Compile Include="../../Terminal/OutputLinkScanner.cs" Link="OutputLinkScanner.cs" />
   </ItemGroup>
 </Project>

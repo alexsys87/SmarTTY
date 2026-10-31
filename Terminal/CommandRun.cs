@@ -26,8 +26,8 @@ internal class CommandRun
         this.StartLine = startLine;
     }
 
-    internal TerminalEmulatorBase.ILinkScanner CreateScanner()
+    internal TerminalEmulatorBase.ILinkScanner CreateScanner(bool links, bool highlightDiagnostics)
     {
-        return new OutputLinkScanner(_terminal, WorkingDirectory, CommandText);
+        return new OutputLinkScanner(_terminal, WorkingDirectory, CommandText, links, highlightDiagnostics);
     }
 }

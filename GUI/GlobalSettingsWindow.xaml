@@ -547,6 +547,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -631,6 +632,7 @@
               <CheckBox Grid.Row="6" Grid.ColumnSpan="2" Margin="5" Content="Show the exit code of a command that fails" IsChecked="{Binding ShowExitCodes}" />
               <TextBlock Text="Programs in shells that count UTF-8 bytes:" Grid.Row="7" ToolTip="For commands run from a Smart Terminal tab when the shell edits its input in UTF-8 bytes (BusyBox without UTF-8 support, OpenWrt): Backspace, Delete and the arrows are sent once per byte of a non-Latin letter. The command line itself is always edited by SmarTTY. Applies to tabs opened afterwards." />
               <ListBox Grid.Row="7" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=ByteOrientedLineEditing, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding ByteOrientedLineEditing}" />
+              <CheckBox Grid.Row="8" Grid.ColumnSpan="2" Margin="5" Content="Highlight errors and warnings in command output" IsChecked="{Binding HighlightDiagnostics}" ToolTip="Colours error:, warning: and note: (and undefined reference, make's Error 2) in red, yellow and cyan when the compiler did not colour them itself. The compiler's own colours are never changed." />
             </Grid>
           </GroupBox>
           <GroupBox Header="Command Completion" DataContext="{Binding VirtualTerminal}">

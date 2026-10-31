@@ -43,6 +43,12 @@ public class VirtualTerminalSettings
     public bool ShowFileExplorer { get; set; } = true;
 
     /// <summary>
+    /// Colour "error:", "warning:" and "note:" (and "undefined reference", make's "Error 2") in the output of commands in red,
+    /// yellow and cyan where the compiler did not colour them itself; the compiler's own colours are never changed.
+    /// </summary>
+    public bool HighlightDiagnostics { get; set; } = true;
+
+    /// <summary>
     /// Byte mode for programs run in Smart Terminal tabs when the shell counts UTF-8 bytes (BusyBox without Unicode
     /// support, OpenWrt); the command line itself is always edited locally. See GlobalSettings.ByteOrientedLineEditing.
     /// </summary>

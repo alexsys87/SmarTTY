@@ -249,8 +249,123 @@ internal static class Program
         Check(!BuildDirectories.TryParseMessage(null, out entering, out directory), "null text");
     }
 
+    private static string Spans(string line)
+    {
+        return string.Join(" | ", DiagnosticHighlighter.FindSpans(line).Select(span => span.Severity + ":" + line.Substring(span.Start, span.Length)));
+    }
+
+    private static void DiagnosticSpanChecks()
+    {
+        Equal(Spans("main.c:12:5: error: expected ';' before 'return'"), "3:error:", "gcc error");
+        Equal(Spans("main.c:3:1: warning: unused variable 'x' [-Wunused-variable]"), "2:warning:", "gcc warning");
+        Equal(Spans("main.c:3:1: note: declared here"), "1:note:", "gcc note");
+        Equal(Spans("gcc: error: foo.c: No such file or directory"), "3:error:", "the driver: 'gcc: error:'");
+        Equal(Spans("cc1: fatal error: foo.h: No such file or directory"), "3:fatal error:", "fatal error");
+        Equal(Spans("a.c:1:10: fatal error: 'x.h' file not found"), "3:fatal error:", "clang fatal error with a position");
+        Equal(Spans("/usr/bin/ld: warning: x.o: missing .note.GNU-stack section implies executable stack"), "2:warning:", "ld warning; '.note.GNU-stack' is not a note");
+        Equal(Spans("collect2: error: ld returned 1 exit status"), "3:error:", "collect2");
+        Equal(Spans("make[1]: warning: jobserver unavailable"), "2:warning:", "a warning of make");
+        Equal(Spans("error[E0425]: cannot find value `x` in this scope"), "3:error[E0425]:", "rustc error with a code");
+        Equal(Spans("warning: unused variable: `x`"), "2:warning:", "rustc/cargo warning at the start of the line");
+        Equal(Spans("  = note: `#[warn(unused_variables)]` on by default"), "1:note:", "cargo '= note:'");
+        Equal(Spans("error: failed to push some refs to 'origin'"), "3:error:", "git error");
+
+        Equal(Spans("main.o: in function `main':"), "", "a line with a colon and no keyword");
+        Equal(Spans("this is an error: not really"), "", "the word in a sentence is left alone");
+        Equal(Spans("Error: Cannot find module 'x'"), "", "a capital letter is not a compiler keyword");
+        Equal(Spans("see errors: below"), "", "'errors' is not 'error'");
+        Equal(Spans("main.c: In function 'f':"), "", "'In function' is not a keyword");
+        Equal(Spans("[error: x]"), "", "inside brackets is not the place");
+        Equal(Spans("make: Nothing to be done for 'all'."), "", "another make message");
+        Equal(Spans("   Compiling foo v0.1.0"), "", "an ordinary line");
+        Equal(Spans(""), "", "empty line");
+        Equal(Spans(null), "", "null line");
+
+        Equal(Spans("main.c:(.text+0x5): undefined reference to `foo'"), "3:undefined reference to", "linker: undefined reference");
+        Equal(Spans("b.o:(.data+0x0): multiple definition of `x'; a.o:(.data+0x0): first defined here"), "3:multiple definition of", "linker: multiple definition");
+        Equal(Spans("make: *** [Makefile:30: all] Error 2"), "3:*** | 3:Error 2", "make failure: the marker and the status");
+        Equal(Spans("make[2]: *** No rule to make target 'x'.  Stop."), "3:***", "make: no rule");
+        Equal(Spans("FAILED: CMakeFiles/a.dir/b.c.o"), "3:FAILED:", "ninja failure");
+        Equal(Spans("gcc: error: undefined reference to x"), "3:error: | 3:undefined reference to", "a keyword and a phrase on one line");
+    }
+
+    private sealed class Marker
+    {
+        private readonly OutputLinkScanner _scanner;
+
+        public Marker(bool links, bool highlight)
+        {
+            _scanner = new OutputLinkScanner(new Host(), "/w", "make", links, highlight);
+        }
+
+        public int LinkCount { get; private set; }
+
+        // One line of output as pieces (column from the start of the line). Returns the text marked as note, warning, error.
+        public string[] Line(params string[] pieces)
+        {
+            StringBuilder[] marked = { new StringBuilder(), new StringBuilder(), new StringBuilder(), new StringBuilder() };
+            int column = 0;
+            foreach (string piece in pieces)
+            {
+                TerminalEmulatorBase.LinkCell[] cells = _scanner.Scan(piece, column);
+                for (int i = 0; i < cells.Length; i++)
+                {
+                    marked[cells[i].Severity].Append(piece[i]);
+                    if (cells[i].Target != null && cells[i].Target.IsActive)
+                    {
+                        LinkCount++;
+                    }
+                }
+                column += piece.Length;
+            }
+            return new[] { marked[1].ToString(), marked[2].ToString(), marked[3].ToString() };
+        }
+    }
+
+    private static void SeverityCellChecks()
+    {
+        Marker marker = new Marker(links: true, highlight: true);
+        string[] gcc = marker.Line("main.c:12:5: error: expected ';' before 'return'");
+        Equal(gcc[2], "error:", "a cell of 'error:' is marked as an error");
+        Equal(gcc[0] + gcc[1], "", "nothing else on the line is marked");
+        Check(marker.LinkCount > 0, "the file name on the same line is still a link");
+
+        string[] warning = marker.Line("a.c:1:1: warning: x");
+        Equal(warning[1], "warning:", "a warning");
+        string[] note = marker.Line("a.c:1:1: note: y");
+        Equal(note[0], "note:", "a note");
+
+        // The pieces of a coloured line: the position and the keyword arrive separately.
+        string[] pieces = new Marker(true, true).Line("main.c:1:1: ", "error:", " bad");
+        Equal(pieces[2], "error:", "the keyword in a piece of its own, after the position");
+
+        // A keyword cut between two pieces is marked from where the match is complete: the rest of it.
+        string[] cut = new Marker(true, true).Line("main.c:1:1: err", "or: bad");
+        Equal(cut[2], "or:", "a keyword split between two pieces: the part written earlier stays plain");
+
+        // A new line (column 0) forgets the line before; the same piece in the middle of a line does not.
+        Marker lines = new Marker(true, true);
+        lines.Line("something: ");
+        Equal(lines.Line("error: x")[2], "error:", "'error:' at the start of the next line");
+        Equal(lines.Line("prefix words ", "error: x")[2], "", "'error:' after ordinary words is not marked");
+
+        Equal(new Marker(true, false).Line("main.c:1:1: error: x")[2], "", "highlighting off: nothing is marked");
+
+        Marker noLinks = new Marker(links: false, highlight: true);
+        string[] only = noLinks.Line("main.c:1:1: error: x");
+        Equal(only[2], "error:", "links off: the keyword is still marked");
+        Equal(noLinks.LinkCount, 0, "links off: there is no link");
+
+        // A very long line is not analysed.
+        Marker longLine = new Marker(true, true);
+        Equal(longLine.Line(new string('x', 1200), "error: y")[2], "", "a line longer than the limit is left alone");
+        Equal(longLine.Line("error: z")[2], "error:", "...and the next line is analysed again");
+    }
+
     private static void Main()
     {
+        DiagnosticSpanChecks();
+        SeverityCellChecks();
         CompilerMessageChecks();
         ColoredOutputChecks();
         NameWithoutExtensionChecks();

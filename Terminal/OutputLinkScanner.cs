@@ -24,9 +24,12 @@ internal interface IOutputLinkHost
 /// Names are relative to the directory the build tool works in, which is what <see cref="BuildDirectories"/> works out from
 /// the command line and from the "Entering directory" lines of make and ninja.
 ///
+/// It also marks the words that stand for an error, a warning or a note (<see cref="DiagnosticHighlighter"/>) in the
+/// cells it returns, for the terminal to colour where the compiler left the text plain.
+///
 /// The class is free of any UI dependency, so the test harness can check it without a display.
 /// </summary>
-internal sealed class OutputLinkScanner : TerminalEmulatorBase.ILinkScanner
+internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkScanner
 {
     public const string PathCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-/";
 
@@ -38,6 +41,9 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.ILinkScanner
 
     // The end of the output is kept to find a "Entering directory" message; a message is a line, far below this.
     private const int TailLimit = 600;
+
+    // A line longer than this is not looked at for errors and warnings (a minified file, a binary dump).
+    private const int MaxAnalyzedLine = 1000;
 
     private enum CandidateState
     {
@@ -202,6 +208,15 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.ILinkScanner
 
     private readonly StringBuilder _tail = new StringBuilder();
 
+    private readonly bool _links;
+
+    private readonly bool _highlight;
+
+    // The text of the line so far, for the words of errors and warnings, which are told by what stands in front of them.
+    private readonly StringBuilder _line = new StringBuilder();
+
+    private bool _lineTooLong;
+
     private LinkCandidate _current;
 
     // The last name that started with '/': the directory of an "Entering directory" message is that one.
@@ -212,9 +227,13 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.ILinkScanner
     /// <param name="host">The terminal.</param>
     /// <param name="workingDirectory">Where the command was typed.</param>
     /// <param name="commandText">The command line; where it says the build works in another directory, the names are relative to that.</param>
-    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText)
+    /// <param name="links">Make links of the file names.</param>
+    /// <param name="highlight">Mark the words of errors, warnings and notes.</param>
+    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText, bool links = true, bool highlight = false)
     {
         _host = host;
+        _links = links;
+        _highlight = highlight;
         _startDirectory = BuildDirectories.Analyze(commandText, workingDirectory, out _shellDirectory) ?? workingDirectory;
     }
 
@@ -285,23 +304,66 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.ILinkScanner
 
     public TerminalEmulatorBase.LinkCell[] Scan(string lineText)
     {
-        char[] charArray = lineText.ToArray();
-        LinkCandidate[] candidateArray = charArray.Select(ReadChar).ToArray();
-        for (int i = 0; i < candidateArray.Length; i++)
+        return Scan(lineText, -1);
+    }
+
+    /// <param name="text">A piece of the output, within one line.</param>
+    /// <param name="column">The column of the piece on the screen: 0 starts a new line; -1 when it is not known.</param>
+    public TerminalEmulatorBase.LinkCell[] Scan(string text, int column)
+    {
+        TerminalEmulatorBase.LinkCell[] cells = new TerminalEmulatorBase.LinkCell[text.Length];
+        if (_links)
         {
-            if (candidateArray[i] != null && candidateArray[i].State == CandidateState.Rejected)
+            char[] charArray = text.ToArray();
+            LinkCandidate[] candidateArray = charArray.Select(ReadChar).ToArray();
+            for (int i = 0; i < candidateArray.Length; i++)
             {
-                candidateArray[i] = null;
-            }
-            else if (charArray[i] == ':' && (i >= candidateArray.Length - 1 || candidateArray[i + 1] == null || candidateArray[i + 1].State == CandidateState.Rejected))
-            {
-                candidateArray[i] = null;
+                if (candidateArray[i] != null && candidateArray[i].State == CandidateState.Rejected)
+                {
+                    candidateArray[i] = null;
+                }
+                else if (charArray[i] == ':' && (i >= candidateArray.Length - 1 || candidateArray[i + 1] == null || candidateArray[i + 1].State == CandidateState.Rejected))
+                {
+                    candidateArray[i] = null;
+                }
+                cells[i].Target = candidateArray[i];
             }
         }
-        return candidateArray.Select((LinkCandidate linkCandidate) => new TerminalEmulatorBase.LinkCell
+        if (_highlight)
         {
-            Target = linkCandidate
-        }).ToArray();
+            MarkDiagnostics(text, column, cells);
+        }
+        return cells;
+    }
+
+    private void MarkDiagnostics(string text, int column, TerminalEmulatorBase.LinkCell[] cells)
+    {
+        if (column == 0)
+        {
+            _line.Clear();
+            _lineTooLong = false;
+        }
+        if (_lineTooLong)
+        {
+            return;
+        }
+        int offset = _line.Length;
+        if (offset + text.Length > MaxAnalyzedLine)
+        {
+            _lineTooLong = true;
+            return;
+        }
+        _line.Append(text);
+        foreach (DiagnosticHighlighter.Span span in DiagnosticHighlighter.FindSpans(_line.ToString()))
+        {
+            // Only the part of the span that is in this piece: the earlier part has been written already.
+            int from = Math.Max(span.Start, offset) - offset;
+            int to = Math.Min(span.Start + span.Length, offset + text.Length) - offset;
+            for (int i = from; i < to; i++)
+            {
+                cells[i].Severity = span.Severity;
+            }
+        }
     }
 
     public void Finish()
