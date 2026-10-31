@@ -97,6 +97,14 @@ public partial class SshConnector : Component
     public static Func<SSHConnectionSettings, string, bool> HostKeyMismatchPrompt;
 
     /// <summary>
+    /// Asks the user for the prompts of a keyboard-interactive login that the password does not answer, such as a
+    /// verification code (settings, the name and instruction of the server, the prompts): returns the responses in the
+    /// order of the prompts, or null when the user cancelled. Injected by <c>App</c> like the host key prompts. Without a
+    /// hook those prompts are answered with an empty text.
+    /// </summary>
+    public static Func<SSHConnectionSettings, string, string, SshSession.KeyboardInteractivePrompt[], string[]> KeyboardInteractivePrompt;
+
+    /// <summary>
     /// Tells the user that the list of known hosts is damaged or cannot be read, or that an accepted host key could not be saved:
     /// otherwise the hosts accepted so far would silently ask for confirmation again. Injected by <c>App</c> like the prompts above;
     /// without a hook nothing is shown.
@@ -347,7 +355,33 @@ public partial class SshConnector : Component
                     // before the user has typed anything. An account without a password still works: the prompt returns "".
                     // Without a prompt handler there is nobody to ask, so the empty password is tried as before.
                     string attemptedPassword = ConnectionRules.FirstPasswordToTry(password, canAskUser: CredentialsRequested != null);
-                    if (attemptedPassword != null && session.Authenticate(sshConnectionSettings.UserName, attemptedPassword))
+                    // A server with two-factor authentication asks for more than the password in the same login: the
+                    // user answers those prompts (the verification code) here, the password answers its own prompt.
+                    bool promptDeclined = false;
+                    SshSession.KeyboardInteractiveHandler promptsForUser = KeyboardInteractivePrompt == null ? null : (string name, string instruction, SshSession.KeyboardInteractivePrompt[] prompts, string[] responses) =>
+                    {
+                        string[] answers = null;
+                        InvokeOnUi(() =>
+                        {
+                            if (!connectionAttempt.Cancelled)
+                            {
+                                answers = KeyboardInteractivePrompt(sshConnectionSettings, name, instruction, prompts);
+                            }
+                        });
+                        if (answers == null)
+                        {
+                            promptDeclined = true;
+                            return;
+                        }
+                        Array.Copy(answers, responses, Math.Min(answers.Length, responses.Length));
+                    };
+                    bool passwordAccepted = attemptedPassword != null && session.Authenticate(sshConnectionSettings.UserName, attemptedPassword, promptsForUser);
+                    if (promptDeclined)
+                    {
+                        // The user closed the question of the server: that is giving up, not a wrong password.
+                        throw new OperationCanceledException();
+                    }
+                    if (passwordAccepted)
                     {
                         if (passwordConfirmed && sshConnectionSettings.EncryptedSavedPassword != null && password != null)
                         {

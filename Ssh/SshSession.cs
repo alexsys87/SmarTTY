@@ -813,7 +813,7 @@ public class SshSession : IDisposable
     /// <summary>
     /// Authenticates with a password, using the password or keyboard-interactive method depending on what the server allows.
     /// </summary>
-    public bool Authenticate(string userName, string password)
+    public bool Authenticate(string userName, string password, KeyboardInteractiveHandler promptsForUser = null)
     {
         AuthMethods authMethods = GetAuthMethods(userName);
         if (IsAuthenticated)
@@ -830,11 +830,11 @@ public class SshSession : IDisposable
         }
         if ((authMethods & AuthMethods.KeyboardInteractive) != 0)
         {
-            return AuthenticateKeyboardInteractiveWithPassword(userName, password);
+            return AuthenticateKeyboardInteractiveWithPassword(userName, password, promptsForUser);
         }
         if (!AuthenticateWithPassword(userName, password))
         {
-            return AuthenticateKeyboardInteractiveWithPassword(userName, password);
+            return AuthenticateKeyboardInteractiveWithPassword(userName, password, promptsForUser);
         }
         return true;
     }
@@ -848,13 +848,27 @@ public class SshSession : IDisposable
         });
     }
 
-    public bool AuthenticateKeyboardInteractiveWithPassword(string userName, string password)
+    /// <summary>
+    /// Answers the password prompt with the password. The other prompts of the server (a verification code, a one-time
+    /// password, the new password of an expired account) are handed to <paramref name="promptsForUser"/> with just those
+    /// prompts, which fills their responses; without it they are answered with an empty text.
+    /// </summary>
+    public bool AuthenticateKeyboardInteractiveWithPassword(string userName, string password, KeyboardInteractiveHandler promptsForUser = null)
     {
+        KeyboardInteractiveAnswers answers = new KeyboardInteractiveAnswers(password);
         return AuthenticateKeyboardInteractive(userName, (string name, string instruction, KeyboardInteractivePrompt[] prompts, string[] responses) =>
         {
-            if (responses.Length > 0)
+            List<int> forUser = answers.Fill(prompts.Select((KeyboardInteractivePrompt prompt) => prompt.Text).ToArray(), responses);
+            if (forUser.Count == 0 || promptsForUser == null)
             {
-                responses[0] = password;
+                return;
+            }
+            KeyboardInteractivePrompt[] asked = forUser.Select((int index) => prompts[index]).ToArray();
+            string[] answered = new string[asked.Length];
+            promptsForUser(name, instruction, asked, answered);
+            for (int i = 0; i < asked.Length; i++)
+            {
+                responses[forUser[i]] = answered[i];
             }
         });
     }
