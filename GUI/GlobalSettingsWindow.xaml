@@ -549,6 +549,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -636,6 +637,7 @@
               <CheckBox Grid.Row="8" Grid.ColumnSpan="2" Margin="5" Content="Highlight errors and warnings in command output" IsChecked="{Binding HighlightDiagnostics}" ToolTip="Colours error:, warning: and note: (and undefined reference, make's Error 2) in red, yellow and cyan when the compiler did not colour them itself. The compiler's own colours are never changed." />
               <TextBlock Text="Columns in compiler messages count:" Grid.Row="9" ToolTip="What the column in file:line:column means when you click a message and the file opens at that place. gcc counts screen columns (a tab goes to the next multiple of 8), clang and go count bytes, rustc counts characters. Detect looks at the command that printed the message." />
               <ListBox Grid.Row="9" Grid.Column="1" Style="{StaticResource EnumListBox}" ItemsSource="{Binding Path=CompilerColumns, Converter={StaticResource EnumValueFetcher}}" SelectedItem="{Binding CompilerColumns}" />
+              <CheckBox Grid.Row="10" Grid.ColumnSpan="2" Margin="5" Content="Ctrl+click a file name in a normal terminal tab to open it in the editor" IsChecked="{Binding ClassicTerminalLinks}" ToolTip="For the output of programs in an ordinary shell tab of a Unix host. A name relative to the current directory is resolved against the directory the shell reports (OSC 7, which the prompt of bash and zsh sends on many systems) or, failing that, the one read from the title or the prompt. Applies to tabs opened afterwards." />
             </Grid>
           </GroupBox>
           <GroupBox Header="Command Completion" DataContext="{Binding VirtualTerminal}">

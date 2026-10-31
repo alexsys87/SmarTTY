@@ -1,4 +1,6 @@
-﻿using SmarTTY.Native;
+﻿using SmarTTY.IO;
+using SmarTTY.Native;
+using SmarTTY.TextEditing;
 using SmarTTY.Terminal;
 using SmarTTY.Utilities;
 using System;
@@ -23,13 +25,143 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     /// </summary>
     public bool HighlightLogLevels { get; set; }
 
+    /// <summary>
+    /// File names in the output of the programs are links (Ctrl+click opens the file in the editor). Only for a classic terminal
+    /// of a Unix host; a Smart Terminal tab has links of its own (see <see cref="SshTerminalControl"/>).
+    /// </summary>
+    public bool FileLinks { get; set; }
+
+    /// <summary>
+    /// The directory the shell reported with OSC 7 (the prompt of bash or zsh sends it on many systems), or null. Relative names in
+    /// the output are resolved against it.
+    /// </summary>
+    public string ReportedDirectory { get; private set; }
+
+    /// <summary>
+    /// Tells the directory of the shell when it did not report one (the title or the prompt, see AppEnvironment.GetCurrentDirectory);
+    /// called when a link is clicked, since reading it may take a round trip to the server.
+    /// </summary>
+    public Func<string> DirectoryFallback { get; set; }
+
+    /// <summary>A link to a file was clicked; the path is absolute when the directory of the shell is known.</summary>
+    public event EventHandler<OpenFileEventArgs> FileLinkClicked;
+
+    private string _linkExtensionsText;
+
+    private System.Collections.Generic.HashSet<string> _linkExtensions;
+
+    private sealed class ClassicLinkHost : IOutputLinkHost
+    {
+        private readonly TerminalEmulatorControl _terminal;
+
+        public ClassicLinkHost(TerminalEmulatorControl terminal)
+        {
+            _terminal = terminal;
+        }
+
+        public bool IsLinkExtension(string extension)
+        {
+            return _terminal.IsLinkExtension(extension);
+        }
+
+        public void RequestOpenFile(string path, int? line, int? column, CodeEditing.ColumnUnit unit)
+        {
+            _terminal.OpenLinkedFile(path, line, column, unit);
+        }
+    }
+
+    private bool IsLinkExtension(string extension)
+    {
+        string text = AppSettings?.VirtualTerminal?.AutoLinkExtensions;
+        if (!string.Equals(text, _linkExtensionsText, StringComparison.Ordinal) || _linkExtensions == null)
+        {
+            _linkExtensionsText = text;
+            _linkExtensions = VirtualTerminalSettings.ParseAutoLinkExtensions(text);
+        }
+        return _linkExtensions.Contains(extension);
+    }
+
+    private void OpenLinkedFile(string path, int? line, int? column, CodeEditing.ColumnUnit unit)
+    {
+        if (!path.StartsWith("/", StringComparison.Ordinal))
+        {
+            // A name relative to a directory that the shell never reported: the directory it is in now.
+            string directory = null;
+            try
+            {
+                directory = DirectoryFallback?.Invoke();
+            }
+            catch (Exception)
+            {
+            }
+            path = RemotePathUtils.Combine(directory, path);
+        }
+        FileLinkClicked?.Invoke(this, new OpenFileEventArgs
+        {
+            Path = path,
+            Line = line,
+            Column = column,
+            ColumnUnit = unit
+        });
+    }
+
+    // Only an ordinary screen of a shell has links: a full-screen program (an editor, a pager) draws its own text, and one that
+    // takes the mouse needs the clicks.
+    private bool LinksAvailable => FileLinks && ActiveBufferIndex == 0 && _mouseMode == MouseReportingMode.Off;
+
     internal override ILinkScanner CreateLinkScanner()
     {
         if (HighlightLogLevels)
         {
             return new SmarTTY.Terminal.OutputLinkScanner(null, "/", null, links: false, highlight: false, logLevels: true);
         }
+        if (LinksAvailable)
+        {
+            return new SmarTTY.Terminal.OutputLinkScanner(new ClassicLinkHost(this), ReportedDirectory ?? "", null, links: true, highlight: false, logLevels: false,
+                columnSetting: AppSettings?.VirtualTerminal?.CompilerColumns ?? CodeEditing.ColumnUnit.Auto, strictAbsolute: true);
+        }
         return base.CreateLinkScanner();
+    }
+
+    private ILinkTarget GetFileLinkAt(int line, Point point)
+    {
+        LineInfo lineInfo = ActiveBuffer?.Lines?.GetLine(line);
+        if (lineInfo?.Cells != null)
+        {
+            TextDocument.TextPosition textPosition = HitTest(point);
+            if (textPosition.Column >= 0 && textPosition.Column < lineInfo.Cells.Length)
+            {
+                return lineInfo.Cells[textPosition.Column]._link.Target;
+            }
+        }
+        return null;
+    }
+
+    // Plain clicks select text in a classic terminal, so a link needs Ctrl.
+    protected override HoverTarget GetHoverTarget(int line, Point point)
+    {
+        if (LinksAvailable && (Control.ModifierKeys & Keys.Control) != 0 && (Control.ModifierKeys & Keys.Shift) == 0)
+        {
+            ILinkTarget linkTarget = GetFileLinkAt(line, point);
+            if (linkTarget != null && linkTarget.IsActive)
+            {
+                return new HoverTarget
+                {
+                    Cursor = Cursors.Hand,
+                    ClickAction = linkTarget.Activate
+                };
+            }
+        }
+        return base.GetHoverTarget(line, point);
+    }
+
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        if (FileLinks && e.KeyCode == Keys.ControlKey)
+        {
+            RefreshHoverTarget();
+        }
     }
 
     public enum BeepMode
@@ -1161,6 +1293,16 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             return false;
         }
+        if (command == 7)
+        {
+            // The directory of the shell (the prompt of bash and zsh sends it on many systems).
+            string directory = TerminalDirectoryWatcher.UnixDirectoryOfOsc(command, content.Substring(separator + 1));
+            if (directory != null)
+            {
+                ReportedDirectory = directory;
+            }
+            return directory != null;
+        }
         // 0 sets the icon name and the title, 2 the title only; 1 (the icon name alone) does not touch the title.
         if (command == 0 || command == 2)
         {
@@ -1604,6 +1746,10 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        if (FileLinks && e.KeyCode == Keys.ControlKey)
+        {
+            RefreshHoverTarget();
+        }
         if (TryHandlePasteShortcut(e))
         {
             return;

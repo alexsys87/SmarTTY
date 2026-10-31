@@ -55,6 +55,12 @@ public class VirtualTerminalSettings
     public SmarTTY.CodeEditing.ColumnUnit CompilerColumns { get; set; }
 
     /// <summary>
+    /// File names in the output of programs in a classic terminal tab (an ordinary shell on a Unix host) open in the editor on
+    /// Ctrl+click. Applies to tabs opened afterwards.
+    /// </summary>
+    public bool ClassicTerminalLinks { get; set; } = true;
+
+    /// <summary>
     /// Byte mode for programs run in Smart Terminal tabs when the shell counts UTF-8 bytes (BusyBox without Unicode
     /// support, OpenWrt); the command line itself is always edited locally. See GlobalSettings.ByteOrientedLineEditing.
     /// </summary>
