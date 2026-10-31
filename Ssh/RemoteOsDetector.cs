@@ -17,6 +17,18 @@ public enum RemoteOsKind
     Windows
 }
 
+/// <summary>The kernel of a Unix host, as far as the tools of SmarTTY care: some of them (the process manager reads /proc) need Linux.</summary>
+public enum RemoteKernelKind
+{
+    /// <summary>Not asked yet, or the host did not answer: the tools are offered as before.</summary>
+    Unknown,
+
+    Linux,
+
+    /// <summary>FreeBSD, macOS, Solaris and the like.</summary>
+    Other
+}
+
 /// <summary>
 /// Tells a Windows SSH server from the Unix ones. The probes and the file listing of SmarTTY are shell commands of Linux and
 /// BSD hosts; on Windows they fail one after the other (the disk bar polling df every ten seconds, the package manager window
@@ -72,5 +84,34 @@ public static class RemoteOsDetector
             }
         }
         return RemoteOsKind.Unknown;
+    }
+
+    /// <summary>Printed by the host probe as "SMARTTY_KERNEL=" followed by the output of uname -s.</summary>
+    public const string KernelMarker = "SMARTTY_KERNEL=";
+
+    /// <summary>The shell command that makes the host print its kernel, to be part of the host probe.</summary>
+    public const string KernelProbeCommand = "echo " + KernelMarker + "$(uname -s 2>/dev/null)";
+
+    /// <summary>Linux or another kernel from the output of <see cref="KernelProbeCommand"/>; unknown when it printed no name.</summary>
+    public static RemoteKernelKind FromKernelProbe(IEnumerable<string> lines)
+    {
+        if (lines == null)
+        {
+            return RemoteKernelKind.Unknown;
+        }
+        foreach (string rawLine in lines)
+        {
+            string line = rawLine?.Trim();
+            if (line != null && line.StartsWith(KernelMarker, StringComparison.Ordinal))
+            {
+                string name = line.Substring(KernelMarker.Length).Trim();
+                if (name.Length == 0)
+                {
+                    return RemoteKernelKind.Unknown;
+                }
+                return string.Equals(name, "Linux", StringComparison.OrdinalIgnoreCase) ? RemoteKernelKind.Linux : RemoteKernelKind.Other;
+            }
+        }
+        return RemoteKernelKind.Unknown;
     }
 }

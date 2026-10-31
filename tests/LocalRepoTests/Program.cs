@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using SmarTTY.LocalRepo;
@@ -1441,6 +1442,65 @@ internal static class Program
     }
 
     /// <summary>A Windows SSH server is recognised by its banner, and by a command when the banner says nothing.</summary>
+    private static void ToolAvailabilityTests()
+    {
+        Check(RemoteOsDetector.FromKernelProbe(new[] { "SMARTTY_KERNEL=Linux" }) == RemoteKernelKind.Linux, "Kernel probe: Linux");
+        Check(RemoteOsDetector.FromKernelProbe(new[] { "SMARTTY_OS=other", " SMARTTY_KERNEL=FreeBSD " }) == RemoteKernelKind.Other, "Kernel probe: FreeBSD is another kernel");
+        Check(RemoteOsDetector.FromKernelProbe(new[] { "SMARTTY_KERNEL=Darwin" }) == RemoteKernelKind.Other, "Kernel probe: macOS is another kernel");
+        Check(RemoteOsDetector.FromKernelProbe(new[] { "SMARTTY_KERNEL=" }) == RemoteKernelKind.Unknown, "Kernel probe: no name is no answer");
+        Check(RemoteOsDetector.FromKernelProbe(new[] { "'uname' is not recognized" }) == RemoteKernelKind.Unknown && RemoteOsDetector.FromKernelProbe(null) == RemoteKernelKind.Unknown, "Kernel probe: an error or no output is no answer");
+
+        // The host probe prints the kernel for real: the answer of this machine's sh agrees with uname.
+        RunArgs("sh", new[] { "-c", OpenWrtDetector.ProbeCommand }, out string probeOutput, out _);
+        RemoteKernelKind thisKernel = RemoteOsDetector.FromKernelProbe(probeOutput.Split('\n'));
+        Check(thisKernel == (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? RemoteKernelKind.Linux : RemoteKernelKind.Other), "Host probe: the kernel is reported next to the OpenWrt markers (" + probeOutput.Trim().Replace('\n', ' ') + ")");
+        Check(OpenWrtDetector.IsAnswer(probeOutput.Split('\n')), "Host probe: the OpenWrt markers are still there");
+
+        RemoteHostFacts Host(RemoteOsKind os, RemoteKernelKind kernel = RemoteKernelKind.Unknown, bool packageManager = false, bool localRepo = false, bool isDevice = false)
+        {
+            return new RemoteHostFacts(isDevice, os, kernel, packageManager, localRepo);
+        }
+
+        // Linux, found by the probes: everything but the TFTP upload of devices.
+        RemoteHostFacts linux = Host(RemoteOsKind.Unix, RemoteKernelKind.Linux, packageManager: true);
+        foreach (SessionTool tool in new[] { SessionTool.PackageManager, SessionTool.ProcessManager, SessionTool.PortForwarding, SessionTool.SocksProxy, SessionTool.PublicKeyAuthentication, SessionTool.RunScript, SessionTool.X11Check })
+        {
+            Check(ToolAvailability.IsAvailable(tool, linux), "Linux host offers " + tool);
+        }
+        Check(!ToolAvailability.IsAvailable(SessionTool.TftpFirmware, linux), "Linux host: no TFTP upload");
+        Check(!ToolAvailability.IsAvailable(SessionTool.LocalRepoServer, linux), "Linux host that is not OpenWrt: no local repository server");
+        Check(ToolAvailability.IsAvailable(SessionTool.LocalRepoServer, Host(RemoteOsKind.Unix, RemoteKernelKind.Linux, localRepo: true)), "OpenWrt host offers the local repository server");
+
+        // A host that has not answered a probe yet: the tools that do not wait for a probe are offered, the others are not.
+        RemoteHostFacts unprobed = Host(RemoteOsKind.Unknown);
+        Check(ToolAvailability.IsAvailable(SessionTool.ProcessManager, unprobed) && ToolAvailability.IsAvailable(SessionTool.RunScript, unprobed), "Unprobed host: the Unix tools are offered");
+        Check(!ToolAvailability.IsAvailable(SessionTool.PackageManager, unprobed) && !ToolAvailability.IsAvailable(SessionTool.LocalRepoServer, unprobed), "Unprobed host: the tools that wait for a probe are not");
+
+        // FreeBSD / macOS: no /proc, but the rest of the Unix tools work.
+        RemoteHostFacts bsd = Host(RemoteOsKind.Unix, RemoteKernelKind.Other, packageManager: true);
+        Check(!ToolAvailability.IsAvailable(SessionTool.ProcessManager, bsd), "BSD host: no process manager (it reads /proc)");
+        Check(ToolAvailability.IsAvailable(SessionTool.RunScript, bsd) && ToolAvailability.IsAvailable(SessionTool.X11Check, bsd) && ToolAvailability.IsAvailable(SessionTool.PackageManager, bsd), "BSD host: script, X11 check and packages");
+
+        // Windows: only what the SSH protocol and the key files give; winget is the package manager.
+        RemoteHostFacts windows = Host(RemoteOsKind.Windows, packageManager: true);
+        foreach (SessionTool tool in new[] { SessionTool.ProcessManager, SessionTool.RunScript, SessionTool.X11Check, SessionTool.TftpFirmware, SessionTool.LocalRepoServer })
+        {
+            Check(!ToolAvailability.IsAvailable(tool, windows), "Windows host does not offer " + tool);
+        }
+        foreach (SessionTool tool in new[] { SessionTool.PortForwarding, SessionTool.SocksProxy, SessionTool.PublicKeyAuthentication, SessionTool.PackageManager })
+        {
+            Check(ToolAvailability.IsAvailable(tool, windows), "Windows host offers " + tool);
+        }
+        Check(!ToolAvailability.IsAvailable(SessionTool.PackageManager, Host(RemoteOsKind.Windows)), "Windows host without winget: no packages");
+
+        // A COM or TCP device has no SSH server at all: only the TFTP upload.
+        RemoteHostFacts deviceHost = Host(RemoteOsKind.Unknown, packageManager: true, localRepo: true, isDevice: true);
+        foreach (SessionTool tool in System.Enum.GetValues(typeof(SessionTool)))
+        {
+            Check(ToolAvailability.IsAvailable(tool, deviceHost) == (tool == SessionTool.TftpFirmware), "Device session: " + tool + (tool == SessionTool.TftpFirmware ? " is offered" : " is not offered"));
+        }
+    }
+
     private static void RemoteOsDetectorTests()
     {
         foreach ((string banner, RemoteOsKind expected) in new[]
@@ -1928,6 +1988,7 @@ internal static class Program
             ApkDetectorAndScannerTests();
             PosixShellTests();
             RemoteOsDetectorTests();
+            ToolAvailabilityTests();
             ApkConfigTests();
             await ApkServerAndHostTests();
             await ApkEndToEndTests();

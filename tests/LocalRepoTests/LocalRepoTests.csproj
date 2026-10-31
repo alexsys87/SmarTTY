@@ -22,6 +22,7 @@
     <Compile Include="../../Utilities/XmlStorage.cs" Link="XmlStorage.cs" />
     <Compile Include="../../Utilities/PosixShell.cs" Link="PosixShell.cs" />
     <Compile Include="../../Ssh/RemoteOsDetector.cs" Link="RemoteOsDetector.cs" />
+    <Compile Include="../../Ssh/ToolAvailability.cs" Link="ToolAvailability.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
   </ItemGroup>
 </Project>
