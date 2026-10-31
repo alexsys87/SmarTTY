@@ -366,8 +366,9 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 UpdateEditorTitle(editor);
                 // A file whose name tells nothing (e.g. a script without an extension) may still be
-                // recognized by its "#!" line now that the content is known.
-                if (editor.SyntaxOverride == null && _Controller.Settings.Editor.SyntaxHighlighting && SyntaxHighlighting.DetectLanguage(editor.RemotePath) == SyntaxHighlighting.Language.Plain)
+                // recognized by its "#!" line now that the content is known. The completion language follows
+                // the detection even when the highlighting is off, so this runs in that case too.
+                if (editor.SyntaxOverride == null && SyntaxHighlighting.DetectLanguage(editor.RemotePath) == SyntaxHighlighting.Language.Plain)
                 {
                     _Controller.ApplySyntaxHighlighting(editor);
                 }

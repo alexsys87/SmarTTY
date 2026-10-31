@@ -41,8 +41,9 @@ public partial class RemoteFileEditor
     internal void ReportLanguage(SyntaxHighlighting.Language language)
     {
         CurrentLanguage = language;
-        // The completion popup offers the words of the highlighted language.
-        CompletionLanguage = language;
+        // The completion popup offers the words of the file's language (chosen by hand, or detected from the
+        // name and the #! line), whether or not the highlighting is switched on.
+        CompletionLanguage = DetectSyntax();
         CurrentLanguageChanged?.Invoke(this, EventArgs.Empty);
     }
 }

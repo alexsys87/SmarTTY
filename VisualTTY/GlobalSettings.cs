@@ -90,7 +90,7 @@ public class GlobalSettings : INotifyPropertyChanged
         // The editor offers words (keywords and identifiers of the file) while typing; Ctrl+Space opens the list.
         public bool Autocompletion;
 
-        // The completion popup also opens by itself after a couple of letters of an identifier.
+        // The completion popup also opens by itself after a couple of letters of an identifier (on by default).
         public bool AutocompletionOnTyping;
 
         // The completion list and the parameter hint also offer the standard API symbols of the language
@@ -191,7 +191,7 @@ public class GlobalSettings : INotifyPropertyChanged
         ShowLineNumbers = true,
         SyntaxHighlighting = true,
         Autocompletion = true,
-        AutocompletionOnTyping = false,
+        AutocompletionOnTyping = true,
         ApiSymbols = true
     };
 
@@ -356,6 +356,8 @@ public class GlobalSettings : INotifyPropertyChanged
     public bool ShowTabsMigrated { get; set; }
 
     public bool EditorAutocompletionMigrated { get; set; }
+
+    public bool EditorAutocompletionOnTypingMigrated { get; set; }
 
     public bool EditorApiSymbolsMigrated { get; set; }
 
@@ -530,6 +532,15 @@ public class GlobalSettings : INotifyPropertyChanged
             // configurations; it can be switched off in Settings afterwards.
             Editor.Autocompletion = true;
             EditorAutocompletionMigrated = true;
+            Save();
+        }
+        if (!EditorAutocompletionOnTypingMigrated)
+        {
+            // The completion list used to open only on Ctrl+Space (the setting was off by default). It now opens
+            // while typing by default: turn it on once for existing configurations; it can be switched off in
+            // Settings afterwards.
+            Editor.AutocompletionOnTyping = true;
+            EditorAutocompletionOnTypingMigrated = true;
             Save();
         }
         if (!EditorApiSymbolsMigrated)
