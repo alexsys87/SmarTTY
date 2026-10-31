@@ -1,6 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <UserControl x:Class="SmarTTY.GUI.ConnectionClosedPopup" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:SmarTTY.GUI">
-  <Grid Margin="5" Width="420">
+  <Border Background="{DynamicResource Theme.PopupBackground}" BorderBrush="{DynamicResource Theme.Border}" BorderThickness="1" Padding="12" TextBlock.Foreground="{DynamicResource Theme.Text}">
+  <Grid Width="420">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
@@ -18,14 +19,16 @@
         <Style x:Key="{x:Type Button}" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
           <Setter Property="VerticalAlignment" Value="Center" />
           <Setter Property="Padding" Value="5 2 5 2" />
+          <Setter Property="Margin" Value="3" />
+          <Setter Property="MinHeight" Value="26" />
         </Style>
       </ResourceDictionary>
     </FrameworkElement.Resources>
-    <TextBlock Text="Connection closed" Grid.ColumnSpan="2" HorizontalAlignment="Center" FontSize="24" FontWeight="Bold" />
-    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding HostName, StringFormat=The connection to {0} has been closed. Please select an action:}" />
+    <TextBlock Text="Connection closed" Grid.ColumnSpan="2" HorizontalAlignment="Center" FontSize="24" FontWeight="Bold" Margin="3 0 3 6" />
+    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" TextWrapping="Wrap" Margin="3 0 3 6" Text="{Binding HostName, StringFormat=The connection to {0} has been closed. Please select an action:}" />
     <Image Width="64" Height="64" Grid.Row="2" Grid.RowSpan="3" Source="../icons/MainWindow/busy.png" Margin="8" />
-    <Button Content="Try reconnecting to host" Grid.Column="1" Grid.Row="2" Click="Reconnect" />
-    <Button Content="Close session" Grid.Column="1" Grid.Row="3" Click="Close" />
+    <Button Content="Try reconnecting" Grid.Column="1" Grid.Row="2" Click="Reconnect" />
+    <Button Content="Close tab" Grid.Column="1" Grid.Row="3" Click="Close" />
     <Button Content="Ignore" Grid.Column="1" Grid.Row="4" Click="Ignore" />
     <Grid Row="5" ColumnSpan="2" Margin="0 10 0 0">
       <Grid.ColumnDefinitions>
@@ -48,4 +51,5 @@
       <ProgressBar IsIndeterminate="True" Margin="5 0 0 0" Grid.Column="1" />
     </Grid>
   </Grid>
+  </Border>
 </UserControl>

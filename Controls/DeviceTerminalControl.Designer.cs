@@ -210,6 +210,8 @@ public partial class DeviceTerminalControl
             // (title, text, picture and the three actions), coloured by ApplyConnectionPromptTheme.
             this.pnlConnectionCard.AutoSize = true;
             this.pnlConnectionCard.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.pnlConnectionCard.Padding = new System.Windows.Forms.Padding(12);
+            this.pnlConnectionCard.Paint += new System.Windows.Forms.PaintEventHandler(this.pnlConnectionCard_Paint);
             this.pnlConnectionCard.ColumnCount = 2;
             this.pnlConnectionCard.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 80F));
             this.pnlConnectionCard.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 340F));
