@@ -127,8 +127,6 @@ public class SSHConnectionSettings
 
     public string ConnectionAlias { get; set; }
 
-    public bool SuppressKeyMismatchWarning { get; set; }
-
     /// <summary>Keep-alive default of a connection whose profile does not say (0), in seconds.</summary>
     public const int DefaultKeepaliveSeconds = 15;
 
