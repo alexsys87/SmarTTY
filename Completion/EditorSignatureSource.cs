@@ -252,6 +252,7 @@ public static class EditorSignatureSource
                 return TryKeywordDefinition(text, i, out name, out openParen, "def", "sub", "function", "fn")
                     || TryBareDefinition(text, i, out name, out openParen);
             case SyntaxHighlighting.Language.CLike:
+            case SyntaxHighlighting.Language.Cpp:
                 return TryKeywordDefinition(text, i, out name, out openParen, "function", "func", "fn")
                     || TryCStyleDefinition(text, i, out name, out openParen);
             default:
@@ -540,6 +541,7 @@ public static class EditorSignatureSource
         switch (language)
         {
             case SyntaxHighlighting.Language.CLike:
+            case SyntaxHighlighting.Language.Cpp:
                 return c == '/' && next == '/';
             case SyntaxHighlighting.Language.Sql:
             case SyntaxHighlighting.Language.Lua:
@@ -563,7 +565,8 @@ public static class EditorSignatureSource
         {
             return false;
         }
-        if (language != SyntaxHighlighting.Language.CLike && language != SyntaxHighlighting.Language.Sql)
+        if (language != SyntaxHighlighting.Language.CLike && language != SyntaxHighlighting.Language.Cpp &&
+            language != SyntaxHighlighting.Language.Sql)
         {
             return false;
         }

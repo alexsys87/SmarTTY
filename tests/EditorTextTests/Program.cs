@@ -106,6 +106,26 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/sshd_config"), L.Config, "sshd_config is a config file");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service"), L.Config, "systemd units are config files");
         Equal(SyntaxHighlighting.DetectLanguage("/src/main.c"), L.CLike, "C sources are C-like");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.cpp"), L.Cpp, "C++ sources are C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.cxx"), L.Cpp, ".cxx is C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.cc"), L.Cpp, ".cc is C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.c++"), L.Cpp, ".c++ is C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.hpp"), L.Cpp, "C++ headers are C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.hxx"), L.Cpp, ".hxx is C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.hh"), L.Cpp, ".hh is C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.h++"), L.Cpp, ".h++ is C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.ipp"), L.Cpp, ".ipp is C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.tpp"), L.Cpp, ".tpp is C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.inl"), L.Cpp, ".inl is C++");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.ixx"), L.Cpp, ".ixx is a C++ module interface");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.cppm"), L.Cpp, ".cppm is a C++ module");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/sketch.ino"), L.Cpp, ".ino is a C++ sketch");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.h"), L.CLike, "C headers stay C-like");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Cpp), "C++", "C++ has its own display name");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Cpp), "C++ is in the syntax menu");
+        Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("constexpr"), "C++ keywords contain 'constexpr'");
+        Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("nullptr"), "C++ keywords contain 'nullptr'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Cpp).Contains("interface"), "C++ keywords do not include the C# 'interface'");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Dockerfile.dev"), L.Script, "Dockerfile.dev is a Dockerfile");
         Equal(SyntaxHighlighting.DetectLanguage("/src/Makefile.am"), L.Makefile, "Makefile.am is a makefile");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/bin/busybox sh"), L.Bash, "#!/bin/busybox sh is shell");
@@ -229,6 +249,24 @@ internal static class Program
         Check(open != null && open.Kind == TokenCache.Token.TokenKind.Paired && open.Partner != null && open.Partner.Start == 7, "'(' is paired with ')'");
         TokenCache.Token brace = py.At(4, 11);
         Check(brace != null && brace.Partner != null && py.Doc.GetLineText(4)[brace.Partner.Start] == '}', "'{' is paired with '}'");
+    }
+
+    private static void CppChecks()
+    {
+        Highlighted cpp = new Highlighted(L.Cpp,
+            "#include <vector>\nstd::vector<int> v; // note\nconstexpr int n = 3;\nauto p = std::make_unique<int>(1);\nclass Widget {\npublic:\n  virtual ~Widget() = default;\n};");
+        Equal(Join(cpp.Tokens(0, SyntaxHighlighting.TypePreprocessor)), "#include", "C++ preprocessor directive");
+        Equal(Join(cpp.Tokens(1, SyntaxHighlighting.TypeKeyword)), "std|int", "C++ namespace and type keywords");
+        Equal(Join(cpp.Tokens(1, SyntaxHighlighting.TypeComment)), "// note", "C++ line comment");
+        Equal(Join(cpp.Tokens(2, SyntaxHighlighting.TypeKeyword)), "constexpr|int", "C++ constexpr keyword");
+        Equal(Join(cpp.Tokens(3, SyntaxHighlighting.TypeKeyword)), "auto|std|int", "C++ auto keyword");
+        Equal(Join(cpp.Tokens(4, SyntaxHighlighting.TypeKeyword)), "class", "C++ class keyword");
+        Equal(Join(cpp.Tokens(5, SyntaxHighlighting.TypeKeyword)), "public", "C++ access specifier");
+        Equal(Join(cpp.Tokens(6, SyntaxHighlighting.TypeKeyword)), "virtual|default", "C++ virtual and default keywords");
+        TokenCache.Token brace = cpp.At(4, 13);
+        Check(brace != null && brace.Kind == TokenCache.Token.TokenKind.Paired && brace.Partner != null &&
+              brace.Partner.LineNumber == 7, "C++ braces are paired across lines");
+        Check(brace.Style != null, "C++ braces are foldable");
     }
 
     private static void GenericChecks()
@@ -661,6 +699,7 @@ internal static class Program
         Equal(Join(markup.Toggle(new[] { "<a/>" })), "<!-- <a/> -->", "markup uses a block comment per line");
         Equal(Join(markup.Toggle(new[] { "<!-- <a/> -->" })), "<a/>", "markup comment is removed");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CLike).Toggle(new[] { "int a;" })), "// int a;", "C-like comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Cpp).Toggle(new[] { "int a;" })), "// int a;", "C++ comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Sql).Toggle(new[] { "select 1" })), "-- select 1", "SQL comment");
         Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Plain) == null, "plain text has no comments");
         Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Diff) == null, "a diff has no comments");
@@ -687,6 +726,7 @@ internal static class Program
             OpenWrtDetectionChecks();
             FoldChecks();
             PythonChecks();
+            CppChecks();
             GenericChecks();
             TokenOrderChecks();
             PairEditingChecks();

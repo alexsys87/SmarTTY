@@ -125,12 +125,7 @@ public static class EditorCompletionSource
 
     private static string ShortName(string name)
     {
-        if (string.IsNullOrEmpty(name))
-        {
-            return name;
-        }
-        int dot = name.LastIndexOf('.');
-        return (dot >= 0) ? name.Substring(dot + 1) : name;
+        return ApiSymbolDatabase.ShortName(name);
     }
 
     private static void Add(List<Word> words, HashSet<string> seen, string word, int rank, ApiSymbolDatabase.Symbol symbol, string prefix)

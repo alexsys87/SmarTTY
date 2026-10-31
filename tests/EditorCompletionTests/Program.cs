@@ -58,6 +58,9 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Uci).Contains("config"), "UCI keywords contain 'config'");
         Check(SyntaxHighlighting.GetKeywords(L.Yaml).Contains("true"), "YAML literals contain 'true'");
         Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("select"), "SQL keywords contain 'select'");
+        Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("constexpr"), "C++ keywords contain 'constexpr'");
+        Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("nullptr"), "C++ keywords contain 'nullptr'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Cpp).Contains("interface"), "C++ keywords do not include the C# 'interface'");
         Check(SyntaxHighlighting.GetKeywords(L.Markup).Count == 0, "Markup has no keyword list of its own");
     }
 
@@ -93,6 +96,12 @@ internal static class Program
         Check(EditorCompletionSource.IsIdentifier("foo_bar2"), "foo_bar2 is an identifier");
         Check(!EditorCompletionSource.IsIdentifier("2foo"), "2foo is not an identifier");
         Check(!EditorCompletionSource.IsIdentifier(""), "an empty string is not an identifier");
+
+        // The C++ profile has its own keyword set and still offers the identifiers of the document.
+        List<string> cpp = Names(L.Cpp, "std::vector<int> values;", "");
+        Check(cpp.Contains("constexpr"), "the C++ keyword 'constexpr' is offered");
+        Check(cpp.Contains("values"), "a C++ document identifier is offered");
+        Check(!cpp.Contains("interface"), "a C# keyword is not offered for C++");
     }
 
     private static void SuggestionFilterChecks()

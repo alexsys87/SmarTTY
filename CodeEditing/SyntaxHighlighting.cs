@@ -44,7 +44,7 @@ namespace SmarTTY.CodeEditing
             Python,
             Bash,
             Config,  // INI / .conf / .properties / TOML / systemd units
-            CLike,   // C, C++, C#, Java, JavaScript, Go, Rust, CSS, ...: // and /* */ comments
+            CLike,   // C, C#, Java, JavaScript, Go, Rust, CSS, ...: // and /* */ comments
             Script,  // Dockerfile, CMake, Ruby, Perl, ...: # comments
             Sql,     // SQL: -- comments
             Markup,  // HTML, XML: <!-- --> comments and tag names
@@ -53,14 +53,15 @@ namespace SmarTTY.CodeEditing
             Json,    // JSON: keys, strings, numbers, foldable { } and [ ] blocks
             Makefile,// Makefile: variables, targets, foldable ifeq/define blocks
             Uci,     // OpenWrt UCI (/etc/config/*): config/option/list, foldable config blocks
-            Yaml     // YAML: the colors of Config, blocks that fold by indentation
+            Yaml,    // YAML: the colors of Config, blocks that fold by indentation
+            Cpp      // C++: the C library plus the STL; separate so C files never see C++ symbols
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Python, Language.Yaml, Language.CLike, Language.Script, Language.Sql, Language.Markup, Language.Diff
+            Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.Script, Language.Sql, Language.Markup, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -77,7 +78,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Config: return "Config (INI, conf, properties)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
-                case Language.CLike: return "C, C++, C#, Java, JavaScript";
+                case Language.CLike: return "C, C#, Java, JavaScript";
+                case Language.Cpp: return "C++";
                 case Language.Script: return "Script (Perl, Ruby, Dockerfile)";
                 case Language.Sql: return "SQL";
                 case Language.Markup: return "HTML, XML";
@@ -263,12 +265,6 @@ namespace SmarTTY.CodeEditing
 
                 case "c":
                 case "h":
-                case "cpp":
-                case "hpp":
-                case "hh":
-                case "cc":
-                case "cxx":
-                case "ino":
                 case "cs":
                 case "java":
                 case "kt":
@@ -293,6 +289,22 @@ namespace SmarTTY.CodeEditing
                 case "dts":
                 case "dtsi":
                     return Language.CLike;
+
+                case "cpp":
+                case "cxx":
+                case "cc":
+                case "c++":
+                case "hpp":
+                case "hxx":
+                case "hh":
+                case "h++":
+                case "ipp":
+                case "tpp":
+                case "inl":
+                case "ixx":
+                case "cppm":
+                case "ino":
+                    return Language.Cpp;
 
                 case "rb":
                 case "pl":
@@ -431,6 +443,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Bash: return TokenizeBash;
                 case Language.Config: return TokenizeConfig;
                 case Language.CLike: return CLikeTokenizer;
+                case Language.Cpp: return CppTokenizer;
                 case Language.Script: return ScriptTokenizer;
                 case Language.Sql: return SqlTokenizer;
                 case Language.Markup: return MarkupTokenizer;
@@ -472,6 +485,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(LuaKeywords);
                 case Language.CLike:
                     return Combine(CLikeKeywords, PreprocessorDirectives);
+                case Language.Cpp:
+                    return Combine(CppKeywords, PreprocessorDirectives);
                 case Language.Script:
                     return Combine(ScriptKeywords);
                 case Language.Sql:
@@ -1516,6 +1531,22 @@ namespace SmarTTY.CodeEditing
             "defer"
         };
 
+        /// <summary>The C and C++ keywords; the C++ profile keeps them separate from the C-like languages.</summary>
+        private static readonly HashSet<string> CppKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor", "bool", "break",
+            "case", "catch", "char", "char8_t", "char16_t", "char32_t", "class", "compl", "concept", "const",
+            "consteval", "constexpr", "constinit", "const_cast", "continue", "co_await", "co_return", "co_yield",
+            "decltype", "default", "delete", "do", "double", "dynamic_cast", "else", "enum", "explicit",
+            "export", "extern", "false", "float", "for", "friend", "goto", "if", "import", "inline", "int",
+            "long", "mutable", "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "operator", "or",
+            "or_eq", "private", "protected", "public", "register", "reinterpret_cast", "requires", "return",
+            "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "switch",
+            "template", "this", "thread_local", "throw", "true", "try", "typedef", "typeid", "typename",
+            "union", "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq",
+            "final", "override", "module", "std"
+        };
+
         private static readonly HashSet<string> ScriptKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
             "if", "elif", "elsif", "else", "unless", "end", "endif", "for", "foreach", "while", "until", "do",
@@ -1945,6 +1976,21 @@ namespace SmarTTY.CodeEditing
             BlockCommentStart = "/*",
             BlockCommentEnd = "*/",
             Keywords = CLikeKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer CppTokenizer = new GenericSyntax
+        {
+            SlashComments = true,
+            Preprocessor = true,
+            Brackets = true,
+            FoldCurlyBraces = true,
+            BacktickStrings = true,
+            TripleQuoteStrings = true,
+            VerbatimStrings = true,
+            RustLiterals = true,
+            BlockCommentStart = "/*",
+            BlockCommentEnd = "*/",
+            Keywords = CppKeywords
         }.Tokenize;
 
         private static readonly TokenCache.LineTokenizer ScriptTokenizer = new GenericSyntax

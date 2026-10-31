@@ -68,7 +68,7 @@ internal static class Program
         }
 
         // The set covers the languages the editor highlights with a code tokenizer.
-        foreach (L language in new[] { L.Python, L.CLike, L.Bash, L.Lua, L.Sql, L.Script })
+        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Script })
         {
             Check(database.ForLanguage(language).Count > 0, "the set has symbols for " + language);
         }
@@ -227,6 +227,47 @@ internal static class Program
         Check(database.Find(L.CLike, "bsearch_s").Signature.Contains("rsize_t count"),
             "the 'bsearch_s' signature uses rsize_t bounds");
 
+        // C++ is a separate profile: it inherits the C library and adds the STL, while C files stay C-only.
+        List<ApiSymbolDatabase.Symbol> cpp = database.ForLanguage(L.Cpp).ToList();
+        Check(cpp.Count > 2400, "the C++ set is broad (" + cpp.Count + " symbols)");
+        Equal(cpp.Count, cpp.Select(s => s.Name).Distinct().Count(), "C++ names are unique");
+        Equal(cpp.Count, cpp.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every C++ symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "std::vector", "std::vector::push_back", "std::array", "std::deque", "std::list",
+                     "std::map", "std::unordered_map", "std::set", "std::stack", "std::queue",
+                     "std::string", "std::string_view", "std::sort", "std::find", "std::accumulate",
+                     "std::unique_ptr", "std::shared_ptr", "std::make_unique", "std::make_shared",
+                     "std::optional", "std::variant", "std::any", "std::tuple",
+                     "std::chrono::duration", "std::chrono::system_clock", "std::chrono::milliseconds",
+                     "std::filesystem::path", "std::filesystem::exists", "std::filesystem::directory_iterator",
+                     "std::thread", "std::mutex", "std::lock_guard", "std::condition_variable",
+                     "std::future", "std::async", "std::atomic",
+                     "std::regex", "std::regex_match", "std::smatch",
+                     "std::exception", "std::runtime_error", "std::error_code", "std::system_error",
+                     "std::is_same", "std::enable_if", "std::numeric_limits"
+                 })
+        {
+            Check(database.Find(L.Cpp, name) != null, "the C++ set includes '" + name + "'");
+        }
+        Check(database.Find(L.Cpp, "printf") != null, "the C++ profile inherits the C library ('printf')");
+        Check(database.Find(L.Cpp, "malloc") != null, "the C++ profile inherits the C library ('malloc')");
+        Check(database.Find(L.Cpp, "std::vector").Description.Contains("C++ sequence container"),
+            "the description of 'std::vector' names a C++ sequence container");
+        Check(database.Find(L.Cpp, "std::sort").Description.Contains("C++ algorithm"),
+            "the description of 'std::sort' names a C++ algorithm");
+        Check(database.Find(L.Cpp, "std::filesystem::exists").Description.Contains("C++ filesystem"),
+            "the description of 'std::filesystem::exists' names the C++ filesystem");
+        Check(database.Find(L.CLike, "std::vector") == null, "C files do not see 'std::vector'");
+        Check(database.Find(L.CLike, "std::sort") == null, "C files do not see 'std::sort'");
+        Check(database.Find(L.CLike, "std::string") == null, "C files do not see 'std::string'");
+
+        ParameterSignature cppPushBack = database.FindSignature(L.Cpp, "std::vector::push_back");
+        Check(cppPushBack != null, "a 'std::vector::push_back' call resolves to the C++ method");
+        Equal(cppPushBack.ToString(), "std::vector::push_back(const T& value)",
+            "the resolved C++ signature keeps the qualified name");
+
         // The Bash set covers the shell builtins and the documented shell variables.
         List<ApiSymbolDatabase.Symbol> bash = database.ForLanguage(L.Bash).ToList();
         Check(bash.Count > 150, "the Bash set is complete (" + bash.Count + " symbols)");
@@ -301,6 +342,32 @@ internal static class Program
         ISuggestion varchar = Build(L.Sql, "", "VARC", database).FirstOrDefault(s => s.DisplayName == "VARCHAR");
         Check(varchar != null, "the completion list offers the SQL type 'VARCHAR'");
         Equal(varchar.DetailText, "VARCHAR data type", "the SQL type summary is the detail text");
+
+        // The C++ profile offers the STL under the last segment and keeps the inherited C library.
+        List<ISuggestion> cppVector = Build(L.Cpp, "", "vec", database);
+        ISuggestion vector = cppVector.FirstOrDefault(s => s.DisplayName == "vector");
+        Check(vector != null, "the completion list offers 'std::vector' as 'vector'");
+        Equal(vector.DetailText, "Dynamic array", "the C++ container summary is the detail text");
+        Check(vector.HintText.StartsWith("std::vector("), "the qualified C++ signature is the hint text");
+
+        List<ISuggestion> cppSort = Build(L.Cpp, "", "sor", database);
+        ISuggestion sort = cppSort.FirstOrDefault(s => s.DisplayName == "sort");
+        Check(sort != null, "the completion list offers 'std::sort' as 'sort'");
+        Equal(sort.DetailText, "Sort a range", "the C++ algorithm summary is the detail text");
+        Check(sort.HintText.StartsWith("std::sort("), "the qualified C++ algorithm signature is the hint text");
+
+        ISuggestion cppPushBack = Build(L.Cpp, "", "push_b", database).FirstOrDefault(s => s.DisplayName == "push_back");
+        Check(cppPushBack != null, "the completion list offers 'std::vector::push_back' as 'push_back'");
+        Equal(cppPushBack.DetailText, "Add an element at the end", "the C++ method summary is the detail text");
+        Check(cppPushBack.HintText.StartsWith("std::vector::push_back("),
+            "the qualified C++ method signature is the hint text");
+
+        Check(Build(L.Cpp, "", "print", database).Any(s => s.DisplayName == "printf"),
+            "the C++ completion list offers the inherited C 'printf'");
+        Check(!Build(L.CLike, "", "vec", database).Any(s => s.DisplayName == "vector"),
+            "the C completion list does not offer the STL");
+        Check(!Build(L.CLike, "", "sor", database).Any(s => s.DisplayName == "sort"),
+            "the C completion list does not offer the C++ algorithms");
 
         // The Python modules are offered under their plain names too.
         List<ISuggestion> pythonMath = Build(L.Python, "", "sqr", database);
@@ -411,6 +478,24 @@ internal static class Program
         Check(runHint != null, "a 'subprocess.run(' call finds the 'subprocess.run' function");
         Equal(runHint.Name, "subprocess.run", "the subprocess hint keeps the qualified name");
         Check(runHint.ParameterCount > 5, "the subprocess hint has its parameters");
+
+        ParameterSignature cppSort = EditorSignatureSource.FindSignature(
+            L.Cpp, "sort(\n", 0, 5, database, out int cppSortActive);
+        Check(cppSort != null, "a bare 'sort(' call finds the C++ 'std::sort' algorithm");
+        Equal(cppSort.Name, "std::sort", "the C++ hint keeps the qualified algorithm name");
+        Equal(cppSort.ParameterCount, 3, "the C++ algorithm hint has its parameters");
+        Equal(cppSortActive, 0, "the first C++ parameter is active");
+
+        ParameterSignature cppPush = EditorSignatureSource.FindSignature(
+            L.Cpp, "push_back(\n", 0, 10, database, out int cppPushActive);
+        Check(cppPush != null, "a bare 'push_back(' call finds 'std::vector::push_back'");
+        Equal(cppPush.Name, "std::vector::push_back", "the C++ method hint keeps the qualified name");
+        Equal(cppPush.ParameterCount, 1, "the C++ method hint has its parameter");
+
+        ParameterSignature cppPrintf = EditorSignatureSource.FindSignature(
+            L.Cpp, "printf(\n", 0, 7, database, out int cppPrintfActive);
+        Check(cppPrintf != null, "a 'printf(' call in C++ finds the inherited C function");
+        Equal(cppPrintf.Name, "printf", "the inherited C hint keeps its name");
 
         // Without a database the unknown call shows nothing.
         Check(EditorSignatureSource.FindSignature(L.Python, "print(\n", 0, 6, null, out _) == null,

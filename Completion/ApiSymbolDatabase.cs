@@ -168,18 +168,68 @@ public class ApiSymbolDatabase
             {
                 language.Add(symbol.Name, symbol);
             }
-            // The hint sees only the identifier before "(", so a "math.sqrt" entry is also reachable as "sqrt".
-            int dot = symbol.Name.LastIndexOf('.');
-            if (dot >= 0)
+            // The hint sees only the identifier before "(", so a "math.sqrt" or "std::sort" entry is also
+            // reachable as "sqrt" or "sort".
+            string shortName = ShortName(symbol.Name);
+            if (shortName.Length < symbol.Name.Length)
             {
                 Dictionary<string, Symbol> shortNames = GetLanguage(_byShortName, symbol.Language);
-                string shortName = symbol.Name.Substring(dot + 1);
                 if (!shortNames.ContainsKey(shortName))
                 {
                     shortNames.Add(shortName, symbol);
                 }
             }
         }
+
+        // C++ programs use the C library, so the C++ profile inherits the C entries. The C++ symbols were
+        // indexed first, so a C definition with the same name does not override them. C files never see the
+        // C++ additions: the merge goes in one direction only.
+        if (_byLanguage.TryGetValue("CLike", out Dictionary<string, Symbol> cLibrary))
+        {
+            Dictionary<string, Symbol> cpp = GetLanguage(_byLanguage, "Cpp");
+            foreach (KeyValuePair<string, Symbol> pair in cLibrary)
+            {
+                if (!cpp.ContainsKey(pair.Key))
+                {
+                    cpp.Add(pair.Key, pair.Value);
+                }
+            }
+            if (_byShortName.TryGetValue("CLike", out Dictionary<string, Symbol> cShortNames))
+            {
+                Dictionary<string, Symbol> cppShortNames = GetLanguage(_byShortName, "Cpp");
+                foreach (KeyValuePair<string, Symbol> pair in cShortNames)
+                {
+                    if (!cppShortNames.ContainsKey(pair.Key))
+                    {
+                        cppShortNames.Add(pair.Key, pair.Value);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The last segment of a qualified name: "sqrt" for "math.sqrt", "sort" for "std::sort" and
+    /// "push_back" for "std::vector::push_back". The bare name itself is returned when it is not qualified.
+    /// </summary>
+    public static string ShortName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return name;
+        }
+        int start = 0;
+        int dot = name.LastIndexOf('.');
+        if (dot >= 0)
+        {
+            start = dot + 1;
+        }
+        int colon = name.LastIndexOf("::", StringComparison.Ordinal);
+        if (colon >= 0 && colon + 2 > start)
+        {
+            start = colon + 2;
+        }
+        return name.Substring(start);
     }
 
     private static Dictionary<string, Symbol> GetLanguage(Dictionary<string, Dictionary<string, Symbol>> index, string language)

@@ -28,6 +28,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Script:
                     return new CommentStyle("# ");
                 case SyntaxHighlighting.Language.CLike:
+                case SyntaxHighlighting.Language.Cpp:
                     return new CommentStyle("// ");
                 case SyntaxHighlighting.Language.Sql:
                     return new CommentStyle("-- ");
