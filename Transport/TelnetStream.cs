@@ -301,6 +301,15 @@ internal sealed class TelnetStream : Stream
 
     private readonly MemoryStream _heldOutput = new MemoryStream();
 
+    // The most that is kept for a STARTTLS that has not happened yet: a server that never answers must not make the
+    // typed text pile up for ever (a write beyond it fails and the user is told).
+    internal const int MaxHeldOutputBytes = 64 * 1024;
+
+    // How long the server may take to start STARTTLS (0: no limit), and the timer that watches it.
+    private readonly int _startTlsTimeoutMs;
+
+    private Timer _startTlsTimer;
+
     private byte[] _tlsLeftover;
 
     private string _fatalError;
@@ -335,6 +344,7 @@ internal sealed class TelnetStream : Stream
         // Without a way to make the handshake the option can only be refused.
         _upgradeToTls = options.UpgradeToTls;
         _startTlsMode = _upgradeToTls == null ? TelnetStartTlsMode.Off : options.StartTls;
+        _startTlsTimeoutMs = Math.Max(0, options.StartTlsTimeoutMs);
         _columns = ClampSize(options.Columns, DefaultColumns);
         _rows = ClampSize(options.Rows, DefaultRows);
     }
@@ -396,7 +406,48 @@ internal sealed class TelnetStream : Stream
             }
             QueueCommand(offer.ToArray());
         }
+        if (_startTlsMode == TelnetStartTlsMode.Require)
+        {
+            WatchStartTls();
+        }
         Drain(wait: true);
+    }
+
+    /// <summary>
+    /// True while STARTTLS is required and not done: nothing of the session may be sent in clear text until then (a
+    /// keep-alive, for one, has to wait).
+    /// </summary>
+    internal bool IsAwaitingRequiredTls => _startTlsMode == TelnetStartTlsMode.Require && _tlsPhase != TlsPhase.Done;
+
+    // Gives the server a limited time to start STARTTLS. The handshake itself is not timed here (it has a limit of its
+    // own); the connection is closed, with the reason, when the server has not got that far by then.
+    private void WatchStartTls()
+    {
+        if (_startTlsTimeoutMs <= 0 || _startTlsTimer != null)
+        {
+            return;
+        }
+        _startTlsTimer = new Timer(_ =>
+        {
+            lock (_lock)
+            {
+                bool waiting = _tlsPhase == TlsPhase.FollowsSent || (_tlsPhase == TlsPhase.None && _startTlsMode == TelnetStartTlsMode.Require);
+                if (!waiting)
+                {
+                    return;
+                }
+                _fatalError ??= "The server did not start STARTTLS (Telnet option START_TLS) within " + (_startTlsTimeoutMs / 1000.0).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)
+                    + " s. It may not support it; what was typed meanwhile was not sent.";
+            }
+            try
+            {
+                // Wakes up the reading thread, which then reports the reason.
+                _inner.Dispose();
+            }
+            catch
+            {
+            }
+        }, null, _startTlsTimeoutMs, Timeout.Infinite);
     }
 
     // The offers of active negotiation. The caller holds _lock.
@@ -531,6 +582,10 @@ internal sealed class TelnetStream : Stream
     {
         lock (_lock)
         {
+            if (IsAwaitingRequiredTls)
+            {
+                throw new InvalidOperationException("The connection is waiting for STARTTLS: nothing is sent in clear text until it is done.");
+            }
             QueueCommand(new[] { IAC, command });
         }
         Drain(wait: false);
@@ -605,15 +660,28 @@ internal sealed class TelnetStream : Stream
         }
         while (true)
         {
-            if (_tlsPhase == TlsPhase.HandshakeDue)
+            int received;
+            try
             {
-                UpgradeToTls();
+                if (_tlsPhase == TlsPhase.HandshakeDue)
+                {
+                    UpgradeToTls();
+                }
+                // At most 'count' bytes are taken from the connection and a byte never grows when the commands are
+                // removed, so the result always fits and nothing has to be kept for the next call.
+                received = _inner.Read(_readBuffer, 0, Math.Min(count, _readBuffer.Length));
             }
-            // At most 'count' bytes are taken from the connection and a byte never grows when the commands are
-            // removed, so the result always fits and nothing has to be kept for the next call.
-            int received = _inner.Read(_readBuffer, 0, Math.Min(count, _readBuffer.Length));
+            catch (Exception ex) when (_fatalError != null)
+            {
+                // The connection was closed because of a reason of ours (the STARTTLS time ran out): that is the reason to show.
+                throw new IOException(_fatalError, ex);
+            }
             if (received <= 0)
             {
+                if (_fatalError != null)
+                {
+                    throw new IOException(_fatalError);
+                }
                 return 0;
             }
             int produced;
@@ -739,6 +807,7 @@ internal sealed class TelnetStream : Stream
     {
         if (disposing)
         {
+            _startTlsTimer?.Dispose();
             _inner.Dispose();
         }
         base.Dispose(disposing);
@@ -800,6 +869,10 @@ internal sealed class TelnetStream : Stream
     {
         if (IsHoldingOutput)
         {
+            if (_heldOutput.Length + bytes.Length > MaxHeldOutputBytes)
+            {
+                throw new IOException("The server has not started STARTTLS yet, and too much has been typed meanwhile: " + _heldOutput.Length + " bytes are waiting for it.");
+            }
             _heldOutput.Write(bytes, 0, bytes.Length);
             return;
         }
@@ -908,6 +981,7 @@ internal sealed class TelnetStream : Stream
                 _inner = secure;
             }
             _tlsPhase = TlsPhase.Done;
+            _startTlsTimer?.Dispose();
             ResetNegotiation();
             MemoryStream offer = new MemoryStream();
             WriteActiveOffers(offer);
@@ -945,6 +1019,8 @@ internal sealed class TelnetStream : Stream
     {
         Reply(IAC, SB, OptStartTls, StartTlsFollows, IAC, SE);
         _tlsPhase = TlsPhase.FollowsSent;
+        // Also when STARTTLS is only accepted: a server that agreed and then says nothing must not hold the session for ever.
+        WatchStartTls();
     }
 
     // --- reading ---
@@ -2288,6 +2364,9 @@ internal sealed class TelnetOptions
 
     /// <summary>Whether TLS is negotiated in the session (option START_TLS); needs <see cref="UpgradeToTls"/>.</summary>
     public TelnetStartTlsMode StartTls { get; set; }
+
+    /// <summary>How long the server may take to start STARTTLS, in milliseconds; 0: no limit.</summary>
+    public int StartTlsTimeoutMs { get; set; }
 
     /// <summary>
     /// Makes the TLS handshake of STARTTLS as a client over the given stream and returns the encrypted stream; throws
