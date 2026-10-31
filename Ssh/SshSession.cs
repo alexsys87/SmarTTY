@@ -246,6 +246,9 @@ public class SshSession : IDisposable
 
     private HostKeyInfo _hostKey;
 
+    /// <summary>What the session was opened with, to open a second connection to the same server (see <see cref="CheckPublicKeyLogin"/>).</summary>
+    private readonly SshConnectionParameters _parameters;
+
     private long _bytesReceived;
 
     private long _bytesSent;
@@ -366,6 +369,7 @@ public class SshSession : IDisposable
     /// </summary>
     public SshSession(SshConnectionParameters parameters, WaitHandle cancelEvent = null)
     {
+        _parameters = parameters.Clone();
         HostName = parameters.DisplayHostName ?? parameters.Host;
         Port = parameters.Port;
         EnableOnTheFlyTar = parameters.EnableOnTheFlyTar;
@@ -648,6 +652,50 @@ public class SshSession : IDisposable
     public HostKeyInfo GetHostKey()
     {
         return _hostKey ?? throw new InvalidOperationException("The server did not present a host key");
+    }
+
+    /// <summary>
+    /// Signs in with the key on a new connection to the same server (same proxy, same user) and closes it again: the only
+    /// way to know that the server will let the key in, as opposed to the key line being in authorized_keys. The new
+    /// connection must present the host key of this one, so the key is only offered to the server that was approved.
+    /// Returns null when the server accepted the key, otherwise the reason. Setting <paramref name="cancelEvent"/> ends
+    /// the connecting with <see cref="OperationCanceledException"/>.
+    /// </summary>
+    public string CheckPublicKeyLogin(ISshKeyPair keyPair, WaitHandle cancelEvent = null)
+    {
+        HostKeyInfo approvedHostKey = GetHostKey();
+        SshConnectionParameters parameters = _parameters.Clone();
+        // The same host key algorithm as here, so that a server with several host keys presents the approved one.
+        parameters.PreferredHostKeyType = approvedHostKey.Algorithm;
+        SshSession verificationSession = null;
+        try
+        {
+            verificationSession = new SshSession(parameters, cancelEvent);
+            HostKeyInfo hostKey = verificationSession.GetHostKey();
+            if (hostKey.Algorithm != approvedHostKey.Algorithm || !hostKey.KeyData.SequenceEqual(approvedHostKey.KeyData))
+            {
+                return "the server presented a different host key on the new connection";
+            }
+            return verificationSession.AuthenticateWithPublicKey(parameters.UserName, keyPair) ? null : "the server rejected the key";
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return exception.Message;
+        }
+        finally
+        {
+            try
+            {
+                verificationSession?.Dispose();
+            }
+            catch
+            {
+            }
+        }
     }
 
     /// <summary>

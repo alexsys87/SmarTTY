@@ -53,4 +53,10 @@ public class SshConnectionParameters
     public string PreferredHostKeyType;
 
     public TimeSpan ConnectTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>A copy to connect with again (the fields are plain values and delegates).</summary>
+    public SshConnectionParameters Clone()
+    {
+        return (SshConnectionParameters)MemberwiseClone();
+    }
 }

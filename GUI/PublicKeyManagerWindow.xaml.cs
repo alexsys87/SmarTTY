@@ -196,7 +196,8 @@ public partial class PublicKeyManagerWindow : Window
         Exception error = null;
         try
         {
-            AuthorizedKeysManager.AppendAuthorizedKey(_session, _authorizedKeyLine, ConfirmCleanup);
+            // The key counts as accepted only when a new connection signs in with it; otherwise it is taken out again.
+            AuthorizedKeysManager.InstallKeyAndVerifyLogin(_session, _authorizedKeyLine, () => _session.CheckPublicKeyLogin(_keyPair), ConfirmCleanup);
         }
         catch (Exception exception)
         {

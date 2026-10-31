@@ -258,45 +258,12 @@ public partial class SshConnector : Component
         return confirmed;
     }
 
-    /// <summary>
-    /// Signs in to the same server on a new connection with the key that has just been installed. Returns null when the
-    /// server accepted it, otherwise the reason it did not. The host key must be the one the user has already approved:
-    /// the key is only offered to that server.
-    /// </summary>
-    private static string CheckKeyLogin(ConnectionAttempt connectionAttempt, SshConnectionParameters sshConnectionParameters, SshSession.HostKeyInfo approvedHostKey, ISshKeyPair sshKeyPair)
+    // A failure of the new connection that comes from the cancelling of the attempt is a cancel, not a rejected key.
+    private static string CheckKeyLogin(ConnectionAttempt connectionAttempt, SshSession sshSession, ISshKeyPair sshKeyPair)
     {
-        SshSession verificationSession = null;
-        try
-        {
-            verificationSession = new SshSession(sshConnectionParameters, connectionAttempt.CancelEvent);
-            SshSession.HostKeyInfo hostKey = verificationSession.GetHostKey();
-            if (hostKey.Algorithm != approvedHostKey.Algorithm || !PasswordProtector.BytesEqual(hostKey.KeyData, approvedHostKey.KeyData))
-            {
-                return "the server presented a different host key on the new connection";
-            }
-            return verificationSession.AuthenticateWithPublicKey(sshConnectionParameters.UserName, sshKeyPair)
-                ? null
-                : "the server rejected the key";
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            connectionAttempt.ThrowIfCancelled();
-            return exception.Message;
-        }
-        finally
-        {
-            try
-            {
-                verificationSession?.Dispose();
-            }
-            catch
-            {
-            }
-        }
+        string problem = sshSession.CheckPublicKeyLogin(sshKeyPair, connectionAttempt.CancelEvent);
+        connectionAttempt.ThrowIfCancelled();
+        return problem;
     }
 
     private void Authenticate(ConnectionAttempt connectionAttempt, SshSession session, SSHConnectionSettings sshConnectionSettings, string password, ref bool forcePasswordAuth)
@@ -571,11 +538,10 @@ public partial class SshConnector : Component
                     // The key line is not enough to go on: a fresh connection has to sign in with the key (the server may
                     // ignore the file, refuse the key type or the permissions of the home directory).
                     ReportStatus(connectionAttempt, "Checking key login...");
-                    sshConnectionParameters.PreferredHostKeyType = hostKeyInfo.Algorithm;
                     AuthorizedKeysManager.InstallKeyAndVerifyLogin(
                         sshSession,
                         sshKeyPair.ToAuthorizedKeysLine(Environment.UserName + "@" + Environment.MachineName),
-                        () => CheckKeyLogin(connectionAttempt, sshConnectionParameters, hostKeyInfo, sshKeyPair),
+                        () => CheckKeyLogin(connectionAttempt, sshSession, sshKeyPair),
                         message => Confirm(connectionAttempt, PromptKind.YesNoWarning, message));
                     connectionAttempt.ThrowIfCancelled();
                     keyInstalled = true;
