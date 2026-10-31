@@ -393,20 +393,7 @@ public partial class SshConnector : Component
         string fingerprint = null;
         try
         {
-            if (hostKeyInfo != null && hostKeyInfo.KeyData != null)
-            {
-                byte[] hashBytes = new MD5CryptoServiceProvider().ComputeHash(hostKeyInfo.KeyData);
-                if (hashBytes != null)
-                {
-                    StringBuilder stringBuilder = new StringBuilder();
-                    foreach (byte b in hashBytes)
-                    {
-                        stringBuilder.AppendFormat("{0:x2}:", b);
-                    }
-                    stringBuilder.Remove(stringBuilder.Length - 1, 1);
-                    fingerprint = stringBuilder.ToString();
-                }
-            }
+            fingerprint = HostKeyFingerprint.Describe(hostKeyInfo?.KeyData);
         }
         catch
         {

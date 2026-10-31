@@ -28,8 +28,9 @@
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
-      <TextBlock Grid.Column="0" Text="Key fingerprint:" VerticalAlignment="Center" Margin="0 0 8 0" />
-      <TextBlock Grid.Column="1" Name="KeyText" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      <TextBlock Grid.Column="0" Text="Key fingerprint:" VerticalAlignment="Top" Margin="0 0 8 0" />
+      <!-- Wrapped, never cut off with an ellipsis: a fingerprint that is only partly shown cannot be compared. -->
+      <TextBlock Grid.Column="1" Name="KeyText" FontWeight="Bold" VerticalAlignment="Center" TextWrapping="Wrap" />
     </Grid>
     <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 16 0 0">
       <Button Content="_Save" IsDefault="True" MinWidth="80" Margin="0 0 5 0" Click="Save_Click" />

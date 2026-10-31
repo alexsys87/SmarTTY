@@ -93,6 +93,14 @@ internal static class Program
         Check(AuthorizedKeysFile.PickHomeDirectory(new[] { "no path here" }) == null, "home: nothing that looks like a path");
         Check(AuthorizedKeysFile.PickHomeDirectory(null) == null, "home: null input");
 
+        // Fingerprints of a host key: the expected texts are what ssh-keygen -l prints for the same ed25519 public key
+        // (AAAAC3NzaC1lZDI1NTE5AAAAILTAwIfu28sItna409oruYx5zLvtRCc6QfQ8Dwa0z6b+).
+        byte[] hostBlob = Convert.FromBase64String("AAAAC3NzaC1lZDI1NTE5AAAAILTAwIfu28sItna409oruYx5zLvtRCc6QfQ8Dwa0z6b+");
+        Check(HostKeyFingerprint.Sha256(hostBlob) == "SHA256:NnwNL+UHTy3IZZclD0I27FqnsJ/0cSvPZzsCAxU/nEE", "fingerprint: SHA256 matches ssh-keygen (unpadded base64)");
+        Check(HostKeyFingerprint.Md5(hostBlob) == "MD5:af:4f:15:33:2d:6a:1b:38:ca:c8:42:21:c0:79:b5:d2", "fingerprint: MD5 matches ssh-keygen -E md5");
+        Check(HostKeyFingerprint.Describe(hostBlob) == HostKeyFingerprint.Sha256(hostBlob) + Environment.NewLine + HostKeyFingerprint.Md5(hostBlob), "fingerprint: both are shown, SHA256 first");
+        Check(HostKeyFingerprint.Describe(null) == null && HostKeyFingerprint.Describe(new byte[0]) == null, "fingerprint: no key, no text");
+
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed.");
         return 0;
