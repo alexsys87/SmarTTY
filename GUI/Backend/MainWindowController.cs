@@ -1824,6 +1824,11 @@ public class MainWindowController : INotifyPropertyChanged
             // Clone() keeps the kind of the endpoint: a telnet connection must stay a telnet connection.
             clone.Connection = tcp.Clone();
         }
+        else if (source.Connection is DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole)
+        {
+            // The input mode and the echo are switched per tab.
+            clone.Connection = netconsole.Clone();
+        }
         return clone;
     }
 

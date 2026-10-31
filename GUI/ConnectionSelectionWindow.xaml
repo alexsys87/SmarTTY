@@ -86,6 +86,21 @@
               <TextBlock Text="{Binding Path=ConnectionCounts.Telnet, StringFormat=Telnet ({0})}" />
             </StackPanel>
           </ToggleButton>
+          <ToggleButton IsChecked="{Binding ShowNetconsole}">
+            <FrameworkElement.Style>
+              <Style BasedOn="{StaticResource {x:Type ToggleButton}}" TargetType="{x:Type ToggleButton}">
+                <Style.Triggers>
+                  <DataTrigger Value="0" Binding="{Binding Path=ConnectionCounts.Netconsole}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </FrameworkElement.Style>
+            <StackPanel Orientation="Horizontal">
+              <Image Width="16" Height="16" Source="../icons/net16.png" />
+              <TextBlock Text="{Binding Path=ConnectionCounts.Netconsole, StringFormat=Netconsole ({0})}" />
+            </StackPanel>
+          </ToggleButton>
         </StackPanel>
       </Border>
       <ToggleButton Name="btnSort" VerticalAlignment="Center" Margin="2" Style="{StaticResource DynamicToggleButtonStyle}">
@@ -380,6 +395,12 @@
           <StackPanel Orientation="Horizontal">
             <Image Source="../Icons/term16.png" />
             <AccessText Text="New _Telnet connection..." />
+          </StackPanel>
+        </Button>
+        <Button HorizontalAlignment="Left" Click="NewNetconsole_Click" ToolTip="Receive the console output (printk) of a Linux kernel or U-Boot sent with netconsole over UDP (port 6666 by default), and send input back.">
+          <StackPanel Orientation="Horizontal">
+            <Image Source="../Icons/net16.png" />
+            <AccessText Text="New _Netconsole (UDP) receiver..." />
           </StackPanel>
         </Button>
         <Button HorizontalAlignment="Left" Click="QuickConnect_Click">

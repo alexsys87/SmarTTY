@@ -50,7 +50,17 @@ namespace System.Windows.Threading
             return null;
         }
 
+        public object BeginInvoke(DispatcherPriority priority, Delegate method)
+        {
+            return BeginInvoke(method, new object[0]);
+        }
+
         public void Dispose() => _queue.CompleteAdding();
+    }
+
+    public enum DispatcherPriority
+    {
+        Normal = 9
     }
 }
 

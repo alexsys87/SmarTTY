@@ -12,6 +12,16 @@ namespace System.Windows.Threading
             method.DynamicInvoke(args);
             return null;
         }
+
+        public object BeginInvoke(DispatcherPriority priority, Delegate method)
+        {
+            return BeginInvoke(method, new object[0]);
+        }
+    }
+
+    public enum DispatcherPriority
+    {
+        Normal = 9
     }
 }
 

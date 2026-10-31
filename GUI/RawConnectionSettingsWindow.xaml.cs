@@ -130,6 +130,136 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public bool IsTelnet => Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet;
 
+        public bool IsNetconsole => Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Netconsole;
+
+        // --- netconsole receiver: kept here while the window is open and turned into the connection by
+        // EffectiveConnectionSettings (the ports are text, so a wrong value can be reported instead of lost) ---
+
+        public class NetconsoleInputChoice
+        {
+            public DeviceTerminalSettings.ConnectionSettings.Netconsole.InputMode Value { get; set; }
+
+            public string Text { get; set; }
+        }
+
+        public System.Collections.Generic.IReadOnlyList<NetconsoleInputChoice> NetconsoleInputChoices { get; } = new NetconsoleInputChoice[]
+        {
+            new NetconsoleInputChoice { Value = DeviceTerminalSettings.ConnectionSettings.Netconsole.InputMode.Line, Text = "Line by line: edited below the terminal, sent on Enter" },
+            new NetconsoleInputChoice { Value = DeviceTerminalSettings.ConnectionSettings.Netconsole.InputMode.Character, Text = "Byte by byte: every key is sent at once" }
+        };
+
+        public class NetconsoleFormatChoice
+        {
+            public DeviceTerminalSettings.ConnectionSettings.Netconsole.MessageFormat Value { get; set; }
+
+            public string Text { get; set; }
+        }
+
+        public System.Collections.Generic.IReadOnlyList<NetconsoleFormatChoice> NetconsoleFormatChoices { get; } = new NetconsoleFormatChoice[]
+        {
+            new NetconsoleFormatChoice { Value = DeviceTerminalSettings.ConnectionSettings.Netconsole.MessageFormat.Auto, Text = "Decode extended messages (timestamp and level, like dmesg)" },
+            new NetconsoleFormatChoice { Value = DeviceTerminalSettings.ConnectionSettings.Netconsole.MessageFormat.Raw, Text = "Show every datagram as it is" }
+        };
+
+        public string NetconsoleLocalAddress { get; set; }
+
+        private string _NetconsoleLocalPort = DeviceTerminalSettings.ConnectionSettings.Netconsole.DefaultPort.ToString();
+
+        public string NetconsoleLocalPort
+        {
+            get
+            {
+                return _NetconsoleLocalPort;
+            }
+            set
+            {
+                _NetconsoleLocalPort = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("NetconsoleHint"));
+            }
+        }
+
+        public string NetconsoleRemoteHost { get; set; }
+
+        public string NetconsoleRemotePort { get; set; } = DeviceTerminalSettings.ConnectionSettings.Netconsole.DefaultPort.ToString();
+
+        public bool NetconsoleAcceptOnlyFromRemoteHost { get; set; }
+
+        public DeviceTerminalSettings.ConnectionSettings.Netconsole.InputMode NetconsoleInput { get; set; }
+
+        public DeviceTerminalSettings.ConnectionSettings.Netconsole.MessageFormat NetconsoleFormat { get; set; }
+
+        public bool NetconsoleColorizeLevels { get; set; } = true;
+
+        public bool NetconsoleShowSender { get; set; }
+
+        public bool NetconsoleLocalEcho { get; set; } = true;
+
+        public Visibility NetconsoleSettingsVisibility { get; } = Visibility.Collapsed;
+
+        // The prompt and the echo of the terminal do not apply to netconsole (it has its own echo setting).
+        public Visibility PromptSettingsVisibility => IsNetconsole ? Visibility.Collapsed : Visibility.Visible;
+
+        /// <summary>What to set on the device so that it sends here: the netconsole parameter and the U-Boot variables.</summary>
+        public string NetconsoleHint
+        {
+            get
+            {
+                string address = LocalAddressForHint();
+                string port = ParsePort(NetconsoleLocalPort ?? "") is int value && value > 0 ? value.ToString() : DeviceTerminalSettings.ConnectionSettings.Netconsole.DefaultPort.ToString();
+                return "Linux: netconsole=+@/eth0," + port + "@" + address + "/  (\"+\" for extended messages; on the kernel command line or with modprobe netconsole)\r\n"
+                    + "U-Boot: setenv ncip " + address + (port != "6666" ? ":" + port : "") + "; setenv stdin nc; setenv stdout nc; setenv stderr nc";
+            }
+        }
+
+        /// <summary>The address to give the device: the one typed in, or an IPv4 address of this computer.</summary>
+        private string LocalAddressForHint()
+        {
+            if (!string.IsNullOrWhiteSpace(NetconsoleLocalAddress))
+            {
+                return NetconsoleLocalAddress.Trim();
+            }
+            try
+            {
+                foreach (System.Net.IPAddress address in System.Net.Dns.GetHostAddresses(System.Net.Dns.GetHostName()))
+                {
+                    if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !System.Net.IPAddress.IsLoopback(address))
+                    {
+                        return address.ToString();
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return "<this computer>";
+        }
+
+        /// <summary>Null when the netconsole settings can be used, otherwise why not.</summary>
+        public string ValidateNetconsole()
+        {
+            if (!IsNetconsole)
+            {
+                return null;
+            }
+            if (ParsePort(NetconsoleLocalPort ?? "") == 0)
+            {
+                return "Enter the UDP port to listen on (1-65535; netconsole sends to 6666 unless told otherwise).";
+            }
+            if (ParsePort(NetconsoleRemotePort ?? "") == 0)
+            {
+                return "Enter the UDP port the device reads input on (1-65535; U-Boot uses 6666).";
+            }
+            if (!string.IsNullOrWhiteSpace(NetconsoleLocalAddress) && NetconsoleLocalAddress.Trim().Contains(" "))
+            {
+                return "The local address must be an IP address of this computer (or empty for every interface).";
+            }
+            if (NetconsoleAcceptOnlyFromRemoteHost && string.IsNullOrWhiteSpace(NetconsoleRemoteHost))
+            {
+                return "Enter the device address to show only its messages.";
+            }
+            return null;
+        }
+
         public class TelnetLocalEchoChoice
         {
             public DeviceTerminalSettings.ConnectionSettings.Telnet.LocalEchoMode Value { get; set; }
@@ -368,6 +498,23 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 {
                     return SerialSettings;
                 }
+                if (IsNetconsole)
+                {
+                    // A port that is not a number is 0, which makes the connection invalid instead of throwing.
+                    return new DeviceTerminalSettings.ConnectionSettings.Netconsole
+                    {
+                        LocalAddress = string.IsNullOrWhiteSpace(NetconsoleLocalAddress) ? null : NetconsoleLocalAddress.Trim().Trim('[', ']'),
+                        LocalPort = ParsePort(NetconsoleLocalPort ?? ""),
+                        RemoteHost = string.IsNullOrWhiteSpace(NetconsoleRemoteHost) ? null : NetconsoleRemoteHost.Trim().Trim('[', ']'),
+                        RemotePort = ParsePort(NetconsoleRemotePort ?? ""),
+                        AcceptOnlyFromRemoteHost = NetconsoleAcceptOnlyFromRemoteHost,
+                        Input = NetconsoleInput,
+                        Format = NetconsoleFormat,
+                        ColorizeLevels = NetconsoleColorizeLevels,
+                        ShowSender = NetconsoleShowSender,
+                        LocalEcho = NetconsoleLocalEcho
+                    };
+                }
                 SplitEndpoint(TCPEndpoint, out string host, out int? givenPort, out bool schemeTls);
                 bool tls = TelnetTls || (IsTelnet && schemeTls);
                 // A telnet server is expected on the telnet port unless another one is given; a port that is not a
@@ -501,6 +648,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         /// <summary>Null when the endpoint can be used, otherwise why not.</summary>
         public string ValidateEndpoint()
         {
+            if (IsNetconsole)
+            {
+                return ValidateNetconsole();
+            }
             if (!(Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp))
             {
                 return null;
@@ -679,6 +830,22 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     TCPEndpoint = (tcp.Host.Contains(":") ? "[" + tcp.Host + "]" : tcp.Host) + ":" + tcp.Port;
                 }
             }
+            else if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole)
+            {
+                NetconsoleLocalAddress = netconsole.LocalAddress;
+                NetconsoleLocalPort = netconsole.LocalPort.ToString();
+                NetconsoleRemoteHost = netconsole.RemoteHost;
+                NetconsoleRemotePort = netconsole.RemotePort.ToString();
+                NetconsoleAcceptOnlyFromRemoteHost = netconsole.AcceptOnlyFromRemoteHost;
+                NetconsoleInput = netconsole.Input;
+                NetconsoleFormat = netconsole.Format;
+                NetconsoleColorizeLevels = netconsole.ColorizeLevels;
+                NetconsoleShowSender = netconsole.ShowSender;
+                NetconsoleLocalEcho = netconsole.LocalEcho;
+                SerialSettingsVisibility = Visibility.Collapsed;
+                TCPSettingsVisibility = Visibility.Collapsed;
+                NetconsoleSettingsVisibility = Visibility.Visible;
+            }
         }
 
         public void UpdateMaximumSpeed()
@@ -781,6 +948,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public void ApplyTCPEndpoint()
         {
+            if (IsNetconsole)
+            {
+                Settings.Connection = EffectiveConnectionSettings;
+                return;
+            }
             if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp)
             {
                 // The only place where the text may change another setting: the user has finished typing.
@@ -807,6 +979,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         InitializeComponent();
         this.DataContext = (_Controller = new ControllerImpl(settings, showSaveCheckbox));
         _TestOnOK = testOnOK;
+        if (_Controller.IsNetconsole)
+        {
+            Title = "Netconsole Receiver Settings";
+        }
         if (_Controller.IsTelnet)
         {
             Title = "Telnet Terminal Settings";
@@ -858,6 +1034,17 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         }
     }
 
+    /// <summary>Puts the keyboard where the address or the port that was rejected is typed.</summary>
+    private void FocusEndpointBox()
+    {
+        if (_Controller.IsNetconsole)
+        {
+            txtNetconsoleLocalPort.Focus();
+            return;
+        }
+        txtHost.Focus();
+    }
+
     private void ListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _Controller.UpdateMaximumSpeed();
@@ -873,7 +1060,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         if (endpointProblem != null)
         {
             MessageBoxes.Error(endpointProblem);
-            txtHost.Focus();
+            FocusEndpointBox();
             return;
         }
         try
@@ -968,7 +1155,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         if (endpointProblem != null)
         {
             MessageBoxes.Error(endpointProblem);
-            txtHost.Focus();
+            FocusEndpointBox();
             return;
         }
         string telnetProblem = _Controller.ValidateTelnetOptions();

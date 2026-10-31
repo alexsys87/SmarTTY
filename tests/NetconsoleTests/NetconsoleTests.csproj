@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The real netconsole decoder and UDP transport with the settings they read; Stubs.cs replaces the Windows-only pieces. -->
+    <Compile Include="../../Transport/NetconsoleDecoder.cs" Link="NetconsoleDecoder.cs" />
+    <Compile Include="../../Transport/NetconsoleTransport.cs" Link="NetconsoleTransport.cs" />
+    <Compile Include="../../Transport/IDeviceTransport.cs" Link="IDeviceTransport.cs" />
+    <Compile Include="../../Transport/IHostNameResolver.cs" Link="IHostNameResolver.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/DeviceTerminalSettings.cs" Link="DeviceTerminalSettings.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/DeviceSessionKey.cs" Link="DeviceSessionKey.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/TerminalEncodings.cs" Link="TerminalEncodings.cs" />
+  </ItemGroup>
+</Project>

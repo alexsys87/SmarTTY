@@ -109,6 +109,9 @@ jobs:
       - name: Run Telnet protocol checks (options, LINEMODE, STATUS, CHARSET, TLS and STARTTLS, output queue)
         run: dotnet run --project tests/TelnetStreamTests -c Release
 
+      - name: Run netconsole checks (plain and extended messages, fragments, line and character input over UDP)
+        run: dotnet run --project tests/NetconsoleTests -c Release
+
       - name: Run TAR extractor security checks
         run: dotnet run --project tests/TarExtractorSecurityTests -c Release
 
@@ -271,13 +274,19 @@ jobs:
         run: dotnet run --project tests/SshNetIntegrationTests -c Release
 
       - name: Install Mono and a virtual display for the Smart Terminal checks
-        run: sudo apt-get install -y mono-runtime libmono-system-windows-forms4.0-cil libmono-system-drawing4.0-cil libmono-system-xml-linq4.0-cil libmono-microsoft-csharp4.0-cil libgdiplus xvfb
+        run: sudo apt-get install -y mono-runtime libmono-system-windows-forms4.0-cil libmono-system-drawing4.0-cil libmono-system-xml-linq4.0-cil libmono-microsoft-csharp4.0-cil libmono-windowsbase4.0-cil libgdiplus xvfb
 
       - name: Build the Smart Terminal checks
         run: dotnet build tests/SmartTerminalIntegrationTests -c Release
 
       - name: Run the Smart Terminal checks (the real control under Mono, on OpenSSH and Dropbear)
         run: xvfb-run -a mono tests/SmartTerminalIntegrationTests/bin/Release/net48/SmartTerminalIntegrationTests.exe
+
+      - name: Build the netconsole terminal checks
+        run: dotnet build tests/NetconsoleTerminalTests -c Release
+
+      - name: Run the netconsole terminal checks (the real COM/TCP control as a UDP receiver, under Mono)
+        run: xvfb-run -a mono tests/NetconsoleTerminalTests/bin/Release/net48/NetconsoleTerminalTests.exe
 
   build:
     name: Build SmarTTY (Release)

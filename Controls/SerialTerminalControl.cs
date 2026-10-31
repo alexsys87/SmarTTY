@@ -825,6 +825,68 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// </summary>
     public bool EchoRawInput { get; set; }
 
+    private bool _inputLineDisabled;
+
+    /// <summary>
+    /// When true, the local input line is never shown, whatever the device prints: every key goes to the device at once
+    /// (a netconsole receiver in character mode, or one whose line is typed in a box of its own). An input line that is
+    /// shown when this is switched on is taken off the screen with what was typed in it.
+    /// </summary>
+    public bool InputLineDisabled
+    {
+        get => _inputLineDisabled;
+        set
+        {
+            if (_inputLineDisabled == value)
+            {
+                return;
+            }
+            _inputLineDisabled = value;
+            if (value)
+            {
+                DropInputLine();
+            }
+        }
+    }
+
+    /// <summary>Takes the input line off the screen (the prompt of the device stays) and gives the keys to the device.</summary>
+    private void DropInputLine()
+    {
+        if (_inputLine == null)
+        {
+            return;
+        }
+        _historySearch = null;
+        ReplaceAfterDevicePrompt(string.Empty);
+        OnTextReplaced();
+        int row = _inputLine.StartLine - ActiveBuffer.FirstRow;
+        if (row >= 0)
+        {
+            base.CursorPosition = new Point(_inputLine.StartColumn, row);
+        }
+        _inputLine = null;
+        NavigationLocked = true;
+        UpdateCaret();
+        NotifyInputLineState();
+    }
+
+    /// <summary>
+    /// Shows text that was not received from the device (what was sent, in the colour of echoed characters), on a line
+    /// of its own.
+    /// </summary>
+    public void ShowLocalText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+        if (CursorPosition.X != 0)
+        {
+            text = "\r\n" + text;
+        }
+        ProcessLocalOutput(text);
+    }
+
     // How many typed characters of the current line Backspace may still erase on the screen.
     private int _rawEchoLength;
 
@@ -875,7 +937,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// </summary>
     private bool ContinueDevicePrompt()
     {
-        if (ActiveBufferIndex != 0 || _visibleColumns <= 0)
+        if (_inputLineDisabled || ActiveBufferIndex != 0 || _visibleColumns <= 0)
         {
             return false;
         }
@@ -950,6 +1012,10 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     private void ShowPrompt()
     {
+        if (_inputLineDisabled)
+        {
+            return;
+        }
         // Remove empty last line if exists
         if (((EditableTextBrowser)this).EditableDocument.LineCount > 0)
         {

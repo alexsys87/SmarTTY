@@ -214,6 +214,60 @@
             </Button>
           </StackPanel>
         </local:SettingsGroupBox>
+        <local:SettingsGroupBox Text="Netconsole receiver (UDP)" ImageSource="../icons/net16.png" Visibility="{Binding NetconsoleSettingsVisibility}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Listen on:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding NetconsoleLocalAddress, UpdateSourceTrigger=PropertyChanged}" Tag="all interfaces" ToolTip="An IP address of this computer to receive on only. Empty: every interface, IPv4 and IPv6." />
+            <TextBlock Text="port:" Grid.Column="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Name="txtNetconsoleLocalPort" Grid.Column="3" Margin="2" Width="60" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding NetconsoleLocalPort, UpdateSourceTrigger=PropertyChanged}" ToolTip="The UDP port the device sends to: the tgt-port of netconsole (6666 by default). Allow it in the Windows firewall if nothing arrives." />
+            <TextBlock Text="Device:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding NetconsoleRemoteHost, UpdateSourceTrigger=PropertyChanged}" Tag="the address messages come from" ToolTip="Where typed input is sent (host name or IP address; a broadcast address works too). Empty: the address the last message came from, so nothing can be sent before the device has sent something." />
+            <TextBlock Text="port:" Grid.Row="1" Grid.Column="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="3" Margin="2" Width="60" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding NetconsoleRemotePort, UpdateSourceTrigger=PropertyChanged}" ToolTip="The UDP port the device reads input on (U-Boot: 6666). The Linux netconsole module only sends: it ignores input." />
+            <CheckBox Grid.Row="2" Grid.ColumnSpan="4" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding NetconsoleAcceptOnlyFromRemoteHost}" ToolTip="Drop the datagrams of every other sender on this port (several boards sending to the same computer).">
+              <TextBlock Text="Show only the messages of this device" />
+            </CheckBox>
+            <TextBlock Text="Input:" Grid.Row="3" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Margin="2" ItemsSource="{Binding NetconsoleInputChoices}" DisplayMemberPath="Text" SelectedValuePath="Value" SelectedValue="{Binding NetconsoleInput}" ToolTip="Line by line: the line is typed in a box below the terminal (Up/Down: history) and sent as one UDP datagram when Enter is pressed, so the messages that keep arriving do not mix with it. Byte by byte: every key typed in the terminal is sent at once as a datagram of its own. Can be switched in the terminal's context menu (Netconsole)." />
+            <TextBlock Text="Messages:" Grid.Row="4" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3" Margin="2" ItemsSource="{Binding NetconsoleFormatChoices}" DisplayMemberPath="Text" SelectedValuePath="Value" SelectedValue="{Binding NetconsoleFormat}" ToolTip="Extended netconsole (a '+' in front of the netconsole parameter) sends every kernel message with its level, sequence number and time: it is shown as [seconds.microseconds] text, long messages sent in pieces are put together. Plain netconsole output is shown as it is either way." />
+            <CheckBox Grid.Row="5" Grid.ColumnSpan="4" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding NetconsoleColorizeLevels}" ToolTip="Extended messages: errors red, warnings yellow, notices bold, debug grey, the timestamp green (like dmesg --color).">
+              <TextBlock Text="Colour extended messages by their level" />
+            </CheckBox>
+            <CheckBox Grid.Row="6" Grid.ColumnSpan="4" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding NetconsoleShowSender}" ToolTip="For several devices sending to the same port: every line starts with the address it came from.">
+              <TextBlock Text="Show the sender's address in front of every line" />
+            </CheckBox>
+            <CheckBox Grid.Row="7" Grid.ColumnSpan="4" Margin="5 4 0 2" VerticalContentAlignment="Center" IsChecked="{Binding NetconsoleLocalEcho}" ToolTip="The Linux netconsole module never echoes what it gets; U-Boot does, so turn this off for U-Boot or every key shows twice. Can be switched in the terminal's context menu (Echo typed characters).">
+              <TextBlock Text="Show what is sent (local echo)" />
+            </CheckBox>
+            <StackPanel Grid.Row="8" Grid.ColumnSpan="4">
+              <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Click="Test_Click" ToolTip="Opens the UDP port and closes it again: tells whether another program already listens on it.">
+                <StackPanel Orientation="Horizontal">
+                  <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
+                  <TextBlock Text="Test: open the port now" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <TextBox Margin="2 4 2 2" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource Theme.TextSecondary}" Text="{Binding NetconsoleHint, Mode=OneWay}" ToolTip="Set this on the device so that it sends its console here. The text can be selected and copied." />
+            </StackPanel>
+          </Grid>
+        </local:SettingsGroupBox>
         <local:SettingsGroupBox Text="Automatic reconnect" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
           <Grid>
             <Grid.RowDefinitions>
@@ -410,7 +464,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <CheckBox VerticalContentAlignment="Center" Grid.ColumnSpan="2" IsChecked="{Binding Path=Settings.EchoTypedCharacters}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent">
+            <CheckBox VerticalContentAlignment="Center" Grid.ColumnSpan="2" IsChecked="{Binding Path=Settings.EchoTypedCharacters}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent" Visibility="{Binding PromptSettingsVisibility}">
               <TextBlock Text="Echo back typed characters (with different color)" />
             </CheckBox>
             <TextBlock Text="Line ending style:" Grid.Row="1" Style="{StaticResource HeaderText}" />
@@ -447,8 +501,8 @@
                 <TextBlock Text="Shell counts UTF-8 bytes (BusyBox without UTF-8, OpenWrt)" />
               </CheckBox>
             </StackPanel>
-            <TextBlock Text="Prompt:" Grid.Row="4" Style="{StaticResource HeaderText}" ToolTip="Shown before the device prints a prompt of its own, and when none is recognised. Leave empty for the default &quot;&gt; &quot;." />
-            <StackPanel Grid.Column="1" Grid.Row="4">
+            <TextBlock Text="Prompt:" Grid.Row="4" Style="{StaticResource HeaderText}" Visibility="{Binding PromptSettingsVisibility}" ToolTip="Shown before the device prints a prompt of its own, and when none is recognised. Leave empty for the default &quot;&gt; &quot;." />
+            <StackPanel Grid.Column="1" Grid.Row="4" Visibility="{Binding PromptSettingsVisibility}">
               <TextBox Margin="0 2 0 2" HorizontalAlignment="Left" MinWidth="120" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding Path=Settings.DefaultPrompt, UpdateSourceTrigger=PropertyChanged}" ToolTip="Shown before the device prints a prompt of its own, and when none is recognised. Leave empty for the default &quot;&gt; &quot;." />
               <CheckBox VerticalContentAlignment="Center" Margin="0 2 0 2" IsChecked="{Binding Path=Settings.AutoDetectPrompt}" Checked="RaiseSettingsChangedEvent" Unchecked="RaiseSettingsChangedEvent" ToolTip="When the device prints a prompt that matches a common pattern (&quot;&gt; &quot;, &quot;# &quot;, &quot;$ &quot;, ...), the input line continues it. Turn this off when the device prints something that only looks like a prompt: the input line then always uses the prompt above.">
                 <TextBlock Text="Detect the prompt printed by the device" />

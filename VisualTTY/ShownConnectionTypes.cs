@@ -32,4 +32,7 @@ public struct ShownConnectionTypes
     /// (a "show" flag would read as false and hide them).
     /// </summary>
     public bool HideTelnet;
+
+    /// <summary>Netconsole receivers are hidden when this is set (inverted for the same reason as <see cref="HideTelnet"/>).</summary>
+    public bool HideNetconsole;
 }

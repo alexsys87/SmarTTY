@@ -514,7 +514,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public SubtypeImage TypeImage => SubtypeImage.Terminal;
 
-            public string Title => (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.ToString() ?? "";
+            public virtual string Title => (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Tcp)?.ToString() ?? "";
 
             public virtual string Detail1 => "raw tcp";
 
@@ -554,6 +554,22 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
             }
         }
+
+        /// <summary>
+        /// A saved netconsole receiver (a UDP port the device sends its console output to). It is listed, edited and
+        /// deleted like a raw TCP item, but counted and filtered separately, and never probed: nothing answers on UDP.
+        /// </summary>
+        public class Netconsole : RawTcp
+        {
+            public override string Title => (Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.Netconsole)?.ToString() ?? "";
+
+            public override string Detail1 => "netconsole (UDP)";
+
+            public Netconsole(SavedConnectionStore mgr, RawConnectionSettings settings)
+                : base(mgr, settings)
+            {
+            }
+        }
     }
 
     public class ControllerImpl : INotifyPropertyChanged, IDisposable
@@ -565,6 +581,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             public int RawTcp { get; set; }
 
             public int Telnet { get; set; }
+
+            public int Netconsole { get; set; }
 
             public int Serial { get; set; }
         }
@@ -753,6 +771,20 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 _ShownTypes.HideTelnet = !value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShowTelnet"));
+                UpdateFilteredItems();
+            }
+        }
+
+        public bool ShowNetconsole
+        {
+            get
+            {
+                return !_ShownTypes.HideNetconsole;
+            }
+            set
+            {
+                _ShownTypes.HideNetconsole = !value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShowNetconsole"));
                 UpdateFilteredItems();
             }
         }
@@ -954,6 +986,22 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 }
                 return;
             }
+            if (defaultItemName.StartsWith("/netconsole", StringComparison.InvariantCultureIgnoreCase)
+                && (defaultItemName.Length == "/netconsole".Length || defaultItemName["/netconsole".Length] == ':'))
+            {
+                // /netconsole, /netconsole:port, /netconsole:host[:port] or /netconsole:port@host[:port] - a netconsole
+                // receiver that is not saved anywhere.
+                try
+                {
+                    string text = defaultItemName.Length > "/netconsole:".Length ? defaultItemName.Substring("/netconsole:".Length) : "";
+                    PendingRawConnectionSettings = NewNetconsoleSettings(DeviceTerminalSettings.ConnectionSettings.Netconsole.Parse(text));
+                }
+                catch (FormatException exception)
+                {
+                    MessageBoxes.Exception(exception);
+                }
+                return;
+            }
             if (defaultItemName.StartsWith("/job:", StringComparison.InvariantCultureIgnoreCase))
             {
                 ConnectWithSettings(new SettingsWrappers.SSH(conn: (Job = XmlStorage.LoadFromFile<SmarTTYJob>(defaultItemName.Substring(5), new Type[0])).Settings, mgr: _Connections));
@@ -1055,6 +1103,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 {
                     connectionCounts.Telnet++;
                 }
+                else if (item is SettingsWrappers.Netconsole)
+                {
+                    connectionCounts.Netconsole++;
+                }
                 else if (item is SettingsWrappers.RawTcp)
                 {
                     connectionCounts.RawTcp++;
@@ -1129,6 +1181,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 return ShowTelnet;
             }
+            if (item is SettingsWrappers.Netconsole)
+            {
+                return ShowNetconsole;
+            }
             if (item is SettingsWrappers.RawTcp)
             {
                 return ShowRawTcp;
@@ -1160,6 +1216,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp)
                     {
                         _StaticItems.Add(new SettingsWrappers.RawTcp(_Connections, entry));
+                    }
+                    else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Netconsole)
+                    {
+                        _StaticItems.Add(new SettingsWrappers.Netconsole(_Connections, entry));
                     }
                 }
                 _KnownSerialPortSettings = knownSettings;
@@ -1270,6 +1330,25 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 Port = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultPort,
                 TerminalSpeed = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalSpeed
             }));
+        }
+
+        public bool CreateNewNetconsoleConnection(Window wnd)
+        {
+            return CreateNewTcpConnection(wnd, NewNetconsoleSettings(new DeviceTerminalSettings.ConnectionSettings.Netconsole()));
+        }
+
+        // The kernel ends its lines with a bare LF (netconsole has no tty to add the CR), and U-Boot reads LF as Enter.
+        // There is no prompt to detect: the device prints log messages.
+        private static DeviceTerminalSettings NewNetconsoleSettings(DeviceTerminalSettings.ConnectionSettings.Netconsole connection)
+        {
+            return new DeviceTerminalSettings
+            {
+                Connection = connection,
+                LineEnding = DeviceTerminalSettings.LineEndingType.LF,
+                TreatLFAsCRLF = true,
+                AutoDetectPrompt = false,
+                SyncRemoteTerminalSize = false
+            };
         }
 
         // A telnet session ends a line with CR LF; the server normally echoes what is typed, so local echo stays off.
@@ -1582,6 +1661,14 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     private void NewTelnet_Click(object sender, RoutedEventArgs e)
     {
         if (Controller.CreateNewTelnetConnection((Window)this))
+        {
+            this.Close();
+        }
+    }
+
+    private void NewNetconsole_Click(object sender, RoutedEventArgs e)
+    {
+        if (Controller.CreateNewNetconsoleConnection((Window)this))
         {
             this.Close();
         }
