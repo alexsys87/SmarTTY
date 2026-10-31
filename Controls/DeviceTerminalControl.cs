@@ -335,6 +335,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         Disposed += DeviceTerminalControl_Disposed;
         pnlConnectionInProgress.BringToFront();
         toolStrip1.SendToBack();
+        picConnectionState.Image = Icons.Load("busy");
+        pnlConnectionCard.SizeChanged += (sender, e) => CenterConnectionCard();
         
         // Replace the designer-created TerminalEmulatorControl with our SerialTerminalControl
         ReplaceTerminalControl();
@@ -427,6 +429,38 @@ public partial class DeviceTerminalControl : DpiAwareControl
         ApplyMenuTheme(contextMenuStrip1);
         ApplyNetconsoleBarTheme();
         toolStrip1.Invalidate();
+        ApplyConnectionPromptTheme();
+    }
+
+    /// <summary>Paints the "connection closed" prompt (the same one the SSH sessions show) in the colours of the application theme.</summary>
+    private void ApplyConnectionPromptTheme()
+    {
+        ToolbarPalette palette = _toolbarPalette;
+        pnlConnectionInProgress.BackColor = palette.Background;
+        pnlConnectionInProgress.ForeColor = palette.Text;
+        foreach (Button button in new[] { btnTryReconnect, btnCloseTab, btnIgnore })
+        {
+            button.FlatStyle = FlatStyle.Flat;
+            button.UseVisualStyleBackColor = false;
+            button.BackColor = palette.Input;
+            button.ForeColor = palette.Text;
+            button.FlatAppearance.BorderColor = palette.Border;
+            button.FlatAppearance.MouseOverBackColor = palette.Hover;
+            button.FlatAppearance.MouseDownBackColor = palette.Pressed;
+        }
+    }
+
+    /// <summary>Keeps the prompt in the middle of the terminal area, as the prompt of an SSH session is.</summary>
+    private void CenterConnectionCard()
+    {
+        pnlConnectionCard.Location = new Point(
+            Math.Max(0, (pnlConnectionInProgress.ClientSize.Width - pnlConnectionCard.Width) / 2),
+            Math.Max(0, (pnlConnectionInProgress.ClientSize.Height - pnlConnectionCard.Height) / 2));
+    }
+
+    private void pnlConnectionInProgress_Resize(object sender, EventArgs e)
+    {
+        CenterConnectionCard();
     }
 
     private void ApplyMenuTheme(ToolStripDropDown menu)
@@ -1306,8 +1340,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             pnlConnectionInProgress.Visible = true;
             toolStrip1.Visible = false;
-            progressBar1.Visible = connectionStateEnum == ConnectionStateEnum.Connecting;
-            linkLabel1.Visible = connectionStateEnum != ConnectionStateEnum.Connecting;
+            // While a connection is being opened there is nothing to choose; once it has ended or failed the three actions
+            // of the SSH prompt are offered.
+            bool connecting = connectionStateEnum == ConnectionStateEnum.Connecting;
+            progressBar1.Visible = connecting;
+            btnTryReconnect.Visible = btnCloseTab.Visible = btnIgnore.Visible = !connecting;
         }
         else
         {
@@ -1319,7 +1356,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         switch (connectionStateEnum)
         {
             case ConnectionStateEnum.Connecting:
-                lblConnecting.Text = value;
+                lblConnectionTitle.Text = "Connecting";
+                lblConnecting.Text = string.IsNullOrEmpty(value) ? (_transportDisplayName ?? ConnectionTitle) : value;
                 break;
             case ConnectionStateEnum.Disconnected:
                 {
@@ -1330,12 +1368,19 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     terminal.BackColor = backColor;
                     ToolStripLabel toolStripLabel = lblConnection;
                     // A reason is given when the connection broke (an unplugged adapter, a reset) instead of being closed.
-                    string text = (lblConnecting.Text = string.IsNullOrEmpty(value) ? "Connection closed" : "Connection closed: " + value);
+                    string text = string.IsNullOrEmpty(value) ? "Connection closed" : "Connection closed: " + value;
                     toolStripLabel.Text = text;
+                    lblConnectionTitle.Text = "Connection closed";
+                    lblConnecting.Text = "The connection to " + (_transportDisplayName ?? ConnectionTitle) + " has been closed."
+                        + (string.IsNullOrEmpty(value) ? "" : Environment.NewLine + value)
+                        + Environment.NewLine + "Please select an action:";
                     break;
                 }
             case ConnectionStateEnum.Failed:
-                lblConnecting.Text = "Connection failed: " + value;
+                lblConnectionTitle.Text = "Connection failed";
+                lblConnecting.Text = "The connection to " + (_transportDisplayName ?? ConnectionTitle) + " could not be opened."
+                    + (string.IsNullOrEmpty(value) ? "" : Environment.NewLine + value)
+                    + Environment.NewLine + "Please select an action:";
                 break;
             case ConnectionStateEnum.Connected:
                 {
@@ -1347,6 +1392,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     break;
                 }
         }
+        // The texts decide how big the card is.
+        pnlConnectionCard.PerformLayout();
+        CenterConnectionCard();
     }
 
     // A test of a network connection waits as long as the connection itself would; when that is left to the operating
@@ -1771,9 +1819,33 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // The device may also echo back, which will be handled by OnDataReceived
     }
 
-    private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+    private void btnTryReconnect_Click(object sender, EventArgs e)
     {
         Connect();
+    }
+
+    private void btnCloseTab_Click(object sender, EventArgs e)
+    {
+        CloseTabRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// "Ignore" of the prompt: the last output stays on the screen and the tool bar offers Reconnect, as after a connection
+    /// that was closed on purpose. A pending automatic reconnect is cancelled, like the user's own disconnect does.
+    /// </summary>
+    private void btnIgnore_Click(object sender, EventArgs e)
+    {
+        _manualDisconnect = true;
+        StopAutoReconnectTimer();
+        if (_connectionState == ConnectionStateEnum.Failed)
+        {
+            lblConnection.Text = "Connection failed";
+        }
+        pnlConnectionInProgress.Visible = false;
+        toolStrip1.Visible = true;
+        btnReconnect.Visible = true;
+        btnDisconnect.Visible = false;
+        FocusTerminal();
     }
 
     private void btnDisconnect_Click(object sender, EventArgs e)

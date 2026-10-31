@@ -63,6 +63,11 @@ internal static class Program
             }
             Check(wanted.Count > 0, "the code asks Icons for named images");
 
+            // A few names are pictures rather than toolbar/menu icons: they are shown in a PictureBox at a larger size,
+            // and the "connection closed" card reuses the very same picture as the prompt of an SSH session. For those the
+            // picture has to be square and at least as large as the 16x16 icons, not exactly 16x16.
+            var pictures = new HashSet<string>(StringComparer.Ordinal) { "busy" };
+
             // Every name must be embedded from a real, 16x16 PNG under icons/.
             // SmarTTY.csproj uses both explicit entries and wildcards (icons\editor\*.png -> SmarTTY.Icons.%(Filename).png).
             var embedded = new Dictionary<string, string>(StringComparer.Ordinal); // logical name -> relative path
@@ -97,8 +102,17 @@ internal static class Program
                 }
                 int width = (header[16] << 24) | (header[17] << 16) | (header[18] << 8) | header[19];
                 int height = (header[20] << 24) | (header[21] << 16) | (header[22] << 8) | header[23];
-                Check(header[1] == (byte)'P' && header[2] == (byte)'N' && header[3] == (byte)'G' && width == 16 && height == 16,
-                    $"the picture of the '{name}' icon is a 16x16 PNG");
+                bool isPng = header[1] == (byte)'P' && header[2] == (byte)'N' && header[3] == (byte)'G';
+                if (pictures.Contains(name))
+                {
+                    Check(isPng && width == height && width >= 16,
+                        $"the '{name}' picture is a square PNG of at least 16x16");
+                }
+                else
+                {
+                    Check(isPng && width == 16 && height == 16,
+                        $"the picture of the '{name}' icon is a 16x16 PNG");
+                }
             }
 
             // The Windows Forms .resx images are gone: the .NET SDK cannot compile them for net48 (README, MSB3822).
