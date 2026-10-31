@@ -209,12 +209,12 @@ internal static class MoreClientsTests
 
     private static void DoDetectionChecks()
     {
-        ILinuxPackageManagerClient[] all =
-        {
-            new AptPackageManagerClient(), new DnfPackageManagerClient(), new ZypperPackageManagerClient(), new PacmanPackageManagerClient(),
-            new PortagePackageManagerClient(), new YumPackageManagerClient(), new OpkgPackageManagerClient(), new ApkPackageManagerClient(),
-            new XbpsPackageManagerClient(), new PkgPackageManagerClient(), new HomebrewPackageManagerClient()
-        };
+        // The list of the package manager window and of the probe that decides whether the menu item is offered.
+        ILinuxPackageManagerClient[] all = PackageManagerCatalog.CreateUnixClients();
+        Check(all.Length == 11 && all.Select(client => client.GetType()).Distinct().Count() == 11 && all[0] is AptPackageManagerClient && all[all.Length - 1] is HomebrewPackageManagerClient, "Catalog: eleven different clients, apt first and Homebrew last");
+        Check(PackageManagerCatalog.CreateUnixClients()[0] != all[0], "Catalog: every call gives new instances");
+        // A host without any supported manager gets no menu item: the probe finds no client at all.
+        Check(PackageManagerSelector.Pick(all, new FakeRunner()) == null, "Catalog: a host that answers none of the probes -> no client");
         string brew = HomebrewPackageManagerClient.PathPrefix + "brew --version";
         FakeRunner voidHost = new FakeRunner();
         voidHost.Responses["command -v xbps-install || which xbps-install"] = new[] { "/usr/bin/xbps-install" };
