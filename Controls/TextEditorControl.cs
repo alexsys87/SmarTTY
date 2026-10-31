@@ -34,7 +34,7 @@ public partial class TextEditorControl : EditableTextBrowser
     }
 
     /// <summary>Puts the text on the clipboard; false (after the error was shown) when the clipboard did not take it.</summary>
-    private bool TryCopyToClipboard(string text)
+    protected bool TryCopyToClipboard(string text)
     {
         try
         {

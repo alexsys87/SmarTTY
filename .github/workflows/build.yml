@@ -154,6 +154,9 @@ jobs:
       - name: Run terminal output link (compiler messages) checks
         run: dotnet run --project tests/OutputLinkTests -c Release
 
+      - name: Run multiple cursor checks
+        run: dotnet run --project tests/MultiCursorTests -c Release
+
       - name: Run API symbol checks
         run: dotnet run --project tests/ApiSymbolTests -c Release
 

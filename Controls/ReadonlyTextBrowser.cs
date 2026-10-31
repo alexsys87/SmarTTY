@@ -1903,6 +1903,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
+        if (e.Button == MouseButtons.Left && SuppressMouseSelection)
+        {
+            return;
+        }
         if (e.Button == MouseButtons.Left && _hoverTarget != null && !_hasSelection)
         {
             return;
@@ -2400,7 +2404,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
-    private void PaintSelection(Graphics graphics, TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle, Brush[,] items)
+    protected void PaintSelection(Graphics graphics, TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle, Brush[,] items)
     {
         if (start == end)
         {
@@ -2909,6 +2913,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             PaintSelection(e.Graphics, _selectionStart, SelectionEnd, _selectionStyle, backgroundBrushes);
         }
+        PaintExtraSelections(e.Graphics, backgroundBrushes);
         int firstColumn = ScrollColumn;
         int firstRow = ((e.ClipRectangle.Top >= _textArea.Top) ? ((int)Math.Floor((float)(e.ClipRectangle.Top - _textArea.Top) / _charSize.Height)) : 0);
         int lastRow = (int)Math.Ceiling(((float)(e.ClipRectangle.Bottom - _textArea.Top) - _charSize.Height) / _charSize.Height);
@@ -2949,8 +2954,25 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 _displayRows[row].VirtualLine.Draw(e.Graphics, this, row, ScrollColumn, _displayRows[row].Line, rectangle, _charSize);
             }
         }
+        PaintExtraCarets(e.Graphics);
         base.OnPaint(e);
     }
+
+    /// <summary>Paints the selections of the cursors besides the main one, under the text (see <see cref="PaintSelection"/>).</summary>
+    protected virtual void PaintExtraSelections(Graphics graphics, Brush[,] backgroundBrushes)
+    {
+    }
+
+    /// <summary>Paints the carets of the cursors besides the main one, over the text.</summary>
+    protected virtual void PaintExtraCarets(Graphics graphics)
+    {
+    }
+
+    /// <summary>
+    /// Set by a derived class that dealt with a mouse press itself (a click with Alt): moving the mouse with the button down does not select
+    /// text from the old caret until the button is released.
+    /// </summary>
+    protected bool SuppressMouseSelection;
 
     public void LoadFile(string text)
     {
@@ -3243,6 +3265,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         StopDragScroll();
         base.OnMouseUp(e);
         _lastMouseButton = MouseButtons.None;
+        SuppressMouseSelection = false;
     }
 
     public TextDocument.TextPosition Find(TextDocument.TextPosition textPosition, string searchText, bool searchBackward, bool ignoreCase, bool wrapAround, FindSelectMode findSelectMode = FindSelectMode.None)

@@ -262,6 +262,53 @@ public class EditorCommands
                 Key = Keys.Left
             }
         },
+        new DelegateCommand("AddNextOccurrence", "Add the next occurrence of the word to the selection (multiple cursors)", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.AddNextOccurrence();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Key = Keys.D
+            }
+        },
+        new DelegateCommand("SelectAllOccurrences", "Select all occurrences of the word (multiple cursors)", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.SelectAllOccurrences();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Shift = true,
+                Key = Keys.L
+            }
+        },
+        new DelegateCommand("AddCursorAbove", "Add a cursor on the line above", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.AddCursorAbove();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Alt = true,
+                Key = Keys.Up
+            }
+        },
+        new DelegateCommand("AddCursorBelow", "Add a cursor on the line below", (CodeEditorPP codeEditorPP) =>
+        {
+            codeEditorPP.AddCursorBelow();
+        })
+        {
+            DefaultShortcut = new KeyBindingMap.KeyShortcut
+            {
+                Ctrl = true,
+                Alt = true,
+                Key = Keys.Down
+            }
+        },
         new DelegateCommand("DuplicateLines", "Duplicate line", (CodeEditorPP codeEditorPP) =>
         {
             codeEditorPP.DuplicateLines();
