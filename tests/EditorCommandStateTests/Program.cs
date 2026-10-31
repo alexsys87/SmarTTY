@@ -95,6 +95,12 @@ internal static class Program
         Check(!loading.IsEnabled(EditorToolbarCommand.Reload), "loading: Reload is off");
         Check(new EditorCommandState { IsModified = true }.IsEnabled(EditorToolbarCommand.Reload), "modified file: Reload is on (the window asks before it drops the changes)");
 
+        // Show Changes needs something that differs from the server, and the text view.
+        Check(!clean.IsEnabled(EditorToolbarCommand.ShowChanges), "unmodified file: nothing to show");
+        Check(new EditorCommandState { IsModified = true }.IsEnabled(EditorToolbarCommand.ShowChanges), "modified file: Show Changes is on");
+        Check(new EditorCommandState { IsNewFile = true }.IsEnabled(EditorToolbarCommand.ShowChanges), "new file: Show Changes is on (against nothing)");
+        Check(!new EditorCommandState { IsModified = true, HexMode = true }.IsEnabled(EditorToolbarCommand.ShowChanges), "hex view: Show Changes is off");
+
         // The hex view: it can be opened once the file is loaded, and Replace belongs to the text view.
         Check(new EditorCommandState { CanUseHex = true }.IsEnabled(EditorToolbarCommand.ToggleHex), "loaded file: Hex Editor is on");
         Check(!new EditorCommandState { CanUseHex = false }.IsEnabled(EditorToolbarCommand.ToggleHex), "not loaded: Hex Editor is off");

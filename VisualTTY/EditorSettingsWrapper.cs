@@ -53,6 +53,30 @@ public class EditorSettingsWrapper
         }
     }
 
+    public bool ValidateBeforeSave
+    {
+        get
+        {
+            return !_Settings.Editor.DisableConfigCheck;
+        }
+        set
+        {
+            _Settings.Editor.DisableConfigCheck = !value;
+        }
+    }
+
+    public bool OfferServiceReload
+    {
+        get
+        {
+            return !_Settings.Editor.DisableServiceReloadOffer;
+        }
+        set
+        {
+            _Settings.Editor.DisableServiceReloadOffer = !value;
+        }
+    }
+
     public bool SyntaxHighlighting
     {
         get
