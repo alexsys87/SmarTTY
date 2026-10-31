@@ -438,6 +438,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         ToolbarPalette palette = _toolbarPalette;
         pnlConnectionInProgress.BackColor = palette.Background;
         pnlConnectionInProgress.ForeColor = palette.Text;
+        // The card looks like the prompt of an SSH session: the popup colour of the theme and a thin border.
+        pnlConnectionCard.BackColor = palette.Popup;
+        pnlConnectionCard.ForeColor = palette.Text;
+        pnlConnectionCard.Invalidate();
         foreach (Button button in new[] { btnTryReconnect, btnCloseTab, btnIgnore })
         {
             button.FlatStyle = FlatStyle.Flat;
@@ -448,6 +452,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
             button.FlatAppearance.MouseOverBackColor = palette.Hover;
             button.FlatAppearance.MouseDownBackColor = palette.Pressed;
         }
+    }
+
+    private void pnlConnectionCard_Paint(object sender, PaintEventArgs e)
+    {
+        using Pen pen = new Pen(_toolbarPalette.Border);
+        e.Graphics.DrawRectangle(pen, 0, 0, pnlConnectionCard.Width - 1, pnlConnectionCard.Height - 1);
     }
 
     /// <summary>Keeps the prompt in the middle of the terminal area, as the prompt of an SSH session is.</summary>
