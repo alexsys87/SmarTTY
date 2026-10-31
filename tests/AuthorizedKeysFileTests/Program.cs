@@ -143,6 +143,16 @@ internal static class Program
         forUser = answers.Fill(new[] { "Password:", "Password:" }, responses);
         Check(responses[0] == "secret" && responses[1] == null && forUser.SequenceEqual(new[] { 1 }), "kbd: the password answers one prompt per round");
 
+        // Second step of a chain (password accepted, then keyboard-interactive): an unrecognized prompt is not the password.
+        answers = new KeyboardInteractiveAnswers("secret", passwordAlreadyAccepted: true);
+        responses = new string[1];
+        forUser = answers.Fill(new[] { "Enter the 6 digits:" }, responses);
+        Check(responses[0] == null && forUser.SequenceEqual(new[] { 0 }) && answers.PasswordGiven, "kbd chain: an unrecognized prompt after the password step goes to the user");
+        answers = new KeyboardInteractiveAnswers("secret", passwordAlreadyAccepted: true);
+        responses = new string[1];
+        forUser = answers.Fill(new[] { "Password:" }, responses);
+        Check(responses[0] == "secret" && forUser.Count == 0, "kbd chain: a prompt that asks for the password again still gets it");
+
         foreach (string codePrompt in new[] { "Verification code:", "Enter PIN:", "One-time password (OATH) for `user':", "Authenticator code:", "Response:", "Token:", "SMS passcode:" })
         {
             Check(KeyboardInteractiveAnswers.NeedsUser(codePrompt) && !KeyboardInteractiveAnswers.LooksLikePasswordPrompt(codePrompt), "kbd: '" + codePrompt + "' is for the user");

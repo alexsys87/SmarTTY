@@ -100,6 +100,8 @@ internal static class SshNetContractTests
         Test.Check(HasConstructor(typeof(PrivateKeyFile), typeof(string)) && HasConstructor(typeof(PrivateKeyFile), typeof(string), typeof(string)), "PrivateKeyFile supports a path and a passphrase");
         Test.Check(typeof(NoneAuthenticationMethod).GetProperty("AllowedAuthentications") != null, "NoneAuthenticationMethod.AllowedAuthentications exists");
         Test.Check(HasConstructor(typeof(NoneAuthenticationMethod), typeof(string)), "NoneAuthenticationMethod(string) exists");
+        Test.Check(typeof(PasswordAuthenticationMethod).GetProperty("AllowedAuthentications") != null && typeof(KeyboardInteractiveAuthenticationMethod).GetProperty("AllowedAuthentications") != null, "Password and keyboard-interactive methods tell the methods that may follow a partial success");
+        Test.Check(typeof(AuthenticationResult).GetEnumNames().Contains("PartialSuccess"), "AuthenticationResult.PartialSuccess exists for chained authentication methods");
         Test.Check(typeof(AuthenticationMethod).GetMethod("Authenticate", new[] { typeof(Session) }) != null, "AuthenticationMethod.Authenticate(Session) exists");
         Test.Check(typeof(KeyboardInteractiveAuthenticationMethod).GetEvent("AuthenticationPrompt") != null, "KeyboardInteractiveAuthenticationMethod.AuthenticationPrompt exists");
         Test.Check(GetPropertyType(typeof(AuthenticationPrompt), "Request") == typeof(string) && GetPropertyType(typeof(AuthenticationPrompt), "IsEchoed") == typeof(bool), "AuthenticationPrompt exposes Request and IsEchoed");

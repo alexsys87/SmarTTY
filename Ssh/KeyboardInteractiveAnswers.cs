@@ -26,8 +26,20 @@ public sealed class KeyboardInteractiveAnswers
     private bool _firstRound = true;
 
     public KeyboardInteractiveAnswers(string password)
+        : this(password, passwordAlreadyAccepted: false)
+    {
+    }
+
+    /// <param name="passwordAlreadyAccepted">
+    /// An earlier step of a chain of methods (password, then keyboard-interactive) has taken the password: a prompt that
+    /// is not recognizable as asking for it is then for the user, not a password prompt in a language the patterns do not
+    /// know.
+    /// </param>
+    public KeyboardInteractiveAnswers(string password, bool passwordAlreadyAccepted)
     {
         _password = password ?? string.Empty;
+        _firstRound = !passwordAlreadyAccepted;
+        PasswordGiven = passwordAlreadyAccepted;
     }
 
     /// <summary>Whether the password was sent in any round so far.</summary>

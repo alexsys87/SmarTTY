@@ -760,13 +760,24 @@ public class SshSession : IDisposable
 
     private bool RunAuthentication(string userName, Func<Session, AuthenticationResult> attempt)
     {
+        return RunAttempt(userName, attempt) == AuthenticationResult.Success;
+    }
+
+    /// <summary>
+    /// Runs one attempt and tells how it ended. PartialSuccess means that the server took this step of a chain
+    /// (AuthenticationMethods password,keyboard-interactive in sshd_config) and wants another method before it lets the
+    /// user in.
+    /// </summary>
+    private AuthenticationResult RunAttempt(string userName, Func<Session, AuthenticationResult> attempt)
+    {
         if (IsAuthenticated)
         {
-            return true;
+            return AuthenticationResult.Success;
         }
-        if (_authGate.Run(attempt) != AuthenticationResult.Success)
+        AuthenticationResult result = _authGate.Run(attempt);
+        if (result != AuthenticationResult.Success)
         {
-            return false;
+            return result;
         }
         // SshClient.Connect() completes once the successful attempt returns.
         _connectDone.WaitOne();
@@ -775,7 +786,7 @@ public class SshSession : IDisposable
             ExceptionDispatchInfo.Capture(_connectError).Throw();
         }
         UserName = userName;
-        return true;
+        return AuthenticationResult.Success;
     }
 
     public AuthMethods GetAuthMethods(string userName)
@@ -791,6 +802,11 @@ public class SshSession : IDisposable
         {
             return AuthMethods.None;
         }
+        return ParseAuthMethods(allowed);
+    }
+
+    private static AuthMethods ParseAuthMethods(string[] allowed)
+    {
         AuthMethods authMethods = AuthMethods.None;
         foreach (string name in allowed ?? new string[0])
         {
@@ -824,28 +840,69 @@ public class SshSession : IDisposable
         {
             throw new Exception("The server reported no supported authentication protocols");
         }
-        if ((authMethods & AuthMethods.Password) != 0)
+        if ((authMethods & (AuthMethods.Password | AuthMethods.KeyboardInteractive)) == 0)
         {
-            return AuthenticateWithPassword(userName, password);
+            // Neither is announced (a server that lists only public keys may still take them): try both.
+            if (!AuthenticateWithPassword(userName, password))
+            {
+                return AuthenticateKeyboardInteractiveWithPassword(userName, password, promptsForUser);
+            }
+            return true;
         }
-        if ((authMethods & AuthMethods.KeyboardInteractive) != 0)
+        // The server may ask for more than one method (AuthenticationMethods password,keyboard-interactive): a step that
+        // it accepts but that does not finish the login is a partial success, and the methods it names next are the
+        // ones to go on with. Each method is tried once.
+        bool passwordTried = false;
+        bool interactiveTried = false;
+        bool passwordAccepted = false;
+        while (true)
         {
-            return AuthenticateKeyboardInteractiveWithPassword(userName, password, promptsForUser);
+            AuthenticationResult result;
+            AuthMethods next;
+            if ((authMethods & AuthMethods.Password) != 0 && !passwordTried)
+            {
+                passwordTried = true;
+                result = TryPassword(userName, password, out next);
+                passwordAccepted = result == AuthenticationResult.PartialSuccess;
+            }
+            else if ((authMethods & AuthMethods.KeyboardInteractive) != 0 && !interactiveTried)
+            {
+                interactiveTried = true;
+                result = TryKeyboardInteractive(userName, CreatePasswordPromptHandler(password, promptsForUser, passwordAccepted), out next);
+            }
+            else
+            {
+                return false;
+            }
+            if (result == AuthenticationResult.Success)
+            {
+                return true;
+            }
+            if (result != AuthenticationResult.PartialSuccess)
+            {
+                return false;
+            }
+            authMethods = next;
         }
-        if (!AuthenticateWithPassword(userName, password))
-        {
-            return AuthenticateKeyboardInteractiveWithPassword(userName, password, promptsForUser);
-        }
-        return true;
     }
 
     public bool AuthenticateWithPassword(string userName, string password)
     {
-        return RunAuthentication(userName, (Session session) =>
+        return TryPassword(userName, password, out _) == AuthenticationResult.Success;
+    }
+
+    private AuthenticationResult TryPassword(string userName, string password, out AuthMethods allowedNext)
+    {
+        string[] allowed = null;
+        AuthenticationResult result = RunAttempt(userName, (Session session) =>
         {
             using PasswordAuthenticationMethod method = new PasswordAuthenticationMethod(userName, password);
-            return method.Authenticate(session);
+            AuthenticationResult authResult = method.Authenticate(session);
+            allowed = method.AllowedAuthentications;
+            return authResult;
         });
+        allowedNext = ParseAuthMethods(allowed);
+        return result;
     }
 
     /// <summary>
@@ -855,8 +912,15 @@ public class SshSession : IDisposable
     /// </summary>
     public bool AuthenticateKeyboardInteractiveWithPassword(string userName, string password, KeyboardInteractiveHandler promptsForUser = null)
     {
-        KeyboardInteractiveAnswers answers = new KeyboardInteractiveAnswers(password);
-        return AuthenticateKeyboardInteractive(userName, (string name, string instruction, KeyboardInteractivePrompt[] prompts, string[] responses) =>
+        return AuthenticateKeyboardInteractive(userName, CreatePasswordPromptHandler(password, promptsForUser, passwordAlreadyAccepted: false));
+    }
+
+    // passwordAlreadyAccepted: an earlier step of the chain took the password, so a prompt that is not recognizable as
+    // the password prompt is for the user and must not get the password as a guess.
+    private static KeyboardInteractiveHandler CreatePasswordPromptHandler(string password, KeyboardInteractiveHandler promptsForUser, bool passwordAlreadyAccepted)
+    {
+        KeyboardInteractiveAnswers answers = new KeyboardInteractiveAnswers(password, passwordAlreadyAccepted);
+        return (string name, string instruction, KeyboardInteractivePrompt[] prompts, string[] responses) =>
         {
             List<int> forUser = answers.Fill(prompts.Select((KeyboardInteractivePrompt prompt) => prompt.Text).ToArray(), responses);
             if (forUser.Count == 0 || promptsForUser == null)
@@ -870,12 +934,18 @@ public class SshSession : IDisposable
             {
                 responses[forUser[i]] = answered[i];
             }
-        });
+        };
     }
 
     public bool AuthenticateKeyboardInteractive(string userName, KeyboardInteractiveHandler callback)
     {
-        return RunAuthentication(userName, (Session session) =>
+        return TryKeyboardInteractive(userName, callback, out _) == AuthenticationResult.Success;
+    }
+
+    private AuthenticationResult TryKeyboardInteractive(string userName, KeyboardInteractiveHandler callback, out AuthMethods allowedNext)
+    {
+        string[] allowed = null;
+        AuthenticationResult result = RunAttempt(userName, (Session session) =>
         {
             using KeyboardInteractiveAuthenticationMethod method = new KeyboardInteractiveAuthenticationMethod(userName);
             method.AuthenticationPrompt += (object sender, AuthenticationPromptEventArgs e) =>
@@ -892,8 +962,12 @@ public class SshSession : IDisposable
                     e.Prompts[i].Response = responses[i] ?? "";
                 }
             };
-            return method.Authenticate(session);
+            AuthenticationResult authResult = method.Authenticate(session);
+            allowed = method.AllowedAuthentications;
+            return authResult;
         });
+        allowedNext = ParseAuthMethods(allowed);
+        return result;
     }
 
     public bool AuthenticateWithPublicKey(string userName, ISshKeyPair keyPair)
