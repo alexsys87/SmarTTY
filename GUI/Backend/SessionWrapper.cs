@@ -152,11 +152,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // A failed probe leaves the previous answer alone, so a reconnect to the same host does not hide the item for good.
     private bool _HasPackageManager;
 
-    /// <summary>
-    /// Visibility of the "Tools > Manage Linux Packages" item: offered only for an SSH session whose host answered the probe with a
-    /// package manager that SmarTTY supports. Until the probe answers, and on a host without such a manager, it is not in the menu at all.
-    /// </summary>
-    public System.Windows.Visibility PackageManagerMenuVisibility => (!IsDevice && _HasPackageManager) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    // The kernel of the host from the probe that also looks for OpenWrt: unknown until it has answered. A failed probe leaves
+    // the previous answer alone, like for the package managers.
+    private RemoteKernelKind _Kernel;
 
     private RemoteOsKind _RemoteOs;
 
@@ -175,7 +173,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         _RemoteOs = kind;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RemoteOs)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsWindowsHost)));
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UnixSshVisibility)));
+        RaiseToolVisibilityChanged();
         if (kind == RemoteOsKind.Windows)
         {
             // df is a Unix command: the bar would only collect failed readings there.
@@ -201,16 +199,49 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// <summary>True for the trailing "connect to another target" pseudo session (neither SSH nor device).</summary>
     public bool IsPlaceholder => Session == null && DeviceSettings == null;
 
-    /// <summary>Visible for COM/TCP sessions only (the TFTP / U-Boot upload item of the Tools menu).</summary>
-    public System.Windows.Visibility DeviceOnlyVisibility => IsDevice ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    /// <summary>
+    /// What the Tools menu needs to know about the host of this session: the one input of <see cref="ToolAvailability"/>, which decides
+    /// for every item whether it can work here and so whether it is in the menu at all.
+    /// </summary>
+    private RemoteHostFacts HostFacts => new RemoteHostFacts(IsDevice, _RemoteOs, _Kernel, _HasPackageManager, _LocalRepoManager != null);
+
+    private System.Windows.Visibility ToolVisibility(SessionTool tool)
+    {
+        return ToolAvailability.IsAvailable(tool, HostFacts) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    }
+
+    /// <summary>Tells the Tools menu to ask again which of its items this session offers (the OS or a probe has answered).</summary>
+    private void RaiseToolVisibilityChanged()
+    {
+        foreach (string name in new[]
+        {
+            nameof(PackageManagerMenuVisibility), nameof(ProcessManagerMenuVisibility), nameof(LocalRepoMenuVisibility),
+            nameof(PortForwardingMenuVisibility), nameof(SocksProxyMenuVisibility), nameof(PublicKeyMenuVisibility),
+            nameof(RunScriptMenuVisibility), nameof(X11CheckMenuVisibility), nameof(TftpFirmwareMenuVisibility)
+        })
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+    }
+
+    // The items of the Tools menu: each one is hidden when ToolAvailability says that the host cannot use it.
+    public System.Windows.Visibility PackageManagerMenuVisibility => ToolVisibility(SessionTool.PackageManager);
+
+    public System.Windows.Visibility ProcessManagerMenuVisibility => ToolVisibility(SessionTool.ProcessManager);
+
+    public System.Windows.Visibility PortForwardingMenuVisibility => ToolVisibility(SessionTool.PortForwarding);
+
+    public System.Windows.Visibility SocksProxyMenuVisibility => ToolVisibility(SessionTool.SocksProxy);
+
+    public System.Windows.Visibility PublicKeyMenuVisibility => ToolVisibility(SessionTool.PublicKeyAuthentication);
+
+    public System.Windows.Visibility RunScriptMenuVisibility => ToolVisibility(SessionTool.RunScript);
+
+    public System.Windows.Visibility X11CheckMenuVisibility => ToolVisibility(SessionTool.X11Check);
+
+    public System.Windows.Visibility TftpFirmwareMenuVisibility => ToolVisibility(SessionTool.TftpFirmware);
 
     public System.Windows.Visibility SshOnlyVisibility => IsDevice ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
-
-    /// <summary>
-    /// Visible for SSH sessions to a Unix host only: the tools that rely on ps, sh, /tmp or xauth of the remote host
-    /// (process manager, run script, X11 check) are hidden for devices and for Windows hosts.
-    /// </summary>
-    public System.Windows.Visibility UnixSshVisibility => (IsDevice || IsWindowsHost) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
     /// <summary>
     /// Visibility of the "View -> File List" item: the file list only makes sense for SSH sessions, but the item
@@ -281,7 +312,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// is offered only for an SSH session whose host answered the probe as OpenWrt with opkg or apk installed. Until the probe
     /// answers it stays hidden, so that it does not appear on the hosts that cannot use it.
     /// </summary>
-    public System.Windows.Visibility LocalRepoMenuVisibility => (_LocalRepoManager != null) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    public System.Windows.Visibility LocalRepoMenuVisibility => ToolVisibility(SessionTool.LocalRepoServer);
 
     /// <summary>The package manager of the OpenWrt host (null if the host is not OpenWrt or has not answered the probe yet).</summary>
     public LocalRepoPackageManager? LocalRepoManager => _LocalRepoManager;
@@ -733,7 +764,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             // The server said so in its identification string: there is nothing to ask a Windows host about OpenWrt.
             _LocalRepoManager = null;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalRepoMenuVisibility"));
+            RaiseToolVisibilityChanged();
             return;
         }
         ThreadPool.QueueUserWorkItem(delegate
@@ -764,6 +795,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 }
             }
             LocalRepoPackageManager? manager = isWindows ? null : OpenWrtDetector.Detect(output);
+            RemoteKernelKind kernel = isWindows ? RemoteKernelKind.Unknown : RemoteOsDetector.FromKernelProbe(output);
             _Controller.BeginInvoke(() =>
             {
                 // A reconnect may have replaced the connection while the probe ran: only the current one counts.
@@ -777,7 +809,11 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     SetRemoteOs(RemoteOsKind.Windows);
                 }
                 _LocalRepoManager = manager;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalRepoMenuVisibility"));
+                if (kernel != RemoteKernelKind.Unknown)
+                {
+                    _Kernel = kernel;
+                }
+                RaiseToolVisibilityChanged();
             });
         });
     }
@@ -858,7 +894,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     return;
                 }
                 _HasPackageManager = found;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PackageManagerMenuVisibility)));
+                RaiseToolVisibilityChanged();
             });
         });
     }

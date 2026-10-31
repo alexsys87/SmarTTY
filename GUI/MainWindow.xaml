@@ -230,7 +230,7 @@
             <Image Source="../icons/MainWindow/archive16.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Process _manager..." Click="ProcessManager_Click" ToolTip="Lists the processes of the server with their processor and memory use, and ends or kills the selected one; works with any Linux, OpenWrt included" Visibility="{Binding Path=ActiveSession.UnixSshVisibility, FallbackValue=Visible}">
+        <MenuItem Header="Process _manager..." Click="ProcessManager_Click" ToolTip="Lists the processes of the server with their processor and memory use, and ends or kills the selected one; works with any Linux, OpenWrt included" Visibility="{Binding Path=ActiveSession.ProcessManagerMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/chip.png" />
           </MenuItem.Icon>
@@ -240,32 +240,32 @@
             <Image Source="../icons/MainWindow/archive16.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Port _forwarding..." Click="PortForwarding_Click" ToolTip="Forwards TCP ports through this SSH connection: a port of this computer to a host behind the server (ssh -L), or a port of the server to a host reachable from here (ssh -R)" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+        <MenuItem Header="Port _forwarding..." Click="PortForwarding_Click" ToolTip="Forwards TCP ports through this SSH connection: a port of this computer to a host behind the server (ssh -L), or a port of the server to a host reachable from here (ssh -R)" Visibility="{Binding Path=ActiveSession.PortForwardingMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/export16.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="S_OCKS5 proxy over SSH..." Click="SocksProxy_Click" ToolTip="Starts a SOCKS5 proxy on this computer (127.0.0.1:1080 by default) that carries the connections of other programs through this SSH connection, like ssh -N -D 127.0.0.1:1080 -o ServerAliveInterval=30" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+        <MenuItem Header="S_OCKS5 proxy over SSH..." Click="SocksProxy_Click" ToolTip="Starts a SOCKS5 proxy on this computer (127.0.0.1:1080 by default) that carries the connections of other programs through this SSH connection, like ssh -N -D 127.0.0.1:1080 -o ServerAliveInterval=30" Visibility="{Binding Path=ActiveSession.SocksProxyMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/net16.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="_Public key authentication" Click="PublicKey_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+        <MenuItem Header="_Public key authentication" Click="PublicKey_Click" Visibility="{Binding Path=ActiveSession.PublicKeyMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/pubkey.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Run _script..." Click="RunScript_Click" ToolTip="Uploads a shell script (bash or ash) to /tmp on the server, makes it executable, runs it in the terminal and removes it afterwards" Visibility="{Binding Path=ActiveSession.UnixSshVisibility, FallbackValue=Visible}">
+        <MenuItem Header="Run _script..." Click="RunScript_Click" ToolTip="Uploads a shell script (bash or ash) to /tmp on the server, makes it executable, runs it in the terminal and removes it afterwards" Visibility="{Binding Path=ActiveSession.RunScriptMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/terminal.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Check _X11 forwarding..." Click="CheckX11_Click" ToolTip="Shows whether X11 forwarding works for this connection: the server's answer, xauth and libX11 on the remote host, and VcXsrv on this computer" Visibility="{Binding Path=ActiveSession.UnixSshVisibility, FallbackValue=Visible}">
+        <MenuItem Header="Check _X11 forwarding..." Click="CheckX11_Click" ToolTip="Shows whether X11 forwarding works for this connection: the server's answer, xauth and libX11 on the remote host, and VcXsrv on this computer" Visibility="{Binding Path=ActiveSession.X11CheckMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/x11.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="_TFTP server / U-Boot upload..." Click="TftpFirmware_Click" Visibility="{Binding Path=ActiveSession.DeviceOnlyVisibility, FallbackValue=Collapsed}">
+        <MenuItem Header="_TFTP server / U-Boot upload..." Click="TftpFirmware_Click" Visibility="{Binding Path=ActiveSession.TftpFirmwareMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/upload.png" />
           </MenuItem.Icon>

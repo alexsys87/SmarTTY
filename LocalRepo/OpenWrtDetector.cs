@@ -23,11 +23,14 @@ public static class OpenWrtDetector
     /// "prolede" or "fedora-lede" is not taken for it) and which package manager it has: apk (OpenWrt 25.12 and newer)
     /// or opkg. Both answers are printed as markers so that a missing command, a shell banner or an error line cannot be
     /// mistaken for a positive answer. When both managers are installed, apk wins, like in the package manager window.
+    /// The same round trip reports the kernel of the host (<see cref="SmarTTY.Ssh.RemoteOsDetector.KernelProbeCommand"/>), which
+    /// decides whether the tools that need Linux are offered.
     /// </summary>
     public const string ProbeCommand =
         "if [ -f /etc/openwrt_release ] || [ -f /etc/opkg/customfeeds.conf ] || [ -f /etc/apk/repositories.d/customfeeds.list ] || " +
         "grep -qsE '^(ID|ID_LIKE)=([^[:alnum:]]*|.*[^[:alnum:]_-])(openwrt|lede)([^[:alnum:]_-]|$)' /etc/os-release; then echo " + OpenWrtMarker + "; else echo SMARTTY_OS=other; fi; " +
-        "pm=none; command -v opkg >/dev/null 2>&1 && pm=opkg; command -v apk >/dev/null 2>&1 && pm=apk; echo SMARTTY_PKG=$pm";
+        "pm=none; command -v opkg >/dev/null 2>&1 && pm=opkg; command -v apk >/dev/null 2>&1 && pm=apk; echo SMARTTY_PKG=$pm; " +
+        SmarTTY.Ssh.RemoteOsDetector.KernelProbeCommand;
 
     /// <summary>
     /// True when the host answered the probe at all (it printed "SMARTTY_OS=openwrt" or "SMARTTY_OS=other"). A host that did
