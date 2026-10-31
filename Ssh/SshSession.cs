@@ -676,7 +676,7 @@ public class SshSession : IDisposable
             {
                 return "the server presented a different host key on the new connection";
             }
-            return verificationSession.AuthenticateWithPublicKey(parameters.UserName, keyPair) ? null : "the server rejected the key";
+            return verificationSession.AcceptsPublicKey(parameters.UserName, keyPair) ? null : "the server rejected the key";
         }
         catch (OperationCanceledException)
         {
@@ -849,9 +849,18 @@ public class SshSession : IDisposable
             }
             return true;
         }
-        // The server may ask for more than one method (AuthenticationMethods password,keyboard-interactive): a step that
-        // it accepts but that does not finish the login is a partial success, and the methods it names next are the
-        // ones to go on with. Each method is tried once.
+        return ContinueWithPassword(userName, authMethods, () => password, promptsForUser);
+    }
+
+    /// <summary>
+    /// Goes on with the password and keyboard-interactive steps among <paramref name="authMethods"/>. The server may ask
+    /// for more than one method (AuthenticationMethods password,keyboard-interactive): a step that it accepts but that
+    /// does not finish the login is a partial success, and the methods it names next are the ones to go on with. Each
+    /// method is tried once. <paramref name="passwordSource"/> is asked when a step needs the password, so that a login
+    /// that does not need it never asks for it.
+    /// </summary>
+    private bool ContinueWithPassword(string userName, AuthMethods authMethods, Func<string> passwordSource, KeyboardInteractiveHandler promptsForUser)
+    {
         bool passwordTried = false;
         bool interactiveTried = false;
         bool passwordAccepted = false;
@@ -862,13 +871,13 @@ public class SshSession : IDisposable
             if ((authMethods & AuthMethods.Password) != 0 && !passwordTried)
             {
                 passwordTried = true;
-                result = TryPassword(userName, password, out next);
+                result = TryPassword(userName, passwordSource(), out next);
                 passwordAccepted = result == AuthenticationResult.PartialSuccess;
             }
             else if ((authMethods & AuthMethods.KeyboardInteractive) != 0 && !interactiveTried)
             {
                 interactiveTried = true;
-                result = TryKeyboardInteractive(userName, CreatePasswordPromptHandler(password, promptsForUser, passwordAccepted), out next);
+                result = TryKeyboardInteractive(userName, CreatePasswordPromptHandler(passwordSource(), promptsForUser, passwordAccepted), out next);
             }
             else
             {
@@ -970,21 +979,62 @@ public class SshSession : IDisposable
         return result;
     }
 
-    public bool AuthenticateWithPublicKey(string userName, ISshKeyPair keyPair)
+    /// <summary>
+    /// Authenticates with the key. A server that wants another method after the key (AuthenticationMethods
+    /// publickey,password) is answered with <paramref name="accountPassword"/> and <paramref name="promptsForUser"/> as
+    /// <see cref="Authenticate"/> does; without <paramref name="accountPassword"/> such a login counts as refused.
+    /// </summary>
+    public bool AuthenticateWithPublicKey(string userName, ISshKeyPair keyPair, Func<string> accountPassword = null, KeyboardInteractiveHandler promptsForUser = null)
     {
-        return RunAuthentication(userName, (Session session) =>
+        AuthenticationResult result = TryPublicKey(userName, keyPair, out AuthMethods next);
+        return FinishChain(userName, result, next, accountPassword, promptsForUser);
+    }
+
+    /// <summary>
+    /// Whether the server takes the key as the step of the login that it is: a server that wants a password or a code
+    /// after the key answers with a partial success, and the key is as good as accepted. Used to check a freshly
+    /// installed key, which must not be thrown away because the account has more than one factor.
+    /// </summary>
+    public bool AcceptsPublicKey(string userName, ISshKeyPair keyPair)
+    {
+        AuthenticationResult result = TryPublicKey(userName, keyPair, out _);
+        return result == AuthenticationResult.Success || result == AuthenticationResult.PartialSuccess;
+    }
+
+    private AuthenticationResult TryPublicKey(string userName, ISshKeyPair keyPair, out AuthMethods allowedNext)
+    {
+        string[] allowed = null;
+        AuthenticationResult result = RunAttempt(userName, (Session session) =>
         {
             IPrivateKeySource key = keyPair.CreatePrivateKeySource();
             try
             {
                 using PrivateKeyAuthenticationMethod method = new PrivateKeyAuthenticationMethod(userName, key);
-                return method.Authenticate(session);
+                AuthenticationResult authResult = method.Authenticate(session);
+                allowed = method.AllowedAuthentications;
+                return authResult;
             }
             finally
             {
                 (key as IDisposable)?.Dispose();
             }
         });
+        allowedNext = ParseAuthMethods(allowed);
+        return result;
+    }
+
+    // The end of a login whose first step was a key: done, refused, or a partial success that goes on with the password.
+    private bool FinishChain(string userName, AuthenticationResult result, AuthMethods next, Func<string> accountPassword, KeyboardInteractiveHandler promptsForUser)
+    {
+        if (result == AuthenticationResult.Success)
+        {
+            return true;
+        }
+        if (result != AuthenticationResult.PartialSuccess || accountPassword == null)
+        {
+            return false;
+        }
+        return ContinueWithPassword(userName, next, accountPassword, promptsForUser);
     }
 
     /// <summary>
@@ -993,7 +1043,7 @@ public class SshSession : IDisposable
     /// <paramref name="passphraseRequired"/> is set if the key is encrypted and could not be loaded with the given passphrase.
     /// A key that cannot be loaded for another reason (damaged, not a private key, unsupported format) is an error.
     /// </summary>
-    public bool AuthenticateWithKeyFile(string userName, out bool passphraseRequired, string keyFile = null, string passphrase = null)
+    public bool AuthenticateWithKeyFile(string userName, out bool passphraseRequired, string keyFile = null, string passphrase = null, Func<string> accountPassword = null, KeyboardInteractiveHandler promptsForUser = null)
     {
         passphraseRequired = false;
         if (string.IsNullOrEmpty(keyFile))
@@ -1019,11 +1069,15 @@ public class SshSession : IDisposable
         }
         using (key)
         {
-            return RunAuthentication(userName, (Session session) =>
+            string[] allowed = null;
+            AuthenticationResult result = RunAttempt(userName, (Session session) =>
             {
                 using PrivateKeyAuthenticationMethod method = new PrivateKeyAuthenticationMethod(userName, key);
-                return method.Authenticate(session);
+                AuthenticationResult authResult = method.Authenticate(session);
+                allowed = method.AllowedAuthentications;
+                return authResult;
             });
+            return FinishChain(userName, result, ParseAuthMethods(allowed), accountPassword, promptsForUser);
         }
     }
 
