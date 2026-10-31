@@ -25,6 +25,9 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private readonly TextDocument.TextPosition _initialCaret;
 
+    // What the column of _initialCaret counts (a compiler message may say screen columns or bytes).
+    private readonly ColumnUnit _initialColumnUnit;
+
     private Thread _loadThread;
 
     private GlobalSettings _settings;
@@ -618,9 +621,11 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
     }
 
-    public RemoteFileEditor(ITerminalSessionContext terminalSessionContext, string text, GlobalSettings globalSettings, TextDocument.TextPosition textPosition, Action<Exception> action = null)
+    /// <param name="initialColumnUnit">What the column of <paramref name="textPosition"/> counts: the caret is put at the character it points at once the text is loaded.</param>
+    public RemoteFileEditor(ITerminalSessionContext terminalSessionContext, string text, GlobalSettings globalSettings, TextDocument.TextPosition textPosition, Action<Exception> action = null, ColumnUnit initialColumnUnit = ColumnUnit.Characters)
         : this()
     {
+        _initialColumnUnit = initialColumnUnit;
         this._context = terminalSessionContext;
         RemotePath = text;
         _draftKey = ClaimDraftKey(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
@@ -976,7 +981,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                 }
                 else if (_initialCaret.IsValid)
                 {
-                    SetCaret(_initialCaret);
+                    SetCaretFromColumnUnit(_initialCaret, _initialColumnUnit);
                 }
                 if (_restoreHexAfterReload)
                 {
@@ -1233,6 +1238,21 @@ public partial class RemoteFileEditor : CodeEditorPP
         FormatChanged?.Invoke(this, EventArgs.Empty);
         _loadThread = new Thread(LoadFile);
         _loadThread.Start();
+    }
+
+    /// <summary>
+    /// Puts the caret at a place named by a tool: <paramref name="position"/> is a line and a column counted from 0 in
+    /// <paramref name="unit"/> (screen columns with tab stops of 8 for gcc, bytes for clang and go). The column is turned into the
+    /// index of the character it points at in the line, so a tab or a non-ASCII letter in front of it does not move the caret.
+    /// </summary>
+    public void SetCaretFromColumnUnit(TextDocument.TextPosition position, ColumnUnit unit)
+    {
+        if (unit != ColumnUnit.Characters && unit != ColumnUnit.Auto && position.IsValid && base.EditableDocument != null
+            && position.Line >= 0 && position.Line < base.EditableDocument.LineCount)
+        {
+            position.Column = CompilerColumns.ToCharIndex(base.EditableDocument.GetLineText(position.Line), position.Column, unit);
+        }
+        SetCaret(position);
     }
 
     /// <summary>

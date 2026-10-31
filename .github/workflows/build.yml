@@ -148,6 +148,9 @@ jobs:
       - name: Run text view row layout (inline messages and folds) checks
         run: dotnet run --project tests/VirtualRowTests -c Release
 
+      - name: Run compiler message column (tabs, bytes) checks
+        run: dotnet run --project tests/CompilerColumnTests -c Release
+
       - name: Run terminal output link (compiler messages) checks
         run: dotnet run --project tests/OutputLinkTests -c Release
 

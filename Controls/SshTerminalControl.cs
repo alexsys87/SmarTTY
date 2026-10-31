@@ -431,13 +431,14 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         return list;
     }
 
-    public void RequestOpenFile(string text, int? line, int? column)
+    public void RequestOpenFile(string text, int? line, int? column, SmarTTY.CodeEditing.ColumnUnit unit)
     {
         OpenFileRequested?.Invoke(this, new OpenFileEventArgs
         {
             Path = text,
             Column = column,
-            Line = line
+            Line = line,
+            ColumnUnit = unit
         });
     }
 
