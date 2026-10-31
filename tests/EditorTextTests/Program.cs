@@ -670,6 +670,56 @@ internal static class Program
             "the Show All Characters tool bar icon exists");
     }
 
+    // The problems a check finds before a save are shown as an inline message under each offending line. The editor
+    // and the message provider are Windows-only, so the wiring is checked by reading the sources, as the checks above.
+    private static void InlineMessageChecks()
+    {
+        string root = FindRepositoryRoot();
+        if (root == null)
+        {
+            Console.WriteLine("SKIP: repository root not found, the inline message wiring is not checked");
+            return;
+        }
+        string provider = File.ReadAllText(Path.Combine(root, "CodeEditing", "InlineMessageProvider.cs"));
+        Check(provider.Contains("EnsureDrawingObjects") && provider.Contains("_fontHeight != rowHeight"),
+            "the message provider builds its font and icons once, not on every paint");
+        Check(provider.Contains("public Color BackColor") && provider.Contains("public Color ErrorColor") && provider.Contains("public Color WarningColor"),
+            "the message colours are settings of the provider instead of the old fixed ones");
+        Check(!provider.Contains("Brushes.LightGray") && !provider.Contains("Brushes.Red") && !provider.Contains("Brushes.DarkGoldenrod"),
+            "the provider no longer paints with the fixed light-theme brushes");
+        string editor = File.ReadAllText(Path.Combine(root, "Controls", "CodeEditorPP.cs"));
+        Check(editor.Contains("public void ClearMessages()") && editor.Contains("_inlineMessageProvider.Clear()"),
+            "ClearMessages drops the messages and lays the editor out again");
+        Check(editor.Contains("public void AddMessages(IEnumerable<InlineMessageProvider.MessageRequest> messages)"),
+            "a whole list of problems can be added in one rebuild");
+        Check(editor.Contains("protected override void OnWordWrapChanged()"),
+            "switching the word wrapping on or off drops the messages");
+        string remote = File.ReadAllText(Path.Combine(root, "Controls", "RemoteFileEditor.cs"));
+        Check(remote.Contains("bool showInText = !WordWrap && !IsHexMode;"),
+            "messages are shown in the text view only, not in the wrapped or the hex view");
+        Check(remote.Contains("AddMessages(messages)") && remote.Contains("const int MaxInline = 50"),
+            "the problems of a failed check become inline messages, capped like ParseIssues");
+        Check(remote.Contains("they are shown in the text") && !remote.Contains("const int MaxShown"),
+            "the dialog is short and no longer lists the problems it points at");
+        Check(remote.Contains("RefreshMessageColors()"),
+            "the messages take the colours of the current theme");
+        int clears = 0;
+        foreach (string snippet in new[] { "// The problems the previous check named", "// The messages name lines of the text", "// The messages are rows of the text view" })
+        {
+            if (remote.Contains(snippet))
+            {
+                clears++;
+            }
+        }
+        Check(clears == 3, "the messages are cleared before a save, on a reload and on a hex view switch");
+        string settings = File.ReadAllText(Path.Combine(root, "VisualTTY", "GlobalSettings.cs"));
+        Check(settings.Contains("public DeviceTerminalSettings.ColorWrapper ErrorColor { get; set; }")
+            && settings.Contains("public DeviceTerminalSettings.ColorWrapper WarningColor { get; set; }"),
+            "the editor colours carry an error and a warning colour for the messages");
+        Check(settings.Contains("colors.ErrorColor = defaults.ErrorColor") && settings.Contains("colors.WarningColor = defaults.WarningColor"),
+            "older settings files get the default message colours");
+    }
+
     private static string FindRepositoryRoot()
     {
         string root = AppContext.BaseDirectory;
@@ -734,6 +784,7 @@ internal static class Program
             WrapChecks();
             ShowTabsChecks();
             ShowAllCharactersChecks();
+            InlineMessageChecks();
         }
         catch (Exception exception)
         {

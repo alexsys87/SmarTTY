@@ -40,6 +40,12 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public DeviceTerminalSettings.ColorWrapper PreprocessorColor { get; set; }
 
+        // ---- Цвета строки с сообщением о проблеме (см. InlineMessageProvider): полоса, текст ошибки
+        //      и предупреждения. Фон полосы — LineNumberBackground, рамка — LineNumberForeground. ----
+        public DeviceTerminalSettings.ColorWrapper ErrorColor { get; set; }
+
+        public DeviceTerminalSettings.ColorWrapper WarningColor { get; set; }
+
         public static EditorColors DarkColors => new EditorColors
         {
             TextColor = Color.White,
@@ -52,7 +58,9 @@ public class GlobalSettings : INotifyPropertyChanged
             NumberColor = Color.FromArgb(181, 206, 168),
             VariableColor = Color.FromArgb(156, 220, 254),
             SectionColor = Color.FromArgb(78, 201, 176),
-            PreprocessorColor = Color.FromArgb(189, 99, 197)
+            PreprocessorColor = Color.FromArgb(189, 99, 197),
+            ErrorColor = Color.FromArgb(255, 123, 114),
+            WarningColor = Color.FromArgb(255, 180, 84)
         };
 
         public static EditorColors LightColors => new EditorColors
@@ -67,7 +75,9 @@ public class GlobalSettings : INotifyPropertyChanged
             NumberColor = Color.FromArgb(135, 91, 33),
             VariableColor = Color.FromArgb(0, 115, 165),
             SectionColor = Color.FromArgb(0, 122, 117),
-            PreprocessorColor = Color.FromArgb(159, 23, 138)
+            PreprocessorColor = Color.FromArgb(159, 23, 138),
+            ErrorColor = Color.FromArgb(198, 40, 40),
+            WarningColor = Color.FromArgb(168, 74, 0)
         };
     }
 
@@ -481,6 +491,14 @@ public class GlobalSettings : INotifyPropertyChanged
         if (colors.PreprocessorColor.Alpha == 0)
         {
             colors.PreprocessorColor = defaults.PreprocessorColor;
+        }
+        if (colors.ErrorColor.Alpha == 0)
+        {
+            colors.ErrorColor = defaults.ErrorColor;
+        }
+        if (colors.WarningColor.Alpha == 0)
+        {
+            colors.WarningColor = defaults.WarningColor;
         }
     }
 
