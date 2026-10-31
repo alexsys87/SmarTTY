@@ -8,5 +8,6 @@
   <ItemGroup>
     <Compile Include="../../Ssh/AuthorizedKeysFile.cs" Link="AuthorizedKeysFile.cs" />
     <Compile Include="../../Ssh/HostKeyFingerprint.cs" Link="HostKeyFingerprint.cs" />
+    <Compile Include="../../Ssh/KeyboardInteractiveAnswers.cs" Link="KeyboardInteractiveAnswers.cs" />
   </ItemGroup>
 </Project>

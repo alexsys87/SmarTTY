@@ -100,6 +100,60 @@ internal static class Program
         Check(HostKeyFingerprint.Md5(hostBlob) == "MD5:af:4f:15:33:2d:6a:1b:38:ca:c8:42:21:c0:79:b5:d2", "fingerprint: MD5 matches ssh-keygen -E md5");
         Check(HostKeyFingerprint.Describe(hostBlob) == HostKeyFingerprint.Sha256(hostBlob) + Environment.NewLine + HostKeyFingerprint.Md5(hostBlob), "fingerprint: both are shown, SHA256 first");
         Check(HostKeyFingerprint.Describe(null) == null && HostKeyFingerprint.Describe(new byte[0]) == null, "fingerprint: no key, no text");
+        // Keyboard-interactive login: the password answers the password prompt, the rest is left for the user.
+        string[] responses = new string[2];
+        KeyboardInteractiveAnswers answers = new KeyboardInteractiveAnswers("secret");
+        List<int> forUser = answers.Fill(new[] { "Password: ", "Verification code: " }, responses);
+        Check(responses[0] == "secret" && responses[1] == null && forUser.SequenceEqual(new[] { 1 }), "kbd: the password answers its prompt, the code is left for the user");
+        Check(answers.PasswordGiven, "kbd: the password is remembered as sent");
+
+        answers = new KeyboardInteractiveAnswers("secret");
+        responses = new string[2];
+        forUser = answers.Fill(new[] { "Duo passcode or option (1-3): ", "Password:" }, responses);
+        Check(responses[0] == null && responses[1] == "secret" && forUser.SequenceEqual(new[] { 0 }), "kbd: the password goes to the password prompt wherever it is");
+
+        // Two rounds, the code only in the second one (PAM with a second module).
+        answers = new KeyboardInteractiveAnswers("secret");
+        responses = new string[1];
+        forUser = answers.Fill(new[] { "Password:" }, responses);
+        Check(responses[0] == "secret" && forUser.Count == 0, "kbd: round one is answered by the password alone");
+        responses = new string[1];
+        forUser = answers.Fill(new[] { "Verification code:" }, responses);
+        Check(responses[0] == null && forUser.SequenceEqual(new[] { 0 }), "kbd: round two asks the user, the password is not sent as the code");
+
+        // A server in another language: the first prompt of the first round is still taken for the password.
+        answers = new KeyboardInteractiveAnswers("secret");
+        responses = new string[1];
+        forUser = answers.Fill(new[] { "Kennwort:" }, responses);
+        Check(responses[0] == "secret" && forUser.Count == 0, "kbd: an unrecognized first prompt gets the password as before");
+        answers = new KeyboardInteractiveAnswers("secret");
+        responses = new string[2];
+        forUser = answers.Fill(new[] { "Kennwort:", "Code:" }, responses);
+        Check(responses[0] == "secret" && forUser.SequenceEqual(new[] { 1 }), "kbd: a second unrecognized prompt is left for the user");
+
+        // Expired password: the old password answers the current-password prompt, the new one is asked from the user.
+        answers = new KeyboardInteractiveAnswers("secret");
+        responses = new string[3];
+        forUser = answers.Fill(new[] { "(current) UNIX password:", "New password:", "Retype new password:" }, responses);
+        Check(responses[0] == "secret" && responses[1] == null && responses[2] == null && forUser.SequenceEqual(new[] { 1, 2 }), "kbd: the old password is never sent as the new one");
+
+        // Only one prompt of a round gets the password.
+        answers = new KeyboardInteractiveAnswers("secret");
+        responses = new string[2];
+        forUser = answers.Fill(new[] { "Password:", "Password:" }, responses);
+        Check(responses[0] == "secret" && responses[1] == null && forUser.SequenceEqual(new[] { 1 }), "kbd: the password answers one prompt per round");
+
+        foreach (string codePrompt in new[] { "Verification code:", "Enter PIN:", "One-time password (OATH) for `user':", "Authenticator code:", "Response:", "Token:", "SMS passcode:" })
+        {
+            Check(KeyboardInteractiveAnswers.NeedsUser(codePrompt) && !KeyboardInteractiveAnswers.LooksLikePasswordPrompt(codePrompt), "kbd: '" + codePrompt + "' is for the user");
+        }
+        foreach (string passwordPrompt in new[] { "Password:", "user@host's password:", "Password for root:", "Passwort:", "Mot de passe :", "\u041f\u0430\u0440\u043e\u043b\u044c:" })
+        {
+            Check(KeyboardInteractiveAnswers.LooksLikePasswordPrompt(passwordPrompt), "kbd: '" + passwordPrompt + "' is a password prompt");
+        }
+        responses = new string[1];
+        new KeyboardInteractiveAnswers(null).Fill(new[] { "Password:" }, responses);
+        Check(responses[0] == "", "kbd: no password is an empty answer, not null");
 
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed.");
