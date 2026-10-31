@@ -104,6 +104,29 @@ internal static class Program
         Check(!cpp.Contains("interface"), "a C# keyword is not offered for C++");
     }
 
+    private static void FileLanguageChecks()
+    {
+        // The completion list follows the language detected from the file name or the #! line.
+        L python = SyntaxHighlighting.DetectLanguage("/home/user/app.PY");
+        Equal(python, L.Python, "app.PY is detected as Python");
+        List<string> pythonWords = Names(python, "", "");
+        Check(pythonWords.Contains("def"), "a .py file is offered the Python keyword 'def'");
+        Check(!pythonWords.Contains("select"), "a .py file is not offered the SQL keyword 'select'");
+        Check(!pythonWords.Contains("include"), "a .py file is not offered the C preprocessor word 'include'");
+
+        L sql = SyntaxHighlighting.DetectLanguage("/srv/query.sql");
+        Equal(sql, L.Sql, "query.sql is detected as SQL");
+        List<string> sqlWords = Names(sql, "", "");
+        Check(sqlWords.Contains("select"), "a .sql file is offered the SQL keyword 'select'");
+        Check(!sqlWords.Contains("def"), "a .sql file is not offered the Python keyword 'def'");
+
+        L shell = SyntaxHighlighting.DetectLanguage("/usr/local/bin/backup", "#!/bin/bash");
+        Equal(shell, L.Bash, "a #!/bin/bash script without an extension is detected as Bash");
+        Check(Names(shell, "", "").Contains("fi"), "a Bash script is offered the keyword 'fi'");
+
+        Equal(SyntaxHighlighting.DetectLanguage("/tmp/notes.unknown"), L.Plain, "an unknown extension is plain text");
+    }
+
     private static void SuggestionFilterChecks()
     {
         // The rule the completion popup filters its list with. A name shorter than the prefix cannot start with
@@ -125,6 +148,7 @@ internal static class Program
     {
         KeywordChecks();
         SourceChecks();
+        FileLanguageChecks();
         SuggestionFilterChecks();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " completion checks passed.");
