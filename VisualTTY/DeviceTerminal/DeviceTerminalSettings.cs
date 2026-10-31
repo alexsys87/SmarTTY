@@ -95,6 +95,20 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
             /// </summary>
             public const int DefaultKeepAliveSeconds = 15;
 
+            /// <summary>
+            /// How long connecting may take, over all the addresses of the host, in seconds. 0 leaves it to the operating
+            /// system (about 21 seconds per address on Windows). A slow link (VPN, satellite) may need more than the default.
+            /// </summary>
+            public int ConnectTimeoutSeconds { get; set; } = DefaultConnectTimeoutSeconds;
+
+            public const int DefaultConnectTimeoutSeconds = 10;
+
+            public const int MaxConnectTimeoutSeconds = 600;
+
+            /// <summary>The connect timeout in milliseconds, within the limits (a value written by hand cannot overflow or go negative).</summary>
+            [XmlIgnore]
+            public int ConnectTimeoutMs => Math.Max(0, Math.Min(ConnectTimeoutSeconds, MaxConnectTimeoutSeconds)) * 1000;
+
             [XmlIgnore]
             public override string FileNameBase => Host + "_" + Port;
 

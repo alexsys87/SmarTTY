@@ -269,6 +269,21 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public Visibility TcpKeepAliveSettingsVisibility => IsTelnet ? Visibility.Collapsed : Visibility.Visible;
 
+        private int _TcpConnectTimeoutSeconds = DeviceTerminalSettings.ConnectionSettings.Tcp.DefaultConnectTimeoutSeconds;
+
+        // How long connecting may take; the same input for raw TCP and telnet. 0 leaves it to the operating system.
+        public int TcpConnectTimeoutSeconds
+        {
+            get
+            {
+                return _TcpConnectTimeoutSeconds;
+            }
+            set
+            {
+                _TcpConnectTimeoutSeconds = Math.Max(0, Math.Min(value, DeviceTerminalSettings.ConnectionSettings.Tcp.MaxConnectTimeoutSeconds));
+            }
+        }
+
         public Visibility TelnetSettingsVisibility => IsTelnet ? Visibility.Visible : Visibility.Collapsed;
 
         // Automatic login. The password is kept here in plain text only while the window is open; it is encrypted
@@ -377,6 +392,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                         TlsClientCertificate = TelnetTlsInUse && !string.IsNullOrWhiteSpace(TelnetTlsClientCertificate) ? TelnetTlsClientCertificate.Trim() : null,
                         SendAutomaticValues = TelnetSendAutomaticValues,
                         KeepAliveSeconds = TelnetKeepAliveSeconds,
+                        ConnectTimeoutSeconds = TcpConnectTimeoutSeconds,
                         AutoLoginUserName = string.IsNullOrWhiteSpace(TelnetAutoLoginUserName) ? null : TelnetAutoLoginUserName.Trim(),
                         EncryptedSavedPassword = EncryptTelnetPassword(),
                         AutoLoginPassword = !string.IsNullOrEmpty(_QuickConnectPassword) && TelnetPassword == _QuickConnectPassword ? _QuickConnectPassword : null,
@@ -388,7 +404,8 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 {
                     Host = host,
                     Port = port,
-                    KeepAliveSeconds = TcpKeepAliveSeconds
+                    KeepAliveSeconds = TcpKeepAliveSeconds,
+                    ConnectTimeoutSeconds = TcpConnectTimeoutSeconds
                 };
             }
         }
@@ -608,6 +625,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             }
             else if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
             {
+                TcpConnectTimeoutSeconds = tcp.ConnectTimeoutSeconds;
                 if (tcp is DeviceTerminalSettings.ConnectionSettings.Telnet telnet)
                 {
                     TelnetTerminalType = telnet.TerminalType;

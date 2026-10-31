@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Transport;
 
@@ -21,8 +22,8 @@ internal sealed class TcpConnector
     /// <summary>The longest keep-alive time that is passed to the operating system (one day).</summary>
     public const int MaxKeepAliveSeconds = 24 * 60 * 60;
 
-    /// <summary>How long one connect may take, over all addresses, unless a transport says otherwise.</summary>
-    public const int DefaultConnectTimeoutMs = 10000;
+    /// <summary>How long one connect may take, over all addresses, unless the settings of the connection say otherwise.</summary>
+    public const int DefaultConnectTimeoutMs = DeviceTerminalSettings.ConnectionSettings.Tcp.DefaultConnectTimeoutSeconds * 1000;
 
     private readonly object _lock = new object();
 

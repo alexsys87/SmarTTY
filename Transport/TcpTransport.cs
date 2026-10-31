@@ -27,11 +27,12 @@ internal class TcpTransport : IDeviceTransport, IDisposable
     public string ConnectingMessage => "Connecting to " + _tcp + "...";
 
     /// <summary>How long one <see cref="Open"/> may take, in milliseconds; 0 leaves it to the operating system.</summary>
-    public int ConnectTimeoutMs { get; set; } = TcpConnector.DefaultConnectTimeoutMs;
+    public int ConnectTimeoutMs { get; set; }
 
     public TcpTransport(DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
     {
         _tcp = tcp ?? throw new ArgumentNullException(nameof(tcp));
+        ConnectTimeoutMs = _tcp.ConnectTimeoutMs;
     }
 
     public void Open(IHostNameResolver hostNameResolver)
