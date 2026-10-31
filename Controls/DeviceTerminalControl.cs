@@ -434,14 +434,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
     // cannot look different. It takes its colours from the WPF theme by itself.
     private SmarTTY.GUI.Backend.ConnectionPromptModel _connectionPrompt;
 
-    private System.Windows.Forms.Integration.ElementHost _connectionPromptHost;
+    private Control _connectionPromptHost;
 
     /// <summary>
-    /// Creates the WPF element that shows a connection prompt (the application sets it to the ConnectionClosedPopup
-    /// that the SSH sessions show too). It is a hook because this control is also compiled without the WPF part of the
-    /// application, in the test programs; without it the control shows no prompt.
+    /// Creates the control that shows a connection prompt (the application sets it to an ElementHost with the
+    /// ConnectionClosedPopup that the SSH sessions show too). It is a hook because this control is also compiled without
+    /// the WPF part of the application (and, under Mono, without WPF hosting) in the test programs; without it the
+    /// control shows no prompt.
     /// </summary>
-    public static Func<SmarTTY.GUI.Backend.IConnectionPrompt, System.Windows.UIElement> ConnectionPromptElementFactory;
+    public static Func<SmarTTY.GUI.Backend.IConnectionPrompt, Control> ConnectionPromptHostFactory;
 
     private void CreateConnectionPrompt()
     {
@@ -449,14 +450,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
             reconnect: () => Connect(),
             close: () => CloseTabRequested?.Invoke(this, EventArgs.Empty),
             ignore: IgnoreConnectionPrompt);
-        if (ConnectionPromptElementFactory != null)
+        if (ConnectionPromptHostFactory != null)
         {
-            _connectionPromptHost = new System.Windows.Forms.Integration.ElementHost
-            {
-                AutoSize = true,
-                Dock = DockStyle.None,
-                Child = ConnectionPromptElementFactory(_connectionPrompt)
-            };
+            _connectionPromptHost = ConnectionPromptHostFactory(_connectionPrompt);
+            _connectionPromptHost.Dock = DockStyle.None;
             pnlConnectionInProgress.Controls.Add(_connectionPromptHost);
         }
         // The panel is as big as the popup and sits in the middle of the terminal area, as the popup of an SSH session does.
