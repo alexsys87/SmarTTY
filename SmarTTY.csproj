@@ -86,6 +86,8 @@
     <EmbeddedResource Include="icons\terminal-transfer.png" LogicalName="SmarTTY.Icons.terminal-transfer.png" />
     <EmbeddedResource Include="icons\terminal-save.png" LogicalName="SmarTTY.Icons.terminal-save.png" />
     <EmbeddedResource Include="icons\terminal-settings.png" LogicalName="SmarTTY.Icons.terminal-settings.png" />
+    <!-- The picture of the "connection closed" prompt, the same one as in the prompt of an SSH session. -->
+    <EmbeddedResource Include="icons\MainWindow\busy.png" LogicalName="SmarTTY.Icons.busy.png" />
     <Resource Include="icons\**\*.png" />
   </ItemGroup>
 
