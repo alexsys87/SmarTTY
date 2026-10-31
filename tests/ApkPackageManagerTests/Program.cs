@@ -205,7 +205,8 @@ internal static class Program
         ILinuxPackageManagerClient[] all =
         {
             new AptPackageManagerClient(), new DnfPackageManagerClient(), new ZypperPackageManagerClient(), new PacmanPackageManagerClient(),
-            new PortagePackageManagerClient(), new YumPackageManagerClient(), new OpkgPackageManagerClient(), new ApkPackageManagerClient()
+            new PortagePackageManagerClient(), new YumPackageManagerClient(), new OpkgPackageManagerClient(), new ApkPackageManagerClient(),
+            new XbpsPackageManagerClient(), new PkgPackageManagerClient(), new HomebrewPackageManagerClient()
         };
         FakeRunner host = new FakeRunner();
         Check(PackageManagerSelector.Pick(all, host) == null, "Selector: a host without any package manager -> null");
@@ -231,7 +232,7 @@ internal static class Program
         Check(PackageManagerSelector.Pick(all, new FakeRunner()) == null, "Selector: a failing probe is not a result");
 
         // The message for a host without a known package manager.
-        string supported = "apt, dnf, zypper, pacman, portage, yum, opkg, apk";
+        string supported = "apt, dnf, zypper, pacman, portage, yum, opkg, apk, xbps, pkg, homebrew";
         FakeRunner voidHost = new FakeRunner();
         voidHost.Responses[PackageManagerSelector.HostInfoCommand] = new[] { "Linux x86_64", "PRETTY_NAME=\"Void Linux\"" };
         Check(PackageManagerSelector.BuildNotFoundMessage(voidHost, all) == "Could not detect the package manager on the remote host (Linux x86_64, Void Linux). Supported: " + supported + ".", "Not found: the message says what the host is and what is supported");
@@ -241,6 +242,7 @@ internal static class Program
         Check(PackageManagerSelector.DescribeHost(new[] { "FreeBSD amd64" }) == "FreeBSD amd64" && PackageManagerSelector.DescribeHost(null) == "", "Not found: FreeBSD without os-release; no lines -> empty");
 
         _passed += AdditionalClientsTests.Run();
+        _passed += MoreClientsTests.Run();
         _passed += PackageListFixesTests.Run();
         _passed += WingetTests.Run();
 

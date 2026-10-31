@@ -9,12 +9,15 @@
     <Compile Include="../../PackageManagers/ApkPackageManagerClient.cs" Link="ApkPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/AptPackageManagerClient.cs" Link="AptPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/DnfPackageManagerClient.cs" Link="DnfPackageManagerClient.cs" />
+    <Compile Include="../../PackageManagers/HomebrewPackageManagerClient.cs" Link="HomebrewPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/OpkgPackageManagerClient.cs" Link="OpkgPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/PackageManagerSelector.cs" Link="PackageManagerSelector.cs" />
     <Compile Include="../../PackageManagers/PacmanPackageManagerClient.cs" Link="PacmanPackageManagerClient.cs" />
+    <Compile Include="../../PackageManagers/PkgPackageManagerClient.cs" Link="PkgPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/PortagePackageManagerClient.cs" Link="PortagePackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/YumPackageManagerClient.cs" Link="YumPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/WingetPackageManagerClient.cs" Link="WingetPackageManagerClient.cs" />
+    <Compile Include="../../PackageManagers/XbpsPackageManagerClient.cs" Link="XbpsPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/ZypperPackageManagerClient.cs" Link="ZypperPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/PackageIndexUpdater.cs" Link="PackageIndexUpdater.cs" />
     <Compile Include="../../VisualTTY/ILinuxPackageManagerClient.cs" Link="ILinuxPackageManagerClient.cs" />

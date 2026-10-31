@@ -22,7 +22,7 @@ public partial class PackageManagerWindow : Window
 
         private SessionWrapper _Session;
 
-        private ILinuxPackageManagerClient[] _Clients = new ILinuxPackageManagerClient[8]
+        private ILinuxPackageManagerClient[] _Clients = new ILinuxPackageManagerClient[11]
         {
             new AptPackageManagerClient(),
             new DnfPackageManagerClient(),
@@ -31,7 +31,11 @@ public partial class PackageManagerWindow : Window
             new PortagePackageManagerClient(),
             new YumPackageManagerClient(),
             new OpkgPackageManagerClient(),
-            new ApkPackageManagerClient()
+            new ApkPackageManagerClient(),
+            // After the managers of the Linux distributions: a host that answers to one of them with the top score is not asked the rest.
+            new XbpsPackageManagerClient(),
+            new PkgPackageManagerClient(),
+            new HomebrewPackageManagerClient()
         };
 
         // A Windows host has winget only: none of the package managers of Linux exists there.
@@ -271,8 +275,9 @@ public partial class PackageManagerWindow : Window
                 }
                 _Session.PackageManagerClient = bestClient;
                 _Client = bestClient;
-                // Windows has no root and no sudo: the commands run as they are.
-                _IsRoot = bestClient is WingetPackageManagerClient || PackageIndexUpdater.IsRoot(_Session);
+                // Windows has no root and no sudo: the commands run as they are. Homebrew refuses to run as root or under sudo
+                // ("Don't run this as root!") and needs neither: its commands run as the SSH user.
+                _IsRoot = bestClient is WingetPackageManagerClient || bestClient is HomebrewPackageManagerClient || PackageIndexUpdater.IsRoot(_Session);
                 LoadPackages(null);
             }
             catch (Exception exception)

@@ -95,7 +95,7 @@ public static class PackageManagerSelector
 
     /// <summary>
     /// The message for a host where no probe found a package manager: what the host is and which managers are supported, so
-    /// that a missing one (Void's xbps, FreeBSD's pkg) is told from a probe that failed.
+    /// that a missing one (OpenBSD's pkg_add, NixOS's nix-env) is told from a probe that failed.
     /// </summary>
     public static string BuildNotFoundMessage(ISSHCommandRunner runner, IEnumerable<ILinuxPackageManagerClient> clients)
     {
