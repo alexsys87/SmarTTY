@@ -350,7 +350,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             for (int providerIndex = 0; providerIndex < this._providers.Count; providerIndex++)
             {
                 int providerLine = this._providers[providerIndex].GetNextSpecialLine(line);
-                if (providerLine < nextLine)
+                // -1 says "no more": it is not the nearest line, whatever the other providers have ahead.
+                if (providerLine >= 0 && providerLine < nextLine)
                 {
                     nextLine = providerLine;
                 }
@@ -3079,75 +3080,12 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private int RowToLine(int row, out int remainingRows, out int previousLine)
     {
-        int line = 0;
-        int rowIndex = 0;
-        int previousVisibleLine = 0;
-        while (true)
-        {
-            if (rowIndex == row)
-            {
-                remainingRows = -1;
-                previousLine = previousVisibleLine;
-                return line;
-            }
-            if (rowIndex > row)
-            {
-                break;
-            }
-            previousVisibleLine = line;
-            int nextSpecialLine = _virtualLines.GetNextSpecialLine(Math.Min(line, 0));
-            if (nextSpecialLine == -1)
-            {
-                nextSpecialLine = _document.LineCount;
-            }
-            int lineSpan = nextSpecialLine - line;
-            if (lineSpan > 0)
-            {
-                int step = Math.Min(lineSpan, row - rowIndex);
-                line += step;
-                rowIndex += step;
-                previousVisibleLine = line - 1;
-            }
-            else
-            {
-                line += _virtualLines.GetHiddenLineCount(line);
-                rowIndex += _virtualLines.GetVirtualRowCount(line);
-                line++;
-                rowIndex++;
-            }
-        }
-        remainingRows = rowIndex - row;
-        previousLine = previousVisibleLine;
-        return previousVisibleLine;
+        return VirtualRowLayout.RowToLine(_virtualLines, _document.LineCount, row, out remainingRows, out previousLine);
     }
 
     private int LineToRowIndex(int line)
     {
-        int currentLine = 0;
-        int rowIndex = 0;
-        while (currentLine < line)
-        {
-            int nextSpecialLine = _virtualLines.GetNextSpecialLine(currentLine);
-            if (nextSpecialLine == -1)
-            {
-                nextSpecialLine = _document.LineCount;
-            }
-            int lineSpan = nextSpecialLine - currentLine;
-            if (lineSpan > 0)
-            {
-                int step = Math.Min(lineSpan, line - currentLine);
-                currentLine += step;
-                rowIndex += step;
-            }
-            else
-            {
-                currentLine += _virtualLines.GetHiddenLineCount(currentLine);
-                rowIndex += _virtualLines.GetVirtualRowCount(currentLine);
-                currentLine++;
-                rowIndex++;
-            }
-        }
-        return rowIndex;
+        return VirtualRowLayout.LineToRowIndex(_virtualLines, _document.LineCount, line);
     }
 
     internal void RebuildDisplayRows()
