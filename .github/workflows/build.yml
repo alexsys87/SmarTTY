@@ -142,6 +142,9 @@ jobs:
       - name: Run editor Show Changes (line diff) checks
         run: dotnet run --project tests/TextDiffTests -c Release
 
+      - name: Run terminal output link (compiler messages) checks
+        run: dotnet run --project tests/OutputLinkTests -c Release
+
       - name: Run API symbol checks
         run: dotnet run --project tests/ApiSymbolTests -c Release
 

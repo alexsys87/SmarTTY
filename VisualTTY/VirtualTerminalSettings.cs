@@ -51,8 +51,14 @@ public class VirtualTerminalSettings
     /// <summary>The list that older versions shipped as the default; settings that still hold it are upgraded once.</summary>
     public const string OldDefaultAutoLinkExtensions = ".c;.cpp;.h;.sh;.txt;.js";
 
-    /// <summary>Text file extensions that are underlined in the output of commands such as "ls" and open in the editor on click.</summary>
-    public const string DefaultAutoLinkExtensions = ".txt;.log;.json;.html;.htm;.xml;.css;.js;.py;.sh;.bash;.c;.cpp;.cc;.h;.hpp;.md;.csv;.tsv;.yml;.yaml;.toml;.ini;.cfg;.conf;.cnf;.env;.properties;.sql;.php;.pl;.rb;.lua;.go;.rs;.java;.kt;.mk;.cmake;.diff;.patch;.service;.rules;.list;.repo;.desktop;.rst;.tex;.svg;.jsx;.tsx;.vue;.scss";
+    /// <summary>The default that the version before the C/C++ build additions shipped; settings that still hold it get the current one once.</summary>
+    public const string PreviousDefaultAutoLinkExtensions = ".txt;.log;.json;.html;.htm;.xml;.css;.js;.py;.sh;.bash;.c;.cpp;.cc;.h;.hpp;.md;.csv;.tsv;.yml;.yaml;.toml;.ini;.cfg;.conf;.cnf;.env;.properties;.sql;.php;.pl;.rb;.lua;.go;.rs;.java;.kt;.mk;.cmake;.diff;.patch;.service;.rules;.list;.repo;.desktop;.rst;.tex;.svg;.jsx;.tsx;.vue;.scss";
+
+    /// <summary>
+    /// Text file extensions that are underlined in the output of commands such as "ls" and of compilers ("main.c:12:5: error")
+    /// and open in the editor on click. A few file names without an extension (Makefile, Dockerfile, ...) are linked as well.
+    /// </summary>
+    public const string DefaultAutoLinkExtensions = ".txt;.log;.json;.html;.htm;.xml;.css;.js;.py;.sh;.bash;.c;.cpp;.cc;.h;.hpp;.md;.csv;.tsv;.yml;.yaml;.toml;.ini;.cfg;.conf;.cnf;.env;.properties;.sql;.php;.pl;.rb;.lua;.go;.rs;.java;.kt;.mk;.cmake;.diff;.patch;.service;.rules;.list;.repo;.desktop;.rst;.tex;.svg;.jsx;.tsx;.vue;.scss;.cxx;.hh;.hxx;.ipp;.inl;.cu;.cuh;.m;.mm;.s;.asm;.ld;.lds;.dts;.dtsi;.ino;.am;.ac;.in;.mak;.gradle;.ts;.zig;.swift;.cs;.scala";
 
     public string AutoLinkExtensions { get; set; } = DefaultAutoLinkExtensions;
 

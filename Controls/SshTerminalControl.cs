@@ -15,7 +15,7 @@ using SmarTTY.Completion;
 
 namespace SmarTTY.Controls;
 
-public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.IFileListHost
+public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.IFileListHost, SmarTTY.Terminal.IOutputLinkHost
 {
     public class InputRegion
     {

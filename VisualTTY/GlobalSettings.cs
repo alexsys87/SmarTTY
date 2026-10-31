@@ -371,6 +371,8 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public bool AutoLinkExtensionsMigrated { get; set; }
 
+    public bool AutoLinkExtensionsMigratedV2 { get; set; }
+
     [XmlIgnore]
     public EditorSettingsWrapper EditorWrapper { get; }
 
@@ -570,6 +572,18 @@ public class GlobalSettings : INotifyPropertyChanged
                 VirtualTerminal.AutoLinkExtensions = VirtualTerminalSettings.DefaultAutoLinkExtensions;
             }
             AutoLinkExtensionsMigrated = true;
+            Save();
+        }
+        if (!AutoLinkExtensionsMigratedV2)
+        {
+            // The list gained the extensions of C/C++ builds (.cxx, .hh, .S, .ld, .dts, ...) so that the file names in compiler
+            // messages are links. A list that is still exactly the previous default is replaced once; one the user edited is left alone.
+            VirtualTerminal ??= new VirtualTerminalSettings();
+            if (string.Equals(VirtualTerminal.AutoLinkExtensions, VirtualTerminalSettings.PreviousDefaultAutoLinkExtensions, StringComparison.Ordinal))
+            {
+                VirtualTerminal.AutoLinkExtensions = VirtualTerminalSettings.DefaultAutoLinkExtensions;
+            }
+            AutoLinkExtensionsMigratedV2 = true;
             Save();
         }
         if (!CompletionTriggersMigratedV2)
