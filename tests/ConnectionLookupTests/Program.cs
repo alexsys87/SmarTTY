@@ -69,6 +69,9 @@ internal static class Program
         Check(!xml.Contains("SshOption") && !xml.Contains("ListenText"), "forwardings: only the settings are saved, not the texts made from them");
         SSHConnectionSettings old = XmlStorage.Deserialize<SSHConnectionSettings>("<?xml version=\"1.0\"?><SSHConnectionSettings><HostName>h</HostName></SSHConnectionSettings>");
         Check(old.PortForwards != null && old.PortForwards.Count == 0, "forwardings: a profile of an earlier version has an empty list");
+        // The removed "do not warn about a changed host key" setting must not stop an old profile from loading.
+        SSHConnectionSettings withRemovedSetting = XmlStorage.Deserialize<SSHConnectionSettings>("<?xml version=\"1.0\"?><SSHConnectionSettings><HostName>h</HostName><SuppressKeyMismatchWarning>true</SuppressKeyMismatchWarning></SSHConnectionSettings>");
+        Check(withRemovedSetting.HostName == "h" && !XmlStorage.Serialize(withRemovedSetting).Contains("SuppressKeyMismatchWarning"), "profile: the removed host key warning setting is read without error and not written again");
     }
 
     private static void CheckSplitting()

@@ -31,7 +31,7 @@ public partial class HostKeyMismatchWindow : Window
 
     private void Continue_Click(object sender, RoutedEventArgs e)
     {
-        // The same second confirmation the WinForms dialog asked for: the safe answer stays the default.
+        // The same second confirmation the WinForms dialog asked for. Abort is the default button, so Enter never trusts the new key.
         if (!MessageBoxes.AskWarn("Are you sure? If the remote computer has been compromised, the attacker might be able to capture your password!"))
         {
             return;

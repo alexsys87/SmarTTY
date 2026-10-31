@@ -416,10 +416,8 @@ public partial class SshConnector : Component
 
     private bool ConfirmHostKeyMismatch(ConnectionAttempt connectionAttempt, SSHConnectionSettings sshConnectionSettings, SshSession.HostKeyInfo hostKeyInfo, string mismatchReason)
     {
-        if (sshConnectionSettings.SuppressKeyMismatchWarning)
-        {
-            return true;
-        }
+        // Always asked: a changed host key may be a man-in-the-middle attack, so no setting of a profile may accept it
+        // silently (an old profile that still has the "SuppressKeyMismatchWarning" element is read and the element dropped).
         if (IsOffUiThread)
         {
             return (bool)InvokeOnUiWithResult((Func<bool>)(() => ConfirmHostKeyMismatch(connectionAttempt, sshConnectionSettings, hostKeyInfo, mismatchReason)));
