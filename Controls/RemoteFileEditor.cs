@@ -1646,6 +1646,12 @@ public partial class RemoteFileEditor : CodeEditorPP
     public bool CanRunInTerminal => _loaded && !_reloading && !IsPreview && !IsWindowsHost && base.EditableDocument != null
         && RemoteScript.CanRun(RemotePathUtils.GetFileName(RemotePath), base.EditableDocument.GetLineText(0));
 
+    /// <summary>
+    /// The file can be followed like tail -f in a terminal tab: it is on the server and the host is a Unix one. It is the
+    /// file on the server that is followed, not the text in the editor.
+    /// </summary>
+    public bool CanFollowLog => _loaded && !_reloading && !IsNewFile && !IsWindowsHost;
+
     /// <summary>The interpreter for a file that is not executable and has no shebang (see <see cref="RemoteScript.DefaultInterpreter"/>).</summary>
     public string RunInterpreter => RemoteScript.DefaultInterpreter(RemotePathUtils.GetFileName(RemotePath)) ?? "sh";
 

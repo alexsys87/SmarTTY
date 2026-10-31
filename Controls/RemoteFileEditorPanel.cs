@@ -49,6 +49,9 @@ internal sealed class RemoteFileEditorPanel : UserControl
     /// <summary>The Run in Terminal button, menu item or F5 was used: the terminal tabs belong to the session.</summary>
     public event EventHandler RunRequested;
 
+    /// <summary>The Follow Log button or menu item was used: the terminal tab and the question belong to the main window.</summary>
+    public event EventHandler FollowLogRequested;
+
     /// <summary>The toolbar or the context menu switched the invisible-character marks on or off.</summary>
     public event EventHandler ShowAllCharactersChanged;
 
@@ -180,6 +183,10 @@ internal sealed class RemoteFileEditorPanel : UserControl
                         _editor.Reload();
                     }
                     break;
+                case EditorToolbarCommand.FollowLog:
+                    focusEditor = false;
+                    FollowLogRequested?.Invoke(this, EventArgs.Empty);
+                    break;
                 case EditorToolbarCommand.RunFile:
                     focusEditor = false;
                     RunRequested?.Invoke(this, EventArgs.Empty);
@@ -242,6 +249,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
                 IsSaving = _editor.IsSaving,
                 HexMode = true,
                 CanRun = _editor.CanRunInTerminal,
+                CanFollow = _editor.CanFollowLog,
                 CanUseHex = _editor.CanToggleHexMode,
                 ShowAllCharacters = _editor.ShowAllCharacters,
                 WordWrap = _editor.WordWrap
@@ -260,6 +268,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
             IsSaving = _editor.IsSaving,
             HexMode = false,
             CanRun = _editor.CanRunInTerminal,
+            CanFollow = _editor.CanFollowLog,
             CanUseHex = _editor.CanToggleHexMode,
             ShowAllCharacters = _editor.ShowAllCharacters,
             WordWrap = _editor.WordWrap

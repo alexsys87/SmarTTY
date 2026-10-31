@@ -293,9 +293,9 @@ internal static class Program
     {
         private readonly OutputLinkScanner _scanner;
 
-        public Marker(bool links, bool highlight)
+        public Marker(bool links, bool highlight, bool logLevels = false)
         {
-            _scanner = new OutputLinkScanner(new Host(), "/w", "make", links, highlight);
+            _scanner = new OutputLinkScanner(new Host(), "/w", "make", links, highlight, logLevels);
         }
 
         public int LinkCount { get; private set; }
@@ -320,6 +320,64 @@ internal static class Program
             }
             return new[] { marked[1].ToString(), marked[2].ToString(), marked[3].ToString() };
         }
+    }
+
+    private static string Level(string line)
+    {
+        return DiagnosticHighlighter.TryFindLogLevel(line, out int index, out byte severity) ? severity + ":" + line.Substring(index) : "";
+    }
+
+    private static void LogLevelChecks()
+    {
+        Equal(Level("2026-10-31 07:00:01 ERROR db: connection refused"), "3:ERROR db: connection refused", "ERROR: coloured from the level to the end");
+        Equal(Level("Oct 31 07:00:01 host app[12]: WARNING disk almost full"), "2:WARNING disk almost full", "WARNING");
+        Equal(Level("07:00:01 WARN slow request"), "2:WARN slow request", "WARN");
+        Equal(Level("07:00:01 FATAL out of memory"), "3:FATAL out of memory", "FATAL");
+        Equal(Level("07:00:01 CRITICAL x"), "3:CRITICAL x", "CRITICAL");
+        Equal(Level("07:00:01 NOTICE started"), "1:NOTICE started", "NOTICE is a note");
+        Equal(Level("2026/10/31 07:00:01 [error] 12#12: *1 open() failed"), "3:[error] 12#12: *1 open() failed", "nginx [error]");
+        Equal(Level("2026/10/31 07:00:01 [warn] 12#12: x"), "2:[warn] 12#12: x", "nginx [warn]");
+        Equal(Level("ts=2026-10-31 level=error msg=\"boom\""), "3:level=error msg=\"boom\"", "logfmt level=error");
+        Equal(Level("ts=1 level=warn msg=x"), "2:level=warn msg=x", "logfmt level=warn");
+        Equal(Level("Oct 31 07:00:01 host sshd[12]: error: PAM: Authentication failure"), "3:error: PAM: Authentication failure", "syslog tag followed by 'error:'");
+        Equal(Level("07:00:01 ERROR first WARN second"), "3:ERROR first WARN second", "the first level in the line wins");
+        Equal(Level("07:00:01 WARN first ERROR second"), "2:WARN first ERROR second", "the first level in the line wins, a warning here");
+
+        Equal(Level("GET /index.html 200 OK"), "", "an ordinary line");
+        Equal(Level("ERROR_CODE=5 retrying"), "", "a longer word is not a level");
+        Equal(Level("PREERROR happened"), "", "a word that contains a level is not one");
+        Equal(Level("this is an error in a sentence"), "", "a lower case word in a sentence is not a level");
+        Equal(Level("no errors found"), "", "'errors' is not a level");
+        Equal(Level(""), "", "empty line");
+        Equal(Level(null), "", "null line");
+    }
+
+    private static void LogLevelCellChecks()
+    {
+        Marker log = new Marker(links: false, highlight: false, logLevels: true);
+        string[] error = log.Line("2026-10-31 07:00:01 ERROR db: connection refused");
+        Equal(error[2], "ERROR db: connection refused", "the line is marked from the level to its end");
+
+        string[] pieces = new Marker(false, false, true).Line("07:00:01 ", "WARN", " slow ", "request");
+        Equal(pieces[1], "WARN slow request", "pieces: the level and everything after it, in later pieces too");
+
+        // The next line is a new one: an ordinary line has no level, and it does not inherit the one before.
+        Marker lines = new Marker(false, false, true);
+        lines.Line("07:00:01 ERROR x");
+        Equal(string.Join("", lines.Line("07:00:02 INFO all good")), "", "a new line forgets the level of the line before");
+        Equal(lines.Line("07:00:03 WARN y")[1], "WARN y", "...and finds its own");
+
+        Equal(string.Join("", new Marker(false, false, false).Line("07:00:01 ERROR x")), "", "log levels off: nothing is marked");
+
+        // A level found early still colours the end of a very long line.
+        Marker longLine = new Marker(false, false, true);
+        string[] tail = longLine.Line("07:00:01 ERROR ", new string('x', 1500), " end");
+        Equal(tail[2].Length, "ERROR ".Length + 1500 + " end".Length, "a long line is coloured to its end");
+
+        // The compiler words and the log levels can be asked for together.
+        Marker both = new Marker(true, true, true);
+        string[] mixed = both.Line("main.c:1:1: error: x");
+        Equal(mixed[2].Length > 0, true, "both modes on: the line is marked");
     }
 
     private static void SeverityCellChecks()
@@ -365,6 +423,8 @@ internal static class Program
     private static void Main()
     {
         DiagnosticSpanChecks();
+        LogLevelChecks();
+        LogLevelCellChecks();
         SeverityCellChecks();
         CompilerMessageChecks();
         ColoredOutputChecks();

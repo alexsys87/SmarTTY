@@ -3,8 +3,11 @@ using System;
 
 namespace SmarTTY.GUI.Backend;
 
-public struct InitialCommand(string initialCommand, bool echoInitialCommand, Action tabKeptAfterExit = null)
+public struct InitialCommand(string initialCommand, bool echoInitialCommand, Action tabKeptAfterExit = null, bool highlightLogLevels = false)
 {
+    /// <summary>The command shows a log (tail -F): the terminal colours its lines by level (ERROR, WARN, ...).</summary>
+    public readonly bool HighlightLogLevels = highlightLogLevels;
+
     public readonly string Command = initialCommand;
 
     public readonly bool Echo = echoInitialCommand;

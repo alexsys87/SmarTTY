@@ -23,6 +23,7 @@ public partial class FileListControl : UserControl, IComponentConnector
         Download,
         DownloadArchive,
         Run,
+        Follow,
         Upload,
         InstallPackage
     }
@@ -202,6 +203,26 @@ public partial class FileListControl : UserControl, IComponentConnector
         }
     }
 
+    private void Follow_Click(object sender, RoutedEventArgs e)
+    {
+        FileExplorer.ItemWrapper file = SelectedFile();
+        if (file != null)
+        {
+            FileActionRequested?.Invoke(this, new FileEventArgs
+            {
+                FullPath = file.FullPath,
+                Event = FileEvent.Follow
+            });
+        }
+    }
+
+    /// <summary>The selected item if it is the only one and a file (not a folder), otherwise null.</summary>
+    private FileExplorer.ItemWrapper SelectedFile()
+    {
+        FileExplorer.ItemWrapper[] selected = ((ListBox)TransferList).SelectedItems.OfType<FileExplorer.ItemWrapper>().ToArray();
+        return selected.Length == 1 && !selected[0].Entry.IsDirectory ? selected[0] : null;
+    }
+
     /// <summary>The selected file if it is the only selected item and a shell script, otherwise null.</summary>
     private FileExplorer.ItemWrapper SelectedScript()
     {
@@ -300,6 +321,7 @@ public partial class FileListControl : UserControl, IComponentConnector
             // Scripts, tar and chmod are the tools of a Unix host.
             bool windowsHost = Explorer?.IsWindowsHost == true;
             cmdRun.Visibility = !windowsHost && SelectedScript() != null ? Visibility.Visible : Visibility.Collapsed;
+            cmdFollow.Visibility = !windowsHost && SelectedFile() != null ? Visibility.Visible : Visibility.Collapsed;
             cmdExtract.Visibility = !windowsHost && extractableSelected ? Visibility.Visible : Visibility.Collapsed;
             UpdatePackageMenu();
             // A Windows host has no tar: its folder is downloaded as a folder, file by file.

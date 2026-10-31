@@ -84,6 +84,11 @@
                 <Image Source="../icons/PlayHS.png" />
               </MenuItem.Icon>
             </MenuItem>
+            <MenuItem Name="cmdFollow" Header="Follow (tail -f)..." ToolTip="Follows the selected file like tail -f in a new terminal tab: the last lines, then the lines that are added" Click="Follow_Click">
+              <MenuItem.Icon>
+                <Image Source="../icons/editor/follow.png" />
+              </MenuItem.Icon>
+            </MenuItem>
             <MenuItem Name="cmdNavigate" Header="Go to subdirectory.." Click="Navigate_Click">
               <MenuItem.Icon>
                 <Image Source="../icons/MainWindow/go16.png" />
