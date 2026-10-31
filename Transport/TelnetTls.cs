@@ -162,15 +162,21 @@ internal static class TelnetTls
         try
         {
             store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
+            X509Certificate2 found = null;
             foreach (X509Certificate2 candidate in store.Certificates)
             {
-                if (string.Equals(candidate.Thumbprint, thumbprint, StringComparison.OrdinalIgnoreCase)
-                    || (thumbprint.Length == 64 && string.Equals(Sha256Thumbprint(candidate), thumbprint, StringComparison.Ordinal)))
+                if (found == null && (string.Equals(candidate.Thumbprint, thumbprint, StringComparison.OrdinalIgnoreCase)
+                    || (thumbprint.Length == 64 && string.Equals(Sha256Thumbprint(candidate), thumbprint, StringComparison.Ordinal))))
                 {
-                    return candidate;
+                    found = candidate;
+                }
+                else
+                {
+                    // Every certificate of the store is a copy with its own handles: only the one that is used stays.
+                    candidate.Dispose();
                 }
             }
-            return null;
+            return found;
         }
         catch (CryptographicException)
         {

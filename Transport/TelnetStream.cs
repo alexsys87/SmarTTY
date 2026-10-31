@@ -227,7 +227,14 @@ internal sealed class TelnetStream : Stream
 
     private readonly bool _acceptEnvironmentRequests;
 
-    private readonly string _charset;
+    // The character set offered to the server (normalized for comparison, and as written for sending); the terminal's
+    // encoding may be changed while connected (see UpdateTextEncoding).
+    private volatile string _charset;
+
+    private volatile string _charsetName;
+
+    // How the user's own text (the automatic login) is turned into bytes, and where a character of the line ends.
+    private volatile Encoding _textEncoding;
 
     private readonly TelnetStartTlsMode _startTlsMode;
 
@@ -279,6 +286,9 @@ internal sealed class TelnetStream : Stream
     private int _slcEw = DefaultSlcEw;
 
     private readonly byte[] _subData = new byte[MaxSubnegotiationLength];
+
+    // The subnegotiation being read was longer than the buffer: what is kept is incomplete and must not be acted on.
+    private bool _subOverflow;
 
     private ParseState _state = ParseState.Data;
 
@@ -341,6 +351,8 @@ internal sealed class TelnetStream : Stream
         _environment = BuildEnvironment(options.Environment, _xDisplayLocation);
         _acceptEnvironmentRequests = options.AcceptEnvironmentRequests;
         _charset = NormalizeCharsetName(options.Charset);
+        _charsetName = string.IsNullOrWhiteSpace(options.Charset) ? null : options.Charset.Trim();
+        _textEncoding = options.TextEncoding ?? Encoding.UTF8;
         // Without a way to make the handshake the option can only be refused.
         _upgradeToTls = options.UpgradeToTls;
         _startTlsMode = _upgradeToTls == null ? TelnetStartTlsMode.Off : options.StartTls;
@@ -741,7 +753,7 @@ internal sealed class TelnetStream : Stream
         {
             foreach (string line in _autoLogin.Feed(buffer, offset, count))
             {
-                byte[] bytes = Encoding.UTF8.GetBytes(line);
+                byte[] bytes = _textEncoding.GetBytes(line);
                 WriteData(bytes, 0, bytes.Length, wait: false);
             }
         }
@@ -1120,6 +1132,7 @@ internal sealed class TelnetStream : Stream
                 case ParseState.SubOption:
                     _subOption = b;
                     _subLength = 0;
+                    _subOverflow = false;
                     _state = ParseState.SubData;
                     break;
 
@@ -1191,6 +1204,10 @@ internal sealed class TelnetStream : Stream
         if (_subLength < _subData.Length)
         {
             _subData[_subLength++] = b;
+        }
+        else
+        {
+            _subOverflow = true;
         }
     }
 
@@ -1339,6 +1356,16 @@ internal sealed class TelnetStream : Stream
 
     private void OnSubnegotiation()
     {
+        if (_subOverflow)
+        {
+            // A request cut off at the buffer would be read as a shorter, complete one (a list of character sets, say).
+            _subOverflow = false;
+            if (_subOption == OptCharset && (_local[OptCharset] == OptionState.On || _remote[OptCharset] == OptionState.On))
+            {
+                Reply(IAC, SB, OptCharset, CharsetRejected, IAC, SE);
+            }
+            return;
+        }
         if (_subLength < 1)
         {
             return;
@@ -1420,6 +1447,37 @@ internal sealed class TelnetStream : Stream
         // Other subnegotiations are not used by the options we accepted.
     }
 
+    /// <summary>
+    /// The terminal's encoding was changed while connected: the automatic login and the line editing follow it, and a
+    /// server that agreed on a character set earlier is asked to switch to the new one (CHARSET REQUEST), so both
+    /// sides keep using the same one.
+    /// </summary>
+    public void UpdateTextEncoding(Encoding encoding, string charsetName)
+    {
+        lock (_lock)
+        {
+            _textEncoding = encoding ?? Encoding.UTF8;
+            string normalized = NormalizeCharsetName(charsetName);
+            _charset = normalized;
+            _charsetName = string.IsNullOrWhiteSpace(charsetName) ? null : charsetName.Trim();
+            bool negotiated = _local[OptCharset] == OptionState.On || _remote[OptCharset] == OptionState.On;
+            if (!negotiated || normalized == null || _acceptedCharset == null || NormalizeCharsetName(_acceptedCharset) == normalized)
+            {
+                return;
+            }
+            MemoryStream request = new MemoryStream();
+            request.Write(new[] { IAC, SB, OptCharset, CharsetRequest, (byte)';' }, 0, 5);
+            byte[] name = Encoding.ASCII.GetBytes(_charsetName);
+            foreach (byte b in name)
+            {
+                request.WriteByte(b);
+            }
+            request.Write(new[] { IAC, SE }, 0, 2);
+            QueueCommand(request.ToArray());
+        }
+        Drain(wait: false);
+    }
+
     // CHARSET (RFC 2066): REQUEST [ "[TTABLE]" version ] <separator> name <separator> name ... The terminal's own
     // character set is accepted when the server lists it (under any of its usual names), otherwise the request is
     // rejected and both sides go on as before. A translation table is never accepted.
@@ -1430,9 +1488,17 @@ internal sealed class TelnetStream : Stream
             Reply(IAC, SB, OptCharset, CharsetTTableRejected, IAC, SE);
             return;
         }
+        if (command == CharsetAccepted)
+        {
+            // The answer to the request made when the terminal's encoding was changed.
+            if (_subLength > 1)
+            {
+                _acceptedCharset = Encoding.ASCII.GetString(_subData, 1, _subLength - 1).Trim();
+            }
+            return;
+        }
         if (command != CharsetRequest)
         {
-            // ACCEPTED / REJECTED answer requests we never make.
             return;
         }
         int i = 1;
@@ -1816,6 +1882,7 @@ internal sealed class TelnetStream : Stream
     }
 
     // Removes the last character of the line; a character of the UTF-8 text is a lead byte and its continuation bytes.
+    // (A multi-byte encoding other than UTF-8 is treated like UTF-8 here.)
     private void EraseLastCharacter()
     {
         byte[] data = _line.GetBuffer();
@@ -1825,9 +1892,14 @@ internal sealed class TelnetStream : Stream
             return;
         }
         length--;
-        while (length > 0 && (data[length] & 0xC0) == 0x80)
+        // Only UTF-8 has continuation bytes (0x80-0xBF); in a single-byte code page (KOI8-R, CP866, CP1251) every
+        // byte is a character of its own.
+        if (!_textEncoding.IsSingleByte)
         {
-            length--;
+            while (length > 0 && (data[length] & 0xC0) == 0x80)
+            {
+                length--;
+            }
         }
         _line.SetLength(length);
     }
@@ -2369,6 +2441,12 @@ internal sealed class TelnetOptions
     public int StartTlsTimeoutMs { get; set; }
 
     /// <summary>
+    /// The encoding of the terminal: the automatic login is typed in it, and a character of the line is one byte in a
+    /// single-byte one. Null: UTF-8.
+    /// </summary>
+    public Encoding TextEncoding { get; set; }
+
+    /// <summary>
     /// Makes the TLS handshake of STARTTLS as a client over the given stream and returns the encrypted stream; throws
     /// when it fails. Null: STARTTLS is refused.
     /// </summary>
@@ -2415,6 +2493,36 @@ internal static class TelnetEnvironment
             }
         }
         return result;
+    }
+
+    /// <summary>The lines of <paramref name="text"/> that <see cref="Parse"/> leaves out because they are not valid.</summary>
+    public static List<string> InvalidLines(string text)
+    {
+        List<string> invalid = new List<string>();
+        if (string.IsNullOrEmpty(text))
+        {
+            return invalid;
+        }
+        int accepted = 0;
+        foreach (string rawLine in text.Split('\n'))
+        {
+            string line = rawLine.Trim('\r').TrimStart();
+            if (line.Length == 0 || line[0] == '#')
+            {
+                continue;
+            }
+            int equals = line.IndexOf('=');
+            bool valid = equals > 0 && IsValidName(line.Substring(0, equals).Trim()) && IsValidValue(line.Substring(equals + 1).Trim());
+            if (!valid || accepted >= MaxVariables)
+            {
+                invalid.Add(line);
+            }
+            else
+            {
+                accepted++;
+            }
+        }
+        return invalid;
     }
 
     public static bool IsValidName(string name)

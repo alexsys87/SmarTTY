@@ -14,7 +14,7 @@ namespace SmarTTY.Transport;
 /// clean text and the server's option negotiation is answered. Everything else (reconnecting, the writer queue,
 /// the display name) works as for a raw TCP connection.
 /// </summary>
-internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, IDisposable
+internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, ITextEncodingAwareTransport, IDisposable
 {
     private readonly DeviceTerminalSettings.ConnectionSettings.Telnet _telnet;
 
@@ -28,6 +28,9 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
     private TcpConnector _connector;
 
     private bool _closed;
+
+    // The client certificate of the connection that is open (or being made), released with it.
+    private X509Certificate2 _clientCertificate;
 
     private Timer _keepAliveTimer;
 
@@ -109,6 +112,8 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 throw new ObjectDisposedException(nameof(TelnetTransport), "The connection is closed.");
             }
             _connector = connector;
+            // The certificate of an earlier attempt is not needed any more (its key handle would wait for the finalizer).
+            ReleaseClientCertificate();
         }
         Socket client;
         try
@@ -151,7 +156,13 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
             }
             // Loaded for every attempt, before anything is sent: a missing certificate is reported as the reason the
             // connection cannot be made.
-            X509Certificate2 clientCertificate = _telnet.UsesTls ? TelnetTls.LoadClientCertificate(_telnet.TlsClientCertificate) : null;
+            // Only when TLS is certain to be used does a certificate that cannot be loaded stop the connection: with
+            // STARTTLS "when offered" the server may never ask for TLS, and the file is read when it does.
+            if (_telnet.Tls || _telnet.StartTls == DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Required)
+            {
+                ClientCertificate();
+            }
+            X509Certificate2 clientCertificate = _clientCertificate;
             Stream wire = new NetworkStream(client, ownsSocket: true);
             if (_telnet.Tls)
             {
@@ -178,12 +189,13 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 Environment = TelnetEnvironment.Parse(_telnet.EffectiveEnvironmentVariables()),
                 AcceptEnvironmentRequests = _telnet.SendAutomaticValues,
                 Charset = Charset,
+                TextEncoding = TextEncoding,
                 // telnets is TLS already: the in-band option is not needed (and refused).
                 StartTls = _telnet.Tls ? TelnetStartTlsMode.Off : ToStreamMode(_telnet.StartTls),
                 StartTlsTimeoutMs = StartTlsTimeoutMs,
                 UpgradeToTls = _telnet.Tls || _telnet.StartTls == DeviceTerminalSettings.ConnectionSettings.Telnet.StartTlsMode.Off
                     ? null
-                    : (Func<Stream, Stream>)(raw => TelnetTls.Authenticate(raw, _telnet.Host, _telnet.TlsAllowInvalidCertificate, clientCertificate: clientCertificate))
+                    : (Func<Stream, Stream>)(raw => TelnetTls.Authenticate(raw, _telnet.Host, _telnet.TlsAllowInvalidCertificate, clientCertificate: ClientCertificate()))
             });
             stream.RemoteEchoChanged += OnStreamRemoteEchoChanged;
             stream.RemoteStatusReceived += OnStreamRemoteStatusReceived;
@@ -192,6 +204,10 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
         catch
         {
             client.Close();
+            lock (_sizeLock)
+            {
+                ReleaseClientCertificate();
+            }
             throw;
         }
         int latestColumns;
@@ -227,15 +243,81 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
     public void Close()
     {
         TcpConnector connector;
+        TelnetStream stream;
+        Socket socket;
         lock (_sizeLock)
         {
             _closed = true;
             StopKeepAlive();
             connector = _connector;
             _connector = null;
-            _socket?.Close();
+            stream = _stream;
+            socket = _socket;
+            // A writer that asks later is told that the connection is closed instead of getting a disposed stream.
+            _stream = null;
         }
         connector?.Abort();
+        if (stream != null && (_telnet.Tls || stream.StartTlsActive))
+        {
+            // Disposing a TLS stream sends close_notify, so the server does not log a broken connection. It is a write,
+            // which must not block the caller (the UI thread) and must not keep the connection open when the peer does
+            // not read: the socket is closed after a short wait either way, which also ends the read.
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    System.Threading.Tasks.Task.Run(() => stream.Dispose()).Wait(1000);
+                }
+                catch
+                {
+                }
+                CloseSocketAndCertificate(socket);
+            });
+            return;
+        }
+        try
+        {
+            stream?.Dispose();
+        }
+        catch
+        {
+        }
+        CloseSocketAndCertificate(socket);
+    }
+
+    private void CloseSocketAndCertificate(Socket socket)
+    {
+        try
+        {
+            socket?.Close();
+        }
+        catch
+        {
+        }
+        lock (_sizeLock)
+        {
+            ReleaseClientCertificate();
+        }
+    }
+
+    // The certificate is loaded when it is first needed, and once per connection attempt. The caller holds no lock.
+    private X509Certificate2 ClientCertificate()
+    {
+        lock (_sizeLock)
+        {
+            if (_clientCertificate == null && _telnet.UsesTls)
+            {
+                _clientCertificate = TelnetTls.LoadClientCertificate(_telnet.TlsClientCertificate);
+            }
+            return _clientCertificate;
+        }
+    }
+
+    // The caller holds _sizeLock.
+    private void ReleaseClientCertificate()
+    {
+        _clientCertificate?.Dispose();
+        _clientCertificate = null;
     }
 
     public Stream GetStream()
@@ -339,6 +421,35 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
         Close();
     }
 
+    /// <summary>The terminal's encoding was changed: the stream (when connected) and later attempts use the new one.</summary>
+    public void SetTextEncoding(System.Text.Encoding encoding)
+    {
+        TelnetStream stream;
+        lock (_sizeLock)
+        {
+            Charset = encoding?.WebName;
+            stream = _stream;
+        }
+        if (stream == null)
+        {
+            return;
+        }
+        // Called on the UI thread; sending must not be able to block it.
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            try
+            {
+                stream.UpdateTextEncoding(encoding, encoding?.WebName);
+            }
+            catch
+            {
+                // The connection is gone; the reading side reports that.
+            }
+        });
+    }
+
+    private System.Text.Encoding TextEncoding => TerminalEncodings.Resolve(Charset);
+
     // The key container is the one of the saved SSH passwords.
     private const string PasswordContainerName = "com.sysprogs.smartty.passwords";
 
@@ -362,7 +473,7 @@ internal class TelnetTransport : IDeviceTransport, ITerminalSizeAwareTransport, 
                 // (the user name, if there is one, is still sent).
             }
         }
-        return new TelnetAutoLogin(_telnet.AutoLoginUserName, password, _telnet.LoginPrompts, _telnet.PasswordPrompts, lineEnding: _lineEnding);
+        return new TelnetAutoLogin(_telnet.AutoLoginUserName, password, _telnet.LoginPrompts, _telnet.PasswordPrompts, lineEnding: _lineEnding, encoding: TextEncoding);
     }
 
     private void OnStreamRemoteEchoChanged(object sender, EventArgs e)

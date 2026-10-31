@@ -335,11 +335,11 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
             public bool HasAutoLogin => !string.IsNullOrEmpty(AutoLoginUserName) || EncryptedSavedPassword != null || !string.IsNullOrEmpty(AutoLoginPassword);
 
             /// <summary>
-            /// Saved telnet and raw TCP connections to the same host and port are different connections,
-            /// so they must not share a file.
+            /// Saved telnet, telnet over TLS and raw TCP connections to the same host and port are different
+            /// connections, so they must not share a file.
             /// </summary>
             [XmlIgnore]
-            public override string FileNameBase => "telnet_" + Host + "_" + Port;
+            public override string FileNameBase => (Tls ? "telnets_" : "telnet_") + Host + "_" + Port;
 
             /// <summary>
             /// Reads what a user types for a quick connection: "host", "host:port", "[ipv6]:port", a bare IPv6 address,

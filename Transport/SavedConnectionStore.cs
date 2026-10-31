@@ -242,16 +242,38 @@ public class SavedConnectionStore
 
     public void SaveRawConnection(RawConnectionSettings rawConnectionSettings)
     {
+        List<RawConnectionSettings> replaced = new List<RawConnectionSettings>();
         for (int i = 0; i < _rawConnections.Count; i++)
         {
             // Host names are case-insensitive and so are file names on NTFS: "Device.local:23" and "device.local:23" are one profile.
             if (_rawConnections[i].Settings != null && string.Equals(_rawConnections[i].Settings.Connection.FileNameBase, rawConnectionSettings.Settings.Connection.FileNameBase, StringComparison.OrdinalIgnoreCase))
             {
+                replaced.Add(_rawConnections[i]);
                 _rawConnections.RemoveAt(i--);
             }
         }
         _rawConnections.Add(rawConnectionSettings);
-        rawConnectionSettings.FileName = Path.Combine(_directory, ToFileName(rawConnectionSettings.Settings.Connection.FileNameBase) + ".rawconnection");
+        string newFileName = Path.Combine(_directory, ToFileName(rawConnectionSettings.Settings.Connection.FileNameBase) + ".rawconnection");
+        rawConnectionSettings.FileName = newFileName;
+        foreach (RawConnectionSettings old in replaced)
+        {
+            // The same connection saved under another name earlier (a telnet over TLS profile was once named like the plain
+            // one): its old file would come back as a second entry at the next start.
+            if (!ReferenceEquals(old, rawConnectionSettings) && !string.IsNullOrEmpty(old.FileName)
+                && !string.Equals(old.FileName, newFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    File.Delete(old.FileName);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+            }
+        }
         rawConnectionSettings.Save();
     }
 

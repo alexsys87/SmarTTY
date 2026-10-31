@@ -59,6 +59,12 @@ internal sealed class TelnetAutoLogin
 
     private readonly StringBuilder _tail = new StringBuilder();
 
+    // The text of the server is read in the encoding of the session: the prompts are written as the user reads them
+    // ("Логин:"), not as Latin-1 characters. A decoder keeps a character that arrives in two pieces.
+    private readonly Encoding _encoding;
+
+    private readonly Decoder _decoder;
+
     private Stage _stage;
 
     /// <param name="userName">Empty: the server is not asked for a user name.</param>
@@ -70,8 +76,11 @@ internal sealed class TelnetAutoLogin
     /// <param name="lineEnding">What ends the user name and the password: the same as the Enter key of the terminal sends,
     /// because many servers take CR and LF for two line ends and would read the extra one as an empty answer to the
     /// next prompt (null: CR LF).</param>
-    public TelnetAutoLogin(string userName, string password, string loginPrompts, string passwordPrompts, int timeoutSeconds = 0, Func<long> nowMs = null, string lineEnding = null)
+    /// <param name="encoding">How the bytes of the server are turned into text (null: Latin-1, one byte one character).</param>
+    public TelnetAutoLogin(string userName, string password, string loginPrompts, string passwordPrompts, int timeoutSeconds = 0, Func<long> nowMs = null, string lineEnding = null, Encoding encoding = null)
     {
+        _encoding = encoding ?? Encoding.GetEncoding("iso-8859-1");
+        _decoder = _encoding.GetDecoder();
         _lineEnding = string.IsNullOrEmpty(lineEnding) ? "\r\n" : lineEnding;
         _userName = userName ?? "";
         _password = password ?? "";
@@ -108,10 +117,9 @@ internal sealed class TelnetAutoLogin
             _tail.Clear();
             return Array.Empty<string>();
         }
-        for (int i = offset; i < offset + count; i++)
-        {
-            _tail.Append((char)data[i]);
-        }
+        char[] chars = new char[_encoding.GetMaxCharCount(count)];
+        int decoded = _decoder.GetChars(data, offset, count, chars, 0);
+        _tail.Append(chars, 0, decoded);
         if (_tail.Length > MaxTailLength)
         {
             _tail.Remove(0, _tail.Length - MaxTailLength);
