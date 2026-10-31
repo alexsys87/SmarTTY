@@ -14,6 +14,9 @@ public static class PackageIndexUpdater
 
     private const int ErrorTailLines = 8;
 
+    /// <summary>The longest time the update of the package lists may take before it is abandoned.</summary>
+    internal static readonly TimeSpan UpdateTimeout = TimeSpan.FromSeconds(120);
+
     /// <summary>
     /// Tells whether the SSH user on the remote host is root. Devices such as OpenWrt usually have no sudo at all,
     /// so privilege escalation is used only when this returns false.
@@ -61,13 +64,26 @@ public static class PackageIndexUpdater
         if (client is WingetPackageManagerClient)
         {
             // The shell of a Windows host is not sh: no "{ ...; } 2>&1; echo", no sudo. The runner reports a failed command as null.
-            if (runner.RunCommand(command) == null)
+            string[] wingetOutput = runner is ISSHCommandRunnerWithTimeout wingetRunner
+                ? wingetRunner.RunCommand(command, UpdateTimeout)
+                : runner.RunCommand(command);
+            if (wingetOutput == null)
             {
                 throw new Exception("Failed to run '" + command + "' on the remote host.");
             }
             return;
         }
-        string[] lines = runner.RunCommand(BuildCommandLine(command, isRoot));
+        string commandLine = BuildCommandLine(command, isRoot);
+        // Without internet access the package manager can retry connections for a very long time and the program
+        // would wait for it (holding the connection busy), so give up after a while.
+        string[] lines = runner is ISSHCommandRunnerWithTimeout timedRunner
+            ? timedRunner.RunCommand(commandLine, UpdateTimeout)
+            : runner.RunCommand(commandLine);
+        if (lines == null && runner is ISSHCommandRunnerWithTimeout)
+        {
+            throw new Exception("Failed to update the package lists ('" + command + "'): no result within " + (int)UpdateTimeout.TotalSeconds
+                + " seconds or the command could not be run. Check that the remote host has internet access.");
+        }
         CheckResult(lines, command, isRoot);
     }
 
