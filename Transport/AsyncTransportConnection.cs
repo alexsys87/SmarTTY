@@ -119,7 +119,9 @@ internal class AsyncTransportConnection : IDisposable
     {
         try
         {
-            _dispatcher.BeginInvoke((Delegate)callback, new object[0]);
+            // Normal priority is what BeginInvoke(Delegate, object[]) uses as well; this overload also exists in Mono's
+            // WindowsBase, so the control runs under the Mono test harnesses too.
+            _dispatcher.BeginInvoke(DispatcherPriority.Normal, callback);
         }
         catch
         {

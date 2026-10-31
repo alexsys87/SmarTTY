@@ -377,6 +377,12 @@ public class DeviceLineInputStorage
         return string.IsNullOrWhiteSpace(host) ? null : Sanitize("tcp-" + host.Trim().ToLowerInvariant() + "-" + port);
     }
 
+    /// <summary>Key of a netconsole receiver: the local UDP port it listens on.</summary>
+    public static string MakeNetconsoleKey(int localPort)
+    {
+        return localPort > 0 ? Sanitize("udp-" + localPort) : null;
+    }
+
     private static string Sanitize(string raw)
     {
         StringBuilder key = new StringBuilder();

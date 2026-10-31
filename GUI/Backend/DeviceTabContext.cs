@@ -93,7 +93,13 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     /// <summary>Returns a key that is equal for two settings only when they would open the same exclusive resource.</summary>
     public static string MakeExclusiveKey(DeviceTerminalSettings.ConnectionSettings connection)
     {
-        return connection is DeviceTerminalSettings.ConnectionSettings.Serial serial ? DeviceSessionKey.ForSerialPort(serial.ComPortName) : null;
+        return connection switch
+        {
+            DeviceTerminalSettings.ConnectionSettings.Serial serial => DeviceSessionKey.ForSerialPort(serial.ComPortName),
+            // Only one session can listen on a UDP port.
+            DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole => DeviceSessionKey.ForUdpPort(netconsole.LocalPort),
+            _ => null,
+        };
     }
 
     private void Terminal_HandleCreated(object sender, EventArgs e)

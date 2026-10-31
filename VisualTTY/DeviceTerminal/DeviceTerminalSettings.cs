@@ -11,6 +11,7 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
     [XmlInclude(typeof(Serial))]
     [XmlInclude(typeof(Tcp))]
     [XmlInclude(typeof(Telnet))]
+    [XmlInclude(typeof(Netconsole))]
     public abstract class ConnectionSettings
     {
         [XmlType("com.sysprogs.terminal.connection.serial")]
@@ -446,6 +447,179 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
                 if (!int.TryParse(text.Trim(), out int port) || port < 1 || port > 65535)
                 {
                     throw new System.FormatException("Invalid port number: '" + text + "' (expected 1-65535)");
+                }
+                return port;
+            }
+        }
+
+        /// <summary>
+        /// A Linux netconsole receiver: the kernel (CONFIG_NETCONSOLE, "netconsole=..." on the command line or the
+        /// configfs targets) sends the console output (printk) as UDP datagrams to a port on this computer, by default
+        /// 6666. Nothing has to be connected: the port is opened here and every datagram that arrives is shown. What is
+        /// typed is sent back as UDP datagrams to the device (U-Boot's netconsole reads them, the Linux module ignores
+        /// them), either one datagram per key or one per line.
+        /// It is not a <see cref="Tcp"/>: nothing that handles TCP endpoints applies to it.
+        /// </summary>
+        [XmlType("com.sysprogs.terminal.connection.netconsole")]
+        public class Netconsole : ConnectionSettings
+        {
+            /// <summary>The port netconsole sends to unless told otherwise (and the port U-Boot listens on).</summary>
+            public const int DefaultPort = 6666;
+
+            /// <summary>How typed input is sent to the device.</summary>
+            public enum InputMode
+            {
+                /// <summary>The line is edited here and sent as one datagram when Enter is pressed.</summary>
+                Line,
+                /// <summary>Every key is sent at once, as a datagram of its own.</summary>
+                Character
+            }
+
+            /// <summary>How the received datagrams are shown.</summary>
+            public enum MessageFormat
+            {
+                /// <summary>
+                /// Extended netconsole messages ("6,123,4567890,-;text", the /dev/kmsg format) are shown like dmesg
+                /// does, with a timestamp and coloured by level; anything else is shown as it was received.
+                /// </summary>
+                Auto,
+                /// <summary>Every datagram is shown as it was received.</summary>
+                Raw
+            }
+
+            /// <summary>The local address to listen on; empty listens on every interface (IPv4 and IPv6).</summary>
+            public string LocalAddress { get; set; }
+
+            /// <summary>The UDP port the device sends to (netconsole's tgt-port, 6666 by default).</summary>
+            public int LocalPort { get; set; } = DefaultPort;
+
+            /// <summary>
+            /// Where typed input goes, and with <see cref="AcceptOnlyFromRemoteHost"/> the only sender that is shown.
+            /// Empty: the input goes to the address the last datagram came from.
+            /// </summary>
+            public string RemoteHost { get; set; }
+
+            /// <summary>The UDP port typed input is sent to (U-Boot listens on 6666).</summary>
+            public int RemotePort { get; set; } = DefaultPort;
+
+            /// <summary>Show only the datagrams sent from <see cref="RemoteHost"/> (other senders on the port are dropped).</summary>
+            public bool AcceptOnlyFromRemoteHost { get; set; }
+
+            public InputMode Input { get; set; } = InputMode.Line;
+
+            public MessageFormat Format { get; set; } = MessageFormat.Auto;
+
+            /// <summary>Colour the extended messages by their log level (errors red, warnings yellow, debug grey).</summary>
+            public bool ColorizeLevels { get; set; } = true;
+
+            /// <summary>Put the address of the sender in front of every line (several devices sending to one port).</summary>
+            public bool ShowSender { get; set; }
+
+            /// <summary>
+            /// Draw what is typed in character mode (the Linux module never echoes; U-Boot does, so turn it off there).
+            /// </summary>
+            public bool LocalEcho { get; set; } = true;
+
+            [XmlIgnore]
+            public override string FileNameBase => "netconsole_" + (string.IsNullOrWhiteSpace(LocalAddress) ? "" : LocalAddress.Trim() + "_") + LocalPort;
+
+            /// <summary>"netconsole :6666" or "netconsole 192.168.0.2:6666", followed by " -> device:port" when the device is set.</summary>
+            public override string ToString()
+            {
+                string local = string.IsNullOrWhiteSpace(LocalAddress) ? ":" + LocalPort : Tcp.FormatEndpoint(LocalAddress.Trim(), LocalPort);
+                string text = "netconsole " + local;
+                if (!string.IsNullOrWhiteSpace(RemoteHost))
+                {
+                    text += " -> " + Tcp.FormatEndpoint(RemoteHost.Trim(), RemotePort);
+                }
+                return text;
+            }
+
+            public override bool IsValid()
+            {
+                return LocalPort > 0 && LocalPort <= 65535 && RemotePort > 0 && RemotePort <= 65535
+                    && (!AcceptOnlyFromRemoteHost || !string.IsNullOrWhiteSpace(RemoteHost));
+            }
+
+            public Netconsole Clone()
+            {
+                return (Netconsole)MemberwiseClone();
+            }
+
+            /// <summary>
+            /// Reads what a user types for a quick netconsole listener: "6666" (the local port), "host" or "host:port"
+            /// (the device input is sent to; the local port stays 6666), "6666@host[:port]" for both, each optionally
+            /// with "netconsole://" or "udp://" in front. An empty text listens on 6666 and answers the last sender.
+            /// </summary>
+            public static Netconsole Parse(string text)
+            {
+                text = (text ?? "").Trim();
+                foreach (string scheme in new[] { "netconsole://", "udp://" })
+                {
+                    if (text.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
+                    {
+                        text = text.Substring(scheme.Length).TrimEnd('/');
+                        break;
+                    }
+                }
+                Netconsole netconsole = new Netconsole();
+                if (text.Length == 0)
+                {
+                    return netconsole;
+                }
+                int at = text.IndexOf('@');
+                if (at != -1)
+                {
+                    netconsole.LocalPort = ParsePort(text.Substring(0, at));
+                    text = text.Substring(at + 1);
+                }
+                else if (int.TryParse(text, out _))
+                {
+                    netconsole.LocalPort = ParsePort(text);
+                    return netconsole;
+                }
+                string host = text;
+                if (text.StartsWith("[", StringComparison.Ordinal))
+                {
+                    int closing = text.IndexOf(']');
+                    if (closing == -1)
+                    {
+                        throw new FormatException("The IPv6 address is missing its closing ']'.");
+                    }
+                    host = text.Substring(1, closing - 1);
+                    string rest = text.Substring(closing + 1);
+                    if (rest.StartsWith(":", StringComparison.Ordinal))
+                    {
+                        netconsole.RemotePort = ParsePort(rest.Substring(1));
+                    }
+                    else if (rest.Length != 0)
+                    {
+                        throw new FormatException("Expected: [address]:port");
+                    }
+                }
+                else
+                {
+                    int colon = text.IndexOf(':');
+                    // A single colon separates the port; several colons are an IPv6 address without a port.
+                    if (colon != -1 && colon == text.LastIndexOf(':'))
+                    {
+                        host = text.Substring(0, colon);
+                        netconsole.RemotePort = ParsePort(text.Substring(colon + 1));
+                    }
+                }
+                if (host.Trim().Length == 0)
+                {
+                    throw new FormatException("Expected: port, host[:port] or port@host[:port]");
+                }
+                netconsole.RemoteHost = host.Trim();
+                return netconsole;
+            }
+
+            private static int ParsePort(string text)
+            {
+                if (!int.TryParse(text.Trim(), out int port) || port < 1 || port > 65535)
+                {
+                    throw new FormatException("Invalid port number: '" + text + "' (expected 1-65535)");
                 }
                 return port;
             }

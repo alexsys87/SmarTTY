@@ -180,6 +180,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             DeviceTerminalSettings.ConnectionSettings.Serial serial => serial.ComPortName,
             DeviceTerminalSettings.ConnectionSettings.Tcp tcp => tcp.ToString(),
+            DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole => netconsole.ToString(),
             _ => "Raw Terminal",
         };
     }
@@ -206,6 +207,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private string ConnectedStatusText(string name)
     {
+        if (IsNetconsole)
+        {
+            return NetconsoleStatusText(name);
+        }
         string state = DeviceTerminalStateText.State(connected: true, _serialTerminalControl.HasInputLine, _serialTerminalControl.FullScreenProgramActive, _serialTerminalControl.CurrentPrompt);
         return state.Length == 0 ? name + ": connected" : name + ": connected (" + state + ")";
     }
@@ -269,6 +274,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         bool isVisible = (btnSend.Visible = hexView);
         bool visible = (toolStripTextBox.Visible = isVisible);
         toolStripLabel.Visible = visible;
+        UpdateNetconsoleBarVisibility();
 
         if (_deviceTerminalSettings != null)
         {
@@ -353,6 +359,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         InitializeKermitMenu();
         InitializeGzipBase64Menu();
         InitializeTftpSupport();
+        InitializeNetconsoleSupport();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
         ThemeManager.ThemeChanged += OnThemeChanged;
         ApplyToolbarTheme();
@@ -418,6 +425,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
             btnLog.ForeColor = _toolbarPalette.Error;
         }
         ApplyMenuTheme(contextMenuStrip1);
+        ApplyNetconsoleBarTheme();
         toolStrip1.Invalidate();
     }
 
@@ -933,6 +941,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             return () => new TcpTransport(connectionSettings as DeviceTerminalSettings.ConnectionSettings.Tcp);
         }
+        if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole)
+        {
+            return () => new NetconsoleTransport(netconsole);
+        }
         return null;
     }
 
@@ -1016,7 +1028,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
             sendImmediatelyToolStripMenuItem.Checked = deviceTerminalSettings.HexSettings.AutoSend;
         }
         changeSettingsToolStripMenuItem.Visible = _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial;
-        bool needsStty = !(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
+        // Telnet passes the size on by itself; a netconsole receiver has no shell to tell it to.
+        bool needsStty = !(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet) && !IsNetconsole;
         _syncRemoteSizeMenuItem.Visible = needsStty;
         _sendRemoteSizeMenuItem.Visible = needsStty;
         _syncRemoteSizeMenuItem.Checked = needsStty && _deviceTerminalSettings.SyncRemoteTerminalSize;
@@ -1024,6 +1037,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _autoDetectPromptMenuItem.Checked = _deviceTerminalSettings.AutoDetectPrompt;
         UpdateSerialLineUi();
         UpdateTelnetMenu(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
+        ConfigureNetconsole();
         ConfigureCommandLists();
         Connect();
     }
@@ -1066,11 +1080,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
             connectTimeoutMs = Math.Max(connectTimeoutMs, ReopenRetryMs);
         }
         _transportDisplayName = deviceTransport.GetDisplayName(includeParameters: true);
-        lblConnection.Text = "Connected to " + _transportDisplayName;
+        // Nothing is connected to for netconsole: the port is opened and waits for the device.
+        lblConnection.Text = (deviceTransport is NetconsoleTransport ? "Listening: " : "Connected to ") + _transportDisplayName;
         Interlocked.Exchange(ref _bytesSent, 0L);
         Interlocked.Exchange(ref _bytesReceived, 0L);
         _connectionState = ConnectionStateEnum.Connecting;
         _telnetTransport = null;
+        AttachNetconsole(deviceTransport as NetconsoleTransport);
         if (deviceTransport is TelnetTransport telnetTransport && _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet telnetSettings)
         {
             // The server may propose a character set (option CHARSET): the terminal's own one is accepted.
@@ -1736,6 +1752,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             return; // typed characters would corrupt the transfer
         }
+        if (RedirectToNetconsoleLine(buffer, inputKind))
+        {
+            return; // line mode: the text goes into the input box below the terminal
+        }
         if (_asyncTransportConnection != null)
         {
             SendToDevice(buffer, buffer.Length);
@@ -2305,6 +2325,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
 
     private void echoTypedCharactersToolStripMenuItem_Click(object sender, EventArgs e)
     {
+        if (IsNetconsole)
+        {
+            ToggleNetconsoleEcho();
+            return;
+        }
         if (_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet)
         {
             // For telnet the item switches the echo of this session until the server's echo changes (or a reconnect).

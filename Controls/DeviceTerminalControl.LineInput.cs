@@ -52,6 +52,7 @@ public partial class DeviceTerminalControl
         {
             DeviceTerminalSettings.ConnectionSettings.Serial serial => DeviceLineInputStorage.MakeSerialKey(serial.ComPortName),
             DeviceTerminalSettings.ConnectionSettings.Tcp tcp => DeviceLineInputStorage.MakeTcpKey(tcp.Host, tcp.Port),
+            DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole => DeviceLineInputStorage.MakeNetconsoleKey(netconsole.LocalPort),
             _ => null,
         };
         _commandStorage = new DeviceLineInputStorage(GlobalSettings.DataDirectory);
