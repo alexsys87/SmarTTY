@@ -13,7 +13,8 @@ internal static class MessageBoxes
 
     public static void Exception(Exception exception)
     {
-        Error(exception.Message);
+        // A window with selectable text instead of a message box, so that the error can be copied.
+        ErrorDetailsWindow.Show(exception.Message);
     }
 
     internal static bool Ask(string text)

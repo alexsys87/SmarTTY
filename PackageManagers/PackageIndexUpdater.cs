@@ -12,7 +12,7 @@ public static class PackageIndexUpdater
 {
     internal const string ExitMarker = "__SMARTTY_EXIT__=";
 
-    private const int ErrorTailLines = 8;
+    private const int ErrorTailLines = 30;
 
     /// <summary>The longest time the update of the package lists may take before it is abandoned.</summary>
     internal static readonly TimeSpan UpdateTimeout = TimeSpan.FromSeconds(120);
