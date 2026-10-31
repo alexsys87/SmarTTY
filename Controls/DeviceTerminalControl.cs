@@ -1333,7 +1333,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
     }
 
-    // A test of a network connection gives up after this long instead of the operating system's connect timeout.
+    // A test of a network connection waits as long as the connection itself would; when that is left to the operating
+    // system (a timeout of 0), it gives up after this long instead.
     private const int TestConnectTimeoutMs = 10000;
 
     /// <summary>
@@ -1350,10 +1351,16 @@ public partial class DeviceTerminalControl : DpiAwareControl
         switch (deviceTransport)
         {
             case TcpTransport tcpTransport:
-                tcpTransport.ConnectTimeoutMs = TestConnectTimeoutMs;
+                if (tcpTransport.ConnectTimeoutMs <= 0)
+                {
+                    tcpTransport.ConnectTimeoutMs = TestConnectTimeoutMs;
+                }
                 break;
             case TelnetTransport telnetTransport:
-                telnetTransport.ConnectTimeoutMs = TestConnectTimeoutMs;
+                if (telnetTransport.ConnectTimeoutMs <= 0)
+                {
+                    telnetTransport.ConnectTimeoutMs = TestConnectTimeoutMs;
+                }
                 break;
         }
         deviceTransport.Open(null);

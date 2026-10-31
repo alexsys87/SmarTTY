@@ -33,10 +33,13 @@
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock Text="Connect to: " VerticalAlignment="Center" />
             <TextBox Name="txtHost" Grid.Column="1" Grid.ColumnSpan="3" Margin="2" VerticalContentAlignment="Center" Text="{Binding TCPEndpoint, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsChecked, ElementName=rbTCP}" Tag="&lt;hostname or IP address&gt;:&lt;port&gt;" ToolTip="host, host:port or [IPv6 address]:port, optionally with tcp:// in front. Without a port telnet uses 23 (992 with TLS)." />
-            <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Grid.Row="1" Grid.ColumnSpan="2" Click="Test_Click">
+            <TextBlock Text="Connect timeout, s:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Grid.Row="1" Margin="2" Width="50" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpConnectTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" ToolTip="Seconds (default 10, 0 = the operating system's own timeout, about 21 s per address of the host). How long connecting may take over all the addresses of the host; raise it for a slow link (VPN, satellite)." />
+            <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Grid.Row="2" Grid.ColumnSpan="2" Click="Test_Click">
               <StackPanel Orientation="Horizontal">
                 <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
                 <TextBlock Text="Test connection now" VerticalAlignment="Center" />
