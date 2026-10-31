@@ -140,6 +140,32 @@ internal static class Program
         Equal(luaGsub.ToString(), "string.gsub(text, pattern, replacement)",
             "the resolved Lua signature keeps the qualified name");
 
+        // The SQL set covers functions and data types; statement keywords come from the syntax highlighting.
+        List<ApiSymbolDatabase.Symbol> sql = database.ForLanguage(L.Sql).ToList();
+        Check(sql.Count >= 140, "the SQL set is broad (" + sql.Count + " symbols)");
+        Equal(sql.Count, sql.Select(s => s.Name).Distinct().Count(), "SQL names are unique");
+        Equal(sql.Count, sql.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every SQL symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "CONCAT", "LEFT", "RIGHT", "LPAD", "DATE_TRUNC", "EXTRACT", "ROW_NUMBER", "RANK",
+                     "LAG", "LEAD", "STRING_AGG", "JSON_EXTRACT", "JSON_OBJECT", "JSONB",
+                     "INT", "VARCHAR", "TIMESTAMP", "BOOLEAN"
+                 })
+        {
+            Check(database.Find(L.Sql, name) != null, "the SQL set includes '" + name + "'");
+        }
+        Check(database.Find(L.Sql, "ROW_NUMBER").Description.Contains("SQL window function"),
+            "the description of 'ROW_NUMBER' names a SQL window function");
+        Check(database.Find(L.Sql, "CONCAT").Description.Contains("SQL string function"),
+            "the description of 'CONCAT' names a SQL string function");
+        Check(database.Find(L.Sql, "INT").Description.Contains("SQL data type"),
+            "the description of 'INT' names a SQL data type");
+
+        ParameterSignature sqlConcat = database.FindSignature(L.Sql, "CONCAT");
+        Check(sqlConcat != null, "a 'CONCAT' call resolves to the SQL function");
+        Equal(sqlConcat.ToString(), "CONCAT(value, ...)", "the SQL signature keeps its parameters");
+
         // A "module.name" call is resolved to its last segment.
         ParameterSignature pythonSqrt = database.FindSignature(L.Python, "math.sqrt");
         Check(pythonSqrt != null, "a 'math.sqrt' call resolves to the Python symbol");
@@ -248,6 +274,16 @@ internal static class Program
         Check(Build(L.Lua, "", "codepo", database).Any(s => s.DisplayName == "codepoint"),
             "the completion list offers 'utf8.codepoint' as 'codepoint'");
 
+        // SQL functions and data types feed the completion list with their summaries.
+        List<ISuggestion> sqlWindow = Build(L.Sql, "", "ROW_N", database);
+        ISuggestion rowNumber = sqlWindow.FirstOrDefault(s => s.DisplayName == "ROW_NUMBER");
+        Check(rowNumber != null, "the completion list offers the SQL function 'ROW_NUMBER'");
+        Equal(rowNumber.DetailText, "Row number in a window", "the SQL summary is the detail text");
+        Check(rowNumber.HintText.StartsWith("ROW_NUMBER("), "the SQL signature is the hint text");
+        ISuggestion varchar = Build(L.Sql, "", "VARC", database).FirstOrDefault(s => s.DisplayName == "VARCHAR");
+        Check(varchar != null, "the completion list offers the SQL type 'VARCHAR'");
+        Equal(varchar.DetailText, "VARCHAR data type", "the SQL type summary is the detail text");
+
         // The Python modules are offered under their plain names too.
         List<ISuggestion> pythonMath = Build(L.Python, "", "sqr", database);
         ISuggestion pythonSqrt = pythonMath.FirstOrDefault(s => s.DisplayName == "sqrt");
@@ -303,6 +339,12 @@ internal static class Program
         Check(luaGsubHint != null, "a bare 'gsub(' call finds the 'string.gsub' symbol");
         Check(luaGsubHint.Name == "string.gsub", "the Lua string hint keeps the qualified name");
         Equal(luaGsubHint.ParameterCount, 3, "the Lua string hint has its parameters");
+
+        ParameterSignature sql = EditorSignatureSource.FindSignature(
+            L.Sql, "CONCAT(\n", 0, 7, database, out int sqlActive);
+        Check(sql != null, "a bare 'CONCAT(' call finds the SQL function");
+        Equal(sql.Name, "CONCAT", "the SQL hint keeps the function name");
+        Equal(sql.ParameterCount, 2, "the SQL hint has its parameters");
 
         ParameterSignature python = EditorSignatureSource.FindSignature(
             L.Python, "sqrt(\n", 0, 5, database, out int pythonActive);
