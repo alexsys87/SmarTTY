@@ -106,6 +106,13 @@
       <ToggleButton Name="btnSort" VerticalAlignment="Center" Margin="2" Style="{StaticResource DynamicToggleButtonStyle}">
         <Image Width="16" Height="16" Source="../icons/sort16.png" Margin="2" />
       </ToggleButton>
+      <!-- Settings archive: icons here, so the row of "New ..." links below fits on one line. -->
+      <Button VerticalAlignment="Center" Margin="2" Style="{StaticResource DynamicButton}" Click="ImportSettings_Click" ToolTip="Import settings..." AutomationProperties.Name="Import settings">
+        <Image Width="16" Height="16" Source="../icons/import16.png" Margin="2" />
+      </Button>
+      <Button VerticalAlignment="Center" Margin="2" Style="{StaticResource DynamicButton}" Click="ExportSettings_Click" ToolTip="Export settings..." AutomationProperties.Name="Export settings">
+        <Image Width="16" Height="16" Source="../icons/export16.png" Margin="2" />
+      </Button>
       <Popup PopupAnimation="Slide" Placement="Relative" SnapsToDevicePixels="True" StaysOpen="False" AllowsTransparency="True" IsOpen="{Binding IsChecked, ElementName=btnSort}" PlacementTarget="{Binding ElementName=btnSort}" VerticalOffset="{Binding Path=ActualHeight, ElementName=btnSort}">
         <Border Style="{DynamicResource PopupBorder}" Padding="8">
           <StackPanel Orientation="Vertical">
@@ -413,18 +420,6 @@
           <StackPanel Orientation="Horizontal">
             <Image Source="../Icons/event16.png" />
             <AccessText Text="Quick telnet _connection..." />
-          </StackPanel>
-        </Button>
-        <Button HorizontalAlignment="Left" Click="ImportSettings_Click">
-          <StackPanel Orientation="Horizontal">
-            <Image Source="../Icons/import16.png" />
-            <AccessText Text="_Import settings..." />
-          </StackPanel>
-        </Button>
-        <Button HorizontalAlignment="Left" Click="ExportSettings_Click">
-          <StackPanel Orientation="Horizontal">
-            <Image Source="../Icons/export16.png" />
-            <AccessText Text="E_xport settings..." />
           </StackPanel>
         </Button>
       </WrapPanel>
