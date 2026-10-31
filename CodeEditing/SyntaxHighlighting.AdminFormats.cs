@@ -218,7 +218,7 @@ public static partial class SyntaxHighlighting
         (int startState, string text, TokenCache.ITokenSink sink, out int endState) => TokenizeConfigCore(SystemdDirectives, startState, text, sink, out endState);
 
     private static readonly TokenCache.LineTokenizer NginxTokenizer =
-        (int startState, string text, TokenCache.ITokenSink sink, out int endState) => TokenizeConfigCore(NginxDirectives, startState, text, sink, out endState);
+        (int startState, string text, TokenCache.ITokenSink sink, out int endState) => TokenizeConfigCore(NginxDirectives, startState, text, sink, out endState, foldBraces: true);
 
     private static readonly TokenCache.LineTokenizer SshConfigTokenizer =
         (int startState, string text, TokenCache.ITokenSink sink, out int endState) => TokenizeConfigCore(SshDirectives, startState, text, sink, out endState);
