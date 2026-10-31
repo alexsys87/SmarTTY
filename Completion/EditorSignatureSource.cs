@@ -550,6 +550,9 @@ public static class EditorSignatureSource
             case SyntaxHighlighting.Language.Bash:
             case SyntaxHighlighting.Language.Script:
             case SyntaxHighlighting.Language.Config:
+            case SyntaxHighlighting.Language.Systemd:
+            case SyntaxHighlighting.Language.Nginx:
+            case SyntaxHighlighting.Language.SshConfig:
             case SyntaxHighlighting.Language.Makefile:
             case SyntaxHighlighting.Language.Uci:
             case SyntaxHighlighting.Language.Yaml:

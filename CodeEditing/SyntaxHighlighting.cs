@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SmarTTY.CodeEditing
 {
@@ -16,7 +17,7 @@ namespace SmarTTY.CodeEditing
     /// State that spans lines (Python triple quotes, block comments, ...) is kept in the integer
     /// startState/endState that TokenCache stores for every line.
     /// </summary>
-    public static class SyntaxHighlighting
+    public static partial class SyntaxHighlighting
     {
         // ------------------------------------------------------------------
         // Token types: indices into TokenBrushes. Index 0 must be the plain text
@@ -54,13 +55,18 @@ namespace SmarTTY.CodeEditing
             Makefile,// Makefile: variables, targets, foldable ifeq/define blocks
             Uci,     // OpenWrt UCI (/etc/config/*): config/option/list, foldable config blocks
             Yaml,    // YAML: the colors of Config, blocks that fold by indentation
-            Cpp      // C++: the C library plus the STL; separate so C files never see C++ symbols
+            Cpp,     // C++: the C library plus the STL; separate so C files never see C++ symbols
+            Systemd, // systemd units: the colors of Config, the directives of systemd are keywords (SyntaxHighlighting.AdminFormats.cs)
+            Nginx,   // nginx configuration: the colors of Config, the directives of nginx are keywords
+            SshConfig, // ssh_config, sshd_config: the colors of Config, the options of OpenSSH are keywords
+            Log      // logs: the timestamp and the level (ERROR, WARN, ...) of each line
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Lua, Language.Makefile, Language.Json, Language.Config,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.Script, Language.Sql, Language.Markup, Language.Diff
         };
 
@@ -75,7 +81,11 @@ namespace SmarTTY.CodeEditing
                 case Language.Lua: return "Lua";
                 case Language.Makefile: return "Makefile";
                 case Language.Json: return "JSON";
-                case Language.Config: return "Config (INI, conf, properties)";
+                case Language.Config: return "Config (INI, TOML, .env, properties)";
+                case Language.Systemd: return "systemd unit";
+                case Language.Nginx: return "nginx config";
+                case Language.SshConfig: return "SSH config (ssh_config, sshd_config)";
+                case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
                 case Language.CLike: return "C, C#, Java, JavaScript";
@@ -134,12 +144,66 @@ namespace SmarTTY.CodeEditing
                 return Language.Uci;
             }
 
+            Language byPath = DetectLanguageFromPath(directory, name);
+            if (byPath != Language.Plain)
+            {
+                return byPath;
+            }
+
             Language byName = DetectLanguageFromNameOnly(name);
             if (byName == Language.Plain && IsOpenWrtShellDirectory(directory))
             {
                 return Language.Bash;
             }
             return byName;
+        }
+
+        /// <summary>
+        /// The formats an administrator edits that are told by where the file is: nginx configuration, the files of OpenSSH, the
+        /// drop-ins of systemd, the logs of /var/log. Plain when the place says nothing.
+        /// </summary>
+        private static Language DetectLanguageFromPath(string lowerCasePath, string name)
+        {
+            bool nginxDirectory = lowerCasePath.Contains("/etc/nginx/") || lowerCasePath.Contains("/nginx/sites-") || lowerCasePath.Contains("/nginx/conf");
+            if (nginxDirectory && (name.EndsWith(".conf", StringComparison.Ordinal) || name.IndexOf('.') < 0))
+            {
+                return Language.Nginx;
+            }
+            if (name == "config" && lowerCasePath.Contains("/.ssh/"))
+            {
+                return Language.SshConfig;
+            }
+            if ((lowerCasePath.Contains("/ssh_config.d/") || lowerCasePath.Contains("/sshd_config.d/")) && name.EndsWith(".conf", StringComparison.Ordinal))
+            {
+                return Language.SshConfig;
+            }
+            // /etc/systemd/system/x.service.d/override.conf, /etc/systemd/journald.conf, /usr/lib/systemd/...
+            if (lowerCasePath.Contains("/systemd/") && name.EndsWith(".conf", StringComparison.Ordinal))
+            {
+                return Language.Systemd;
+            }
+            if (lowerCasePath.Contains("/var/log/") && IsSystemLogName(name))
+            {
+                return Language.Log;
+            }
+            return Language.Plain;
+        }
+
+        // Files of /var/log that are text: no extension (syslog, messages, auth), .log, and the rotated ones (syslog.1, x.log.2).
+        // wtmp, btmp, lastlog and the like are binary and are not opened as text anyway.
+        private static bool IsSystemLogName(string name)
+        {
+            if (name == "wtmp" || name == "btmp" || name == "lastlog" || name == "faillog" || name == "utmp")
+            {
+                return false;
+            }
+            int dot = name.LastIndexOf('.');
+            if (dot < 0)
+            {
+                return true;
+            }
+            string extension = name.Substring(dot + 1);
+            return extension == "log" || extension == "old" || (extension.Length > 0 && extension.All(char.IsDigit));
         }
 
         /// <summary>OpenWrt scripts that have no extension: init scripts, hotplug handlers, uci-defaults.</summary>
@@ -198,10 +262,21 @@ namespace SmarTTY.CodeEditing
                 case "hosts":
                 case "passwd":
                 case "group":
-                case "ssh_config":
-                case "sshd_config":
                 case "config":
                     return Language.Config;
+
+                case "ssh_config":
+                case "sshd_config":
+                    return Language.SshConfig;
+
+                case "nginx.conf":
+                    return Language.Nginx;
+            }
+
+            // Rotated logs: app.log.1, app.log.2.
+            if (name.Contains(".log.") && name.Substring(name.LastIndexOf('.') + 1).All(char.IsDigit))
+            {
+                return Language.Log;
             }
 
             // Variants of well-known names: Dockerfile.dev, Makefile.am.
@@ -250,18 +325,27 @@ namespace SmarTTY.CodeEditing
                 case "editorconfig":
                 case "toml":
                 case "env":
-                case "service":
-                case "socket":
-                case "timer":
-                case "mount":
-                case "target":
-                case "path":
                 case "network":
                 case "netdev":
                 case "link":
                 case "desktop":
                 case "rules":
                     return Language.Config;
+
+                case "service":
+                case "socket":
+                case "timer":
+                case "mount":
+                case "automount":
+                case "swap":
+                case "target":
+                case "path":
+                case "slice":
+                case "scope":
+                    return Language.Systemd;
+
+                case "log":
+                    return Language.Log;
 
                 case "c":
                 case "h":
@@ -355,8 +439,9 @@ namespace SmarTTY.CodeEditing
                 case "patch":
                     return Language.Diff;
 
-                // Prose (txt, md, log, csv, keys and certificates) stays plain: apostrophes and
-                // "//" in URLs would otherwise be colored as strings and comments.
+                // Prose (txt, md, csv, keys and certificates) stays plain: apostrophes and
+                // "//" in URLs would otherwise be colored as strings and comments. A log is coloured by
+                // its timestamps and levels only, which prose cannot be mistaken for.
                 default:
                     return Language.Plain;
             }
@@ -453,6 +538,10 @@ namespace SmarTTY.CodeEditing
                 case Language.Makefile: return TokenizeMakefile;
                 case Language.Uci: return TokenizeUci;
                 case Language.Yaml: return TokenizeYaml;
+                case Language.Systemd: return SystemdTokenizer;
+                case Language.Nginx: return NginxTokenizer;
+                case Language.SshConfig: return SshConfigTokenizer;
+                case Language.Log: return TokenizeLog;
                 default: return null;
             }
         }
@@ -501,6 +590,14 @@ namespace SmarTTY.CodeEditing
                     return Combine(ConfigConstants);
                 case Language.Uci:
                     return Combine(UciKeywords);
+                case Language.Systemd:
+                    return Combine(SystemdDirectives, SystemdSectionNames, SystemdValues, ConfigConstants);
+                case Language.Nginx:
+                    return Combine(NginxDirectives, NginxValues, ConfigConstants);
+                case Language.SshConfig:
+                    return Combine(SshDirectives, SshValues);
+                case Language.Log:
+                    return Combine(LogLevelWords);
                 default:
                     return EmptyKeywords;
             }
@@ -1303,6 +1400,15 @@ namespace SmarTTY.CodeEditing
 
         private static bool TokenizeConfig(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
+            return TokenizeConfigCore(null, startState, text, sink, out endState);
+        }
+
+        /// <summary>
+        /// The tokenizer of Config. With <paramref name="directives"/> (systemd, nginx, ssh) the key at the start of a line is a
+        /// keyword when it is one of them, and stays a plain key otherwise.
+        /// </summary>
+        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
             int len = text.Length;
             int last = 0;
             int i = SkipBlanks(text, 0);
@@ -1364,7 +1470,8 @@ namespace SmarTTY.CodeEditing
                         if (isKey)
                         {
                             Normal(ref last, last, keyStart, sink);
-                            sink.AddToken(TypeVariable, keyStart, keyEnd);
+                            bool known = directives != null && directives.Contains(text.Substring(keyStart, keyEnd - keyStart));
+                            sink.AddToken(known ? TypeKeyword : TypeVariable, keyStart, keyEnd);
                             i = keyEnd;
                             last = i;
                         }
