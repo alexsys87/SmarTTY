@@ -145,6 +145,9 @@ jobs:
       - name: Run editor Text menu (line transform) checks
         run: dotnet run --project tests/LineTransformTests -c Release
 
+      - name: Run text view row layout (inline messages and folds) checks
+        run: dotnet run --project tests/VirtualRowTests -c Release
+
       - name: Run terminal output link (compiler messages) checks
         run: dotnet run --project tests/OutputLinkTests -c Release
 

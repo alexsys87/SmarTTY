@@ -5,7 +5,7 @@ using System.Drawing.Imaging;
 
 namespace SmarTTY.CodeEditing;
 
-public class InlineMessageProvider : ReadonlyTextBrowser.IVirtualLineProvider
+public class InlineMessageProvider : ReadonlyTextBrowser.IVirtualLineProvider, System.IDisposable
 {
     public class InlineMessage : ReadonlyTextBrowser.IVirtualLine
     {
@@ -138,6 +138,17 @@ public class InlineMessageProvider : ReadonlyTextBrowser.IVirtualLineProvider
         _lastLine = 0;
     }
 
+    /// <summary>How many messages there are.</summary>
+    public int Count => _messages.Count;
+
+    /// <summary>Releases the font and the format of the rows; the editor does it when it is disposed.</summary>
+    public void Dispose()
+    {
+        _font?.Dispose();
+        _font = null;
+        _format.Dispose();
+    }
+
     // The font follows the row height; the icons are loaded once, when a message is first drawn.
     private void EnsureDrawingObjects(int rowHeight)
     {
@@ -251,7 +262,8 @@ public class InlineMessageProvider : ReadonlyTextBrowser.IVirtualLineProvider
         }
         if (lineIndex > _lastLine)
         {
-            return -1;
+            // No more messages. int.MaxValue, as the fold manager answers: another provider with a line ahead is the nearest.
+            return int.MaxValue;
         }
         int minLine = int.MaxValue;
         foreach (int key in _messages.Keys)

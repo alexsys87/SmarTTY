@@ -188,6 +188,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         ImageList = new ImageList();
         ImageList.ImageSize = new Size(16, 16);
         ImageList.ColorDepth = ColorDepth.Depth32Bit;
+        Disposed += (object sender, EventArgs e) => _inlineMessageProvider.Dispose();
         SuggestionAccepted += OnSuggestionAccepted;
     }
 
@@ -375,8 +376,17 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     /// </summary>
     public void AddMessage(int line, InlineMessageProvider.MessageSeverity messageSeverity, string text, int column)
     {
-        _inlineMessageProvider.AddMessage(line - 1, messageSeverity, text, column - 1);
+        _inlineMessageProvider.AddMessage(MessageLine(line), messageSeverity, text, column - 1);
         RefreshMessages();
+    }
+
+    /// <summary>
+    /// The row index of the line a message is for (the line from 1): a line past the end, which is what a check reports for
+    /// "unexpected end of file", goes on the last line, where there is a row to show it.
+    /// </summary>
+    private int MessageLine(int line)
+    {
+        return Math.Max(0, Math.Min(line - 1, LineCount - 1));
     }
 
     /// <summary>
@@ -389,7 +399,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         {
             // A message is drawn as a row under its line: the line is 1-based here, the provider counts from 0.
             // The column is 1-based too, and 0 means "not known": -1 makes the message centre in the row.
-            _inlineMessageProvider.AddMessage(message.Line - 1, message.Severity, message.Text, message.Column - 1);
+            _inlineMessageProvider.AddMessage(MessageLine(message.Line), message.Severity, message.Text, message.Column - 1);
         }
         RefreshMessages();
     }
@@ -397,6 +407,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     /// <summary>Removes the messages shown under the lines (they were answered or the text changed under them).</summary>
     public void ClearMessages()
     {
+        // Called before every save: with no message there is nothing to lay out again.
+        if (_inlineMessageProvider == null || _inlineMessageProvider.Count == 0)
+        {
+            return;
+        }
         _inlineMessageProvider.Clear();
         RefreshMessages();
     }
@@ -436,7 +451,6 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         {
             column = 0;
         }
-        line = _inlineMessageProvider.GetCurrentLine(line);
         if (_foldingManager.ExpandAt(line, column))
         {
             RebuildDisplayRows();
