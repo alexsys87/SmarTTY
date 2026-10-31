@@ -83,7 +83,7 @@ internal static class Program
 
         // The Python set covers the builtins, the exceptions, the base classes and the common modules.
         List<ApiSymbolDatabase.Symbol> python = database.ForLanguage(L.Python).ToList();
-        Check(python.Count > 550, "the Python set is broad (" + python.Count + " symbols)");
+        Check(python.Count > 1300, "the Python set is broad (" + python.Count + " symbols)");
         Equal(python.Count, python.Select(s => s.Name).Distinct().Count(), "Python names are unique");
         Equal(python.Count, python.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
             "every Python symbol has a summary and a description");
@@ -93,7 +93,16 @@ internal static class Program
                      "math.sqrt", "math.pi", "os.getcwd", "os.path.join", "sys.argv", "sys.version_info",
                      "re.compile", "re.IGNORECASE", "json.loads", "json.JSONDecodeError",
                      "pathlib.Path", "pathlib.Path.read_text", "datetime.datetime", "datetime.timedelta",
-                     "collections.Counter", "collections.abc.Mapping", "itertools.product", "functools.lru_cache"
+                     "collections.Counter", "collections.abc.Mapping", "itertools.product", "functools.lru_cache",
+                     "str.split", "list.append", "dict.get", "set.add", "file.read",
+                     "subprocess.run", "argparse.ArgumentParser", "logging.getLogger", "typing.Optional",
+                     "asyncio.run", "random.choice", "time.monotonic", "shutil.copytree", "glob.glob",
+                     "tempfile.TemporaryDirectory", "socket.create_connection", "sqlite3.connect",
+                     "csv.DictReader", "urllib.parse.urlparse", "http.client.HTTPSConnection",
+                     "unittest.mock.patch", "dataclasses.dataclass", "enum.Enum", "threading.Thread",
+                     "hashlib.sha256", "base64.b64encode", "pickle.dumps", "copy.deepcopy", "pprint.pformat",
+                     "traceback.format_exc", "contextlib.contextmanager", "statistics.mean", "decimal.Decimal",
+                     "uuid.uuid4", "platform.system", "ssl.SSLContext"
                  })
         {
             Check(database.Find(L.Python, name) != null, "the Python set includes '" + name + "'");
@@ -104,6 +113,12 @@ internal static class Program
             "the description of 'object' names a Python base class");
         Check(database.Find(L.Python, "math.sqrt").Description.Contains("Python math module"),
             "the description of 'math.sqrt' names the math module");
+        Check(database.Find(L.Python, "str.split").Description.Contains("Python str method"),
+            "the description of 'str.split' names a str method");
+        Check(database.Find(L.Python, "subprocess.run").Description.Contains("Python subprocess module"),
+            "the description of 'subprocess.run' names the subprocess module");
+        Check(database.Find(L.Python, "hashlib.HASH.hexdigest").Description.Contains("Python hash object"),
+            "the description of 'hashlib.HASH.hexdigest' names a hash object");
 
         // The Lua set covers the base library, the standard modules and the metamethods.
         List<ApiSymbolDatabase.Symbol> luaSymbols = database.ForLanguage(L.Lua).ToList();
@@ -172,6 +187,9 @@ internal static class Program
         Equal(pythonSqrt.ToString(), "math.sqrt(x)", "the resolved Python signature keeps the qualified name");
         Check(database.FindSignature(L.Python, "sqrt") != null,
             "a bare 'sqrt' call also finds the Python math function");
+        ParameterSignature pythonSplit = database.FindSignature(L.Python, "str.split");
+        Check(pythonSplit != null, "a 'str.split' call resolves to the Python method");
+        Equal(pythonSplit.ToString(), "str.split(sep=None, maxsplit=-1)", "the resolved method signature keeps the qualified name");
         ParameterSignature luaSqrt = database.FindSignature(L.Lua, "math.sqrt");
         Check(luaSqrt != null, "a 'math.sqrt' call resolves to the 'sqrt' symbol");
         Equal(luaSqrt.ToString(), "math.sqrt(x)", "the resolved signature keeps the qualified name");
@@ -295,6 +313,17 @@ internal static class Program
         Check(Build(L.Python, "", "read_te", database).Any(s => s.DisplayName == "read_text"),
             "the completion list offers 'Path.read_text' as 'read_text'");
 
+        // Built-in type methods and the phase-2 modules feed the completion list under their short names.
+        List<ISuggestion> pythonDict = Build(L.Python, "", "get", database);
+        ISuggestion dictGet = pythonDict.FirstOrDefault(s => s.DisplayName == "get");
+        Check(dictGet != null, "the completion list offers 'dict.get' as 'get'");
+        Equal(dictGet.DetailText, "Read a value", "the dict method summary is the detail text");
+        Check(dictGet.HintText.StartsWith("dict.get("), "the qualified dict method signature is the hint text");
+        ISuggestion connect = Build(L.Python, "", "create_conn", database).FirstOrDefault(s => s.DisplayName == "create_connection");
+        Check(connect != null, "the completion list offers 'socket.create_connection' as 'create_connection'");
+        Equal(connect.DetailText, "Connect to a host", "the socket summary is the detail text");
+        Check(connect.HintText.StartsWith("socket.create_connection("), "the socket signature is the hint text");
+
         // The Bash builtins and variables feed the completion list.
         List<ISuggestion> bash = Build(L.Bash, "", "sho", database);
         ISuggestion shopt = bash.FirstOrDefault(s => s.DisplayName == "shopt");
@@ -350,6 +379,18 @@ internal static class Program
             L.Python, "sqrt(\n", 0, 5, database, out int pythonActive);
         Check(python != null, "a bare 'sqrt(' call finds the Python 'math.sqrt' symbol");
         Check(python.Name == "math.sqrt", "the Python hint keeps the qualified name");
+
+        ParameterSignature getHint = EditorSignatureSource.FindSignature(
+            L.Python, "get(\n", 0, 4, database, out int getActive);
+        Check(getHint != null, "a bare 'get(' call finds the 'dict.get' method");
+        Equal(getHint.Name, "dict.get", "the dict method hint keeps the qualified name");
+        Equal(getHint.ParameterCount, 2, "the dict method hint has its parameters");
+
+        ParameterSignature runHint = EditorSignatureSource.FindSignature(
+            L.Python, "subprocess.run(\n", 0, 15, database, out int runActive);
+        Check(runHint != null, "a 'subprocess.run(' call finds the 'subprocess.run' function");
+        Equal(runHint.Name, "subprocess.run", "the subprocess hint keeps the qualified name");
+        Check(runHint.ParameterCount > 5, "the subprocess hint has its parameters");
 
         // Without a database the unknown call shows nothing.
         Check(EditorSignatureSource.FindSignature(L.Python, "print(\n", 0, 6, null, out _) == null,
