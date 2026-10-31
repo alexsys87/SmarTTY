@@ -20,6 +20,7 @@ internal enum EditorToolbarCommand
     WordWrap,
     Reload,
     ShowChanges,
+    RunFile,
     ToggleHex
 }
 
@@ -59,6 +60,9 @@ internal struct EditorCommandState
     /// <summary>The editor shows the bytes in the hex view.</summary>
     public bool HexMode { get; set; }
 
+    /// <summary>The file is loaded and its name or first line says how to run it (shell, Python, Lua, ...).</summary>
+    public bool CanRun { get; set; }
+
     /// <summary>The file is loaded and no save is running: the hex view can be opened.</summary>
     public bool CanUseHex { get; set; }
 
@@ -92,6 +96,9 @@ internal struct EditorCommandState
             case EditorToolbarCommand.WordWrap:
                 // The hex view shows rows of bytes.
                 return !HexMode;
+            case EditorToolbarCommand.RunFile:
+                // The text view only; unsaved changes are saved first, after a question.
+                return CanRun && !HexMode && !IsSaving;
             case EditorToolbarCommand.ShowChanges:
                 // There is something to compare with the file on the server (a new file is compared with nothing).
                 return !HexMode && (IsModified || IsNewFile);
@@ -152,6 +159,7 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.Save,
         EditorToolbarCommand.Reload,
         EditorToolbarCommand.ShowChanges,
+        EditorToolbarCommand.RunFile,
         null,
         EditorToolbarCommand.Undo,
         EditorToolbarCommand.Redo,
@@ -194,7 +202,8 @@ internal static class EditorCommandCatalog
         null,
         EditorToolbarCommand.Save,
         EditorToolbarCommand.Reload,
-        EditorToolbarCommand.ShowChanges
+        EditorToolbarCommand.ShowChanges,
+        EditorToolbarCommand.RunFile
     };
 
     public static EditorCommandDescription Describe(EditorToolbarCommand command)
@@ -231,6 +240,8 @@ internal static class EditorCommandCatalog
                 return new EditorCommandDescription("Reload from Server", "refresh", "MainWindow/refresh16.png", "");
             case EditorToolbarCommand.ShowChanges:
                 return new EditorCommandDescription("Show Changes...", "show-changes", "editor/show-changes.png", "");
+            case EditorToolbarCommand.RunFile:
+                return new EditorCommandDescription("Run in Terminal", "run", "editor/run.png", "F5");
             case EditorToolbarCommand.ToggleHex:
                 return new EditorCommandDescription("Hex Editor", "hex", "editor/hex.png", "");
             default:

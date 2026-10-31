@@ -46,6 +46,9 @@ internal sealed class RemoteFileEditorPanel : UserControl
     /// <summary>The Show Changes button or menu item was used: the window with the differences is the main window's.</summary>
     public event EventHandler ShowChangesRequested;
 
+    /// <summary>The Run in Terminal button, menu item or F5 was used: the terminal tabs belong to the session.</summary>
+    public event EventHandler RunRequested;
+
     /// <summary>The toolbar or the context menu switched the invisible-character marks on or off.</summary>
     public event EventHandler ShowAllCharactersChanged;
 
@@ -177,6 +180,10 @@ internal sealed class RemoteFileEditorPanel : UserControl
                         _editor.Reload();
                     }
                     break;
+                case EditorToolbarCommand.RunFile:
+                    focusEditor = false;
+                    RunRequested?.Invoke(this, EventArgs.Empty);
+                    break;
                 case EditorToolbarCommand.ShowChanges:
                     focusEditor = false;
                     ShowChangesRequested?.Invoke(this, EventArgs.Empty);
@@ -234,6 +241,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
                 IsNewFile = _editor.IsNewFile,
                 IsSaving = _editor.IsSaving,
                 HexMode = true,
+                CanRun = _editor.CanRunInTerminal,
                 CanUseHex = _editor.CanToggleHexMode,
                 ShowAllCharacters = _editor.ShowAllCharacters,
                 WordWrap = _editor.WordWrap
@@ -251,6 +259,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
             IsNewFile = _editor.IsNewFile,
             IsSaving = _editor.IsSaving,
             HexMode = false,
+            CanRun = _editor.CanRunInTerminal,
             CanUseHex = _editor.CanToggleHexMode,
             ShowAllCharacters = _editor.ShowAllCharacters,
             WordWrap = _editor.WordWrap

@@ -35,6 +35,48 @@ public static class RemoteScript
         return false;
     }
 
+    /// <summary>
+    /// The program that runs a file of this name when it is not executable and has no shebang: sh for shell scripts, and the
+    /// usual interpreter of Python, Lua, Perl and Ruby files. Null for any other name.
+    /// </summary>
+    public static string DefaultInterpreter(string fileName)
+    {
+        if (IsScriptFileName(fileName))
+        {
+            return "sh";
+        }
+        if (string.IsNullOrEmpty(fileName))
+        {
+            return null;
+        }
+        if (fileName.EndsWith(".py", StringComparison.OrdinalIgnoreCase) && fileName.Length > 3)
+        {
+            return "python3";
+        }
+        if (fileName.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) && fileName.Length > 4)
+        {
+            return "lua";
+        }
+        if (fileName.EndsWith(".pl", StringComparison.OrdinalIgnoreCase) && fileName.Length > 3)
+        {
+            return "perl";
+        }
+        if (fileName.EndsWith(".rb", StringComparison.OrdinalIgnoreCase) && fileName.Length > 3)
+        {
+            return "ruby";
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Whether the editor offers to run a file: its name says which interpreter to use (<see cref="DefaultInterpreter"/>),
+    /// or its first line is a shebang.
+    /// </summary>
+    public static bool CanRun(string fileName, string firstLine)
+    {
+        return DefaultInterpreter(fileName) != null || (firstLine != null && firstLine.StartsWith("#!", StringComparison.Ordinal));
+    }
+
     /// <summary>What <see cref="ProbeCommand"/> prints for a file that can be executed.</summary>
     public const string ExecutableMarker = "smartty:executable";
 
@@ -53,14 +95,16 @@ public static class RemoteScript
     /// directory and an "exit" ends only the script). An executable file is run as it is (its own shebang decides); one that is
     /// not is given to the interpreter its shebang names ("#!/bin/bash", "#!/usr/bin/env bash"), or to sh when it has none, so
     /// that the file is never changed. <paramref name="probeOutput"/> is what <see cref="ProbeCommand"/> printed.
+    /// <paramref name="defaultInterpreter"/> is used for a file that is not executable and has no shebang (see
+    /// <see cref="DefaultInterpreter"/>); anything but a plain program name falls back to sh.
     /// </summary>
-    public static string BuildRunInPlaceCommand(string remotePath, System.Collections.Generic.IList<string> probeOutput)
+    public static string BuildRunInPlaceCommand(string remotePath, System.Collections.Generic.IList<string> probeOutput, string defaultInterpreter = "sh")
     {
         int slash = remotePath.LastIndexOf('/');
         string directory = slash < 0 ? "." : slash == 0 ? "/" : remotePath.Substring(0, slash);
         string name = remotePath.Substring(slash + 1);
         string first = (probeOutput != null && probeOutput.Count > 0 ? probeOutput[0] : "").Trim();
-        string runner = "sh ";
+        string runner = IsPlainProgramName(defaultInterpreter) ? defaultInterpreter + " " : "sh ";
         if (first == ExecutableMarker)
         {
             runner = "";
@@ -76,6 +120,22 @@ public static class RemoteScript
         }
         // "./" in front of the name: a name that starts with '-' is not an option of the interpreter.
         return "(cd " + RemotePathUtils.ShellQuote(directory) + " && " + runner + RemotePathUtils.ShellQuote("./" + name) + ")";
+    }
+
+    private static bool IsPlainProgramName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+        foreach (char c in name)
+        {
+            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>Returns null if <paramref name="content"/> can be run as a script, otherwise why it cannot.</summary>

@@ -2243,9 +2243,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// <summary>
     /// Runs a shell script that is on the server from the folder it is in (see <see cref="RemoteScript.BuildRunInPlaceCommand"/>),
     /// in the terminal tab that is active now: the command is typed there and everything the script prints and asks is in
-    /// that terminal.
+    /// that terminal. <paramref name="defaultInterpreter"/> runs a file that is not executable and has no shebang.
     /// </summary>
-    public void RunRemoteScript(string remotePath)
+    public void RunRemoteScript(string remotePath, string defaultInterpreter = "sh")
     {
         ITabContext origin = ActiveTab;
         SshSession session = Session;
@@ -2260,7 +2260,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             catch (Exception)
             {
             }
-            string command = RemoteScript.BuildRunInPlaceCommand(remotePath, probe);
+            string command = RemoteScript.BuildRunInPlaceCommand(remotePath, probe, defaultInterpreter);
             _Controller.BeginInvoke(() => RunInTerminal(command, origin));
         });
     }

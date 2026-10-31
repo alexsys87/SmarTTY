@@ -1640,6 +1640,16 @@ public partial class RemoteFileEditor : CodeEditorPP
     }
 
     /// <summary>
+    /// The file can be run in a terminal of the session (F5): it is loaded in full, the host has a shell, and the file
+    /// name or the first line says how to run it.
+    /// </summary>
+    public bool CanRunInTerminal => _loaded && !_reloading && !IsPreview && !IsWindowsHost && base.EditableDocument != null
+        && RemoteScript.CanRun(RemotePathUtils.GetFileName(RemotePath), base.EditableDocument.GetLineText(0));
+
+    /// <summary>The interpreter for a file that is not executable and has no shebang (see <see cref="RemoteScript.DefaultInterpreter"/>).</summary>
+    public string RunInterpreter => RemoteScript.DefaultInterpreter(RemotePathUtils.GetFileName(RemotePath)) ?? "sh";
+
+    /// <summary>
     /// The differences between the file on the server (as it was opened, or last saved) and the text in the editor,
     /// for the Show Changes window.
     /// </summary>

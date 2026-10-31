@@ -381,6 +381,7 @@ public class MainWindowController : INotifyPropertyChanged
             newTab.EditorPanel.SaveRequested += (object sender, EventArgs e) => SaveFile();
             newTab.EditorPanel.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
             newTab.EditorPanel.ShowChangesRequested += (object sender, EventArgs e) => ShowChanges(editor);
+            newTab.EditorPanel.RunRequested += (object sender, EventArgs e) => RunInTerminal(editor, session);
             newTab.EditorPanel.ShowAllCharactersChanged += (object sender, EventArgs e) =>
             {
                 // The switch on the tool bar and in the context menu is the same setting as in the settings window.
@@ -438,6 +439,44 @@ public class MainWindowController : INotifyPropertyChanged
                 editor.GoToPosition(window.Line - 1, Math.Max(0, window.Column - 1));
             }
             editor.FocusActiveView();
+        }
+
+        /// <summary>
+        /// Runs the file of the editor in the terminal (F5): from its folder, in the terminal tab used last (a new one when
+        /// there is none). Unsaved changes, and a file that does not exist yet, are saved first after a question.
+        /// </summary>
+        private void RunInTerminal(RemoteFileEditor editor, SessionWrapper session)
+        {
+            if (editor == null || session == null || !editor.CanRunInTerminal || editor.IsSaving)
+            {
+                return;
+            }
+            if (!editor.IsModified && !editor.IsNewFile)
+            {
+                session.RunRemoteScript(editor.RemotePath, editor.RunInterpreter);
+                return;
+            }
+            if (!MessageBoxes.Ask("Save " + RemotePathUtils.GetFileName(editor.RemotePath) + " and run it?"))
+            {
+                return;
+            }
+            // The save runs in the background: the file is run once it is on the server. When it ends without having saved
+            // (a conflict, a refused write, a problem the check found) nothing is run; F5 starts again.
+            EventHandler runWhenSaved = null;
+            runWhenSaved = (object sender, EventArgs e) =>
+            {
+                if (editor.IsSaving)
+                {
+                    return;
+                }
+                editor.SavingChanged -= runWhenSaved;
+                if (!editor.IsModified && !editor.IsNewFile)
+                {
+                    session.RunRemoteScript(editor.RemotePath, editor.RunInterpreter);
+                }
+            };
+            editor.SavingChanged += runWhenSaved;
+            editor.SaveInBackground();
         }
 
         /// <summary>Shows what has been changed in the editor against the file on the server (Show Changes).</summary>
@@ -520,6 +559,14 @@ public class MainWindowController : INotifyPropertyChanged
                         e.SuppressKeyPress = true;
                         GoToLine(sender as RemoteFileEditor);
                         break;
+                }
+            }
+            else if (!e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.F5)
+            {
+                if (sender is RemoteFileEditor runnable && runnable.CanRunInTerminal && runnable.Tag is EditorTabContext runnableTab)
+                {
+                    e.SuppressKeyPress = true;
+                    runnableTab.EditorPanel.RunCommand(EditorToolbarCommand.RunFile);
                 }
             }
             else if (!e.Control && !e.Alt && e.KeyCode == Keys.F3)
@@ -856,11 +903,11 @@ public class MainWindowController : INotifyPropertyChanged
         }
 
         /// <summary>Runs a shell script that is on the server, from the folder it is in, in the active terminal.</summary>
-        public void RunRemoteScript(string remotePath)
+        public void RunRemoteScript(string remotePath, string defaultInterpreter = "sh")
         {
             try
             {
-                RequireSshSession("Running scripts").RunRemoteScript(remotePath);
+                RequireSshSession("Running scripts").RunRemoteScript(remotePath, defaultInterpreter);
             }
             catch (Exception exception)
             {
