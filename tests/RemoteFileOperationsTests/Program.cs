@@ -342,6 +342,27 @@ internal static class Program
         Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.sh", new[] { "echo hi" }), "(cd '/a' && sh './x.sh')", "a script without a shebang is given to sh");
         Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.sh", null), "(cd '/a' && sh './x.sh')", "without an answer from the server sh is used");
         Equal(RemoteScript.BuildRunInPlaceCommand("/a/-x's.sh", new[] { "#!/bin/sh; rm -rf ~" }), "(cd '/a' && '/bin/sh;' 'rm' '-rf' '~' './-x'\\''s.sh')", "text of the shebang line is quoted, it is never shell syntax");
+
+        // Run in Terminal of the editor (F5): the interpreter of a file with no shebang follows its name.
+        Equal(RemoteScript.DefaultInterpreter("run.sh"), "sh", "editor run: a shell script is given to sh");
+        Equal(RemoteScript.DefaultInterpreter("Tool.PY"), "python3", "editor run: a Python file is given to python3 (any case)");
+        Equal(RemoteScript.DefaultInterpreter("init.lua"), "lua", "editor run: a Lua file is given to lua");
+        Equal(RemoteScript.DefaultInterpreter("a.pl"), "perl", "editor run: a Perl file is given to perl");
+        Equal(RemoteScript.DefaultInterpreter("a.rb"), "ruby", "editor run: a Ruby file is given to ruby");
+        Equal(RemoteScript.DefaultInterpreter("notes.txt"), (string)null, "editor run: a text file has no interpreter");
+        Equal(RemoteScript.DefaultInterpreter(".py"), (string)null, "editor run: a bare extension is not a file name");
+        Equal(RemoteScript.DefaultInterpreter(""), (string)null, "editor run: no name, no interpreter");
+        Equal(RemoteScript.DefaultInterpreter(null), (string)null, "editor run: a null name, no interpreter");
+        Check(RemoteScript.CanRun("backup", "#!/bin/bash"), "editor run: a shebang makes any name runnable");
+        Check(RemoteScript.CanRun("x.py", ""), "editor run: a known name is runnable without a shebang");
+        Check(!RemoteScript.CanRun("hosts", "127.0.0.1 localhost"), "editor run: a plain file is not runnable");
+        Check(!RemoteScript.CanRun("hosts", null), "editor run: no first line and no known name");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.py", new[] { "import os" }, "python3"), "(cd '/a' && python3 './x.py')", "editor run: a Python file without a shebang is given to python3");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.py", new[] { "#!/usr/bin/env python3" }, "python3"), "(cd '/a' && '/usr/bin/env' 'python3' './x.py')", "editor run: a shebang wins over the default interpreter");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.py", new[] { RemoteScript.ExecutableMarker }, "python3"), "(cd '/a' && './x.py')", "editor run: an executable file is run as it is");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.py", null, "python3"), "(cd '/a' && python3 './x.py')", "editor run: without an answer from the server the default interpreter is used");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.sh", new[] { "echo" }, "sh; rm -rf ~"), "(cd '/a' && sh './x.sh')", "editor run: a default interpreter that is not a plain program name is never put in the command");
+        Equal(RemoteScript.BuildRunInPlaceCommand("/a/x.sh", new[] { "echo" }, null), "(cd '/a' && sh './x.sh')", "editor run: no default interpreter means sh");
     }
 
     // The two steps of "Run" in the file list: ask the server about the file, then build the command from the answer.

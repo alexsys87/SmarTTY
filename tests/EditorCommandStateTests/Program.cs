@@ -101,6 +101,16 @@ internal static class Program
         Check(new EditorCommandState { IsNewFile = true }.IsEnabled(EditorToolbarCommand.ShowChanges), "new file: Show Changes is on (against nothing)");
         Check(!new EditorCommandState { IsModified = true, HexMode = true }.IsEnabled(EditorToolbarCommand.ShowChanges), "hex view: Show Changes is off");
 
+        // Run in Terminal needs a file that says how to run it, the text view, and no save in progress.
+        Check(!clean.IsEnabled(EditorToolbarCommand.RunFile), "plain file: Run in Terminal is off");
+        Check(new EditorCommandState { CanRun = true }.IsEnabled(EditorToolbarCommand.RunFile), "script: Run in Terminal is on");
+        Check(new EditorCommandState { CanRun = true, IsModified = true }.IsEnabled(EditorToolbarCommand.RunFile), "modified script: Run in Terminal is on (it asks to save first)");
+        Check(new EditorCommandState { CanRun = true, IsNewFile = true }.IsEnabled(EditorToolbarCommand.RunFile), "new script: Run in Terminal is on (it asks to save first)");
+        Check(new EditorCommandState { CanRun = true, ReadOnly = true }.IsEnabled(EditorToolbarCommand.RunFile), "script that cannot be written: it can still be run");
+        Check(!new EditorCommandState { CanRun = true, IsSaving = true }.IsEnabled(EditorToolbarCommand.RunFile), "saving: Run in Terminal is off");
+        Check(!new EditorCommandState { CanRun = true, HexMode = true }.IsEnabled(EditorToolbarCommand.RunFile), "hex view: Run in Terminal is off");
+        Check(EditorCommandCatalog.Describe(EditorToolbarCommand.RunFile).Shortcut == "F5", "Run in Terminal is on F5");
+
         // The hex view: it can be opened once the file is loaded, and Replace belongs to the text view.
         Check(new EditorCommandState { CanUseHex = true }.IsEnabled(EditorToolbarCommand.ToggleHex), "loaded file: Hex Editor is on");
         Check(!new EditorCommandState { CanUseHex = false }.IsEnabled(EditorToolbarCommand.ToggleHex), "not loaded: Hex Editor is off");
@@ -143,7 +153,7 @@ internal static class Program
         // Every command has a rule (an unknown value is off).
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {
-            bool everythingOn = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true, CanUseHex = true }.IsEnabled(command);
+            bool everythingOn = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true, CanUseHex = true, CanRun = true }.IsEnabled(command);
             Check(everythingOn, "all conditions met: " + command + " is on");
         }
         Check(!empty.IsEnabled((EditorToolbarCommand)999), "unknown command is off");
