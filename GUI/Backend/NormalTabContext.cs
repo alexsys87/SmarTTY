@@ -95,6 +95,9 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             SmarTTY.Terminal.TerminalDirectoryWatcher directoryWatcher = new SmarTTY.Terminal.TerminalDirectoryWatcher();
             directoryWatcher.DirectoryReported += fileListHost.ReportTerminalDirectory;
             term.OutputReceived += directoryWatcher.Observe;
+            // And the other way: a folder opened in the list is entered in the shell too, when the shell waits at a prompt.
+            SmarTTY.Terminal.TerminalDirectorySync directorySync = new SmarTTY.Terminal.TerminalDirectorySync(directoryWatcher, term.TypeText);
+            fileListHost.Navigated += directorySync.Request;
         }
         _Session = sessionWrapper;
         Terminal = term;

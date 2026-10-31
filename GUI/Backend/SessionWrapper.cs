@@ -1443,7 +1443,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         if (regularFiles.Length != 0)
         {
-            string[] scripts = regularFiles.Where(IsDroppedShellScript).ToArray();
+            // chmod +x and Unix line ends are for a Unix host; a Windows host gets the file as it is.
+            string[] scripts = Session?.RemoteOs == RemoteOsKind.Windows ? new string[0] : regularFiles.Where(IsDroppedShellScript).ToArray();
             if (scripts.Length != 0)
             {
                 switch (MessageBoxes.YesNoCancel(BuildShellScriptQuestion(scripts, remoteDir)))
@@ -1470,7 +1471,16 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             // A dropped drive root (D:\) has no name of its own: its contents go straight into the directory.
             string folderName = Path.GetFileName(folder.TrimEnd('\\', '/'));
-            ShowDirectoryUploadForm(folder, string.IsNullOrEmpty(folderName) ? remoteDir : remoteDir.TrimEnd('/') + "/" + folderName, startNow: true);
+            string remoteFolder = string.IsNullOrEmpty(folderName) ? remoteDir : remoteDir.TrimEnd('/') + "/" + folderName;
+            if (Session?.RemoteOs == RemoteOsKind.Windows)
+            {
+                // The directory upload window works with tar and stat on the host: a Windows host is walked over SFTP instead.
+                UploadFolderOverSftp(folder, remoteFolder);
+            }
+            else
+            {
+                ShowDirectoryUploadForm(folder, remoteFolder, startNow: true);
+            }
         }
     }
 
@@ -1690,7 +1700,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     {
                         return queued;
                     }
-                    if (Session.RunCommandChecked("mkdir -p " + RemotePathUtils.ShellQuote(remoteDir), requireSuccess: true) == null)
+                    if (Session.RemoteOs == RemoteOsKind.Windows)
+                    {
+                        using SftpChannel sftp = SftpChannel.Open(Session);
+                        new SftpFileSystem(sftp).CreateDirectories(remoteDir);
+                    }
+                    else if (Session.RunCommandChecked("mkdir -p " + RemotePathUtils.ShellQuote(remoteDir), requireSuccess: true) == null)
                     {
                         // The outer catch reports a lost connection as such instead of "cannot create".
                         Session.ThrowIfConnectionLost();
@@ -1902,6 +1917,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// </summary>
     public void DoDownloadArchive(string remoteDir, string localDir, bool openWhenDone, bool confirmOverwrite = true)
     {
+        if (Session.RemoteOs == RemoteOsKind.Windows)
+        {
+            // No tar on the host: the folder is walked over SFTP and its files go through the queue one by one.
+            DownloadFolderOverSftp(remoteDir, localDir, openWhenDone, confirmOverwrite);
+            return;
+        }
         // The remote name may contain characters that Windows does not allow in file names (':', '?', '*', ...).
         string fileName = RemotePathUtils.GetFileName(remoteDir.TrimEnd('/'));
         foreach (char invalid in Path.GetInvalidFileNameChars())
@@ -1926,6 +1947,168 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         catch (Exception exception)
         {
             MessageBoxes.Error("Cannot download a folder: " + exception.Message);
+        }
+    }
+
+    /// <summary>
+    /// Downloads a folder of a Windows host as a folder: the tree is walked over SFTP in the background, the folders are made
+    /// on the local disk, and the files are queued like any others (the queue shows their progress, and can stop them).
+    /// </summary>
+    private void DownloadFolderOverSftp(string remoteDir, string localDir, bool openWhenDone, bool confirmOverwrite)
+    {
+        string name = SftpFolderPlan.LocalName(RemotePathUtils.GetFileName(remoteDir.TrimEnd('/')));
+        if (name.Length == 0)
+        {
+            name = "files";
+        }
+        string target = Path.Combine(localDir, name);
+        if (File.Exists(target))
+        {
+            MessageBoxes.Error("Cannot download " + remoteDir + ": " + target + " is a file.");
+            return;
+        }
+        if (confirmOverwrite && Directory.Exists(target) && !MessageBoxes.AskWarn(target + " already exists. Download into it, replacing the files that have the same names?"))
+        {
+            return;
+        }
+        SshSession session = Session;
+        ThreadPool.QueueUserWorkItem((object state) =>
+        {
+            FolderPlan plan = null;
+            string error = null;
+            try
+            {
+                using SftpChannel sftp = SftpChannel.Open(session);
+                plan = SftpFolderPlan.PlanDownload(sftp, remoteDir, target);
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+            }
+            _Controller.BeginInvoke(() => QueueFolderDownload(plan, error, remoteDir, openWhenDone));
+        });
+    }
+
+    private void QueueFolderDownload(FolderPlan plan, string error, string remoteDir, bool openWhenDone)
+    {
+        if (plan == null)
+        {
+            MessageBoxes.Error("Cannot download " + remoteDir + ": " + error);
+            return;
+        }
+        try
+        {
+            foreach (string directory in plan.Directories)
+            {
+                Directory.CreateDirectory(directory);
+            }
+            for (int index = 0; index < plan.Files.Count; index++)
+            {
+                FolderFile file = plan.Files[index];
+                // The local folder is opened once, when the last file is queued; the size is known from the walk.
+                FileTransferManager.TransferJob job = TransferManager.EnqueueDownload(file.Source, file.Destination, null, openWhenDone && index == plan.Files.Count - 1, file.Size);
+                SCPController.AddTransfer(job);
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot download a folder: " + exception.Message);
+            return;
+        }
+        if (plan.Skipped.Count != 0)
+        {
+            MessageBoxes.Warning("These were not downloaded:\n\n" + FormatFileList(plan.Skipped));
+        }
+    }
+
+    /// <summary>
+    /// Uploads a local folder to a Windows host: the folders are made over SFTP, and the files are queued like any others. Asks
+    /// first when the folder is already on the server.
+    /// </summary>
+    private void UploadFolderOverSftp(string localFolder, string remoteFolder)
+    {
+        SshSession session = Session;
+        ThreadPool.QueueUserWorkItem((object state) =>
+        {
+            FolderPlan plan = null;
+            bool exists = false;
+            string error = null;
+            try
+            {
+                plan = SftpFolderPlan.PlanUpload(localFolder, remoteFolder);
+                using SftpChannel sftp = SftpChannel.Open(session);
+                SftpFileAttributes attributes = sftp.Stat(WindowsSftpPath.ForServer(remoteFolder));
+                if (attributes != null && !attributes.IsDirectory)
+                {
+                    throw new RemoteOperationException(remoteFolder + " is a file on the server, not a folder.");
+                }
+                exists = attributes != null;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+            }
+            _Controller.BeginInvoke(() =>
+            {
+                if (plan == null)
+                {
+                    MessageBoxes.Error("Cannot upload " + localFolder + ": " + error);
+                    return;
+                }
+                if (exists && !MessageBoxes.AskWarn(remoteFolder + " already exists on the server. Upload into it, replacing the files that have the same names?"))
+                {
+                    return;
+                }
+                ThreadPool.QueueUserWorkItem((object innerState) =>
+                {
+                    string createError = null;
+                    try
+                    {
+                        using SftpChannel sftp = SftpChannel.Open(session);
+                        SftpFileSystem fileSystem = new SftpFileSystem(sftp);
+                        foreach (string directory in plan.Directories)
+                        {
+                            fileSystem.CreateDirectories(directory);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        createError = exception.Message;
+                    }
+                    _Controller.BeginInvoke(() => QueueFolderUpload(plan, createError, localFolder, remoteFolder));
+                });
+            });
+        });
+    }
+
+    private void QueueFolderUpload(FolderPlan plan, string error, string localFolder, string remoteFolder)
+    {
+        if (error != null)
+        {
+            MessageBoxes.Error("Cannot create the folders of " + remoteFolder + ": " + error);
+            return;
+        }
+        try
+        {
+            foreach (FolderFile file in plan.Files)
+            {
+                FileTransferManager.TransferJob job = TransferManager.EnqueueUpload(file.Source, file.Destination, null, checkOverwrite: false);
+                if (job != null)
+                {
+                    SCPController.AddTransfer(job);
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Error("Cannot upload " + localFolder + ": " + exception.Message);
+        }
+        // The new folder shows up in the file panels now: the files follow as the queue finishes them.
+        RefreshFileExplorers(RemotePathUtils.GetDirectoryName(remoteFolder.TrimEnd('/')));
+        RefreshFileExplorers(remoteFolder);
+        if (plan.Skipped.Count != 0)
+        {
+            MessageBoxes.Warning("These were not uploaded:\n\n" + FormatFileList(plan.Skipped));
         }
     }
 

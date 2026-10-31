@@ -353,6 +353,12 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public event TerminalDataHandler DataEntered;
 
+    /// <summary>Sends text to the remote side as if the user had typed it (a line ends with "\r").</summary>
+    public void TypeText(string text)
+    {
+        SendText(text, InputKind.Typed);
+    }
+
     /// <summary>
     /// Raised with every chunk of output as it arrives, escape sequences included, before it is drawn. The chunk may end in the
     /// middle of an escape sequence.

@@ -30,6 +30,12 @@ public sealed class WindowsFileListHost : IFileListHost
     public event Action<string> DirectoryChanged;
 
     /// <summary>
+    /// Raised when the user opened a folder in the list (not when the terminal moved, and not for the start directory): the
+    /// terminal of the tab is asked to go there too.
+    /// </summary>
+    public event Action<string> Navigated;
+
+    /// <summary>
     /// Finds the start directory in the background and announces it. When the server cannot say (no SFTP), the list starts at
     /// the root, where it shows the reason of the failure instead of waiting for a directory that never comes.
     /// </summary>
@@ -74,6 +80,7 @@ public sealed class WindowsFileListHost : IFileListHost
             }
         }
         SetCurrentDirectory(target);
+        Navigated?.Invoke(target);
     }
 
     /// <summary>

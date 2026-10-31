@@ -1,5 +1,6 @@
 using SmarTTY.Transport;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -97,6 +98,31 @@ internal static class WindowsEditingTests
         Test.Throws<SftpStatusException>(() => WindowsRemoteFileEditing.Save(session, directory, shorter, backup: false), "saving to a path that is a directory fails");
         Test.Throws<SftpStatusException>(() => WindowsRemoteFileEditing.Save(session, directory + "/no-such-folder/x", shorter, backup: false), "saving into a folder that does not exist fails");
         Test.Throws<SftpStatusException>(() => WindowsRemoteFileEditing.OpenRead(session, directory + "/missing", out _), "opening a missing file fails with the status of the server");
+
+        // Whether a file can be written, without writing it.
+        using (SftpChannel sftp = SftpChannel.Open(session))
+        {
+            Test.Equal(true, WindowsRemoteFileEditing.CanWrite(sftp, file), "a file the user owns can be written");
+            Test.Check(Read(session, file).SequenceEqual(longer), "and the probe did not change the file");
+            Test.Check(WindowsRemoteFileEditing.CanWrite(sftp, directory + "/missing") == null, "a file that is not there: no answer, not a refusal");
+            Test.Check(WindowsRemoteFileEditing.CanWrite(sftp, directory) == null, "a directory: no answer");
+            string readOnly = directory + "/read-only";
+            using (Stream writer = sftp.OpenWrite(readOnly, 0, truncate: true, mode: Convert.ToInt32("444", 8)))
+            {
+                writer.Write(shorter, 0, shorter.Length);
+            }
+            List<string> user = session.RunCommand("id -u", out _);
+            bool root = user != null && user.Count > 0 && user[0].Trim() == "0";
+            if (!root)
+            {
+                Test.Check(WindowsRemoteFileEditing.CanWrite(sftp, readOnly) == false, "a file that is read-only for the user is reported as not writable");
+                Test.Check(Read(session, readOnly).SequenceEqual(shorter), "and is untouched");
+            }
+            else
+            {
+                Test.Check(true, "a user who is root can write anything: the refusal is not checked");
+            }
+        }
 
         // A bigger file, read through the stream that owns its channel.
         byte[] big = new byte[3 * 1024 * 1024 + 5];

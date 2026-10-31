@@ -3,10 +3,23 @@ using System.Text.RegularExpressions;
 
 namespace SmarTTY.Terminal;
 
+/// <summary>The shell that wrote a prompt: they take different commands to change the directory.</summary>
+public enum PromptShell
+{
+    Unknown,
+
+    /// <summary>cmd.exe: "C:\Users\me&gt;".</summary>
+    Cmd,
+
+    /// <summary>PowerShell: "PS C:\Users\me&gt; ".</summary>
+    PowerShell
+}
+
 /// <summary>
 /// Finds out which directory the shell of a Windows host is in, from what the host writes to the terminal. cmd.exe and
 /// PowerShell tell the client nothing about their directory, so the file list next to the terminal could not follow a "cd".
-/// Two things are recognised, and nothing is typed into the shell of the user for it:
+/// Two things are recognised, and the watcher itself types nothing into the shell of the user (<see cref="TerminalDirectorySync"/>
+/// does, and only at an empty prompt):
 /// the escape sequences that terminals know for it (OSC 9;9 of Windows Terminal and ConEmu, OSC 7), if the prompt of the
 /// user sends them, and otherwise the standard prompts, "C:\Users\me>" of cmd.exe and "PS C:\Users\me>" of PowerShell,
 /// at the start of a line. A prompt of another shape is not understood, and the list then stays where it is.
@@ -30,6 +43,9 @@ public sealed class TerminalDirectoryWatcher
     // A drive path; the characters Windows does not allow in a name end it, so that "PS HKLM:\SOFTWARE>" and a UNC path are not taken.
     private static readonly Regex Prompt = new Regex("^(?:PS )?(?<path>[A-Za-z]:\\\\[^<>:\"|?*\\n]*)>", RegexOptions.Compiled | RegexOptions.Multiline);
 
+    // The line of the cursor is a prompt and nothing else: the shell waits for a command and nothing has been typed.
+    private static readonly Regex IdlePrompt = new Regex("^(?<ps>PS )?(?<path>[A-Za-z]:\\\\[^<>:\"|?*\\n]*)> ?$", RegexOptions.Compiled);
+
     private static readonly Regex FileUrl = new Regex("^file://[^/]*(?<path>/.*)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private string _carry = "";
@@ -44,6 +60,21 @@ public sealed class TerminalDirectoryWatcher
     /// reported last.
     /// </summary>
     public event Action<string> DirectoryReported;
+
+    /// <summary>
+    /// True while the cursor stands behind a prompt of cmd.exe or PowerShell and nothing has been typed after it: the one moment
+    /// when text can be sent to the shell without landing in a program that is running or in a line being typed.
+    /// </summary>
+    public bool AtPrompt { get; private set; }
+
+    /// <summary>The directory named by the prompt that <see cref="AtPrompt"/> is about.</summary>
+    public string PromptDirectory { get; private set; }
+
+    /// <summary>The shell that wrote that prompt.</summary>
+    public PromptShell Shell { get; private set; }
+
+    /// <summary>Raised when the shell has shown a new prompt and waits (<see cref="AtPrompt"/> has become true, or a prompt was shown again).</summary>
+    public event Action PromptReady;
 
     /// <summary>Looks at a chunk of the output of the host, escape sequences included. Chunks may end anywhere.</summary>
     public void Observe(string chunk)
@@ -76,7 +107,10 @@ public sealed class TerminalDirectoryWatcher
         // a new line for what follows, as a newline would; the others (colours, cursor visibility) are just dropped.
         text = Csi.Replace(text, match => "ABEFHJdf".IndexOf(match.Value[match.Value.Length - 1]) >= 0 ? "\n" : "");
         text = ShortEscape.Replace(text, match => match.Value.Length == 2 && "DEM".IndexOf(match.Value[1]) >= 0 ? "\n" : "");
-        text = _line + Control.Replace(text, "").Replace("\r\n", "\n").Replace('\r', '\n');
+        string cleaned = Control.Replace(text, "").Replace("\r\n", "\n").Replace('\r', '\n');
+        // A line break in this chunk means that the line the cursor is on now is another one than before.
+        bool lineBreak = cleaned.IndexOf('\n') >= 0;
+        text = _line + cleaned;
         int lineStart = text.LastIndexOf('\n') + 1;
         _line = text.Length - lineStart <= MaxLine ? text.Substring(lineStart) : "";
         Match last = null;
@@ -87,6 +121,19 @@ public sealed class TerminalDirectoryWatcher
         if (last != null)
         {
             Report(last.Groups["path"].Value);
+        }
+        Match idle = IdlePrompt.Match(_line);
+        bool wasAtPrompt = AtPrompt;
+        AtPrompt = idle.Success;
+        if (idle.Success)
+        {
+            PromptDirectory = idle.Groups["path"].Value;
+            Shell = idle.Groups["ps"].Success ? PromptShell.PowerShell : PromptShell.Cmd;
+            if (!wasAtPrompt || lineBreak)
+            {
+                // A new prompt: also when Enter and the prompt after it came in one chunk, with no typed text in between.
+                PromptReady?.Invoke();
+            }
         }
     }
 

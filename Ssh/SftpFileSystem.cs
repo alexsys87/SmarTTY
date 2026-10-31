@@ -59,6 +59,32 @@ public sealed class SftpFileSystem
         return drives;
     }
 
+    /// <summary>
+    /// "mkdir -p": creates the directory and the missing ones above it; nothing happens when it is there already. A file in the
+    /// way is an error. The topmost thing that does not exist and cannot be created (a drive that is not there) fails with the
+    /// status of the server.
+    /// </summary>
+    public void CreateDirectories(string path)
+    {
+        string trimmed = path.Length > 1 ? path.TrimEnd('/') : path;
+        SftpFileAttributes attributes = _sftp.Stat(WindowsSftpPath.ForServer(trimmed));
+        if (attributes != null)
+        {
+            if (!attributes.IsDirectory)
+            {
+                throw new RemoteOperationException(trimmed + " is not a directory.");
+            }
+            return;
+        }
+        int slash = trimmed.LastIndexOf('/');
+        string parent = slash <= 0 ? "/" : trimmed.Substring(0, slash);
+        if (parent != trimmed && parent != "/")
+        {
+            CreateDirectories(parent);
+        }
+        _sftp.MakeDirectory(WindowsSftpPath.ForServer(trimmed));
+    }
+
     public void CreateDirectory(string path)
     {
         _sftp.MakeDirectory(WindowsSftpPath.ForServer(path));

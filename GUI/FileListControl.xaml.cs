@@ -302,7 +302,9 @@ public partial class FileListControl : UserControl, IComponentConnector
             cmdRun.Visibility = !windowsHost && SelectedScript() != null ? Visibility.Visible : Visibility.Collapsed;
             cmdExtract.Visibility = !windowsHost && extractableSelected ? Visibility.Visible : Visibility.Collapsed;
             UpdatePackageMenu();
-            cmdDownloadArchive.Visibility = !windowsHost && archivableSelected ? Visibility.Visible : Visibility.Collapsed;
+            // A Windows host has no tar: its folder is downloaded as a folder, file by file.
+            cmdDownloadArchive.Header = windowsHost ? "Download folder..." : "Download folder as .tar.gz...";
+            cmdDownloadArchive.Visibility = archivableSelected ? Visibility.Visible : Visibility.Collapsed;
             cmdNavigate.Visibility = ((!directorySelectionChanged) ? Visibility.Collapsed : Visibility.Visible);
             if (((ListBox)TransferList).SelectedItems.Count == 0 && ((CollectionView)TransferList.Items).Count > 0 && _SelDepth < 5)
             {

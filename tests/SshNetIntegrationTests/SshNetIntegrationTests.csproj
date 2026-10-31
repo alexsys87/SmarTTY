@@ -39,11 +39,13 @@
     <Compile Include="../../IO/RemoteScript.cs" Link="IO/RemoteScript.cs" />
     <Compile Include="../../IO/RemoteProcessList.cs" Link="IO/RemoteProcessList.cs" />
     <Compile Include="../../Terminal/TerminalDirectoryWatcher.cs" Link="Terminal/TerminalDirectoryWatcher.cs" />
+    <Compile Include="../../Terminal/TerminalDirectorySync.cs" Link="Terminal/TerminalDirectorySync.cs" />
     <Compile Include="../../Terminal/ByteColumns.cs" Link="Terminal/ByteColumns.cs" />
     <Compile Include="../../Transport/FileTransferManager.cs" Link="Transport/FileTransferManager.cs" />
     <Compile Include="../../Transport/RemoteFileTools.cs" Link="Transport/RemoteFileTools.cs" />
     <Compile Include="../../Transport/WindowsRemoteFileTools.cs" Link="Transport/WindowsRemoteFileTools.cs" />
     <Compile Include="../../Transport/WindowsRemoteFileEditing.cs" Link="Transport/WindowsRemoteFileEditing.cs" />
+    <Compile Include="../../Transport/SftpFolderPlan.cs" Link="Transport/SftpFolderPlan.cs" />
     <Compile Include="../../Transport/RateLimiter.cs" Link="Transport/RateLimiter.cs" />
     <Compile Include="../../Transport/TransferQueueStore.cs" Link="Transport/TransferQueueStore.cs" />
     <Compile Include="../../Utilities/EnumDisplayText.cs" Link="Utilities/EnumDisplayText.cs" />
