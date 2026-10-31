@@ -49,6 +49,12 @@ public class VirtualTerminalSettings
     public bool HighlightDiagnostics { get; set; } = true;
 
     /// <summary>
+    /// What the column in "file:line:column" counts when a message is clicked and the file is opened at that place: gcc counts
+    /// screen columns (a tab goes to the next multiple of 8), clang and go bytes, rustc characters. Auto tells from the command.
+    /// </summary>
+    public SmarTTY.CodeEditing.ColumnUnit CompilerColumns { get; set; }
+
+    /// <summary>
     /// Byte mode for programs run in Smart Terminal tabs when the shell counts UTF-8 bytes (BusyBox without Unicode
     /// support, OpenWrt); the command line itself is always edited locally. See GlobalSettings.ByteOrientedLineEditing.
     /// </summary>

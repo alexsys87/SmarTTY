@@ -1,3 +1,4 @@
+using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using System;
 using System.Collections.Generic;
@@ -12,8 +13,11 @@ internal interface IOutputLinkHost
     /// <summary>The text after the last dot of a file name, dot included (".c"), is a kind of file that gets a link.</summary>
     bool IsLinkExtension(string extension);
 
-    /// <summary>The link was clicked: open <paramref name="path"/> at the line and column (counted from 0), when they are known.</summary>
-    void RequestOpenFile(string path, int? line, int? column);
+    /// <summary>
+    /// The link was clicked: open <paramref name="path"/> at the line and column (counted from 0, in <paramref name="unit"/>), when
+    /// they are known.
+    /// </summary>
+    void RequestOpenFile(string path, int? line, int? column, ColumnUnit unit);
 }
 
 /// <summary>
@@ -63,6 +67,8 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
 
         private readonly string _directory;
 
+        private readonly ColumnUnit _unit;
+
         private StringBuilder _extension;
 
         private int? _line;
@@ -81,17 +87,18 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             State = CandidateState.Rejected;
         }
 
-        public LinkCandidate(IOutputLinkHost host, string directory, char firstChar)
+        public LinkCandidate(IOutputLinkHost host, string directory, ColumnUnit unit, char firstChar)
         {
             _host = host;
             _directory = directory;
+            _unit = unit;
             _path.Append(firstChar);
             State = (firstChar == '/') ? CandidateState.AbsolutePath : CandidateState.Word;
         }
 
         public void Activate()
         {
-            _host.RequestOpenFile(BuildDirectories.Resolve(_directory, _path.ToString()), _line, _column);
+            _host.RequestOpenFile(BuildDirectories.Resolve(_directory, _path.ToString()), _line, _column, _unit);
         }
 
         public override string ToString()
@@ -208,6 +215,9 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
 
     private readonly StringBuilder _tail = new StringBuilder();
 
+    // What the columns of the messages of this command count (see CompilerColumns).
+    private readonly ColumnUnit _columnUnit;
+
     private readonly bool _links;
 
     private readonly bool _highlight;
@@ -236,9 +246,11 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
     /// <param name="links">Make links of the file names.</param>
     /// <param name="highlight">Mark the words of errors, warnings and notes.</param>
     /// <param name="logLevels">Mark the lines of a log from their level (ERROR, WARN, [error], level=warn) to the end.</param>
-    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText, bool links = true, bool highlight = false, bool logLevels = false)
+    /// <param name="columnSetting">What the columns count, or Auto to tell it from the command line.</param>
+    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText, bool links = true, bool highlight = false, bool logLevels = false, ColumnUnit columnSetting = ColumnUnit.Auto)
     {
         _host = host;
+        _columnUnit = CompilerColumns.Resolve(columnSetting, commandText);
         _links = links;
         _highlight = highlight;
         _logLevels = logLevels;
@@ -294,7 +306,7 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         {
             if (IsPathChar(ch) && prevChar != '/')
             {
-                _current = new LinkCandidate(_host, CurrentDirectory, ch);
+                _current = new LinkCandidate(_host, CurrentDirectory, _columnUnit, ch);
                 if (ch == '/')
                 {
                     _lastAbsolute = _current;

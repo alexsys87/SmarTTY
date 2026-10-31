@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using SmarTTY.Terminal;
 
@@ -32,14 +33,17 @@ internal static class Program
     {
         public readonly List<string> Opened = new List<string>();
 
+        public readonly List<ColumnUnit> Units = new List<ColumnUnit>();
+
         public bool IsLinkExtension(string extension)
         {
             // The default list of the terminal, shortened to what the checks use.
             return new[] { ".c", ".h", ".cpp", ".hpp", ".cc", ".py", ".sh", ".rs", ".go", ".txt", ".mk", ".cxx", ".s" }.Contains(extension, StringComparer.OrdinalIgnoreCase);
         }
 
-        public void RequestOpenFile(string path, int? line, int? column)
+        public void RequestOpenFile(string path, int? line, int? column, ColumnUnit unit)
         {
+            Units.Add(unit);
             Opened.Add(path + "|" + (line.HasValue ? line.Value.ToString() : "-") + "|" + (column.HasValue ? column.Value.ToString() : "-"));
         }
     }
@@ -141,6 +145,35 @@ internal static class Program
 
         Output split = new Output("/w", "gcc", "src/ma", "in.c:", "3", ":1: error\n");
         Equal(split.Click(0), "/w/src/main.c|2|0", "a name split between two pieces of output");
+    }
+
+    // The unit that a click on the first link of the output passes on, for a command and a setting.
+    private static ColumnUnit UnitOf(string command, ColumnUnit setting, string output = "a.c:3:17: error: x\n")
+    {
+        Host host = new Host();
+        OutputLinkScanner scanner = new OutputLinkScanner(host, "/w", command, links: true, highlight: false, logLevels: false, columnSetting: setting);
+        TerminalEmulatorBase.LinkCell[] cells = scanner.Scan(output);
+        scanner.Finish();
+        cells.First(cell => cell.Target != null && cell.Target.IsActive).Target.Activate();
+        return host.Units[0];
+    }
+
+    private static void ColumnUnitChecks()
+    {
+        Equal(UnitOf("gcc -Wall a.c", ColumnUnit.Auto), ColumnUnit.TabStops, "a gcc message counts screen columns with tab stops");
+        Equal(UnitOf("make", ColumnUnit.Auto), ColumnUnit.TabStops, "make runs gcc");
+        Equal(UnitOf("clang a.c", ColumnUnit.Auto), ColumnUnit.Bytes, "a clang message counts bytes");
+        Equal(UnitOf("CC=clang make", ColumnUnit.Auto), ColumnUnit.Bytes, "clang named in a make command wins");
+        Equal(UnitOf("go build ./...", ColumnUnit.Auto, "./main.go:12:2: undefined: foo\n"), ColumnUnit.Bytes, "go counts bytes");
+        Equal(UnitOf("cargo build", ColumnUnit.Auto, "  --> src/main.rs:5:9\n"), ColumnUnit.Characters, "rustc counts characters");
+        Equal(UnitOf("python3 t.py", ColumnUnit.Auto), ColumnUnit.Characters, "an unknown tool counts characters");
+        Equal(UnitOf("gcc a.c", ColumnUnit.Characters), ColumnUnit.Characters, "the setting wins over the command");
+        Equal(UnitOf("python3 t.py", ColumnUnit.TabStops), ColumnUnit.TabStops, "...also for an unknown tool");
+
+        // The scanner does not change the column: the editor does, with the text of the line.
+        Output gcc = new Output("/w", "gcc a.c", "a.c:3:17: error: x\n");
+        Equal(gcc.Click(0), "/w/a.c|2|16", "the column is passed on as it was printed, minus one");
+        Equal(gcc.Host.Units[0], ColumnUnit.TabStops, "...with the unit");
     }
 
     private static void NameWithoutExtensionChecks()
@@ -429,6 +462,7 @@ internal static class Program
         CompilerMessageChecks();
         ColoredOutputChecks();
         NameWithoutExtensionChecks();
+        ColumnUnitChecks();
         DirectoryChecks();
         CommandHintChecks();
         MessageChecks();

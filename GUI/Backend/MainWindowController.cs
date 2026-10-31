@@ -332,14 +332,15 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
-        public void CreateNewEditorTab(SessionWrapper session, string fn, TextDocument.TextPosition initialLoc = default(TextDocument.TextPosition))
+        /// <param name="columnUnit">What the column of <paramref name="initialLoc"/> counts (a compiler message says it in screen columns or bytes).</param>
+        public void CreateNewEditorTab(SessionWrapper session, string fn, TextDocument.TextPosition initialLoc = default(TextDocument.TextPosition), ColumnUnit columnUnit = ColumnUnit.Characters)
         {
             EditorTabContext editorTabContext = session.TryActivateEditorForFile(fn);
             if (editorTabContext != null)
             {
                 try
                 {
-                    editorTabContext.Editor.SetCaret(initialLoc);
+                    editorTabContext.Editor.SetCaretFromColumnUnit(initialLoc, columnUnit);
                     return;
                 }
                 catch
@@ -347,7 +348,7 @@ public class MainWindowController : INotifyPropertyChanged
                     return;
                 }
             }
-            RemoteFileEditor editor = new RemoteFileEditor(session, fn, _Controller.Settings, initialLoc, MessageBoxes.Exception)
+            RemoteFileEditor editor = new RemoteFileEditor(session, fn, _Controller.Settings, initialLoc, MessageBoxes.Exception, columnUnit)
             {
                 NativeScrollSemantics = false
             };
@@ -1937,7 +1938,7 @@ public class MainWindowController : INotifyPropertyChanged
     {
         try
         {
-            MenuCommandHandlers.CreateNewEditorTab(ActiveSession, e.Path, new TextDocument.TextPosition(e.Column.GetValueOrDefault(), e.Line.GetValueOrDefault()));
+            MenuCommandHandlers.CreateNewEditorTab(ActiveSession, e.Path, new TextDocument.TextPosition(e.Column.GetValueOrDefault(), e.Line.GetValueOrDefault()), e.ColumnUnit);
         }
         catch (Exception exception)
         {

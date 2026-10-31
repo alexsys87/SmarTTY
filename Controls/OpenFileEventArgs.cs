@@ -1,3 +1,4 @@
+using SmarTTY.CodeEditing;
 using System;
 
 namespace SmarTTY.Controls;
@@ -12,4 +13,7 @@ public class OpenFileEventArgs : EventArgs
     public int? Line;
 
     public int? Column;
+
+    /// <summary>What <see cref="Column"/> counts (the tool that wrote the message decides); characters when nothing is said.</summary>
+    public ColumnUnit ColumnUnit;
 }
