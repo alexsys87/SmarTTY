@@ -14,16 +14,16 @@ public partial class ConnectionClosedPopup : UserControl, IComponentConnector
 
     private void Reconnect(object sender, RoutedEventArgs e)
     {
-        (this.DataContext as SessionWrapper.SessionFixer)?.Reconnect();
+        (this.DataContext as IConnectionPrompt)?.Reconnect();
     }
 
     private void Ignore(object sender, RoutedEventArgs e)
     {
-        (this.DataContext as SessionWrapper.SessionFixer)?.Ignore();
+        (this.DataContext as IConnectionPrompt)?.Ignore();
     }
 
     private void Close(object sender, RoutedEventArgs e)
     {
-        (this.DataContext as SessionWrapper.SessionFixer)?.Close();
+        (this.DataContext as IConnectionPrompt)?.Close();
     }
 }

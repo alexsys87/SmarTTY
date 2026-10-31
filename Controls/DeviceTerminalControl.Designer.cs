@@ -14,9 +14,7 @@ public partial class DeviceTerminalControl
 
 	private Panel pnlConnectionInProgress;
 
-	private Label lblConnecting;
 
-	private ProgressBar progressBar1;
 
 	private ToolStrip toolStrip1;
 
@@ -26,19 +24,12 @@ public partial class DeviceTerminalControl
 
 	private ToolStripButton btnReconnect;
 
-	private TableLayoutPanel pnlConnectionCard;
 
-	private Label lblConnectionTitle;
 
-	private PictureBox picConnectionState;
 
-	private TableLayoutPanel pnlConnectionActions;
 
-	private Button btnTryReconnect;
 
-	private Button btnCloseTab;
 
-	private Button btnIgnore;
 
 	private ToolStripSplitButton btnSend;
 
@@ -131,15 +122,6 @@ public partial class DeviceTerminalControl
             this.components = new System.ComponentModel.Container();
             SmarTTY.TextEditing.HighlightStyle highlightStyle1 = new SmarTTY.TextEditing.HighlightStyle();
             this.pnlConnectionInProgress = new System.Windows.Forms.Panel();
-            this.pnlConnectionCard = new System.Windows.Forms.TableLayoutPanel();
-            this.lblConnectionTitle = new System.Windows.Forms.Label();
-            this.picConnectionState = new System.Windows.Forms.PictureBox();
-            this.pnlConnectionActions = new System.Windows.Forms.TableLayoutPanel();
-            this.btnTryReconnect = new System.Windows.Forms.Button();
-            this.btnCloseTab = new System.Windows.Forms.Button();
-            this.btnIgnore = new System.Windows.Forms.Button();
-            this.progressBar1 = new System.Windows.Forms.ProgressBar();
-            this.lblConnecting = new System.Windows.Forms.Label();
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.lblConnection = new System.Windows.Forms.ToolStripLabel();
             this.btnDisconnect = new System.Windows.Forms.ToolStripButton();
@@ -184,9 +166,6 @@ public partial class DeviceTerminalControl
             this.pasteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.hexTerminalControl1 = new SmarTTY.Controls.HexTerminalControl();
             this.terminalEmulatorControl1 = new SmarTTY.Controls.TerminalEmulatorControl();
-            ((System.ComponentModel.ISupportInitialize)(this.picConnectionState)).BeginInit();
-            this.pnlConnectionActions.SuspendLayout();
-            this.pnlConnectionCard.SuspendLayout();
             this.pnlConnectionInProgress.SuspendLayout();
             this.toolStrip1.SuspendLayout();
             this.contextMenuStrip1.SuspendLayout();
@@ -194,131 +173,14 @@ public partial class DeviceTerminalControl
             // 
             // pnlConnectionInProgress
             // 
-            this.pnlConnectionInProgress.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.pnlConnectionInProgress.Controls.Add(this.pnlConnectionCard);
+            // The shared "connection closed" popup (ConnectionClosedPopup) is hosted in this panel by the control's
+            // constructor; the panel shrinks to the popup and is centered over the terminal.
+            this.pnlConnectionInProgress.AutoSize = true;
+            this.pnlConnectionInProgress.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.pnlConnectionInProgress.Location = new System.Drawing.Point(0, 0);
             this.pnlConnectionInProgress.Name = "pnlConnectionInProgress";
-            this.pnlConnectionInProgress.Size = new System.Drawing.Size(634, 236);
             this.pnlConnectionInProgress.TabIndex = 1;
             this.pnlConnectionInProgress.Visible = false;
-            // 
-            // pnlConnectionCard
-            // 
-            // The card of the "connection closed" prompt: the same content and order as the prompt of an SSH session
-            // (title, text, picture and the three actions), coloured by ApplyConnectionPromptTheme.
-            this.pnlConnectionCard.AutoSize = true;
-            this.pnlConnectionCard.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
-            this.pnlConnectionCard.Padding = new System.Windows.Forms.Padding(12);
-            this.pnlConnectionCard.Paint += new System.Windows.Forms.PaintEventHandler(this.pnlConnectionCard_Paint);
-            this.pnlConnectionCard.ColumnCount = 2;
-            this.pnlConnectionCard.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 80F));
-            this.pnlConnectionCard.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 340F));
-            this.pnlConnectionCard.Controls.Add(this.lblConnectionTitle, 0, 0);
-            this.pnlConnectionCard.Controls.Add(this.lblConnecting, 0, 1);
-            this.pnlConnectionCard.Controls.Add(this.picConnectionState, 0, 2);
-            this.pnlConnectionCard.Controls.Add(this.pnlConnectionActions, 1, 2);
-            this.pnlConnectionCard.Location = new System.Drawing.Point(107, 40);
-            this.pnlConnectionCard.Name = "pnlConnectionCard";
-            this.pnlConnectionCard.RowCount = 3;
-            this.pnlConnectionCard.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.pnlConnectionCard.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.pnlConnectionCard.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.pnlConnectionCard.Size = new System.Drawing.Size(420, 156);
-            this.pnlConnectionCard.TabIndex = 0;
-            // 
-            // lblConnectionTitle
-            // 
-            this.lblConnectionTitle.AutoSize = true;
-            this.lblConnectionTitle.Anchor = System.Windows.Forms.AnchorStyles.None;
-            this.pnlConnectionCard.SetColumnSpan(this.lblConnectionTitle, 2);
-            this.lblConnectionTitle.Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblConnectionTitle.Margin = new System.Windows.Forms.Padding(3, 0, 3, 6);
-            this.lblConnectionTitle.Name = "lblConnectionTitle";
-            this.lblConnectionTitle.TabIndex = 0;
-            this.lblConnectionTitle.Text = "Connecting...";
-            this.lblConnectionTitle.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // lblConnecting
-            // 
-            this.lblConnecting.AutoSize = true;
-            this.lblConnecting.Anchor = System.Windows.Forms.AnchorStyles.Left;
-            this.pnlConnectionCard.SetColumnSpan(this.lblConnecting, 2);
-            this.lblConnecting.Margin = new System.Windows.Forms.Padding(3, 0, 3, 6);
-            this.lblConnecting.MaximumSize = new System.Drawing.Size(414, 0);
-            this.lblConnecting.Name = "lblConnecting";
-            this.lblConnecting.TabIndex = 1;
-            this.lblConnecting.Text = "Connecting...";
-            // 
-            // picConnectionState
-            // 
-            this.picConnectionState.Anchor = System.Windows.Forms.AnchorStyles.None;
-            this.picConnectionState.Margin = new System.Windows.Forms.Padding(8);
-            this.picConnectionState.Name = "picConnectionState";
-            this.picConnectionState.Size = new System.Drawing.Size(64, 64);
-            this.picConnectionState.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
-            this.picConnectionState.TabIndex = 2;
-            this.picConnectionState.TabStop = false;
-            // 
-            // pnlConnectionActions
-            // 
-            this.pnlConnectionActions.AutoSize = true;
-            this.pnlConnectionActions.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
-            this.pnlConnectionActions.ColumnCount = 1;
-            this.pnlConnectionActions.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.pnlConnectionActions.Controls.Add(this.btnTryReconnect, 0, 0);
-            this.pnlConnectionActions.Controls.Add(this.btnCloseTab, 0, 1);
-            this.pnlConnectionActions.Controls.Add(this.btnIgnore, 0, 2);
-            this.pnlConnectionActions.Controls.Add(this.progressBar1, 0, 3);
-            this.pnlConnectionActions.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pnlConnectionActions.Margin = new System.Windows.Forms.Padding(0);
-            this.pnlConnectionActions.Name = "pnlConnectionActions";
-            this.pnlConnectionActions.RowCount = 4;
-            this.pnlConnectionActions.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.pnlConnectionActions.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.pnlConnectionActions.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.pnlConnectionActions.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.pnlConnectionActions.TabIndex = 3;
-            // 
-            // btnTryReconnect
-            // 
-            this.btnTryReconnect.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.btnTryReconnect.Margin = new System.Windows.Forms.Padding(3);
-            this.btnTryReconnect.MinimumSize = new System.Drawing.Size(0, 26);
-            this.btnTryReconnect.Name = "btnTryReconnect";
-            this.btnTryReconnect.TabIndex = 0;
-            this.btnTryReconnect.Text = "Try reconnecting";
-            this.btnTryReconnect.UseVisualStyleBackColor = true;
-            // 
-            // btnCloseTab
-            // 
-            this.btnCloseTab.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.btnCloseTab.Margin = new System.Windows.Forms.Padding(3);
-            this.btnCloseTab.MinimumSize = new System.Drawing.Size(0, 26);
-            this.btnCloseTab.Name = "btnCloseTab";
-            this.btnCloseTab.TabIndex = 1;
-            this.btnCloseTab.Text = "Close tab";
-            this.btnCloseTab.UseVisualStyleBackColor = true;
-            // 
-            // btnIgnore
-            // 
-            this.btnIgnore.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.btnIgnore.Margin = new System.Windows.Forms.Padding(3);
-            this.btnIgnore.MinimumSize = new System.Drawing.Size(0, 26);
-            this.btnIgnore.Name = "btnIgnore";
-            this.btnIgnore.TabIndex = 2;
-            this.btnIgnore.Text = "Ignore";
-            this.btnIgnore.UseVisualStyleBackColor = true;
-            // 
-            // progressBar1
-            // 
-            this.progressBar1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.progressBar1.Margin = new System.Windows.Forms.Padding(3, 8, 3, 3);
-            this.progressBar1.Name = "progressBar1";
-            this.progressBar1.Size = new System.Drawing.Size(334, 18);
-            this.progressBar1.Style = System.Windows.Forms.ProgressBarStyle.Marquee;
-            this.progressBar1.TabIndex = 3;
             // 
             // toolStrip1
             // 
@@ -745,10 +607,6 @@ public partial class DeviceTerminalControl
             //
             // Event handlers (YMODEM, ZMODEM and Kermit items are wired in their own partial files)
             //
-            this.btnTryReconnect.Click += new System.EventHandler(this.btnTryReconnect_Click);
-            this.btnCloseTab.Click += new System.EventHandler(this.btnCloseTab_Click);
-            this.btnIgnore.Click += new System.EventHandler(this.btnIgnore_Click);
-            this.pnlConnectionInProgress.Resize += new System.EventHandler(this.pnlConnectionInProgress_Resize);
             this.btnDisconnect.Click += new System.EventHandler(this.btnDisconnect_Click);
             this.btnReconnect.Click += new System.EventHandler(this.btnReconnect_Click);
             this.btnSend.ButtonClick += new System.EventHandler(this.btnSend_ButtonClick);
@@ -792,11 +650,6 @@ public partial class DeviceTerminalControl
             this.Controls.Add(this.pnlConnectionInProgress);
             this.Name = "DeviceTerminalControl";
             this.Size = new System.Drawing.Size(634, 236);
-            ((System.ComponentModel.ISupportInitialize)(this.picConnectionState)).EndInit();
-            this.pnlConnectionActions.ResumeLayout(false);
-            this.pnlConnectionActions.PerformLayout();
-            this.pnlConnectionCard.ResumeLayout(false);
-            this.pnlConnectionCard.PerformLayout();
             this.pnlConnectionInProgress.ResumeLayout(false);
             this.pnlConnectionInProgress.PerformLayout();
             this.toolStrip1.ResumeLayout(false);

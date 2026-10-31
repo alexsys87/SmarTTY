@@ -335,8 +335,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         Disposed += DeviceTerminalControl_Disposed;
         pnlConnectionInProgress.BringToFront();
         toolStrip1.SendToBack();
-        picConnectionState.Image = Icons.Load("busy");
-        pnlConnectionCard.SizeChanged += (sender, e) => CenterConnectionCard();
+        CreateConnectionPrompt();
         
         // Replace the designer-created TerminalEmulatorControl with our SerialTerminalControl
         ReplaceTerminalControl();
@@ -429,48 +428,45 @@ public partial class DeviceTerminalControl : DpiAwareControl
         ApplyMenuTheme(contextMenuStrip1);
         ApplyNetconsoleBarTheme();
         toolStrip1.Invalidate();
-        ApplyConnectionPromptTheme();
     }
 
-    /// <summary>Paints the "connection closed" prompt (the same one the SSH sessions show) in the colours of the application theme.</summary>
-    private void ApplyConnectionPromptTheme()
+    // The prompt is the very same ConnectionClosedPopup (WPF) that the SSH sessions show, hosted here, so that the two
+    // cannot look different. It takes its colours from the WPF theme by itself.
+    private SmarTTY.GUI.Backend.ConnectionPromptModel _connectionPrompt;
+
+    private Control _connectionPromptHost;
+
+    /// <summary>
+    /// Creates the control that shows a connection prompt (the application sets it to an ElementHost with the
+    /// ConnectionClosedPopup that the SSH sessions show too). It is a hook because this control is also compiled without
+    /// the WPF part of the application (and, under Mono, without WPF hosting) in the test programs; without it the
+    /// control shows no prompt.
+    /// </summary>
+    public static Func<SmarTTY.GUI.Backend.IConnectionPrompt, Control> ConnectionPromptHostFactory;
+
+    private void CreateConnectionPrompt()
     {
-        ToolbarPalette palette = _toolbarPalette;
-        pnlConnectionInProgress.BackColor = palette.Background;
-        pnlConnectionInProgress.ForeColor = palette.Text;
-        // The card looks like the prompt of an SSH session: the popup colour of the theme and a thin border.
-        pnlConnectionCard.BackColor = palette.Popup;
-        pnlConnectionCard.ForeColor = palette.Text;
-        pnlConnectionCard.Invalidate();
-        foreach (Button button in new[] { btnTryReconnect, btnCloseTab, btnIgnore })
+        _connectionPrompt = new SmarTTY.GUI.Backend.ConnectionPromptModel(
+            reconnect: () => Connect(),
+            close: () => CloseTabRequested?.Invoke(this, EventArgs.Empty),
+            ignore: IgnoreConnectionPrompt);
+        if (ConnectionPromptHostFactory != null)
         {
-            button.FlatStyle = FlatStyle.Flat;
-            button.UseVisualStyleBackColor = false;
-            button.BackColor = palette.Input;
-            button.ForeColor = palette.Text;
-            button.FlatAppearance.BorderColor = palette.Border;
-            button.FlatAppearance.MouseOverBackColor = palette.Hover;
-            button.FlatAppearance.MouseDownBackColor = palette.Pressed;
+            _connectionPromptHost = ConnectionPromptHostFactory(_connectionPrompt);
+            _connectionPromptHost.Dock = DockStyle.None;
+            pnlConnectionInProgress.Controls.Add(_connectionPromptHost);
         }
+        // The panel is as big as the popup and sits in the middle of the terminal area, as the popup of an SSH session does.
+        pnlConnectionInProgress.SizeChanged += (sender, e) => CenterConnectionCard();
+        Resize += (sender, e) => CenterConnectionCard();
     }
 
-    private void pnlConnectionCard_Paint(object sender, PaintEventArgs e)
-    {
-        using Pen pen = new Pen(_toolbarPalette.Border);
-        e.Graphics.DrawRectangle(pen, 0, 0, pnlConnectionCard.Width - 1, pnlConnectionCard.Height - 1);
-    }
-
-    /// <summary>Keeps the prompt in the middle of the terminal area, as the prompt of an SSH session is.</summary>
+    /// <summary>Keeps the prompt in the middle of the terminal area.</summary>
     private void CenterConnectionCard()
     {
-        pnlConnectionCard.Location = new Point(
-            Math.Max(0, (pnlConnectionInProgress.ClientSize.Width - pnlConnectionCard.Width) / 2),
-            Math.Max(0, (pnlConnectionInProgress.ClientSize.Height - pnlConnectionCard.Height) / 2));
-    }
-
-    private void pnlConnectionInProgress_Resize(object sender, EventArgs e)
-    {
-        CenterConnectionCard();
+        pnlConnectionInProgress.Location = new Point(
+            Math.Max(0, (ClientSize.Width - pnlConnectionInProgress.Width) / 2),
+            Math.Max(0, (ClientSize.Height - pnlConnectionInProgress.Height) / 2));
     }
 
     private void ApplyMenuTheme(ToolStripDropDown menu)
@@ -1353,8 +1349,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
             // While a connection is being opened there is nothing to choose; once it has ended or failed the three actions
             // of the SSH prompt are offered.
             bool connecting = connectionStateEnum == ConnectionStateEnum.Connecting;
-            progressBar1.Visible = connecting;
-            btnTryReconnect.Visible = btnCloseTab.Visible = btnIgnore.Visible = !connecting;
+            _connectionPrompt.ShowActions = !connecting;
+            _connectionPrompt.ProgressText = connecting ? "" : null;
         }
         else
         {
@@ -1366,8 +1362,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
         switch (connectionStateEnum)
         {
             case ConnectionStateEnum.Connecting:
-                lblConnectionTitle.Text = "Connecting";
-                lblConnecting.Text = string.IsNullOrEmpty(value) ? (_transportDisplayName ?? ConnectionTitle) : value;
+                _connectionPrompt.Title = "Connecting";
+                _connectionPrompt.Message = string.IsNullOrEmpty(value) ? (_transportDisplayName ?? ConnectionTitle) : value;
                 break;
             case ConnectionStateEnum.Disconnected:
                 {
@@ -1380,15 +1376,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     // A reason is given when the connection broke (an unplugged adapter, a reset) instead of being closed.
                     string text = string.IsNullOrEmpty(value) ? "Connection closed" : "Connection closed: " + value;
                     toolStripLabel.Text = text;
-                    lblConnectionTitle.Text = "Connection closed";
-                    lblConnecting.Text = "The connection to " + (_transportDisplayName ?? ConnectionTitle) + " has been closed."
+                    _connectionPrompt.Title = "Connection closed";
+                    _connectionPrompt.Message = "The connection to " + (_transportDisplayName ?? ConnectionTitle) + " has been closed."
                         + (string.IsNullOrEmpty(value) ? "" : Environment.NewLine + value)
                         + Environment.NewLine + "Please select an action:";
                     break;
                 }
             case ConnectionStateEnum.Failed:
-                lblConnectionTitle.Text = "Connection failed";
-                lblConnecting.Text = "The connection to " + (_transportDisplayName ?? ConnectionTitle) + " could not be opened."
+                _connectionPrompt.Title = "Connection failed";
+                _connectionPrompt.Message = "The connection to " + (_transportDisplayName ?? ConnectionTitle) + " could not be opened."
                     + (string.IsNullOrEmpty(value) ? "" : Environment.NewLine + value)
                     + Environment.NewLine + "Please select an action:";
                 break;
@@ -1402,8 +1398,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
                     break;
                 }
         }
-        // The texts decide how big the card is.
-        pnlConnectionCard.PerformLayout();
+        // The texts decide how big the popup is.
+        _connectionPromptHost?.PerformLayout();
         CenterConnectionCard();
     }
 
@@ -1829,21 +1825,11 @@ public partial class DeviceTerminalControl : DpiAwareControl
         // The device may also echo back, which will be handled by OnDataReceived
     }
 
-    private void btnTryReconnect_Click(object sender, EventArgs e)
-    {
-        Connect();
-    }
-
-    private void btnCloseTab_Click(object sender, EventArgs e)
-    {
-        CloseTabRequested?.Invoke(this, EventArgs.Empty);
-    }
-
     /// <summary>
     /// "Ignore" of the prompt: the last output stays on the screen and the tool bar offers Reconnect, as after a connection
     /// that was closed on purpose. A pending automatic reconnect is cancelled, like the user's own disconnect does.
     /// </summary>
-    private void btnIgnore_Click(object sender, EventArgs e)
+    private void IgnoreConnectionPrompt()
     {
         _manualDisconnect = true;
         StopAutoReconnectTimer();
