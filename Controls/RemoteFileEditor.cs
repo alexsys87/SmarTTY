@@ -806,7 +806,19 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         if (IsWindowsHost)
         {
-            // SFTP cannot ask whether a Windows file is writable; a save that is refused says so then (and there is no sudo).
+            // A new file: its folder is not probed (that would mean creating a file to delete it), a refused save says so then.
+            if (forNewFile || SmarTTY.Transport.WindowsRemoteFileEditing.CanWrite(_context.Session, target) != false)
+            {
+                return;
+            }
+            // No sudo on Windows: the choice is to read the file or not to open it.
+            if (Ask("You do not have permission to write to " + target + ".\n\n"
+                + "Yes: open the file read-only.\n"
+                + "No: do not open the file.", MessageBoxButtons.YesNo) != DialogResult.Yes)
+            {
+                throw new OperationCanceledException();
+            }
+            IsReadOnlyMode = true;
             return;
         }
         if (_context.Session.RunCommandChecked("test -w " + RemotePathUtils.ShellQuote(target), requireSuccess: true) != null)

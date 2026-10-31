@@ -49,6 +49,7 @@ internal static class Program
             WindowsAuthorizedKeysTests.Run(environment);
             WindowsTransferTests.Run(environment);
             WindowsEditingTests.Run(environment);
+            SftpFolderTests.Run(environment);
             HostToHostCopyTests.Run(environment);
             X11ForwardingTests.RunLive(environment);
         }

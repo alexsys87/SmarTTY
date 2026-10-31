@@ -20,6 +20,8 @@ internal static class WindowsHostTests
         ProgramData();
         Prompts();
         Certutil();
+        IdlePrompt();
+        Sync();
     }
 
     private static void Paths()
@@ -168,6 +170,95 @@ internal static class WindowsHostTests
         Test.Equal("", string.Join("|", Reports(esc + "]7;file://host/home/user\u0007", esc + "]9;9;/not/windows\u0007", esc + "]0;C:\\Windows\\system32\\cmd.exe\u0007")), "a Unix OSC 7, a path without a drive and a window title are not directories");
         Test.Equal(@"C:\", string.Join("|", Reports(esc + "]0;C:\\Windows\\system32\\cmd.exe\u0007C:\\>")), "a title with a path in it does not hide the prompt after it");
         Test.Equal("", string.Join("|", Reports("", null, "plain output\r\n")), "empty chunks and plain output report nothing");
+    }
+
+    private static void IdlePrompt()
+    {
+        string esc = "\u001b";
+        SmarTTY.Terminal.TerminalDirectoryWatcher watcher = new SmarTTY.Terminal.TerminalDirectoryWatcher();
+        int ready = 0;
+        watcher.PromptReady += () => ready++;
+        Test.Check(!watcher.AtPrompt, "before any output the shell is not known to wait");
+        watcher.Observe("Microsoft Windows [Version 10.0.19045.3693]\r\n\r\nC:\\Users\\me>");
+        Test.Check(watcher.AtPrompt && watcher.PromptDirectory == @"C:\Users\me" && watcher.Shell == SmarTTY.Terminal.PromptShell.Cmd && ready == 1, "a cmd.exe prompt with nothing after it: waiting, with its directory and its shell, announced once");
+        watcher.Observe(esc + "[?25h");
+        Test.Check(watcher.AtPrompt && ready == 1, "a chunk with only escape sequences changes nothing");
+        watcher.Observe("d");
+        Test.Check(!watcher.AtPrompt, "a typed character after the prompt: no longer waiting");
+        watcher.Observe("ir\r\n volume\r\n\r\nC:\\Users\\me>");
+        Test.Check(watcher.AtPrompt && ready == 2, "the next prompt is waiting again, announced again");
+        watcher.Observe("\r\nPS D:\\Work> ");
+        Test.Check(watcher.AtPrompt && watcher.PromptDirectory == @"D:\Work" && watcher.Shell == SmarTTY.Terminal.PromptShell.PowerShell && ready == 3, "a PowerShell prompt, with the space after it");
+        watcher.Observe("\r\nPS HKLM:\\SOFTWARE> ");
+        Test.Check(!watcher.AtPrompt, "the prompt of the registry provider is not a place to type cd into");
+        watcher.Observe("\r\nPS C:\\a> ");
+        watcher.Observe("\r\n");
+        Test.Check(!watcher.AtPrompt, "a newline ends the line: the prompt is behind");
+    }
+
+    private static void Sync()
+    {
+        System.Collections.Generic.List<string> typed = new System.Collections.Generic.List<string>();
+        DateTime clock = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        SmarTTY.Terminal.TerminalDirectoryWatcher watcher = new SmarTTY.Terminal.TerminalDirectoryWatcher();
+        SmarTTY.Terminal.TerminalDirectorySync sync = new SmarTTY.Terminal.TerminalDirectorySync(watcher, typed.Add, () => clock);
+
+        sync.Request("/D:/data");
+        Test.Check(typed.Count == 0, "nothing is typed while the shell is not known to wait at a prompt");
+        watcher.Observe("C:\\Users\\me>");
+        Test.Equal("cd /d \"D:\\data\"\r", string.Join("|", typed), "the request that waited is typed when the cmd.exe prompt comes");
+
+        // The shell has done it and shows the new prompt: the next request is typed again.
+        typed.Clear();
+        watcher.Observe("cd /d \"D:\\data\"\r\n\r\nD:\\data>");
+        sync.Request("/D:/data");
+        Test.Check(typed.Count == 0, "a request for the directory the shell is in is not typed");
+        sync.Request("/D:/DATA/");
+        Test.Check(typed.Count == 0, "also in other letters and with a trailing slash");
+        sync.Request("/E:/x y");
+        Test.Equal("cd /d \"E:\\x y\"\r", string.Join("|", typed), "a path with a space is in quotes");
+
+        // A line being typed is not interrupted; the newest request wins when the prompt is back.
+        typed.Clear();
+        watcher.Observe("\r\nE:\\x y>");
+        clock = clock.AddSeconds(1);
+        watcher.Observe("di");
+        sync.Request("/C:/one");
+        sync.Request("/C:/two");
+        Test.Check(typed.Count == 0, "nothing is typed into a line the user is typing");
+        watcher.Observe("r\r\n\r\nE:\\x y>");
+        Test.Equal("cd /d \"C:\\two\"\r", string.Join("|", typed), "when the prompt is back, the newest request is typed, once");
+
+        // One command is on its way: a second request waits for its prompt, and a lost answer does not block for ever.
+        typed.Clear();
+        sync.Request("/C:/three");
+        Test.Check(typed.Count == 0, "while the previous command has not been answered, the next one waits");
+        watcher.Observe("cd /d \"C:\\two\"\r\n\r\nC:\\two>");
+        Test.Equal("cd /d \"C:\\three\"\r", string.Join("|", typed), "and is typed at the prompt that answers it");
+        typed.Clear();
+        clock = clock.AddSeconds(3);
+        sync.Request("/C:/four");
+        Test.Check(typed.Count == 0, "still waiting for the prompt after the command that was typed");
+        clock = clock.AddSeconds(30);
+        sync.Request("/C:/four");
+        Test.Equal("cd /d \"C:\\four\"\r", string.Join("|", typed), "a command that got no answer for a long time is forgotten, and the next request goes out");
+
+        // PowerShell, and the paths that cannot be passed.
+        typed.Clear();
+        SmarTTY.Terminal.TerminalDirectoryWatcher psWatcher = new SmarTTY.Terminal.TerminalDirectoryWatcher();
+        SmarTTY.Terminal.TerminalDirectorySync psSync = new SmarTTY.Terminal.TerminalDirectorySync(psWatcher, typed.Add, () => clock);
+        psWatcher.Observe("PS C:\\Users\\me> ");
+        psSync.Request("/D:/My [files]/O'Neil");
+        Test.Equal("Set-Location -LiteralPath 'D:\\My [files]\\O''Neil'\r", string.Join("|", typed), "PowerShell gets Set-Location -LiteralPath, with the quote doubled");
+        typed.Clear();
+        psWatcher.Observe("\r\nPS D:\\My [files]\\O'Neil> ");
+        psSync.Request("/");
+        psSync.Request("/C:/100%/x");
+        Test.Check(typed.Count == 0, "the place above the drives and a path with % are not typed");
+
+        Test.Equal("Set-Location -LiteralPath 'C:\\a\u2019\u2019b'", SmarTTY.Terminal.TerminalDirectorySync.BuildCommand(SmarTTY.Terminal.PromptShell.PowerShell, "C:\\a\u2019b"), "a typographic quote is doubled for PowerShell as well");
+        Test.Equal("cd /d \"C:\\a&b^c\"", SmarTTY.Terminal.TerminalDirectorySync.BuildCommand(SmarTTY.Terminal.PromptShell.Cmd, "C:\\a&b^c"), "& and ^ are safe inside the quotes of cmd.exe");
+        Test.Check(SmarTTY.Terminal.TerminalDirectorySync.BuildCommand(SmarTTY.Terminal.PromptShell.Cmd, "C:\\a\"b") == null && SmarTTY.Terminal.TerminalDirectorySync.BuildCommand(SmarTTY.Terminal.PromptShell.Unknown, "C:\\a") == null && SmarTTY.Terminal.TerminalDirectorySync.BuildCommand(SmarTTY.Terminal.PromptShell.Cmd, "C:\\a%PATH%") == null, "a quote, a % and an unknown shell give no command");
     }
 
     private static void Certutil()

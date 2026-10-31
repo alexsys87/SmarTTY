@@ -295,13 +295,21 @@ public class FileTransferManager : IDisposable
     /// <summary>
     /// Queues a download; throws if the remote file cannot be read (missing, a directory, no permission).
     /// </summary>
-    public TransferJob EnqueueDownload(string remotePath, string localPath, object tag = null, bool openFolderWhenDone = false)
+    public TransferJob EnqueueDownload(string remotePath, string localPath, object tag = null, bool openFolderWhenDone = false, long? knownSize = null)
     {
         long size;
-        using (ITransferBackend backend = CreateBackend())
+        if (knownSize != null)
         {
-            // Reports a missing or unreadable file right away and tells its size.
-            backend.Probe(remotePath, out size, out _);
+            // The size is known from a listing (the files of a folder): no channel is opened for each of thousands of files here.
+            size = knownSize.Value;
+        }
+        else
+        {
+            using (ITransferBackend backend = CreateBackend())
+            {
+                // Reports a missing or unreadable file right away and tells its size.
+                backend.Probe(remotePath, out size, out _);
+            }
         }
         TransferJob transferJob = new TransferJob
         {

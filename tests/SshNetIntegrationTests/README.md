@@ -54,6 +54,8 @@ names) and the installation and removal of a key in the key files (CRLF kept, no
 SFTP against the Unix test server: the protocol is the same one Win32-OpenSSH speaks. What only a Windows host can answer
 (`whoami`, `icacls`) is a callback in these tests, and a directory of the test stands for `%ProgramData%`.
 
+Folders go the same way (`SftpFolderTests`: the walk over SFTP and over the local disk, `mkdir -p`, a tree through the real transfer queue in both directions, a depth limit that stands for the junction loops of Windows), as do file transfers (`WindowsTransferTests`: SFTP is used although SCP is selected, replacing an existing file, the kinds of paths) and the remote file editor (`WindowsEditingTests`: read, save in place, the `file~` backup, the version signature, whether the file is writable). The prompt reading and the typing of `cd` into cmd.exe and PowerShell (`TerminalDirectoryWatcher`, `TerminalDirectorySync`) need no server and are part of `WindowsHostTests`.
+
 ## Running
 
 The suite needs the .NET 8 SDK and an OpenSSH server. `setup-sshd.sh` provisions a throwaway

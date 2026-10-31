@@ -31,6 +31,39 @@ internal static class WindowsRemoteFileEditing
         return Signature(sftp, path);
     }
 
+    /// <summary>
+    /// Whether the user may write to an existing file, found out the only way SFTP offers: the file is opened for writing, without
+    /// creating or truncating it, and closed again. False when the server refuses for lack of permission; null when the answer is
+    /// not known (the file is not there, or the server refuses for another reason, such as a file in use), because a question that
+    /// cannot be answered must not become a warning.
+    /// </summary>
+    public static bool? CanWrite(SftpChannel sftp, string path)
+    {
+        byte[] handle;
+        try
+        {
+            handle = sftp.OpenFile(path, SftpChannel.OpenFlags.Write);
+        }
+        catch (SftpStatusException exception)
+        {
+            return exception.Status == SftpChannel.StatusPermissionDenied ? false : (bool?)null;
+        }
+        try
+        {
+            sftp.CloseHandle(handle);
+        }
+        catch (Exception exception) when (exception is RemoteOperationException)
+        {
+        }
+        return true;
+    }
+
+    public static bool? CanWrite(SshSession session, string path)
+    {
+        using SftpChannel sftp = SftpChannel.Open(session);
+        return CanWrite(sftp, path);
+    }
+
     public static bool Exists(SshSession session, string path)
     {
         using SftpChannel sftp = SftpChannel.Open(session);
