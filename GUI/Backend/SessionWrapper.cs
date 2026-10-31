@@ -145,8 +145,18 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // (or has neither opkg nor apk) never sees the item.
     private LocalRepoPackageManager? _LocalRepoManager;
 
-    /// <summary>The package manager client the package manager window found on this connection (null until it asks); forgotten on a reconnect.</summary>
+    /// <summary>The package manager client found on this connection (null until it is found); forgotten on a reconnect.</summary>
     internal VisualTTY.ILinuxPackageManagerClient PackageManagerClient;
+
+    // Whether the host of this session has a package manager SmarTTY supports: false until the probe in the background has found one.
+    // A failed probe leaves the previous answer alone, so a reconnect to the same host does not hide the item for good.
+    private bool _HasPackageManager;
+
+    /// <summary>
+    /// Visibility of the "Tools > Manage Linux Packages" item: offered only for an SSH session whose host answered the probe with a
+    /// package manager that SmarTTY supports. Until the probe answers, and on a host without such a manager, it is not in the menu at all.
+    /// </summary>
+    public System.Windows.Visibility PackageManagerMenuVisibility => (!IsDevice && _HasPackageManager) ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
     private RemoteOsKind _RemoteOs;
 
@@ -698,6 +708,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         IsInactive = false;
         PackageManagerClient = null;
         StartOpenWrtProbe();
+        StartPackageManagerProbe();
         if (deferredError != null)
         {
             MessageBoxes.Exception(deferredError);
@@ -767,6 +778,87 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 }
                 _LocalRepoManager = manager;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalRepoMenuVisibility"));
+            });
+        });
+    }
+
+    /// <summary>
+    /// Finds the package manager of the host (the one the package manager window then uses) and remembers it for the connection:
+    /// null when the host has none that is supported. A Windows host is asked for winget only, and any other host for the package
+    /// managers of <see cref="PackageManagerCatalog"/>; a host whose banner said nothing and that answered none of them is checked
+    /// for being Windows. <paramref name="isCancelled"/> stops the probes that are not run yet.
+    /// </summary>
+    internal VisualTTY.ILinuxPackageManagerClient DetectPackageManager(Func<bool> isCancelled = null)
+    {
+        SshSession session = Session;
+        VisualTTY.ILinuxPackageManagerClient client = PackageManagerClient;
+        if (client != null || session == null)
+        {
+            return client;
+        }
+        if (!IsWindowsHost)
+        {
+            client = PackageManagerSelector.Pick(PackageManagerCatalog.CreateUnixClients(), this, isCancelled);
+            if (client == null && !(isCancelled?.Invoke() ?? false) && _RemoteOs == RemoteOsKind.Unknown && DetectWindowsHost())
+            {
+                // The banner of the server did not say that it is Windows, and no package manager of Linux answered.
+                client = PickWinget(isCancelled);
+            }
+        }
+        else
+        {
+            // A Windows host has winget only: none of the package managers of Unix exists there.
+            client = PickWinget(isCancelled);
+        }
+        if (client != null && ReferenceEquals(Session, session))
+        {
+            // A reconnect may have replaced the connection while the probes ran: the answer is for the old one then.
+            PackageManagerClient = client;
+        }
+        return client;
+    }
+
+    private VisualTTY.ILinuxPackageManagerClient PickWinget(Func<bool> isCancelled)
+    {
+        return PackageManagerSelector.Pick(new VisualTTY.ILinuxPackageManagerClient[] { new WingetPackageManagerClient() }, this, isCancelled);
+    }
+
+    /// <summary>
+    /// Looks for the package manager of the host once per connection, in the background (the session works meanwhile), and raises the
+    /// visibility of "Tools > Manage Linux Packages" when one is found. A host without a supported manager never sees the item.
+    /// </summary>
+    private void StartPackageManagerProbe()
+    {
+        SshSession session = Session;
+        if (session == null)
+        {
+            return;
+        }
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            VisualTTY.ILinuxPackageManagerClient client = null;
+            try
+            {
+                client = DetectPackageManager(() => !ReferenceEquals(Session, session));
+                if (client == null)
+                {
+                    // Every probe failed because the connection went away: that says nothing about the host, keep the previous answer.
+                    session.ThrowIfConnectionLost();
+                }
+            }
+            catch
+            {
+                return;
+            }
+            bool found = client != null;
+            _Controller.BeginInvoke(() =>
+            {
+                if (!ReferenceEquals(Session, session) || _HasPackageManager == found)
+                {
+                    return;
+                }
+                _HasPackageManager = found;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PackageManagerMenuVisibility)));
             });
         });
     }

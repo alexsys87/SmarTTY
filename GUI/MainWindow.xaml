@@ -225,7 +225,7 @@
         </MenuItem>
       </MenuItem>
       <MenuItem Header="_Tools">
-        <MenuItem Header="Manage Linux _Packages" Click="ManagePackages_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
+        <MenuItem Header="Manage Linux _Packages" Click="ManagePackages_Click" Visibility="{Binding Path=ActiveSession.PackageManagerMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/archive16.png" />
           </MenuItem.Icon>

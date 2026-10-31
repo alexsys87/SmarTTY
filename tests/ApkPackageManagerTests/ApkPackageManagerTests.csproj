@@ -11,6 +11,7 @@
     <Compile Include="../../PackageManagers/DnfPackageManagerClient.cs" Link="DnfPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/HomebrewPackageManagerClient.cs" Link="HomebrewPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/OpkgPackageManagerClient.cs" Link="OpkgPackageManagerClient.cs" />
+    <Compile Include="../../PackageManagers/PackageManagerCatalog.cs" Link="PackageManagerCatalog.cs" />
     <Compile Include="../../PackageManagers/PackageManagerSelector.cs" Link="PackageManagerSelector.cs" />
     <Compile Include="../../PackageManagers/PacmanPackageManagerClient.cs" Link="PacmanPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/PkgPackageManagerClient.cs" Link="PkgPackageManagerClient.cs" />

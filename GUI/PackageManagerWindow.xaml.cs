@@ -22,25 +22,6 @@ public partial class PackageManagerWindow : Window
 
         private SessionWrapper _Session;
 
-        private ILinuxPackageManagerClient[] _Clients = new ILinuxPackageManagerClient[11]
-        {
-            new AptPackageManagerClient(),
-            new DnfPackageManagerClient(),
-            new ZypperPackageManagerClient(),
-            new PacmanPackageManagerClient(),
-            new PortagePackageManagerClient(),
-            new YumPackageManagerClient(),
-            new OpkgPackageManagerClient(),
-            new ApkPackageManagerClient(),
-            // After the managers of the Linux distributions: a host that answers to one of them with the top score is not asked the rest.
-            new XbpsPackageManagerClient(),
-            new PkgPackageManagerClient(),
-            new HomebrewPackageManagerClient()
-        };
-
-        // A Windows host has winget only: none of the package managers of Linux exists there.
-        private WingetPackageManagerClient _WingetClient = new WingetPackageManagerClient();
-
         private string _ProgressText;
 
         private ILinuxPackageManagerClient _Client;
@@ -248,21 +229,9 @@ public partial class PackageManagerWindow : Window
         {
             try
             {
-                // The package manager of a host does not change while the connection lasts: the window asks the host once.
-                ILinuxPackageManagerClient bestClient = _Session.PackageManagerClient;
-                if (bestClient == null && !_Session.IsWindowsHost)
-                {
-                    bestClient = PackageManagerSelector.Pick(_Clients, _Session, () => _Closed);
-                    if (bestClient == null && !_Closed && _Session.RemoteOs == RemoteOsKind.Unknown && _Session.DetectWindowsHost())
-                    {
-                        // The banner of the server did not say that it is Windows, and no package manager of Linux answered.
-                        bestClient = PickWinget();
-                    }
-                }
-                else if (bestClient == null)
-                {
-                    bestClient = PickWinget();
-                }
+                // The package manager of a host does not change while the connection lasts: the session asks the host once
+                // (in the background, when the connection is made, so that the menu item is offered only on a host that has one).
+                ILinuxPackageManagerClient bestClient = _Session.DetectPackageManager(() => _Closed);
                 if (_Closed)
                 {
                     return;
@@ -271,7 +240,7 @@ public partial class PackageManagerWindow : Window
                 {
                     // Every probe failed because the connection went away: say so instead of "no package manager".
                     _Session.Session?.ThrowIfConnectionLost();
-                    throw new Exception(_Session.IsWindowsHost ? PackageManagerSelector.WindowsHostMessage() : PackageManagerSelector.BuildNotFoundMessage(_Session, _Clients));
+                    throw new Exception(_Session.IsWindowsHost ? PackageManagerSelector.WindowsHostMessage() : PackageManagerSelector.BuildNotFoundMessage(_Session, PackageManagerCatalog.CreateUnixClients()));
                 }
                 _Session.PackageManagerClient = bestClient;
                 _Client = bestClient;
@@ -288,11 +257,6 @@ public partial class PackageManagerWindow : Window
                     _Window.Close();
                 });
             }
-        }
-
-        private ILinuxPackageManagerClient PickWinget()
-        {
-            return PackageManagerSelector.Pick(new ILinuxPackageManagerClient[] { _WingetClient }, _Session, () => _Closed);
         }
 
         /// <summary>Queries the package list and replaces the current one; <paramref name="selection"/> restores pending marks.</summary>
