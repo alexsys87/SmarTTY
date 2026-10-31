@@ -118,6 +118,9 @@ jobs:
       - name: Run authorized_keys checks
         run: dotnet run --project tests/AuthorizedKeysFileTests -c Release
 
+      - name: Run connection decision checks (host key comparison, proxy credentials, first password)
+        run: dotnet run --project tests/ConnectionRulesTests -c Release
+
       - name: Run public key installation checks (script wait, exit status, read-back)
         run: dotnet run --project tests/AuthorizedKeysManagerTests -c Release
 

@@ -346,7 +346,7 @@ public partial class SshConnector : Component
                     // password would be a failed login that the server logs and counts towards MaxAuthTries and fail2ban
                     // before the user has typed anything. An account without a password still works: the prompt returns "".
                     // Without a prompt handler there is nobody to ask, so the empty password is tried as before.
-                    string attemptedPassword = password ?? (CredentialsRequested == null ? "" : null);
+                    string attemptedPassword = ConnectionRules.FirstPasswordToTry(password, canAskUser: CredentialsRequested != null);
                     if (attemptedPassword != null && session.Authenticate(sshConnectionSettings.UserName, attemptedPassword))
                     {
                         if (passwordConfirmed && sshConnectionSettings.EncryptedSavedPassword != null && password != null)
@@ -488,15 +488,8 @@ public partial class SshConnector : Component
                 }
                 else
                 {
-                    byte[] knownKeyData = Convert.FromBase64String(knownHostKey.KeyBase64);
-                    string oldKeyType = NormalizeKeyType(knownHostKey.KeyType);
-                    if (oldKeyType != hostKeyInfo.Algorithm || !PasswordProtector.BytesEqual(knownKeyData, hostKeyInfo.KeyData))
+                    if (ConnectionRules.CompareHostKey(knownHostKey.KeyType, knownHostKey.KeyBase64, hostKeyInfo.Algorithm, hostKeyInfo.KeyData, out string mismatchReason) == ConnectionRules.HostKeyVerdict.Changed)
                     {
-                        string mismatchReason = null;
-                        if (oldKeyType != hostKeyInfo.Algorithm)
-                        {
-                            mismatchReason = "Key type changed from " + knownHostKey.KeyType + " to " + hostKeyInfo.Algorithm;
-                        }
                         if (!ConfirmHostKeyMismatch(connectionAttempt, sshConnectionSettings, hostKeyInfo, mismatchReason))
                         {
                             // A changed host key may mean a man-in-the-middle attack: do not authenticate.
@@ -547,7 +540,7 @@ public partial class SshConnector : Component
             }
             // Without periodic traffic a pulled cable is only noticed once the user types something, so a default is used
             // when none is set (0); a profile that switched the keep-alive off (negative) keeps it off.
-            int keepAliveSeconds = sshConnectionSettings.KeepaliveInterval < 0 ? 0 : (sshConnectionSettings.KeepaliveInterval != 0 ? sshConnectionSettings.KeepaliveInterval : DefaultKeepAliveSeconds);
+            int keepAliveSeconds = ConnectionRules.KeepAliveSeconds(sshConnectionSettings.KeepaliveInterval, DefaultKeepAliveSeconds);
             sshSession.ConfigureKeepAlive(keepAliveSeconds);
             RaiseConnected(connectionAttempt, sshSession, sshConnectionSettings);
         }
@@ -569,35 +562,14 @@ public partial class SshConnector : Component
         }
     }
 
-    // Older versions stored host key types unknown to them as libssh2 type numbers.
     private static string NormalizeKeyType(string keyType)
     {
-        return keyType switch
-        {
-            "4" => "ecdsa-sha2-nistp384",
-            "5" => "ecdsa-sha2-nistp521",
-            "6" => "ssh-ed25519",
-            _ => keyType,
-        };
+        return ConnectionRules.NormalizeKeyType(keyType);
     }
 
-    // Proxy credentials are stored as "user:password".
     private static void SplitProxyCredentials(string credentials, out string userName, out string password)
     {
-        userName = null;
-        password = null;
-        if (string.IsNullOrEmpty(credentials))
-        {
-            return;
-        }
-        int colonIdx = credentials.IndexOf(':');
-        if (colonIdx == -1)
-        {
-            userName = credentials;
-            return;
-        }
-        userName = credentials.Substring(0, colonIdx);
-        password = credentials.Substring(colonIdx + 1);
+        ConnectionRules.SplitProxyCredentials(credentials, out userName, out password);
     }
 
     public void ConnectAsync(SSHConnectionSettings sshConnectionSettings, string password, bool forcePasswordAuth)
