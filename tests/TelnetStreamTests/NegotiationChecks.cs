@@ -242,6 +242,38 @@ internal static class NegotiationChecks
             CheckBytes(wire.TakeWritten(), Cat(B(IAC, SB, TelnetStream.OptNewEnviron, 0, 0), Text("USER"), B(IAC, SE)), "new-environ: ...and a requested variable is reported as not defined");
         }
 
+        // --- subnegotiation longer than the buffer, terminal encoding changed while connected, login prompts ---
+        {
+            // the first name would fit, the rest does not: the request is not acted on as if it were complete
+            Wire wire = new Wire(
+                Cat(B(IAC, DO, CS), Text(".")),
+                Cat(B(IAC, SB, CS, 1), Text(";UTF-8" + string.Concat(Enumerable.Repeat(";ISO-8859-1", 60))), B(IAC, SE), Text(".")));
+            TelnetStream stream = new TelnetStream(wire, new TelnetOptions { Charset = "utf-8" });
+            ReadText(stream);
+            wire.TakeWritten();
+            ReadText(stream);
+            CheckBytes(wire.TakeWritten(), B(IAC, SB, CS, 3, IAC, SE), "charset: a request cut off at the buffer is rejected, not read as a shorter one");
+            check(stream.AcceptedCharset == null, "charset: nothing was agreed on from incomplete data");
+        }
+        {
+            Wire wire = Wire.Open();
+            TelnetStream stream = new TelnetStream(wire, new TelnetOptions { Charset = "utf-8" });
+            wire.Send(Cat(B(IAC, DO, CS), Text(".")));
+            ReadText(stream);
+            wire.Send(Cat(B(IAC, SB, CS, 1), Text(";UTF-8"), B(IAC, SE), Text(".")));
+            ReadText(stream);
+            wire.TakeWritten();
+            stream.UpdateTextEncoding(Encoding.GetEncoding("iso-8859-1"), "iso-8859-1");
+            CheckBytes(wire.TakeWritten(), Cat(B(IAC, SB, CS, 1), Text(";iso-8859-1"), B(IAC, SE)), "charset: a changed terminal encoding is offered to the server that agreed on one");
+        }
+        {
+            TelnetAutoLogin login = new TelnetAutoLogin("user", "pw", "логин:", null, encoding: Encoding.UTF8);
+            byte[] prompt = Encoding.UTF8.GetBytes("Логин:");
+            IList<string> first = login.Feed(prompt, 0, 3);
+            IList<string> second = login.Feed(prompt, 3, prompt.Length - 3);
+            check(first.Count == 0 && second.Count == 1 && second[0] == "user\r\n", "autologin: a prompt in the session's encoding is recognized, even when a character arrives in two pieces");
+        }
+
         // --- CHARSET ---
         {
             Wire refused = new Wire(Cat(B(IAC, DO, CS, IAC, WILL, CS), Text(".")));

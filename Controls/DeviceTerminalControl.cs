@@ -826,6 +826,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
     private void SetTextEncoding(string encodingName)
     {
         _textEncoding = TerminalEncodings.Resolve(encodingName);
+        // A telnet server that agreed on a character set is told about the new one.
+        _asyncTransportConnection?.SetTextEncoding(_textEncoding);
         _textDecoder = new TextStreamDecoder(_textEncoding);
         _serialTerminalControl.InputEncoding = _textEncoding;
         // A recording in progress follows the change, so a text log matches what the terminal shows.

@@ -452,6 +452,35 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             return int.TryParse(text.Trim(), out int port) && port > 0 && port <= 65535 ? port : 0;
         }
 
+        /// <summary>
+        /// Null when the Telnet options can be used as written. A speed, an X display location or an environment line
+        /// that is not valid is left out of the negotiation, so the person is told instead of wondering why the server
+        /// did not get it.
+        /// </summary>
+        public string ValidateTelnetOptions()
+        {
+            if (!IsTelnet)
+            {
+                return null;
+            }
+            if (!string.IsNullOrWhiteSpace(TelnetTerminalSpeed) && SmarTTY.Transport.TelnetStream.NormalizeTerminalSpeed(TelnetTerminalSpeed) == null)
+            {
+                return "The terminal speed must be one number or two separated by a comma (each of up to 9 digits), for example 38400 or 38400,38400.";
+            }
+            if (!string.IsNullOrWhiteSpace(TelnetXDisplayLocation) && SmarTTY.Transport.TelnetStream.NormalizeDisplayLocation(TelnetXDisplayLocation) == null)
+            {
+                return "The X display location must be printable ASCII text of at most 255 characters, for example 192.168.0.5:0.";
+            }
+            System.Collections.Generic.List<string> invalid = SmarTTY.Transport.TelnetEnvironment.InvalidLines(TelnetEnvironmentVariables);
+            if (invalid.Count > 0)
+            {
+                string first = invalid[0].Length > 60 ? invalid[0].Substring(0, 57) + "..." : invalid[0];
+                return invalid.Count + " environment variable line" + (invalid.Count == 1 ? " is" : "s are") + " not valid and would not be sent (one NAME=value per line, at most "
+                    + SmarTTY.Transport.TelnetEnvironment.MaxVariables + " variables): " + first;
+            }
+            return null;
+        }
+
         /// <summary>Null when the endpoint can be used, otherwise why not.</summary>
         public string ValidateEndpoint()
         {
@@ -922,6 +951,12 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         {
             MessageBoxes.Error(endpointProblem);
             txtHost.Focus();
+            return;
+        }
+        string telnetProblem = _Controller.ValidateTelnetOptions();
+        if (telnetProblem != null)
+        {
+            MessageBoxes.Error(telnetProblem);
             return;
         }
         string serialProblem = _Controller.ValidateSerialSettings(cbBaudRate.Text);

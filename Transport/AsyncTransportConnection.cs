@@ -674,6 +674,12 @@ internal class AsyncTransportConnection : IDisposable
         (_transport as ITerminalSizeAwareTransport)?.SetTerminalSize(columns, rows);
     }
 
+    /// <summary>Tells the transport the encoding of the terminal (used by telnet); other transports ignore it.</summary>
+    public void SetTextEncoding(System.Text.Encoding encoding)
+    {
+        (_transport as ITextEncodingAwareTransport)?.SetTextEncoding(encoding);
+    }
+
     public string GetDisplayName(bool includeParameters, IHostNameResolver hostNameResolver)
     {
         string name = _transport.GetDisplayName(includeParameters);
