@@ -190,7 +190,7 @@ internal static class Program
         Check(failure != null && failure.Contains("apk update"), "refresh fails clearly when the command cannot be run at all");
 
         failure = null;
-        updateRunner.Responses[wrapped] = Enumerable.Range(1, 30).Select(i => "line " + i).Concat(new[] { "__SMARTTY_EXIT__=100" }).ToArray();
+        updateRunner.Responses[wrapped] = Enumerable.Range(1, 60).Select(i => "line " + i).Concat(new[] { "__SMARTTY_EXIT__=100" }).ToArray();
         try
         {
             PackageIndexUpdater.Run(updateRunner, client, isRoot: true);
@@ -199,7 +199,7 @@ internal static class Program
         {
             failure = exception.Message;
         }
-        Check(failure != null && failure.Contains("line 30") && failure.Contains("line 23") && !failure.Contains("line 22\n"), "only the tail of a long error output is shown");
+        Check(failure != null && failure.Contains("line 60") && failure.Contains("line 31") && !failure.Contains("line 30\n"), "only the tail of a long error output is shown");
 
         // Choosing the client of a host from the probes (PackageManagerSelector).
         ILinuxPackageManagerClient[] all =
