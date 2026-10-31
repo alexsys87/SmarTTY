@@ -1167,7 +1167,8 @@ public class SshSession : IDisposable
                 Interlocked.Exchange(ref timedOut, 1);
                 try
                 {
-                    channel.Dispose();
+                    // Not Dispose: that waits for the server to confirm the close, and it does not while the command runs.
+                    channel.Abandon();
                 }
                 catch
                 {
