@@ -14,6 +14,8 @@ namespace SmarTTY.Controls
         internal struct LinkCell
         {
             public ILinkTarget Target;
+
+            public byte Severity;
         }
 
         internal interface ILinkScanner
@@ -21,6 +23,11 @@ namespace SmarTTY.Controls
             LinkCell[] Scan(string text);
 
             void Finish();
+        }
+
+        internal interface IColumnAwareLinkScanner : ILinkScanner
+        {
+            LinkCell[] Scan(string text, int column);
         }
     }
 }

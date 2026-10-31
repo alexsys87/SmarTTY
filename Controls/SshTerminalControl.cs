@@ -1856,11 +1856,14 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
     internal override ILinkScanner CreateLinkScanner()
     {
-        if (string.IsNullOrEmpty(VtSettings.AutoLinkExtensions))
+        // No extensions means no links; the words of errors and warnings are marked on their own setting.
+        bool links = !string.IsNullOrEmpty(VtSettings.AutoLinkExtensions);
+        bool highlight = VtSettings.HighlightDiagnostics;
+        if (!links && !highlight)
         {
             return null;
         }
-        return _channel?.Run?.CreateScanner();
+        return _channel?.Run?.CreateScanner(links, highlight);
     }
 
     private void PostToUi(Action action)

@@ -59,7 +59,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
             {
                 if (Foreground == 0 && Background == 0 && ExtendedForeground == 0 && ExtendedBackground == 0 && !Bold && !Inverse && !Underline && Override == null)
                 {
-                    return _link.Target == null;
+                    return _link.Target == null && _link.Severity == 0;
                 }
                 return false;
             }
@@ -108,6 +108,12 @@ public partial class TerminalEmulatorBase : TextEditorControl
     internal struct LinkCell
     {
         public ILinkTarget Target;
+
+        /// <summary>
+        /// 0: none; 1: the text is a note, 2: a warning, 3: an error (<see cref="Terminal.DiagnosticHighlighter"/>). The
+        /// cell is drawn in the colour of that kind unless the program that wrote it chose a colour of its own.
+        /// </summary>
+        public byte Severity;
     }
 
     internal interface ILinkScanner
@@ -115,6 +121,12 @@ public partial class TerminalEmulatorBase : TextEditorControl
         LinkCell[] Scan(string text);
 
         void Finish();
+    }
+
+    /// <summary>A scanner that is also told where on the screen each piece of text goes (column 0 is the start of a line).</summary>
+    internal interface IColumnAwareLinkScanner : ILinkScanner
+    {
+        LinkCell[] Scan(string text, int column);
     }
 
     private class LinkTracker
@@ -161,6 +173,10 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 return null;
             }
             _expectedPosition = new TextDocument.TextPosition(textPosition.Column + text.Length, textPosition.Line);
+            if (_scanner is IColumnAwareLinkScanner columnAware)
+            {
+                return columnAware.Scan(text, textPosition.Column);
+            }
             return _scanner.Scan(text);
         }
 
@@ -1245,6 +1261,12 @@ public partial class TerminalEmulatorBase : TextEditorControl
         return brush;
     }
 
+    // The palette entries of the colours: 2 is red, 4 yellow, 7 cyan (the SGR numbers 31, 33 and 36).
+    private static byte SeverityColor(byte severity)
+    {
+        return severity >= 3 ? (byte)2 : (severity == 2 ? (byte)4 : (byte)7);
+    }
+
     private ColorSpan CreateColorSpan(int start, int end, CellStyle cellStyle)
     {
         Brush foregroundBrush = (cellStyle.ExtendedForeground != 0) ? GetExtendedBrush(cellStyle.ExtendedForeground) : ((cellStyle.Foreground != 0 || !cellStyle.Bold) ? _palette.GetBrush(cellStyle.Foreground, cellStyle.Bold) : _defaultForeBrush);
@@ -1266,6 +1288,11 @@ public partial class TerminalEmulatorBase : TextEditorControl
         if (cellStyle.Override != null && cellStyle.Override.Brush != null)
         {
             foregroundBrush = cellStyle.Override.Brush;
+        }
+        else if (cellStyle._link.Severity != 0 && cellStyle.Foreground == 0 && cellStyle.ExtendedForeground == 0 && !cellStyle.Inverse)
+        {
+            // An error, a warning or a note that the program wrote without a colour of its own.
+            foregroundBrush = _palette.GetBrush(SeverityColor(cellStyle._link.Severity), bright: true);
         }
         return new ColorSpan
         {
