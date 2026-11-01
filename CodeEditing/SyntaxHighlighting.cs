@@ -46,7 +46,7 @@ namespace SmarTTY.CodeEditing
             Bash,
             Config,  // INI / .conf / .properties / TOML / systemd units
             CLike,   // C, C#, Java, JavaScript, Go, Rust, CSS, ...: // and /* */ comments
-            Script,  // Dockerfile, CMake, Ruby, Perl, ...: # comments
+            Script,  // R, AWK, Tcl, Nix: the generic # comment profile
             Sql,     // SQL: -- comments
             Markup,  // HTML, XML: <!-- --> comments and tag names
             Diff,    // unified diffs
@@ -59,7 +59,11 @@ namespace SmarTTY.CodeEditing
             Systemd, // systemd units: the colors of Config, the directives of systemd are keywords (SyntaxHighlighting.AdminFormats.cs)
             Nginx,   // nginx configuration: the colors of Config, the directives of nginx are keywords
             SshConfig, // ssh_config, sshd_config: the colors of Config, the options of OpenSSH are keywords
-            Log      // logs: the timestamp and the level (ERROR, WARN, ...) of each line
+            Log,     // logs: the timestamp and the level (ERROR, WARN, ...) of each line
+            Ruby,    // Ruby: # comments, def/end blocks
+            Perl,    // Perl: # comments, sub blocks
+            CMake,   // CMake: commands, variables and # comments
+            Dockerfile // Dockerfile: instructions and # comments
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -67,7 +71,8 @@ namespace SmarTTY.CodeEditing
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Lua, Language.Makefile, Language.Json, Language.Config,
             Language.Systemd, Language.Nginx, Language.SshConfig, Language.Log,
-            Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.Script, Language.Sql, Language.Markup, Language.Diff
+            Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.Script, Language.Ruby, Language.Perl,
+            Language.CMake, Language.Dockerfile, Language.Sql, Language.Markup, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -90,7 +95,11 @@ namespace SmarTTY.CodeEditing
                 case Language.Python: return "Python";
                 case Language.CLike: return "C, C#, Java, JavaScript";
                 case Language.Cpp: return "C++";
-                case Language.Script: return "Script (Perl, Ruby, Dockerfile)";
+                case Language.Script: return "Script (R, AWK, Tcl, Nix)";
+                case Language.Ruby: return "Ruby";
+                case Language.Perl: return "Perl";
+                case Language.CMake: return "CMake";
+                case Language.Dockerfile: return "Dockerfile";
                 case Language.Sql: return "SQL";
                 case Language.Markup: return "HTML, XML";
                 case Language.Diff: return "Diff, patch";
@@ -244,7 +253,32 @@ namespace SmarTTY.CodeEditing
 
                 case "dockerfile":
                 case "containerfile":
+                    return Language.Dockerfile;
+
                 case "cmakelists.txt":
+                    return Language.CMake;
+
+                case "gemfile":
+                case "rakefile":
+                case "vagrantfile":
+                case "guardfile":
+                case "capfile":
+                case "podfile":
+                case "fastfile":
+                case "appfile":
+                case "berksfile":
+                case "thorfile":
+                case "brewfile":
+                case "puppetfile":
+                case "dangerfile":
+                case "steepfile":
+                    return Language.Ruby;
+
+                case "makefile.pl":
+                case "build.pl":
+                case "cpanfile":
+                    return Language.Perl;
+
                 case "requirements.txt":
                 case ".gitignore":
                 case ".hgignore":
@@ -282,7 +316,7 @@ namespace SmarTTY.CodeEditing
             // Variants of well-known names: Dockerfile.dev, Makefile.am.
             if (name.StartsWith("dockerfile.", StringComparison.Ordinal) || name.StartsWith("containerfile.", StringComparison.Ordinal))
             {
-                return Language.Script;
+                return Language.Dockerfile;
             }
             if (name.StartsWith("makefile.", StringComparison.Ordinal))
             {
@@ -391,13 +425,27 @@ namespace SmarTTY.CodeEditing
                     return Language.Cpp;
 
                 case "rb":
+                case "rake":
+                case "gemspec":
+                case "ru":
+                    return Language.Ruby;
+
                 case "pl":
                 case "pm":
+                case "pod":
+                case "psgi":
+                case "t":
+                    return Language.Perl;
+
+                case "cmake":
+                    return Language.CMake;
+
+                case "dockerfile":
+                    return Language.Dockerfile;
+
                 case "r":
                 case "tcl":
                 case "awk":
-                case "cmake":
-                case "dockerfile":
                 case "nix":
                     return Language.Script;
 
@@ -503,10 +551,21 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.Lua;
             }
-            if (program.StartsWith("perl", StringComparison.Ordinal) ||
-                program.StartsWith("ruby", StringComparison.Ordinal) ||
-                program.EndsWith("awk", StringComparison.Ordinal) ||
-                program == "tclsh")
+            if (program.StartsWith("ruby", StringComparison.Ordinal))
+            {
+                return Language.Ruby;
+            }
+            if (program.StartsWith("perl", StringComparison.Ordinal))
+            {
+                return Language.Perl;
+            }
+            if (program.StartsWith("cmake", StringComparison.Ordinal))
+            {
+                return Language.CMake;
+            }
+            if (program.EndsWith("awk", StringComparison.Ordinal) ||
+                program == "tclsh" || program == "wish" || program == "rscript" ||
+                program.StartsWith("nix", StringComparison.Ordinal))
             {
                 return Language.Script;
             }
@@ -530,6 +589,10 @@ namespace SmarTTY.CodeEditing
                 case Language.CLike: return CLikeTokenizer;
                 case Language.Cpp: return CppTokenizer;
                 case Language.Script: return ScriptTokenizer;
+                case Language.Ruby: return RubyTokenizer;
+                case Language.Perl: return PerlTokenizer;
+                case Language.CMake: return CMakeTokenizer;
+                case Language.Dockerfile: return DockerfileTokenizer;
                 case Language.Sql: return SqlTokenizer;
                 case Language.Markup: return MarkupTokenizer;
                 case Language.Diff: return TokenizeDiff;
@@ -578,6 +641,14 @@ namespace SmarTTY.CodeEditing
                     return Combine(CppKeywords, PreprocessorDirectives);
                 case Language.Script:
                     return Combine(ScriptKeywords);
+                case Language.Ruby:
+                    return Combine(RubyKeywords);
+                case Language.Perl:
+                    return Combine(PerlKeywords);
+                case Language.CMake:
+                    return Combine(CMakeKeywords);
+                case Language.Dockerfile:
+                    return Combine(DockerfileKeywords);
                 case Language.Sql:
                     return Combine(SqlKeywords);
                 case Language.Makefile:
@@ -1666,13 +1737,69 @@ namespace SmarTTY.CodeEditing
 
         private static readonly HashSet<string> ScriptKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
-            "if", "elif", "elsif", "else", "unless", "end", "endif", "for", "foreach", "while", "until", "do",
-            "done", "case", "when", "then", "begin", "rescue", "ensure", "return", "break", "next", "last",
-            "redo", "def", "class", "module", "sub", "my", "our", "local", "use", "require", "include",
-            "import", "export", "true", "false", "nil", "undef", "and", "or", "not", "in", "function",
-            "ifeq", "ifneq", "ifdef", "ifndef", "define", "endef", "override",
-            "FROM", "RUN", "CMD", "LABEL", "EXPOSE", "ENV", "ADD", "COPY", "ENTRYPOINT", "VOLUME", "USER",
-            "WORKDIR", "ARG", "ONBUILD", "STOPSIGNAL", "HEALTHCHECK", "SHELL"
+            // R.
+            "if", "else", "repeat", "while", "function", "for", "in", "next", "break", "library", "require",
+            "source", "TRUE", "FALSE", "NULL", "NA", "NaN", "Inf",
+            // AWK.
+            "BEGIN", "END", "do", "continue", "nextfile", "exit", "delete", "getline", "print", "printf",
+            // Tcl.
+            "proc", "elseif", "then", "foreach", "switch", "case", "default", "set", "unset", "expr", "return",
+            "namespace", "variable", "global", "upvar", "uplevel", "catch", "error",
+            // Nix.
+            "let", "with", "rec", "inherit", "assert", "or"
+        };
+
+        private static readonly HashSet<string> RubyKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "BEGIN", "END", "alias", "and", "begin", "break", "case", "class", "def", "do", "else", "elsif",
+            "end", "ensure", "false", "for", "if", "in", "module", "next", "nil", "not", "or", "redo", "rescue",
+            "retry", "return", "self", "super", "then", "true", "undef", "unless", "until", "when", "while",
+            "yield", "__FILE__", "__LINE__", "__dir__", "require", "require_relative", "load", "include",
+            "extend", "prepend", "attr_accessor", "attr_reader", "attr_writer", "private", "protected", "public",
+            "module_function", "raise", "lambda", "proc", "catch", "throw", "loop"
+        };
+
+        private static readonly HashSet<string> PerlKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "BEGIN", "END", "CHECK", "INIT", "UNITCHECK", "package", "use", "no", "require", "sub", "my", "our",
+            "local", "state", "if", "elsif", "else", "unless", "while", "until", "for", "foreach", "continue",
+            "last", "next", "redo", "goto", "return", "do", "eval", "die", "warn", "defined", "undef", "ref",
+            "bless", "wantarray", "scalar", "qw", "qq", "qr", "qx", "and", "or", "not", "xor", "eq", "ne", "lt",
+            "gt", "le", "ge", "cmp", "__END__", "__DATA__"
+        };
+
+        private static readonly HashSet<string> CMakeKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "add_compile_definitions", "add_compile_options", "add_custom_command", "add_custom_target",
+            "add_definitions", "add_dependencies", "add_executable", "add_library", "add_link_options",
+            "add_subdirectory", "add_test", "aux_source_directory", "break", "build_command",
+            "cmake_host_system_information", "cmake_language", "cmake_minimum_required", "cmake_parse_arguments",
+            "cmake_path", "cmake_policy", "configure_file", "continue", "create_test_sourcelist", "ctest_build",
+            "ctest_configure", "ctest_coverage", "ctest_empty_binary_directory", "ctest_memcheck",
+            "ctest_read_custom_files", "ctest_run_script", "ctest_sleep", "ctest_start", "ctest_submit",
+            "ctest_test", "ctest_update", "ctest_upload", "define_property", "else", "elseif", "enable_language",
+            "enable_testing", "endforeach", "endfunction", "endif", "endmacro", "endwhile", "execute_process",
+            "export", "file", "find_file", "find_library", "find_package", "find_path", "find_program", "foreach",
+            "function", "get_cmake_property", "get_directory_property", "get_filename_component", "get_property",
+            "get_source_file_property", "get_target_property", "get_test_property", "if", "include",
+            "include_directories", "include_external_msproject", "include_guard", "include_regular_expression",
+            "install", "link_directories", "link_libraries", "list", "load_cache", "load_command", "macro",
+            "make_directory", "mark_as_advanced", "math", "message", "option", "project", "remove",
+            "remove_definitions", "return", "separate_arguments", "set", "set_directory_properties",
+            "set_property", "set_source_files_properties", "set_target_properties", "set_tests_properties",
+            "site_name", "source_group", "string", "target_compile_definitions", "target_compile_features",
+            "target_compile_options", "target_include_directories", "target_link_directories",
+            "target_link_libraries", "target_link_options", "target_precompile_headers", "target_sources",
+            "try_compile", "try_run", "unset", "variable_watch", "while",
+            // Common arguments and boolean constants.
+            "ON", "OFF", "TRUE", "FALSE", "YES", "NO", "NOTFOUND", "REQUIRED", "QUIET", "INTERFACE", "PUBLIC",
+            "PRIVATE", "EXISTS", "COMMAND", "TARGET", "POLICY", "VERSION", "STATUS", "FATAL_ERROR", "WARNING"
+        };
+
+        private static readonly HashSet<string> DockerfileKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "FROM", "RUN", "CMD", "LABEL", "MAINTAINER", "EXPOSE", "ENV", "ADD", "COPY", "ENTRYPOINT", "VOLUME",
+            "USER", "WORKDIR", "ARG", "ONBUILD", "STOPSIGNAL", "HEALTHCHECK", "SHELL"
         };
 
         private static readonly HashSet<string> SqlKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -1694,6 +1821,8 @@ namespace SmarTTY.CodeEditing
         private sealed class GenericSyntax
         {
             public bool HashComments;          // '#' starts a comment at the start of a line or after whitespace
+            public bool HashCommentsAnywhere;  // '#' starts a comment even directly after code (Ruby, Perl, CMake)
+            public bool KeywordsAtLineStart;   // only the first word of a line is a keyword (Dockerfile, CMake)
             public bool SlashComments;         // "//" comments
             public bool DashDashComments;      // "--" comments
             public bool Preprocessor;          // #include-style directives at the start of a line
@@ -1720,7 +1849,8 @@ namespace SmarTTY.CodeEditing
                 {
                     return true;
                 }
-                return HashComments && c == '#' && (i == 0 || char.IsWhiteSpace(text[i - 1]));
+                return HashComments && c == '#' &&
+                    (HashCommentsAnywhere || i == 0 || char.IsWhiteSpace(text[i - 1]));
             }
 
             /// <summary>The index after the end of a string of the given kind (a state bit) searched from an index, or -1.</summary>
@@ -2056,7 +2186,19 @@ namespace SmarTTY.CodeEditing
                                 continue;
                             }
                         }
-                        if (Keywords != null && Keywords.Contains(word))
+                        bool keyword = Keywords != null && Keywords.Contains(word);
+                        if (keyword && KeywordsAtLineStart)
+                        {
+                            // Dockerfile instructions and CMake commands are the first word of a line;
+                            // the same word in an argument is plain text.
+                            int before = s - 1;
+                            while (before >= 0 && char.IsWhiteSpace(text[before]))
+                            {
+                                before--;
+                            }
+                            keyword = before < 0;
+                        }
+                        if (keyword)
                         {
                             Normal(ref last, last, s, sink);
                             sink.AddToken(TypeKeyword, s, i);
@@ -2114,6 +2256,40 @@ namespace SmarTTY.CodeEditing
         {
             HashComments = true,
             Keywords = ScriptKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer RubyTokenizer = new GenericSyntax
+        {
+            HashComments = true,
+            HashCommentsAnywhere = true,
+            Brackets = true,
+            FoldCurlyBraces = true,
+            Keywords = RubyKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer PerlTokenizer = new GenericSyntax
+        {
+            HashComments = true,
+            HashCommentsAnywhere = true,
+            Brackets = true,
+            FoldCurlyBraces = true,
+            Keywords = PerlKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer CMakeTokenizer = new GenericSyntax
+        {
+            HashComments = true,
+            HashCommentsAnywhere = true,
+            KeywordsAtLineStart = true,
+            Brackets = true,
+            Keywords = CMakeKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer DockerfileTokenizer = new GenericSyntax
+        {
+            HashComments = true,
+            KeywordsAtLineStart = true,
+            Keywords = DockerfileKeywords
         }.Tokenize;
 
         private static readonly TokenCache.LineTokenizer SqlTokenizer = new GenericSyntax

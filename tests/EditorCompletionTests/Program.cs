@@ -61,6 +61,10 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("constexpr"), "C++ keywords contain 'constexpr'");
         Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("nullptr"), "C++ keywords contain 'nullptr'");
         Check(!SyntaxHighlighting.GetKeywords(L.Cpp).Contains("interface"), "C++ keywords do not include the C# 'interface'");
+        Check(SyntaxHighlighting.GetKeywords(L.Ruby).Contains("def"), "Ruby keywords contain 'def'");
+        Check(SyntaxHighlighting.GetKeywords(L.Perl).Contains("sub"), "Perl keywords contain 'sub'");
+        Check(SyntaxHighlighting.GetKeywords(L.CMake).Contains("add_executable"), "CMake keywords contain 'add_executable'");
+        Check(SyntaxHighlighting.GetKeywords(L.Dockerfile).Contains("FROM"), "Dockerfile keywords contain 'FROM'");
         Check(SyntaxHighlighting.GetKeywords(L.Markup).Count == 0, "Markup has no keyword list of its own");
     }
 
@@ -102,6 +106,14 @@ internal static class Program
         Check(cpp.Contains("constexpr"), "the C++ keyword 'constexpr' is offered");
         Check(cpp.Contains("values"), "a C++ document identifier is offered");
         Check(!cpp.Contains("interface"), "a C# keyword is not offered for C++");
+
+        // Ruby, CMake and Dockerfile have separate keyword sets.
+        Check(Names(L.Ruby, "", "").Contains("def"), "the Ruby keyword 'def' is offered");
+        Check(!Names(L.Ruby, "", "").Contains("FROM"), "a Dockerfile instruction is not offered for Ruby");
+        Check(Names(L.Perl, "", "").Contains("sub"), "the Perl keyword 'sub' is offered");
+        Check(Names(L.CMake, "", "add_").Contains("add_executable"), "the CMake command 'add_executable' is offered");
+        Check(Names(L.Dockerfile, "", "FR").Contains("FROM"), "the Dockerfile instruction 'FROM' is offered");
+        Check(!Names(L.Dockerfile, "", "add_").Contains("add_executable"), "the CMake command is not offered for Dockerfile");
     }
 
     private static void FileLanguageChecks()

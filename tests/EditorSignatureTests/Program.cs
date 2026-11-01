@@ -54,9 +54,13 @@ internal static class Program
         Equal(string.Join("|", Definitions(L.Lua, "function M.add(a, b)\nend\n")), "add(a, b)", "lua: method name keeps the last identifier");
         Check(!Definitions(L.Lua, "-- function f(a)\n").Any(), "lua: a comment is not a definition");
 
-        // Script (Ruby / Perl / shell / Dockerfile share this tokenizer).
-        Equal(string.Join("|", Definitions(L.Script, "def render(item, style)\nend\n")), "render(item, style)", "script: def");
-        Equal(string.Join("|", Definitions(L.Script, "sub trim($)\n}\n")), "trim($)", "script: sub");
+        // Ruby, Perl and CMake have their own profiles; Dockerfile has no functions.
+        Equal(string.Join("|", Definitions(L.Ruby, "def render(item, style)\nend\n")), "render(item, style)", "ruby: def");
+        Equal(string.Join("|", Definitions(L.Ruby, "def self.render(item)\nend\n")), "render(item)", "ruby: a singleton method keeps the callable name");
+        Equal(string.Join("|", Definitions(L.Perl, "sub trim($)\n}\n")), "trim($)", "perl: sub");
+        Equal(string.Join("|", Definitions(L.CMake, "function(my_func arg1 arg2)\nendfunction()\n")), "my_func(arg1 arg2)", "cmake: function");
+        Equal(string.Join("|", Definitions(L.CMake, "macro(my_macro)\nendmacro()\n")), "my_macro()", "cmake: macro");
+        Check(!Definitions(L.Dockerfile, "FROM alpine\n").Any(), "dockerfile: no definitions");
 
         // C-like.
         Equal(string.Join("|", Definitions(L.CLike, "int add(int a, int b) {\n    return a + b;\n}\n")), "add(int a, int b)", "c-like: a function definition");
