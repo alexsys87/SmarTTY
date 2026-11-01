@@ -65,7 +65,13 @@ public static class EditorCompletionSource
         {
             return false;
         }
-        for (int i = 1; i < word.Length; i++)
+        // Ruby predicates and bang methods end with '?' or '!' ("empty?", "sort!").
+        int length = word.Length;
+        if (length > 1 && (word[length - 1] == '?' || word[length - 1] == '!'))
+        {
+            length--;
+        }
+        for (int i = 1; i < length; i++)
         {
             if (!IsIdentifierChar(word[i]))
             {

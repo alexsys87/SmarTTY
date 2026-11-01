@@ -68,7 +68,7 @@ internal static class Program
         }
 
         // The set covers the languages the editor highlights with a code tokenizer.
-        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Ruby })
+        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Ruby, L.Perl, L.CMake })
         {
             Check(database.ForLanguage(language).Count > 0, "the set has symbols for " + language);
         }
@@ -288,6 +288,90 @@ internal static class Program
         Check(database.Find(L.CMake, "puts") == null, "CMake does not see the Ruby methods");
         Check(database.Find(L.Dockerfile, "puts") == null, "Dockerfile does not see the Ruby methods");
 
+        // The Ruby set covers the kernel, core classes and the common standard modules.
+        Check(ruby.Count > 400, "the Ruby set is broad (" + ruby.Count + " symbols)");
+        foreach (string name in new[]
+                 {
+                     "warn", "raise", "loop", "Integer", "lambda", "send", "respond_to?", "new", "dup",
+                     "empty?", "start_with?", "gsub", "match?", "each_line", "unicode_normalize",
+                     "each_with_index", "reduce", "transform_values", "each_slice", "tally", "lazy",
+                     "even?", "gcd", "next_float", "File.exist?", "File.basename", "Dir.glob", "read",
+                     "write", "Time.now", "strftime", "Regexp.escape", "Math.sqrt", "JSON.parse",
+                     "Base64.strict_encode64", "SecureRandom.hex", "FileUtils.mkdir_p", "Open3.capture3"
+                 })
+        {
+            Check(database.Find(L.Ruby, name) != null, "the Ruby set includes '" + name + "'");
+        }
+        Check(database.Find(L.Ruby, "File.exist?").Description.Contains("File class method"),
+            "the description of 'File.exist?' names the File class");
+        Check(database.Find(L.Ruby, "Math.sqrt").Description.Contains("Math module"),
+            "the description of 'Math.sqrt' names the Math module");
+        Check(database.Find(L.Ruby, "JSON.parse").Description.Contains("JSON module"),
+            "the description of 'JSON.parse' names the JSON module");
+        ParameterSignature rubyExist = database.FindSignature(L.Ruby, "exist?");
+        Check(rubyExist != null, "the Ruby predicate 'exist?' resolves to its signature");
+        Equal(rubyExist.ToString(), "File.exist?(path)", "the Ruby predicate keeps its qualified signature");
+        Equal(database.FindSignature(L.Ruby, "Math.sqrt").ToString(), "Math.sqrt(x)",
+            "the Ruby Math signature keeps its module");
+
+        // Perl is a separate profile: the builtins and the common standard modules.
+        List<ApiSymbolDatabase.Symbol> perl = database.ForLanguage(L.Perl).ToList();
+        Check(perl.Count > 190, "the Perl set is broad (" + perl.Count + " symbols)");
+        Equal(perl.Count, perl.Select(s => s.Name).Distinct().Count(), "Perl names are unique");
+        Equal(perl.Count, perl.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every Perl symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "print", "printf", "substr", "split", "join", "push", "keys", "values", "open",
+                     "close", "chomp", "stat", "File::Basename::basename", "File::Spec::catfile",
+                     "List::Util::sum", "JSON::PP::encode_json", "Getopt::Long::GetOptions",
+                     "Data::Dumper::Dumper", "Cwd::getcwd", "MIME::Base64::encode_base64",
+                     "Digest::SHA::sha256_hex", "Sys::Hostname::hostname"
+                 })
+        {
+            Check(database.Find(L.Perl, name) != null, "the Perl set includes '" + name + "'");
+        }
+        Check(database.Find(L.Perl, "substr").Description.Contains("Perl built-in"),
+            "the description of 'substr' names a Perl builtin");
+        Check(database.Find(L.Perl, "File::Basename::basename").Description.Contains("File::Basename module"),
+            "the description of 'File::Basename::basename' names the module");
+        Equal(database.FindSignature(L.Perl, "substr").ToString(), "substr($expr, $offset, $length)",
+            "the Perl signature keeps its parameters");
+        Equal(database.FindSignature(L.Perl, "basename").ToString(), "File::Basename::basename($path, $suffix)",
+            "a bare Perl module call resolves to the qualified signature");
+        Check(database.Find(L.Perl, "add_executable") == null, "Perl does not see the CMake commands");
+        Check(database.Find(L.Ruby, "substr") == null, "Ruby does not see the Perl builtins");
+
+        // CMake is a separate profile: the commands carry signatures, the variables and conditions their docs.
+        List<ApiSymbolDatabase.Symbol> cmake = database.ForLanguage(L.CMake).ToList();
+        Check(cmake.Count > 160, "the CMake set is broad (" + cmake.Count + " symbols)");
+        Equal(cmake.Count, cmake.Select(s => s.Name).Distinct().Count(), "CMake names are unique");
+        Equal(cmake.Count, cmake.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every CMake symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "add_executable", "add_library", "target_link_libraries", "target_include_directories",
+                     "cmake_minimum_required", "find_package", "configure_file", "execute_process",
+                     "set", "unset", "message", "CMAKE_SOURCE_DIR", "CMAKE_CXX_STANDARD", "PROJECT_NAME",
+                     "CMAKE_BUILD_TYPE", "WIN32"
+                 })
+        {
+            Check(database.Find(L.CMake, name) != null, "the CMake set includes '" + name + "'");
+        }
+        Check(database.Find(L.CMake, "add_executable").Description.Contains("CMake command"),
+            "the description of 'add_executable' names a CMake command");
+        Check(database.Find(L.CMake, "CMAKE_SOURCE_DIR").Description.Contains("CMake variable"),
+            "the description of 'CMAKE_SOURCE_DIR' names a CMake variable");
+        Check(database.Find(L.CMake, "WIN32").Description.Contains("CMake condition"),
+            "the description of 'WIN32' names a CMake condition");
+        Equal(database.FindSignature(L.CMake, "add_executable").ToString(), "add_executable(name sources...)",
+            "the CMake signature keeps its arguments");
+        Equal(database.FindSignature(L.CMake, "ADD_EXECUTABLE").ToString(), "add_executable(name sources...)",
+            "a CMake command is found without case");
+        Check(database.FindSignature(L.CMake, "CMAKE_SOURCE_DIR") == null,
+            "a CMake variable has no parameter hint");
+        Check(database.Find(L.CMake, "puts") == null, "CMake does not see the Ruby methods");
+
         // The remaining Script languages are still a profile of their own.
         Equal(database.ForLanguage(L.Script).Count, 0, "the generic Script profile has no API symbols of its own");
 
@@ -403,6 +487,28 @@ internal static class Program
             "the Ruby method 'puts' is not offered for CMake");
         Check(!Build(L.Dockerfile, "", "pu", database).Any(s => s.DisplayName == "puts"),
             "the Ruby method 'puts' is not offered for Dockerfile");
+
+        // Ruby predicates end with '?' and are offered like the other methods.
+        ISuggestion rubyExist = Build(L.Ruby, "", "exi", database).FirstOrDefault(s => s.DisplayName == "exist?");
+        Check(rubyExist != null, "the completion list offers the Ruby predicate 'exist?'");
+        Equal(rubyExist.DetailText, "File exists", "the Ruby predicate summary is the detail text");
+        Equal(rubyExist.HintText, "File.exist?(path)", "the Ruby predicate keeps its qualified signature");
+        Check(Build(L.Ruby, "", "suc", database).Any(s => s.DisplayName == "succ"),
+            "the completion list offers the Ruby String method 'succ'");
+
+        // The Perl builtins and module functions feed the completion list under their short names.
+        ISuggestion perlSubstr = Build(L.Perl, "", "subs", database).FirstOrDefault(s => s.DisplayName == "substr");
+        Check(perlSubstr != null, "the completion list offers the Perl builtin 'substr'");
+        Equal(perlSubstr.DetailText, "Extract a substring", "the Perl summary is the detail text");
+        Equal(perlSubstr.HintText, "substr($expr, $offset, $length)", "the Perl signature is the hint text");
+        Check(Build(L.Perl, "", "base", database).Any(s => s.DisplayName == "basename"),
+            "the completion list offers 'File::Basename::basename' as 'basename'");
+
+        // CMake variables are API symbols because the commands are already keywords.
+        ISuggestion cmakeSource = Build(L.CMake, "", "CMAKE_SO", database)
+            .FirstOrDefault(s => s.DisplayName == "CMAKE_SOURCE_DIR");
+        Check(cmakeSource != null, "the completion list offers the CMake variable 'CMAKE_SOURCE_DIR'");
+        Equal(cmakeSource.DetailText, "Top-level source directory", "the CMake variable summary is the detail text");
 
         // The Python modules are offered under their plain names too.
         List<ISuggestion> pythonMath = Build(L.Python, "", "sqr", database);
@@ -531,6 +637,30 @@ internal static class Program
             L.Cpp, "printf(\n", 0, 7, database, out int cppPrintfActive);
         Check(cppPrintf != null, "a 'printf(' call in C++ finds the inherited C function");
         Equal(cppPrintf.Name, "printf", "the inherited C hint keeps its name");
+
+        // Ruby predicates keep the trailing '?' in the name.
+        ParameterSignature rubyExistHint = EditorSignatureSource.FindSignature(
+            L.Ruby, "File.exist?(\n", 0, 12, database, out int rubyExistActive);
+        Check(rubyExistHint != null, "a 'File.exist?(' call finds the Ruby predicate");
+        Equal(rubyExistHint.Name, "File.exist?", "the Ruby predicate hint keeps its name");
+        Equal(rubyExistHint.ParameterCount, 1, "the Ruby predicate hint has its parameter");
+
+        ParameterSignature rubyEmpty = EditorSignatureSource.FindSignature(
+            L.Ruby, "empty?(\n", 0, 7, database, out int rubyEmptyActive);
+        Check(rubyEmpty != null, "a bare 'empty?(' call finds the Ruby predicate");
+        Equal(rubyEmpty.Name, "empty?", "the bare Ruby predicate hint keeps its name");
+
+        // Perl builtins and CMake commands resolve to their signatures; CMake ignores the case.
+        ParameterSignature perlSubstrHint = EditorSignatureSource.FindSignature(
+            L.Perl, "substr(\n", 0, 7, database, out int perlSubstrActive);
+        Check(perlSubstrHint != null, "a 'substr(' call finds the Perl builtin");
+        Equal(perlSubstrHint.ParameterCount, 3, "the Perl builtin hint has its parameters");
+
+        ParameterSignature cmakeAdd = EditorSignatureSource.FindSignature(
+            L.CMake, "ADD_EXECUTABLE(\n", 0, 15, database, out int cmakeAddActive);
+        Check(cmakeAdd != null, "an 'ADD_EXECUTABLE(' call finds the CMake command");
+        Equal(cmakeAdd.Name, "add_executable", "the CMake hint shows the canonical command name");
+        Equal(cmakeAdd.ParameterCount, 1, "the CMake command hint has its arguments");
 
         // Without a database the unknown call shows nothing.
         Check(EditorSignatureSource.FindSignature(L.Python, "print(\n", 0, 6, null, out _) == null,

@@ -17581,5 +17581,3085 @@
       <Summary>Formatted string</Summary>
       <Description>Ruby method. Returns the arguments formatted by the format string instead of writing them.</Description>
     </Symbol>
+    <Symbol language="Ruby" name="warn" signature="warn(message)">
+      <Summary>Write a warning to stderr</Summary>
+      <Description>Ruby method. Writes the message to standard error unless warnings are disabled.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="raise" signature="raise(exception, message)">
+      <Summary>Raise an exception</Summary>
+      <Description>Ruby method. Raises the exception with the optional message; with no arguments it re-raises the current exception.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="fail" signature="fail(exception, message)">
+      <Summary>Raise an exception</Summary>
+      <Description>Ruby method. An alias of raise.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="loop" signature="loop(block)">
+      <Summary>Repeat a block</Summary>
+      <Description>Ruby method. Calls the block until it raises StopIteration.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="sleep" signature="sleep(seconds)">
+      <Summary>Pause the current thread</Summary>
+      <Description>Ruby method. Suspends the current thread for the given number of seconds.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="exit" signature="exit(status)">
+      <Summary>End the program</Summary>
+      <Description>Ruby method. Raises SystemExit with the given status; the process ends unless the exception is rescued.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="abort" signature="abort(message)">
+      <Summary>End the program with an error</Summary>
+      <Description>Ruby method. Writes the message to standard error and exits with a failure status.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="at_exit" signature="at_exit(block)">
+      <Summary>Run a block at exit</Summary>
+      <Description>Ruby method. Registers the block to run when the program exits.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="system" signature="system(command, args)">
+      <Summary>Run a command</Summary>
+      <Description>Ruby method. Runs the command in a subshell and returns true when it exits successfully.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="exec" signature="exec(command, args)">
+      <Summary>Replace the process</Summary>
+      <Description>Ruby method. Replaces the current process with the command.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="spawn" signature="spawn(command, args)">
+      <Summary>Start a process</Summary>
+      <Description>Ruby method. Starts the command in a new process and returns its process id.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="rand" signature="rand(limit)">
+      <Summary>Random number</Summary>
+      <Description>Ruby method. Returns a random float below one, or an integer below the limit.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="srand" signature="srand(seed)">
+      <Summary>Seed the random generator</Summary>
+      <Description>Ruby method. Seeds the random number generator and returns the previous seed.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="format" signature="format(template, args)">
+      <Summary>Formatted string</Summary>
+      <Description>Ruby method. Returns the arguments formatted by the template; an alias of sprintf.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Integer" signature="Integer(value, base)">
+      <Summary>Convert to an integer</Summary>
+      <Description>Ruby method. Converts the value to an integer and raises ArgumentError when it is not a number.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Float" signature="Float(value)">
+      <Summary>Convert to a float</Summary>
+      <Description>Ruby method. Converts the value to a float and raises ArgumentError when it is not a number.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="String" signature="String(value)">
+      <Summary>Convert to a string</Summary>
+      <Description>Ruby method. Converts the value with to_s.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Array" signature="Array(value)">
+      <Summary>Convert to an array</Summary>
+      <Description>Ruby method. Returns the value as an array, wrapping a single object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Hash" signature="Hash(value)">
+      <Summary>Convert to a hash</Summary>
+      <Description>Ruby method. Returns the value as a hash and raises TypeError when it cannot be converted.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="lambda" signature="lambda(block)">
+      <Summary>Create a lambda</Summary>
+      <Description>Ruby method. Returns a lambda from the block with strict argument checking.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="proc" signature="proc(block)">
+      <Summary>Create a procedure</Summary>
+      <Description>Ruby method. Returns a Proc from the block without strict argument checking.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="catch" signature="catch(tag, block)">
+      <Summary>Catch a throw</Summary>
+      <Description>Ruby method. Runs the block and returns the value thrown with the matching tag.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="throw" signature="throw(tag, value)">
+      <Summary>Throw a tag</Summary>
+      <Description>Ruby method. Unwinds to the matching catch with the given value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="binding" signature="binding()">
+      <Summary>Capture the current scope</Summary>
+      <Description>Ruby method. Returns a Binding that captures the local variables and methods of the current scope.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="eval" signature="eval(string, binding)">
+      <Summary>Evaluate Ruby code</Summary>
+      <Description>Ruby method. Evaluates the string as Ruby code in the given binding.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="load" signature="load(filename)">
+      <Summary>Load a Ruby file</Summary>
+      <Description>Ruby method. Loads and runs the Ruby file every time it is called.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="require_relative" signature="require_relative(path)">
+      <Summary>Load a relative library</Summary>
+      <Description>Ruby method. Loads the library once, resolving the path relative to the calling file.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="autoload" signature="autoload(constant, filename)">
+      <Summary>Load a constant on demand</Summary>
+      <Description>Ruby method. Registers the file that defines the constant and loads it on first use.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="caller" signature="caller(start, length)">
+      <Summary>Call stack</Summary>
+      <Description>Ruby method. Returns the current call stack as an array of strings.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="caller_locations" signature="caller_locations(start, length)">
+      <Summary>Call stack locations</Summary>
+      <Description>Ruby method. Returns the current call stack as Location objects.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="fork" signature="fork(block)">
+      <Summary>Fork the process</Summary>
+      <Description>Ruby method. Creates a child process and returns its process id in the parent and nil in the child.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="trap" signature="trap(signal, command)">
+      <Summary>Handle a signal</Summary>
+      <Description>Ruby method. Registers the handler for the signal.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="test" signature="test(cmd, path)">
+      <Summary>File test</Summary>
+      <Description>Ruby method. Performs the single-character file test on the path.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="open" signature="open(path, mode)">
+      <Summary>Open a file or URL</Summary>
+      <Description>Ruby method. Opens the file or IO object and returns it; a block closes it automatically.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="putc" signature="putc(char)">
+      <Summary>Write a character</Summary>
+      <Description>Ruby method. Writes one character to the output.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="pp" signature="pp(object)">
+      <Summary>Pretty print</Summary>
+      <Description>Ruby method. Writes the object in an indented, readable form and returns it.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="readline" signature="readline(separator)">
+      <Summary>Read a line</Summary>
+      <Description>Ruby method. Reads a line from standard input and raises EOFError at the end.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="readlines" signature="readlines(separator)">
+      <Summary>Read all lines</Summary>
+      <Description>Ruby method. Reads the remaining lines and returns them as an array.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="global_variables" signature="global_variables()">
+      <Summary>List global variables</Summary>
+      <Description>Ruby method. Returns the names of the global variables.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="local_variables" signature="local_variables()">
+      <Summary>List local variables</Summary>
+      <Description>Ruby method. Returns the names of the local variables in the current scope.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="block_given?" signature="block_given?()">
+      <Summary>Block given</Summary>
+      <Description>Ruby method. Returns true when the current method was called with a block.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="send" signature="send(name, args)">
+      <Summary>Call a method</Summary>
+      <Description>Ruby method. Calls the named method, including private methods.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="public_send" signature="public_send(name, args)">
+      <Summary>Call a public method</Summary>
+      <Description>Ruby method. Calls the named public method.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="method" signature="method(name)">
+      <Summary>Method object</Summary>
+      <Description>Ruby method. Returns a Method object for the named method.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="methods" signature="methods()">
+      <Summary>List methods</Summary>
+      <Description>Ruby method. Returns the names of the public and protected methods of the object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="singleton_methods" signature="singleton_methods()">
+      <Summary>List singleton methods</Summary>
+      <Description>Ruby method. Returns the names of the methods defined on the singleton class.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="instance_variables" signature="instance_variables()">
+      <Summary>List instance variables</Summary>
+      <Description>Ruby method. Returns the names of the instance variables.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="instance_variable_get" signature="instance_variable_get(name)">
+      <Summary>Read an instance variable</Summary>
+      <Description>Ruby method. Returns the value of the instance variable with the given name.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="instance_variable_set" signature="instance_variable_set(name, value)">
+      <Summary>Write an instance variable</Summary>
+      <Description>Ruby method. Sets the instance variable and returns the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="instance_variable_defined?" signature="instance_variable_defined?(name)">
+      <Summary>Instance variable defined</Summary>
+      <Description>Ruby method. Returns true when the instance variable exists.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="remove_instance_variable" signature="remove_instance_variable(name)">
+      <Summary>Remove an instance variable</Summary>
+      <Description>Ruby method. Removes the instance variable and returns its value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="object_id" signature="object_id()">
+      <Summary>Object identity</Summary>
+      <Description>Ruby method. Returns the stable identifier of the object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="hash" signature="hash()">
+      <Summary>Hash code</Summary>
+      <Description>Ruby method. Returns the integer hash code used by Hash and Set.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="dup" signature="dup()">
+      <Summary>Shallow copy</Summary>
+      <Description>Ruby method. Returns a shallow copy that shares the referenced objects.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="clone" signature="clone(freeze)">
+      <Summary>Copy an object</Summary>
+      <Description>Ruby method. Returns a copy that preserves the frozen state and singleton methods.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="freeze" signature="freeze()">
+      <Summary>Freeze an object</Summary>
+      <Description>Ruby method. Prevents further modification of the object and returns it.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="frozen?" signature="frozen?()">
+      <Summary>Frozen object</Summary>
+      <Description>Ruby method. Returns true when the object can no longer be modified.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="inspect" signature="inspect()">
+      <Summary>Readable representation</Summary>
+      <Description>Ruby method. Returns a string that is useful for debugging.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="display" signature="display(stream)">
+      <Summary>Write the object</Summary>
+      <Description>Ruby method. Writes the object to the stream with to_s.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="tap" signature="tap(block)">
+      <Summary>Inspect a value</Summary>
+      <Description>Ruby method. Yields the object to the block and returns the object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="then" signature="then(block)">
+      <Summary>Transform a value</Summary>
+      <Description>Ruby method. Yields the object to the block and returns the result.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="yield_self" signature="yield_self(block)">
+      <Summary>Transform a value</Summary>
+      <Description>Ruby method. An alias of then.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="itself" signature="itself()">
+      <Summary>Return the object</Summary>
+      <Description>Ruby method. Returns the receiver unchanged.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="extend" signature="extend(modules)">
+      <Summary>Extend an object</Summary>
+      <Description>Ruby method. Adds the modules to the singleton class.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="superclass" signature="superclass()">
+      <Summary>Parent class</Summary>
+      <Description>Ruby method. Returns the superclass of the class.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="ancestors" signature="ancestors()">
+      <Summary>Class ancestry</Summary>
+      <Description>Ruby method. Returns the classes and modules included in the receiver in lookup order.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="included_modules" signature="included_modules()">
+      <Summary>Included modules</Summary>
+      <Description>Ruby method. Returns the modules included in the receiver.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="instance_methods" signature="instance_methods(inherit)">
+      <Summary>Instance methods</Summary>
+      <Description>Ruby method. Returns the names of the instance methods.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="public_instance_methods" signature="public_instance_methods(inherit)">
+      <Summary>Public instance methods</Summary>
+      <Description>Ruby method. Returns the names of the public instance methods.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="private_instance_methods" signature="private_instance_methods(inherit)">
+      <Summary>Private instance methods</Summary>
+      <Description>Ruby method. Returns the names of the private instance methods.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="method_defined?" signature="method_defined?(name)">
+      <Summary>Method defined</Summary>
+      <Description>Ruby method. Returns true when the module defines the instance method.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="const_get" signature="const_get(name)">
+      <Summary>Read a constant</Summary>
+      <Description>Ruby method. Returns the value of the named constant.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="const_set" signature="const_set(name, value)">
+      <Summary>Write a constant</Summary>
+      <Description>Ruby method. Sets the named constant and returns the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="const_defined?" signature="const_defined?(name)">
+      <Summary>Constant defined</Summary>
+      <Description>Ruby method. Returns true when the constant is defined.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="class_eval" signature="class_eval(code)">
+      <Summary>Evaluate in the class</Summary>
+      <Description>Ruby method. Evaluates the string or block in the context of the class.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="module_eval" signature="module_eval(code)">
+      <Summary>Evaluate in the module</Summary>
+      <Description>Ruby method. An alias of class_eval.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="class_variable_get" signature="class_variable_get(name)">
+      <Summary>Read a class variable</Summary>
+      <Description>Ruby method. Returns the value of the class variable.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="class_variable_set" signature="class_variable_set(name, value)">
+      <Summary>Write a class variable</Summary>
+      <Description>Ruby method. Sets the class variable and returns the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="define_method" signature="define_method(name, block)">
+      <Summary>Define a method</Summary>
+      <Description>Ruby method. Defines an instance method from the block.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="alias_method" signature="alias_method(new_name, old_name)">
+      <Summary>Alias a method</Summary>
+      <Description>Ruby method. Creates a new name for an existing method.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="new" signature="new(args)">
+      <Summary>Create an object</Summary>
+      <Description>Ruby method. Allocates an instance and calls initialize with the arguments.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="allocate" signature="allocate()">
+      <Summary>Allocate an object</Summary>
+      <Description>Ruby method. Creates an instance without calling initialize.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="nil?" signature="nil?()">
+      <Summary>Nil object</Summary>
+      <Description>Ruby method. Returns true only for nil.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="is_a?" signature="is_a?(class)">
+      <Summary>Instance of a class</Summary>
+      <Description>Ruby method. Returns true when the object belongs to the class or one of its ancestors.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="kind_of?" signature="kind_of?(class)">
+      <Summary>Instance of a class</Summary>
+      <Description>Ruby method. An alias of is_a?.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="instance_of?" signature="instance_of?(class)">
+      <Summary>Exact class</Summary>
+      <Description>Ruby method. Returns true when the object is an instance of exactly the class.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="equal?" signature="equal?(other)">
+      <Summary>Same object</Summary>
+      <Description>Ruby method. Returns true when the two references point to the same object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="eql?" signature="eql?(other)">
+      <Summary>Hash equality</Summary>
+      <Description>Ruby method. Returns true when the objects are equal and have the same hash code.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="respond_to?" signature="respond_to?(name)">
+      <Summary>Method available</Summary>
+      <Description>Ruby method. Returns true when the object responds to the method.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="between?" signature="between?(min, max)">
+      <Summary>In a range</Summary>
+      <Description>Ruby method. Returns true when the value lies between the bounds.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="clamp" signature="clamp(min, max)">
+      <Summary>Limit a value</Summary>
+      <Description>Ruby method. Returns the value limited to the range.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="id2name" signature="id2name()">
+      <Summary>Symbol name</Summary>
+      <Description>Ruby method. Returns the string with the name of the symbol.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="name" signature="name()">
+      <Summary>Symbol name</Summary>
+      <Description>Ruby method. Returns the frozen string with the name of the symbol.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="to_proc" signature="to_proc()">
+      <Summary>Symbol as a block</Summary>
+      <Description>Ruby method. Returns a Proc that calls the named method on its argument.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="capitalize" signature="capitalize()">
+      <Summary>Capitalize the string</Summary>
+      <Description>Ruby method. Returns the string with the first letter upper case and the rest lower case.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="swapcase" signature="swapcase()">
+      <Summary>Swap the letter case</Summary>
+      <Description>Ruby method. Returns the string with the case of every letter swapped.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="chars" signature="chars()">
+      <Summary>Characters</Summary>
+      <Description>Ruby method. Returns an array of the characters.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="bytes" signature="bytes()">
+      <Summary>Bytes</Summary>
+      <Description>Ruby method. Returns an array of the bytes.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="codepoints" signature="codepoints()">
+      <Summary>Code points</Summary>
+      <Description>Ruby method. Returns an array of the Unicode code points.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="lines" signature="lines(separator)">
+      <Summary>Lines</Summary>
+      <Description>Ruby method. Returns an array of the lines, keeping the separators.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_line" signature="each_line(separator, block)">
+      <Summary>Iterate the lines</Summary>
+      <Description>Ruby method. Yields each line to the block.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_char" signature="each_char(block)">
+      <Summary>Iterate the characters</Summary>
+      <Description>Ruby method. Yields each character to the block.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_byte" signature="each_byte(block)">
+      <Summary>Iterate the bytes</Summary>
+      <Description>Ruby method. Yields each byte to the block.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="empty?" signature="empty?()">
+      <Summary>Empty collection</Summary>
+      <Description>Ruby method. Returns true when the string, array or hash has no elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="start_with?" signature="start_with?(prefixes)">
+      <Summary>Starts with</Summary>
+      <Description>Ruby method. Returns true when the string starts with one of the prefixes.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="end_with?" signature="end_with?(suffixes)">
+      <Summary>Ends with</Summary>
+      <Description>Ruby method. Returns true when the string ends with one of the suffixes.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="include?" signature="include?(value)">
+      <Summary>Contains a value</Summary>
+      <Description>Ruby method. Returns true when the string, array or hash contains the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="index" signature="index(substring, offset)">
+      <Summary>Find a substring</Summary>
+      <Description>Ruby method. Returns the index of the first occurrence of the substring, or nil.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="rindex" signature="rindex(substring, offset)">
+      <Summary>Find a substring from the end</Summary>
+      <Description>Ruby method. Returns the index of the last occurrence of the substring, or nil.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="insert" signature="insert(index, string)">
+      <Summary>Insert a string</Summary>
+      <Description>Ruby method. Inserts the string at the index and returns the receiver.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="ljust" signature="ljust(width, pad)">
+      <Summary>Pad on the right</Summary>
+      <Description>Ruby method. Returns the string padded with spaces or the pad string to the width.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="rjust" signature="rjust(width, pad)">
+      <Summary>Pad on the left</Summary>
+      <Description>Ruby method. Returns the string padded on the left to the width.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="center" signature="center(width, pad)">
+      <Summary>Center the string</Summary>
+      <Description>Ruby method. Returns the string centered in the width.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="lstrip" signature="lstrip()">
+      <Summary>Strip leading spaces</Summary>
+      <Description>Ruby method. Returns the string without leading whitespace.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="rstrip" signature="rstrip()">
+      <Summary>Strip trailing spaces</Summary>
+      <Description>Ruby method. Returns the string without trailing whitespace.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="squeeze" signature="squeeze(chars)">
+      <Summary>Collapse repeated characters</Summary>
+      <Description>Ruby method. Returns the string with runs of the same character collapsed.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="tr" signature="tr(from, to)">
+      <Summary>Translate characters</Summary>
+      <Description>Ruby method. Returns the string with the characters of from replaced by those of to.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="sub" signature="sub(pattern, replacement)">
+      <Summary>Replace the first match</Summary>
+      <Description>Ruby method. Returns the string with the first match of the pattern replaced.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="gsub" signature="gsub(pattern, replacement)">
+      <Summary>Replace all matches</Summary>
+      <Description>Ruby method. Returns the string with every match of the pattern replaced.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="match" signature="match(pattern)">
+      <Summary>Match a pattern</Summary>
+      <Description>Ruby method. Returns a MatchData for the first match of the pattern, or nil.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="match?" signature="match?(pattern)">
+      <Summary>Match test</Summary>
+      <Description>Ruby method. Returns true when the pattern matches the string.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="scan" signature="scan(pattern)">
+      <Summary>Find all matches</Summary>
+      <Description>Ruby method. Returns the matches of the pattern as an array.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="reverse" signature="reverse()">
+      <Summary>Reverse the string</Summary>
+      <Description>Ruby method. Returns the string with the characters in reverse order, or the array in reverse order.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="size" signature="size()">
+      <Summary>Collection size</Summary>
+      <Description>Ruby method. Returns the number of characters or elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="slice" signature="slice(index, length)">
+      <Summary>Extract a substring</Summary>
+      <Description>Ruby method. Returns the character or substring at the index.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="succ" signature="succ()">
+      <Summary>Next string</Summary>
+      <Description>Ruby method. Returns the next string in the sequence: a to b, z to aa.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="delete_prefix" signature="delete_prefix(prefix)">
+      <Summary>Remove a prefix</Summary>
+      <Description>Ruby method. Returns the string without the prefix when it starts with it.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="delete_suffix" signature="delete_suffix(suffix)">
+      <Summary>Remove a suffix</Summary>
+      <Description>Ruby method. Returns the string without the suffix when it ends with it.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="count" signature="count(chars)">
+      <Summary>Count characters</Summary>
+      <Description>Ruby method. Returns the number of characters from the set.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="replace" signature="replace(other)">
+      <Summary>Replace the contents</Summary>
+      <Description>Ruby method. Replaces the contents of the string with the other string.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="prepend" signature="prepend(other)">
+      <Summary>Prepend a string</Summary>
+      <Description>Ruby method. Inserts the other string at the beginning.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="concat" signature="concat(other)">
+      <Summary>Append a string</Summary>
+      <Description>Ruby method. Appends the other string to the receiver.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="casecmp" signature="casecmp(other)">
+      <Summary>Compare ignoring case</Summary>
+      <Description>Ruby method. Returns -1, 0 or 1 after comparing the strings without case.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="casecmp?" signature="casecmp?(other)">
+      <Summary>Equal ignoring case</Summary>
+      <Description>Ruby method. Returns true when the strings are equal without case.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="partition" signature="partition(separator)">
+      <Summary>Split at a separator</Summary>
+      <Description>Ruby method. Returns the part before, the separator and the part after.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="rpartition" signature="rpartition(separator)">
+      <Summary>Split at the last separator</Summary>
+      <Description>Ruby method. Returns the parts around the last separator.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="unpack" signature="unpack(format)">
+      <Summary>Decode binary data</Summary>
+      <Description>Ruby method. Decodes the string according to the format and returns an array.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="unpack1" signature="unpack1(format)">
+      <Summary>Decode one value</Summary>
+      <Description>Ruby method. Returns the first value decoded by the format.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="encode" signature="encode(encoding)">
+      <Summary>Change the encoding</Summary>
+      <Description>Ruby method. Returns the string transcoded to the encoding.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="force_encoding" signature="force_encoding(encoding)">
+      <Summary>Set the encoding</Summary>
+      <Description>Ruby method. Changes the encoding tag without transcoding the bytes.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="valid_encoding?" signature="valid_encoding?()">
+      <Summary>Valid encoding</Summary>
+      <Description>Ruby method. Returns true when the bytes are valid in the encoding.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="ascii_only?" signature="ascii_only?()">
+      <Summary>ASCII only</Summary>
+      <Description>Ruby method. Returns true when the string contains only ASCII characters.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="b" signature="b()">
+      <Summary>Binary string</Summary>
+      <Description>Ruby method. Returns a copy with the ASCII-8BIT encoding.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="scrub" signature="scrub(replacement)">
+      <Summary>Replace invalid bytes</Summary>
+      <Description>Ruby method. Replaces the bytes that are invalid in the encoding.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="unicode_normalize" signature="unicode_normalize(form)">
+      <Summary>Normalize Unicode</Summary>
+      <Description>Ruby method. Returns the string in the given Unicode normalization form.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="oct" signature="oct()">
+      <Summary>Parse octal</Summary>
+      <Description>Ruby method. Interprets the string as octal, or hexadecimal with a 0x prefix.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="to_str" signature="to_str()">
+      <Summary>String conversion</Summary>
+      <Description>Ruby method. Returns the receiver for implicit conversion.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="to_sym" signature="to_sym()">
+      <Summary>Convert to a symbol</Summary>
+      <Description>Ruby method. Returns the symbol with the same characters.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="intern" signature="intern()">
+      <Summary>Convert to a symbol</Summary>
+      <Description>Ruby method. An alias of to_sym.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="ord" signature="ord()">
+      <Summary>Code point</Summary>
+      <Description>Ruby method. Returns the code point of the first character.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="first" signature="first(count)">
+      <Summary>First elements</Summary>
+      <Description>Ruby method. Returns the first element or the first count elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="last" signature="last(count)">
+      <Summary>Last elements</Summary>
+      <Description>Ruby method. Returns the last element or the last count elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="shift" signature="shift(count)">
+      <Summary>Remove from the front</Summary>
+      <Description>Ruby method. Removes and returns the first element.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="unshift" signature="unshift(objects)">
+      <Summary>Insert at the front</Summary>
+      <Description>Ruby method. Inserts the objects at the beginning and returns the array.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="pop" signature="pop(count)">
+      <Summary>Remove from the end</Summary>
+      <Description>Ruby method. Removes and returns the last element.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="find_index" signature="find_index(value)">
+      <Summary>Index of an element</Summary>
+      <Description>Ruby method. Returns the index of the first element that matches the value or block.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="flatten" signature="flatten(level)">
+      <Summary>Flatten nested arrays</Summary>
+      <Description>Ruby method. Returns a copy with the nested arrays expanded.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="compact" signature="compact()">
+      <Summary>Remove nil values</Summary>
+      <Description>Ruby method. Returns a copy without nil elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="uniq" signature="uniq(block)">
+      <Summary>Remove duplicates</Summary>
+      <Description>Ruby method. Returns a copy without duplicate elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="reverse_each" signature="reverse_each(block)">
+      <Summary>Iterate in reverse</Summary>
+      <Description>Ruby method. Yields the elements from the end.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="fetch" signature="fetch(key, default)">
+      <Summary>Read an element</Summary>
+      <Description>Ruby method. Returns the element at the key, or the default when it is missing.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="values_at" signature="values_at(indexes)">
+      <Summary>Selected elements</Summary>
+      <Description>Ruby method. Returns the elements at the given indexes or keys.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_with_index" signature="each_with_index(block)">
+      <Summary>Iterate with an index</Summary>
+      <Description>Ruby method. Yields each element and its index.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_with_object" signature="each_with_object(object, block)">
+      <Summary>Iterate with an accumulator</Summary>
+      <Description>Ruby method. Yields each element and the object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="reduce" signature="reduce(initial, block)">
+      <Summary>Fold the elements</Summary>
+      <Description>Ruby method. Combines the elements with the block into one value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="inject" signature="inject(initial, block)">
+      <Summary>Fold the elements</Summary>
+      <Description>Ruby method. An alias of reduce.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="find" signature="find(block)">
+      <Summary>Find an element</Summary>
+      <Description>Ruby method. Returns the first element for which the block is true.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="detect" signature="detect(block)">
+      <Summary>Find an element</Summary>
+      <Description>Ruby method. An alias of find.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="min" signature="min(block)">
+      <Summary>Smallest element</Summary>
+      <Description>Ruby method. Returns the smallest element, using the block as the comparison.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="max" signature="max(block)">
+      <Summary>Largest element</Summary>
+      <Description>Ruby method. Returns the largest element, using the block as the comparison.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="minmax" signature="minmax(block)">
+      <Summary>Smallest and largest</Summary>
+      <Description>Ruby method. Returns the smallest and largest elements as a pair.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="sum" signature="sum(initial, block)">
+      <Summary>Sum the elements</Summary>
+      <Description>Ruby method. Adds the elements, starting from the initial value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="all?" signature="all?(pattern)">
+      <Summary>All match</Summary>
+      <Description>Ruby method. Returns true when the block or pattern is true for every element.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="any?" signature="any?(pattern)">
+      <Summary>Any match</Summary>
+      <Description>Ruby method. Returns true when the block or pattern is true for at least one element.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="none?" signature="none?(pattern)">
+      <Summary>None match</Summary>
+      <Description>Ruby method. Returns true when the block or pattern is false for every element.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="one?" signature="one?(pattern)">
+      <Summary>Exactly one match</Summary>
+      <Description>Ruby method. Returns true when the block or pattern is true for exactly one element.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="group_by" signature="group_by(block)">
+      <Summary>Group the elements</Summary>
+      <Description>Ruby method. Returns a hash that groups the elements by the block result.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="grep" signature="grep(pattern)">
+      <Summary>Filter with a pattern</Summary>
+      <Description>Ruby method. Returns the elements that match the pattern.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="grep_v" signature="grep_v(pattern)">
+      <Summary>Reject with a pattern</Summary>
+      <Description>Ruby method. Returns the elements that do not match the pattern.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="zip" signature="zip(others)">
+      <Summary>Combine arrays</Summary>
+      <Description>Ruby method. Pairs the elements with the elements of the other arrays.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="flat_map" signature="flat_map(block)">
+      <Summary>Map and flatten</Summary>
+      <Description>Ruby method. Maps the elements and concatenates one level.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="collect" signature="collect(block)">
+      <Summary>Map the elements</Summary>
+      <Description>Ruby method. An alias of map.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="collect_concat" signature="collect_concat(block)">
+      <Summary>Map and flatten</Summary>
+      <Description>Ruby method. An alias of flat_map.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_slice" signature="each_slice(size, block)">
+      <Summary>Iterate in slices</Summary>
+      <Description>Ruby method. Yields consecutive slices of the given size.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_cons" signature="each_cons(size, block)">
+      <Summary>Iterate in windows</Summary>
+      <Description>Ruby method. Yields consecutive windows of the given size.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="tally" signature="tally()">
+      <Summary>Count the elements</Summary>
+      <Description>Ruby method. Returns a hash with the number of occurrences of each element.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="sort_by" signature="sort_by(block)">
+      <Summary>Sort by a key</Summary>
+      <Description>Ruby method. Sorts the elements by the values returned by the block.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="min_by" signature="min_by(block)">
+      <Summary>Smallest by a key</Summary>
+      <Description>Ruby method. Returns the element with the smallest block value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="max_by" signature="max_by(block)">
+      <Summary>Largest by a key</Summary>
+      <Description>Ruby method. Returns the element with the largest block value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="filter_map" signature="filter_map(block)">
+      <Summary>Map and filter</Summary>
+      <Description>Ruby method. Keeps the block results that are not nil or false.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="lazy" signature="lazy()">
+      <Summary>Lazy enumeration</Summary>
+      <Description>Ruby method. Returns a lazy enumerator that evaluates the chain on demand.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="cycle" signature="cycle(count, block)">
+      <Summary>Repeat the elements</Summary>
+      <Description>Ruby method. Yields the elements repeatedly.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="to_a" signature="to_a()">
+      <Summary>Convert to an array</Summary>
+      <Description>Ruby method. Returns the elements as an array.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="to_h" signature="to_h(block)">
+      <Summary>Convert to a hash</Summary>
+      <Description>Ruby method. Returns the pairs as a hash, or builds the pairs with the block.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_entry" signature="each_entry(block)">
+      <Summary>Iterate the entries</Summary>
+      <Description>Ruby method. Yields each element, wrapping multiple values in an array.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="drop" signature="drop(count)">
+      <Summary>Skip elements</Summary>
+      <Description>Ruby method. Returns the elements after the first count.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="drop_while" signature="drop_while(block)">
+      <Summary>Skip while true</Summary>
+      <Description>Ruby method. Skips the elements while the block is true.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="take" signature="take(count)">
+      <Summary>Take elements</Summary>
+      <Description>Ruby method. Returns the first count elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="take_while" signature="take_while(block)">
+      <Summary>Take while true</Summary>
+      <Description>Ruby method. Returns the elements before the block first returns false.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="chunk_while" signature="chunk_while(block)">
+      <Summary>Chunk adjacent elements</Summary>
+      <Description>Ruby method. Splits the elements into chunks where the block is true for neighbours.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="slice_when" signature="slice_when(block)">
+      <Summary>Slice at boundaries</Summary>
+      <Description>Ruby method. Splits the elements where the block returns true.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="slice_before" signature="slice_before(pattern)">
+      <Summary>Slice before a match</Summary>
+      <Description>Ruby method. Starts a new slice before each element that matches.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="slice_after" signature="slice_after(pattern)">
+      <Summary>Slice after a match</Summary>
+      <Description>Ruby method. Ends a slice after each element that matches.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="sample" signature="sample(count)">
+      <Summary>Random element</Summary>
+      <Description>Ruby method. Returns a random element or an array of random elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="shuffle" signature="shuffle()">
+      <Summary>Shuffle the elements</Summary>
+      <Description>Ruby method. Returns a copy with the elements in random order.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="rotate" signature="rotate(count)">
+      <Summary>Rotate the elements</Summary>
+      <Description>Ruby method. Returns a copy rotated by the count.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="transpose" signature="transpose()">
+      <Summary>Transpose rows</Summary>
+      <Description>Ruby method. Swaps the rows and columns of an array of arrays.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="assoc" signature="assoc(key)">
+      <Summary>Find a pair</Summary>
+      <Description>Ruby method. Returns the first sub-array whose first element equals the key.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="rassoc" signature="rassoc(value)">
+      <Summary>Find a pair by value</Summary>
+      <Description>Ruby method. Returns the first sub-array whose second element equals the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="fill" signature="fill(value)">
+      <Summary>Fill the array</Summary>
+      <Description>Ruby method. Replaces the elements with the value and returns the array.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="clear" signature="clear()">
+      <Summary>Empty the collection</Summary>
+      <Description>Ruby method. Removes all elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="combination" signature="combination(n, block)">
+      <Summary>Combinations</Summary>
+      <Description>Ruby method. Yields the combinations of n elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="permutation" signature="permutation(n, block)">
+      <Summary>Permutations</Summary>
+      <Description>Ruby method. Yields the permutations of n elements.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="product" signature="product(others)">
+      <Summary>Cartesian product</Summary>
+      <Description>Ruby method. Returns the combinations of one element from each array.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="dig" signature="dig(key, keys)">
+      <Summary>Read nested values</Summary>
+      <Description>Ruby method. Follows the keys into the nested collections.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="append" signature="append(objects)">
+      <Summary>Append elements</Summary>
+      <Description>Ruby method. An alias of push.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="member?" signature="member?(value)">
+      <Summary>Contains a value</Summary>
+      <Description>Ruby method. An alias of include? for arrays.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="keys" signature="keys()">
+      <Summary>Hash keys</Summary>
+      <Description>Ruby method. Returns an array of the keys.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="values" signature="values()">
+      <Summary>Hash values</Summary>
+      <Description>Ruby method. Returns an array of the values.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="store" signature="store(key, value)">
+      <Summary>Write an entry</Summary>
+      <Description>Ruby method. Sets the value for the key and returns the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="merge" signature="merge(other, block)">
+      <Summary>Merge hashes</Summary>
+      <Description>Ruby method. Returns a new hash with the entries of the other hash.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="update" signature="update(other)">
+      <Summary>Merge into the hash</Summary>
+      <Description>Ruby method. Adds the entries of the other hash to the receiver.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_pair" signature="each_pair(block)">
+      <Summary>Iterate the pairs</Summary>
+      <Description>Ruby method. Yields each key and value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_key" signature="each_key(block)">
+      <Summary>Iterate the keys</Summary>
+      <Description>Ruby method. Yields each key.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="each_value" signature="each_value(block)">
+      <Summary>Iterate the values</Summary>
+      <Description>Ruby method. Yields each value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="invert" signature="invert()">
+      <Summary>Swap keys and values</Summary>
+      <Description>Ruby method. Returns a hash with the keys and values exchanged.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="transform_keys" signature="transform_keys(block)">
+      <Summary>Transform the keys</Summary>
+      <Description>Ruby method. Returns a hash with the keys replaced by the block results.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="transform_values" signature="transform_values(block)">
+      <Summary>Transform the values</Summary>
+      <Description>Ruby method. Returns a hash with the values replaced by the block results.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="fetch_values" signature="fetch_values(keys)">
+      <Summary>Read several values</Summary>
+      <Description>Ruby method. Returns the values for the keys and raises KeyError when one is missing.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="except" signature="except(keys)">
+      <Summary>Remove keys</Summary>
+      <Description>Ruby method. Returns a copy without the given keys.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="default" signature="default(key)">
+      <Summary>Default value</Summary>
+      <Description>Ruby method. Returns the value used for missing keys.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="delete_if" signature="delete_if(block)">
+      <Summary>Delete matching pairs</Summary>
+      <Description>Ruby method. Removes the pairs for which the block is true.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="keep_if" signature="keep_if(block)">
+      <Summary>Keep matching pairs</Summary>
+      <Description>Ruby method. Removes the pairs for which the block is false.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="compare_by_identity" signature="compare_by_identity()">
+      <Summary>Compare keys by identity</Summary>
+      <Description>Ruby method. Makes the hash use object identity instead of equality for keys.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="rehash" signature="rehash()">
+      <Summary>Rebuild the hash</Summary>
+      <Description>Ruby method. Rebuilds the table after a key was modified.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="key?" signature="key?(key)">
+      <Summary>Key present</Summary>
+      <Description>Ruby method. Returns true when the hash has the key.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="value?" signature="value?(value)">
+      <Summary>Value present</Summary>
+      <Description>Ruby method. Returns true when the hash has the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="has_key?" signature="has_key?(key)">
+      <Summary>Key present</Summary>
+      <Description>Ruby method. An alias of key?.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="has_value?" signature="has_value?(value)">
+      <Summary>Value present</Summary>
+      <Description>Ruby method. An alias of value?.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="times" signature="times(block)">
+      <Summary>Repeat a block</Summary>
+      <Description>Ruby method. Calls the block once for each number from zero to the receiver.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="upto" signature="upto(limit, block)">
+      <Summary>Count up</Summary>
+      <Description>Ruby method. Calls the block with every number up to the limit.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="downto" signature="downto(limit, block)">
+      <Summary>Count down</Summary>
+      <Description>Ruby method. Calls the block with every number down to the limit.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="step" signature="step(limit, increment, block)">
+      <Summary>Iterate with a step</Summary>
+      <Description>Ruby method. Calls the block with the numbers from the receiver to the limit.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="abs" signature="abs()">
+      <Summary>Absolute value</Summary>
+      <Description>Ruby method. Returns the value without its sign.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="ceil" signature="ceil(digits)">
+      <Summary>Round up</Summary>
+      <Description>Ruby method. Returns the smallest integer greater than or equal to the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="floor" signature="floor(digits)">
+      <Summary>Round down</Summary>
+      <Description>Ruby method. Returns the largest integer less than or equal to the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="round" signature="round(digits)">
+      <Summary>Round to the nearest</Summary>
+      <Description>Ruby method. Rounds the value to the nearest integer or to the given digits.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="truncate" signature="truncate(digits)">
+      <Summary>Discard the fraction</Summary>
+      <Description>Ruby method. Returns the value without its fractional part.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="divmod" signature="divmod(divisor)">
+      <Summary>Quotient and remainder</Summary>
+      <Description>Ruby method. Returns the quotient and remainder as a pair.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="modulo" signature="modulo(divisor)">
+      <Summary>Remainder</Summary>
+      <Description>Ruby method. Returns the remainder with the sign of the divisor.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="gcd" signature="gcd(other)">
+      <Summary>Greatest common divisor</Summary>
+      <Description>Ruby method. Returns the greatest common divisor.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="gcdlcm" signature="gcdlcm(other)">
+      <Summary>GCD and LCM</Summary>
+      <Description>Ruby method. Returns the greatest common divisor and the least common multiple.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="lcm" signature="lcm(other)">
+      <Summary>Least common multiple</Summary>
+      <Description>Ruby method. Returns the least common multiple.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="pow" signature="pow(exponent)">
+      <Summary>Power</Summary>
+      <Description>Ruby method. Returns the receiver raised to the exponent.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="digits" signature="digits(base)">
+      <Summary>Decimal digits</Summary>
+      <Description>Ruby method. Returns the digits in the given base, least significant first.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="bit_length" signature="bit_length()">
+      <Summary>Bits needed</Summary>
+      <Description>Ruby method. Returns the number of bits needed to represent the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="pred" signature="pred()">
+      <Summary>Previous number</Summary>
+      <Description>Ruby method. Returns the receiver minus one.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="chr" signature="chr(encoding)">
+      <Summary>Character</Summary>
+      <Description>Ruby method. Returns the character with the code point.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="to_r" signature="to_r()">
+      <Summary>Convert to a rational</Summary>
+      <Description>Ruby method. Returns the value as a Rational.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="to_c" signature="to_c()">
+      <Summary>Convert to a complex</Summary>
+      <Description>Ruby method. Returns the value as a Complex.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="numerator" signature="numerator()">
+      <Summary>Rational numerator</Summary>
+      <Description>Ruby method. Returns the numerator of the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="denominator" signature="denominator()">
+      <Summary>Rational denominator</Summary>
+      <Description>Ruby method. Returns the denominator of the value.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="coerce" signature="coerce(other)">
+      <Summary>Coerce for arithmetic</Summary>
+      <Description>Ruby method. Returns the pair of values used by an arithmetic operator.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="fdiv" signature="fdiv(divisor)">
+      <Summary>Floating division</Summary>
+      <Description>Ruby method. Divides the values as floats.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="div" signature="div(divisor)">
+      <Summary>Integer division</Summary>
+      <Description>Ruby method. Divides the values and truncates toward negative infinity.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="remainder" signature="remainder(divisor)">
+      <Summary>Remainder</Summary>
+      <Description>Ruby method. Returns the remainder with the sign of the receiver.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="magnitude" signature="magnitude()">
+      <Summary>Absolute value</Summary>
+      <Description>Ruby method. An alias of abs.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="sign" signature="sign()">
+      <Summary>Sign of the number</Summary>
+      <Description>Ruby method. Returns -1, 0 or 1.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="next_float" signature="next_float()">
+      <Summary>Next float</Summary>
+      <Description>Ruby method. Returns the next representable float toward positive infinity.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="prev_float" signature="prev_float()">
+      <Summary>Previous float</Summary>
+      <Description>Ruby method. Returns the next representable float toward negative infinity.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="even?" signature="even?()">
+      <Summary>Even number</Summary>
+      <Description>Ruby method. Returns true when the integer is divisible by two.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="odd?" signature="odd?()">
+      <Summary>Odd number</Summary>
+      <Description>Ruby method. Returns true when the integer is not divisible by two.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="zero?" signature="zero?()">
+      <Summary>Zero</Summary>
+      <Description>Ruby method. Returns true when the value is zero.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="positive?" signature="positive?()">
+      <Summary>Positive number</Summary>
+      <Description>Ruby method. Returns true when the value is greater than zero.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="negative?" signature="negative?()">
+      <Summary>Negative number</Summary>
+      <Description>Ruby method. Returns true when the value is less than zero.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="integer?" signature="integer?()">
+      <Summary>Integer value</Summary>
+      <Description>Ruby method. Returns true when the value has no fractional part.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="finite?" signature="finite?()">
+      <Summary>Finite number</Summary>
+      <Description>Ruby method. Returns true when the value is not infinite or NaN.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="infinite?" signature="infinite?()">
+      <Summary>Infinite number</Summary>
+      <Description>Ruby method. Returns 1 or -1 for an infinite value and nil otherwise.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="nan?" signature="nan?()">
+      <Summary>Not a number</Summary>
+      <Description>Ruby method. Returns true when the float is NaN.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.exist?" signature="File.exist?(path)">
+      <Summary>File exists</Summary>
+      <Description>Ruby File class method. Returns true when the path exists.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.file?" signature="File.file?(path)">
+      <Summary>Regular file</Summary>
+      <Description>Ruby File class method. Returns true when the path is a regular file.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.directory?" signature="File.directory?(path)">
+      <Summary>Directory</Summary>
+      <Description>Ruby File class method. Returns true when the path is a directory.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.executable?" signature="File.executable?(path)">
+      <Summary>Executable file</Summary>
+      <Description>Ruby File class method. Returns true when the path is executable.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.readable?" signature="File.readable?(path)">
+      <Summary>Readable file</Summary>
+      <Description>Ruby File class method. Returns true when the path is readable.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.writable?" signature="File.writable?(path)">
+      <Summary>Writable file</Summary>
+      <Description>Ruby File class method. Returns true when the path is writable.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.symlink?" signature="File.symlink?(path)">
+      <Summary>Symbolic link</Summary>
+      <Description>Ruby File class method. Returns true when the path is a symbolic link.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.basename" signature="File.basename(path, suffix)">
+      <Summary>Base name</Summary>
+      <Description>Ruby File class method. Returns the last component of the path.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.dirname" signature="File.dirname(path)">
+      <Summary>Directory name</Summary>
+      <Description>Ruby File class method. Returns the path without its last component.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.extname" signature="File.extname(path)">
+      <Summary>Extension</Summary>
+      <Description>Ruby File class method. Returns the extension of the last component.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.expand_path" signature="File.expand_path(path, base)">
+      <Summary>Absolute path</Summary>
+      <Description>Ruby File class method. Expands the path to an absolute path.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.absolute_path" signature="File.absolute_path(path, base)">
+      <Summary>Absolute path</Summary>
+      <Description>Ruby File class method. Returns the absolute path without resolving links.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.realpath" signature="File.realpath(path)">
+      <Summary>Resolved path</Summary>
+      <Description>Ruby File class method. Resolves the path, including symbolic links.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.rename" signature="File.rename(old_path, new_path)">
+      <Summary>Rename a file</Summary>
+      <Description>Ruby File class method. Renames or moves the file.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.mtime" signature="File.mtime(path)">
+      <Summary>Modification time</Summary>
+      <Description>Ruby File class method. Returns the modification time as a Time.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.atime" signature="File.atime(path)">
+      <Summary>Access time</Summary>
+      <Description>Ruby File class method. Returns the last access time as a Time.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.ctime" signature="File.ctime(path)">
+      <Summary>Change time</Summary>
+      <Description>Ruby File class method. Returns the status change time as a Time.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.stat" signature="File.stat(path)">
+      <Summary>File status</Summary>
+      <Description>Ruby File class method. Returns a File::Stat with the details of the path.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.lstat" signature="File.lstat(path)">
+      <Summary>Link status</Summary>
+      <Description>Ruby File class method. Returns the status of the link itself instead of its target.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.readlink" signature="File.readlink(path)">
+      <Summary>Link target</Summary>
+      <Description>Ruby File class method. Returns the path the symbolic link points to.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.chmod" signature="File.chmod(mode, paths)">
+      <Summary>Change permissions</Summary>
+      <Description>Ruby File class method. Changes the permission bits of the paths.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.utime" signature="File.utime(atime, mtime, paths)">
+      <Summary>Set times</Summary>
+      <Description>Ruby File class method. Sets the access and modification times.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.symlink" signature="File.symlink(old_path, new_path)">
+      <Summary>Create a symbolic link</Summary>
+      <Description>Ruby File class method. Creates a symbolic link at the new path.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.link" signature="File.link(old_path, new_path)">
+      <Summary>Create a hard link</Summary>
+      <Description>Ruby File class method. Creates a hard link at the new path.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.identical?" signature="File.identical?(path1, path2)">
+      <Summary>Same file</Summary>
+      <Description>Ruby File class method. Returns true when the paths refer to the same file.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.fnmatch" signature="File.fnmatch(pattern, path)">
+      <Summary>Match a file name</Summary>
+      <Description>Ruby File class method. Returns true when the path matches the glob pattern.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="File.path" signature="File.path(path)">
+      <Summary>Path string</Summary>
+      <Description>Ruby File class method. Returns the string path of the file object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.entries" signature="Dir.entries(path)">
+      <Summary>Directory entries</Summary>
+      <Description>Ruby Dir class method. Returns the names of all entries, including . and ..</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.children" signature="Dir.children(path)">
+      <Summary>Directory children</Summary>
+      <Description>Ruby Dir class method. Returns the names of the entries without . and ..</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.glob" signature="Dir.glob(pattern)">
+      <Summary>Glob a directory</Summary>
+      <Description>Ruby Dir class method. Returns the paths that match the glob pattern.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.pwd" signature="Dir.pwd()">
+      <Summary>Current directory</Summary>
+      <Description>Ruby Dir class method. Returns the current working directory.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.chdir" signature="Dir.chdir(path)">
+      <Summary>Change directory</Summary>
+      <Description>Ruby Dir class method. Changes the current working directory.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.mkdir" signature="Dir.mkdir(path, mode)">
+      <Summary>Create a directory</Summary>
+      <Description>Ruby Dir class method. Creates the directory with the mode.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.rmdir" signature="Dir.rmdir(path)">
+      <Summary>Remove a directory</Summary>
+      <Description>Ruby Dir class method. Removes the empty directory.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.home" signature="Dir.home(user)">
+      <Summary>Home directory</Summary>
+      <Description>Ruby Dir class method. Returns the home directory of the user.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.tmpdir" signature="Dir.tmpdir()">
+      <Summary>Temporary directory</Summary>
+      <Description>Ruby Dir class method. Returns the path of the temporary directory.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Dir.each_child" signature="Dir.each_child(path, block)">
+      <Summary>Iterate the children</Summary>
+      <Description>Ruby Dir class method. Yields each entry name except . and ..</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="read" signature="read(length)">
+      <Summary>Read from an IO</Summary>
+      <Description>Ruby method. Reads up to the length bytes from the IO.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="write" signature="write(string)">
+      <Summary>Write to an IO</Summary>
+      <Description>Ruby method. Writes the string to the IO and returns the number of bytes.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="close" signature="close()">
+      <Summary>Close an IO</Summary>
+      <Description>Ruby method. Closes the IO and releases the file descriptor.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="flush" signature="flush()">
+      <Summary>Flush an IO</Summary>
+      <Description>Ruby method. Writes the buffered output to the IO.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="eof?" signature="eof?()">
+      <Summary>End of file</Summary>
+      <Description>Ruby method. Returns true when the IO is at the end.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="lineno" signature="lineno()">
+      <Summary>Input line number</Summary>
+      <Description>Ruby method. Returns the number of the last line read.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="rewind" signature="rewind()">
+      <Summary>Rewind an IO</Summary>
+      <Description>Ruby method. Moves the IO back to the beginning.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="seek" signature="seek(offset, whence)">
+      <Summary>Seek in an IO</Summary>
+      <Description>Ruby method. Moves the IO position by the offset.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="tell" signature="tell()">
+      <Summary>IO position</Summary>
+      <Description>Ruby method. Returns the current position of the IO.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="getc" signature="getc()">
+      <Summary>Read a character</Summary>
+      <Description>Ruby method. Reads one character from the IO.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="ungetc" signature="ungetc(char)">
+      <Summary>Put back a character</Summary>
+      <Description>Ruby method. Pushes the character back into the IO.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="binmode" signature="binmode()">
+      <Summary>Binary mode</Summary>
+      <Description>Ruby method. Puts the IO into binary mode.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="sysread" signature="sysread(length)">
+      <Summary>Low-level read</Summary>
+      <Description>Ruby method. Reads bytes from the IO without buffering.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="syswrite" signature="syswrite(string)">
+      <Summary>Low-level write</Summary>
+      <Description>Ruby method. Writes bytes to the IO without buffering.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="readpartial" signature="readpartial(length)">
+      <Summary>Read available bytes</Summary>
+      <Description>Ruby method. Reads at most the length bytes that are available.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="foreach" signature="foreach(path, block)">
+      <Summary>Iterate the lines of a file</Summary>
+      <Description>Ruby File class method. Yields each line of the file.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Time.now" signature="Time.now()">
+      <Summary>Current time</Summary>
+      <Description>Ruby Time class method. Returns the current time.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Time.at" signature="Time.at(seconds)">
+      <Summary>Time from a timestamp</Summary>
+      <Description>Ruby Time class method. Returns the time at the number of seconds since the epoch.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Time.local" signature="Time.local(year, month, day)">
+      <Summary>Local time</Summary>
+      <Description>Ruby Time class method. Creates a time in the local time zone.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Time.utc" signature="Time.utc(year, month, day)">
+      <Summary>UTC time</Summary>
+      <Description>Ruby Time class method. Creates a time in UTC.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Time.mktime" signature="Time.mktime(year, month, day)">
+      <Summary>Local time</Summary>
+      <Description>Ruby Time class method. Creates a time from the date parts in the local zone.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="strftime" signature="strftime(format)">
+      <Summary>Format a time</Summary>
+      <Description>Ruby method. Returns the time formatted by the strftime directives.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="strptime" signature="strptime(string, format)">
+      <Summary>Parse a time</Summary>
+      <Description>Ruby method. Parses the string with the format and returns a Time.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="year" signature="year()">
+      <Summary>Year</Summary>
+      <Description>Ruby method. Returns the year of the time.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="month" signature="month()">
+      <Summary>Month</Summary>
+      <Description>Ruby method. Returns the month of the time, 1 to 12.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="day" signature="day()">
+      <Summary>Day of the month</Summary>
+      <Description>Ruby method. Returns the day of the month.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="hour" signature="hour()">
+      <Summary>Hour</Summary>
+      <Description>Ruby method. Returns the hour of the day, 0 to 23.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="sec" signature="sec()">
+      <Summary>Second</Summary>
+      <Description>Ruby method. Returns the second of the minute.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="usec" signature="usec()">
+      <Summary>Microseconds</Summary>
+      <Description>Ruby method. Returns the microseconds of the time.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="nsec" signature="nsec()">
+      <Summary>Nanoseconds</Summary>
+      <Description>Ruby method. Returns the nanoseconds of the time.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="wday" signature="wday()">
+      <Summary>Day of the week</Summary>
+      <Description>Ruby method. Returns the day of the week, 0 for Sunday.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="yday" signature="yday()">
+      <Summary>Day of the year</Summary>
+      <Description>Ruby method. Returns the day of the year, 1 to 366.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="zone" signature="zone()">
+      <Summary>Time zone</Summary>
+      <Description>Ruby method. Returns the time zone abbreviation.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="utc_offset" signature="utc_offset()">
+      <Summary>UTC offset</Summary>
+      <Description>Ruby method. Returns the offset from UTC in seconds.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="getlocal" signature="getlocal(offset)">
+      <Summary>Local time</Summary>
+      <Description>Ruby method. Returns the time converted to the local zone or the offset.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="getutc" signature="getutc()">
+      <Summary>UTC time</Summary>
+      <Description>Ruby method. Returns the time converted to UTC.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Regexp.escape" signature="Regexp.escape(string)">
+      <Summary>Escape a pattern</Summary>
+      <Description>Ruby Regexp class method. Escapes the characters that are special in a regular expression.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Regexp.union" signature="Regexp.union(patterns)">
+      <Summary>Combine patterns</Summary>
+      <Description>Ruby Regexp class method. Returns a pattern that matches any of the patterns.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Regexp.last_match" signature="Regexp.last_match(index)">
+      <Summary>Last match</Summary>
+      <Description>Ruby Regexp class method. Returns the MatchData of the last match in the current scope.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="MatchData.captures" signature="MatchData.captures()">
+      <Summary>Capture groups</Summary>
+      <Description>Ruby MatchData class method. Returns the captured strings of the match.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="MatchData.names" signature="MatchData.names()">
+      <Summary>Capture names</Summary>
+      <Description>Ruby MatchData class method. Returns the names of the named captures.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="MatchData.pre_match" signature="MatchData.pre_match()">
+      <Summary>Text before the match</Summary>
+      <Description>Ruby MatchData class method. Returns the text before the match.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="MatchData.post_match" signature="MatchData.post_match()">
+      <Summary>Text after the match</Summary>
+      <Description>Ruby MatchData class method. Returns the text after the match.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.sqrt" signature="Math.sqrt(x)">
+      <Summary>Square root</Summary>
+      <Description>Ruby Math module method. Returns the square root of the number.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.sin" signature="Math.sin(x)">
+      <Summary>Sine</Summary>
+      <Description>Ruby Math module method. Returns the sine of the angle in radians.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.cos" signature="Math.cos(x)">
+      <Summary>Cosine</Summary>
+      <Description>Ruby Math module method. Returns the cosine of the angle in radians.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.tan" signature="Math.tan(x)">
+      <Summary>Tangent</Summary>
+      <Description>Ruby Math module method. Returns the tangent of the angle in radians.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.atan2" signature="Math.atan2(y, x)">
+      <Summary>Arc tangent</Summary>
+      <Description>Ruby Math module method. Returns the angle whose tangent is y divided by x.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.log" signature="Math.log(x, base)">
+      <Summary>Logarithm</Summary>
+      <Description>Ruby Math module method. Returns the logarithm of the number, by default the natural one.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.log10" signature="Math.log10(x)">
+      <Summary>Decimal logarithm</Summary>
+      <Description>Ruby Math module method. Returns the base-10 logarithm of the number.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.log2" signature="Math.log2(x)">
+      <Summary>Binary logarithm</Summary>
+      <Description>Ruby Math module method. Returns the base-2 logarithm of the number.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.exp" signature="Math.exp(x)">
+      <Summary>Exponential</Summary>
+      <Description>Ruby Math module method. Returns e raised to the power.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.hypot" signature="Math.hypot(x, y)">
+      <Summary>Hypotenuse</Summary>
+      <Description>Ruby Math module method. Returns the square root of the sum of the squares.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math.cbrt" signature="Math.cbrt(x)">
+      <Summary>Cube root</Summary>
+      <Description>Ruby Math module method. Returns the cube root of the number.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math::PI">
+      <Summary>Pi constant</Summary>
+      <Description>Ruby Math module constant. The value of pi.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Math::E">
+      <Summary>Euler constant</Summary>
+      <Description>Ruby Math module constant. The value of e, the base of the natural logarithm.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="JSON.parse" signature="JSON.parse(source)">
+      <Summary>Parse JSON</Summary>
+      <Description>Ruby JSON module method. Parses the JSON string into Ruby objects.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="JSON.generate" signature="JSON.generate(object)">
+      <Summary>Generate JSON</Summary>
+      <Description>Ruby JSON module method. Returns the JSON string for the object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="JSON.pretty_generate" signature="JSON.pretty_generate(object)">
+      <Summary>Generate indented JSON</Summary>
+      <Description>Ruby JSON module method. Returns the JSON string for the object with indentation.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="JSON.dump" signature="JSON.dump(object)">
+      <Summary>Dump JSON</Summary>
+      <Description>Ruby JSON module method. Writes or returns the JSON representation of the object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Base64.encode64" signature="Base64.encode64(data)">
+      <Summary>Encode Base64</Summary>
+      <Description>Ruby Base64 module method. Returns the Base64 encoding of the data with line breaks.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Base64.decode64" signature="Base64.decode64(data)">
+      <Summary>Decode Base64</Summary>
+      <Description>Ruby Base64 module method. Returns the bytes decoded from the Base64 string.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Base64.strict_encode64" signature="Base64.strict_encode64(data)">
+      <Summary>Encode Base64 without line breaks</Summary>
+      <Description>Ruby Base64 module method. Returns the Base64 encoding without line breaks.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Base64.strict_decode64" signature="Base64.strict_decode64(data)">
+      <Summary>Decode strict Base64</Summary>
+      <Description>Ruby Base64 module method. Decodes the Base64 string without ignoring invalid characters.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="SecureRandom.hex" signature="SecureRandom.hex(n)">
+      <Summary>Random hex string</Summary>
+      <Description>Ruby SecureRandom module method. Returns n bytes as a hexadecimal string from a secure generator.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="SecureRandom.base64" signature="SecureRandom.base64(n)">
+      <Summary>Random Base64 string</Summary>
+      <Description>Ruby SecureRandom module method. Returns n bytes as a Base64 string from a secure generator.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="SecureRandom.uuid" signature="SecureRandom.uuid()">
+      <Summary>Random UUID</Summary>
+      <Description>Ruby SecureRandom module method. Returns a random version 4 UUID string.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="SecureRandom.random_number" signature="SecureRandom.random_number(limit)">
+      <Summary>Secure random number</Summary>
+      <Description>Ruby SecureRandom module method. Returns a random number from a secure generator.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Digest::SHA256.hexdigest" signature="Digest::SHA256.hexdigest(string)">
+      <Summary>SHA-256 digest</Summary>
+      <Description>Ruby Digest module method. Returns the SHA-256 digest of the string as hexadecimal.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="FileUtils.cp" signature="FileUtils.cp(source, destination)">
+      <Summary>Copy a file</Summary>
+      <Description>Ruby FileUtils module method. Copies the source file to the destination.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="FileUtils.cp_r" signature="FileUtils.cp_r(source, destination)">
+      <Summary>Copy a directory</Summary>
+      <Description>Ruby FileUtils module method. Copies the source directory recursively.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="FileUtils.mv" signature="FileUtils.mv(source, destination)">
+      <Summary>Move a file</Summary>
+      <Description>Ruby FileUtils module method. Moves or renames the source to the destination.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="FileUtils.rm" signature="FileUtils.rm(paths)">
+      <Summary>Remove files</Summary>
+      <Description>Ruby FileUtils module method. Removes the files.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="FileUtils.rm_rf" signature="FileUtils.rm_rf(paths)">
+      <Summary>Remove a tree</Summary>
+      <Description>Ruby FileUtils module method. Removes the files and directories recursively.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="FileUtils.mkdir_p" signature="FileUtils.mkdir_p(paths)">
+      <Summary>Create directories</Summary>
+      <Description>Ruby FileUtils module method. Creates the directories and their parents.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="FileUtils.touch" signature="FileUtils.touch(paths)">
+      <Summary>Touch files</Summary>
+      <Description>Ruby FileUtils module method. Creates the files or updates their modification times.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Open3.capture3" signature="Open3.capture3(command)">
+      <Summary>Capture a command</Summary>
+      <Description>Ruby Open3 module method. Runs the command and returns its stdout, stderr and status.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Open3.capture2" signature="Open3.capture2(command)">
+      <Summary>Capture stdout</Summary>
+      <Description>Ruby Open3 module method. Runs the command and returns its stdout and status.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Net::HTTP.get" signature="Net::HTTP.get(uri)">
+      <Summary>HTTP GET</Summary>
+      <Description>Ruby Net::HTTP class method. Fetches the URI with an HTTP GET and returns the body.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="Net::HTTP.get_response" signature="Net::HTTP.get_response(uri)">
+      <Summary>HTTP response</Summary>
+      <Description>Ruby Net::HTTP class method. Fetches the URI and returns the HTTP response object.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="URI.encode_www_form" signature="URI.encode_www_form(params)">
+      <Summary>Form encoding</Summary>
+      <Description>Ruby URI module method. Encodes the pairs as an application/x-www-form-urlencoded string.</Description>
+    </Symbol>
+    <Symbol language="Ruby" name="URI.decode_www_form" signature="URI.decode_www_form(string)">
+      <Summary>Form decoding</Summary>
+      <Description>Ruby URI module method. Decodes a form-encoded string into pairs.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="print" signature="print($list)">
+      <Summary>Write to a filehandle</Summary>
+      <Description>Perl built-in function. Writes the list to the current output filehandle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="printf" signature="printf($format, $list)">
+      <Summary>Formatted output</Summary>
+      <Description>Perl built-in function. Writes the list formatted by the format.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="say" signature="say($list)">
+      <Summary>Write a line</Summary>
+      <Description>Perl built-in function. Writes the list followed by a newline.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="open" signature="open($filehandle, $mode, $filename)">
+      <Summary>Open a file</Summary>
+      <Description>Perl built-in function. Opens the file and associates it with the filehandle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="close" signature="close($filehandle)">
+      <Summary>Close a file</Summary>
+      <Description>Perl built-in function. Closes the filehandle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="read" signature="read($filehandle, $buffer, $length)">
+      <Summary>Read bytes</Summary>
+      <Description>Perl built-in function. Reads bytes from the filehandle into the buffer.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="sysread" signature="sysread($filehandle, $buffer, $length)">
+      <Summary>Low-level read</Summary>
+      <Description>Perl built-in function. Reads bytes with the system call, bypassing the buffered layer.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="syswrite" signature="syswrite($filehandle, $data, $length)">
+      <Summary>Low-level write</Summary>
+      <Description>Perl built-in function. Writes bytes with the system call, bypassing the buffered layer.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="readline" signature="readline($filehandle)">
+      <Summary>Read a line</Summary>
+      <Description>Perl built-in function. Reads one line from the filehandle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getc" signature="getc($filehandle)">
+      <Summary>Read a character</Summary>
+      <Description>Perl built-in function. Reads one character from the filehandle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="eof" signature="eof($filehandle)">
+      <Summary>End of file</Summary>
+      <Description>Perl built-in function. Returns true when the next read is at the end of the file.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="seek" signature="seek($filehandle, $position, $whence)">
+      <Summary>Seek in a file</Summary>
+      <Description>Perl built-in function. Moves the file position.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="tell" signature="tell($filehandle)">
+      <Summary>File position</Summary>
+      <Description>Perl built-in function. Returns the current file position.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="binmode" signature="binmode($filehandle, $layer)">
+      <Summary>Binary mode</Summary>
+      <Description>Perl built-in function. Sets the I/O layer of the filehandle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="flock" signature="flock($filehandle, $operation)">
+      <Summary>Lock a file</Summary>
+      <Description>Perl built-in function. Locks or unlocks the file for the operation.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="sysopen" signature="sysopen($filehandle, $filename, $flags, $mode)">
+      <Summary>Open with flags</Summary>
+      <Description>Perl built-in function. Opens the file with the system flags and mode.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="truncate" signature="truncate($file, $length)">
+      <Summary>Truncate a file</Summary>
+      <Description>Perl built-in function. Shortens the file to the length.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="select" signature="select($rbits, $wbits, $ebits, $timeout)">
+      <Summary>Wait for I/O</Summary>
+      <Description>Perl built-in function. Waits until one of the file descriptors is ready.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="syscall" signature="syscall($number, $args)">
+      <Summary>System call</Summary>
+      <Description>Perl built-in function. Calls the system call with the arguments.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="ioctl" signature="ioctl($filehandle, $function, $argument)">
+      <Summary>I/O control</Summary>
+      <Description>Perl built-in function. Performs the ioctl operation on the filehandle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="fcntl" signature="fcntl($filehandle, $function, $argument)">
+      <Summary>File control</Summary>
+      <Description>Perl built-in function. Performs the fcntl operation on the filehandle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="length" signature="length($expr)">
+      <Summary>String length</Summary>
+      <Description>Perl built-in function. Returns the number of characters in the expression.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="substr" signature="substr($expr, $offset, $length)">
+      <Summary>Extract a substring</Summary>
+      <Description>Perl built-in function. Returns the part of the string from the offset.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="index" signature="index($str, $substr, $position)">
+      <Summary>Find a substring</Summary>
+      <Description>Perl built-in function. Returns the position of the first occurrence, or -1.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="rindex" signature="rindex($str, $substr, $position)">
+      <Summary>Find a substring from the end</Summary>
+      <Description>Perl built-in function. Returns the position of the last occurrence, or -1.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="split" signature="split($pattern, $expr, $limit)">
+      <Summary>Split a string</Summary>
+      <Description>Perl built-in function. Divides the string by the pattern and returns the fields.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="join" signature="join($separator, $list)">
+      <Summary>Join a list</Summary>
+      <Description>Perl built-in function. Concatenates the list with the separator between the elements.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="sprintf" signature="sprintf($format, $list)">
+      <Summary>Formatted string</Summary>
+      <Description>Perl built-in function. Returns the list formatted by the format.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="chomp" signature="chomp($list)">
+      <Summary>Remove the trailing newline</Summary>
+      <Description>Perl built-in function. Removes the input record separator from the end of the strings.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="chop" signature="chop($list)">
+      <Summary>Remove the last character</Summary>
+      <Description>Perl built-in function. Removes the last character from the strings.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="lc" signature="lc($expr)">
+      <Summary>Lower case</Summary>
+      <Description>Perl built-in function. Returns the string in lower case.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="uc" signature="uc($expr)">
+      <Summary>Upper case</Summary>
+      <Description>Perl built-in function. Returns the string in upper case.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="lcfirst" signature="lcfirst($expr)">
+      <Summary>Lower first letter</Summary>
+      <Description>Perl built-in function. Returns the string with the first letter lower case.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="ucfirst" signature="ucfirst($expr)">
+      <Summary>Upper first letter</Summary>
+      <Description>Perl built-in function. Returns the string with the first letter upper case.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="quotemeta" signature="quotemeta($expr)">
+      <Summary>Escape regex characters</Summary>
+      <Description>Perl built-in function. Escapes the characters that are special in a regular expression.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="chr" signature="chr($number)">
+      <Summary>Character</Summary>
+      <Description>Perl built-in function. Returns the character with the code point.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="ord" signature="ord($expr)">
+      <Summary>Code point</Summary>
+      <Description>Perl built-in function. Returns the code point of the first character.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="hex" signature="hex($expr)">
+      <Summary>Parse hexadecimal</Summary>
+      <Description>Perl built-in function. Interprets the string as hexadecimal and returns the number.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="oct" signature="oct($expr)">
+      <Summary>Parse octal</Summary>
+      <Description>Perl built-in function. Interprets the string as octal, or hexadecimal with a 0x prefix.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="pack" signature="pack($template, $list)">
+      <Summary>Pack binary data</Summary>
+      <Description>Perl built-in function. Packs the list into a binary string.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="unpack" signature="unpack($template, $expr)">
+      <Summary>Unpack binary data</Summary>
+      <Description>Perl built-in function. Unpacks the string into a list of values.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="vec" signature="vec($expr, $offset, $bits)">
+      <Summary>Bit vector</Summary>
+      <Description>Perl built-in function. Returns or sets the bits of the string.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="pos" signature="pos($expr)">
+      <Summary>Match position</Summary>
+      <Description>Perl built-in function. Returns or sets the position of the last match.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="prototype" signature="prototype($function)">
+      <Summary>Subroutine prototype</Summary>
+      <Description>Perl built-in function. Returns the prototype of the subroutine.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="reset" signature="reset($expr)">
+      <Summary>Reset variables</Summary>
+      <Description>Perl built-in function. Clears the package variables and resets the ?? operator.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="reverse" signature="reverse($list)">
+      <Summary>Reverse a list</Summary>
+      <Description>Perl built-in function. Returns the list in reverse order, or the string reversed in scalar context.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="sort" signature="sort($comparison, $list)">
+      <Summary>Sort a list</Summary>
+      <Description>Perl built-in function. Returns the list sorted, optionally with the comparison block.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="map" signature="map($block, $list)">
+      <Summary>Transform a list</Summary>
+      <Description>Perl built-in function. Returns the list with the block applied to every element.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="grep" signature="grep($pattern, $list)">
+      <Summary>Filter a list</Summary>
+      <Description>Perl built-in function. Returns the elements that match the pattern or block.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="keys" signature="keys($hash)">
+      <Summary>Hash keys</Summary>
+      <Description>Perl built-in function. Returns the keys of the hash.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="values" signature="values($hash)">
+      <Summary>Hash values</Summary>
+      <Description>Perl built-in function. Returns the values of the hash.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="each" signature="each($hash)">
+      <Summary>Iterate a hash</Summary>
+      <Description>Perl built-in function. Returns the next key and value pair of the hash.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="exists" signature="exists($key)">
+      <Summary>Key exists</Summary>
+      <Description>Perl built-in function. Returns true when the hash has the key.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="delete" signature="delete($key)">
+      <Summary>Delete a key</Summary>
+      <Description>Perl built-in function. Removes the key from the hash and returns its value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="push" signature="push($array, $list)">
+      <Summary>Append to an array</Summary>
+      <Description>Perl built-in function. Appends the list to the array.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="pop" signature="pop($array)">
+      <Summary>Remove from the end</Summary>
+      <Description>Perl built-in function. Removes and returns the last element of the array.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="shift" signature="shift($array)">
+      <Summary>Remove from the front</Summary>
+      <Description>Perl built-in function. Removes and returns the first element of the array.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="unshift" signature="unshift($array, $list)">
+      <Summary>Insert at the front</Summary>
+      <Description>Perl built-in function. Inserts the list at the beginning of the array.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="splice" signature="splice($array, $offset, $length, $replacement)">
+      <Summary>Splice an array</Summary>
+      <Description>Perl built-in function. Removes and replaces elements of the array.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="scalar" signature="scalar($expr)">
+      <Summary>Scalar context</Summary>
+      <Description>Perl built-in function. Evaluates the expression in scalar context.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="wantarray" signature="wantarray()">
+      <Summary>List context</Summary>
+      <Description>Perl built-in function. Returns true, false or undef according to the caller's context.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="defined" signature="defined($expr)">
+      <Summary>Defined value</Summary>
+      <Description>Perl built-in function. Returns true when the expression has a defined value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="undef" signature="undef($function)">
+      <Summary>Undefine</Summary>
+      <Description>Perl built-in function. Removes the definition of the subroutine or variable.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="ref" signature="ref($expr)">
+      <Summary>Reference type</Summary>
+      <Description>Perl built-in function. Returns the type of the reference, or an empty string.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="bless" signature="bless($ref, $class)">
+      <Summary>Bless a reference</Summary>
+      <Description>Perl built-in function. Makes the reference an object of the class.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="tie" signature="tie($variable, $package, $args)">
+      <Summary>Tie a variable</Summary>
+      <Description>Perl built-in function. Binds the variable to the package.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="tied" signature="tied($variable)">
+      <Summary>Tied package</Summary>
+      <Description>Perl built-in function. Returns the package behind the tied variable.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="untie" signature="untie($variable)">
+      <Summary>Untie a variable</Summary>
+      <Description>Perl built-in function. Breaks the binding of the variable.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="abs" signature="abs($value)">
+      <Summary>Absolute value</Summary>
+      <Description>Perl built-in function. Returns the value without its sign.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="int" signature="int($value)">
+      <Summary>Integer part</Summary>
+      <Description>Perl built-in function. Returns the integer part of the value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="sqrt" signature="sqrt($value)">
+      <Summary>Square root</Summary>
+      <Description>Perl built-in function. Returns the square root of the value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="exp" signature="exp($value)">
+      <Summary>Exponential</Summary>
+      <Description>Perl built-in function. Returns e raised to the value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="log" signature="log($value)">
+      <Summary>Logarithm</Summary>
+      <Description>Perl built-in function. Returns the natural logarithm of the value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="sin" signature="sin($angle)">
+      <Summary>Sine</Summary>
+      <Description>Perl built-in function. Returns the sine of the angle in radians.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="cos" signature="cos($angle)">
+      <Summary>Cosine</Summary>
+      <Description>Perl built-in function. Returns the cosine of the angle in radians.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="atan2" signature="atan2($y, $x)">
+      <Summary>Arc tangent</Summary>
+      <Description>Perl built-in function. Returns the angle whose tangent is y divided by x.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="rand" signature="rand($limit)">
+      <Summary>Random number</Summary>
+      <Description>Perl built-in function. Returns a random fractional number or an integer below the limit.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="srand" signature="srand($seed)">
+      <Summary>Seed the random generator</Summary>
+      <Description>Perl built-in function. Seeds the random number generator.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="time" signature="time()">
+      <Summary>Current time</Summary>
+      <Description>Perl built-in function. Returns the number of seconds since the epoch.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="localtime" signature="localtime($time)">
+      <Summary>Local time</Summary>
+      <Description>Perl built-in function. Returns the broken-down local time.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="gmtime" signature="gmtime($time)">
+      <Summary>UTC time</Summary>
+      <Description>Perl built-in function. Returns the broken-down UTC time.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="sleep" signature="sleep($seconds)">
+      <Summary>Pause the program</Summary>
+      <Description>Perl built-in function. Suspends the program for the number of seconds.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="alarm" signature="alarm($seconds)">
+      <Summary>Set an alarm</Summary>
+      <Description>Perl built-in function. Schedules SIGALRM after the number of seconds.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="times" signature="times()">
+      <Summary>Process times</Summary>
+      <Description>Perl built-in function. Returns the user and system times of the process.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="die" signature="die($message)">
+      <Summary>Exit with an error</Summary>
+      <Description>Perl built-in function. Writes the message to standard error and exits.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="warn" signature="warn($message)">
+      <Summary>Write a warning</Summary>
+      <Description>Perl built-in function. Writes the message to standard error.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="eval" signature="eval($string)">
+      <Summary>Evaluate Perl code</Summary>
+      <Description>Perl built-in function. Evaluates the string as Perl code and catches errors.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="require" signature="require($module)">
+      <Summary>Load a module</Summary>
+      <Description>Perl built-in function. Loads the module at run time.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="do" signature="do($filename)">
+      <Summary>Run a file</Summary>
+      <Description>Perl built-in function. Executes the file and returns the value of its last expression.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="exit" signature="exit($status)">
+      <Summary>End the program</Summary>
+      <Description>Perl built-in function. Exits the program with the status.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="caller" signature="caller($depth)">
+      <Summary>Call stack</Summary>
+      <Description>Perl built-in function. Returns information about the current or caller frame.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="system" signature="system($list)">
+      <Summary>Run a command</Summary>
+      <Description>Perl built-in function. Runs the command and returns its exit status.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="exec" signature="exec($list)">
+      <Summary>Replace the process</Summary>
+      <Description>Perl built-in function. Replaces the current process with the command.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="fork" signature="fork()">
+      <Summary>Fork the process</Summary>
+      <Description>Perl built-in function. Creates a child process and returns its process id.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="wait" signature="wait()">
+      <Summary>Wait for a child</Summary>
+      <Description>Perl built-in function. Waits for a child process and returns its process id.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="waitpid" signature="waitpid($pid, $flags)">
+      <Summary>Wait for a process</Summary>
+      <Description>Perl built-in function. Waits for the process and returns its process id.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="kill" signature="kill($signal, $pids)">
+      <Summary>Send a signal</Summary>
+      <Description>Perl built-in function. Sends the signal to the processes.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getppid" signature="getppid()">
+      <Summary>Parent process id</Summary>
+      <Description>Perl built-in function. Returns the process id of the parent.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="umask" signature="umask($mask)">
+      <Summary>File creation mask</Summary>
+      <Description>Perl built-in function. Sets the file creation mask and returns the previous one.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getlogin" signature="getlogin()">
+      <Summary>Login name</Summary>
+      <Description>Perl built-in function. Returns the login name of the user.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="chdir" signature="chdir($path)">
+      <Summary>Change directory</Summary>
+      <Description>Perl built-in function. Changes the working directory.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="chmod" signature="chmod($mode, $files)">
+      <Summary>Change permissions</Summary>
+      <Description>Perl built-in function. Changes the permission bits of the files.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="chown" signature="chown($uid, $gid, $files)">
+      <Summary>Change owner</Summary>
+      <Description>Perl built-in function. Changes the owner and group of the files.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="unlink" signature="unlink($files)">
+      <Summary>Remove files</Summary>
+      <Description>Perl built-in function. Removes the files.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="rename" signature="rename($old, $new)">
+      <Summary>Rename a file</Summary>
+      <Description>Perl built-in function. Renames or moves the file.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="mkdir" signature="mkdir($path, $mode)">
+      <Summary>Create a directory</Summary>
+      <Description>Perl built-in function. Creates the directory.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="rmdir" signature="rmdir($path)">
+      <Summary>Remove a directory</Summary>
+      <Description>Perl built-in function. Removes the empty directory.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="opendir" signature="opendir($dirhandle, $path)">
+      <Summary>Open a directory</Summary>
+      <Description>Perl built-in function. Opens the directory and associates it with the handle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="readdir" signature="readdir($dirhandle)">
+      <Summary>Read a directory entry</Summary>
+      <Description>Perl built-in function. Returns the next entry name of the directory.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="closedir" signature="closedir($dirhandle)">
+      <Summary>Close a directory</Summary>
+      <Description>Perl built-in function. Closes the directory handle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="glob" signature="glob($pattern)">
+      <Summary>Glob a pattern</Summary>
+      <Description>Perl built-in function. Returns the paths that match the shell pattern.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="stat" signature="stat($file)">
+      <Summary>File status</Summary>
+      <Description>Perl built-in function. Returns the status fields of the file.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="lstat" signature="lstat($file)">
+      <Summary>Link status</Summary>
+      <Description>Perl built-in function. Returns the status of the link itself.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="readlink" signature="readlink($path)">
+      <Summary>Link target</Summary>
+      <Description>Perl built-in function. Returns the path the symbolic link points to.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="symlink" signature="symlink($old, $new)">
+      <Summary>Create a symbolic link</Summary>
+      <Description>Perl built-in function. Creates a symbolic link at the new path.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="link" signature="link($old, $new)">
+      <Summary>Create a hard link</Summary>
+      <Description>Perl built-in function. Creates a hard link at the new path.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="utime" signature="utime($atime, $mtime, $files)">
+      <Summary>Set file times</Summary>
+      <Description>Perl built-in function. Sets the access and modification times of the files.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getpwnam" signature="getpwnam($name)">
+      <Summary>User information</Summary>
+      <Description>Perl built-in function. Returns the passwd fields of the user.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getgrnam" signature="getgrnam($name)">
+      <Summary>Group information</Summary>
+      <Description>Perl built-in function. Returns the group fields of the group.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="gethostbyname" signature="gethostbyname($name)">
+      <Summary>Host information</Summary>
+      <Description>Perl built-in function. Returns the addresses of the host.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getprotobyname" signature="getprotobyname($name)">
+      <Summary>Protocol information</Summary>
+      <Description>Perl built-in function. Returns the protocol number of the name.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getservbyname" signature="getservbyname($name, $protocol)">
+      <Summary>Service information</Summary>
+      <Description>Perl built-in function. Returns the port of the service.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getpwent" signature="getpwent()">
+      <Summary>Passwd entry</Summary>
+      <Description>Perl built-in function. Returns the next passwd entry.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="setpwent" signature="setpwent()">
+      <Summary>Rewind passwd lookup</Summary>
+      <Description>Perl built-in function. Rewinds the passwd database.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="endpwent" signature="endpwent()">
+      <Summary>End passwd lookup</Summary>
+      <Description>Perl built-in function. Closes the passwd database.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getgrent" signature="getgrent()">
+      <Summary>Group entry</Summary>
+      <Description>Perl built-in function. Returns the next group entry.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="setgrent" signature="setgrent()">
+      <Summary>Rewind group lookup</Summary>
+      <Description>Perl built-in function. Rewinds the group database.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="endgrent" signature="endgrent()">
+      <Summary>End group lookup</Summary>
+      <Description>Perl built-in function. Closes the group database.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="gethostbyaddr" signature="gethostbyaddr($address)">
+      <Summary>Reverse lookup</Summary>
+      <Description>Perl built-in function. Returns the host name of the address.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getnetbyname" signature="getnetbyname($name)">
+      <Summary>Network information</Summary>
+      <Description>Perl built-in function. Returns the network number of the name.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="getservbyport" signature="getservbyport($port, $protocol)">
+      <Summary>Service by port</Summary>
+      <Description>Perl built-in function. Returns the service name of the port.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="gethostent" signature="gethostent()">
+      <Summary>Host entry</Summary>
+      <Description>Perl built-in function. Returns the next host entry.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="sethostent" signature="sethostent($stayopen)">
+      <Summary>Rewind host lookup</Summary>
+      <Description>Perl built-in function. Rewinds the host database.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="endhostent" signature="endhostent()">
+      <Summary>End host lookup</Summary>
+      <Description>Perl built-in function. Closes the host database.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="socket" signature="socket($socket, $domain, $type, $protocol)">
+      <Summary>Create a socket</Summary>
+      <Description>Perl built-in function. Creates a socket handle.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="socketpair" signature="socketpair($socket1, $socket2, $domain, $type, $protocol)">
+      <Summary>Socket pair</Summary>
+      <Description>Perl built-in function. Creates a pair of connected sockets.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="bind" signature="bind($socket, $address)">
+      <Summary>Bind a socket</Summary>
+      <Description>Perl built-in function. Binds the socket to the address.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="listen" signature="listen($socket, $backlog)">
+      <Summary>Listen on a socket</Summary>
+      <Description>Perl built-in function. Prepares the socket to accept connections.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="accept" signature="accept($socket)">
+      <Summary>Accept a connection</Summary>
+      <Description>Perl built-in function. Accepts a connection on the socket.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="connect" signature="connect($socket, $address)">
+      <Summary>Connect a socket</Summary>
+      <Description>Perl built-in function. Connects the socket to the address.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="send" signature="send($socket, $data, $flags)">
+      <Summary>Send data</Summary>
+      <Description>Perl built-in function. Sends the data on the socket.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="recv" signature="recv($socket, $buffer, $length, $flags)">
+      <Summary>Receive data</Summary>
+      <Description>Perl built-in function. Receives data from the socket.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="shutdown" signature="shutdown($socket, $how)">
+      <Summary>Shut down a socket</Summary>
+      <Description>Perl built-in function. Closes one direction of the socket.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Basename::basename" signature="File::Basename::basename($path, $suffix)">
+      <Summary>Base name</Summary>
+      <Description>Perl File::Basename module function. Returns the last component of the path.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Basename::dirname" signature="File::Basename::dirname($path)">
+      <Summary>Directory name</Summary>
+      <Description>Perl File::Basename module function. Returns the path without its last component.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Basename::fileparse" signature="File::Basename::fileparse($path, $suffixes)">
+      <Summary>Parse a path</Summary>
+      <Description>Perl File::Basename module function. Splits the path into the directory, base name and suffix.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Spec::catfile" signature="File::Spec::catfile($parts)">
+      <Summary>Join a file path</Summary>
+      <Description>Perl File::Spec module function. Joins the parts with the platform separator.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Spec::catdir" signature="File::Spec::catdir($parts)">
+      <Summary>Join a directory path</Summary>
+      <Description>Perl File::Spec module function. Joins the directory parts with the platform separator.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Spec::abs2rel" signature="File::Spec::abs2rel($path, $base)">
+      <Summary>Relative path</Summary>
+      <Description>Perl File::Spec module function. Returns the path relative to the base.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Spec::rel2abs" signature="File::Spec::rel2abs($path, $base)">
+      <Summary>Absolute path</Summary>
+      <Description>Perl File::Spec module function. Returns the absolute path from the base.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Copy::copy" signature="File::Copy::copy($source, $destination)">
+      <Summary>Copy a file</Summary>
+      <Description>Perl File::Copy module function. Copies the source file to the destination.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Copy::move" signature="File::Copy::move($source, $destination)">
+      <Summary>Move a file</Summary>
+      <Description>Perl File::Copy module function. Moves the source file to the destination.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Path::make_path" signature="File::Path::make_path($paths)">
+      <Summary>Create directories</Summary>
+      <Description>Perl File::Path module function. Creates the directories and their parents.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Path::remove_tree" signature="File::Path::remove_tree($paths)">
+      <Summary>Remove a tree</Summary>
+      <Description>Perl File::Path module function. Removes the files and directories recursively.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Temp::tempfile" signature="File::Temp::tempfile($template, $options)">
+      <Summary>Temporary file</Summary>
+      <Description>Perl File::Temp module function. Creates and opens a temporary file.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="File::Temp::tempdir" signature="File::Temp::tempdir($template, $options)">
+      <Summary>Temporary directory</Summary>
+      <Description>Perl File::Temp module function. Creates a temporary directory.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Cwd::getcwd" signature="Cwd::getcwd()">
+      <Summary>Current directory</Summary>
+      <Description>Perl Cwd module function. Returns the current working directory.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Cwd::abs_path" signature="Cwd::abs_path($path)">
+      <Summary>Absolute path</Summary>
+      <Description>Perl Cwd module function. Returns the absolute path with links resolved.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Cwd::realpath" signature="Cwd::realpath($path)">
+      <Summary>Resolved path</Summary>
+      <Description>Perl Cwd module function. Returns the canonical path.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Data::Dumper::Dumper" signature="Data::Dumper::Dumper($values)">
+      <Summary>Dump data</Summary>
+      <Description>Perl Data::Dumper module function. Returns a Perl representation of the values.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="JSON::PP::encode_json" signature="JSON::PP::encode_json($value)">
+      <Summary>Encode JSON</Summary>
+      <Description>Perl JSON::PP module function. Returns the JSON string for the value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="JSON::PP::decode_json" signature="JSON::PP::decode_json($string)">
+      <Summary>Decode JSON</Summary>
+      <Description>Perl JSON::PP module function. Parses the JSON string into Perl values.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Getopt::Long::GetOptions" signature="Getopt::Long::GetOptions($options)">
+      <Summary>Parse options</Summary>
+      <Description>Perl Getopt::Long module function. Parses the command-line options into the variables.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Getopt::Long::GetOptionsFromArray" signature="Getopt::Long::GetOptionsFromArray($array, $options)">
+      <Summary>Parse options from an array</Summary>
+      <Description>Perl Getopt::Long module function. Parses the options from the array.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Time::HiRes::gettimeofday" signature="Time::HiRes::gettimeofday()">
+      <Summary>High-resolution time</Summary>
+      <Description>Perl Time::HiRes module function. Returns the seconds and microseconds since the epoch.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Time::HiRes::usleep" signature="Time::HiRes::usleep($microseconds)">
+      <Summary>Microsecond sleep</Summary>
+      <Description>Perl Time::HiRes module function. Suspends the program for the number of microseconds.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="POSIX::strftime" signature="POSIX::strftime($format, $time)">
+      <Summary>Format a time</Summary>
+      <Description>Perl POSIX module function. Returns the time formatted by the strftime directives.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="POSIX::ceil" signature="POSIX::ceil($value)">
+      <Summary>Round up</Summary>
+      <Description>Perl POSIX module function. Returns the smallest integer greater than or equal to the value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="POSIX::floor" signature="POSIX::floor($value)">
+      <Summary>Round down</Summary>
+      <Description>Perl POSIX module function. Returns the largest integer less than or equal to the value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="POSIX::pow" signature="POSIX::pow($base, $exponent)">
+      <Summary>Power</Summary>
+      <Description>Perl POSIX module function. Returns the base raised to the exponent.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="MIME::Base64::encode_base64" signature="MIME::Base64::encode_base64($data, $eol)">
+      <Summary>Encode Base64</Summary>
+      <Description>Perl MIME::Base64 module function. Returns the Base64 encoding of the data.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="MIME::Base64::decode_base64" signature="MIME::Base64::decode_base64($data)">
+      <Summary>Decode Base64</Summary>
+      <Description>Perl MIME::Base64 module function. Returns the bytes decoded from the Base64 string.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Digest::SHA::sha256_hex" signature="Digest::SHA::sha256_hex($data)">
+      <Summary>SHA-256 digest</Summary>
+      <Description>Perl Digest::SHA module function. Returns the SHA-256 digest of the data as hexadecimal.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Digest::SHA::sha1_hex" signature="Digest::SHA::sha1_hex($data)">
+      <Summary>SHA-1 digest</Summary>
+      <Description>Perl Digest::SHA module function. Returns the SHA-1 digest of the data as hexadecimal.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Digest::MD5::md5_hex" signature="Digest::MD5::md5_hex($data)">
+      <Summary>MD5 digest</Summary>
+      <Description>Perl Digest::MD5 module function. Returns the MD5 digest of the data as hexadecimal.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Encode::encode" signature="Encode::encode($encoding, $string)">
+      <Summary>Encode a string</Summary>
+      <Description>Perl Encode module function. Returns the string encoded in the encoding.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Encode::decode" signature="Encode::decode($encoding, $string)">
+      <Summary>Decode a string</Summary>
+      <Description>Perl Encode module function. Returns the string decoded from the encoding.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Storable::store" signature="Storable::store($file, $value)">
+      <Summary>Store data</Summary>
+      <Description>Perl Storable module function. Writes the value to the file in binary form.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Storable::retrieve" signature="Storable::retrieve($file)">
+      <Summary>Retrieve data</Summary>
+      <Description>Perl Storable module function. Reads a value written by store from the file.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Storable::dclone" signature="Storable::dclone($value)">
+      <Summary>Deep clone</Summary>
+      <Description>Perl Storable module function. Returns a deep copy of the value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::sum" signature="List::Util::sum($list)">
+      <Summary>Sum a list</Summary>
+      <Description>Perl List::Util module function. Returns the sum of the numbers.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::max" signature="List::Util::max($list)">
+      <Summary>Maximum</Summary>
+      <Description>Perl List::Util module function. Returns the largest number.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::min" signature="List::Util::min($list)">
+      <Summary>Minimum</Summary>
+      <Description>Perl List::Util module function. Returns the smallest number.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::first" signature="List::Util::first($block, $list)">
+      <Summary>First match</Summary>
+      <Description>Perl List::Util module function. Returns the first element for which the block is true.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::any" signature="List::Util::any($block, $list)">
+      <Summary>Any match</Summary>
+      <Description>Perl List::Util module function. Returns true when the block is true for at least one element.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::all" signature="List::Util::all($block, $list)">
+      <Summary>All match</Summary>
+      <Description>Perl List::Util module function. Returns true when the block is true for every element.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::none" signature="List::Util::none($block, $list)">
+      <Summary>None match</Summary>
+      <Description>Perl List::Util module function. Returns true when the block is false for every element.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::uniq" signature="List::Util::uniq($list)">
+      <Summary>Unique elements</Summary>
+      <Description>Perl List::Util module function. Returns the list without duplicate elements.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::shuffle" signature="List::Util::shuffle($list)">
+      <Summary>Shuffle a list</Summary>
+      <Description>Perl List::Util module function. Returns the list in random order.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="List::Util::reduce" signature="List::Util::reduce($block, $list)">
+      <Summary>Fold a list</Summary>
+      <Description>Perl List::Util module function. Combines the elements with the block into one value.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Scalar::Util::blessed" signature="Scalar::Util::blessed($value)">
+      <Summary>Blessed reference</Summary>
+      <Description>Perl Scalar::Util module function. Returns the package name when the value is a blessed reference.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Scalar::Util::reftype" signature="Scalar::Util::reftype($value)">
+      <Summary>Reference type</Summary>
+      <Description>Perl Scalar::Util module function. Returns the internal type of the reference.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Scalar::Util::looks_like_number" signature="Scalar::Util::looks_like_number($value)">
+      <Summary>Number check</Summary>
+      <Description>Perl Scalar::Util module function. Returns true when the value looks like a number.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Scalar::Util::dualvar" signature="Scalar::Util::dualvar($number, $string)">
+      <Summary>Dual value</Summary>
+      <Description>Perl Scalar::Util module function. Returns a value with different string and number interpretations.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="IO::Socket::INET::new" signature="IO::Socket::INET::new($peer)">
+      <Summary>Create a socket</Summary>
+      <Description>Perl IO::Socket::INET module method. Creates an internet socket, connecting to the peer when one is given.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="HTTP::Tiny::get" signature="HTTP::Tiny::get($url)">
+      <Summary>HTTP GET</Summary>
+      <Description>Perl HTTP::Tiny module method. Fetches the URL and returns the response hash.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="HTTP::Tiny::post" signature="HTTP::Tiny::post($url, $content)">
+      <Summary>HTTP POST</Summary>
+      <Description>Perl HTTP::Tiny module method. Sends the content to the URL and returns the response hash.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="LWP::Simple::getstore" signature="LWP::Simple::getstore($url, $file)">
+      <Summary>Fetch to a file</Summary>
+      <Description>Perl LWP::Simple module function. Stores the body of the URL in the file.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Net::Ping::ping" signature="Net::Ping::ping($host)">
+      <Summary>Ping a host</Summary>
+      <Description>Perl Net::Ping module method. Sends a ping and returns true when the host answers.</Description>
+    </Symbol>
+    <Symbol language="Perl" name="Sys::Hostname::hostname" signature="Sys::Hostname::hostname()">
+      <Summary>Host name</Summary>
+      <Description>Perl Sys::Hostname module function. Returns the name of the host.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_compile_definitions" signature="add_compile_definitions(definitions...)">
+      <Summary>Add preprocessor definitions</Summary>
+      <Description>CMake command. Adds preprocessor definitions to the compilation of the current directory and its targets.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_compile_options" signature="add_compile_options(options...)">
+      <Summary>Add compiler options</Summary>
+      <Description>CMake command. Adds compiler options to the compilation of the current directory and its targets.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_custom_command" signature="add_custom_command(OUTPUT outputs COMMAND command DEPENDS depends)">
+      <Summary>Add a custom build rule</Summary>
+      <Description>CMake command. Adds a custom build rule that produces outputs or runs after a target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_custom_target" signature="add_custom_target(name COMMAND command DEPENDS depends)">
+      <Summary>Add a custom target</Summary>
+      <Description>CMake command. Adds a target that always runs the given commands.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_definitions" signature="add_definitions(definitions...)">
+      <Summary>Add preprocessor definitions</Summary>
+      <Description>CMake command. Adds preprocessor definitions to the compilation flags.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_dependencies" signature="add_dependencies(target dependencies...)">
+      <Summary>Add target dependencies</Summary>
+      <Description>CMake command. Makes one target build after the listed dependencies.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_executable" signature="add_executable(name sources...)">
+      <Summary>Add an executable target</Summary>
+      <Description>CMake command. Defines an executable target from the listed source files.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_library" signature="add_library(name type sources...)">
+      <Summary>Add a library target</Summary>
+      <Description>CMake command. Defines a library target from the sources; the type is STATIC, SHARED, MODULE or INTERFACE.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_link_options" signature="add_link_options(options...)">
+      <Summary>Add linker options</Summary>
+      <Description>CMake command. Adds linker options to the link step.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_subdirectory" signature="add_subdirectory(source_dir binary_dir)">
+      <Summary>Build a subdirectory</Summary>
+      <Description>CMake command. Builds the CMake project in the subdirectory.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="add_test" signature="add_test(NAME name COMMAND command)">
+      <Summary>Register a test</Summary>
+      <Description>CMake command. Registers a test that CTest runs.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="aux_source_directory" signature="aux_source_directory(dir variable)">
+      <Summary>Collect source files</Summary>
+      <Description>CMake command. Collects the source files of the directory into the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="build_command" signature="build_command(variable)">
+      <Summary>Build command</Summary>
+      <Description>CMake command. Sets the variable to the command that builds the project.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="cmake_host_system_information" signature="cmake_host_system_information(RESULT variable QUERY query)">
+      <Summary>Query the host system</Summary>
+      <Description>CMake command. Queries information about the host system into the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="cmake_language" signature="cmake_language(SUBCOMMAND args...)">
+      <Summary>Run a CMake subcommand</Summary>
+      <Description>CMake command. Calls a CMake subcommand or evaluates code.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="cmake_minimum_required" signature="cmake_minimum_required(VERSION version)">
+      <Summary>Require a CMake version</Summary>
+      <Description>CMake command. Requires a minimum CMake version and sets the policy version.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="cmake_parse_arguments" signature="cmake_parse_arguments(prefix options one_value multi_value args...)">
+      <Summary>Parse command arguments</Summary>
+      <Description>CMake command. Parses the arguments into the options, one-value and multi-value variables.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="cmake_path" signature="cmake_path(SUBCOMMAND path_var args...)">
+      <Summary>Manipulate a path</Summary>
+      <Description>CMake command. Manipulates a filesystem path in the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="cmake_policy" signature="cmake_policy(VERSION version)">
+      <Summary>Set a CMake policy</Summary>
+      <Description>CMake command. Sets a policy to OLD or NEW, or applies a version.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="configure_file" signature="configure_file(input output)">
+      <Summary>Configure a file</Summary>
+      <Description>CMake command. Copies the input file to the output and substitutes the @VAR@ and ${VAR} references.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="create_test_sourcelist" signature="create_test_sourcelist(variable source_list files...)">
+      <Summary>Create a test source list</Summary>
+      <Description>CMake command. Creates a test driver source from the listed sources.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_build" signature="ctest_build(BUILD build_dir)">
+      <Summary>Run the CTest build step</Summary>
+      <Description>CMake command. Runs the build step of a CTest dashboard.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_configure" signature="ctest_configure(BUILD build_dir)">
+      <Summary>Run the CTest configure step</Summary>
+      <Description>CMake command. Runs the configure step of a CTest dashboard.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_coverage" signature="ctest_coverage(BUILD build_dir)">
+      <Summary>Run the CTest coverage step</Summary>
+      <Description>CMake command. Runs the coverage step of a CTest dashboard.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_empty_binary_directory" signature="ctest_empty_binary_directory(binary_dir)">
+      <Summary>Empty a binary directory</Summary>
+      <Description>CMake command. Empties the binary directory before a dashboard run.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_memcheck" signature="ctest_memcheck(BUILD build_dir)">
+      <Summary>Run the CTest memory check</Summary>
+      <Description>CMake command. Runs the memory check step of a CTest dashboard.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_read_custom_files" signature="ctest_read_custom_files(directories...)">
+      <Summary>Read CTest custom files</Summary>
+      <Description>CMake command. Reads the CTest custom files from the directories.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_run_script" signature="ctest_run_script(scripts...)">
+      <Summary>Run a CTest script</Summary>
+      <Description>CMake command. Runs a CTest script.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_sleep" signature="ctest_sleep(seconds)">
+      <Summary>Wait in a CTest script</Summary>
+      <Description>CMake command. Waits for the given time in a CTest script.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_start" signature="ctest_start(model TRACK track)">
+      <Summary>Start a dashboard run</Summary>
+      <Description>CMake command. Starts a CTest dashboard run.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_submit" signature="ctest_submit(PARTS parts...)">
+      <Summary>Submit dashboard results</Summary>
+      <Description>CMake command. Submits the dashboard results to the server.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_test" signature="ctest_test(BUILD build_dir)">
+      <Summary>Run the CTest tests</Summary>
+      <Description>CMake command. Runs the tests of a CTest dashboard.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_update" signature="ctest_update(SOURCE source_dir)">
+      <Summary>Run the CTest update step</Summary>
+      <Description>CMake command. Runs the update step of a CTest dashboard.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ctest_upload" signature="ctest_upload(FILES files...)">
+      <Summary>Upload dashboard files</Summary>
+      <Description>CMake command. Uploads the files of a CTest dashboard.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="define_property" signature="define_property(scope PROPERTY property)">
+      <Summary>Document a property</Summary>
+      <Description>CMake command. Documents a property and its scope.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="enable_language" signature="enable_language(languages...)">
+      <Summary>Enable a language</Summary>
+      <Description>CMake command. Enables a language for the project.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="enable_testing" signature="enable_testing()">
+      <Summary>Enable CTest</Summary>
+      <Description>CMake command. Enables CTest for the current directory.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="execute_process" signature="execute_process(COMMAND command OUTPUT_VARIABLE variable)">
+      <Summary>Run a process</Summary>
+      <Description>CMake command. Runs one or more commands and captures their output.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="export" signature="export(TARGETS targets NAMESPACE namespace)">
+      <Summary>Export targets</Summary>
+      <Description>CMake command. Exports targets for use by other projects.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="file" signature="file(SUBCOMMAND args...)">
+      <Summary>Work with files</Summary>
+      <Description>CMake command. Reads, writes, copies or inspects files and directories.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="find_file" signature="find_file(variable name PATHS paths...)">
+      <Summary>Find a file</Summary>
+      <Description>CMake command. Finds a file and stores its path in the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="find_library" signature="find_library(variable name PATHS paths...)">
+      <Summary>Find a library</Summary>
+      <Description>CMake command. Finds a library and stores its path in the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="find_package" signature="find_package(package version REQUIRED)">
+      <Summary>Find a package</Summary>
+      <Description>CMake command. Finds a package and loads its configuration or module.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="find_path" signature="find_path(variable name PATHS paths...)">
+      <Summary>Find an include directory</Summary>
+      <Description>CMake command. Finds a directory with the named file and stores it in the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="find_program" signature="find_program(variable name PATHS paths...)">
+      <Summary>Find a program</Summary>
+      <Description>CMake command. Finds an executable and stores its path in the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="get_cmake_property" signature="get_cmake_property(variable property)">
+      <Summary>Read a CMake property</Summary>
+      <Description>CMake command. Reads a CMake property into the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="get_directory_property" signature="get_directory_property(variable property)">
+      <Summary>Read a directory property</Summary>
+      <Description>CMake command. Reads a directory property into the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="get_filename_component" signature="get_filename_component(variable filename COMPONENT)">
+      <Summary>Split a path</Summary>
+      <Description>CMake command. Splits a path into the requested component.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="get_property" signature="get_property(variable scope PROPERTY property)">
+      <Summary>Read a property</Summary>
+      <Description>CMake command. Reads a property of a scope, target, source or test.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="get_source_file_property" signature="get_source_file_property(variable source_file property)">
+      <Summary>Read a source property</Summary>
+      <Description>CMake command. Reads a property of a source file.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="get_target_property" signature="get_target_property(variable target property)">
+      <Summary>Read a target property</Summary>
+      <Description>CMake command. Reads a property of a target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="get_test_property" signature="get_test_property(test property variable)">
+      <Summary>Read a test property</Summary>
+      <Description>CMake command. Reads a property of a test.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="include" signature="include(file)">
+      <Summary>Include a CMake file</Summary>
+      <Description>CMake command. Runs another CMake file in the current scope.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="include_directories" signature="include_directories(directories...)">
+      <Summary>Add include directories</Summary>
+      <Description>CMake command. Adds directories to the include path.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="include_external_msproject" signature="include_external_msproject(project file)">
+      <Summary>Include a Microsoft project</Summary>
+      <Description>CMake command. Includes a Microsoft project file in the build.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="include_guard" signature="include_guard(DIRECTORY)">
+      <Summary>Guard against double inclusion</Summary>
+      <Description>CMake command. Protects the current file from being included twice.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="include_regular_expression" signature="include_regular_expression(regex)">
+      <Summary>Set the dependency regex</Summary>
+      <Description>CMake command. Sets the regular expression used by dependency scanning.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="install" signature="install(TARGETS targets DESTINATION dir)">
+      <Summary>Add an install rule</Summary>
+      <Description>CMake command. Defines an installation rule for targets, files or directories.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="link_directories" signature="link_directories(directories...)">
+      <Summary>Add library directories</Summary>
+      <Description>CMake command. Adds directories to the library search path.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="link_libraries" signature="link_libraries(libraries...)">
+      <Summary>Link libraries</Summary>
+      <Description>CMake command. Links the libraries to all targets created after the call.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="list" signature="list(SUBCOMMAND list args...)">
+      <Summary>Work with lists</Summary>
+      <Description>CMake command. Reads, modifies and compares lists.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="load_cache" signature="load_cache(path)">
+      <Summary>Load another cache</Summary>
+      <Description>CMake command. Loads the cache of another build tree.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="load_command" signature="load_command(command_name)">
+      <Summary>Load a custom command</Summary>
+      <Description>CMake command. Loads a custom command from a module.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="make_directory" signature="make_directory(dir)">
+      <Summary>Create a directory</Summary>
+      <Description>CMake command. Creates a directory.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="mark_as_advanced" signature="mark_as_advanced(variables...)">
+      <Summary>Mark cache variables advanced</Summary>
+      <Description>CMake command. Marks cache variables as advanced.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="math" signature="math(EXPR variable expression)">
+      <Summary>Evaluate an expression</Summary>
+      <Description>CMake command. Evaluates a mathematical expression into the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="message" signature="message(message...)">
+      <Summary>Write a message</Summary>
+      <Description>CMake command. Writes a message with an optional severity.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="option" signature="option(variable help value)">
+      <Summary>Define a boolean option</Summary>
+      <Description>CMake command. Defines a boolean cache option.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="project" signature="project(name VERSION version LANGUAGES languages...)">
+      <Summary>Set the project</Summary>
+      <Description>CMake command. Sets the project name, version and languages.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="remove" signature="remove(variable values...)">
+      <Summary>Remove values</Summary>
+      <Description>CMake command. Removes the values from the variable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="remove_definitions" signature="remove_definitions(definitions...)">
+      <Summary>Remove definitions</Summary>
+      <Description>CMake command. Removes preprocessor definitions from the compilation flags.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="separate_arguments" signature="separate_arguments(variable args...)">
+      <Summary>Split arguments</Summary>
+      <Description>CMake command. Splits the arguments into a list.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="set" signature="set(variable value CACHE type doc)">
+      <Summary>Set a variable</Summary>
+      <Description>CMake command. Sets a variable or a cache entry.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="set_directory_properties" signature="set_directory_properties(PROPERTIES property value)">
+      <Summary>Set directory properties</Summary>
+      <Description>CMake command. Sets properties of the current directory.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="set_property" signature="set_property(scope PROPERTY property value)">
+      <Summary>Set a property</Summary>
+      <Description>CMake command. Sets a property of a scope, target, source or test.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="set_source_files_properties" signature="set_source_files_properties(files PROPERTIES property value)">
+      <Summary>Set source properties</Summary>
+      <Description>CMake command. Sets properties of source files.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="set_target_properties" signature="set_target_properties(targets PROPERTIES property value)">
+      <Summary>Set target properties</Summary>
+      <Description>CMake command. Sets properties of targets.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="set_tests_properties" signature="set_tests_properties(tests PROPERTIES property value)">
+      <Summary>Set test properties</Summary>
+      <Description>CMake command. Sets properties of tests.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="site_name" signature="site_name(variable)">
+      <Summary>Set the site name</Summary>
+      <Description>CMake command. Sets the site name of the dashboard.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="source_group" signature="source_group(name files...)">
+      <Summary>Group source files</Summary>
+      <Description>CMake command. Groups source files in the IDE.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="string" signature="string(SUBCOMMAND result args...)">
+      <Summary>Work with strings</Summary>
+      <Description>CMake command. Manipulates strings and regular expressions.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="target_compile_definitions" signature="target_compile_definitions(target definitions...)">
+      <Summary>Add target definitions</Summary>
+      <Description>CMake command. Adds preprocessor definitions to the target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="target_compile_features" signature="target_compile_features(target features...)">
+      <Summary>Require compiler features</Summary>
+      <Description>CMake command. Requires compiler features for the target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="target_compile_options" signature="target_compile_options(target options...)">
+      <Summary>Add target compile options</Summary>
+      <Description>CMake command. Adds compiler options to the target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="target_include_directories" signature="target_include_directories(target directories...)">
+      <Summary>Add target include directories</Summary>
+      <Description>CMake command. Adds include directories to the target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="target_link_directories" signature="target_link_directories(target directories...)">
+      <Summary>Add target library directories</Summary>
+      <Description>CMake command. Adds library search directories to the target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="target_link_libraries" signature="target_link_libraries(target libraries...)">
+      <Summary>Link target libraries</Summary>
+      <Description>CMake command. Adds libraries to the link line of the target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="target_link_options" signature="target_link_options(target options...)">
+      <Summary>Add target linker options</Summary>
+      <Description>CMake command. Adds linker options to the target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="target_precompile_headers" signature="target_precompile_headers(target headers...)">
+      <Summary>Add precompiled headers</Summary>
+      <Description>CMake command. Adds precompiled headers to the target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="target_sources" signature="target_sources(target sources...)">
+      <Summary>Add target sources</Summary>
+      <Description>CMake command. Adds source files to the target.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="try_compile" signature="try_compile(result binary_dir source_dir)">
+      <Summary>Try to compile</Summary>
+      <Description>CMake command. Tries to compile the source and stores the result.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="try_run" signature="try_run(run_result compile_result binary_dir source_file)">
+      <Summary>Try to run</Summary>
+      <Description>CMake command. Tries to compile and run the source and stores the results.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="unset" signature="unset(variable CACHE)">
+      <Summary>Unset a variable</Summary>
+      <Description>CMake command. Removes a variable or a cache entry.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="variable_watch" signature="variable_watch(variable)">
+      <Summary>Watch a variable</Summary>
+      <Description>CMake command. Calls a command when the variable changes.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_SOURCE_DIR">
+      <Summary>Top-level source directory</Summary>
+      <Description>CMake variable. The source directory of the top-level project.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_BINARY_DIR">
+      <Summary>Top-level build directory</Summary>
+      <Description>CMake variable. The build directory of the top-level project.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CURRENT_SOURCE_DIR">
+      <Summary>Current source directory</Summary>
+      <Description>CMake variable. The source directory of the current CMakeLists.txt.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CURRENT_BINARY_DIR">
+      <Summary>Current build directory</Summary>
+      <Description>CMake variable. The build directory of the current CMakeLists.txt.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CURRENT_LIST_DIR">
+      <Summary>Current list directory</Summary>
+      <Description>CMake variable. The directory of the CMake file being processed.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CURRENT_LIST_FILE">
+      <Summary>Current list file</Summary>
+      <Description>CMake variable. The full path of the CMake file being processed.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CURRENT_LIST_LINE">
+      <Summary>Current list line</Summary>
+      <Description>CMake variable. The line number in the CMake file being processed.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_PARENT_LIST_FILE">
+      <Summary>Parent list file</Summary>
+      <Description>CMake variable. The CMake file that included the current file.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_MODULE_PATH">
+      <Summary>Module search path</Summary>
+      <Description>CMake variable. The directories searched for CMake modules.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_PREFIX_PATH">
+      <Summary>Prefix search path</Summary>
+      <Description>CMake variable. The installation prefixes searched by find_package and the find commands.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_INSTALL_PREFIX">
+      <Summary>Install prefix</Summary>
+      <Description>CMake variable. The directory the project is installed into.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_INSTALL_LIBDIR">
+      <Summary>Library install directory</Summary>
+      <Description>CMake variable. The library directory relative to the install prefix.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_INSTALL_BINDIR">
+      <Summary>Program install directory</Summary>
+      <Description>CMake variable. The executable directory relative to the install prefix.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_INSTALL_INCLUDEDIR">
+      <Summary>Header install directory</Summary>
+      <Description>CMake variable. The header directory relative to the install prefix.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_BUILD_TYPE">
+      <Summary>Build type</Summary>
+      <Description>CMake variable. The configuration to build, such as Debug, Release or RelWithDebInfo.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CONFIGURATION_TYPES">
+      <Summary>Configuration types</Summary>
+      <Description>CMake variable. The configurations offered by a multi-configuration generator.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_C_STANDARD">
+      <Summary>C standard</Summary>
+      <Description>CMake variable. The C language standard requested from the compiler.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_C_STANDARD_REQUIRED">
+      <Summary>Require the C standard</Summary>
+      <Description>CMake variable. Whether the C standard is required instead of a preference.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CXX_STANDARD">
+      <Summary>C++ standard</Summary>
+      <Description>CMake variable. The C++ language standard requested from the compiler.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CXX_STANDARD_REQUIRED">
+      <Summary>Require the C++ standard</Summary>
+      <Description>CMake variable. Whether the C++ standard is required instead of a preference.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CXX_EXTENSIONS">
+      <Summary>C++ compiler extensions</Summary>
+      <Description>CMake variable. Whether the compiler may use extensions to the C++ standard.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_C_COMPILER">
+      <Summary>C compiler</Summary>
+      <Description>CMake variable. The compiler used for C sources.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CXX_COMPILER">
+      <Summary>C++ compiler</Summary>
+      <Description>CMake variable. The compiler used for C++ sources.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_C_COMPILER_ID">
+      <Summary>C compiler ID</Summary>
+      <Description>CMake variable. The identifier of the C compiler, such as GNU or Clang.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CXX_COMPILER_ID">
+      <Summary>C++ compiler ID</Summary>
+      <Description>CMake variable. The identifier of the C++ compiler, such as GNU or Clang.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_C_FLAGS">
+      <Summary>C compiler flags</Summary>
+      <Description>CMake variable. The flags added to every C compilation.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CXX_FLAGS">
+      <Summary>C++ compiler flags</Summary>
+      <Description>CMake variable. The flags added to every C++ compilation.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_EXE_LINKER_FLAGS">
+      <Summary>Executable linker flags</Summary>
+      <Description>CMake variable. The flags added when linking an executable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_SHARED_LINKER_FLAGS">
+      <Summary>Shared library linker flags</Summary>
+      <Description>CMake variable. The flags added when linking a shared library.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_MODULE_LINKER_FLAGS">
+      <Summary>Module linker flags</Summary>
+      <Description>CMake variable. The flags added when linking a module.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_EXPORT_COMPILE_COMMANDS">
+      <Summary>Export compile commands</Summary>
+      <Description>CMake variable. Writes compile_commands.json when enabled.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_VERBOSE_MAKEFILE">
+      <Summary>Verbose build</Summary>
+      <Description>CMake variable. Shows the full compiler command lines when enabled.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_RUNTIME_OUTPUT_DIRECTORY">
+      <Summary>Executable output directory</Summary>
+      <Description>CMake variable. The directory for executable targets.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_LIBRARY_OUTPUT_DIRECTORY">
+      <Summary>Library output directory</Summary>
+      <Description>CMake variable. The directory for library targets.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_ARCHIVE_OUTPUT_DIRECTORY">
+      <Summary>Archive output directory</Summary>
+      <Description>CMake variable. The directory for static libraries.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_TOOLCHAIN_FILE">
+      <Summary>Toolchain file</Summary>
+      <Description>CMake variable. The file that describes the compiler and platform for cross compiling.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_SYSTEM_NAME">
+      <Summary>Target system name</Summary>
+      <Description>CMake variable. The name of the target operating system.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_SYSTEM_PROCESSOR">
+      <Summary>Target processor</Summary>
+      <Description>CMake variable. The processor of the target system.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_SYSTEM_VERSION">
+      <Summary>Target system version</Summary>
+      <Description>CMake variable. The version of the target operating system.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_HOST_SYSTEM_NAME">
+      <Summary>Host system name</Summary>
+      <Description>CMake variable. The name of the host operating system.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_HOST_SYSTEM_PROCESSOR">
+      <Summary>Host processor</Summary>
+      <Description>CMake variable. The processor of the host system.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_HOST_SYSTEM">
+      <Summary>Host system</Summary>
+      <Description>CMake variable. The host system combined from its name, version and processor.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_SIZEOF_VOID_P">
+      <Summary>Pointer size</Summary>
+      <Description>CMake variable. The size of a void pointer in bytes.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_COMMAND">
+      <Summary>CMake executable</Summary>
+      <Description>CMake variable. The full path of the CMake executable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CTEST_COMMAND">
+      <Summary>CTest executable</Summary>
+      <Description>CMake variable. The full path of the CTest executable.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_MAKE_PROGRAM">
+      <Summary>Build program</Summary>
+      <Description>CMake variable. The program the generator uses to build the project.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_GENERATOR">
+      <Summary>Generator</Summary>
+      <Description>CMake variable. The name of the build system generator.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_GENERATOR_PLATFORM">
+      <Summary>Generator platform</Summary>
+      <Description>CMake variable. The platform selected for the generator.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_GENERATOR_TOOLSET">
+      <Summary>Generator toolset</Summary>
+      <Description>CMake variable. The toolset selected for the generator.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_AR">
+      <Summary>Archiver</Summary>
+      <Description>CMake variable. The archiver used for static libraries.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_RANLIB">
+      <Summary>Archive indexer</Summary>
+      <Description>CMake variable. The program that indexes static libraries.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_LINKER">
+      <Summary>Linker</Summary>
+      <Description>CMake variable. The linker used by the compiler.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_NM">
+      <Summary>Symbol lister</Summary>
+      <Description>CMake variable. The program that lists the symbols of an object file.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_OBJCOPY">
+      <Summary>Object copier</Summary>
+      <Description>CMake variable. The program that converts object files.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_OBJDUMP">
+      <Summary>Object dumper</Summary>
+      <Description>CMake variable. The program that dumps object files.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_STRIP">
+      <Summary>Symbol stripper</Summary>
+      <Description>CMake variable. The program that removes symbols from binaries.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="PROJECT_NAME">
+      <Summary>Project name</Summary>
+      <Description>CMake variable. The name given to project in the current directory.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="PROJECT_VERSION">
+      <Summary>Project version</Summary>
+      <Description>CMake variable. The full version of the project.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="PROJECT_VERSION_MAJOR">
+      <Summary>Project major version</Summary>
+      <Description>CMake variable. The major component of the project version.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="PROJECT_VERSION_MINOR">
+      <Summary>Project minor version</Summary>
+      <Description>CMake variable. The minor component of the project version.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="PROJECT_VERSION_PATCH">
+      <Summary>Project patch version</Summary>
+      <Description>CMake variable. The patch component of the project version.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="PROJECT_SOURCE_DIR">
+      <Summary>Project source directory</Summary>
+      <Description>CMake variable. The source directory of the last project call.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="PROJECT_BINARY_DIR">
+      <Summary>Project build directory</Summary>
+      <Description>CMake variable. The build directory of the last project call.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="PROJECT_IS_TOP_LEVEL">
+      <Summary>Top-level project</Summary>
+      <Description>CMake variable. True when the project call is in the top-level source directory.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_PROJECT_NAME">
+      <Summary>Top-level project name</Summary>
+      <Description>CMake variable. The name of the first project in the build.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_MAJOR_VERSION">
+      <Summary>CMake major version</Summary>
+      <Description>CMake variable. The major version of CMake.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_MINOR_VERSION">
+      <Summary>CMake minor version</Summary>
+      <Description>CMake variable. The minor version of CMake.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_PATCH_VERSION">
+      <Summary>CMake patch version</Summary>
+      <Description>CMake variable. The patch version of CMake.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_VERSION">
+      <Summary>CMake version</Summary>
+      <Description>CMake variable. The full version of CMake.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="WIN32">
+      <Summary>Windows target</Summary>
+      <Description>CMake condition. True when the target system is Windows, including 64-bit Windows.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="UNIX">
+      <Summary>Unix target</Summary>
+      <Description>CMake condition. True when the target system is Unix or Unix-like.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="APPLE">
+      <Summary>Apple target</Summary>
+      <Description>CMake condition. True when the target system is Apple, including iOS.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="MSVC">
+      <Summary>Microsoft compiler</Summary>
+      <Description>CMake condition. True when the compiler is Microsoft Visual C++.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="MINGW">
+      <Summary>MinGW compiler</Summary>
+      <Description>CMake condition. True when the compiler is MinGW or MinGW-w64.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CYGWIN">
+      <Summary>Cygwin target</Summary>
+      <Description>CMake condition. True when the target system is Cygwin.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="ANDROID">
+      <Summary>Android target</Summary>
+      <Description>CMake condition. True when the target system is Android.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="IOS">
+      <Summary>iOS target</Summary>
+      <Description>CMake condition. True when the target system is iOS.</Description>
+    </Symbol>
+    <Symbol language="CMake" name="CMAKE_CROSSCOMPILING">
+      <Summary>Cross compiling</Summary>
+      <Description>CMake condition. True when CMake is cross compiling for another system.</Description>
+    </Symbol>
   </Symbols>
 </ApiSymbols>

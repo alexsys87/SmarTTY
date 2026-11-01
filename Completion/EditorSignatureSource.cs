@@ -162,17 +162,23 @@ public static class EditorSignatureSource
         {
             end--;
         }
+        int nameEnd = end;
+        if (language == SyntaxHighlighting.Language.Ruby && end >= 0 && (text[end] == '?' || text[end] == '!'))
+        {
+            // Ruby predicates and bang methods: "empty?(" and "sort!(".
+            end--;
+        }
         int start = end;
         while (start >= 0 && EditorCompletionSource.IsIdentifierChar(text[start]))
         {
             start--;
         }
         start++;
-        if (start > end)
+        if (start > end || nameEnd < 0)
         {
             return false;
         }
-        name = text.Substring(start, end - start + 1);
+        name = text.Substring(start, nameEnd - start + 1);
         activeParameter = CountParameters(language, text, top + 1, offset, depth);
         return true;
     }

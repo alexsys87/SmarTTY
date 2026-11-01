@@ -277,6 +277,19 @@ public class ApiSymbolDatabase
         {
             shortNames.TryGetValue(name, out symbol);
         }
+        if (symbol == null && language == SyntaxHighlighting.Language.CMake &&
+            _byLanguage.TryGetValue(LanguageName(language), out Dictionary<string, Symbol> cmake))
+        {
+            // CMake command names are case-insensitive: ADD_EXECUTABLE is the same as add_executable.
+            foreach (KeyValuePair<string, Symbol> pair in cmake)
+            {
+                if (string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    symbol = pair.Value;
+                    break;
+                }
+            }
+        }
         if (symbol == null || string.IsNullOrEmpty(symbol.Signature))
         {
             return null;
