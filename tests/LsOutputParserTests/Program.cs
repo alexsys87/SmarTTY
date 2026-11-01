@@ -64,6 +64,22 @@ internal static class Program
         Check(RemotePermissions.Classify(null) == PermissionHighlight.None && RemotePermissions.Classify("garbage") == PermissionHighlight.None, "no mode, no colour");
         Check(RemotePermissions.DescribeHighlight(PermissionHighlight.None) == null && RemotePermissions.DescribeHighlight(PermissionHighlight.SetId) == "setuid or setgid", "colour reasons");
 
+        // BusyBox ls of OpenWrt colours its output when it writes to a terminal (the completion lists with a PTY), and
+        // so does GNU ls with --color: the codes must not end up in the names shown by the completion popup.
+        LsOutputParser.LsEntry bbColourDir = LsOutputParser.LsParser.ParseLine("drwxr-xr-x    2 root     root          4096 2026-11-01 21:05:49 +0000 \x1b[1;34msubdir\x1b[m/");
+        Check(bbColourDir.Name == "subdir" && bbColourDir.IsDirectory, "BusyBox coloured directory");
+        LsOutputParser.LsEntry bbColourExe = LsOutputParser.LsParser.ParseLine("-rwxr-xr-x    1 root     root             0 2026-11-01 21:05:55 +0000 \x1b[1;32mrun.sh\x1b[m*");
+        Check(bbColourExe.Name == "run.sh" && bbColourExe.IsExecutable, "BusyBox coloured executable");
+        LsOutputParser.LsEntry bbColourLink = LsOutputParser.LsParser.ParseLine("lrwxrwxrwx    1 root     root             6 2026-11-01 21:05:55 +0000 \x1b[1;36mlnk\x1b[m -> \x1b[1;34msubdir\x1b[m/");
+        Check(bbColourLink.Name == "lnk", "BusyBox coloured symlink");
+        LsOutputParser.LsEntry gnuColourDot = LsOutputParser.LsParser.ParseLine("drwxr-xr-x  3 root root 4096 2026-11-01 21:05:55.295631772 +0000 \x1b[0m\x1b[01;34m.\x1b[0m/");
+        Check(gnuColourDot.Name == "." && gnuColourDot.IsDirectory, "GNU coloured entry with a leading reset");
+        LsOutputParser.LsEntry gnuHyperlink = LsOutputParser.LsParser.ParseLine("-rw-r--r-- 1 root root 3 2026-10-19 19:30:28.965886611 +0000 \x1b]8;;file://host/tmp/a.txt\x1b\\a.txt\x1b]8;;\x1b\\");
+        Check(gnuHyperlink.Name == "a.txt", "GNU hyperlinked name");
+        Check(LsOutputParser.LsParser.StripEscapeSequences("plain name") == "plain name", "a line without escapes stays as it is");
+        Check(LsOutputParser.LsParser.StripEscapeSequences("cut\x1b[1;3") == "cut", "an escape cut off at the end of the line is dropped");
+        Check(LsOutputParser.LsParser.ParseLine(null).Name == null, "no line, no entry");
+
         Check(LsOutputParser.LsParser.ParseLine("total 20").Name == null, "total line ignored");
         Check(LsOutputParser.LsParser.ParseLine("").Name == null, "empty line ignored");
 

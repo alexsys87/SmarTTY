@@ -104,14 +104,53 @@ public partial class App : Application
         };
     }
 
+    /// <summary>
+    /// The main window of a new SSH connection could not be opened: the error is written to the crash log and shown, the
+    /// connection is closed and the launcher comes back, so that the user is not left without any window.
+    /// </summary>
+    private static void OnMainWindowFailed(MainWindow mainWindow, SshSession session, Exception exception)
+    {
+        CrashLog.Write("Cannot open the main window of the SSH connection", exception);
+        // The launcher first: closing the half-built main window must not leave the application without windows, which
+        // would shut it down.
+        ShowLauncher(null);
+        try
+        {
+            mainWindow?.Close();
+        }
+        catch
+        {
+        }
+        try
+        {
+            session?.Dispose();
+        }
+        catch
+        {
+        }
+        MessageBoxes.Error("Cannot open the terminal window of the connection:\n\n" + exception.GetType().Name + ": " + exception.Message
+            + "\n\nThe details are in " + CrashLog.FilePath);
+    }
+
     private static void OnSelectionWindowClosed(object sender, EventArgs e)
     {
         ConnectionSelectionWindow connectionSelectionWindow = (ConnectionSelectionWindow)sender;
         if (connectionSelectionWindow.Controller.SelectedSettings != null && connectionSelectionWindow.Controller.CreatedSession != null)
         {
-            MainWindow mainWindow = new MainWindow(connectionSelectionWindow.Controller.CreatedSession, connectionSelectionWindow.Controller.SelectedSettings, connectionSelectionWindow.Controller.Job?.Command, connectionSelectionWindow.Controller.Job?.EchoInitialCommand ?? false);
-            mainWindow.Show();
-            ExitWithMainWindow(mainWindow);
+            SshSession session = connectionSelectionWindow.Controller.CreatedSession;
+            MainWindow mainWindow = null;
+            try
+            {
+                mainWindow = new MainWindow(session, connectionSelectionWindow.Controller.SelectedSettings, connectionSelectionWindow.Controller.Job?.Command, connectionSelectionWindow.Controller.Job?.EchoInitialCommand ?? false);
+                mainWindow.Show();
+                ExitWithMainWindow(mainWindow);
+            }
+            catch (Exception exception)
+            {
+                // The launcher is already gone: an exception here used to end the program (or leave it running without
+                // any window), so that the connection seemed to vanish. Say what went wrong and offer the list again.
+                OnMainWindowFailed(mainWindow, session, exception);
+            }
         }
         else if (connectionSelectionWindow.Controller.PendingRawConnectionSettings != null)
         {
