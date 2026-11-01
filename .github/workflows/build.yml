@@ -249,6 +249,9 @@ jobs:
       - name: gzip + base64 transfer through a real shell on a pseudo terminal (BusyBox ash as on OpenWrt, bash; damaged data, cancel, no echo)
         run: dotnet run --project tests/GzipBase64TransferTests -c Release
 
+      - name: Backup to tar.gz (mount table, folder tree, tar streamed to stdout; /bin/sh with GNU tar, BusyBox ash with BusyBox tar as on OpenWrt)
+        run: dotnet run --project tests/RemoteBackupTests -c Release
+
   sshnet:
     name: SSH.NET integration tests
     runs-on: ubuntu-24.04

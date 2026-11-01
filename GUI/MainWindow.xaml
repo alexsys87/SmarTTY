@@ -235,6 +235,11 @@
             <Image Source="../icons/chip.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="_Backup to tar.gz..." Click="Backup_Click" ToolTip="Packs the whole root file system of the server, or the folders checked in a tree, into a tar.gz archive on this computer; tar sends the archive straight through the SSH connection, so nothing is written on the server, not even to /tmp" Visibility="{Binding Path=ActiveSession.BackupMenuVisibility, FallbackValue=Collapsed}">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/archive16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="Local OpenWrt _repository server..." Click="LocalRepo_Click" ToolTip="Serve OpenWrt packages built on this computer to the device and install them with the package manager" Visibility="{Binding Path=ActiveSession.LocalRepoMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/archive16.png" />
