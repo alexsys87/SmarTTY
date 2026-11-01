@@ -100,7 +100,7 @@ internal static class Program
     private static void LanguageDetectionChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Main.PY"), L.Python, "extensions are case insensitive");
-        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Dockerfile"), L.Script, "Dockerfile (capitalized) is recognized");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Dockerfile"), L.Dockerfile, "Dockerfile (capitalized) is recognized");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Makefile"), L.Makefile, "Makefile (capitalized) is recognized");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/.bashrc"), L.Bash, ".bashrc is bash");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/ssh/sshd_config"), L.SshConfig, "sshd_config is an ssh config file");
@@ -126,7 +126,32 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("constexpr"), "C++ keywords contain 'constexpr'");
         Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("nullptr"), "C++ keywords contain 'nullptr'");
         Check(!SyntaxHighlighting.GetKeywords(L.Cpp).Contains("interface"), "C++ keywords do not include the C# 'interface'");
-        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Dockerfile.dev"), L.Script, "Dockerfile.dev is a Dockerfile");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Dockerfile.dev"), L.Dockerfile, "Dockerfile.dev is a Dockerfile");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.rb"), L.Ruby, ".rb is Ruby");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Gemfile"), L.Ruby, "Gemfile is Ruby");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/script.pl"), L.Perl, ".pl is Perl");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Module.pm"), L.Perl, ".pm is Perl");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/CMakeLists.txt"), L.CMake, "CMakeLists.txt is CMake");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/tools.cmake"), L.CMake, ".cmake is CMake");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/job.r"), L.Script, "R stays in the generic script profile");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/run.awk"), L.Script, "AWK stays in the generic script profile");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/default.nix"), L.Script, "Nix stays in the generic script profile");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Ruby), "Ruby", "Ruby has its own display name");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Perl), "Perl", "Perl has its own display name");
+        Equal(SyntaxHighlighting.GetDisplayName(L.CMake), "CMake", "CMake has its own display name");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Dockerfile), "Dockerfile", "Dockerfile has its own display name");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Ruby), "Ruby is in the syntax menu");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Perl), "Perl is in the syntax menu");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.CMake), "CMake is in the syntax menu");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Dockerfile), "Dockerfile is in the syntax menu");
+        Check(SyntaxHighlighting.GetKeywords(L.Ruby).Contains("def"), "Ruby keywords contain 'def'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Ruby).Contains("FROM"), "Ruby keywords do not contain the Dockerfile 'FROM'");
+        Check(SyntaxHighlighting.GetKeywords(L.Perl).Contains("sub"), "Perl keywords contain 'sub'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Perl).Contains("def"), "Perl keywords do not contain the Ruby 'def'");
+        Check(SyntaxHighlighting.GetKeywords(L.CMake).Contains("add_executable"), "CMake keywords contain 'add_executable'");
+        Check(!SyntaxHighlighting.GetKeywords(L.CMake).Contains("FROM"), "CMake keywords do not contain the Dockerfile 'FROM'");
+        Check(SyntaxHighlighting.GetKeywords(L.Dockerfile).Contains("FROM"), "Dockerfile keywords contain 'FROM'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Dockerfile).Contains("add_executable"), "Dockerfile keywords do not contain the CMake commands");
         Equal(SyntaxHighlighting.DetectLanguage("/src/Makefile.am"), L.Makefile, "Makefile.am is a makefile");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/bin/busybox sh"), L.Bash, "#!/bin/busybox sh is shell");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/env node"), L.CLike, "#!/usr/bin/env node is JavaScript");
@@ -137,7 +162,10 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/srv/index.html"), L.Markup, "HTML is markup");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/backup", "#!/bin/bash"), L.Bash, "#!/bin/bash makes a script without an extension bash");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env python3"), L.Python, "#!/usr/bin/env python3 is python");
-        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env -S perl -w"), L.Script, "env options are skipped");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env -S perl -w"), L.Perl, "env options are skipped and Perl is recognized");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env ruby"), L.Ruby, "#!/usr/bin/env ruby is Ruby");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/cmake -P"), L.CMake, "a CMake script is CMake");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/Rscript"), L.Script, "Rscript stays in the generic script profile");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "hello"), L.Plain, "no shebang: plain");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/x.sh", "#!/usr/bin/python"), L.Bash, "the extension wins over the shebang");
     }
@@ -312,10 +340,33 @@ internal static class Program
         Equal(Join(html2.Tokens(2, SyntaxHighlighting.TypeKeyword)), "</a", "and the tag after it");
         Equal(Join(html2.Tokens(3, SyntaxHighlighting.TypeKeyword)), "<!DOCTYPE", "the doctype");
 
-        Highlighted make = new Highlighted(L.Script, "FROM alpine # base\nURL=http://example.com/a#b");
-        Equal(Join(make.Tokens(0, SyntaxHighlighting.TypeKeyword)), "FROM", "Dockerfile instruction");
-        Equal(Join(make.Tokens(0, SyntaxHighlighting.TypeComment)), "# base", "'#' comment after whitespace");
-        Equal(Join(make.Tokens(1, SyntaxHighlighting.TypeComment)), "", "'#' inside a word is not a comment");
+        Highlighted docker = new Highlighted(L.Dockerfile,
+            "FROM alpine # base\nRUN echo http://example.com/a#b\nfrom scratch\nRUN echo FROM");
+        Equal(Join(docker.Tokens(0, SyntaxHighlighting.TypeKeyword)), "FROM", "Dockerfile instruction");
+        Equal(Join(docker.Tokens(0, SyntaxHighlighting.TypeComment)), "# base", "'#' comment after whitespace");
+        Equal(Join(docker.Tokens(1, SyntaxHighlighting.TypeComment)), "", "'#' inside a word is not a comment");
+        Equal(Join(docker.Tokens(2, SyntaxHighlighting.TypeKeyword)), "from", "Dockerfile instructions are case insensitive");
+        Equal(Join(docker.Tokens(3, SyntaxHighlighting.TypeKeyword)), "RUN", "only the first word of a line is an instruction");
+
+        Highlighted ruby = new Highlighted(L.Ruby, "class Widget#note\ndef render(item)\n  puts item\nend\nend");
+        Equal(Join(ruby.Tokens(0, SyntaxHighlighting.TypeKeyword)), "class", "Ruby class keyword");
+        Equal(Join(ruby.Tokens(0, SyntaxHighlighting.TypeComment)), "#note", "Ruby '#' starts a comment after code");
+        Equal(Join(ruby.Tokens(1, SyntaxHighlighting.TypeKeyword)), "def", "Ruby def keyword");
+        Equal(Join(ruby.Tokens(3, SyntaxHighlighting.TypeKeyword)), "end", "Ruby end keyword");
+
+        Highlighted perl = new Highlighted(L.Perl, "my $x = 1;# note\nsub trim($) {\n  return $x;\n}");
+        Equal(Join(perl.Tokens(0, SyntaxHighlighting.TypeKeyword)), "my", "Perl my keyword");
+        Equal(Join(perl.Tokens(0, SyntaxHighlighting.TypeComment)), "# note", "Perl '#' starts a comment after code");
+        Equal(Join(perl.Tokens(1, SyntaxHighlighting.TypeKeyword)), "sub", "Perl sub keyword");
+
+        Highlighted cmake = new Highlighted(L.CMake,
+            "cmake_minimum_required(VERSION 3.20)\nADD_EXECUTABLE(app main.cpp) # note\nif(APPLE)\n  set(CMAKE_CXX_STANDARD 20)\nendif()");
+        Equal(Join(cmake.Tokens(0, SyntaxHighlighting.TypeKeyword)), "cmake_minimum_required", "CMake command");
+        Equal(Join(cmake.Tokens(1, SyntaxHighlighting.TypeKeyword)), "ADD_EXECUTABLE", "CMake commands are case insensitive");
+        Equal(Join(cmake.Tokens(1, SyntaxHighlighting.TypeComment)), "# note", "CMake comment after code");
+        Equal(Join(cmake.Tokens(2, SyntaxHighlighting.TypeKeyword)), "if", "CMake if command");
+        Equal(Join(cmake.Tokens(3, SyntaxHighlighting.TypeKeyword)), "set", "CMake set command");
+        Equal(Join(cmake.Tokens(4, SyntaxHighlighting.TypeKeyword)), "endif", "CMake endif command");
 
         Highlighted diff = new Highlighted(L.Diff, "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n same");
         Equal(diff.TypeAt(3, 0), SyntaxHighlighting.TypeString, "removed line");
@@ -435,7 +486,7 @@ internal static class Program
         foreach (L language in Enum.GetValues(typeof(L)))
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is offered in the syntax menu");
-            Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString() || language == L.Lua || language == L.Json || language == L.Makefile || language == L.Python || language == L.Sql || language == L.Diff || language == L.Plain, language + " has a display name");
+            Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString() || language == L.Lua || language == L.Json || language == L.Makefile || language == L.Python || language == L.Sql || language == L.Diff || language == L.Plain || language == L.Ruby || language == L.Perl || language == L.CMake || language == L.Dockerfile, language + " has a display name");
         }
     }
 
@@ -888,6 +939,10 @@ internal static class Program
         Equal(Join(markup.Toggle(new[] { "<!-- <a/> -->" })), "<a/>", "markup comment is removed");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CLike).Toggle(new[] { "int a;" })), "// int a;", "C-like comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Cpp).Toggle(new[] { "int a;" })), "// int a;", "C++ comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Ruby).Toggle(new[] { "puts 1" })), "# puts 1", "Ruby comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Perl).Toggle(new[] { "print 1" })), "# print 1", "Perl comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CMake).Toggle(new[] { "set(X 1)" })), "# set(X 1)", "CMake comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Dockerfile).Toggle(new[] { "FROM alpine" })), "# FROM alpine", "Dockerfile comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Sql).Toggle(new[] { "select 1" })), "-- select 1", "SQL comment");
         Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Plain) == null, "plain text has no comments");
         Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Diff) == null, "a diff has no comments");

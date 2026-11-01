@@ -17485,77 +17485,101 @@
       <Summary>UUID data type</Summary>
       <Description>UUID data type. SQL data type. A universally unique identifier.</Description>
     </Symbol>
-    <Symbol language="Script" name="puts" signature="puts(args)">
+    <Symbol language="Ruby" name="puts" signature="puts(args)">
       <Summary>Write the arguments and a newline</Summary>
+      <Description>Ruby method. Writes each argument to standard output, separated by the output field separator and followed by a newline.</Description>
     </Symbol>
-    <Symbol language="Script" name="print" signature="print(args)">
+    <Symbol language="Ruby" name="print" signature="print(args)">
       <Summary>Write the arguments</Summary>
+      <Description>Ruby method. Writes each argument to standard output without a trailing newline.</Description>
     </Symbol>
-    <Symbol language="Script" name="p" signature="p(object)">
+    <Symbol language="Ruby" name="p" signature="p(object)">
       <Summary>Inspect and write an object</Summary>
+      <Description>Ruby method. Writes the inspect form of each argument and returns the object; unlike puts, strings are quoted.</Description>
     </Symbol>
-    <Symbol language="Script" name="gets" signature="gets()">
+    <Symbol language="Ruby" name="gets" signature="gets()">
       <Summary>Read a line from the input</Summary>
+      <Description>Ruby method. Reads one line from standard input, including the trailing newline, and returns nil at end of file.</Description>
     </Symbol>
-    <Symbol language="Script" name="require" signature="require(name)">
+    <Symbol language="Ruby" name="require" signature="require(name)">
       <Summary>Load a library</Summary>
+      <Description>Ruby method. Loads a library once and returns true when it was loaded for the first time.</Description>
     </Symbol>
-    <Symbol language="Script" name="chomp" signature="chomp(text)">
+    <Symbol language="Ruby" name="chomp" signature="chomp(text)">
       <Summary>Remove the trailing newline</Summary>
+      <Description>Ruby method. Returns the string without its trailing record separator, usually a newline.</Description>
     </Symbol>
-    <Symbol language="Script" name="strip" signature="strip(text)">
+    <Symbol language="Ruby" name="strip" signature="strip(text)">
       <Summary>Remove the surrounding spaces</Summary>
+      <Description>Ruby method. Returns the string without leading and trailing whitespace.</Description>
     </Symbol>
-    <Symbol language="Script" name="split" signature="split(text, separator)">
+    <Symbol language="Ruby" name="split" signature="split(text, separator)">
       <Summary>Split a string</Summary>
+      <Description>Ruby method. Divides the string at the separator and returns an array of the fields.</Description>
     </Symbol>
-    <Symbol language="Script" name="join" signature="join(separator, items)">
+    <Symbol language="Ruby" name="join" signature="join(separator, items)">
       <Summary>Join the items into a string</Summary>
+      <Description>Ruby method. Concatenates the elements of the array, putting the separator between them.</Description>
     </Symbol>
-    <Symbol language="Script" name="to_s" signature="to_s()">
+    <Symbol language="Ruby" name="to_s" signature="to_s()">
       <Summary>Convert to a string</Summary>
+      <Description>Ruby method. Returns a string representation of the object.</Description>
     </Symbol>
-    <Symbol language="Script" name="to_i" signature="to_i()">
+    <Symbol language="Ruby" name="to_i" signature="to_i()">
       <Summary>Convert to an integer</Summary>
+      <Description>Ruby method. Parses the leading integer of the string and returns zero when there is none.</Description>
     </Symbol>
-    <Symbol language="Script" name="to_f" signature="to_f()">
+    <Symbol language="Ruby" name="to_f" signature="to_f()">
       <Summary>Convert to a float</Summary>
+      <Description>Ruby method. Parses the leading floating-point number of the string and returns 0.0 when there is none.</Description>
     </Symbol>
-    <Symbol language="Script" name="length" signature="length()">
+    <Symbol language="Ruby" name="length" signature="length()">
       <Summary>Number of characters</Summary>
+      <Description>Ruby method. Returns the number of characters of a string or the number of elements of a collection.</Description>
     </Symbol>
-    <Symbol language="Script" name="upcase" signature="upcase()">
+    <Symbol language="Ruby" name="upcase" signature="upcase()">
       <Summary>Upper case</Summary>
+      <Description>Ruby method. Returns the string with every letter converted to upper case.</Description>
     </Symbol>
-    <Symbol language="Script" name="downcase" signature="downcase()">
+    <Symbol language="Ruby" name="downcase" signature="downcase()">
       <Summary>Lower case</Summary>
+      <Description>Ruby method. Returns the string with every letter converted to lower case.</Description>
     </Symbol>
-    <Symbol language="Script" name="each" signature="each(block)">
+    <Symbol language="Ruby" name="each" signature="each(block)">
       <Summary>Iterate the items</Summary>
+      <Description>Ruby method. Calls the block once for every element and returns the receiver.</Description>
     </Symbol>
-    <Symbol language="Script" name="map" signature="map(block)">
+    <Symbol language="Ruby" name="map" signature="map(block)">
       <Summary>Transform the items</Summary>
+      <Description>Ruby method. Calls the block for every element and returns an array of the results.</Description>
     </Symbol>
-    <Symbol language="Script" name="select" signature="select(block)">
+    <Symbol language="Ruby" name="select" signature="select(block)">
       <Summary>Keep the items the block accepts</Summary>
+      <Description>Ruby method. Returns the elements for which the block returns a true value.</Description>
     </Symbol>
-    <Symbol language="Script" name="reject" signature="reject(block)">
+    <Symbol language="Ruby" name="reject" signature="reject(block)">
       <Summary>Drop the items the block accepts</Summary>
+      <Description>Ruby method. Returns the elements for which the block returns a false value.</Description>
     </Symbol>
-    <Symbol language="Script" name="sort" signature="sort(block)">
+    <Symbol language="Ruby" name="sort" signature="sort(block)">
       <Summary>Sort the items</Summary>
+      <Description>Ruby method. Returns the elements in ascending order, using the block as the comparison when one is given.</Description>
     </Symbol>
-    <Symbol language="Script" name="push" signature="push(value)">
+    <Symbol language="Ruby" name="push" signature="push(value)">
       <Summary>Append an item</Summary>
+      <Description>Ruby method. Appends the value to the end of the array and returns the array.</Description>
     </Symbol>
-    <Symbol language="Script" name="delete" signature="delete(key)">
+    <Symbol language="Ruby" name="delete" signature="delete(key)">
       <Summary>Remove an item</Summary>
+      <Description>Ruby method. Removes the key from the hash and returns its value, or nil when the key is absent.</Description>
     </Symbol>
-    <Symbol language="Script" name="printf" signature="printf(format, args)">
+    <Symbol language="Ruby" name="printf" signature="printf(format, args)">
       <Summary>Formatted output</Summary>
+      <Description>Ruby method. Writes the arguments to standard output formatted by the format string.</Description>
     </Symbol>
-    <Symbol language="Script" name="sprintf" signature="sprintf(format, args)">
+    <Symbol language="Ruby" name="sprintf" signature="sprintf(format, args)">
       <Summary>Formatted string</Summary>
+      <Description>Ruby method. Returns the arguments formatted by the format string instead of writing them.</Description>
     </Symbol>
   </Symbols>
 </ApiSymbols>

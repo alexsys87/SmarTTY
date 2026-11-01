@@ -29,6 +29,10 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Nginx:
                 case SyntaxHighlighting.Language.SshConfig:
                 case SyntaxHighlighting.Language.Script:
+                case SyntaxHighlighting.Language.Ruby:
+                case SyntaxHighlighting.Language.Perl:
+                case SyntaxHighlighting.Language.CMake:
+                case SyntaxHighlighting.Language.Dockerfile:
                     return new CommentStyle("# ");
                 case SyntaxHighlighting.Language.CLike:
                 case SyntaxHighlighting.Language.Cpp:

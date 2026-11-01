@@ -68,7 +68,7 @@ internal static class Program
         }
 
         // The set covers the languages the editor highlights with a code tokenizer.
-        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Script })
+        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Ruby })
         {
             Check(database.ForLanguage(language).Count > 0, "the set has symbols for " + language);
         }
@@ -268,6 +268,29 @@ internal static class Program
         Equal(cppPushBack.ToString(), "std::vector::push_back(const T& value)",
             "the resolved C++ signature keeps the qualified name");
 
+        // Ruby is a separate profile: the old Script bucket no longer carries Ruby methods into CMake or Dockerfile.
+        List<ApiSymbolDatabase.Symbol> ruby = database.ForLanguage(L.Ruby).ToList();
+        Check(ruby.Count >= 20, "the Ruby set has its methods (" + ruby.Count + " symbols)");
+        Equal(ruby.Count, ruby.Select(s => s.Name).Distinct().Count(), "Ruby names are unique");
+        Equal(ruby.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)), ruby.Count,
+            "every Ruby symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "puts", "print", "p", "gets", "require", "chomp", "strip", "split", "join", "to_s",
+                     "to_i", "to_f", "length", "upcase", "downcase", "each", "map", "select", "reject",
+                     "sort", "push", "delete", "printf", "sprintf"
+                 })
+        {
+            Check(database.Find(L.Ruby, name) != null, "the Ruby set includes '" + name + "'");
+        }
+        Check(database.Find(L.Script, "puts") == null, "the generic Script profile does not carry Ruby methods");
+        Check(database.Find(L.Perl, "puts") == null, "Perl does not see the Ruby methods");
+        Check(database.Find(L.CMake, "puts") == null, "CMake does not see the Ruby methods");
+        Check(database.Find(L.Dockerfile, "puts") == null, "Dockerfile does not see the Ruby methods");
+
+        // The remaining Script languages are still a profile of their own.
+        Equal(database.ForLanguage(L.Script).Count, 0, "the generic Script profile has no API symbols of its own");
+
         // The Bash set covers the shell builtins and the documented shell variables.
         List<ApiSymbolDatabase.Symbol> bash = database.ForLanguage(L.Bash).ToList();
         Check(bash.Count > 150, "the Bash set is complete (" + bash.Count + " symbols)");
@@ -368,6 +391,18 @@ internal static class Program
             "the C completion list does not offer the STL");
         Check(!Build(L.CLike, "", "sor", database).Any(s => s.DisplayName == "sort"),
             "the C completion list does not offer the C++ algorithms");
+
+        // The Ruby methods live in the Ruby profile only.
+        ISuggestion rubyPuts = Build(L.Ruby, "", "pu", database).FirstOrDefault(s => s.DisplayName == "puts");
+        Check(rubyPuts != null, "the completion list offers the Ruby method 'puts'");
+        Equal(rubyPuts.DetailText, "Write the arguments and a newline", "the Ruby summary is the detail text");
+        Check(rubyPuts.HintText.StartsWith("puts("), "the Ruby signature is the hint text");
+        Check(!Build(L.Perl, "", "pu", database).Any(s => s.DisplayName == "puts"),
+            "the Ruby method 'puts' is not offered for Perl");
+        Check(!Build(L.CMake, "", "pu", database).Any(s => s.DisplayName == "puts"),
+            "the Ruby method 'puts' is not offered for CMake");
+        Check(!Build(L.Dockerfile, "", "pu", database).Any(s => s.DisplayName == "puts"),
+            "the Ruby method 'puts' is not offered for Dockerfile");
 
         // The Python modules are offered under their plain names too.
         List<ISuggestion> pythonMath = Build(L.Python, "", "sqr", database);

@@ -96,11 +96,15 @@ public static class EditorSignatureSource
         int offset = 0;
         foreach (string line in text.Split('\n'))
         {
-            if (TryParseDefinitionHead(language, line, out string name, out int openParen))
+            if (TryParseDefinitionHead(language, line, out string name, out int openParen, out bool skipFirstName))
             {
                 string inner = ExtractParenGroup(text, offset + openParen);
                 if (inner != null)
                 {
+                    if (skipFirstName)
+                    {
+                        inner = RemoveFirstWord(inner);
+                    }
                     result.Add(new ParameterSignature(name, ParameterSignature.SplitParameters(inner)));
                 }
             }
@@ -217,10 +221,11 @@ public static class EditorSignatureSource
         return count;
     }
 
-    private static bool TryParseDefinitionHead(SyntaxHighlighting.Language language, string line, out string name, out int openParen)
+    private static bool TryParseDefinitionHead(SyntaxHighlighting.Language language, string line, out string name, out int openParen, out bool skipFirstName)
     {
         name = null;
         openParen = -1;
+        skipFirstName = false;
         string text = StripLineComment(language, line);
         int i = 0;
         while (i < text.Length && char.IsWhiteSpace(text[i]))
@@ -248,8 +253,15 @@ public static class EditorSignatureSource
                 return TryKeywordDefinition(text, i, out name, out openParen, "function");
             case SyntaxHighlighting.Language.Bash:
                 return TryBareDefinition(text, i, out name, out openParen);
+            case SyntaxHighlighting.Language.Ruby:
+                return TryKeywordDefinition(text, i, out name, out openParen, "def");
+            case SyntaxHighlighting.Language.Perl:
+                return TryKeywordDefinition(text, i, out name, out openParen, "sub");
+            case SyntaxHighlighting.Language.CMake:
+                skipFirstName = TryCMakeDefinition(text, i, out name, out openParen);
+                return skipFirstName;
             case SyntaxHighlighting.Language.Script:
-                return TryKeywordDefinition(text, i, out name, out openParen, "def", "sub", "function", "fn")
+                return TryKeywordDefinition(text, i, out name, out openParen, "function", "fn")
                     || TryBareDefinition(text, i, out name, out openParen);
             case SyntaxHighlighting.Language.CLike:
             case SyntaxHighlighting.Language.Cpp:
@@ -305,6 +317,65 @@ public static class EditorSignatureSource
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// A CMake definition: "function(name arg1 arg2)" or "macro(name ...)". The first argument inside the
+    /// parentheses is the name of the function or macro, not a parameter.
+    /// </summary>
+    private static bool TryCMakeDefinition(string text, int start, out string name, out int openParen)
+    {
+        name = null;
+        openParen = -1;
+        foreach (string keyword in new[] { "function", "macro" })
+        {
+            if (!StartsWithWord(text, start, keyword))
+            {
+                continue;
+            }
+            int p = start + keyword.Length;
+            while (p < text.Length && char.IsWhiteSpace(text[p]))
+            {
+                p++;
+            }
+            if (p >= text.Length || text[p] != '(')
+            {
+                continue;
+            }
+            int q = p + 1;
+            while (q < text.Length && char.IsWhiteSpace(text[q]))
+            {
+                q++;
+            }
+            int nameStart = q;
+            while (q < text.Length && EditorCompletionSource.IsIdentifierChar(text[q]))
+            {
+                q++;
+            }
+            if (q == nameStart)
+            {
+                continue;
+            }
+            name = text.Substring(nameStart, q - nameStart);
+            openParen = p;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Removes the first whitespace-separated word, used for the name of a CMake definition.</summary>
+    private static string RemoveFirstWord(string text)
+    {
+        int i = 0;
+        while (i < text.Length && !char.IsWhiteSpace(text[i]))
+        {
+            i++;
+        }
+        while (i < text.Length && char.IsWhiteSpace(text[i]))
+        {
+            i++;
+        }
+        return text.Substring(i);
     }
 
     /// <summary>A shell-style definition: "name(args) { ... }" (the brace makes it a definition, not a call).</summary>
@@ -549,6 +620,10 @@ public static class EditorSignatureSource
             case SyntaxHighlighting.Language.Python:
             case SyntaxHighlighting.Language.Bash:
             case SyntaxHighlighting.Language.Script:
+            case SyntaxHighlighting.Language.Ruby:
+            case SyntaxHighlighting.Language.Perl:
+            case SyntaxHighlighting.Language.CMake:
+            case SyntaxHighlighting.Language.Dockerfile:
             case SyntaxHighlighting.Language.Config:
             case SyntaxHighlighting.Language.Systemd:
             case SyntaxHighlighting.Language.Nginx:
