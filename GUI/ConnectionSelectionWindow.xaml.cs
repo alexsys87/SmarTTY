@@ -1300,7 +1300,15 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 if (newSSHConnectionWindow.Controller.SaveSettings)
                 {
-                    _Connections.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
+                    try
+                    {
+                        _Connections.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
+                    }
+                    catch (Exception exception)
+                    {
+                        // The connection is up: open it anyway instead of losing it together with the error.
+                        MessageBoxes.Error("The connection settings could not be saved: " + exception.Message);
+                    }
                 }
                 CreatedSession = newSSHConnectionWindow.Controller.CreatedSession;
                 SelectedSettings = newSSHConnectionWindow.Controller.FinalSettings;
@@ -1627,7 +1635,18 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
     private void NewSSH_Click(object sender, RoutedEventArgs e)
     {
-        if (Controller.CreateNewSSHConnection((Window)this))
+        bool connected;
+        try
+        {
+            connected = Controller.CreateNewSSHConnection((Window)this);
+        }
+        catch (Exception exception)
+        {
+            // Saving the new profile can fail (a settings folder that cannot be written): that must not end the program.
+            MessageBoxes.Exception(exception);
+            return;
+        }
+        if (connected)
         {
             this.Close();
         }
