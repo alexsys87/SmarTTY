@@ -34,7 +34,9 @@
           <DataTemplate>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
               <Image Source="pack://application:,,,/icons/dialog-host-key-continue.png" Width="16" Height="16" Margin="0 0 6 0" />
-              <ContentPresenter VerticalAlignment="Center" />
+              <!-- A ContentPresenter here would take this very template again (it inherits the ContentTemplate of the button) and
+                   nest it in itself until the stack overflows: the content of the template is the text of the button. -->
+              <TextBlock Text="{Binding}" VerticalAlignment="Center" />
             </StackPanel>
           </DataTemplate>
         </Button.ContentTemplate>

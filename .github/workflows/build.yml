@@ -211,6 +211,9 @@ jobs:
       - name: Run XAML encoding checks (non-ASCII markup keeps its UTF-8 BOM)
         run: dotnet run --project tests/XamlEncodingTests -c Release
 
+      - name: Run XAML template checks (no ContentTemplate repeats itself through a bare ContentPresenter)
+        run: dotnet run --project tests/XamlTemplateTests -c Release
+
       - name: Run public key window layout checks (the window grows to the key, capped to the screen)
         run: dotnet run --project tests/PublicKeyWindowLayoutTests -c Release
 
