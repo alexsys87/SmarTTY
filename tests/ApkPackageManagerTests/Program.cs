@@ -243,6 +243,7 @@ internal static class Program
 
         _passed += AdditionalClientsTests.Run();
         _passed += MoreClientsTests.Run();
+        _passed += RebootTests.Run();
         _passed += PackageListFixesTests.Run();
         _passed += WingetTests.Run();
 

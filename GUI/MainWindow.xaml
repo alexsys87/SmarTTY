@@ -270,6 +270,11 @@
             <Image Source="../icons/MainWindow/pubkey.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="Re_boot server..." Click="Reboot_Click" ToolTip="Reboots the server with the command of its operating system, found out when you click: systemctl reboot (Linux with systemd), reboot (other Linux, OpenWrt), shutdown -r now (FreeBSD, OpenBSD, NetBSD, DragonFly, macOS), shutdown -y -i6 -g0 (Solaris), shutdown -Fr (AIX), shutdown /r /t 0 (Windows). The command is shown before it is typed in the terminal" Visibility="{Binding Path=ActiveSession.RebootMenuVisibility, FallbackValue=Collapsed}">
+          <MenuItem.Icon>
+            <Image Source="../icons/MainWindow/refresh16.png" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="Run _script..." Click="RunScript_Click" ToolTip="Uploads a shell script (bash or ash) to /tmp on the server, makes it executable, runs it in the terminal and removes it afterwards" Visibility="{Binding Path=ActiveSession.RunScriptMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/terminal.png" />
