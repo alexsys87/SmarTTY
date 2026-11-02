@@ -26,7 +26,8 @@ public static class OpenWrtDetector
     /// The same round trip reports the kernel of the host (<see cref="SmarTTY.Ssh.RemoteOsDetector.KernelProbeCommand"/>), which
     /// decides whether the tools that need Linux are offered, and whether the host has tar
     /// (<see cref="SmarTTY.Transport.RemoteBackup.TarProbeCommand"/>), which decides whether the backup to tar.gz is offered, and whether
-    /// it has flash partitions (<see cref="SmarTTY.Transport.MtdFlash.ProbeCommand"/>) for the flash backup.
+    /// it has flash partitions (<see cref="SmarTTY.Transport.MtdFlash.ProbeCommand"/>) for the flash backup, and devmem or devmem2
+    /// (<see cref="SmarTTY.Transport.DevMem.ProbeCommand"/>) for the memory window.
     /// </summary>
     public const string ProbeCommand =
         "if [ -f /etc/openwrt_release ] || [ -f /etc/opkg/customfeeds.conf ] || [ -f /etc/apk/repositories.d/customfeeds.list ] || " +
@@ -34,6 +35,7 @@ public static class OpenWrtDetector
         "pm=none; command -v opkg >/dev/null 2>&1 && pm=opkg; command -v apk >/dev/null 2>&1 && pm=apk; echo SMARTTY_PKG=$pm; " +
         SmarTTY.Transport.RemoteBackup.TarProbeCommand + "; " +
         SmarTTY.Transport.MtdFlash.ProbeCommand + "; " +
+        SmarTTY.Transport.DevMem.ProbeCommand + "; " +
         SmarTTY.Ssh.RemoteOsDetector.KernelProbeCommand;
 
     /// <summary>

@@ -183,6 +183,13 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // Whether /proc/mtd lists flash partitions, so that "Tools > Flash (MTD) backup and restore" is offered: from the same probe.
     private bool _HasMtd;
 
+    // The program that reads and writes physical memory (devmem, busybox devmem, devmem2), so that "Tools > Memory (devmem)" is
+    // offered: from the same probe, None until it has answered.
+    private DevMemTool _DevMemTool;
+
+    /// <summary>The program of the memory window on this host; None when the host has none (or the probe has not answered).</summary>
+    public DevMemTool DevMemTool => _DevMemTool;
+
     private RemoteOsKind _RemoteOs;
 
     /// <summary>What the SSH server runs on: from its identification string at connect, confirmed by a command when that said nothing.</summary>
@@ -230,7 +237,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// What the Tools menu needs to know about the host of this session: the one input of <see cref="ToolAvailability"/>, which decides
     /// for every item whether it can work here and so whether it is in the menu at all.
     /// </summary>
-    private RemoteHostFacts HostFacts => new RemoteHostFacts(IsDevice, _RemoteOs, _Kernel, _HasPackageManager, _LocalRepoManager != null, _HasTar, _HasMtd);
+    private RemoteHostFacts HostFacts => new RemoteHostFacts(IsDevice, _RemoteOs, _Kernel, _HasPackageManager, _LocalRepoManager != null, _HasTar, _HasMtd, _DevMemTool != DevMemTool.None);
 
     private System.Windows.Visibility ToolVisibility(SessionTool tool)
     {
@@ -245,7 +252,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             nameof(PackageManagerMenuVisibility), nameof(ProcessManagerMenuVisibility), nameof(LocalRepoMenuVisibility),
             nameof(PortForwardingMenuVisibility), nameof(SocksProxyMenuVisibility), nameof(PublicKeyMenuVisibility),
             nameof(RunScriptMenuVisibility), nameof(X11CheckMenuVisibility), nameof(TftpFirmwareMenuVisibility),
-            nameof(BackupMenuVisibility), nameof(MtdFlashMenuVisibility)
+            nameof(BackupMenuVisibility), nameof(MtdFlashMenuVisibility), nameof(MemoryEditorMenuVisibility)
         })
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -272,6 +279,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     public System.Windows.Visibility BackupMenuVisibility => ToolVisibility(SessionTool.Backup);
 
     public System.Windows.Visibility MtdFlashMenuVisibility => ToolVisibility(SessionTool.MtdFlash);
+
+    public System.Windows.Visibility MemoryEditorMenuVisibility => ToolVisibility(SessionTool.MemoryEditor);
 
     public System.Windows.Visibility SshOnlyVisibility => IsDevice ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
@@ -830,6 +839,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             RemoteKernelKind kernel = isWindows ? RemoteKernelKind.Unknown : RemoteOsDetector.FromKernelProbe(output);
             bool? hasTar = isWindows ? false : SmarTTY.Transport.RemoteBackup.FromTarProbe(output);
             bool? hasMtd = isWindows ? false : SmarTTY.Transport.MtdFlash.FromProbe(output);
+            DevMemTool? devMemTool = isWindows ? DevMemTool.None : DevMem.FromProbe(output);
             _Controller.BeginInvoke(() =>
             {
                 // A reconnect may have replaced the connection while the probe ran: only the current one counts.
@@ -854,6 +864,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 if (hasMtd.HasValue)
                 {
                     _HasMtd = hasMtd.Value;
+                }
+                if (devMemTool.HasValue)
+                {
+                    _DevMemTool = devMemTool.Value;
                 }
                 RaiseToolVisibilityChanged();
             });

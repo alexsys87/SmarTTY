@@ -1458,10 +1458,11 @@ internal static class Program
         Check(SmarTTY.Transport.RemoteBackup.FromTarProbe(probeOutput.Split('\n')) == (File.Exists("/usr/bin/tar") || File.Exists("/bin/tar")), "Host probe: whether tar is installed is reported too");
         bool thisHasMtd = File.Exists("/proc/mtd") && File.ReadAllLines("/proc/mtd").Any(line => line.StartsWith("mtd", StringComparison.Ordinal));
         Check(SmarTTY.Transport.MtdFlash.FromProbe(probeOutput.Split('\n')) == thisHasMtd, "Host probe: whether /proc/mtd lists partitions is reported too");
+        Check(SmarTTY.Transport.DevMem.FromProbe(probeOutput.Split('\n')).HasValue, "Host probe: whether devmem or devmem2 exists is reported too");
 
-        RemoteHostFacts Host(RemoteOsKind os, RemoteKernelKind kernel = RemoteKernelKind.Unknown, bool packageManager = false, bool localRepo = false, bool isDevice = false, bool tar = false, bool mtd = false)
+        RemoteHostFacts Host(RemoteOsKind os, RemoteKernelKind kernel = RemoteKernelKind.Unknown, bool packageManager = false, bool localRepo = false, bool isDevice = false, bool tar = false, bool mtd = false, bool devmem = false)
         {
-            return new RemoteHostFacts(isDevice, os, kernel, packageManager, localRepo, tar, mtd);
+            return new RemoteHostFacts(isDevice, os, kernel, packageManager, localRepo, tar, mtd, devmem);
         }
 
         // Linux, found by the probes: everything but the TFTP upload of devices.
@@ -1486,6 +1487,11 @@ internal static class Program
         Check(ToolAvailability.IsAvailable(SessionTool.MtdFlash, Host(RemoteOsKind.Unknown, RemoteKernelKind.Linux, localRepo: true, mtd: true)), "OpenWrt host with /proc/mtd offers the flash backup");
         Check(!ToolAvailability.IsAvailable(SessionTool.MtdFlash, Host(RemoteOsKind.Windows, mtd: true)), "Windows host never offers the flash backup");
 
+        // The memory window: only once the probe has found devmem or devmem2.
+        Check(!ToolAvailability.IsAvailable(SessionTool.MemoryEditor, Host(RemoteOsKind.Unix, RemoteKernelKind.Linux, tar: true, mtd: true)), "Linux host without devmem: no memory window");
+        Check(ToolAvailability.IsAvailable(SessionTool.MemoryEditor, Host(RemoteOsKind.Unknown, RemoteKernelKind.Linux, devmem: true)), "Linux host with devmem offers the memory window");
+        Check(!ToolAvailability.IsAvailable(SessionTool.MemoryEditor, Host(RemoteOsKind.Windows, devmem: true)), "Windows host never offers the memory window");
+
         // A host that has not answered a probe yet: the tools that do not wait for a probe are offered, the others are not.
         RemoteHostFacts unprobed = Host(RemoteOsKind.Unknown);
         Check(ToolAvailability.IsAvailable(SessionTool.ProcessManager, unprobed) && ToolAvailability.IsAvailable(SessionTool.RunScript, unprobed), "Unprobed host: the Unix tools are offered");
@@ -1498,7 +1504,7 @@ internal static class Program
 
         // Windows: only what the SSH protocol and the key files give; winget is the package manager.
         RemoteHostFacts windows = Host(RemoteOsKind.Windows, packageManager: true);
-        foreach (SessionTool tool in new[] { SessionTool.ProcessManager, SessionTool.RunScript, SessionTool.X11Check, SessionTool.TftpFirmware, SessionTool.LocalRepoServer, SessionTool.Backup, SessionTool.MtdFlash })
+        foreach (SessionTool tool in new[] { SessionTool.ProcessManager, SessionTool.RunScript, SessionTool.X11Check, SessionTool.TftpFirmware, SessionTool.LocalRepoServer, SessionTool.Backup, SessionTool.MtdFlash, SessionTool.MemoryEditor })
         {
             Check(!ToolAvailability.IsAvailable(tool, windows), "Windows host does not offer " + tool);
         }
@@ -1509,7 +1515,7 @@ internal static class Program
         Check(!ToolAvailability.IsAvailable(SessionTool.PackageManager, Host(RemoteOsKind.Windows)), "Windows host without winget: no packages");
 
         // A COM or TCP device has no SSH server at all: only the TFTP upload.
-        RemoteHostFacts deviceHost = Host(RemoteOsKind.Unknown, packageManager: true, localRepo: true, isDevice: true, tar: true, mtd: true);
+        RemoteHostFacts deviceHost = Host(RemoteOsKind.Unknown, packageManager: true, localRepo: true, isDevice: true, tar: true, mtd: true, devmem: true);
         foreach (SessionTool tool in System.Enum.GetValues(typeof(SessionTool)))
         {
             Check(ToolAvailability.IsAvailable(tool, deviceHost) == (tool == SessionTool.TftpFirmware), "Device session: " + tool + (tool == SessionTool.TftpFirmware ? " is offered" : " is not offered"));

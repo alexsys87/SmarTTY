@@ -250,6 +250,11 @@
             <Image Source="../icons/chip.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="Memor_y (devmem)..." Click="Memory_Click" ToolTip="Reads and writes physical memory and registers with devmem or devmem2 (driver and FPGA/PL debugging, e.g. Zynq): a table in hex, decimal, binary, ASCII and float, automatic refresh of the checked registers with the changes highlighted, writes of values, bit fields, masks and single bits" Visibility="{Binding Path=ActiveSession.MemoryEditorMenuVisibility, FallbackValue=Collapsed}">
+          <MenuItem.Icon>
+            <Image Source="../icons/chip.png" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="Local OpenWrt _repository server..." Click="LocalRepo_Click" ToolTip="Serve OpenWrt packages built on this computer to the device and install them with the package manager" Visibility="{Binding Path=ActiveSession.LocalRepoMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/archive16.png" />

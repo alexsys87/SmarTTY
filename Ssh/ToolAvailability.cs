@@ -34,7 +34,10 @@ public enum SessionTool
     Backup,
 
     /// <summary>Tools > Flash (MTD) backup and restore: for a host with flash partitions in /proc/mtd.</summary>
-    MtdFlash
+    MtdFlash,
+
+    /// <summary>Tools > Memory (devmem): reads and writes physical memory with devmem or devmem2.</summary>
+    MemoryEditor
 }
 
 /// <summary>What is known about the host of a session when the Tools menu is shown.</summary>
@@ -61,7 +64,10 @@ public readonly struct RemoteHostFacts
     /// <summary>The probe in the background found flash partitions in /proc/mtd (false until it has answered).</summary>
     public bool HasMtd { get; }
 
-    public RemoteHostFacts(bool isDevice, RemoteOsKind os, RemoteKernelKind kernel, bool hasPackageManager, bool hasLocalRepoManager, bool hasTar = false, bool hasMtd = false)
+    /// <summary>The probe in the background found devmem or devmem2 (false until it has answered).</summary>
+    public bool HasDevMem { get; }
+
+    public RemoteHostFacts(bool isDevice, RemoteOsKind os, RemoteKernelKind kernel, bool hasPackageManager, bool hasLocalRepoManager, bool hasTar = false, bool hasMtd = false, bool hasDevMem = false)
     {
         IsDevice = isDevice;
         Os = os;
@@ -70,6 +76,7 @@ public readonly struct RemoteHostFacts
         HasLocalRepoManager = hasLocalRepoManager;
         HasTar = hasTar;
         HasMtd = hasMtd;
+        HasDevMem = hasDevMem;
     }
 }
 
@@ -116,6 +123,9 @@ public static class ToolAvailability
             case SessionTool.MtdFlash:
                 // /proc/mtd is Linux: offered once the probe has found a partition there, so a host without flash never sees the item.
                 return host.Os != RemoteOsKind.Windows && host.HasMtd;
+            case SessionTool.MemoryEditor:
+                // devmem / devmem2 work on /dev/mem: offered once the probe has found one of them.
+                return host.Os != RemoteOsKind.Windows && host.HasDevMem;
             default:
                 return true;
         }
