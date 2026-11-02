@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.RestoreWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:t="clr-namespace:SmarTTY.Transport" Title="Restore from tar.gz" SnapsToDevicePixels="True" WindowStartupLocation="CenterOwner" Width="760" Height="700" MinWidth="560" MinHeight="500" Style="{DynamicResource SecondaryWindowStyle}" FocusManager.FocusedElement="{Binding ElementName=OpenButton}">
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- What the restore does. -->
+    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0 0 0 8">
+      Unpacks a tar.gz archive of this computer (made by Backup to tar.gz, or any other) on the server. The archive is read here, only
+      the checked members are sent, and tar on the server unpacks them from the SSH connection: the archive itself is never written
+      on the server, not even to /tmp. Afterwards md5sum on the server checks every restored file against the archive.
+    </TextBlock>
+
+    <!-- The archive. -->
+    <DockPanel Grid.Row="1" Margin="0 0 0 6">
+      <TextBlock DockPanel.Dock="Left" Text="Archive:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <Button Name="OpenButton" DockPanel.Dock="Right" Padding="8 2 8 2" Margin="4 0 0 0" Click="Open_Click" ToolTip="Choose the archive to restore (tar.gz, tgz or tar)">
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/open16.png" />
+          <TextBlock Margin="4 0 0 0" Text="Open..." />
+        </StackPanel>
+      </Button>
+      <TextBox Name="ArchiveBox" IsReadOnly="True" VerticalContentAlignment="Center" Style="{DynamicResource ThemedTextBox}" />
+    </DockPanel>
+
+    <!-- Quick selections and what the archive holds. -->
+    <DockPanel Grid.Row="2" Margin="0 0 0 6">
+      <Button Name="AllButton" DockPanel.Dock="Left" Padding="8 2 8 2" Margin="0 0 6 0" IsEnabled="False" Click="All_Click" ToolTip="Check everything in the archive">
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/MainWindow/archive16.png" />
+          <TextBlock Margin="4 0 0 0" Text="Everything" />
+        </StackPanel>
+      </Button>
+      <Button Name="ConfigOnlyButton" DockPanel.Dock="Left" Padding="8 2 8 2" Margin="0 0 6 0" IsEnabled="False" Click="ConfigOnly_Click" ToolTip="Check /etc only: the configuration of the system">
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/gear16.png" />
+          <TextBlock Margin="4 0 0 0" Text="Configuration (/etc)" />
+        </StackPanel>
+      </Button>
+      <Button Name="ClearButton" DockPanel.Dock="Left" Padding="8 2 8 2" Margin="0 0 6 0" IsEnabled="False" Click="Clear_Click" ToolTip="Uncheck everything">
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/delete16.png" />
+          <TextBlock Margin="4 0 0 0" Text="Clear" />
+        </StackPanel>
+      </Button>
+      <TextBlock Name="SummaryText" VerticalAlignment="Center" Margin="6 0 0 0" Foreground="{DynamicResource Theme.TextSecondary}" TextTrimming="CharacterEllipsis" />
+    </DockPanel>
+
+    <!-- The members of the archive. -->
+    <Grid Grid.Row="3">
+      <TreeView Name="FolderTree" MinHeight="160" VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling">
+        <TreeView.ItemContainerStyle>
+          <Style TargetType="{x:Type TreeViewItem}">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+          </Style>
+        </TreeView.ItemContainerStyle>
+        <TreeView.Resources>
+          <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+          <HierarchicalDataTemplate DataType="{x:Type t:BackupNode}" ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal" Margin="0 1 0 1">
+              <CheckBox VerticalAlignment="Center" Focusable="False" IsThreeState="False" IsChecked="{Binding IsChecked, Mode=TwoWay}" IsEnabled="{Binding IsEnabled}" Visibility="{Binding IsCheckable, Converter={StaticResource BoolToVisibility}}" Margin="0 0 4 0" />
+              <Image Width="16" Height="16" Margin="0 0 4 0" VerticalAlignment="Center">
+                <Image.Style>
+                  <Style TargetType="{x:Type Image}">
+                    <Setter Property="Source" Value="../icons/MainWindow/document_flat.png" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsDirectory}" Value="True">
+                        <Setter Property="Source" Value="../icons/MainWindow/folder_flat.png" />
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding Kind}" Value="{x:Static t:RemoteEntryKind.SymbolicLink}">
+                        <Setter Property="Source" Value="../icons/export16.png" />
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding IsPlaceholder}" Value="True">
+                        <Setter Property="Source" Value="../icons/MainWindow/busy.png" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Image.Style>
+              </Image>
+              <TextBlock VerticalAlignment="Center" Text="{Binding Name}">
+                <TextBlock.Style>
+                  <Style TargetType="{x:Type TextBlock}">
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsLocked}" Value="True">
+                        <Setter Property="Foreground" Value="{DynamicResource Theme.TextDisabled}" />
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding IsPlaceholder}" Value="True">
+                        <Setter Property="Foreground" Value="{DynamicResource Theme.TextSecondary}" />
+                        <Setter Property="FontStyle" Value="Italic" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+              <TextBlock VerticalAlignment="Center" Margin="8 0 0 0" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}" Text="{Binding Note, StringFormat=({0})}" Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+          </HierarchicalDataTemplate>
+        </TreeView.Resources>
+      </TreeView>
+      <!-- Shown over the tree until an archive is read. -->
+      <StackPanel Name="LoadingPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Width="300">
+        <ProgressBar Name="LoadingBar" Height="14" IsIndeterminate="True" Visibility="Collapsed" />
+        <TextBlock Name="LoadingText" Margin="0 6 0 0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Text="Open the archive to restore." />
+      </StackPanel>
+    </Grid>
+
+    <!-- Where the archive goes and how. -->
+    <Grid Grid.Row="4" Margin="0 10 0 0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <TextBlock Grid.Row="0" Grid.Column="0" Text="Restore to:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <TextBox Name="TargetBox" Grid.Row="0" Grid.Column="1" Margin="0 2 0 2" Text="/" VerticalContentAlignment="Center" Style="{DynamicResource ThemedTextBox}" ToolTip="The folder of the server the archive is unpacked into: / puts every file back where it was; another folder (it is made if needed) keeps the system as it is" />
+      <TextBlock Grid.Row="1" Grid.Column="0" Text="Transfer:" VerticalAlignment="Center" Margin="0 0 8 0" />
+      <ComboBox Name="CompressionBox" Grid.Row="1" Grid.Column="1" Margin="0 2 0 2" SelectedIndex="0">
+        <ComboBoxItem Name="CompressedItem" Content="Compressed (tar -xz on the server): less data over the network" ToolTip="This computer compresses the selected members again; tar on the server decompresses them" />
+        <ComboBoxItem Content="Plain tar: less load on the device" ToolTip="Needed when tar on the server cannot decompress gzip" />
+      </ComboBox>
+      <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0 4 0 0">
+        <CheckBox Name="KeepBox" Content="Keep the files that exist on the server (tar -k)" ToolTip="Only the files that are missing on the server are restored; the others are left as they are" />
+        <CheckBox Name="VerifyBox" IsChecked="True" Margin="0 4 0 0" Content="Check the restored files with md5sum on the server" ToolTip="The MD5 of every restored file is computed on the server and compared with the archive" />
+        <CheckBox Name="SudoBox" Visibility="Collapsed" Margin="0 4 0 0" Content="Run tar as root with sudo (sudo -n, no password is asked)" ToolTip="The user of this connection is not root: without sudo, the files it cannot write are not restored" />
+        <TextBlock Name="UserText" Margin="0 4 0 0" TextWrapping="Wrap" Foreground="{DynamicResource Theme.TextSecondary}" Text="Asking the server..." />
+      </StackPanel>
+    </Grid>
+
+    <!-- Progress. -->
+    <StackPanel Grid.Row="5" Margin="0 10 0 0">
+      <ProgressBar Name="Progress" Height="16" Maximum="100" />
+      <DockPanel Margin="0 4 0 0">
+        <TextBlock Name="RateText" DockPanel.Dock="Right" Margin="8 0 0 0" />
+        <TextBlock Name="StatusText" TextTrimming="CharacterEllipsis" Text="Open an archive, check what to restore and press Start." />
+      </DockPanel>
+      <TextBlock Name="CurrentFileText" Margin="0 2 0 0" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}" TextTrimming="CharacterEllipsis" />
+    </StackPanel>
+
+    <!-- What tar and the check said. -->
+    <TextBox Name="LogBox" Grid.Row="6" Height="96" Margin="0 8 0 0" IsReadOnly="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11" Style="{DynamicResource ThemedTextBox}" />
+
+    <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 10 0 0">
+      <Button Name="StartButton" Content="_Start restore" MinWidth="100" Margin="0 0 6 0" IsDefault="True" IsEnabled="False" Click="Start_Click" />
+      <Button Name="StopButton" Content="S_top" MinWidth="80" Margin="0 0 6 0" IsEnabled="False" Click="Stop_Click" ToolTip="Stop tar on the server; the files unpacked so far stay" />
+      <Button Name="CloseButton" Content="Close" MinWidth="80" IsCancel="True" Click="Close_Click" />
+    </StackPanel>
+  </Grid>
+</Window>

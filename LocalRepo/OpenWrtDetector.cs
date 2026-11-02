@@ -25,13 +25,15 @@ public static class OpenWrtDetector
     /// mistaken for a positive answer. When both managers are installed, apk wins, like in the package manager window.
     /// The same round trip reports the kernel of the host (<see cref="SmarTTY.Ssh.RemoteOsDetector.KernelProbeCommand"/>), which
     /// decides whether the tools that need Linux are offered, and whether the host has tar
-    /// (<see cref="SmarTTY.Transport.RemoteBackup.TarProbeCommand"/>), which decides whether the backup to tar.gz is offered.
+    /// (<see cref="SmarTTY.Transport.RemoteBackup.TarProbeCommand"/>), which decides whether the backup to tar.gz is offered, and whether
+    /// it has flash partitions (<see cref="SmarTTY.Transport.MtdFlash.ProbeCommand"/>) for the flash backup.
     /// </summary>
     public const string ProbeCommand =
         "if [ -f /etc/openwrt_release ] || [ -f /etc/opkg/customfeeds.conf ] || [ -f /etc/apk/repositories.d/customfeeds.list ] || " +
         "grep -qsE '^(ID|ID_LIKE)=([^[:alnum:]]*|.*[^[:alnum:]_-])(openwrt|lede)([^[:alnum:]_-]|$)' /etc/os-release; then echo " + OpenWrtMarker + "; else echo SMARTTY_OS=other; fi; " +
         "pm=none; command -v opkg >/dev/null 2>&1 && pm=opkg; command -v apk >/dev/null 2>&1 && pm=apk; echo SMARTTY_PKG=$pm; " +
         SmarTTY.Transport.RemoteBackup.TarProbeCommand + "; " +
+        SmarTTY.Transport.MtdFlash.ProbeCommand + "; " +
         SmarTTY.Ssh.RemoteOsDetector.KernelProbeCommand;
 
     /// <summary>

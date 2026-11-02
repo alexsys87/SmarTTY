@@ -249,8 +249,11 @@ jobs:
       - name: gzip + base64 transfer through a real shell on a pseudo terminal (BusyBox ash as on OpenWrt, bash; damaged data, cancel, no echo)
         run: dotnet run --project tests/GzipBase64TransferTests -c Release
 
-      - name: Backup to tar.gz (mount table, folder tree, tar streamed to stdout; /bin/sh with GNU tar, BusyBox ash with BusyBox tar as on OpenWrt)
+      - name: Backup to and restore from tar.gz (mount table, folder tree, tar streamed to stdout and stdin, md5sum check; /bin/sh with GNU tar, BusyBox ash with BusyBox tar as on OpenWrt)
         run: dotnet run --project tests/RemoteBackupTests -c Release
+
+      - name: Flash (MTD) backup and restore (/proc/mtd and sysfs, full flash layout, RAM check, upload, write and read-back with fake flash tools; /bin/sh and BusyBox)
+        run: dotnet run --project tests/MtdFlashTests -c Release
 
   sshnet:
     name: SSH.NET integration tests

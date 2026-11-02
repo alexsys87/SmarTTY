@@ -1048,6 +1048,40 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
     }
 
+    private void Restore_Click(object sender, RoutedEventArgs e)
+    {
+        SessionWrapper activeSession = Controller.ActiveSession;
+        if (activeSession == null || activeSession.IsDevice || activeSession.Session == null)
+        {
+            return;
+        }
+        try
+        {
+            RestoreWindow.ShowFor(activeSession, this);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void MtdFlash_Click(object sender, RoutedEventArgs e)
+    {
+        SessionWrapper activeSession = Controller.ActiveSession;
+        if (activeSession == null || activeSession.IsDevice || activeSession.Session == null)
+        {
+            return;
+        }
+        try
+        {
+            MtdFlashWindow.ShowFor(activeSession, this);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     private void PortForwarding_Click(object sender, RoutedEventArgs e)
     {
         SessionWrapper activeSession = Controller.ActiveSession;

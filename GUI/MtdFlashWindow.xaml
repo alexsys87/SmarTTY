@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.MtdFlashWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Flash (MTD) backup and restore" SnapsToDevicePixels="True" WindowStartupLocation="CenterOwner" Width="860" Height="720" MinWidth="640" MinHeight="520" Style="{DynamicResource SecondaryWindowStyle}">
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- The flash of the server: partitions, tools, memory. -->
+    <StackPanel Grid.Row="0" Margin="0 0 0 8">
+      <TextBlock TextWrapping="Wrap">
+        The flash partitions of the server (/proc/mtd). A backup reads them with cat straight into files on this computer and checks them
+        against the flash; nothing is written on the server. A restore checks the image here, checks that the server has the memory for it,
+        copies it into RAM, checks it there, writes it with the flash tool of the system and reads the partition back: only when that last
+        checksum matches is the write done.
+      </TextBlock>
+      <TextBlock Name="HostText" Margin="0 6 0 0" TextWrapping="Wrap" Foreground="{DynamicResource Theme.TextSecondary}" Text="Asking the server..." />
+    </StackPanel>
+
+    <TabControl Name="Tabs" Grid.Row="1">
+      <!-- Backup. -->
+      <TabItem Header="Backup">
+        <Grid Margin="8">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <ListView Name="PartitionList" Grid.Row="0" SelectionMode="Single">
+            <ListView.View>
+              <GridView>
+                <GridView.Columns>
+                  <GridViewColumn Header="" Width="34">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" IsEnabled="{Binding CanRead}" ToolTip="{Binding ReadProblem}" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Device" Width="70" DisplayMemberBinding="{Binding Device}" />
+                  <GridViewColumn Header="Name" Width="150" DisplayMemberBinding="{Binding Name}" />
+                  <GridViewColumn Header="Size" Width="90" DisplayMemberBinding="{Binding SizeText}" />
+                  <GridViewColumn Header="Offset" Width="90" DisplayMemberBinding="{Binding OffsetText}" />
+                  <GridViewColumn Header="Erase block" Width="80" DisplayMemberBinding="{Binding EraseText}" />
+                  <GridViewColumn Header="Type" Width="70" DisplayMemberBinding="{Binding TypeText}" />
+                  <GridViewColumn Header="Notes" Width="230">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Notes}" ToolTip="{Binding Notes}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Theme.TextSecondary}" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                </GridView.Columns>
+              </GridView>
+            </ListView.View>
+          </ListView>
+          <StackPanel Grid.Row="1" Margin="0 8 0 0">
+            <RadioButton Name="PartitionsMode" GroupName="BackupMode" IsChecked="True" Content="The checked partitions, a file each" Checked="Mode_Changed" />
+            <RadioButton Name="FullFlashMode" GroupName="BackupMode" Margin="0 4 0 0" Content="The whole flash, one file" Checked="Mode_Changed" />
+            <TextBlock Name="FullFlashText" Margin="20 2 0 0" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}" />
+          </StackPanel>
+          <Grid Grid.Row="2" Margin="0 8 0 0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Save to folder:" VerticalAlignment="Center" Margin="0 0 8 0" />
+            <TextBox Name="FolderBox" Grid.Column="1" Margin="0 2 4 2" VerticalContentAlignment="Center" Style="{DynamicResource ThemedTextBox}" ToolTip="The images (name.bin) and their description with the checksums (name.mtdinfo) are written here" />
+            <Button Name="FolderButton" Grid.Column="2" Content="Browse..." MinWidth="80" Margin="0 2 0 2" Click="Folder_Click" />
+          </Grid>
+          <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 8 0 0">
+            <Button Name="CheckAllButton" Content="Check all" MinWidth="80" Margin="0 0 6 0" Click="CheckAll_Click" />
+            <Button Name="CheckNoneButton" Content="Clear" MinWidth="80" Margin="0 0 6 0" Click="CheckNone_Click" />
+            <Button Name="BackupButton" Content="_Back up" MinWidth="110" IsEnabled="False" Click="Backup_Click" />
+          </StackPanel>
+        </Grid>
+      </TabItem>
+
+      <!-- Restore. -->
+      <TabItem Header="Restore">
+        <Grid Margin="8">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <DockPanel Grid.Row="0" Margin="0 0 0 6">
+            <TextBlock DockPanel.Dock="Left" Text="Backup:" VerticalAlignment="Center" Margin="0 0 8 0" />
+            <Button Name="OpenImageButton" DockPanel.Dock="Right" Padding="8 2 8 2" Margin="4 0 0 0" Click="OpenImage_Click" ToolTip="Open the description of a backup made here (.mtdinfo), or a single image (.bin) to write into a partition you choose">
+              <StackPanel Orientation="Horizontal">
+                <Image Width="16" Height="16" Source="../icons/open16.png" />
+                <TextBlock Margin="4 0 0 0" Text="Open..." />
+              </StackPanel>
+            </Button>
+            <TextBox Name="ImageBox" IsReadOnly="True" VerticalContentAlignment="Center" Style="{DynamicResource ThemedTextBox}" />
+          </DockPanel>
+          <ListView Name="ImageList" Grid.Row="1" SelectionMode="Single">
+            <ListView.View>
+              <GridView>
+                <GridView.Columns>
+                  <GridViewColumn Header="" Width="34">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Image of" Width="150" DisplayMemberBinding="{Binding Source}" />
+                  <GridViewColumn Header="Size" Width="85" DisplayMemberBinding="{Binding SizeText}" />
+                  <GridViewColumn Header="Checksum" Width="90" DisplayMemberBinding="{Binding ChecksumText}" />
+                  <GridViewColumn Header="Write to" Width="200">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <ComboBox MinWidth="180" ItemsSource="{Binding Targets}" SelectedItem="{Binding Target, Mode=TwoWay}" DisplayMemberPath="Text" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Check" Width="230">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Verdict}" ToolTip="{Binding VerdictDetails}" TextTrimming="CharacterEllipsis" Foreground="{Binding VerdictBrush}" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                </GridView.Columns>
+              </GridView>
+            </ListView.View>
+          </ListView>
+          <TextBlock Grid.Row="2" Margin="0 8 0 0" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}">
+            Images are written one after another. Writing the boot loader or the calibration data (art, factory) of another device makes this one unusable;
+            do not switch the device off while it is written, and restart it only after the last image is checked.
+          </TextBlock>
+          <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 8 0 0">
+            <Button Name="WriteButton" Content="_Write to flash..." MinWidth="130" IsEnabled="False" Click="Write_Click" />
+          </StackPanel>
+        </Grid>
+      </TabItem>
+    </TabControl>
+
+    <!-- Progress of the running job. -->
+    <StackPanel Grid.Row="2" Margin="0 10 0 0">
+      <ProgressBar Name="Progress" Height="16" Maximum="100" />
+      <DockPanel Margin="0 4 0 0">
+        <TextBlock Name="RateText" DockPanel.Dock="Right" Margin="8 0 0 0" />
+        <TextBlock Name="StatusText" TextTrimming="CharacterEllipsis" />
+      </DockPanel>
+    </StackPanel>
+
+    <TextBox Name="LogBox" Grid.Row="3" Height="110" Margin="0 8 0 0" IsReadOnly="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11" Style="{DynamicResource ThemedTextBox}" />
+
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 10 0 0">
+      <Button Name="OpenFolderButton" Content="Open folder" MinWidth="90" Margin="0 0 6 0" IsEnabled="False" Click="OpenFolder_Click" />
+      <Button Name="StopButton" Content="S_top" MinWidth="80" Margin="0 0 6 0" IsEnabled="False" Click="Stop_Click" ToolTip="Stop the running job; a write into the flash itself is never interrupted" />
+      <Button Name="CloseButton" Content="Close" MinWidth="80" IsCancel="True" Click="Close_Click" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -30,8 +30,11 @@ public enum SessionTool
     /// <summary>Tools > TFTP server / U-Boot upload: for a COM or TCP device session.</summary>
     TftpFirmware,
 
-    /// <summary>Tools > Backup to tar.gz: runs tar on a Unix host and streams the archive through the SSH channel.</summary>
-    Backup
+    /// <summary>Tools > Backup to tar.gz and Restore from tar.gz: run tar on a Unix host and stream the archive through the SSH channel.</summary>
+    Backup,
+
+    /// <summary>Tools > Flash (MTD) backup and restore: for a host with flash partitions in /proc/mtd.</summary>
+    MtdFlash
 }
 
 /// <summary>What is known about the host of a session when the Tools menu is shown.</summary>
@@ -55,7 +58,10 @@ public readonly struct RemoteHostFacts
     /// <summary>The probe in the background found tar on the host (false until it has answered).</summary>
     public bool HasTar { get; }
 
-    public RemoteHostFacts(bool isDevice, RemoteOsKind os, RemoteKernelKind kernel, bool hasPackageManager, bool hasLocalRepoManager, bool hasTar = false)
+    /// <summary>The probe in the background found flash partitions in /proc/mtd (false until it has answered).</summary>
+    public bool HasMtd { get; }
+
+    public RemoteHostFacts(bool isDevice, RemoteOsKind os, RemoteKernelKind kernel, bool hasPackageManager, bool hasLocalRepoManager, bool hasTar = false, bool hasMtd = false)
     {
         IsDevice = isDevice;
         Os = os;
@@ -63,6 +69,7 @@ public readonly struct RemoteHostFacts
         HasPackageManager = hasPackageManager;
         HasLocalRepoManager = hasLocalRepoManager;
         HasTar = hasTar;
+        HasMtd = hasMtd;
     }
 }
 
@@ -106,6 +113,9 @@ public static class ToolAvailability
             case SessionTool.Backup:
                 // /bin/sh and tar: offered once the probe has found tar, so a host without it (or a Windows one) never sees the item.
                 return host.Os != RemoteOsKind.Windows && host.HasTar;
+            case SessionTool.MtdFlash:
+                // /proc/mtd is Linux: offered once the probe has found a partition there, so a host without flash never sees the item.
+                return host.Os != RemoteOsKind.Windows && host.HasMtd;
             default:
                 return true;
         }
