@@ -255,6 +255,9 @@ jobs:
       - name: Flash (MTD) backup and restore (/proc/mtd and sysfs, full flash layout, RAM check, upload, write and read-back with fake flash tools; /bin/sh and BusyBox)
         run: dotnet run --project tests/MtdFlashTests -c Release
 
+      - name: Quick commands (rules, QuickCommands.xml and the settings archive, script upload with chmod and the typed ./name; /bin/sh and BusyBox)
+        run: dotnet run --project tests/QuickCommandsTests -c Release
+
   sshnet:
     name: SSH.NET integration tests
     runs-on: ubuntu-24.04

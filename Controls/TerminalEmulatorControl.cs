@@ -507,6 +507,18 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     }
 
     /// <summary>
+    /// Puts a command into the command line without running it (Tools > Quick commands): the user checks it and presses Enter.
+    /// A classic terminal types it to the shell; the Smart Terminal inserts it into its own input line.
+    /// </summary>
+    public virtual void InsertCommand(string text)
+    {
+        if (!string.IsNullOrEmpty(text))
+        {
+            TypeText(text);
+        }
+    }
+
+    /// <summary>
     /// Raised with every chunk of output as it arrives, escape sequences included, before it is drawn. The chunk may end in the
     /// middle of an escape sequence.
     /// </summary>

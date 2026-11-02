@@ -9,6 +9,7 @@ using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using SmarTTY.Utilities;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -1676,6 +1677,8 @@ public class MainWindowController : INotifyPropertyChanged
             // Only the Smart Terminal knows when a command has ended.
             pasteLineByLineItem.Enabled = ((_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal) is SshTerminalControl;
         };
+        // The quick commands go on top of the menu; they are rebuilt each time it opens, from the list as it is saved now.
+        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) => AddQuickCommandItems();
         // Painted when it opens, so that it follows the theme chosen in the settings like the other menus.
         _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) => ThemedMenu.Apply(_TerminalContextMenu);
         _TerminalContextMenu.Items.Add("Copy All", Icons.Load("copy"), (object _, EventArgs e) =>
@@ -1702,6 +1705,65 @@ public class MainWindowController : INotifyPropertyChanged
             FullScreenMode = commonGUIPreferences.FullScreen;
         }
         ApplyGlobalVisualSettings();
+    }
+
+    // The items of the quick commands in the menu of the terminal, removed and added again each time it opens.
+    private readonly List<ToolStripItem> _QuickCommandItems = new List<ToolStripItem>();
+
+    private void AddQuickCommandItems()
+    {
+        foreach (ToolStripItem old in _QuickCommandItems)
+        {
+            _TerminalContextMenu.Items.Remove(old);
+            old.Dispose();
+        }
+        _QuickCommandItems.Clear();
+        TerminalEmulatorControl terminal = (_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+        SessionWrapper session = ActiveSession?.Tabs.OfType<NormalTabContext>().Any(tab => tab.Terminal == terminal) == true
+            ? ActiveSession
+            : AllSessions.FirstOrDefault(candidate => candidate.Tabs.OfType<NormalTabContext>().Any(tab => tab.Terminal == terminal));
+        if (terminal == null || session == null)
+        {
+            return;
+        }
+        bool scriptsPossible = session.Session != null && !session.IsWindowsHost;
+        foreach (QuickCommand item in QuickCommandRules.MenuItems(QuickCommandStore.LoadForMenu(), scriptsPossible))
+        {
+            QuickCommand chosen = item;
+            ToolStripMenuItem menuItem = new ToolStripMenuItem(chosen.MenuText.Replace("&", "&&"), Icons.Load(chosen.Kind == QuickCommandKind.Script ? "run" : "terminal"), (object sender, EventArgs e) => session.InsertQuickCommand(chosen, terminal))
+            {
+                ToolTipText = chosen.Kind == QuickCommandKind.Script
+                    ? "Puts the script " + chosen.FileName + " into the current folder, makes it executable and types ./" + chosen.FileName + " (press Enter to run it)"
+                    : QuickCommandRules.ToCommandLine(chosen.Text) + Environment.NewLine + "(press Enter to run it)"
+            };
+            _QuickCommandItems.Add(menuItem);
+        }
+        ToolStripMenuItem manage = new ToolStripMenuItem(_QuickCommandItems.Count == 0 ? "Add quick commands..." : "Quick commands...", Icons.Load("edit"), (object sender, EventArgs e) => ShowQuickCommands())
+        {
+            ToolTipText = "Commands and scripts that this menu puts into the command line"
+        };
+        _QuickCommandItems.Add(manage);
+        _QuickCommandItems.Add(new ToolStripSeparator());
+        for (int i = 0; i < _QuickCommandItems.Count; i++)
+        {
+            _TerminalContextMenu.Items.Insert(i, _QuickCommandItems[i]);
+        }
+        _TerminalContextMenu.ShowItemToolTips = true;
+    }
+
+    /// <summary>Tools > Quick commands: the window that edits the commands and scripts of the menu of the terminal.</summary>
+    internal void ShowQuickCommands()
+    {
+        try
+        {
+            QuickCommandsWindow window = new QuickCommandsWindow();
+            WindowOwnership.Attach(window, _Window);
+            window.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
     }
 
     private static Dock HeaderOrientationToDock(HeaderOrientation orient)

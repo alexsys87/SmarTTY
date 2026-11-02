@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Terminal/QuickCommands.cs" Link="QuickCommands.cs" />
+    <Compile Include="../../IO/RemoteScript.cs" Link="RemoteScript.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+    <Compile Include="../../Utilities/PosixShell.cs" Link="PosixShell.cs" />
+    <Compile Include="../../VisualTTY/SettingsArchive.cs" Link="SettingsArchive.cs" />
+  </ItemGroup>
+</Project>

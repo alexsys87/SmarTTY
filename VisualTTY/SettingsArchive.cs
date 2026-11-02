@@ -34,11 +34,13 @@ public enum SettingsParts
     CommandCompletions = 512,
     /// <summary>The TFTP server / U-Boot upload window: the files it serves and the commands it types (per computer).</summary>
     TftpFirmware = 1024,
+    /// <summary>Tools > Quick commands: the commands and scripts of the menu of the terminal (QuickCommands.xml).</summary>
+    QuickCommands = 2048,
 
     /// <summary>What the archive held before the parts were selectable (passwords are chosen separately).</summary>
     Legacy = MainSettings | KnownHosts | GuiPreferences | SshProfiles | RawProfiles,
     /// <summary>Selected by default in the export/import window: everything except passwords and private keys.</summary>
-    Default = Legacy | CommandCompletions | TftpFirmware,
+    Default = Legacy | CommandCompletions | TftpFirmware | QuickCommands,
     Keys = SshKey | PasswordKey | OpenSshKeys,
     All = Default | SavedPasswords | Keys
 }
@@ -106,6 +108,7 @@ public sealed class SettingsContents
 /// Archive layout (only these entries are ever read or written):
 ///   Settings.xml                         &lt;- %APPDATA%\SmarTTY\Settings.xml
 ///   KnownHosts.xml                       &lt;- %APPDATA%\SmarTTY\KnownHosts.xml
+///   QuickCommands.xml                    &lt;- %APPDATA%\SmarTTY\QuickCommands.xml (Tools > Quick commands)
 ///   SavedConnections/*.sshconnection     &lt;- %APPDATA%\SmarTTY\SavedConnections\
 ///   SavedConnections/*.rawconnection     &lt;- %APPDATA%\SmarTTY\SavedConnections\
 ///   Local/GUIPreferences.xml             &lt;- %LOCALAPPDATA%\SmarTTY\GUIPreferences.xml
@@ -129,6 +132,7 @@ public static class SettingsArchive
     public const string KnownHostsFileName = "KnownHosts.xml";
     public const string GuiPreferencesFileName = "GUIPreferences.xml";
     public const string TftpFirmwareFileName = "TftpFirmware.xml";
+    public const string QuickCommandsFileName = "QuickCommands.xml";
     public const string CommandCompletionsFileName = "CommandCompletions.xml";
     public const string CommandCompletionsGzipEntryName = "CommandCompletions.xml.gz";
     public const string ConnectionsDirectoryName = "SavedConnections";
@@ -182,6 +186,7 @@ public static class SettingsArchive
         public bool KnownHostsImported;
         public bool GuiPreferencesImported;
         public bool TftpFirmwareImported;
+        public bool QuickCommandsImported;
         public bool CommandCompletionsImported;
         public bool SshKeyImported;
         public bool PasswordKeyImported;
@@ -199,7 +204,7 @@ public static class SettingsArchive
             get
             {
                 return (SettingsImported ? 1 : 0) + (KnownHostsImported ? 1 : 0) + (GuiPreferencesImported ? 1 : 0) +
-                       (TftpFirmwareImported ? 1 : 0) + (CommandCompletionsImported ? 1 : 0) + (SshKeyImported ? 1 : 0) +
+                       (TftpFirmwareImported ? 1 : 0) + (QuickCommandsImported ? 1 : 0) + (CommandCompletionsImported ? 1 : 0) + (SshKeyImported ? 1 : 0) +
                        (PasswordKeyImported ? 1 : 0) + SshProfiles + RawProfiles + OpenSshKeyFiles;
             }
         }
@@ -211,6 +216,7 @@ public static class SettingsArchive
         KnownHosts,
         GuiPreferences,
         TftpFirmware,
+        QuickCommands,
         SshConnection,
         RawConnection,
         CommandCompletions,
@@ -500,6 +506,10 @@ public static class SettingsArchive
         {
             AddIfExists(items, report, "TFTP firmware settings", LocalPrefix + TftpFirmwareFileName, Path.Combine(locations.LocalDataDirectory, TftpFirmwareFileName));
         }
+        if (Has(parts, SettingsParts.QuickCommands))
+        {
+            AddIfExists(items, report, "quick commands", QuickCommandsFileName, Path.Combine(locations.DataDirectory, QuickCommandsFileName));
+        }
         if (Has(parts, SettingsParts.CommandCompletions))
         {
             if (string.IsNullOrEmpty(locations.CommandCompletionsPath))
@@ -758,7 +768,8 @@ public static class SettingsArchive
                 throw new InvalidOperationException("The location of CommandCompletions.xml is not known.");
             }
             if (item.Target.Part == SettingsParts.SshKey || item.Target.Part == SettingsParts.PasswordKey ||
-                item.Target.Part == SettingsParts.OpenSshKeys || item.Target.Part == SettingsParts.CommandCompletions)
+                item.Target.Part == SettingsParts.OpenSshKeys || item.Target.Part == SettingsParts.CommandCompletions ||
+                item.Target.Part == SettingsParts.QuickCommands)
             {
                 backupParts |= item.Target.Part;
             }
@@ -808,6 +819,10 @@ public static class SettingsArchive
                 case EntryKind.TftpFirmware:
                     WriteFileReplacing(Path.Combine(locations.LocalDataDirectory, item.Target.FileName), data);
                     result.TftpFirmwareImported = true;
+                    break;
+                case EntryKind.QuickCommands:
+                    WriteFileReplacing(Path.Combine(locations.DataDirectory, item.Target.FileName), data);
+                    result.QuickCommandsImported = true;
                     break;
                 case EntryKind.SshConnection:
                 case EntryKind.RawConnection:
@@ -902,6 +917,10 @@ public static class SettingsArchive
         else if (name == LocalPrefix + TftpFirmwareFileName)
         {
             target = new Target { Kind = EntryKind.TftpFirmware, Part = SettingsParts.TftpFirmware, FileName = TftpFirmwareFileName, RootElement = "TftpFirmwareSettings" };
+        }
+        else if (name == QuickCommandsFileName)
+        {
+            target = new Target { Kind = EntryKind.QuickCommands, Part = SettingsParts.QuickCommands, FileName = QuickCommandsFileName, RootElement = "QuickCommandList" };
         }
         else if (name == CommandCompletionsFileName)
         {
