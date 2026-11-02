@@ -22961,5 +22961,1673 @@
       <Summary>Wake all waiters</Summary>
       <Description>C++ atomic. Wakes all threads waiting on the flag.</Description>
     </Symbol>
+    <Symbol language="Sql" name="ANY_VALUE" signature="ANY_VALUE(expression)">
+      <Summary>Value from any row</Summary>
+      <Description>Value from any row. SQL aggregate function. Returns an arbitrary value from the group (MySQL, BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="EVERY" signature="EVERY(expression)">
+      <Summary>True when every value is true</Summary>
+      <Description>True when every value is true. SQL aggregate function. Returns true when every non-null value in the group is true (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MEDIAN" signature="MEDIAN(expression)">
+      <Summary>Median value</Summary>
+      <Description>Median value. SQL aggregate function. Returns the median of the non-null values in the group.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MODE" signature="MODE() WITHIN GROUP (ORDER BY expression)">
+      <Summary>Most frequent value</Summary>
+      <Description>Most frequent value. SQL aggregate function. Returns the most frequent value in the group (PostgreSQL ordered-set aggregate).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PERCENTILE_CONT" signature="PERCENTILE_CONT(fraction) WITHIN GROUP (ORDER BY expression)">
+      <Summary>Interpolated percentile</Summary>
+      <Description>Interpolated percentile. SQL aggregate function. Returns the interpolated value at the given fraction within the group.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PERCENTILE_DISC" signature="PERCENTILE_DISC(fraction) WITHIN GROUP (ORDER BY expression)">
+      <Summary>Discrete percentile</Summary>
+      <Description>Discrete percentile. SQL aggregate function. Returns the first value whose cumulative distribution reaches the given fraction.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CORR" signature="CORR(y, x)">
+      <Summary>Correlation coefficient</Summary>
+      <Description>Correlation coefficient. SQL aggregate function. Returns the correlation coefficient of two expressions.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="COVAR_POP" signature="COVAR_POP(y, x)">
+      <Summary>Population covariance</Summary>
+      <Description>Population covariance. SQL aggregate function. Returns the population covariance of two expressions.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="COVAR_SAMP" signature="COVAR_SAMP(y, x)">
+      <Summary>Sample covariance</Summary>
+      <Description>Sample covariance. SQL aggregate function. Returns the sample covariance of two expressions.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="VAR_SAMP" signature="VAR_SAMP(expression)">
+      <Summary>Sample variance</Summary>
+      <Description>Sample variance. SQL aggregate function. Returns the sample variance of the values.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGR_SLOPE" signature="REGR_SLOPE(y, x)">
+      <Summary>Regression slope</Summary>
+      <Description>Regression slope. SQL aggregate function. Returns the slope of the least-squares regression line.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGR_INTERCEPT" signature="REGR_INTERCEPT(y, x)">
+      <Summary>Regression intercept</Summary>
+      <Description>Regression intercept. SQL aggregate function. Returns the intercept of the least-squares regression line.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGR_R2" signature="REGR_R2(y, x)">
+      <Summary>Coefficient of determination</Summary>
+      <Description>Coefficient of determination. SQL aggregate function. Returns the coefficient of determination of the regression line.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGR_COUNT" signature="REGR_COUNT(y, x)">
+      <Summary>Regression pair count</Summary>
+      <Description>Regression pair count. SQL aggregate function. Returns the number of non-null pairs used by the regression.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGR_AVGX" signature="REGR_AVGX(y, x)">
+      <Summary>Average x value</Summary>
+      <Description>Average x value. SQL aggregate function. Returns the average of the independent values in the regression.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGR_AVGY" signature="REGR_AVGY(y, x)">
+      <Summary>Average y value</Summary>
+      <Description>Average y value. SQL aggregate function. Returns the average of the dependent values in the regression.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGR_SXX" signature="REGR_SXX(y, x)">
+      <Summary>Sum of squares of x</Summary>
+      <Description>Sum of squares of x. SQL aggregate function. Returns the sum of the squares of the independent values.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGR_SYY" signature="REGR_SYY(y, x)">
+      <Summary>Sum of squares of y</Summary>
+      <Description>Sum of squares of y. SQL aggregate function. Returns the sum of the squares of the dependent values.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGR_SXY" signature="REGR_SXY(y, x)">
+      <Summary>Sum of products</Summary>
+      <Description>Sum of products. SQL aggregate function. Returns the sum of the products of the regression values.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BIT_AND" signature="BIT_AND(expression)">
+      <Summary>Bitwise AND of the group</Summary>
+      <Description>Bitwise AND of the group. SQL aggregate function. Returns the bitwise AND of all non-null values in the group.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BIT_OR" signature="BIT_OR(expression)">
+      <Summary>Bitwise OR of the group</Summary>
+      <Description>Bitwise OR of the group. SQL aggregate function. Returns the bitwise OR of all non-null values in the group.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BIT_XOR" signature="BIT_XOR(expression)">
+      <Summary>Bitwise XOR of the group</Summary>
+      <Description>Bitwise XOR of the group. SQL aggregate function. Returns the bitwise XOR of all non-null values in the group.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="APPROX_COUNT_DISTINCT" signature="APPROX_COUNT_DISTINCT(expression)">
+      <Summary>Approximate distinct count</Summary>
+      <Description>Approximate distinct count. SQL aggregate function. Returns an approximate count of the distinct values (BigQuery, SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="APPROX_PERCENTILE" signature="APPROX_PERCENTILE(expression, fraction)">
+      <Summary>Approximate percentile</Summary>
+      <Description>Approximate percentile. SQL aggregate function. Returns an approximate percentile of the values (BigQuery, Snowflake).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="COUNT_BIG" signature="COUNT_BIG(expression)">
+      <Summary>Number of rows as bigint</Summary>
+      <Description>Number of rows as bigint. SQL aggregate function. Returns the number of rows as a big integer (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LISTAGG" signature="LISTAGG(expression, delimiter)">
+      <Summary>Concatenate group values</Summary>
+      <Description>Concatenate group values. SQL aggregate function. Concatenates the group values with a delimiter (Oracle, SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="XMLAGG" signature="XMLAGG(expression)">
+      <Summary>Aggregate XML fragments</Summary>
+      <Description>Aggregate XML fragments. SQL aggregate function. Aggregates XML fragments into a single XML value.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_GROUP_ARRAY" signature="JSON_GROUP_ARRAY(expression)">
+      <Summary>JSON array from group values</Summary>
+      <Description>JSON array from group values. SQL aggregate function. Collects the group values into a JSON array (SQLite).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_GROUP_OBJECT" signature="JSON_GROUP_OBJECT(name, value)">
+      <Summary>JSON object from group pairs</Summary>
+      <Description>JSON object from group pairs. SQL aggregate function. Collects the group key and value pairs into a JSON object (SQLite).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GROUPING" signature="GROUPING(expression)">
+      <Summary>Grouping level</Summary>
+      <Description>Grouping level. SQL aggregate function. Returns 1 when the column is aggregated by ROLLUP or CUBE.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GROUPING_ID" signature="GROUPING_ID(expression, ...)">
+      <Summary>Grouping bitmap</Summary>
+      <Description>Grouping bitmap. SQL aggregate function. Returns the grouping bitmap for several expressions.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CHECKSUM_AGG" signature="CHECKSUM_AGG(expression)">
+      <Summary>Checksum of group values</Summary>
+      <Description>Checksum of group values. SQL aggregate function. Returns a checksum of the group values (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="STDEV" signature="STDEV(expression)">
+      <Summary>Sample standard deviation</Summary>
+      <Description>Sample standard deviation. SQL aggregate function. Returns the sample standard deviation of the values (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="STDEVP" signature="STDEVP(expression)">
+      <Summary>Population standard deviation</Summary>
+      <Description>Population standard deviation. SQL aggregate function. Returns the population standard deviation of the values (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="VAR" signature="VAR(expression)">
+      <Summary>Sample variance</Summary>
+      <Description>Sample variance. SQL aggregate function. Returns the sample variance of the values (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="VARP" signature="VARP(expression)">
+      <Summary>Population variance</Summary>
+      <Description>Population variance. SQL aggregate function. Returns the population variance of the values (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="RATIO_TO_REPORT" signature="RATIO_TO_REPORT(expression)">
+      <Summary>Share of the partition sum</Summary>
+      <Description>Share of the partition sum. SQL window function. Returns the ratio of a value to the sum of its window partition (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BIT_LENGTH" signature="BIT_LENGTH(text)">
+      <Summary>Length in bits</Summary>
+      <Description>Length in bits. SQL string function. Returns the length of a string in bits.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FORMAT" signature="FORMAT(value, format)">
+      <Summary>Format a value</Summary>
+      <Description>Format a value. SQL string function. Formats a number or date with the given format.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="QUOTE" signature="QUOTE(text)">
+      <Summary>Quote a string</Summary>
+      <Description>Quote a string. SQL string function. Returns the string quoted for use in SQL (PostgreSQL, MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="QUOTE_IDENT" signature="QUOTE_IDENT(text)">
+      <Summary>Quote an identifier</Summary>
+      <Description>Quote an identifier. SQL string function. Returns the string quoted as an SQL identifier (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="QUOTE_LITERAL" signature="QUOTE_LITERAL(text)">
+      <Summary>Quote a literal</Summary>
+      <Description>Quote a literal. SQL string function. Returns the string quoted as an SQL string literal (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="QUOTE_NULLABLE" signature="QUOTE_NULLABLE(text)">
+      <Summary>Quote or null</Summary>
+      <Description>Quote or null. SQL string function. Quotes the string as a literal or returns NULL when it is null (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SOUNDEX" signature="SOUNDEX(text)">
+      <Summary>Phonetic code</Summary>
+      <Description>Phonetic code. SQL string function. Returns the Soundex code of a string.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DIFFERENCE" signature="DIFFERENCE(text1, text2)">
+      <Summary>Soundex similarity</Summary>
+      <Description>Soundex similarity. SQL string function. Returns how similar the Soundex codes of two strings are (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CHARINDEX" signature="CHARINDEX(substring, text, start)">
+      <Summary>Position of a substring</Summary>
+      <Description>Position of a substring. SQL string function. Returns the position of a substring starting from the given position (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PATINDEX" signature="PATINDEX(pattern, text)">
+      <Summary>Pattern position</Summary>
+      <Description>Pattern position. SQL string function. Returns the position of a pattern in a string (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="STUFF" signature="STUFF(text, start, length, replacement)">
+      <Summary>Replace a range</Summary>
+      <Description>Replace a range. SQL string function. Deletes characters and inserts the replacement at the position (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SPACE" signature="SPACE(count)">
+      <Summary>Spaces</Summary>
+      <Description>Spaces. SQL string function. Returns a string of the given number of spaces.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UNICODE" signature="UNICODE(text)">
+      <Summary>Unicode code point</Summary>
+      <Description>Unicode code point. SQL string function. Returns the Unicode code point of the first character (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="STRCMP" signature="STRCMP(text1, text2)">
+      <Summary>Compare strings</Summary>
+      <Description>Compare strings. SQL string function. Compares two strings and returns -1, 0 or 1 (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FIND_IN_SET" signature="FIND_IN_SET(text, list)">
+      <Summary>Position in a list</Summary>
+      <Description>Position in a list. SQL string function. Returns the position of a string in a comma-separated list (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LOCATE" signature="LOCATE(substring, text, start)">
+      <Summary>Position of a substring</Summary>
+      <Description>Position of a substring. SQL string function. Returns the position of a substring starting from the given position (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FIELD" signature="FIELD(value, value, ...)">
+      <Summary>Position in an argument list</Summary>
+      <Description>Position in an argument list. SQL string function. Returns the position of the first value in the following arguments (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ELT" signature="ELT(index, value, ...)">
+      <Summary>Value at an index</Summary>
+      <Description>Value at an index. SQL string function. Returns the argument at the given position (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="INSERT" signature="INSERT(text, start, length, replacement)">
+      <Summary>Replace a range</Summary>
+      <Description>Replace a range. SQL string function. Replaces characters in a string with the replacement (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MID" signature="MID(text, start, length)">
+      <Summary>Substring</Summary>
+      <Description>Substring. SQL string function. Returns a substring from the given position and length (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGEXP_LIKE" signature="REGEXP_LIKE(text, pattern, flags)">
+      <Summary>Regular expression test</Summary>
+      <Description>Regular expression test. SQL string function. Checks whether a string matches a regular expression.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGEXP_SUBSTR" signature="REGEXP_SUBSTR(text, pattern, start, occurrence)">
+      <Summary>Regular expression substring</Summary>
+      <Description>Regular expression substring. SQL string function. Returns the substring matched by a regular expression.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGEXP_INSTR" signature="REGEXP_INSTR(text, pattern, start, occurrence)">
+      <Summary>Regular expression position</Summary>
+      <Description>Regular expression position. SQL string function. Returns the position of a regular expression match.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGEXP_COUNT" signature="REGEXP_COUNT(text, pattern, start)">
+      <Summary>Regular expression matches</Summary>
+      <Description>Regular expression matches. SQL string function. Returns the number of regular expression matches.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGEXP_MATCHES" signature="REGEXP_MATCHES(text, pattern, flags)">
+      <Summary>Regular expression matches</Summary>
+      <Description>Regular expression matches. SQL string function. Returns the substrings matched by a regular expression (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGEXP_SPLIT_TO_ARRAY" signature="REGEXP_SPLIT_TO_ARRAY(text, pattern)">
+      <Summary>Split by regular expression</Summary>
+      <Description>Split by regular expression. SQL string function. Splits a string on a regular expression into an array (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGEXP_SPLIT_TO_TABLE" signature="REGEXP_SPLIT_TO_TABLE(text, pattern)">
+      <Summary>Split by regular expression</Summary>
+      <Description>Split by regular expression. SQL string function. Splits a string on a regular expression into rows (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="OVERLAY" signature="OVERLAY(text PLACING replacement FROM start FOR length)">
+      <Summary>Overlay a substring</Summary>
+      <Description>Overlay a substring. SQL string function. Replaces a range of characters with another string.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NORMALIZE" signature="NORMALIZE(text, form)">
+      <Summary>Normalize Unicode</Summary>
+      <Description>Normalize Unicode. SQL string function. Returns the string in the given Unicode normalization form.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SPLIT" signature="SPLIT(text, delimiter)">
+      <Summary>Split a string</Summary>
+      <Description>Split a string. SQL string function. Splits a string on a delimiter into an array (BigQuery, Spark).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="STRING_SPLIT" signature="STRING_SPLIT(text, separator)">
+      <Summary>Split a string</Summary>
+      <Description>Split a string. SQL string function. Splits a string on a separator into rows (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SUBSTRING_INDEX" signature="SUBSTRING_INDEX(text, delimiter, count)">
+      <Summary>Substring before a delimiter</Summary>
+      <Description>Substring before a delimiter. SQL string function. Returns the part of a string before the given number of delimiter occurrences (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PRINTF" signature="PRINTF(format, value, ...)">
+      <Summary>Format a string</Summary>
+      <Description>Format a string. SQL string function. Returns a string formatted with printf-style placeholders (SQLite).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LCASE" signature="LCASE(text)">
+      <Summary>Lower case</Summary>
+      <Description>Lower case. SQL string function. Converts a string to lower case (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UCASE" signature="UCASE(text)">
+      <Summary>Upper case</Summary>
+      <Description>Upper case. SQL string function. Converts a string to upper case (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LEN" signature="LEN(text)">
+      <Summary>Number of characters</Summary>
+      <Description>Number of characters. SQL string function. Returns the number of characters without trailing spaces (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATALENGTH" signature="DATALENGTH(value)">
+      <Summary>Length in bytes</Summary>
+      <Description>Length in bytes. SQL string function. Returns the number of bytes used by a value (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REPLICATE" signature="REPLICATE(text, count)">
+      <Summary>Repeat a string</Summary>
+      <Description>Repeat a string. SQL string function. Repeats a string the given number of times (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TEXTJOIN" signature="TEXTJOIN(delimiter, ignore_empty, value, ...)">
+      <Summary>Join strings</Summary>
+      <Description>Join strings. SQL string function. Joins the arguments with a delimiter (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UNISTR" signature="UNISTR(text)">
+      <Summary>Unicode string</Summary>
+      <Description>Unicode string. SQL string function. Returns a string with escape sequences interpreted as Unicode characters (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="STRING_ESCAPE" signature="STRING_ESCAPE(text, type)">
+      <Summary>Escape a string</Summary>
+      <Description>Escape a string. SQL string function. Escapes special characters for the given output type (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="COMPRESS" signature="COMPRESS(value)">
+      <Summary>Compress a value</Summary>
+      <Description>Compress a value. SQL string function. Returns the compressed binary representation of a value (SQL Server, PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DECOMPRESS" signature="DECOMPRESS(value)">
+      <Summary>Decompress a value</Summary>
+      <Description>Decompress a value. SQL string function. Returns the decompressed value from binary data (SQL Server, PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ACOS" signature="ACOS(number)">
+      <Summary>Arc cosine</Summary>
+      <Description>Arc cosine. SQL numeric function. Returns the arc cosine of a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ASIN" signature="ASIN(number)">
+      <Summary>Arc sine</Summary>
+      <Description>Arc sine. SQL numeric function. Returns the arc sine of a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ATAN" signature="ATAN(number)">
+      <Summary>Arc tangent</Summary>
+      <Description>Arc tangent. SQL numeric function. Returns the arc tangent of a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ATAN2" signature="ATAN2(y, x)">
+      <Summary>Arc tangent of two values</Summary>
+      <Description>Arc tangent of two values. SQL numeric function. Returns the arc tangent of y divided by x.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="COS" signature="COS(number)">
+      <Summary>Cosine</Summary>
+      <Description>Cosine. SQL numeric function. Returns the cosine of an angle in radians.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="COT" signature="COT(number)">
+      <Summary>Cotangent</Summary>
+      <Description>Cotangent. SQL numeric function. Returns the cotangent of an angle in radians.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SIN" signature="SIN(number)">
+      <Summary>Sine</Summary>
+      <Description>Sine. SQL numeric function. Returns the sine of an angle in radians.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TAN" signature="TAN(number)">
+      <Summary>Tangent</Summary>
+      <Description>Tangent. SQL numeric function. Returns the tangent of an angle in radians.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DEGREES" signature="DEGREES(radians)">
+      <Summary>Radians to degrees</Summary>
+      <Description>Radians to degrees. SQL numeric function. Converts an angle from radians to degrees.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="RADIANS" signature="RADIANS(degrees)">
+      <Summary>Degrees to radians</Summary>
+      <Description>Degrees to radians. SQL numeric function. Converts an angle from degrees to radians.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SINH" signature="SINH(number)">
+      <Summary>Hyperbolic sine</Summary>
+      <Description>Hyperbolic sine. SQL numeric function. Returns the hyperbolic sine of a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="COSH" signature="COSH(number)">
+      <Summary>Hyperbolic cosine</Summary>
+      <Description>Hyperbolic cosine. SQL numeric function. Returns the hyperbolic cosine of a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TANH" signature="TANH(number)">
+      <Summary>Hyperbolic tangent</Summary>
+      <Description>Hyperbolic tangent. SQL numeric function. Returns the hyperbolic tangent of a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CBRT" signature="CBRT(number)">
+      <Summary>Cube root</Summary>
+      <Description>Cube root. SQL numeric function. Returns the cube root of a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LOG2" signature="LOG2(number)">
+      <Summary>Base-2 logarithm</Summary>
+      <Description>Base-2 logarithm. SQL numeric function. Returns the base-2 logarithm of a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="WIDTH_BUCKET" signature="WIDTH_BUCKET(operand, low, high, count)">
+      <Summary>Histogram bucket</Summary>
+      <Description>Histogram bucket. SQL numeric function. Returns the bucket number of a value in an equal-width histogram.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SETSEED" signature="SETSEED(seed)">
+      <Summary>Seed the random generator</Summary>
+      <Description>Seed the random generator. SQL numeric function. Sets the seed of the random number generator (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="RANDOM_NORMAL" signature="RANDOM_NORMAL(mean, stddev)">
+      <Summary>Normal random value</Summary>
+      <Description>Normal random value. SQL numeric function. Returns a random value from a normal distribution (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SCALE" signature="SCALE(numeric)">
+      <Summary>Decimal scale</Summary>
+      <Description>Decimal scale. SQL numeric function. Returns the number of decimal digits of a numeric value.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MIN_SCALE" signature="MIN_SCALE(numeric)">
+      <Summary>Minimal decimal scale</Summary>
+      <Description>Minimal decimal scale. SQL numeric function. Returns the number of decimal digits needed to represent a value exactly.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TRIM_SCALE" signature="TRIM_SCALE(numeric)">
+      <Summary>Trim decimal scale</Summary>
+      <Description>Trim decimal scale. SQL numeric function. Removes trailing zeros from a numeric value.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GCD" signature="GCD(a, b)">
+      <Summary>Greatest common divisor</Summary>
+      <Description>Greatest common divisor. SQL numeric function. Returns the greatest common divisor of two numbers.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LCM" signature="LCM(a, b)">
+      <Summary>Least common multiple</Summary>
+      <Description>Least common multiple. SQL numeric function. Returns the least common multiple of two numbers.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FACTORIAL" signature="FACTORIAL(n)">
+      <Summary>Factorial</Summary>
+      <Description>Factorial. SQL numeric function. Returns the factorial of a non-negative integer.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BIT_COUNT" signature="BIT_COUNT(value)">
+      <Summary>Count set bits</Summary>
+      <Description>Count set bits. SQL numeric function. Returns the number of bits set to one.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CRC32" signature="CRC32(value)">
+      <Summary>CRC-32 checksum</Summary>
+      <Description>CRC-32 checksum. SQL numeric function. Returns the CRC-32 checksum of a value.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="AGE" signature="AGE(timestamp, timestamp)">
+      <Summary>Interval between timestamps</Summary>
+      <Description>Interval between timestamps. SQL date and time function. Returns the interval between two timestamps (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CLOCK_TIMESTAMP" signature="CLOCK_TIMESTAMP()">
+      <Summary>Current clock time</Summary>
+      <Description>Current clock time. SQL date and time function. Returns the current time from the system clock (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="STATEMENT_TIMESTAMP" signature="STATEMENT_TIMESTAMP()">
+      <Summary>Statement start time</Summary>
+      <Description>Statement start time. SQL date and time function. Returns the time when the current statement started (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TRANSACTION_TIMESTAMP" signature="TRANSACTION_TIMESTAMP()">
+      <Summary>Transaction start time</Summary>
+      <Description>Transaction start time. SQL date and time function. Returns the time when the current transaction started (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TIMEOFDAY" signature="TIMEOFDAY()">
+      <Summary>Current time as text</Summary>
+      <Description>Current time as text. SQL date and time function. Returns the current time as a formatted text string (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATE_FORMAT" signature="DATE_FORMAT(date, format)">
+      <Summary>Format a date</Summary>
+      <Description>Format a date. SQL date and time function. Formats a date with the given format (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TIME_FORMAT" signature="TIME_FORMAT(time, format)">
+      <Summary>Format a time</Summary>
+      <Description>Format a time. SQL date and time function. Formats a time with the given format (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="STR_TO_DATE" signature="STR_TO_DATE(text, format)">
+      <Summary>Parse a date</Summary>
+      <Description>Parse a date. SQL date and time function. Parses a date from text with the given format (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GET_FORMAT" signature="GET_FORMAT(type, format)">
+      <Summary>Date format string</Summary>
+      <Description>Date format string. SQL date and time function. Returns a standard date format string (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FROM_UNIXTIME" signature="FROM_UNIXTIME(seconds)">
+      <Summary>Unix time to date</Summary>
+      <Description>Unix time to date. SQL date and time function. Converts Unix time in seconds to a date and time (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UNIX_TIMESTAMP" signature="UNIX_TIMESTAMP(date)">
+      <Summary>Date to Unix time</Summary>
+      <Description>Date to Unix time. SQL date and time function. Converts a date and time to Unix time in seconds (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MAKE_DATE" signature="MAKE_DATE(year, month, day)">
+      <Summary>Build a date</Summary>
+      <Description>Build a date. SQL date and time function. Constructs a date from the year, month and day (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MAKE_TIME" signature="MAKE_TIME(hour, minute, second)">
+      <Summary>Build a time</Summary>
+      <Description>Build a time. SQL date and time function. Constructs a time from the hour, minute and second (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MAKE_TIMESTAMP" signature="MAKE_TIMESTAMP(year, month, day, hour, minute, second)">
+      <Summary>Build a timestamp</Summary>
+      <Description>Build a timestamp. SQL date and time function. Constructs a timestamp from its date and time fields (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MAKE_TIMESTAMPTZ" signature="MAKE_TIMESTAMPTZ(year, month, day, hour, minute, second, timezone)">
+      <Summary>Build a timestamp with time zone</Summary>
+      <Description>Build a timestamp with time zone. SQL date and time function. Constructs a timestamp with a time zone from its fields (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MAKE_INTERVAL" signature="MAKE_INTERVAL(days, hours, minutes, seconds)">
+      <Summary>Build an interval</Summary>
+      <Description>Build an interval. SQL date and time function. Constructs an interval from its fields (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="YEAR" signature="YEAR(date)">
+      <Summary>Year</Summary>
+      <Description>Year. SQL date and time function. Returns the year of a date.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MONTH" signature="MONTH(date)">
+      <Summary>Month</Summary>
+      <Description>Month. SQL date and time function. Returns the month of a date.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DAY" signature="DAY(date)">
+      <Summary>Day of the month</Summary>
+      <Description>Day of the month. SQL date and time function. Returns the day of the month of a date.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="HOUR" signature="HOUR(time)">
+      <Summary>Hour</Summary>
+      <Description>Hour. SQL date and time function. Returns the hour of a time.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MINUTE" signature="MINUTE(time)">
+      <Summary>Minute</Summary>
+      <Description>Minute. SQL date and time function. Returns the minute of a time.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SECOND" signature="SECOND(time)">
+      <Summary>Second</Summary>
+      <Description>Second. SQL date and time function. Returns the second of a time.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MICROSECOND" signature="MICROSECOND(time)">
+      <Summary>Microsecond</Summary>
+      <Description>Microsecond. SQL date and time function. Returns the microsecond part of a time.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="QUARTER" signature="QUARTER(date)">
+      <Summary>Quarter</Summary>
+      <Description>Quarter. SQL date and time function. Returns the quarter of a date.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="WEEK" signature="WEEK(date, mode)">
+      <Summary>Week number</Summary>
+      <Description>Week number. SQL date and time function. Returns the week number of a date.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="WEEKOFYEAR" signature="WEEKOFYEAR(date)">
+      <Summary>Week of the year</Summary>
+      <Description>Week of the year. SQL date and time function. Returns the week number of a date.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DAYOFWEEK" signature="DAYOFWEEK(date)">
+      <Summary>Day of the week</Summary>
+      <Description>Day of the week. SQL date and time function. Returns the day of the week as a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DAYOFMONTH" signature="DAYOFMONTH(date)">
+      <Summary>Day of the month</Summary>
+      <Description>Day of the month. SQL date and time function. Returns the day of the month as a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DAYOFYEAR" signature="DAYOFYEAR(date)">
+      <Summary>Day of the year</Summary>
+      <Description>Day of the year. SQL date and time function. Returns the day of the year as a number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="WEEKDAY" signature="WEEKDAY(date)">
+      <Summary>Weekday index</Summary>
+      <Description>Weekday index. SQL date and time function. Returns the weekday index of a date (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="YEARWEEK" signature="YEARWEEK(date, mode)">
+      <Summary>Year and week</Summary>
+      <Description>Year and week. SQL date and time function. Returns the year and week number of a date (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MONTHNAME" signature="MONTHNAME(date)">
+      <Summary>Month name</Summary>
+      <Description>Month name. SQL date and time function. Returns the name of the month.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DAYNAME" signature="DAYNAME(date)">
+      <Summary>Day name</Summary>
+      <Description>Day name. SQL date and time function. Returns the name of the weekday.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LAST_DAY" signature="LAST_DAY(date)">
+      <Summary>Last day of the month</Summary>
+      <Description>Last day of the month. SQL date and time function. Returns the last day of the month of a date.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MAKEDATE" signature="MAKEDATE(year, day_of_year)">
+      <Summary>Build a date</Summary>
+      <Description>Build a date. SQL date and time function. Constructs a date from the year and day of the year (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MAKETIME" signature="MAKETIME(hour, minute, second)">
+      <Summary>Build a time</Summary>
+      <Description>Build a time. SQL date and time function. Constructs a time from the hour, minute and second (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_DAYS" signature="TO_DAYS(date)">
+      <Summary>Days since year zero</Summary>
+      <Description>Days since year zero. SQL date and time function. Returns the number of days from year zero to the date (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FROM_DAYS" signature="FROM_DAYS(days)">
+      <Summary>Date from days</Summary>
+      <Description>Date from days. SQL date and time function. Returns the date for the number of days since year zero (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_SECONDS" signature="TO_SECONDS(date)">
+      <Summary>Seconds since year zero</Summary>
+      <Description>Seconds since year zero. SQL date and time function. Returns the number of seconds from year zero to the date (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TIME_TO_SEC" signature="TIME_TO_SEC(time)">
+      <Summary>Time in seconds</Summary>
+      <Description>Time in seconds. SQL date and time function. Returns the time as a number of seconds (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SEC_TO_TIME" signature="SEC_TO_TIME(seconds)">
+      <Summary>Seconds to time</Summary>
+      <Description>Seconds to time. SQL date and time function. Returns the time for a number of seconds (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TIMEDIFF" signature="TIMEDIFF(end, start)">
+      <Summary>Difference between times</Summary>
+      <Description>Difference between times. SQL date and time function. Returns the difference between two times or dates (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TIMESTAMPDIFF" signature="TIMESTAMPDIFF(unit, start, end)">
+      <Summary>Difference in units</Summary>
+      <Description>Difference in units. SQL date and time function. Returns the difference between two timestamps in the given unit (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ADDTIME" signature="ADDTIME(time, interval)">
+      <Summary>Add to a time</Summary>
+      <Description>Add to a time. SQL date and time function. Adds a time interval to a time or date (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SUBTIME" signature="SUBTIME(time, interval)">
+      <Summary>Subtract from a time</Summary>
+      <Description>Subtract from a time. SQL date and time function. Subtracts a time interval from a time or date (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PERIOD_ADD" signature="PERIOD_ADD(period, months)">
+      <Summary>Add months to a period</Summary>
+      <Description>Add months to a period. SQL date and time function. Adds months to a year-month period (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PERIOD_DIFF" signature="PERIOD_DIFF(period1, period2)">
+      <Summary>Difference between periods</Summary>
+      <Description>Difference between periods. SQL date and time function. Returns the number of months between two year-month periods (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATE_BIN" signature="DATE_BIN(interval, timestamp, origin)">
+      <Summary>Bin a timestamp</Summary>
+      <Description>Bin a timestamp. SQL date and time function. Truncates a timestamp to the start of the given interval (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATEFROMPARTS" signature="DATEFROMPARTS(year, month, day)">
+      <Summary>Build a date</Summary>
+      <Description>Build a date. SQL date and time function. Constructs a date from its parts (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TIMEFROMPARTS" signature="TIMEFROMPARTS(hour, minute, second, fractions, precision)">
+      <Summary>Build a time</Summary>
+      <Description>Build a time. SQL date and time function. Constructs a time from its parts (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATETIMEFROMPARTS" signature="DATETIMEFROMPARTS(year, month, day, hour, minute, second, milliseconds)">
+      <Summary>Build a datetime</Summary>
+      <Description>Build a datetime. SQL date and time function. Constructs a datetime from its parts (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATETIME2FROMPARTS" signature="DATETIME2FROMPARTS(year, month, day, hour, minute, second, fractions, precision)">
+      <Summary>Build a datetime2</Summary>
+      <Description>Build a datetime2. SQL date and time function. Constructs a datetime2 value from its parts (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATETIMEOFFSETFROMPARTS" signature="DATETIMEOFFSETFROMPARTS(year, month, day, hour, minute, second, fractions, hour_offset, minute_offset, precision)">
+      <Summary>Build a datetimeoffset</Summary>
+      <Description>Build a datetimeoffset. SQL date and time function. Constructs a datetimeoffset value from its parts (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SMALLDATETIMEFROMPARTS" signature="SMALLDATETIMEFROMPARTS(year, month, day, hour, minute)">
+      <Summary>Build a smalldatetime</Summary>
+      <Description>Build a smalldatetime. SQL date and time function. Constructs a smalldatetime value from its parts (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATENAME" signature="DATENAME(unit, date)">
+      <Summary>Name of a date part</Summary>
+      <Description>Name of a date part. SQL date and time function. Returns the name of the given date part (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATEPART" signature="DATEPART(unit, date)">
+      <Summary>Date part</Summary>
+      <Description>Date part. SQL date and time function. Returns the given part of a date as an integer (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATEADD" signature="DATEADD(unit, count, date)">
+      <Summary>Add to a date</Summary>
+      <Description>Add to a date. SQL date and time function. Adds an interval to a date (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATEDIFF_BIG" signature="DATEDIFF_BIG(unit, start, end)">
+      <Summary>Difference in units</Summary>
+      <Description>Difference in units. SQL date and time function. Returns the difference between two dates as a big integer (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="EOMONTH" signature="EOMONTH(date, months)">
+      <Summary>End of the month</Summary>
+      <Description>End of the month. SQL date and time function. Returns the last day of the month with an optional offset (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GETDATE" signature="GETDATE()">
+      <Summary>Current date and time</Summary>
+      <Description>Current date and time. SQL date and time function. Returns the current date and time of the server (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GETUTCDATE" signature="GETUTCDATE()">
+      <Summary>Current UTC date and time</Summary>
+      <Description>Current UTC date and time. SQL date and time function. Returns the current UTC date and time (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SYSDATETIME" signature="SYSDATETIME()">
+      <Summary>Current date and time</Summary>
+      <Description>Current date and time. SQL date and time function. Returns the current date and time with high precision (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SYSUTCDATETIME" signature="SYSUTCDATETIME()">
+      <Summary>Current UTC date and time</Summary>
+      <Description>Current UTC date and time. SQL date and time function. Returns the current UTC date and time with high precision (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SYSDATETIMEOFFSET" signature="SYSDATETIMEOFFSET()">
+      <Summary>Current date and time with offset</Summary>
+      <Description>Current date and time with offset. SQL date and time function. Returns the current date and time with the time zone offset (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CURRENT_TIMEZONE" signature="CURRENT_TIMEZONE()">
+      <Summary>Current time zone</Summary>
+      <Description>Current time zone. SQL date and time function. Returns the name of the current time zone (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SWITCHOFFSET" signature="SWITCHOFFSET(date, timezone)">
+      <Summary>Change the time zone offset</Summary>
+      <Description>Change the time zone offset. SQL date and time function. Returns a datetimeoffset value with a different offset (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TODATETIMEOFFSET" signature="TODATETIMEOFFSET(date, timezone)">
+      <Summary>Add a time zone offset</Summary>
+      <Description>Add a time zone offset. SQL date and time function. Converts a date to a datetimeoffset with the given offset (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ISFINITE" signature="ISFINITE(date)">
+      <Summary>Finite date test</Summary>
+      <Description>Finite date test. SQL date and time function. Checks whether a date, timestamp or interval is finite (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TIMEZONE" signature="TIMEZONE(zone, timestamp)">
+      <Summary>Convert a time zone</Summary>
+      <Description>Convert a time zone. SQL date and time function. Converts a timestamp to another time zone (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UTC_DATE" signature="UTC_DATE()">
+      <Summary>Current UTC date</Summary>
+      <Description>Current UTC date. SQL date and time function. Returns the current UTC date (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UTC_TIME" signature="UTC_TIME()">
+      <Summary>Current UTC time</Summary>
+      <Description>Current UTC time. SQL date and time function. Returns the current UTC time (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UTC_TIMESTAMP" signature="UTC_TIMESTAMP()">
+      <Summary>Current UTC date and time</Summary>
+      <Description>Current UTC date and time. SQL date and time function. Returns the current UTC date and time (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CONVERT_TZ" signature="CONVERT_TZ(date, from_zone, to_zone)">
+      <Summary>Convert a time zone</Summary>
+      <Description>Convert a time zone. SQL date and time function. Converts a date and time between time zones (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TIMESTAMPADD" signature="TIMESTAMPADD(unit, count, date)">
+      <Summary>Add to a timestamp</Summary>
+      <Description>Add to a timestamp. SQL date and time function. Adds an interval to a timestamp (ODBC, MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CHOOSE" signature="CHOOSE(index, value, ...)">
+      <Summary>Value at an index</Summary>
+      <Description>Value at an index. SQL conditional function. Returns the argument at the given one-based position (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NANVL" signature="NANVL(value, replacement)">
+      <Summary>Replace NaN</Summary>
+      <Description>Replace NaN. SQL conditional function. Returns the replacement when the value is not a number (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LNNVL" signature="LNNVL(condition)">
+      <Summary>Null-aware condition</Summary>
+      <Description>Null-aware condition. SQL conditional function. Returns true when the condition is false or unknown (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ZEROIFNULL" signature="ZEROIFNULL(value)">
+      <Summary>Zero for null</Summary>
+      <Description>Zero for null. SQL conditional function. Returns zero when the value is null (Teradata).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NULLIFZERO" signature="NULLIFZERO(value)">
+      <Summary>Null for zero</Summary>
+      <Description>Null for zero. SQL conditional function. Returns null when the value is zero (Teradata).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TRY_CAST" signature="TRY_CAST(value AS type)">
+      <Summary>Try to convert a value</Summary>
+      <Description>Try to convert a value. SQL type conversion function. Converts a value to a type and returns null on failure.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TRY_CONVERT" signature="TRY_CONVERT(type, value)">
+      <Summary>Try to convert a value</Summary>
+      <Description>Try to convert a value. SQL type conversion function. Converts a value to a type and returns null on failure (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CONVERT" signature="CONVERT(type, value, style)">
+      <Summary>Convert a value</Summary>
+      <Description>Convert a value. SQL type conversion function. Converts a value to another type with an optional style (SQL Server, MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PARSE" signature="PARSE(text AS type)">
+      <Summary>Parse a value</Summary>
+      <Description>Parse a value. SQL type conversion function. Parses a string into the given type (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TRY_PARSE" signature="TRY_PARSE(text AS type)">
+      <Summary>Try to parse a value</Summary>
+      <Description>Try to parse a value. SQL type conversion function. Parses a string into the given type and returns null on failure (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_NUMBER" signature="TO_NUMBER(text, format)">
+      <Summary>Convert to a number</Summary>
+      <Description>Convert to a number. SQL type conversion function. Converts a string to a number with an optional format (Oracle, PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_BINARY_FLOAT" signature="TO_BINARY_FLOAT(value)">
+      <Summary>Convert to binary float</Summary>
+      <Description>Convert to binary float. SQL type conversion function. Converts a value to a binary floating-point number (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_BINARY_DOUBLE" signature="TO_BINARY_DOUBLE(value)">
+      <Summary>Convert to binary double</Summary>
+      <Description>Convert to binary double. SQL type conversion function. Converts a value to a binary double-precision number (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_CLOB" signature="TO_CLOB(value)">
+      <Summary>Convert to a character large object</Summary>
+      <Description>Convert to a character large object. SQL type conversion function. Converts a value to a character large object (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_NCLOB" signature="TO_NCLOB(value)">
+      <Summary>Convert to a national character large object</Summary>
+      <Description>Convert to a national character large object. SQL type conversion function. Converts a value to a national character large object (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_BLOB" signature="TO_BLOB(value)">
+      <Summary>Convert to a binary large object</Summary>
+      <Description>Convert to a binary large object. SQL type conversion function. Converts a value to a binary large object (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_JSON" signature="TO_JSON(value)">
+      <Summary>Convert to JSON</Summary>
+      <Description>Convert to JSON. SQL type conversion function. Converts a value to a JSON value (PostgreSQL, MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_JSONB" signature="TO_JSONB(value)">
+      <Summary>Convert to JSONB</Summary>
+      <Description>Convert to JSONB. SQL type conversion function. Converts a value to a binary JSON value (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_XML" signature="TO_XML(value)">
+      <Summary>Convert to XML</Summary>
+      <Description>Convert to XML. SQL type conversion function. Converts a value to an XML value (Oracle, Db2).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SAFE_CAST" signature="SAFE_CAST(value AS type)">
+      <Summary>Safe conversion</Summary>
+      <Description>Safe conversion. SQL type conversion function. Converts a value to a type and returns null on failure (BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_HEX" signature="TO_HEX(value)">
+      <Summary>Convert to hexadecimal</Summary>
+      <Description>Convert to hexadecimal. SQL type conversion function. Returns the hexadecimal representation of a value (PostgreSQL, BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FROM_HEX" signature="FROM_HEX(text)">
+      <Summary>Convert from hexadecimal</Summary>
+      <Description>Convert from hexadecimal. SQL type conversion function. Decodes a hexadecimal string into binary data (PostgreSQL, BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TO_BASE64" signature="TO_BASE64(value)">
+      <Summary>Encode as base64</Summary>
+      <Description>Encode as base64. SQL type conversion function. Returns the base64 representation of a value (MySQL, BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FROM_BASE64" signature="FROM_BASE64(text)">
+      <Summary>Decode from base64</Summary>
+      <Description>Decode from base64. SQL type conversion function. Decodes a base64 string into binary data (MySQL, BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BASE64_ENCODE" signature="BASE64_ENCODE(value)">
+      <Summary>Encode as base64</Summary>
+      <Description>Encode as base64. SQL type conversion function. Returns the base64 representation of a value (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BASE64_DECODE" signature="BASE64_DECODE(text)">
+      <Summary>Decode from base64</Summary>
+      <Description>Decode from base64. SQL type conversion function. Decodes a base64 string into binary data (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_LENGTH" signature="ARRAY_LENGTH(array, dimension)">
+      <Summary>Array length</Summary>
+      <Description>Array length. SQL array function. Returns the length of an array dimension (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_UPPER" signature="ARRAY_UPPER(array, dimension)">
+      <Summary>Upper array bound</Summary>
+      <Description>Upper array bound. SQL array function. Returns the upper bound of an array dimension (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_LOWER" signature="ARRAY_LOWER(array, dimension)">
+      <Summary>Lower array bound</Summary>
+      <Description>Lower array bound. SQL array function. Returns the lower bound of an array dimension (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_APPEND" signature="ARRAY_APPEND(array, element)">
+      <Summary>Append an element</Summary>
+      <Description>Append an element. SQL array function. Returns the array with an element appended (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_PREPEND" signature="ARRAY_PREPEND(element, array)">
+      <Summary>Prepend an element</Summary>
+      <Description>Prepend an element. SQL array function. Returns the array with an element prepended (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_CAT" signature="ARRAY_CAT(array1, array2)">
+      <Summary>Concatenate arrays</Summary>
+      <Description>Concatenate arrays. SQL array function. Returns the concatenation of two arrays (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_REMOVE" signature="ARRAY_REMOVE(array, element)">
+      <Summary>Remove array elements</Summary>
+      <Description>Remove array elements. SQL array function. Returns the array without the given element (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_REPLACE" signature="ARRAY_REPLACE(array, from, to)">
+      <Summary>Replace array elements</Summary>
+      <Description>Replace array elements. SQL array function. Returns the array with matching elements replaced (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_POSITION" signature="ARRAY_POSITION(array, element)">
+      <Summary>Position in an array</Summary>
+      <Description>Position in an array. SQL array function. Returns the position of the first matching element (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_POSITIONS" signature="ARRAY_POSITIONS(array, element)">
+      <Summary>All positions in an array</Summary>
+      <Description>All positions in an array. SQL array function. Returns the positions of all matching elements (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_DIMS" signature="ARRAY_DIMS(array)">
+      <Summary>Array dimensions</Summary>
+      <Description>Array dimensions. SQL array function. Returns the dimensions of an array as text (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_NDIMS" signature="ARRAY_NDIMS(array)">
+      <Summary>Number of array dimensions</Summary>
+      <Description>Number of array dimensions. SQL array function. Returns the number of dimensions of an array (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_TO_STRING" signature="ARRAY_TO_STRING(array, delimiter)">
+      <Summary>Array to string</Summary>
+      <Description>Array to string. SQL array function. Concatenates the array elements with a delimiter (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="STRING_TO_ARRAY" signature="STRING_TO_ARRAY(text, delimiter)">
+      <Summary>String to array</Summary>
+      <Description>String to array. SQL array function. Splits a string on a delimiter into an array (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_TO_JSON" signature="ARRAY_TO_JSON(array)">
+      <Summary>Array to JSON</Summary>
+      <Description>Array to JSON. SQL array function. Converts an array to a JSON array (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_FILL" signature="ARRAY_FILL(value, dimensions)">
+      <Summary>Fill an array</Summary>
+      <Description>Fill an array. SQL array function. Returns an array filled with the value (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CARDINALITY" signature="CARDINALITY(array)">
+      <Summary>Number of elements</Summary>
+      <Description>Number of elements. SQL array function. Returns the total number of elements in an array (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UNNEST" signature="UNNEST(array)">
+      <Summary>Expand an array</Summary>
+      <Description>Expand an array. SQL array function. Expands an array into a set of rows (PostgreSQL, BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GENERATE_SERIES" signature="GENERATE_SERIES(start, stop, step)">
+      <Summary>Generate a series</Summary>
+      <Description>Generate a series. SQL array function. Generates a series of values from start to stop (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GENERATE_SUBSCRIPTS" signature="GENERATE_SUBSCRIPTS(array, dimension)">
+      <Summary>Generate array subscripts</Summary>
+      <Description>Generate array subscripts. SQL array function. Generates the valid subscripts of an array dimension (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY_CONTAINS" signature="ARRAY_CONTAINS(array, element)">
+      <Summary>Array contains an element</Summary>
+      <Description>Array contains an element. SQL array function. Checks whether an array contains the element (Snowflake, Spark).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FLATTEN" signature="FLATTEN(array)">
+      <Summary>Flatten an array</Summary>
+      <Description>Flatten an array. SQL array function. Expands a nested array into rows (Snowflake).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="RANGE_MERGE" signature="RANGE_MERGE(range1, range2)">
+      <Summary>Merge ranges</Summary>
+      <Description>Merge ranges. SQL range function. Returns the smallest range that contains both ranges (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ISEMPTY" signature="ISEMPTY(range)">
+      <Summary>Empty range test</Summary>
+      <Description>Empty range test. SQL range function. Checks whether a range has no elements (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LOWER_INC" signature="LOWER_INC(range)">
+      <Summary>Lower bound is inclusive</Summary>
+      <Description>Lower bound is inclusive. SQL range function. Checks whether the lower bound of a range is inclusive (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UPPER_INC" signature="UPPER_INC(range)">
+      <Summary>Upper bound is inclusive</Summary>
+      <Description>Upper bound is inclusive. SQL range function. Checks whether the upper bound of a range is inclusive (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LOWER_INF" signature="LOWER_INF(range)">
+      <Summary>Lower bound is infinite</Summary>
+      <Description>Lower bound is infinite. SQL range function. Checks whether the lower bound of a range is infinite (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UPPER_INF" signature="UPPER_INF(range)">
+      <Summary>Upper bound is infinite</Summary>
+      <Description>Upper bound is infinite. SQL range function. Checks whether the upper bound of a range is infinite (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_EXISTS" signature="JSON_EXISTS(json, path)">
+      <Summary>JSON path exists</Summary>
+      <Description>JSON path exists. SQL JSON function. Checks whether a JSON path returns a value.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_SERIALIZE" signature="JSON_SERIALIZE(json)">
+      <Summary>Serialize JSON</Summary>
+      <Description>Serialize JSON. SQL JSON function. Returns the text representation of a JSON value.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_TABLE" signature="JSON_TABLE(json, path COLUMNS (column type PATH path))">
+      <Summary>JSON as a table</Summary>
+      <Description>JSON as a table. SQL JSON function. Expands a JSON document into relational rows and columns.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_SCALAR" signature="JSON_SCALAR(value)">
+      <Summary>JSON scalar</Summary>
+      <Description>JSON scalar. SQL JSON function. Converts a SQL scalar value to a JSON scalar.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_ARRAY_LENGTH" signature="JSON_ARRAY_LENGTH(json, path)">
+      <Summary>JSON array length</Summary>
+      <Description>JSON array length. SQL JSON function. Returns the number of elements in a JSON array (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_ARRAY_APPEND" signature="JSON_ARRAY_APPEND(json, path, value)">
+      <Summary>Append to a JSON array</Summary>
+      <Description>Append to a JSON array. SQL JSON function. Appends a value to a JSON array (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_ARRAY_INSERT" signature="JSON_ARRAY_INSERT(json, path, value)">
+      <Summary>Insert into a JSON array</Summary>
+      <Description>Insert into a JSON array. SQL JSON function. Inserts a value into a JSON array (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_INSERT" signature="JSON_INSERT(json, path, value)">
+      <Summary>Insert into JSON</Summary>
+      <Description>Insert into JSON. SQL JSON function. Inserts a value at a JSON path when the path does not exist (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_REPLACE" signature="JSON_REPLACE(json, path, value)">
+      <Summary>Replace in JSON</Summary>
+      <Description>Replace in JSON. SQL JSON function. Replaces a value at an existing JSON path (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_SEARCH" signature="JSON_SEARCH(json, one_or_all, search)">
+      <Summary>Search JSON strings</Summary>
+      <Description>Search JSON strings. SQL JSON function. Returns the paths of strings matching the search pattern (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_DEPTH" signature="JSON_DEPTH(json)">
+      <Summary>JSON depth</Summary>
+      <Description>JSON depth. SQL JSON function. Returns the maximum depth of a JSON document (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_STORAGE_SIZE" signature="JSON_STORAGE_SIZE(json)">
+      <Summary>JSON storage size</Summary>
+      <Description>JSON storage size. SQL JSON function. Returns the number of bytes used to store a JSON document (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_STORAGE_FREE" signature="JSON_STORAGE_FREE(json)">
+      <Summary>Freed JSON storage</Summary>
+      <Description>Freed JSON storage. SQL JSON function. Returns the number of bytes freed in a JSON document (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_OVERLAPS" signature="JSON_OVERLAPS(json1, json2)">
+      <Summary>JSON overlap test</Summary>
+      <Description>JSON overlap test. SQL JSON function. Checks whether two JSON documents have common values (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_SCHEMA_VALID" signature="JSON_SCHEMA_VALID(schema, json)">
+      <Summary>Validate against a schema</Summary>
+      <Description>Validate against a schema. SQL JSON function. Checks whether a JSON document matches a JSON schema (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_SCHEMA_VALIDATION_REPORT" signature="JSON_SCHEMA_VALIDATION_REPORT(schema, json)">
+      <Summary>Schema validation report</Summary>
+      <Description>Schema validation report. SQL JSON function. Returns a detailed report of JSON schema validation (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_MERGE_PRESERVE" signature="JSON_MERGE_PRESERVE(json1, json2)">
+      <Summary>Merge JSON documents</Summary>
+      <Description>Merge JSON documents. SQL JSON function. Merges two JSON documents while preserving duplicate keys (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_EXTRACT_PATH" signature="JSON_EXTRACT_PATH(json, path, ...)">
+      <Summary>Extract a JSON path</Summary>
+      <Description>Extract a JSON path. SQL JSON function. Returns the value at a JSON path (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_EXTRACT_PATH_TEXT" signature="JSON_EXTRACT_PATH_TEXT(json, path, ...)">
+      <Summary>Extract a JSON path as text</Summary>
+      <Description>Extract a JSON path as text. SQL JSON function. Returns the value at a JSON path as text (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_EXTRACT_PATH" signature="JSONB_EXTRACT_PATH(jsonb, path, ...)">
+      <Summary>Extract a JSONB path</Summary>
+      <Description>Extract a JSONB path. SQL JSON function. Returns the value at a JSONB path (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_EXTRACT_PATH_TEXT" signature="JSONB_EXTRACT_PATH_TEXT(jsonb, path, ...)">
+      <Summary>Extract a JSONB path as text</Summary>
+      <Description>Extract a JSONB path as text. SQL JSON function. Returns the value at a JSONB path as text (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_PATH_EXISTS" signature="JSONB_PATH_EXISTS(jsonb, path)">
+      <Summary>JSONB path exists</Summary>
+      <Description>JSONB path exists. SQL JSON function. Checks whether a JSONB path returns a value (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_PATH_MATCH" signature="JSONB_PATH_MATCH(jsonb, path)">
+      <Summary>JSONB path predicate</Summary>
+      <Description>JSONB path predicate. SQL JSON function. Checks whether a JSONB path predicate matches (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_PATH_QUERY" signature="JSONB_PATH_QUERY(jsonb, path)">
+      <Summary>Query a JSONB path</Summary>
+      <Description>Query a JSONB path. SQL JSON function. Returns all values matched by a JSONB path (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_PATH_QUERY_ARRAY" signature="JSONB_PATH_QUERY_ARRAY(jsonb, path)">
+      <Summary>Query a JSONB path into an array</Summary>
+      <Description>Query a JSONB path into an array. SQL JSON function. Returns all values matched by a JSONB path as an array (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_PATH_QUERY_FIRST" signature="JSONB_PATH_QUERY_FIRST(jsonb, path)">
+      <Summary>First JSONB path value</Summary>
+      <Description>First JSONB path value. SQL JSON function. Returns the first value matched by a JSONB path (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_SET" signature="JSONB_SET(jsonb, path, value)">
+      <Summary>Set a JSONB value</Summary>
+      <Description>Set a JSONB value. SQL JSON function. Replaces or inserts a value at a JSONB path (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_INSERT" signature="JSONB_INSERT(jsonb, path, value)">
+      <Summary>Insert a JSONB value</Summary>
+      <Description>Insert a JSONB value. SQL JSON function. Inserts a value at a JSONB path (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_PRETTY" signature="JSONB_PRETTY(jsonb)">
+      <Summary>Format JSONB</Summary>
+      <Description>Format JSONB. SQL JSON function. Returns an indented text representation of a JSONB value (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_STRIP_NULLS" signature="JSONB_STRIP_NULLS(jsonb)">
+      <Summary>Remove JSONB nulls</Summary>
+      <Description>Remove JSONB nulls. SQL JSON function. Removes null-valued object fields from a JSONB value (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_TYPEOF" signature="JSONB_TYPEOF(jsonb)">
+      <Summary>JSONB type</Summary>
+      <Description>JSONB type. SQL JSON function. Returns the type of a JSONB value (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_TYPEOF" signature="JSON_TYPEOF(json)">
+      <Summary>JSON type</Summary>
+      <Description>JSON type. SQL JSON function. Returns the type of a JSON value (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_BUILD_OBJECT" signature="JSON_BUILD_OBJECT(key, value, ...)">
+      <Summary>Build a JSON object</Summary>
+      <Description>Build a JSON object. SQL JSON function. Builds a JSON object from key and value pairs (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_BUILD_ARRAY" signature="JSON_BUILD_ARRAY(value, ...)">
+      <Summary>Build a JSON array</Summary>
+      <Description>Build a JSON array. SQL JSON function. Builds a JSON array from the arguments (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_BUILD_OBJECT" signature="JSONB_BUILD_OBJECT(key, value, ...)">
+      <Summary>Build a JSONB object</Summary>
+      <Description>Build a JSONB object. SQL JSON function. Builds a JSONB object from key and value pairs (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_BUILD_ARRAY" signature="JSONB_BUILD_ARRAY(value, ...)">
+      <Summary>Build a JSONB array</Summary>
+      <Description>Build a JSONB array. SQL JSON function. Builds a JSONB array from the arguments (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_TO_RECORD" signature="JSONB_TO_RECORD(jsonb)">
+      <Summary>JSONB to record</Summary>
+      <Description>JSONB to record. SQL JSON function. Expands a JSONB object into a record (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_TO_RECORDSET" signature="JSONB_TO_RECORDSET(jsonb)">
+      <Summary>JSONB to record set</Summary>
+      <Description>JSONB to record set. SQL JSON function. Expands a JSONB object into a set of records (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_TO_RECORD" signature="JSON_TO_RECORD(json)">
+      <Summary>JSON to record</Summary>
+      <Description>JSON to record. SQL JSON function. Expands a JSON object into a record (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_TO_RECORDSET" signature="JSON_TO_RECORDSET(json)">
+      <Summary>JSON to record set</Summary>
+      <Description>JSON to record set. SQL JSON function. Expands a JSON object into a set of records (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_EACH" signature="JSON_EACH(json)">
+      <Summary>JSON key and value rows</Summary>
+      <Description>JSON key and value rows. SQL JSON function. Expands the top-level members of a JSON object into rows (SQLite).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_TREE" signature="JSON_TREE(json)">
+      <Summary>JSON tree rows</Summary>
+      <Description>JSON tree rows. SQL JSON function. Expands a JSON document into a tree of rows (SQLite).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_EACH" signature="JSONB_EACH(jsonb)">
+      <Summary>JSONB key and value rows</Summary>
+      <Description>JSONB key and value rows. SQL JSON function. Expands the top-level members of a JSONB object into rows (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_EACH_TEXT" signature="JSONB_EACH_TEXT(jsonb)">
+      <Summary>JSONB key and text value rows</Summary>
+      <Description>JSONB key and text value rows. SQL JSON function. Expands the top-level members of a JSONB object into text rows (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_OBJECT_KEYS" signature="JSONB_OBJECT_KEYS(jsonb)">
+      <Summary>JSONB object keys</Summary>
+      <Description>JSONB object keys. SQL JSON function. Returns the keys of a JSONB object as text (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_ARRAY_ELEMENTS" signature="JSONB_ARRAY_ELEMENTS(jsonb)">
+      <Summary>JSONB array elements</Summary>
+      <Description>JSONB array elements. SQL JSON function. Expands a JSONB array into a set of JSONB values (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_ARRAY_ELEMENTS_TEXT" signature="JSONB_ARRAY_ELEMENTS_TEXT(jsonb)">
+      <Summary>JSONB array elements as text</Summary>
+      <Description>JSONB array elements as text. SQL JSON function. Expands a JSONB array into a set of text values (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONB_ARRAY_LENGTH" signature="JSONB_ARRAY_LENGTH(jsonb)">
+      <Summary>JSONB array length</Summary>
+      <Description>JSONB array length. SQL JSON function. Returns the number of elements in a JSONB array (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_CONTAINS_PATH" signature="JSON_CONTAINS_PATH(json, one_or_all, path)">
+      <Summary>JSON path exists</Summary>
+      <Description>JSON path exists. SQL JSON function. Checks whether a JSON document contains the given path (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_EXTRACT_SCALAR" signature="JSON_EXTRACT_SCALAR(json, path)">
+      <Summary>Extract a JSON scalar</Summary>
+      <Description>Extract a JSON scalar. SQL JSON function. Returns the scalar value at a JSON path (BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_QUERY_ARRAY" signature="JSON_QUERY_ARRAY(json, path)">
+      <Summary>Extract a JSON array</Summary>
+      <Description>Extract a JSON array. SQL JSON function. Returns the JSON array at a path (BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSON_VALUE_ARRAY" signature="JSON_VALUE_ARRAY(json, path)">
+      <Summary>Extract JSON scalar array</Summary>
+      <Description>Extract JSON scalar array. SQL JSON function. Returns the array of scalar values at a path (BigQuery).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PARSE_JSON" signature="PARSE_JSON(text)">
+      <Summary>Parse JSON</Summary>
+      <Description>Parse JSON. SQL JSON function. Parses a JSON string into a JSON value (Snowflake).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TRY_PARSE_JSON" signature="TRY_PARSE_JSON(text)">
+      <Summary>Try to parse JSON</Summary>
+      <Description>Try to parse JSON. SQL JSON function. Parses a JSON string and returns null on failure (Snowflake).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="VERSION" signature="VERSION()">
+      <Summary>Server version</Summary>
+      <Description>Server version. SQL system function. Returns the version of the database server.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CURRENT_USER">
+      <Summary>Current user</Summary>
+      <Description>Current user. SQL system function. Returns the name of the current user.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SESSION_USER">
+      <Summary>Session user</Summary>
+      <Description>Session user. SQL system function. Returns the name of the user of the current session.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SYSTEM_USER">
+      <Summary>System user</Summary>
+      <Description>System user. SQL system function. Returns the name of the operating system user.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="USER">
+      <Summary>Current user</Summary>
+      <Description>Current user. SQL system function. Returns the name of the current user.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CURRENT_ROLE">
+      <Summary>Current role</Summary>
+      <Description>Current role. SQL system function. Returns the name of the current role.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CURRENT_SCHEMA">
+      <Summary>Current schema</Summary>
+      <Description>Current schema. SQL system function. Returns the name of the current schema.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CURRENT_CATALOG">
+      <Summary>Current catalog</Summary>
+      <Description>Current catalog. SQL system function. Returns the name of the current catalog.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CURRENT_DATABASE">
+      <Summary>Current database</Summary>
+      <Description>Current database. SQL system function. Returns the name of the current database.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATABASE" signature="DATABASE()">
+      <Summary>Current database</Summary>
+      <Description>Current database. SQL system function. Returns the name of the current database (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SCHEMA" signature="SCHEMA()">
+      <Summary>Current schema</Summary>
+      <Description>Current schema. SQL system function. Returns the name of the current schema (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CURRENT_SETTING" signature="CURRENT_SETTING(name)">
+      <Summary>Current setting</Summary>
+      <Description>Current setting. SQL system function. Returns the current value of a server setting (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SET_CONFIG" signature="SET_CONFIG(name, value, is_local)">
+      <Summary>Change a setting</Summary>
+      <Description>Change a setting. SQL system function. Sets a server setting for the session or transaction (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LAST_INSERT_ID" signature="LAST_INSERT_ID()">
+      <Summary>Last generated identifier</Summary>
+      <Description>Last generated identifier. SQL system function. Returns the last identifier generated for an insert (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LASTVAL" signature="LASTVAL()">
+      <Summary>Last sequence value</Summary>
+      <Description>Last sequence value. SQL system function. Returns the last value obtained from a sequence (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CURRVAL" signature="CURRVAL(sequence)">
+      <Summary>Current sequence value</Summary>
+      <Description>Current sequence value. SQL system function. Returns the current value of a sequence.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NEXTVAL" signature="NEXTVAL(sequence)">
+      <Summary>Next sequence value</Summary>
+      <Description>Next sequence value. SQL system function. Advances a sequence and returns its next value.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SETVAL" signature="SETVAL(sequence, value)">
+      <Summary>Set a sequence value</Summary>
+      <Description>Set a sequence value. SQL system function. Sets the current value of a sequence (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ROW_COUNT" signature="ROW_COUNT()">
+      <Summary>Affected row count</Summary>
+      <Description>Affected row count. SQL system function. Returns the number of rows affected by the last statement (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="FOUND_ROWS" signature="FOUND_ROWS()">
+      <Summary>Matched row count</Summary>
+      <Description>Matched row count. SQL system function. Returns the number of rows the last query would have matched (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CONNECTION_ID" signature="CONNECTION_ID()">
+      <Summary>Connection identifier</Summary>
+      <Description>Connection identifier. SQL system function. Returns the identifier of the current connection (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TYPEOF" signature="TYPEOF(value)">
+      <Summary>Type of a value</Summary>
+      <Description>Type of a value. SQL system function. Returns the type of a value (SQLite).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PG_TYPEOF" signature="PG_TYPEOF(value)">
+      <Summary>PostgreSQL type of a value</Summary>
+      <Description>PostgreSQL type of a value. SQL system function. Returns the PostgreSQL type of a value.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SQLITE_VERSION" signature="SQLITE_VERSION()">
+      <Summary>SQLite version</Summary>
+      <Description>SQLite version. SQL system function. Returns the version of the SQLite library.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PG_BACKEND_PID" signature="PG_BACKEND_PID()">
+      <Summary>Backend process identifier</Summary>
+      <Description>Backend process identifier. SQL system function. Returns the process identifier of the current backend (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TXID_CURRENT" signature="TXID_CURRENT()">
+      <Summary>Current transaction identifier</Summary>
+      <Description>Current transaction identifier. SQL system function. Returns the identifier of the current transaction (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SLEEP" signature="SLEEP(seconds)">
+      <Summary>Pause execution</Summary>
+      <Description>Pause execution. SQL system function. Pauses the current statement for the given number of seconds.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="RANDOM_BYTES" signature="RANDOM_BYTES(count)">
+      <Summary>Random bytes</Summary>
+      <Description>Random bytes. SQL system function. Returns the given number of random bytes.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="USERENV" signature="USERENV(parameter)">
+      <Summary>Session environment</Summary>
+      <Description>Session environment. SQL system function. Returns information about the current session (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SYS_CONTEXT" signature="SYS_CONTEXT(namespace, parameter)">
+      <Summary>Session context</Summary>
+      <Description>Session context. SQL system function. Returns a value from the application context (Oracle, PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MD5" signature="MD5(text)">
+      <Summary>MD5 hash</Summary>
+      <Description>MD5 hash. SQL cryptographic function. Returns the MD5 hash of a string as hexadecimal text.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SHA1" signature="SHA1(text)">
+      <Summary>SHA-1 hash</Summary>
+      <Description>SHA-1 hash. SQL cryptographic function. Returns the SHA-1 hash of a string as hexadecimal text.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SHA2" signature="SHA2(text, bits)">
+      <Summary>SHA-2 hash</Summary>
+      <Description>SHA-2 hash. SQL cryptographic function. Returns the SHA-2 hash of a string with the given bit length (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SHA256" signature="SHA256(text)">
+      <Summary>SHA-256 hash</Summary>
+      <Description>SHA-256 hash. SQL cryptographic function. Returns the SHA-256 hash of a string.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SHA512" signature="SHA512(text)">
+      <Summary>SHA-512 hash</Summary>
+      <Description>SHA-512 hash. SQL cryptographic function. Returns the SHA-512 hash of a string.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DIGEST" signature="DIGEST(text, algorithm)">
+      <Summary>Cryptographic hash</Summary>
+      <Description>Cryptographic hash. SQL cryptographic function. Returns the hash of a string with the given algorithm (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="HMAC" signature="HMAC(text, key, algorithm)">
+      <Summary>Keyed hash</Summary>
+      <Description>Keyed hash. SQL cryptographic function. Returns the HMAC of a string with the given key and algorithm (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CRYPT" signature="CRYPT(password, salt)">
+      <Summary>Password hash</Summary>
+      <Description>Password hash. SQL cryptographic function. Returns the password hash for the given salt (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GEN_SALT" signature="GEN_SALT(algorithm)">
+      <Summary>Password salt</Summary>
+      <Description>Password salt. SQL cryptographic function. Generates a salt for password hashing with the given algorithm (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PGP_SYM_ENCRYPT" signature="PGP_SYM_ENCRYPT(data, key)">
+      <Summary>Symmetric encryption</Summary>
+      <Description>Symmetric encryption. SQL cryptographic function. Encrypts data with a symmetric key (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PGP_SYM_DECRYPT" signature="PGP_SYM_DECRYPT(data, key)">
+      <Summary>Symmetric decryption</Summary>
+      <Description>Symmetric decryption. SQL cryptographic function. Decrypts data with a symmetric key (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UUID_GENERATE_V4" signature="UUID_GENERATE_V4()">
+      <Summary>Random UUID</Summary>
+      <Description>Random UUID. SQL UUID function. Returns a random version 4 UUID (PostgreSQL extension).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GEN_RANDOM_UUID" signature="GEN_RANDOM_UUID()">
+      <Summary>Random UUID</Summary>
+      <Description>Random UUID. SQL UUID function. Returns a random version 4 UUID (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UUID_SHORT" signature="UUID_SHORT()">
+      <Summary>Short UUID</Summary>
+      <Description>Short UUID. SQL UUID function. Returns a 64-bit unique identifier (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UUID_TO_BIN" signature="UUID_TO_BIN(uuid)">
+      <Summary>UUID to binary</Summary>
+      <Description>UUID to binary. SQL UUID function. Converts a UUID to its binary representation (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BIN_TO_UUID" signature="BIN_TO_UUID(binary)">
+      <Summary>Binary to UUID</Summary>
+      <Description>Binary to UUID. SQL UUID function. Converts a binary value to a UUID (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="IS_UUID" signature="IS_UUID(text)">
+      <Summary>UUID test</Summary>
+      <Description>UUID test. SQL UUID function. Checks whether a string is a valid UUID (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MEDIUMINT">
+      <Summary>Medium-sized integer data type</Summary>
+      <Description>Medium-sized integer data type. SQL data type. An integer that is smaller than INT and larger than SMALLINT.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SERIAL">
+      <Summary>Auto-incrementing integer data type</Summary>
+      <Description>Auto-incrementing integer data type. SQL data type. An auto-incrementing 32-bit integer (PostgreSQL, MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BIGSERIAL">
+      <Summary>Auto-incrementing big integer data type</Summary>
+      <Description>Auto-incrementing big integer data type. SQL data type. An auto-incrementing 64-bit integer (PostgreSQL, MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SMALLSERIAL">
+      <Summary>Auto-incrementing small integer data type</Summary>
+      <Description>Auto-incrementing small integer data type. SQL data type. An auto-incrementing 16-bit integer (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MONEY">
+      <Summary>Currency data type</Summary>
+      <Description>Currency data type. SQL data type. A fixed-point currency amount with a locale-specific scale.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SMALLMONEY">
+      <Summary>Small currency data type</Summary>
+      <Description>Small currency data type. SQL data type. A fixed-point currency amount with a smaller range (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BIT">
+      <Summary>Bit-string data type</Summary>
+      <Description>Bit-string data type. SQL data type. A fixed-length string of bits.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="VARBIT">
+      <Summary>Variable-length bit-string data type</Summary>
+      <Description>Variable-length bit-string data type. SQL data type. A variable-length string of bits.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="XML">
+      <Summary>XML data type</Summary>
+      <Description>XML data type. SQL data type. An XML document or fragment.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="XMLTYPE">
+      <Summary>XML data type</Summary>
+      <Description>XML data type. SQL data type. An XML document type with XML-specific operations (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="JSONPATH">
+      <Summary>JSON path data type</Summary>
+      <Description>JSON path data type. SQL data type. A parsed JSON path expression (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ENUM">
+      <Summary>Enumerated type</Summary>
+      <Description>Enumerated type. SQL data type. A type whose values are chosen from a fixed list (MySQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ARRAY">
+      <Summary>Array data type</Summary>
+      <Description>Array data type. SQL data type. A collection of elements of the same type.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ROW">
+      <Summary>Composite row data type</Summary>
+      <Description>Composite row data type. SQL data type. A composite value with named fields.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="INT4RANGE">
+      <Summary>32-bit integer range data type</Summary>
+      <Description>32-bit integer range data type. SQL data type. A range of 32-bit integers (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="INT8RANGE">
+      <Summary>64-bit integer range data type</Summary>
+      <Description>64-bit integer range data type. SQL data type. A range of 64-bit integers (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NUMRANGE">
+      <Summary>Numeric range data type</Summary>
+      <Description>Numeric range data type. SQL data type. A range of numeric values (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TSRANGE">
+      <Summary>Timestamp range data type</Summary>
+      <Description>Timestamp range data type. SQL data type. A range of timestamps without time zone (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TSTZRANGE">
+      <Summary>Timestamp with time zone range data type</Summary>
+      <Description>Timestamp with time zone range data type. SQL data type. A range of timestamps with time zone (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATERANGE">
+      <Summary>Date range data type</Summary>
+      <Description>Date range data type. SQL data type. A range of dates (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="INT4MULTIRANGE">
+      <Summary>32-bit integer multirange data type</Summary>
+      <Description>32-bit integer multirange data type. SQL data type. A set of non-overlapping 32-bit integer ranges (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="INT8MULTIRANGE">
+      <Summary>64-bit integer multirange data type</Summary>
+      <Description>64-bit integer multirange data type. SQL data type. A set of non-overlapping 64-bit integer ranges (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NUMMULTIRANGE">
+      <Summary>Numeric multirange data type</Summary>
+      <Description>Numeric multirange data type. SQL data type. A set of non-overlapping numeric ranges (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TSMULTIRANGE">
+      <Summary>Timestamp multirange data type</Summary>
+      <Description>Timestamp multirange data type. SQL data type. A set of non-overlapping timestamp ranges (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TSTZMULTIRANGE">
+      <Summary>Timestamp with time zone multirange data type</Summary>
+      <Description>Timestamp with time zone multirange data type. SQL data type. A set of non-overlapping timestamp with time zone ranges (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATEMULTIRANGE">
+      <Summary>Date multirange data type</Summary>
+      <Description>Date multirange data type. SQL data type. A set of non-overlapping date ranges (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TIMETZ">
+      <Summary>Time with time zone data type</Summary>
+      <Description>Time with time zone data type. SQL data type. A time of day with a time zone offset.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GEOMETRY">
+      <Summary>Geometric data type</Summary>
+      <Description>Geometric data type. SQL data type. A planar geometric shape (PostGIS, MySQL, SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GEOGRAPHY">
+      <Summary>Geographic data type</Summary>
+      <Description>Geographic data type. SQL data type. A shape on the Earth's surface (PostGIS, SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="POINT">
+      <Summary>Point data type</Summary>
+      <Description>Point data type. SQL data type. A point in two-dimensional space.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LINE">
+      <Summary>Line data type</Summary>
+      <Description>Line data type. SQL data type. An infinite line in two-dimensional space.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LSEG">
+      <Summary>Line segment data type</Summary>
+      <Description>Line segment data type. SQL data type. A finite line segment in two-dimensional space.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BOX">
+      <Summary>Rectangle data type</Summary>
+      <Description>Rectangle data type. SQL data type. An axis-aligned rectangle in two-dimensional space.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PATH">
+      <Summary>Path data type</Summary>
+      <Description>Path data type. SQL data type. A sequence of connected points.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="POLYGON">
+      <Summary>Polygon data type</Summary>
+      <Description>Polygon data type. SQL data type. A closed geometric shape.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CIRCLE">
+      <Summary>Circle data type</Summary>
+      <Description>Circle data type. SQL data type. A circle with a center and a radius.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="GEOMETRYCOLLECTION">
+      <Summary>Geometry collection data type</Summary>
+      <Description>Geometry collection data type. SQL data type. A collection of geometric values.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MULTIPOINT">
+      <Summary>Multipoint data type</Summary>
+      <Description>Multipoint data type. SQL data type. A collection of points.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MULTILINESTRING">
+      <Summary>Multilinestring data type</Summary>
+      <Description>Multilinestring data type. SQL data type. A collection of line strings.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MULTIPOLYGON">
+      <Summary>Multipolygon data type</Summary>
+      <Description>Multipolygon data type. SQL data type. A collection of polygons.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="INET">
+      <Summary>IP address data type</Summary>
+      <Description>IP address data type. SQL data type. An IPv4 or IPv6 host address (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CIDR">
+      <Summary>Network data type</Summary>
+      <Description>Network data type. SQL data type. An IPv4 or IPv6 network (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MACADDR">
+      <Summary>MAC address data type</Summary>
+      <Description>MAC address data type. SQL data type. A six-byte MAC address (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="MACADDR8">
+      <Summary>Eight-byte MAC address data type</Summary>
+      <Description>Eight-byte MAC address data type. SQL data type. An eight-byte MAC address (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TSVECTOR">
+      <Summary>Text search vector data type</Summary>
+      <Description>Text search vector data type. SQL data type. A document prepared for full-text search (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TSQUERY">
+      <Summary>Text search query data type</Summary>
+      <Description>Text search query data type. SQL data type. A full-text search query (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="OID">
+      <Summary>Object identifier data type</Summary>
+      <Description>Object identifier data type. SQL data type. An unsigned object identifier (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGCLASS">
+      <Summary>Relation OID data type</Summary>
+      <Description>Relation OID data type. SQL data type. An object identifier that refers to a table or view (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGTYPE">
+      <Summary>Type OID data type</Summary>
+      <Description>Type OID data type. SQL data type. An object identifier that refers to a data type (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGPROC">
+      <Summary>Function OID data type</Summary>
+      <Description>Function OID data type. SQL data type. An object identifier that refers to a function (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGPROCEDURE">
+      <Summary>Procedure OID data type</Summary>
+      <Description>Procedure OID data type. SQL data type. An object identifier that refers to a procedure (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGOPER">
+      <Summary>Operator OID data type</Summary>
+      <Description>Operator OID data type. SQL data type. An object identifier that refers to an operator (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGOPERATOR">
+      <Summary>Operator OID data type</Summary>
+      <Description>Operator OID data type. SQL data type. An object identifier that refers to an operator with its argument types (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGNAMESPACE">
+      <Summary>Namespace OID data type</Summary>
+      <Description>Namespace OID data type. SQL data type. An object identifier that refers to a schema (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGROLE">
+      <Summary>Role OID data type</Summary>
+      <Description>Role OID data type. SQL data type. An object identifier that refers to a role (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGCONFIG">
+      <Summary>Text search configuration OID data type</Summary>
+      <Description>Text search configuration OID data type. SQL data type. An object identifier that refers to a text search configuration (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="REGDICTIONARY">
+      <Summary>Text search dictionary OID data type</Summary>
+      <Description>Text search dictionary OID data type. SQL data type. An object identifier that refers to a text search dictionary (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="PG_LSN">
+      <Summary>Log sequence number data type</Summary>
+      <Description>Log sequence number data type. SQL data type. A PostgreSQL write-ahead log sequence number.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="TXID_SNAPSHOT">
+      <Summary>Transaction snapshot data type</Summary>
+      <Description>Transaction snapshot data type. SQL data type. A snapshot of transaction identifiers (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SNAPSHOT">
+      <Summary>Snapshot data type</Summary>
+      <Description>Snapshot data type. SQL data type. A snapshot of transaction visibility (PostgreSQL).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="HSTORE">
+      <Summary>Key-value data type</Summary>
+      <Description>Key-value data type. SQL data type. A set of key and value pairs (PostgreSQL extension).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CITEXT">
+      <Summary>Case-insensitive text data type</Summary>
+      <Description>Case-insensitive text data type. SQL data type. A text type compared without regard to case (PostgreSQL extension).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SQL_VARIANT">
+      <Summary>Variant data type</Summary>
+      <Description>Variant data type. SQL data type. A value of several possible SQL Server types.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UNIQUEIDENTIFIER">
+      <Summary>Globally unique identifier data type</Summary>
+      <Description>Globally unique identifier data type. SQL data type. A 16-byte globally unique identifier (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ROWVERSION">
+      <Summary>Row version data type</Summary>
+      <Description>Row version data type. SQL data type. An automatically updated binary row version (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="IMAGE">
+      <Summary>Image data type</Summary>
+      <Description>Image data type. SQL data type. A variable-length binary data type (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NTEXT">
+      <Summary>National text data type</Summary>
+      <Description>National text data type. SQL data type. A variable-length Unicode text type (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="SMALLDATETIME">
+      <Summary>Small datetime data type</Summary>
+      <Description>Small datetime data type. SQL data type. A date and time with minute precision (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATETIME2">
+      <Summary>High-precision datetime data type</Summary>
+      <Description>High-precision datetime data type. SQL data type. A date and time with configurable fractional seconds (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="DATETIMEOFFSET">
+      <Summary>Datetime with offset data type</Summary>
+      <Description>Datetime with offset data type. SQL data type. A date and time with a time zone offset (SQL Server).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NUMBER">
+      <Summary>Numeric data type</Summary>
+      <Description>Numeric data type. SQL data type. A fixed-point or floating-point number (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="VARCHAR2">
+      <Summary>Variable-length string data type</Summary>
+      <Description>Variable-length string data type. SQL data type. A variable-length string with a maximum length (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NVARCHAR2">
+      <Summary>National variable-length string data type</Summary>
+      <Description>National variable-length string data type. SQL data type. A variable-length Unicode string (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="RAW">
+      <Summary>Raw binary data type</Summary>
+      <Description>Raw binary data type. SQL data type. A variable-length binary value (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="LONG">
+      <Summary>Long text data type</Summary>
+      <Description>Long text data type. SQL data type. A variable-length character data type (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CLOB">
+      <Summary>Character large object data type</Summary>
+      <Description>Character large object data type. SQL data type. A large character object.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="NCLOB">
+      <Summary>National character large object data type</Summary>
+      <Description>National character large object data type. SQL data type. A large national character object.</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BFILE">
+      <Summary>Binary file data type</Summary>
+      <Description>Binary file data type. SQL data type. A large binary object stored outside the database (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="ROWID">
+      <Summary>Row identifier data type</Summary>
+      <Description>Row identifier data type. SQL data type. The address of a row in a table (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="UROWID">
+      <Summary>Universal row identifier data type</Summary>
+      <Description>Universal row identifier data type. SQL data type. A row identifier for several table types (Oracle).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="BYTEINT">
+      <Summary>Byte integer data type</Summary>
+      <Description>Byte integer data type. SQL data type. A one-byte integer (Teradata).</Description>
+    </Symbol>
+    <Symbol language="Sql" name="CHARACTER">
+      <Summary>Fixed-length character data type</Summary>
+      <Description>Fixed-length character data type. SQL data type. A fixed-length character string.</Description>
+    </Symbol>
   </Symbols>
 </ApiSymbols>
