@@ -1456,6 +1456,12 @@ public sealed class HexEditorControl : Control
         Invalidate();
     }
 
+    /// <summary>
+    /// The left edge of the part of the window that scrolls horizontally. The offset column to the left of it is fixed:
+    /// the hex and ASCII columns are clipped here, so that scrolled to the right they never run under the offsets.
+    /// </summary>
+    private int ScrollAreaLeft => Math.Max(0, _hexStart - _charWidth);
+
     /// <summary>The left edge of the hex digits of <paramref name="column"/>, before scrolling.</summary>
     private int HexCellX(int column)
     {
@@ -1501,26 +1507,42 @@ public sealed class HexEditorControl : Control
         Dictionary<int, SolidBrush> highlightBrushes = new Dictionary<int, SolidBrush>();
         try
         {
+            int scrollLeft = Math.Min(ScrollAreaLeft, width);
+            int bodyHeight = Math.Max(0, ClientSize.Height - _headerHeight - (_horizontalScrollBar.Visible ? _horizontalScrollBar.Height : 0));
+            // The fixed offset column: it never moves with the horizontal scroll bar.
             TextRenderer.DrawText(graphics, "OFFSET", Font, new Point(Margin, 2), dimBrush.Color, TextFlags);
-            for (int index = 0; index < _bytesPerRow; index++)
+            using (Region headerRegion = graphics.Clip.Clone())
             {
-                int x = HexCellX(index) - _scrollX;
-                if (x + _charWidth * 2 < 0 || x > width)
+                // Everything that scrolls is clipped at the right edge of the offset column.
+                graphics.SetClip(new Rectangle(scrollLeft, 0, Math.Max(0, width - scrollLeft), _headerHeight));
+                try
                 {
-                    continue;
+                    for (int index = 0; index < _bytesPerRow; index++)
+                    {
+                        int x = HexCellX(index) - _scrollX;
+                        if (x + _charWidth * 2 < scrollLeft || x > width)
+                        {
+                            continue;
+                        }
+                        TextRenderer.DrawText(graphics, index.ToString("X2", CultureInfo.InvariantCulture), Font, new Point(x, 2), dimBrush.Color, TextFlags);
+                    }
+                    TextRenderer.DrawText(graphics, "ASCII", Font, new Point(_asciiStart - _scrollX, 2), dimBrush.Color, TextFlags);
                 }
-                TextRenderer.DrawText(graphics, index.ToString("X2", CultureInfo.InvariantCulture), Font, new Point(x, 2), dimBrush.Color, TextFlags);
+                finally
+                {
+                    graphics.SetClip(headerRegion, CombineMode.Replace);
+                }
             }
-            TextRenderer.DrawText(graphics, "ASCII", Font, new Point(_asciiStart - _scrollX, 2), dimBrush.Color, TextFlags);
             graphics.DrawLine(separatorPen, 0, _headerHeight - 2, width, _headerHeight - 2);
 
             int textYOffset = Math.Max(0, (_rowHeight - Font.Height) / 2);
             int selectionStart = HasSelection ? SelectionStart : -1;
             int selectionEnd = HasSelection ? SelectionEnd : -1;
             using Region previousRegion = graphics.Clip.Clone();
-            graphics.SetClip(new Rectangle(0, _headerHeight, width, Math.Max(0, ClientSize.Height - _headerHeight - (_horizontalScrollBar.Visible ? _horizontalScrollBar.Height : 0))));
+            graphics.SetClip(new Rectangle(0, _headerHeight, width, bodyHeight));
             try
             {
+                // First the fixed offset column, then the scrolling hex and ASCII columns on top of the clipped area.
                 for (int row = _firstRow; row < RowCount; row++)
                 {
                     int y = _headerHeight + (row - _firstRow) * _rowHeight;
@@ -1535,6 +1557,29 @@ public sealed class HexEditorControl : Control
                     }
                     string offsetText = offset.ToString("X8", CultureInfo.InvariantCulture);
                     TextRenderer.DrawText(graphics, offsetText, Font, new Point(Margin, y + textYOffset), dimBrush.Color, TextFlags);
+                }
+                if (_document.Length == 0)
+                {
+                    TextRenderer.DrawText(graphics, "The file is empty. Type hexadecimal digits to add bytes.", Font, new Point(Margin, _headerHeight + textYOffset), dimBrush.Color, TextFlags);
+                }
+                if (_scrollX > 0)
+                {
+                    // A thin line shows that the columns to the right of it are scrolled under the fixed offsets.
+                    graphics.DrawLine(separatorPen, scrollLeft - 1, _headerHeight, scrollLeft - 1, _headerHeight + bodyHeight);
+                }
+                graphics.SetClip(new Rectangle(scrollLeft, _headerHeight, Math.Max(0, width - scrollLeft), bodyHeight));
+                for (int row = _firstRow; row < RowCount; row++)
+                {
+                    int y = _headerHeight + (row - _firstRow) * _rowHeight;
+                    if (y >= ClientSize.Height)
+                    {
+                        break;
+                    }
+                    int offset = row * _bytesPerRow;
+                    if (offset >= _document.Length)
+                    {
+                        break;
+                    }
                     HexHighlight lastHighlight = null;
                     for (int index = 0; index < _bytesPerRow; index++)
                     {
@@ -1582,10 +1627,6 @@ public sealed class HexEditorControl : Control
                         TextRenderer.DrawText(graphics, ascii, Font, new Point(asciiX, y + textYOffset), color, TextFlags);
                     }
                 }
-                if (_document.Length == 0)
-                {
-                    TextRenderer.DrawText(graphics, "The file is empty. Type hexadecimal digits to add bytes.", Font, new Point(Margin, _headerHeight + textYOffset), dimBrush.Color, TextFlags);
-                }
                 if (Focused && _caretVisible && _caretOffset == _document.Length)
                 {
                     int row = _caretOffset / _bytesPerRow;
@@ -1627,7 +1668,7 @@ public sealed class HexEditorControl : Control
     /// <summary>The byte under <paramref name="point"/> in the hex or the ASCII column, or -1.</summary>
     private int ByteAtPoint(Point point)
     {
-        if (point.Y < _headerHeight || point.X >= VisibleWidth)
+        if (point.Y < _headerHeight || point.X >= VisibleWidth || point.X < ScrollAreaLeft)
         {
             return -1;
         }
@@ -1660,7 +1701,8 @@ public sealed class HexEditorControl : Control
     private int OffsetFromPoint(Point point, out EditArea area, out int nibble)
     {
         int row = Math.Max(0, (point.Y - _headerHeight) / Math.Max(1, _rowHeight) + _firstRow);
-        int x = point.X + _scrollX;
+        // A point over the fixed offset column is the start of its row, whatever the horizontal scroll position.
+        int x = (point.X < ScrollAreaLeft) ? 0 : point.X + _scrollX;
         area = EditArea.Hex;
         nibble = 0;
         int column;
@@ -1731,9 +1773,10 @@ public sealed class HexEditorControl : Control
         _firstRow = Math.Max(0, Math.Min(_firstRow, Math.Max(0, RowCount - visibleRows)));
         int x = CaretX();
         int width = VisibleWidth;
-        if (x < _scrollX)
+        if (x - _scrollX < ScrollAreaLeft)
         {
-            _scrollX = Math.Max(0, x - Margin);
+            // Put the cell where it is when not scrolled: right next to the offset column.
+            _scrollX = Math.Max(0, x - _hexStart);
         }
         else if (x + 2 * _charWidth > _scrollX + width)
         {
