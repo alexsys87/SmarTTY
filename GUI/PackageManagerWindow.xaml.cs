@@ -121,7 +121,47 @@ public partial class PackageManagerWindow : Window
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ProgressText"));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsIdle"));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CanSelectUpdates"));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CanInstallPackageFile"));
             }
+        }
+
+        /// <summary>
+        /// True when the package manager of the host installs package files and nothing else is going on: the "Install package file..."
+        /// button is enabled then. xbps, Portage, Homebrew and winget install from repositories only, and have no such button.
+        /// </summary>
+        public bool CanInstallPackageFile => IsIdle && _Client is ILocalPackageFileInstaller;
+
+        /// <summary>Whether the button is in the window at all: it is not before the package manager is found, and not for the managers without the function.</summary>
+        public bool HasInstallPackageFile => _Client is ILocalPackageFileInstaller;
+
+        /// <summary>
+        /// Lets the user pick package files on this computer. Returns what to upload and install, or null when nothing was picked or
+        /// a file is not a package of this host (the user is told which, and nothing is uploaded).
+        /// </summary>
+        public LocalPackageInstallRequest PickPackageFiles(Window owner)
+        {
+            if (!(_Client is ILocalPackageFileInstaller installer) || !IsIdle)
+            {
+                return null;
+            }
+            string[] files = LocalFileDialogWindow.OpenFiles(owner, "Choose the package files to install on the server (" + installer.InstallToolName + ")", installer.LocalPackageFileFilter);
+            if (files == null || files.Length == 0)
+            {
+                return null;
+            }
+            string[] wrongType = files.Where((string file) => !installer.IsPackageFile(System.IO.Path.GetFileName(file))).Select(System.IO.Path.GetFileName).ToArray();
+            if (wrongType.Length != 0)
+            {
+                MessageBoxes.Error("The package manager of this server (" + installer.InstallToolName + ") cannot install:\n\n" + string.Join("\n", wrongType.Take(10)) + (wrongType.Length > 10 ? "\n... and " + (wrongType.Length - 10) + " more" : "") + "\n\nNothing was uploaded.");
+                return null;
+            }
+            string[] unsafeNames = files.Where((string file) => !LocalPackageFiles.IsSafeFileName(System.IO.Path.GetFileName(file))).Select(System.IO.Path.GetFileName).ToArray();
+            if (unsafeNames.Length != 0)
+            {
+                MessageBoxes.Error("The file is uploaded under its own name, and these names have characters that a shell on the server would take for something else (a space, a quote, $):\n\n" + string.Join("\n", unsafeNames.Take(10)) + "\n\nRename the files (letters, digits and . _ + - ~ : @ % , = only) and try again. Nothing was uploaded.");
+                return null;
+            }
+            return new LocalPackageInstallRequest(files, installer, new PackageCommitOptions { NoPrompt = Options.NoPrompt }, _IsRoot);
         }
 
         /// <summary>False while the package manager is being detected, queried or refreshed.</summary>
@@ -244,6 +284,11 @@ public partial class PackageManagerWindow : Window
                 }
                 _Session.PackageManagerClient = bestClient;
                 _Client = bestClient;
+                RunOnUIThread(() =>
+                {
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("HasInstallPackageFile"));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CanInstallPackageFile"));
+                });
                 // Windows has no root and no sudo: the commands run as they are. Homebrew refuses to run as root or under sudo
                 // ("Don't run this as root!") and needs neither: its commands run as the SSH user.
                 _IsRoot = bestClient is WingetPackageManagerClient || bestClient is HomebrewPackageManagerClient || PackageIndexUpdater.IsRoot(_Session);
@@ -456,6 +501,9 @@ public partial class PackageManagerWindow : Window
 
     public string CommandLine { get; private set; }
 
+    /// <summary>Set when the user chose package files on this computer (instead of marking packages): the caller uploads and installs them.</summary>
+    public LocalPackageInstallRequest LocalInstall { get; private set; }
+
     public PackageManagerWindow(SessionWrapper session)
     {
         InitializeComponent();
@@ -471,6 +519,18 @@ public partial class PackageManagerWindow : Window
     private void Refresh_Click(object sender, RoutedEventArgs e)
     {
         (this.DataContext as ControllerImpl)?.Refresh();
+    }
+
+    private void InstallPackageFile_Click(object sender, RoutedEventArgs e)
+    {
+        LocalPackageInstallRequest request = (this.DataContext as ControllerImpl)?.PickPackageFiles(this);
+        if (request == null)
+        {
+            return;
+        }
+        // The window closes without a command line: the caller uploads the files, asks, and types the installation in the terminal.
+        LocalInstall = request;
+        this.DialogResult = true;
     }
 
     private void SelectAllUpdates_Click(object sender, RoutedEventArgs e)

@@ -9,7 +9,7 @@ namespace SmarTTY;
 /// <summary>
 /// Package manager client for pkg(8) of FreeBSD (and the systems that use the same tool, such as DragonFly BSD and GhostBSD).
 /// </summary>
-public class PkgPackageManagerClient : ILinuxPackageManagerClient
+public class PkgPackageManagerClient : ILinuxPackageManagerClient, ILocalPackageFileInstaller
 {
     // "pkg query '%n %v'" and "pkg rquery '%n %v'" line: name version.
     private static readonly Regex NameVersionLineRegex = new Regex(
@@ -20,6 +20,25 @@ public class PkgPackageManagerClient : ILinuxPackageManagerClient
     private static readonly Regex OutdatedLineRegex = new Regex(
         @"^(?<pkgver>[^ \t]+)[ \t]+<(?:[ \t]+needs updating \(remote has (?<version>[^)]+)\))?",
         RegexOptions.Compiled);
+
+    public string LocalPackageFileFilter => "FreeBSD packages (*.pkg;*.txz)|*.pkg;*.txz;*.tgz;*.tbz";
+
+    public string InstallToolName => "pkg";
+
+    public bool IsPackageFile(string fileName)
+    {
+        return LocalPackageFiles.HasExtension(fileName, ".pkg", ".txz", ".tgz", ".tbz");
+    }
+
+    public string GetCommandLineForPackageFiles(string[] remotePaths, PackageCommitOptions options)
+    {
+        if (!LocalPackageFiles.HasFiles(remotePaths))
+        {
+            return null;
+        }
+        // "pkg add" installs the files and fetches what they need from the repositories.
+        return "pkg add " + LocalPackageFiles.QuoteAll(remotePaths);
+    }
 
     public int Probe(ISSHCommandRunner runner)
     {

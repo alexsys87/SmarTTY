@@ -10,13 +10,31 @@ namespace SmarTTY;
 /// Package manager client for dnf: Fedora, RHEL 8+ (CentOS Stream, Rocky Linux, AlmaLinux), Amazon Linux 2023.
 /// On these systems "yum" is only a symlink to dnf, which is why the probe score is higher than the yum client's one.
 /// </summary>
-public class DnfPackageManagerClient : ILinuxPackageManagerClient
+public class DnfPackageManagerClient : ILinuxPackageManagerClient, ILocalPackageFileInstaller
 {
     // "dnf list" line: name.arch version repository ("@System" for the installed packages).
     // A package id always carries the architecture suffix, which is also what keeps the header rows from matching.
     private static readonly Regex ListLineRegex = new Regex(
         @"^(?<id>[^ \t]+\.[^ \t]+)[ \t]+(?<version>[^ \t]+)(?:[ \t]+[^ \t]+)?[ \t]*$",
         RegexOptions.Compiled);
+
+    public string LocalPackageFileFilter => "RPM packages (*.rpm)|*.rpm";
+
+    public string InstallToolName => "dnf";
+
+    public bool IsPackageFile(string fileName)
+    {
+        return LocalPackageFiles.HasExtension(fileName, ".rpm");
+    }
+
+    public string GetCommandLineForPackageFiles(string[] remotePaths, PackageCommitOptions options)
+    {
+        if (!LocalPackageFiles.HasFiles(remotePaths))
+        {
+            return null;
+        }
+        return "dnf install " + ((options != null && options.NoPrompt) ? "-y " : "") + LocalPackageFiles.QuoteAll(remotePaths);
+    }
 
     public int Probe(ISSHCommandRunner runner)
     {

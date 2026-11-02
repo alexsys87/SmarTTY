@@ -6,7 +6,7 @@ using VisualTTY;
 
 namespace SmarTTY;
 
-public class YumPackageManagerClient : ILinuxPackageManagerClient
+public class YumPackageManagerClient : ILinuxPackageManagerClient, ILocalPackageFileInstaller
 {
     // "yum list" line: name.arch version repository ("@repository" for the installed packages).
     private static readonly Regex ListLineRegex = new Regex(
@@ -37,6 +37,24 @@ public class YumPackageManagerClient : ILinuxPackageManagerClient
                 return null;
         }
         return "yum " + actionName + " " + optionsFlag + string.Join(" ", packages.Select((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.ID).ToArray());
+    }
+
+    public string LocalPackageFileFilter => "RPM packages (*.rpm)|*.rpm";
+
+    public string InstallToolName => "yum";
+
+    public bool IsPackageFile(string fileName)
+    {
+        return LocalPackageFiles.HasExtension(fileName, ".rpm");
+    }
+
+    public string GetCommandLineForPackageFiles(string[] remotePaths, PackageCommitOptions options)
+    {
+        if (!LocalPackageFiles.HasFiles(remotePaths))
+        {
+            return null;
+        }
+        return "yum install " + ((options != null && options.NoPrompt) ? "-y " : "") + LocalPackageFiles.QuoteAll(remotePaths);
     }
 
     public int Probe(ISSHCommandRunner runner)

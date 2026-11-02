@@ -6,7 +6,7 @@ using VisualTTY;
 
 namespace SmarTTY;
 
-public class AptPackageManagerClient : ILinuxPackageManagerClient
+public class AptPackageManagerClient : ILinuxPackageManagerClient, ILocalPackageFileInstaller
 {
     private const string UpgradableTo = "upgradable to:";
 
@@ -36,6 +36,25 @@ public class AptPackageManagerClient : ILinuxPackageManagerClient
                 return null;
         }
         return "apt-get " + actionName + " " + optionsFlag + string.Join(" ", packages.Select((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.ID).ToArray());
+    }
+
+    public string LocalPackageFileFilter => "Debian packages (*.deb)|*.deb";
+
+    public string InstallToolName => "apt-get";
+
+    public bool IsPackageFile(string fileName)
+    {
+        return LocalPackageFiles.HasExtension(fileName, ".deb");
+    }
+
+    public string GetCommandLineForPackageFiles(string[] remotePaths, PackageCommitOptions options)
+    {
+        if (!LocalPackageFiles.HasFiles(remotePaths))
+        {
+            return null;
+        }
+        // A path with a slash is read as a file; apt-get also installs what the package needs from the repositories.
+        return "apt-get install " + ((options != null && options.NoPrompt) ? "-y " : "") + LocalPackageFiles.QuoteAll(remotePaths);
     }
 
     public int Probe(ISSHCommandRunner runner)

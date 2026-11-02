@@ -8,7 +8,7 @@ namespace SmarTTY;
 /// <summary>
 /// Package manager client for zypper: openSUSE Leap, openSUSE Tumbleweed and SUSE Linux Enterprise.
 /// </summary>
-public class ZypperPackageManagerClient : ILinuxPackageManagerClient
+public class ZypperPackageManagerClient : ILinuxPackageManagerClient, ILocalPackageFileInstaller
 {
     // Both "zypper packages" and "zypper list-updates" print a table with '|' separated cells,
     // e.g. "i | @System | curl | 8.9.1-1.1" and "v | Update | curl | 8.9.1-1.1 | 8.10.1-1.1".
@@ -16,6 +16,25 @@ public class ZypperPackageManagerClient : ILinuxPackageManagerClient
     // "--non-interactive" keeps zypper from waiting forever for an answer (e.g. to trust a new repository key),
     // as there is nobody to answer it on the other end of the command channel.
     private const string QueryPrefix = "LC_ALL=C zypper --non-interactive ";
+
+    public string LocalPackageFileFilter => "RPM packages (*.rpm)|*.rpm";
+
+    public string InstallToolName => "zypper";
+
+    public bool IsPackageFile(string fileName)
+    {
+        return LocalPackageFiles.HasExtension(fileName, ".rpm");
+    }
+
+    public string GetCommandLineForPackageFiles(string[] remotePaths, PackageCommitOptions options)
+    {
+        if (!LocalPackageFiles.HasFiles(remotePaths))
+        {
+            return null;
+        }
+        // zypper asks what to do with a package file that is not signed; "--non-interactive" answers no, so such a file is refused then.
+        return ((options != null && options.NoPrompt) ? "zypper --non-interactive " : "zypper ") + "install " + LocalPackageFiles.QuoteAll(remotePaths);
+    }
 
     public int Probe(ISSHCommandRunner runner)
     {

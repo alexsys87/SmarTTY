@@ -9,7 +9,7 @@ namespace SmarTTY;
 /// <summary>
 /// Package manager client for pacman: Arch Linux, Manjaro, EndeavourOS, Garuda Linux and other Arch-based distributions.
 /// </summary>
-public class PacmanPackageManagerClient : ILinuxPackageManagerClient
+public class PacmanPackageManagerClient : ILinuxPackageManagerClient, ILocalPackageFileInstaller
 {
     // "pacman -Q" line: name version.
     private static readonly Regex InstalledLineRegex = new Regex(
@@ -25,6 +25,25 @@ public class PacmanPackageManagerClient : ILinuxPackageManagerClient
     private static readonly Regex UpgradeLineRegex = new Regex(
         @"^(?<name>[^ \t]+)[ \t]+(?<installed>[^ \t]+)[ \t]+->[ \t]+(?<version>[^ \t]+)[ \t]*$",
         RegexOptions.Compiled);
+
+    public string LocalPackageFileFilter => "Arch packages (*.pkg.tar.*)|*.pkg.tar.zst;*.pkg.tar.xz;*.pkg.tar.gz;*.pkg.tar.bz2;*.pkg.tar";
+
+    public string InstallToolName => "pacman";
+
+    public bool IsPackageFile(string fileName)
+    {
+        return fileName != null && System.Text.RegularExpressions.Regex.IsMatch(fileName, @"\.pkg\.tar(\.[A-Za-z0-9]+)?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    public string GetCommandLineForPackageFiles(string[] remotePaths, PackageCommitOptions options)
+    {
+        if (!LocalPackageFiles.HasFiles(remotePaths))
+        {
+            return null;
+        }
+        // "-U" installs files; it does not move the other packages to the newer version.
+        return "pacman -U " + ((options != null && options.NoPrompt) ? "--noconfirm " : "") + LocalPackageFiles.QuoteAll(remotePaths);
+    }
 
     public int Probe(ISSHCommandRunner runner)
     {

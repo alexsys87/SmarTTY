@@ -1155,7 +1155,14 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             PackageManagerWindow packageManagerWindow = new PackageManagerWindow(activeSession);
             packageManagerWindow.Owner = (Window)this;
             PackageManagerWindow packageManagerWindow2 = packageManagerWindow;
-            if (packageManagerWindow2.ShowDialog() == true && packageManagerWindow2.CommandLine != null && (!(activeSession.ActiveTab.EditorControl is SshTerminalControl sshTerminalControl) || !sshTerminalControl.Submit(packageManagerWindow2.CommandLine)))
+            bool accepted = packageManagerWindow2.ShowDialog() == true;
+            if (accepted && packageManagerWindow2.LocalInstall != null)
+            {
+                // Package files chosen on this computer: uploaded to the server, then installed there.
+                activeSession.UploadAndInstallLocalPackages(packageManagerWindow2.LocalInstall);
+                return;
+            }
+            if (accepted && packageManagerWindow2.CommandLine != null && (!(activeSession.ActiveTab.EditorControl is SshTerminalControl sshTerminalControl) || !sshTerminalControl.Submit(packageManagerWindow2.CommandLine)))
             {
                 activeSession.CreateNewTerminalPage(virtualMode: false, new InitialCommand(packageManagerWindow2.CommandLine, echoInitialCommand: true, tabKeptAfterExit: () => ShowPackageManager(activeSession)));
             }
