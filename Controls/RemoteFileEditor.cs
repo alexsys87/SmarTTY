@@ -369,7 +369,10 @@ public partial class RemoteFileEditor : CodeEditorPP
             try
             {
                 byte[] serverBytes = _rawBytes ?? Array.Empty<byte>();
+                HexDocument previous = document;
                 document = new HexDocument(GetBytesForHexView(text), serverBytes);
+                // The text was edited meanwhile: the coloured blocks of the bytes are kept as far as they still fit.
+                document.CopyHighlightsFrom(previous);
             }
             catch (InvalidOperationException exception)
             {

@@ -34,6 +34,11 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
 
     private readonly Button _syntaxButton;
 
+    // The byte order and the layout of the hex view (shown in the hex view only).
+    private readonly Button _hexViewButton;
+
+    private readonly StatusBarItem _hexViewItem;
+
     public RemoteFileEditorStatusBar(RemoteFileEditor editor, RemoteFileEditorPanel panel)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
@@ -44,12 +49,15 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
         _encodingButton = CreateMenuButton(ShowEncodingMenu);
         _lineEndingButton = CreateMenuButton(ShowLineEndingMenu);
         _syntaxButton = CreateMenuButton(ShowSyntaxMenu);
+        _hexViewButton = CreateMenuButton(ShowHexViewMenu);
+        _hexViewItem = CreateItem(_hexViewButton, Dock.Right);
         _selectionItem = CreateItem(_selection, Dock.Right);
 
         // A DockPanel fills the last item and stacks the others from the right: the first one added is the rightmost.
         Items.Add(CreateItem(_lineEndingButton, Dock.Right));
         Items.Add(CreateItem(_encodingButton, Dock.Right));
         Items.Add(CreateItem(_syntaxButton, Dock.Right));
+        Items.Add(_hexViewItem);
         Items.Add(_selectionItem);
         Items.Add(CreateItem(_position, Dock.Right));
         Items.Add(CreateItem(_state, Dock.Right));
@@ -161,6 +169,17 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
         _syntaxButton.FontStyle = automatic ? FontStyles.Normal : FontStyles.Italic;
         _syntaxButton.IsEnabled = !hex;
 
+        _hexViewItem.Visibility = hex ? Visibility.Visible : Visibility.Collapsed;
+        if (hex)
+        {
+            HexEditorControl hexEditor = _editor.HexEditor;
+            string order = hexEditor.BigEndian ? "Big endian" : "Little endian";
+            _hexViewButton.Content = (hexEditor.GroupSize > 1)
+                ? order + ", " + (hexEditor.GroupSize * 8).ToString(System.Globalization.CultureInfo.InvariantCulture) + "-bit words"
+                : order;
+            _hexViewButton.ToolTip = "Byte order of the numbers in the data inspector and the tool tips, and how the bytes are laid out";
+        }
+
         LineEndingKind lineEndings = _editor.LineEndings;
         _lineEndingButton.Content = LineEndingDetector.GetName(lineEndings);
         bool windowsEndings = lineEndings == LineEndingKind.CrLf || lineEndings == LineEndingKind.Mixed;
@@ -248,6 +267,47 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
             menu.Items.Add(item);
         }
         OpenMenu(button, menu);
+    }
+
+    private void ShowHexViewMenu(Button button)
+    {
+        HexEditorControl hexEditor = _editor.HexEditor;
+        ContextMenu menu = new ContextMenu();
+        menu.Items.Add(CreateHeader("Byte order"));
+        AddHexViewItem(menu, "Little endian (x86, ARM)", !hexEditor.BigEndian, () => hexEditor.BigEndian = false);
+        AddHexViewItem(menu, "Big endian (network order, MIPS, PowerPC)", hexEditor.BigEndian, () => hexEditor.BigEndian = true);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateHeader("Show bytes"));
+        foreach (int size in HexEditorControl.GroupSizeChoices)
+        {
+            int chosen = size;
+            string text = (size == 1) ? "One by one" : "In " + (size * 8).ToString(System.Globalization.CultureInfo.InvariantCulture) + "-bit words";
+            MenuItem item = AddHexViewItem(menu, text, hexEditor.GroupSize == size, () => hexEditor.GroupSize = chosen);
+            item.IsEnabled = size <= hexEditor.BytesPerRow;
+        }
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateHeader("Bytes per row"));
+        foreach (int count in HexEditorControl.BytesPerRowChoices)
+        {
+            int chosen = count;
+            AddHexViewItem(menu, count.ToString(System.Globalization.CultureInfo.InvariantCulture), hexEditor.BytesPerRow == count, () => hexEditor.BytesPerRow = chosen);
+        }
+        menu.Items.Add(new Separator());
+        AddHexViewItem(menu, "Data inspector", hexEditor.ShowDataInspector, () => hexEditor.ShowDataInspector = !hexEditor.ShowDataInspector);
+        AddHexViewItem(menu, "Color bytes by value", hexEditor.ColorByValue, () => hexEditor.ColorByValue = !hexEditor.ColorByValue);
+        OpenMenu(button, menu);
+    }
+
+    private MenuItem AddHexViewItem(ContextMenu menu, string text, bool isChecked, Action action)
+    {
+        MenuItem item = new MenuItem { Header = text, IsChecked = isChecked };
+        item.Click += (sender, e) =>
+        {
+            action();
+            _editor.FocusActiveView();
+        };
+        menu.Items.Add(item);
+        return item;
     }
 
     private void ShowSyntaxMenu(Button button)

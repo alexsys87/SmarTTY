@@ -396,6 +396,17 @@ public class MainWindowController : INotifyPropertyChanged
                 _Controller.Settings.Editor.WordWrap = editor.WordWrap;
                 _Controller.Settings.Save();
             };
+            newTab.EditorPanel.HexViewOptionsChanged += (object sender, EventArgs e) =>
+            {
+                // The next hex view opens with the byte order, the groups and the row width chosen last.
+                HexEditorControl hex = editor.HexEditor;
+                _Controller.Settings.Editor.HexBytesPerRow = hex.BytesPerRow;
+                _Controller.Settings.Editor.HexGroupSize = hex.GroupSize;
+                _Controller.Settings.Editor.HexBigEndian = hex.BigEndian;
+                _Controller.Settings.Editor.HexColorByValue = hex.ColorByValue;
+                _Controller.Settings.Editor.HexHideDataInspector = !hex.ShowDataInspector;
+                _Controller.Settings.Save();
+            };
         }
 
         internal void Search()
@@ -1570,6 +1581,12 @@ public class MainWindowController : INotifyPropertyChanged
         edit.ShowTabs = Settings.Editor.ShowTabs;
         edit.ShowAllCharacters = Settings.Editor.ShowAllCharacters;
         edit.WordWrap = Settings.Editor.WordWrap;
+        edit.HexEditor.LoadViewOptions(
+            Settings.Editor.HexBytesPerRow > 0 ? Settings.Editor.HexBytesPerRow : 16,
+            Settings.Editor.HexGroupSize > 0 ? Settings.Editor.HexGroupSize : 1,
+            Settings.Editor.HexBigEndian,
+            Settings.Editor.HexColorByValue,
+            !Settings.Editor.HexHideDataInspector);
         edit.FontZoom = Settings.Editor.FontZoom > 0f ? Settings.Editor.FontZoom : 1f;
         edit.CompletionEnabled = Settings.Editor.Autocompletion;
         edit.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;

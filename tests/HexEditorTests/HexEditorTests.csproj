@@ -7,5 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../TextEditing/HexDocument.cs" Link="HexDocument.cs" />
+    <Compile Include="../../TextEditing/HexValueFormats.cs" Link="HexValueFormats.cs" />
+    <Compile Include="../../TextEditing/HexChecksums.cs" Link="HexChecksums.cs" />
   </ItemGroup>
 </Project>

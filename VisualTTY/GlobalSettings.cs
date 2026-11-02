@@ -127,6 +127,19 @@ public class GlobalSettings : INotifyPropertyChanged
         // After saving the configuration of a service (sshd, nginx) the editor does not ask to reload it.
         public bool DisableServiceReloadOffer;
 
+        // The hex view: bytes per row (8, 16 or 32; 0 is the default 16), the bytes shown together (1, 2, 4 or 8; 0 is
+        // single bytes), the byte order of the data inspector and the word tool tips, whether the bytes are coloured by
+        // value, and an "off" switch for the data inspector (shown by default).
+        public int HexBytesPerRow;
+
+        public int HexGroupSize;
+
+        public bool HexBigEndian;
+
+        public bool HexColorByValue;
+
+        public bool HexHideDataInspector;
+
         public EditorColors DarkColors;
 
         public EditorColors LightColors;

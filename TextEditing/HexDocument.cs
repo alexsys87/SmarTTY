@@ -6,6 +6,38 @@ using System.Text;
 namespace SmarTTY.TextEditing;
 
 /// <summary>
+/// A block of bytes the user coloured in the hex editor (a header, a checksum, a field of a structure), with an
+/// optional label. The document moves it with the bytes when bytes are inserted or removed before or inside it.
+/// </summary>
+public sealed class HexHighlight
+{
+    internal HexHighlight(int start, int length, int argb, string label)
+    {
+        Start = start;
+        Length = length;
+        Argb = argb;
+        Label = label ?? "";
+    }
+
+    public int Start { get; internal set; }
+
+    public int Length { get; internal set; }
+
+    /// <summary>The offset just after the block.</summary>
+    public int End => Start + Length;
+
+    /// <summary>The colour as 0xAARRGGBB (the document has no UI types).</summary>
+    public int Argb { get; }
+
+    public string Label { get; }
+
+    public bool Contains(int offset)
+    {
+        return offset >= Start && offset < End;
+    }
+}
+
+/// <summary>
 /// The bytes of a file being edited in the hex editor. It keeps the undo and redo history, remembers the version that
 /// was last saved (so that undoing back to it clears the modified mark, as in the text editor) and compares the bytes
 /// with the saved ones to show which of them changed. It has no UI and no file access: the editor control draws it and
@@ -39,11 +71,17 @@ public sealed class HexDocument
 
     private bool _lastModified;
 
+    // The coloured blocks, sorted by their start; they never overlap.
+    private readonly List<HexHighlight> _highlights = new List<HexHighlight>();
+
     /// <summary>The bytes changed (an edit, an undo or a redo).</summary>
     public event EventHandler Changed;
 
     /// <summary>Whether the document differs from the saved version changed.</summary>
     public event EventHandler ModifiedChanged;
+
+    /// <summary>A coloured block was added or removed (an edit that only moves them raises <see cref="Changed"/>).</summary>
+    public event EventHandler HighlightsChanged;
 
     public HexDocument()
         : this(Array.Empty<byte>())
@@ -236,6 +274,7 @@ public sealed class HexDocument
         {
             _bytes.InsertRange(edit.Offset, edit.Inserted);
         }
+        MoveHighlights(edit.Offset, edit.Removed.Length, edit.Inserted.Length);
     }
 
     private void Revert(Edit edit)
@@ -247,6 +286,225 @@ public sealed class HexDocument
         if (edit.Removed.Length > 0)
         {
             _bytes.InsertRange(edit.Offset, edit.Removed);
+        }
+        MoveHighlights(edit.Offset, edit.Inserted.Length, edit.Removed.Length);
+    }
+
+    /// <summary>The coloured blocks, sorted by offset.</summary>
+    public IReadOnlyList<HexHighlight> Highlights => _highlights;
+
+    /// <summary>
+    /// Colours <paramref name="length"/> bytes at <paramref name="start"/> with <paramref name="argb"/>. The block takes
+    /// the place of the parts of other blocks it covers.
+    /// </summary>
+    public HexHighlight AddHighlight(int start, int length, int argb, string label)
+    {
+        if (start < 0 || length <= 0 || start > _bytes.Count - length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length));
+        }
+        CutHighlights(start, start + length);
+        HexHighlight highlight = new HexHighlight(start, length, argb, label);
+        int index = 0;
+        while (index < _highlights.Count && _highlights[index].Start < start)
+        {
+            index++;
+        }
+        _highlights.Insert(index, highlight);
+        HighlightsChanged?.Invoke(this, EventArgs.Empty);
+        return highlight;
+    }
+
+    /// <summary>
+    /// Removes the colour from <paramref name="length"/> bytes at <paramref name="start"/>; with no length, removes the
+    /// whole block at <paramref name="start"/>. False when there was nothing to remove.
+    /// </summary>
+    public bool RemoveHighlights(int start, int length)
+    {
+        bool removed;
+        if (length <= 0)
+        {
+            HexHighlight highlight = GetHighlightAt(start);
+            removed = highlight != null && _highlights.Remove(highlight);
+        }
+        else
+        {
+            removed = CutHighlights(start, start + length);
+        }
+        if (removed)
+        {
+            HighlightsChanged?.Invoke(this, EventArgs.Empty);
+        }
+        return removed;
+    }
+
+    public void ClearHighlights()
+    {
+        if (_highlights.Count == 0)
+        {
+            return;
+        }
+        _highlights.Clear();
+        HighlightsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The block that colours the byte at <paramref name="offset"/>, or null.</summary>
+    public HexHighlight GetHighlightAt(int offset)
+    {
+        int low = 0;
+        int high = _highlights.Count - 1;
+        while (low <= high)
+        {
+            int middle = (low + high) / 2;
+            HexHighlight highlight = _highlights[middle];
+            if (offset < highlight.Start)
+            {
+                high = middle - 1;
+            }
+            else if (offset >= highlight.End)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                return highlight;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The first block that starts after <paramref name="offset"/> (before it when <paramref name="forward"/> is false),
+    /// continuing from the other end of the file; null when there are no blocks.
+    /// </summary>
+    public HexHighlight FindHighlight(int offset, bool forward)
+    {
+        if (_highlights.Count == 0)
+        {
+            return null;
+        }
+        if (forward)
+        {
+            foreach (HexHighlight highlight in _highlights)
+            {
+                if (highlight.Start > offset)
+                {
+                    return highlight;
+                }
+            }
+            return _highlights[0];
+        }
+        for (int index = _highlights.Count - 1; index >= 0; index--)
+        {
+            if (_highlights[index].Start < offset)
+            {
+                return _highlights[index];
+            }
+        }
+        return _highlights[_highlights.Count - 1];
+    }
+
+    /// <summary>Takes over the blocks of <paramref name="other"/> (the same file shown again), cut to this length.</summary>
+    public void CopyHighlightsFrom(HexDocument other)
+    {
+        if (other == null || ReferenceEquals(other, this))
+        {
+            return;
+        }
+        _highlights.Clear();
+        foreach (HexHighlight highlight in other._highlights)
+        {
+            int end = Math.Min(highlight.End, _bytes.Count);
+            if (highlight.Start < end)
+            {
+                _highlights.Add(new HexHighlight(highlight.Start, end - highlight.Start, highlight.Argb, highlight.Label));
+            }
+        }
+        HighlightsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Removes the parts of the blocks between start and end; a block that spans the range is split in two.
+    private bool CutHighlights(int start, int end)
+    {
+        bool changed = false;
+        for (int index = _highlights.Count - 1; index >= 0; index--)
+        {
+            HexHighlight highlight = _highlights[index];
+            if (highlight.End <= start || highlight.Start >= end)
+            {
+                continue;
+            }
+            changed = true;
+            bool keepsHead = highlight.Start < start;
+            bool keepsTail = highlight.End > end;
+            if (keepsHead && keepsTail)
+            {
+                _highlights.Insert(index + 1, new HexHighlight(end, highlight.End - end, highlight.Argb, highlight.Label));
+                highlight.Length = start - highlight.Start;
+            }
+            else if (keepsHead)
+            {
+                highlight.Length = start - highlight.Start;
+            }
+            else if (keepsTail)
+            {
+                highlight.Length = highlight.End - end;
+                highlight.Start = end;
+            }
+            else
+            {
+                _highlights.RemoveAt(index);
+            }
+        }
+        return changed;
+    }
+
+    /// <summary>
+    /// Moves the blocks after <paramref name="removed"/> bytes at <paramref name="offset"/> were replaced by
+    /// <paramref name="inserted"/> ones. Bytes typed over in place keep their colour; bytes inserted at the start of a
+    /// block go before it, inside it make it longer; a block whose bytes were all removed disappears.
+    /// </summary>
+    private void MoveHighlights(int offset, int removed, int inserted)
+    {
+        if (removed == inserted || _highlights.Count == 0)
+        {
+            return;
+        }
+        int removedEnd = offset + removed;
+        int shift = inserted - removed;
+        for (int index = _highlights.Count - 1; index >= 0; index--)
+        {
+            HexHighlight highlight = _highlights[index];
+            int start = highlight.Start;
+            int end = highlight.End;
+            if (start >= removedEnd)
+            {
+                start += shift;
+            }
+            else if (start >= offset)
+            {
+                // The first bytes of the block were removed: it now starts after the new bytes.
+                start = offset + inserted;
+            }
+            if (end <= offset)
+            {
+                // Nothing changes inside the block (bytes added right after it do not join it).
+            }
+            else if (end >= removedEnd)
+            {
+                end += shift;
+            }
+            else
+            {
+                end = offset;
+            }
+            if (end <= start)
+            {
+                _highlights.RemoveAt(index);
+                continue;
+            }
+            highlight.Start = start;
+            highlight.Length = end - start;
         }
     }
 
@@ -426,11 +684,31 @@ public sealed class HexDocument
     /// <summary>Parses an offset typed in the Go to Offset dialog: decimal ("1234") or hexadecimal ("0x4D2").</summary>
     public static bool TryParseOffset(string text, int length, out int offset)
     {
+        return TryParseOffset(text, length, -1, out offset);
+    }
+
+    /// <summary>
+    /// Parses an offset typed in the Go to Offset dialog: decimal ("1234") or hexadecimal ("0x4D2"), or, when
+    /// <paramref name="currentOffset"/> is not negative, a distance from it ("+0x10", "-16").
+    /// </summary>
+    public static bool TryParseOffset(string text, int length, int currentOffset, out int offset)
+    {
         offset = 0;
         text = (text ?? "").Trim();
         if (text.Length == 0)
         {
             return false;
+        }
+        if (currentOffset >= 0 && (text[0] == '+' || text[0] == '-'))
+        {
+            bool backwards = text[0] == '-';
+            if (!TryParseOffset(text.Substring(1), int.MaxValue, -1, out int distance))
+            {
+                return false;
+            }
+            long target = backwards ? (long)currentOffset - distance : (long)currentOffset + distance;
+            offset = (int)Math.Max(0, Math.Min(target, Math.Max(0, length)));
+            return true;
         }
         bool hex = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) || text.StartsWith("$", StringComparison.Ordinal);
         if (hex)
