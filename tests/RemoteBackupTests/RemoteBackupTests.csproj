@@ -9,6 +9,8 @@
     <Compile Include="../../Transport/RemoteBackup.cs" Link="RemoteBackup.cs" />
     <Compile Include="../../Transport/BackupSelection.cs" Link="BackupSelection.cs" />
     <Compile Include="../../Transport/TarArchiveChecker.cs" Link="TarArchiveChecker.cs" />
+    <Compile Include="../../Transport/TarArchiveReader.cs" Link="TarArchiveReader.cs" />
+    <Compile Include="../../Transport/RemoteRestore.cs" Link="RemoteRestore.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
     <Compile Include="../../Utilities/PosixShell.cs" Link="PosixShell.cs" />
   </ItemGroup>

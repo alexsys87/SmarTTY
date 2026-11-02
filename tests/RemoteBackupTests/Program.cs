@@ -13,7 +13,7 @@ using SmarTTY.Transport;
 // itself, which is run by /bin/sh on a temporary tree with GNU tar and, when installed, with BusyBox sh and BusyBox tar (the
 // tools of OpenWrt). The archive comes out of the standard output of tar, as it does through the SSH channel.
 // Run with: dotnet run --project tests/RemoteBackupTests
-internal static class Program
+internal static partial class Program
 {
     private static int _passed;
 
@@ -47,6 +47,7 @@ internal static class Program
             MemberAndCommandTests();
             SelectionTests();
             ArchiveCheckerTests();
+            ReaderTests();
             if (OperatingSystem.IsWindows())
             {
                 Console.WriteLine("SKIP: the shell commands are not run on Windows");
@@ -55,6 +56,7 @@ internal static class Program
             {
                 ListingTests("/bin/sh", null);
                 ArchiveTests("/bin/sh", null);
+                RestoreTests("/bin/sh", null);
                 string busybox = new[] { "/usr/bin/busybox", "/bin/busybox" }.FirstOrDefault(File.Exists);
                 if (busybox == null)
                 {
@@ -65,6 +67,7 @@ internal static class Program
                     string applets = MakeBusyBoxApplets(busybox);
                     ListingTests(busybox + " sh", applets);
                     ArchiveTests(busybox + " sh", applets);
+                    RestoreTests(busybox + " sh", applets);
                 }
                 if (!OperatingSystem.IsWindows())
                 {
@@ -559,7 +562,7 @@ internal static class Program
     {
         string dir = Path.Combine(_work, "applets");
         Directory.CreateDirectory(dir);
-        foreach (string applet in new[] { "tar", "gzip", "du", "id", "cat", "sh" })
+        foreach (string applet in new[] { "tar", "gzip", "du", "id", "cat", "sh", "md5sum", "sha256sum", "mkdir", "dirname", "df", "head", "dd", "rm" })
         {
             File.CreateSymbolicLink(Path.Combine(dir, applet), busybox);
         }

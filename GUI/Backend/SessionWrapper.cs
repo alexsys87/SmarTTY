@@ -177,6 +177,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // has answered. A failed probe leaves the previous answer alone.
     private bool _HasTar;
 
+    // Whether /proc/mtd lists flash partitions, so that "Tools > Flash (MTD) backup and restore" is offered: from the same probe.
+    private bool _HasMtd;
+
     private RemoteOsKind _RemoteOs;
 
     /// <summary>What the SSH server runs on: from its identification string at connect, confirmed by a command when that said nothing.</summary>
@@ -224,7 +227,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// What the Tools menu needs to know about the host of this session: the one input of <see cref="ToolAvailability"/>, which decides
     /// for every item whether it can work here and so whether it is in the menu at all.
     /// </summary>
-    private RemoteHostFacts HostFacts => new RemoteHostFacts(IsDevice, _RemoteOs, _Kernel, _HasPackageManager, _LocalRepoManager != null, _HasTar);
+    private RemoteHostFacts HostFacts => new RemoteHostFacts(IsDevice, _RemoteOs, _Kernel, _HasPackageManager, _LocalRepoManager != null, _HasTar, _HasMtd);
 
     private System.Windows.Visibility ToolVisibility(SessionTool tool)
     {
@@ -239,7 +242,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             nameof(PackageManagerMenuVisibility), nameof(ProcessManagerMenuVisibility), nameof(LocalRepoMenuVisibility),
             nameof(PortForwardingMenuVisibility), nameof(SocksProxyMenuVisibility), nameof(PublicKeyMenuVisibility),
             nameof(RunScriptMenuVisibility), nameof(X11CheckMenuVisibility), nameof(TftpFirmwareMenuVisibility),
-            nameof(BackupMenuVisibility)
+            nameof(BackupMenuVisibility), nameof(MtdFlashMenuVisibility)
         })
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -264,6 +267,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     public System.Windows.Visibility TftpFirmwareMenuVisibility => ToolVisibility(SessionTool.TftpFirmware);
 
     public System.Windows.Visibility BackupMenuVisibility => ToolVisibility(SessionTool.Backup);
+
+    public System.Windows.Visibility MtdFlashMenuVisibility => ToolVisibility(SessionTool.MtdFlash);
 
     public System.Windows.Visibility SshOnlyVisibility => IsDevice ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
@@ -821,6 +826,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             LocalRepoPackageManager? manager = isWindows ? null : OpenWrtDetector.Detect(output);
             RemoteKernelKind kernel = isWindows ? RemoteKernelKind.Unknown : RemoteOsDetector.FromKernelProbe(output);
             bool? hasTar = isWindows ? false : SmarTTY.Transport.RemoteBackup.FromTarProbe(output);
+            bool? hasMtd = isWindows ? false : SmarTTY.Transport.MtdFlash.FromProbe(output);
             _Controller.BeginInvoke(() =>
             {
                 // A reconnect may have replaced the connection while the probe ran: only the current one counts.
@@ -841,6 +847,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 if (hasTar.HasValue)
                 {
                     _HasTar = hasTar.Value;
+                }
+                if (hasMtd.HasValue)
+                {
+                    _HasMtd = hasMtd.Value;
                 }
                 RaiseToolVisibilityChanged();
             });

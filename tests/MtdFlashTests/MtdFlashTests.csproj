@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Transport/MtdFlash.cs" Link="MtdFlash.cs" />
+    <Compile Include="../../Transport/MtdFlashJobs.cs" Link="MtdFlashJobs.cs" />
+    <Compile Include="../../Transport/RemoteBackup.cs" Link="RemoteBackup.cs" />
+    <Compile Include="../../Transport/TarArchiveReader.cs" Link="TarArchiveReader.cs" />
+    <Compile Include="../../Transport/TarArchiveChecker.cs" Link="TarArchiveChecker.cs" />
+    <Compile Include="../../Transport/BackupSelection.cs" Link="BackupSelection.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+    <Compile Include="../../Utilities/PosixShell.cs" Link="PosixShell.cs" />
+  </ItemGroup>
+</Project>
