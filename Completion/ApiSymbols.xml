@@ -20661,5 +20661,2305 @@
       <Summary>Cross compiling</Summary>
       <Description>CMake condition. True when CMake is cross compiling for another system.</Description>
     </Symbol>
+    <Symbol language="Cpp" name="std::same_as">
+      <Summary>Same type</Summary>
+      <Description>C++ concept. Checks that two types are the same.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::derived_from">
+      <Summary>Derived from</Summary>
+      <Description>C++ concept. Checks that a type derives from a base class.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::convertible_to">
+      <Summary>Convertible to</Summary>
+      <Description>C++ concept. Checks that a type converts implicitly to another type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::common_reference_with">
+      <Summary>Common reference</Summary>
+      <Description>C++ concept. Checks that two types share a common reference type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::common_with">
+      <Summary>Common type</Summary>
+      <Description>C++ concept. Checks that two types share a common type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::integral">
+      <Summary>Integral type</Summary>
+      <Description>C++ concept. Checks that a type is an integer type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::signed_integral">
+      <Summary>Signed integer</Summary>
+      <Description>C++ concept. Checks that a type is a signed integer type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::unsigned_integral">
+      <Summary>Unsigned integer</Summary>
+      <Description>C++ concept. Checks that a type is an unsigned integer type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::floating_point">
+      <Summary>Floating point</Summary>
+      <Description>C++ concept. Checks that a type is a floating-point type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::assignable_from">
+      <Summary>Assignable from</Summary>
+      <Description>C++ concept. Checks that a value of one type can be assigned to another.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::swappable">
+      <Summary>Swappable</Summary>
+      <Description>C++ concept. Checks that values of a type can be swapped.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::swappable_with">
+      <Summary>Swappable with</Summary>
+      <Description>C++ concept. Checks that values of two types can be swapped with each other.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::destructible">
+      <Summary>Destructible</Summary>
+      <Description>C++ concept. Checks that a type can be destroyed.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::constructible_from">
+      <Summary>Constructible from</Summary>
+      <Description>C++ concept. Checks that a type can be constructed from the arguments.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::default_initializable">
+      <Summary>Default initializable</Summary>
+      <Description>C++ concept. Checks that a type can be default constructed.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::move_constructible">
+      <Summary>Move constructible</Summary>
+      <Description>C++ concept. Checks that a type can be move constructed.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::copy_constructible">
+      <Summary>Copy constructible</Summary>
+      <Description>C++ concept. Checks that a type can be copy constructed.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::equality_comparable">
+      <Summary>Equality comparable</Summary>
+      <Description>C++ concept. Checks that a type supports == and !=</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::equality_comparable_with">
+      <Summary>Equality comparable with</Summary>
+      <Description>C++ concept. Checks that two types can be compared for equality.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::totally_ordered">
+      <Summary>Totally ordered</Summary>
+      <Description>C++ concept. Checks that a type supports all comparison operators.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::totally_ordered_with">
+      <Summary>Totally ordered with</Summary>
+      <Description>C++ concept. Checks that two types can be totally ordered against each other.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::movable">
+      <Summary>Movable</Summary>
+      <Description>C++ concept. Checks that a type can be moved and swapped.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::copyable">
+      <Summary>Copyable</Summary>
+      <Description>C++ concept. Checks that a type can be copied, moved and swapped.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::semiregular">
+      <Summary>Semiregular</Summary>
+      <Description>C++ concept. Checks that a type is copyable and default initializable.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::regular">
+      <Summary>Regular</Summary>
+      <Description>C++ concept. Checks that a type is semiregular and equality comparable.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::invocable">
+      <Summary>Invocable</Summary>
+      <Description>C++ concept. Checks that a callable can be invoked with the arguments.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::regular_invocable">
+      <Summary>Regular invocable</Summary>
+      <Description>C++ concept. Checks that a callable is invocable and equality preserving.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::predicate">
+      <Summary>Predicate</Summary>
+      <Description>C++ concept. Checks that a callable returns a boolean-testable value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::relation">
+      <Summary>Relation</Summary>
+      <Description>C++ concept. Checks that a callable is a binary relation over two types.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::equivalence_relation">
+      <Summary>Equivalence relation</Summary>
+      <Description>C++ concept. Checks that a callable is reflexive, symmetric and transitive.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::strict_weak_order">
+      <Summary>Strict weak order</Summary>
+      <Description>C++ concept. Checks that a callable is a strict weak ordering.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::three_way_comparable">
+      <Summary>Three-way comparable</Summary>
+      <Description>C++ concept. Checks that a type supports the three-way comparison operator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::three_way_comparable_with">
+      <Summary>Three-way comparable with</Summary>
+      <Description>C++ concept. Checks that two types can be compared with the three-way operator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_readable">
+      <Summary>Indirectly readable</Summary>
+      <Description>C++ iterator concept. Checks that an iterator can be dereferenced to read a value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_writable">
+      <Summary>Indirectly writable</Summary>
+      <Description>C++ iterator concept. Checks that a value can be written through an iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::weakly_incrementable">
+      <Summary>Weakly incrementable</Summary>
+      <Description>C++ iterator concept. Checks that an iterator can be incremented and compared for equality.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::incrementable">
+      <Summary>Incrementable</Summary>
+      <Description>C++ iterator concept. Checks that an iterator is regular and weakly incrementable.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::input_or_output_iterator">
+      <Summary>Input or output iterator</Summary>
+      <Description>C++ iterator concept. Checks that a type can be dereferenced and incremented.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::sentinel_for">
+      <Summary>Sentinel for</Summary>
+      <Description>C++ iterator concept. Checks that a sentinel marks the end of an iterator range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::sized_sentinel_for">
+      <Summary>Sized sentinel for</Summary>
+      <Description>C++ iterator concept. Checks that the distance between an iterator and its sentinel is known.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::input_iterator">
+      <Summary>Input iterator</Summary>
+      <Description>C++ iterator concept. Checks that an iterator is a single-pass input iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::output_iterator">
+      <Summary>Output iterator</Summary>
+      <Description>C++ iterator concept. Checks that an iterator accepts writes of a value type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::forward_iterator">
+      <Summary>Forward iterator</Summary>
+      <Description>C++ iterator concept. Checks that an iterator can be traversed in one direction repeatedly.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::bidirectional_iterator">
+      <Summary>Bidirectional iterator</Summary>
+      <Description>C++ iterator concept. Checks that an iterator can be moved forward and backward.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::random_access_iterator">
+      <Summary>Random access iterator</Summary>
+      <Description>C++ iterator concept. Checks that an iterator supports constant-time jumps and indexing.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::contiguous_iterator">
+      <Summary>Contiguous iterator</Summary>
+      <Description>C++ iterator concept. Checks that an iterator refers to adjacent elements in memory.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_unary_invocable">
+      <Summary>Indirectly unary invocable</Summary>
+      <Description>C++ iterator concept. Checks that a callable can be applied to the value behind an iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_regular_unary_invocable">
+      <Summary>Indirectly regular unary invocable</Summary>
+      <Description>C++ iterator concept. Checks that a callable is regular when applied through an iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirect_unary_predicate">
+      <Summary>Indirect unary predicate</Summary>
+      <Description>C++ iterator concept. Checks that a callable is a predicate over the value behind an iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirect_binary_predicate">
+      <Summary>Indirect binary predicate</Summary>
+      <Description>C++ iterator concept. Checks that a callable is a predicate over two iterator values.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirect_equivalence_relation">
+      <Summary>Indirect equivalence relation</Summary>
+      <Description>C++ iterator concept. Checks that a callable is an equivalence relation over iterator values.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirect_strict_weak_order">
+      <Summary>Indirect strict weak order</Summary>
+      <Description>C++ iterator concept. Checks that a callable is a strict weak order over iterator values.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_comparable">
+      <Summary>Indirectly comparable</Summary>
+      <Description>C++ iterator concept. Checks that two iterator ranges can be compared with a relation.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_swappable">
+      <Summary>Indirectly swappable</Summary>
+      <Description>C++ iterator concept. Checks that the values behind two iterators can be swapped.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_movable">
+      <Summary>Indirectly movable</Summary>
+      <Description>C++ iterator concept. Checks that values can be moved through iterators.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_movable_storable">
+      <Summary>Indirectly movable storable</Summary>
+      <Description>C++ iterator concept. Checks that moved values can be stored through an output iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_copyable">
+      <Summary>Indirectly copyable</Summary>
+      <Description>C++ iterator concept. Checks that values can be copied through iterators.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::indirectly_copyable_storable">
+      <Summary>Indirectly copyable storable</Summary>
+      <Description>C++ iterator concept. Checks that copied values can be stored through an output iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::range">
+      <Summary>Range</Summary>
+      <Description>C++ range concept. Checks that a type has a begin and an end.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::sized_range">
+      <Summary>Sized range</Summary>
+      <Description>C++ range concept. Checks that the size of a range is known in constant time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::view">
+      <Summary>View</Summary>
+      <Description>C++ range concept. Checks that a range is a lightweight non-owning view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::input_range">
+      <Summary>Input range</Summary>
+      <Description>C++ range concept. Checks that a range can be read in a single pass.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::output_range">
+      <Summary>Output range</Summary>
+      <Description>C++ range concept. Checks that values can be written into a range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::forward_range">
+      <Summary>Forward range</Summary>
+      <Description>C++ range concept. Checks that a range can be traversed forward repeatedly.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::bidirectional_range">
+      <Summary>Bidirectional range</Summary>
+      <Description>C++ range concept. Checks that a range can be traversed in both directions.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::random_access_range">
+      <Summary>Random access range</Summary>
+      <Description>C++ range concept. Checks that a range supports constant-time indexing.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::contiguous_range">
+      <Summary>Contiguous range</Summary>
+      <Description>C++ range concept. Checks that the elements of a range are adjacent in memory.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::common_range">
+      <Summary>Common range</Summary>
+      <Description>C++ range concept. Checks that the begin and end iterators of a range have the same type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::viewable_range">
+      <Summary>Viewable range</Summary>
+      <Description>C++ range concept. Checks that a range can be used to construct a view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::borrowed_range">
+      <Summary>Borrowed range</Summary>
+      <Description>C++ range concept. Checks that the iterators of a range may outlive the range object.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::begin" signature="std::ranges::begin(R&amp;&amp; range)">
+      <Summary>Begin iterator</Summary>
+      <Description>C++ ranges. Returns an iterator to the first element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::end" signature="std::ranges::end(R&amp;&amp; range)">
+      <Summary>End sentinel</Summary>
+      <Description>C++ ranges. Returns a sentinel one past the last element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::cbegin" signature="std::ranges::cbegin(R&amp;&amp; range)">
+      <Summary>Const begin iterator</Summary>
+      <Description>C++ ranges. Returns a const iterator to the first element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::cend" signature="std::ranges::cend(R&amp;&amp; range)">
+      <Summary>Const end sentinel</Summary>
+      <Description>C++ ranges. Returns a const sentinel one past the last element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::rbegin" signature="std::ranges::rbegin(R&amp;&amp; range)">
+      <Summary>Reverse begin iterator</Summary>
+      <Description>C++ ranges. Returns a reverse iterator to the last element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::rend" signature="std::ranges::rend(R&amp;&amp; range)">
+      <Summary>Reverse end sentinel</Summary>
+      <Description>C++ ranges. Returns a reverse sentinel before the first element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::crbegin" signature="std::ranges::crbegin(R&amp;&amp; range)">
+      <Summary>Const reverse begin</Summary>
+      <Description>C++ ranges. Returns a const reverse iterator to the last element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::crend" signature="std::ranges::crend(R&amp;&amp; range)">
+      <Summary>Const reverse end</Summary>
+      <Description>C++ ranges. Returns a const reverse sentinel before the first element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::size" signature="std::ranges::size(R&amp;&amp; range)">
+      <Summary>Range size</Summary>
+      <Description>C++ ranges. Returns the number of elements in the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::ssize" signature="std::ranges::ssize(R&amp;&amp; range)">
+      <Summary>Signed range size</Summary>
+      <Description>C++ ranges. Returns the number of elements in the range as a signed integer.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::empty" signature="std::ranges::empty(R&amp;&amp; range)">
+      <Summary>Empty range</Summary>
+      <Description>C++ ranges. Returns true when the range has no elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::data" signature="std::ranges::data(R&amp;&amp; range)">
+      <Summary>Range data</Summary>
+      <Description>C++ ranges. Returns a pointer to the first element of a contiguous range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::distance" signature="std::ranges::distance(R&amp;&amp; range)">
+      <Summary>Range distance</Summary>
+      <Description>C++ ranges. Returns the number of steps from the begin to the end of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::advance" signature="std::ranges::advance(I&amp; it, D n, S bound)">
+      <Summary>Advance an iterator</Summary>
+      <Description>C++ ranges. Moves the iterator forward by the distance, stopping at the bound.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::next" signature="std::ranges::next(I it, S bound)">
+      <Summary>Next iterator</Summary>
+      <Description>C++ ranges. Returns the iterator advanced by one or by the distance.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::prev" signature="std::ranges::prev(I it, D n)">
+      <Summary>Previous iterator</Summary>
+      <Description>C++ ranges. Returns the iterator moved backward by the distance.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::subrange" signature="std::ranges::subrange(I first, S last)">
+      <Summary>Iterator and sentinel pair</Summary>
+      <Description>C++ ranges view. A view that stores an iterator and a sentinel.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::ref_view" signature="std::ranges::ref_view(R&amp; range)">
+      <Summary>Reference view</Summary>
+      <Description>C++ ranges view. A view that refers to an existing range without owning it.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::owning_view" signature="std::ranges::owning_view(R&amp;&amp; range)">
+      <Summary>Owning view</Summary>
+      <Description>C++ ranges view. A view that owns the range it was constructed from.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::empty_view" signature="std::ranges::empty_view()">
+      <Summary>Empty view</Summary>
+      <Description>C++ ranges view. A view with no elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::single_view" signature="std::ranges::single_view(T value)">
+      <Summary>Single element view</Summary>
+      <Description>C++ ranges view. A view that contains exactly one element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::iota_view" signature="std::ranges::iota_view(Value start, Bound end)">
+      <Summary>Integer sequence view</Summary>
+      <Description>C++ ranges view. A view of consecutive values from the start to the bound.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::istream_view" signature="std::ranges::istream_view(I&amp; stream)">
+      <Summary>Input stream view</Summary>
+      <Description>C++ ranges view. A view that reads values from an input stream.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::repeat_view" signature="std::ranges::repeat_view(T value, Bound count)">
+      <Summary>Repeated value view</Summary>
+      <Description>C++ ranges view. A view that repeats a value a number of times or forever.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::common_view" signature="std::ranges::common_view(R&amp;&amp; range)">
+      <Summary>Common range view</Summary>
+      <Description>C++ ranges view. A view whose begin and end iterators have the same type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::counted_view" signature="std::ranges::counted_view(I first, D count)">
+      <Summary>Counted view</Summary>
+      <Description>C++ ranges view. A view over a number of elements starting at an iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::drop_view" signature="std::ranges::drop_view(R&amp;&amp; range, D count)">
+      <Summary>Dropped prefix view</Summary>
+      <Description>C++ ranges view. A view that skips the first elements of a range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::drop_while_view" signature="std::ranges::drop_while_view(R&amp;&amp; range, Pred pred)">
+      <Summary>Drop while view</Summary>
+      <Description>C++ ranges view. A view that skips the leading elements while the predicate is true.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::elements_view" signature="std::ranges::elements_view(R&amp;&amp; range)">
+      <Summary>Tuple element view</Summary>
+      <Description>C++ ranges view. A view over one element of every tuple in a range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::filter_view" signature="std::ranges::filter_view(R&amp;&amp; range, Pred pred)">
+      <Summary>Filtered view</Summary>
+      <Description>C++ ranges view. A view of the elements that satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::join_view" signature="std::ranges::join_view(R&amp;&amp; range)">
+      <Summary>Joined view</Summary>
+      <Description>C++ ranges view. A view that flattens a range of ranges.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::join_with_view" signature="std::ranges::join_with_view(R&amp;&amp; range, Pattern pattern)">
+      <Summary>Joined with separator</Summary>
+      <Description>C++ ranges view. A view that flattens a range of ranges with a separator between them.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::lazy_split_view" signature="std::ranges::lazy_split_view(R&amp;&amp; range, Pattern pattern)">
+      <Summary>Lazy split view</Summary>
+      <Description>C++ ranges view. A view that splits a range on a pattern without buffering.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::split_view" signature="std::ranges::split_view(R&amp;&amp; range, Pattern pattern)">
+      <Summary>Split view</Summary>
+      <Description>C++ ranges view. A view that splits a range on a pattern.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::take_view" signature="std::ranges::take_view(R&amp;&amp; range, D count)">
+      <Summary>Prefix view</Summary>
+      <Description>C++ ranges view. A view of the first elements of a range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::take_while_view" signature="std::ranges::take_while_view(R&amp;&amp; range, Pred pred)">
+      <Summary>Take while view</Summary>
+      <Description>C++ ranges view. A view of the leading elements while the predicate is true.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::transform_view" signature="std::ranges::transform_view(R&amp;&amp; range, F fun)">
+      <Summary>Transformed view</Summary>
+      <Description>C++ ranges view. A view that applies a function to every element of a range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::reverse_view" signature="std::ranges::reverse_view(R&amp;&amp; range)">
+      <Summary>Reversed view</Summary>
+      <Description>C++ ranges view. A view of a range in reverse order.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::as_const_view" signature="std::ranges::as_const_view(R&amp;&amp; range)">
+      <Summary>Const view</Summary>
+      <Description>C++ ranges view. A view whose elements are accessed as const.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::as_rvalue_view" signature="std::ranges::as_rvalue_view(R&amp;&amp; range)">
+      <Summary>Rvalue view</Summary>
+      <Description>C++ ranges view. A view whose elements are accessed as rvalues.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::adjacent_view" signature="std::ranges::adjacent_view(R&amp;&amp; range)">
+      <Summary>Adjacent elements view</Summary>
+      <Description>C++ ranges view. A view of overlapping tuples of adjacent elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::chunk_view" signature="std::ranges::chunk_view(R&amp;&amp; range, N n)">
+      <Summary>Chunked view</Summary>
+      <Description>C++ ranges view. A view that splits a range into fixed-size chunks.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::chunk_by_view" signature="std::ranges::chunk_by_view(R&amp;&amp; range, Pred pred)">
+      <Summary>Chunk by view</Summary>
+      <Description>C++ ranges view. A view that splits a range into chunks where the predicate holds between neighbours.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::slide_view" signature="std::ranges::slide_view(R&amp;&amp; range, N n)">
+      <Summary>Sliding window view</Summary>
+      <Description>C++ ranges view. A view of overlapping windows of a fixed size.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::stride_view" signature="std::ranges::stride_view(R&amp;&amp; range, N n)">
+      <Summary>Strided view</Summary>
+      <Description>C++ ranges view. A view of every n-th element of a range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::zip_view" signature="std::ranges::zip_view(R&amp;&amp; ranges)">
+      <Summary>Zipped view</Summary>
+      <Description>C++ ranges view. A view that combines several ranges into tuples of their elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::zip_transform_view" signature="std::ranges::zip_transform_view(F fun, R&amp;&amp; ranges)">
+      <Summary>Zipped transformed view</Summary>
+      <Description>C++ ranges view. A view that combines several ranges with a function.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::cartesian_product_view" signature="std::ranges::cartesian_product_view(R&amp;&amp; ranges)">
+      <Summary>Cartesian product view</Summary>
+      <Description>C++ ranges view. A view of the Cartesian product of several ranges.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::enumerate_view" signature="std::ranges::enumerate_view(R&amp;&amp; range)">
+      <Summary>Enumerated view</Summary>
+      <Description>C++ ranges view. A view of index and element pairs.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::pairwise_view" signature="std::ranges::pairwise_view(R&amp;&amp; range)">
+      <Summary>Pairwise view</Summary>
+      <Description>C++ ranges view. A view of adjacent element pairs.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::all" signature="std::views::all(R&amp;&amp; range)">
+      <Summary>All elements</Summary>
+      <Description>C++ ranges adaptor. Returns a view over all elements of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::counted" signature="std::views::counted(I first, D count)">
+      <Summary>Counted elements</Summary>
+      <Description>C++ ranges adaptor. Returns a view over a number of elements starting at an iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::common" signature="std::views::common(R&amp;&amp; range)">
+      <Summary>Common range</Summary>
+      <Description>C++ ranges adaptor. Adapts the range so its begin and end iterators have the same type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::drop" signature="std::views::drop(R&amp;&amp; range, D count)">
+      <Summary>Drop the first elements</Summary>
+      <Description>C++ ranges adaptor. Skips the first elements of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::drop_while" signature="std::views::drop_while(R&amp;&amp; range, Pred pred)">
+      <Summary>Drop while true</Summary>
+      <Description>C++ ranges adaptor. Skips the leading elements while the predicate is true.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::elements" signature="std::views::elements(R&amp;&amp; range)">
+      <Summary>Tuple elements</Summary>
+      <Description>C++ ranges adaptor. Returns a view over one element of every tuple in the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::keys" signature="std::views::keys(R&amp;&amp; range)">
+      <Summary>Pair keys</Summary>
+      <Description>C++ ranges adaptor. Returns a view over the first element of every pair in the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::values" signature="std::views::values(R&amp;&amp; range)">
+      <Summary>Pair values</Summary>
+      <Description>C++ ranges adaptor. Returns a view over the second element of every pair in the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::empty" signature="std::views::empty()">
+      <Summary>Empty view</Summary>
+      <Description>C++ ranges adaptor. Returns a view with no elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::filter" signature="std::views::filter(R&amp;&amp; range, Pred pred)">
+      <Summary>Filter the elements</Summary>
+      <Description>C++ ranges adaptor. Returns a view of the elements that satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::iota" signature="std::views::iota(Value start, Bound end)">
+      <Summary>Integer sequence</Summary>
+      <Description>C++ ranges adaptor. Returns a view of consecutive values from the start to the bound.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::istream" signature="std::views::istream(I&amp; stream)">
+      <Summary>Input stream</Summary>
+      <Description>C++ ranges adaptor. Returns a view that reads values from an input stream.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::join" signature="std::views::join(R&amp;&amp; range)">
+      <Summary>Join the ranges</Summary>
+      <Description>C++ ranges adaptor. Flattens a range of ranges.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::join_with" signature="std::views::join_with(R&amp;&amp; range, Pattern pattern)">
+      <Summary>Join with a separator</Summary>
+      <Description>C++ ranges adaptor. Flattens a range of ranges with a separator between them.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::lazy_split" signature="std::views::lazy_split(R&amp;&amp; range, Pattern pattern)">
+      <Summary>Lazy split</Summary>
+      <Description>C++ ranges adaptor. Splits the range on a pattern without buffering.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::split" signature="std::views::split(R&amp;&amp; range, Pattern pattern)">
+      <Summary>Split</Summary>
+      <Description>C++ ranges adaptor. Splits the range on a pattern.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::take" signature="std::views::take(R&amp;&amp; range, D count)">
+      <Summary>Take the first elements</Summary>
+      <Description>C++ ranges adaptor. Returns a view of the first elements of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::take_while" signature="std::views::take_while(R&amp;&amp; range, Pred pred)">
+      <Summary>Take while true</Summary>
+      <Description>C++ ranges adaptor. Returns a view of the leading elements while the predicate is true.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::transform" signature="std::views::transform(R&amp;&amp; range, F fun)">
+      <Summary>Transform the elements</Summary>
+      <Description>C++ ranges adaptor. Applies a function to every element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::reverse" signature="std::views::reverse(R&amp;&amp; range)">
+      <Summary>Reverse the range</Summary>
+      <Description>C++ ranges adaptor. Returns a view of the range in reverse order.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::single" signature="std::views::single(T value)">
+      <Summary>Single element</Summary>
+      <Description>C++ ranges adaptor. Returns a view with exactly one element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::repeat" signature="std::views::repeat(T value, Bound count)">
+      <Summary>Repeat a value</Summary>
+      <Description>C++ ranges adaptor. Returns a view that repeats a value a number of times or forever.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::adjacent" signature="std::views::adjacent(R&amp;&amp; range)">
+      <Summary>Adjacent elements</Summary>
+      <Description>C++ ranges adaptor. Returns a view of overlapping tuples of adjacent elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::chunk" signature="std::views::chunk(R&amp;&amp; range, N n)">
+      <Summary>Split into chunks</Summary>
+      <Description>C++ ranges adaptor. Splits the range into fixed-size chunks.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::chunk_by" signature="std::views::chunk_by(R&amp;&amp; range, Pred pred)">
+      <Summary>Split into chunks by predicate</Summary>
+      <Description>C++ ranges adaptor. Splits the range where the predicate is false for neighbours.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::slide" signature="std::views::slide(R&amp;&amp; range, N n)">
+      <Summary>Sliding windows</Summary>
+      <Description>C++ ranges adaptor. Returns a view of overlapping windows of a fixed size.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::stride" signature="std::views::stride(R&amp;&amp; range, N n)">
+      <Summary>Strided elements</Summary>
+      <Description>C++ ranges adaptor. Returns a view of every n-th element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::zip" signature="std::views::zip(R&amp;&amp; ranges)">
+      <Summary>Zip the ranges</Summary>
+      <Description>C++ ranges adaptor. Combines several ranges into tuples of their elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::zip_transform" signature="std::views::zip_transform(F fun, R&amp;&amp; ranges)">
+      <Summary>Zip with a function</Summary>
+      <Description>C++ ranges adaptor. Combines several ranges with a function.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::cartesian_product" signature="std::views::cartesian_product(R&amp;&amp; ranges)">
+      <Summary>Cartesian product</Summary>
+      <Description>C++ ranges adaptor. Returns a view of the Cartesian product of several ranges.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::enumerate" signature="std::views::enumerate(R&amp;&amp; range)">
+      <Summary>Enumerate the range</Summary>
+      <Description>C++ ranges adaptor. Returns a view of index and element pairs.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::as_const" signature="std::views::as_const(R&amp;&amp; range)">
+      <Summary>Const elements</Summary>
+      <Description>C++ ranges adaptor. Returns a view whose elements are accessed as const.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::as_rvalue" signature="std::views::as_rvalue(R&amp;&amp; range)">
+      <Summary>Rvalue elements</Summary>
+      <Description>C++ ranges adaptor. Returns a view whose elements are accessed as rvalues.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::views::pairwise" signature="std::views::pairwise(R&amp;&amp; range)">
+      <Summary>Adjacent pairs</Summary>
+      <Description>C++ ranges adaptor. Returns a view of adjacent element pairs.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::for_each" signature="std::ranges::for_each(R&amp;&amp; range, F fun)">
+      <Summary>Apply a function</Summary>
+      <Description>C++ ranges algorithm. Applies the function to every element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::for_each_n" signature="std::ranges::for_each_n(I first, N n, F fun)">
+      <Summary>Apply to the first elements</Summary>
+      <Description>C++ ranges algorithm. Applies the function to the first n elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::all_of" signature="std::ranges::all_of(R&amp;&amp; range, Pred pred)">
+      <Summary>All match</Summary>
+      <Description>C++ ranges algorithm. Checks whether the predicate is true for every element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::any_of" signature="std::ranges::any_of(R&amp;&amp; range, Pred pred)">
+      <Summary>Any match</Summary>
+      <Description>C++ ranges algorithm. Checks whether the predicate is true for at least one element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::none_of" signature="std::ranges::none_of(R&amp;&amp; range, Pred pred)">
+      <Summary>None match</Summary>
+      <Description>C++ ranges algorithm. Checks whether the predicate is false for every element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::count" signature="std::ranges::count(R&amp;&amp; range, T value)">
+      <Summary>Count a value</Summary>
+      <Description>C++ ranges algorithm. Counts the elements equal to the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::count_if" signature="std::ranges::count_if(R&amp;&amp; range, Pred pred)">
+      <Summary>Count matching elements</Summary>
+      <Description>C++ ranges algorithm. Counts the elements that satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::mismatch" signature="std::ranges::mismatch(R1&amp;&amp; range1, R2&amp;&amp; range2)">
+      <Summary>First mismatch</Summary>
+      <Description>C++ ranges algorithm. Finds the first pair of elements that differ.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::equal" signature="std::ranges::equal(R1&amp;&amp; range1, R2&amp;&amp; range2)">
+      <Summary>Ranges equal</Summary>
+      <Description>C++ ranges algorithm. Checks whether two ranges have equal elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::find" signature="std::ranges::find(R&amp;&amp; range, T value)">
+      <Summary>Find a value</Summary>
+      <Description>C++ ranges algorithm. Returns an iterator to the first element equal to the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::find_if" signature="std::ranges::find_if(R&amp;&amp; range, Pred pred)">
+      <Summary>Find a match</Summary>
+      <Description>C++ ranges algorithm. Returns an iterator to the first element that satisfies the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::find_if_not" signature="std::ranges::find_if_not(R&amp;&amp; range, Pred pred)">
+      <Summary>Find a non-match</Summary>
+      <Description>C++ ranges algorithm. Returns an iterator to the first element that does not satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::find_end" signature="std::ranges::find_end(R1&amp;&amp; range1, R2&amp;&amp; range2)">
+      <Summary>Find the last subsequence</Summary>
+      <Description>C++ ranges algorithm. Finds the last occurrence of a subsequence in a range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::find_first_of" signature="std::ranges::find_first_of(R1&amp;&amp; range1, R2&amp;&amp; range2)">
+      <Summary>Find any of the values</Summary>
+      <Description>C++ ranges algorithm. Finds the first element that appears in the other range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::adjacent_find" signature="std::ranges::adjacent_find(R&amp;&amp; range)">
+      <Summary>Find equal neighbours</Summary>
+      <Description>C++ ranges algorithm. Finds the first pair of adjacent equal elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::search" signature="std::ranges::search(R1&amp;&amp; range1, R2&amp;&amp; range2)">
+      <Summary>Search a subsequence</Summary>
+      <Description>C++ ranges algorithm. Finds the first occurrence of a subsequence in a range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::search_n" signature="std::ranges::search_n(R&amp;&amp; range, N n, T value)">
+      <Summary>Search repeated values</Summary>
+      <Description>C++ ranges algorithm. Finds the first run of n equal values.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::copy" signature="std::ranges::copy(R&amp;&amp; range, O result)">
+      <Summary>Copy a range</Summary>
+      <Description>C++ ranges algorithm. Copies the elements of the range to the output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::copy_if" signature="std::ranges::copy_if(R&amp;&amp; range, O result, Pred pred)">
+      <Summary>Copy matching elements</Summary>
+      <Description>C++ ranges algorithm. Copies the elements that satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::copy_n" signature="std::ranges::copy_n(I first, N n, O result)">
+      <Summary>Copy elements</Summary>
+      <Description>C++ ranges algorithm. Copies n elements to the output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::copy_backward" signature="std::ranges::copy_backward(R&amp;&amp; range, O result)">
+      <Summary>Copy backwards</Summary>
+      <Description>C++ ranges algorithm. Copies the range to the output ending at the given position.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::move" signature="std::ranges::move(R&amp;&amp; range, O result)">
+      <Summary>Move a range</Summary>
+      <Description>C++ ranges algorithm. Moves the elements of the range to the output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::move_backward" signature="std::ranges::move_backward(R&amp;&amp; range, O result)">
+      <Summary>Move backwards</Summary>
+      <Description>C++ ranges algorithm. Moves the range to the output ending at the given position.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::fill" signature="std::ranges::fill(R&amp;&amp; range, T value)">
+      <Summary>Fill a range</Summary>
+      <Description>C++ ranges algorithm. Assigns the value to every element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::fill_n" signature="std::ranges::fill_n(O first, N n, T value)">
+      <Summary>Fill elements</Summary>
+      <Description>C++ ranges algorithm. Assigns the value to n elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::transform" signature="std::ranges::transform(R&amp;&amp; range, O result, F fun)">
+      <Summary>Transform a range</Summary>
+      <Description>C++ ranges algorithm. Applies the function to every element and writes the results.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::generate" signature="std::ranges::generate(R&amp;&amp; range, F gen)">
+      <Summary>Generate values</Summary>
+      <Description>C++ ranges algorithm. Assigns the results of the generator to every element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::generate_n" signature="std::ranges::generate_n(O first, N n, F gen)">
+      <Summary>Generate elements</Summary>
+      <Description>C++ ranges algorithm. Assigns the results of the generator to n elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::remove" signature="std::ranges::remove(R&amp;&amp; range, T value)">
+      <Summary>Remove a value</Summary>
+      <Description>C++ ranges algorithm. Moves the elements equal to the value to the end of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::remove_if" signature="std::ranges::remove_if(R&amp;&amp; range, Pred pred)">
+      <Summary>Remove matching elements</Summary>
+      <Description>C++ ranges algorithm. Moves the elements that satisfy the predicate to the end of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::remove_copy" signature="std::ranges::remove_copy(R&amp;&amp; range, O result, T value)">
+      <Summary>Copy without a value</Summary>
+      <Description>C++ ranges algorithm. Copies the elements that are not equal to the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::remove_copy_if" signature="std::ranges::remove_copy_if(R&amp;&amp; range, O result, Pred pred)">
+      <Summary>Copy without matches</Summary>
+      <Description>C++ ranges algorithm. Copies the elements that do not satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::replace" signature="std::ranges::replace(R&amp;&amp; range, T old_value, T new_value)">
+      <Summary>Replace a value</Summary>
+      <Description>C++ ranges algorithm. Replaces the elements equal to the old value with the new value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::replace_if" signature="std::ranges::replace_if(R&amp;&amp; range, Pred pred, T new_value)">
+      <Summary>Replace matches</Summary>
+      <Description>C++ ranges algorithm. Replaces the elements that satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::replace_copy" signature="std::ranges::replace_copy(R&amp;&amp; range, O result, T old_value, T new_value)">
+      <Summary>Copy with replacements</Summary>
+      <Description>C++ ranges algorithm. Copies the range, replacing the old value with the new one.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::replace_copy_if" signature="std::ranges::replace_copy_if(R&amp;&amp; range, O result, Pred pred, T new_value)">
+      <Summary>Copy with predicate replacements</Summary>
+      <Description>C++ ranges algorithm. Copies the range, replacing the elements that satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::swap_ranges" signature="std::ranges::swap_ranges(R1&amp;&amp; range1, R2&amp;&amp; range2)">
+      <Summary>Swap two ranges</Summary>
+      <Description>C++ ranges algorithm. Swaps the elements of two ranges.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::reverse" signature="std::ranges::reverse(R&amp;&amp; range)">
+      <Summary>Reverse a range</Summary>
+      <Description>C++ ranges algorithm. Reverses the order of the elements in the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::reverse_copy" signature="std::ranges::reverse_copy(R&amp;&amp; range, O result)">
+      <Summary>Copy in reverse</Summary>
+      <Description>C++ ranges algorithm. Copies the elements of the range in reverse order.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::rotate" signature="std::ranges::rotate(R&amp;&amp; range, I middle)">
+      <Summary>Rotate a range</Summary>
+      <Description>C++ ranges algorithm. Rotates the range so the middle element becomes the first.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::rotate_copy" signature="std::ranges::rotate_copy(R&amp;&amp; range, I middle, O result)">
+      <Summary>Copy rotated</Summary>
+      <Description>C++ ranges algorithm. Copies the rotated range to the output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::shuffle" signature="std::ranges::shuffle(R&amp;&amp; range, Gen gen)">
+      <Summary>Shuffle a range</Summary>
+      <Description>C++ ranges algorithm. Shuffles the elements with the random number generator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::sample" signature="std::ranges::sample(R&amp;&amp; range, O result, N n, Gen gen)">
+      <Summary>Sample elements</Summary>
+      <Description>C++ ranges algorithm. Copies n random elements from the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::unique" signature="std::ranges::unique(R&amp;&amp; range)">
+      <Summary>Remove duplicates</Summary>
+      <Description>C++ ranges algorithm. Moves the consecutive duplicates to the end of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::unique_copy" signature="std::ranges::unique_copy(R&amp;&amp; range, O result)">
+      <Summary>Copy without duplicates</Summary>
+      <Description>C++ ranges algorithm. Copies the range without consecutive duplicates.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::is_partitioned" signature="std::ranges::is_partitioned(R&amp;&amp; range, Pred pred)">
+      <Summary>Partition test</Summary>
+      <Description>C++ ranges algorithm. Checks whether the range is partitioned by the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::partition" signature="std::ranges::partition(R&amp;&amp; range, Pred pred)">
+      <Summary>Partition a range</Summary>
+      <Description>C++ ranges algorithm. Moves the elements that satisfy the predicate to the front.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::partition_copy" signature="std::ranges::partition_copy(R&amp;&amp; range, O true_result, O false_result, Pred pred)">
+      <Summary>Partition a copy</Summary>
+      <Description>C++ ranges algorithm. Copies the elements into two ranges by the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::stable_partition" signature="std::ranges::stable_partition(R&amp;&amp; range, Pred pred)">
+      <Summary>Stable partition</Summary>
+      <Description>C++ ranges algorithm. Partitions the range while keeping the relative order.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::partition_point" signature="std::ranges::partition_point(R&amp;&amp; range, Pred pred)">
+      <Summary>Partition boundary</Summary>
+      <Description>C++ ranges algorithm. Returns the first element that does not satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::sort" signature="std::ranges::sort(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Sort a range</Summary>
+      <Description>C++ ranges algorithm. Sorts the elements of the range in ascending order.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::stable_sort" signature="std::ranges::stable_sort(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Stable sort</Summary>
+      <Description>C++ ranges algorithm. Sorts the range while keeping equal elements in order.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::partial_sort" signature="std::ranges::partial_sort(R&amp;&amp; range, I middle, Comp comp, Proj proj)">
+      <Summary>Partially sort</Summary>
+      <Description>C++ ranges algorithm. Sorts the first part of the range and leaves the rest unspecified.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::partial_sort_copy" signature="std::ranges::partial_sort_copy(R&amp;&amp; range, O result, Comp comp, Proj proj)">
+      <Summary>Copy a partial sort</Summary>
+      <Description>C++ ranges algorithm. Copies the smallest elements in sorted order.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::nth_element" signature="std::ranges::nth_element(R&amp;&amp; range, I nth, Comp comp, Proj proj)">
+      <Summary>Select the n-th element</Summary>
+      <Description>C++ ranges algorithm. Partitions the range around the n-th element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::is_sorted" signature="std::ranges::is_sorted(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Sorted test</Summary>
+      <Description>C++ ranges algorithm. Checks whether the range is sorted.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::is_sorted_until" signature="std::ranges::is_sorted_until(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Sorted prefix</Summary>
+      <Description>C++ ranges algorithm. Finds the first element that is out of order.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::lower_bound" signature="std::ranges::lower_bound(R&amp;&amp; range, T value, Comp comp, Proj proj)">
+      <Summary>Lower bound</Summary>
+      <Description>C++ ranges algorithm. Returns the first element not less than the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::upper_bound" signature="std::ranges::upper_bound(R&amp;&amp; range, T value, Comp comp, Proj proj)">
+      <Summary>Upper bound</Summary>
+      <Description>C++ ranges algorithm. Returns the first element greater than the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::equal_range" signature="std::ranges::equal_range(R&amp;&amp; range, T value, Comp comp, Proj proj)">
+      <Summary>Equal range</Summary>
+      <Description>C++ ranges algorithm. Returns the subrange of elements equal to the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::binary_search" signature="std::ranges::binary_search(R&amp;&amp; range, T value, Comp comp, Proj proj)">
+      <Summary>Binary search</Summary>
+      <Description>C++ ranges algorithm. Checks whether the sorted range contains the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::merge" signature="std::ranges::merge(R1&amp;&amp; range1, R2&amp;&amp; range2, O result, Comp comp)">
+      <Summary>Merge ranges</Summary>
+      <Description>C++ ranges algorithm. Merges two sorted ranges into the output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::inplace_merge" signature="std::ranges::inplace_merge(R&amp;&amp; range, I middle, Comp comp)">
+      <Summary>Merge in place</Summary>
+      <Description>C++ ranges algorithm. Merges two consecutive sorted subranges in place.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::includes" signature="std::ranges::includes(R1&amp;&amp; range1, R2&amp;&amp; range2, Comp comp)">
+      <Summary>Subset test</Summary>
+      <Description>C++ ranges algorithm. Checks whether one sorted range contains the other.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::set_difference" signature="std::ranges::set_difference(R1&amp;&amp; range1, R2&amp;&amp; range2, O result, Comp comp)">
+      <Summary>Set difference</Summary>
+      <Description>C++ ranges algorithm. Copies the elements of the first range that are not in the second.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::set_intersection" signature="std::ranges::set_intersection(R1&amp;&amp; range1, R2&amp;&amp; range2, O result, Comp comp)">
+      <Summary>Set intersection</Summary>
+      <Description>C++ ranges algorithm. Copies the elements present in both ranges.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::set_symmetric_difference" signature="std::ranges::set_symmetric_difference(R1&amp;&amp; range1, R2&amp;&amp; range2, O result, Comp comp)">
+      <Summary>Symmetric difference</Summary>
+      <Description>C++ ranges algorithm. Copies the elements present in exactly one of the ranges.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::set_union" signature="std::ranges::set_union(R1&amp;&amp; range1, R2&amp;&amp; range2, O result, Comp comp)">
+      <Summary>Set union</Summary>
+      <Description>C++ ranges algorithm. Copies the elements of both ranges without duplicates.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::is_heap" signature="std::ranges::is_heap(R&amp;&amp; range, Comp comp)">
+      <Summary>Heap test</Summary>
+      <Description>C++ ranges algorithm. Checks whether the range is a heap.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::is_heap_until" signature="std::ranges::is_heap_until(R&amp;&amp; range, Comp comp)">
+      <Summary>Heap prefix</Summary>
+      <Description>C++ ranges algorithm. Finds the first element that breaks the heap order.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::make_heap" signature="std::ranges::make_heap(R&amp;&amp; range, Comp comp)">
+      <Summary>Make a heap</Summary>
+      <Description>C++ ranges algorithm. Arranges the range into a heap.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::push_heap" signature="std::ranges::push_heap(R&amp;&amp; range, Comp comp)">
+      <Summary>Push onto a heap</Summary>
+      <Description>C++ ranges algorithm. Places the last element into the heap.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::pop_heap" signature="std::ranges::pop_heap(R&amp;&amp; range, Comp comp)">
+      <Summary>Pop from a heap</Summary>
+      <Description>C++ ranges algorithm. Moves the largest element to the end of the heap.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::sort_heap" signature="std::ranges::sort_heap(R&amp;&amp; range, Comp comp)">
+      <Summary>Sort a heap</Summary>
+      <Description>C++ ranges algorithm. Turns a heap into a sorted range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::min" signature="std::ranges::min(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Smallest element</Summary>
+      <Description>C++ ranges algorithm. Returns the smallest element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::max" signature="std::ranges::max(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Largest element</Summary>
+      <Description>C++ ranges algorithm. Returns the largest element of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::minmax" signature="std::ranges::minmax(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Smallest and largest</Summary>
+      <Description>C++ ranges algorithm. Returns the smallest and largest elements of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::min_element" signature="std::ranges::min_element(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Smallest element iterator</Summary>
+      <Description>C++ ranges algorithm. Returns an iterator to the smallest element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::max_element" signature="std::ranges::max_element(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Largest element iterator</Summary>
+      <Description>C++ ranges algorithm. Returns an iterator to the largest element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::minmax_element" signature="std::ranges::minmax_element(R&amp;&amp; range, Comp comp, Proj proj)">
+      <Summary>Smallest and largest iterators</Summary>
+      <Description>C++ ranges algorithm. Returns iterators to the smallest and largest elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::clamp" signature="std::ranges::clamp(T value, T low, T high, Comp comp)">
+      <Summary>Clamp a value</Summary>
+      <Description>C++ ranges algorithm. Limits the value to the range between low and high.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::lexicographical_compare" signature="std::ranges::lexicographical_compare(R1&amp;&amp; range1, R2&amp;&amp; range2, Comp comp)">
+      <Summary>Lexicographical compare</Summary>
+      <Description>C++ ranges algorithm. Compares two ranges lexicographically.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::next_permutation" signature="std::ranges::next_permutation(R&amp;&amp; range, Comp comp)">
+      <Summary>Next permutation</Summary>
+      <Description>C++ ranges algorithm. Rearranges the range into the next lexicographical permutation.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::prev_permutation" signature="std::ranges::prev_permutation(R&amp;&amp; range, Comp comp)">
+      <Summary>Previous permutation</Summary>
+      <Description>C++ ranges algorithm. Rearranges the range into the previous lexicographical permutation.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::is_permutation" signature="std::ranges::is_permutation(R1&amp;&amp; range1, R2&amp;&amp; range2, Comp comp)">
+      <Summary>Permutation test</Summary>
+      <Description>C++ ranges algorithm. Checks whether one range is a permutation of the other.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::contains" signature="std::ranges::contains(R&amp;&amp; range, T value)">
+      <Summary>Contains a value</Summary>
+      <Description>C++ ranges algorithm. Checks whether the range contains the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::starts_with" signature="std::ranges::starts_with(R1&amp;&amp; range1, R2&amp;&amp; range2)">
+      <Summary>Starts with a range</Summary>
+      <Description>C++ ranges algorithm. Checks whether the first range begins with the second.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::ends_with" signature="std::ranges::ends_with(R1&amp;&amp; range1, R2&amp;&amp; range2)">
+      <Summary>Ends with a range</Summary>
+      <Description>C++ ranges algorithm. Checks whether the first range ends with the second.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::find_last" signature="std::ranges::find_last(R&amp;&amp; range, T value)">
+      <Summary>Find the last value</Summary>
+      <Description>C++ ranges algorithm. Returns a subrange ending at the last element equal to the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::find_last_if" signature="std::ranges::find_last_if(R&amp;&amp; range, Pred pred)">
+      <Summary>Find the last match</Summary>
+      <Description>C++ ranges algorithm. Returns a subrange ending at the last element that satisfies the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::find_last_if_not" signature="std::ranges::find_last_if_not(R&amp;&amp; range, Pred pred)">
+      <Summary>Find the last non-match</Summary>
+      <Description>C++ ranges algorithm. Returns a subrange ending at the last element that does not satisfy the predicate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::fold_left" signature="std::ranges::fold_left(R&amp;&amp; range, T init, F fun)">
+      <Summary>Fold from the left</Summary>
+      <Description>C++ ranges algorithm. Combines the elements with the function, starting from the initial value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::fold_right" signature="std::ranges::fold_right(R&amp;&amp; range, T init, F fun)">
+      <Summary>Fold from the right</Summary>
+      <Description>C++ ranges algorithm. Combines the elements from the right with the function.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::fold_left_first" signature="std::ranges::fold_left_first(R&amp;&amp; range, F fun)">
+      <Summary>Fold from the left</Summary>
+      <Description>C++ ranges algorithm. Folds the range using its first element as the initial value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::fold_right_last" signature="std::ranges::fold_right_last(R&amp;&amp; range, F fun)">
+      <Summary>Fold from the right</Summary>
+      <Description>C++ ranges algorithm. Folds the range using its last element as the initial value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::fold_left_with_iter" signature="std::ranges::fold_left_with_iter(R&amp;&amp; range, T init, F fun)">
+      <Summary>Fold with the end iterator</Summary>
+      <Description>C++ ranges algorithm. Folds the range and returns the result with the end iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::fold_left_first_with_iter" signature="std::ranges::fold_left_first_with_iter(R&amp;&amp; range, F fun)">
+      <Summary>Fold from the first element</Summary>
+      <Description>C++ ranges algorithm. Folds the range from its first element and returns the end iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::iota" signature="std::ranges::iota(R&amp;&amp; range, T value)">
+      <Summary>Fill with consecutive values</Summary>
+      <Description>C++ ranges algorithm. Assigns consecutive values starting from the given value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::shift_left" signature="std::ranges::shift_left(R&amp;&amp; range, D n)">
+      <Summary>Shift left</Summary>
+      <Description>C++ ranges algorithm. Moves the elements n positions to the left.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::shift_right" signature="std::ranges::shift_right(R&amp;&amp; range, D n)">
+      <Summary>Shift right</Summary>
+      <Description>C++ ranges algorithm. Moves the elements n positions to the right.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ranges::to" signature="std::ranges::to(R&amp;&amp; range, Args&amp;&amp;... args)">
+      <Summary>Convert a range</Summary>
+      <Description>C++ ranges algorithm. Constructs a container from the elements of the range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::strong_ordering">
+      <Summary>Strong ordering</Summary>
+      <Description>C++ comparison. A comparison result where equal values are indistinguishable.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::weak_ordering">
+      <Summary>Weak ordering</Summary>
+      <Description>C++ comparison. A comparison result where equal values may still be distinguishable.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::partial_ordering">
+      <Summary>Partial ordering</Summary>
+      <Description>C++ comparison. A comparison result that also allows unordered values.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::strong_ordering::less">
+      <Summary>Less</Summary>
+      <Description>C++ comparison. The result of a strong comparison when the left value is smaller.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::strong_ordering::equal">
+      <Summary>Equal</Summary>
+      <Description>C++ comparison. The result of a strong comparison when the values are equal.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::strong_ordering::equivalent">
+      <Summary>Equivalent</Summary>
+      <Description>C++ comparison. The result of a strong comparison when the values are equivalent.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::strong_ordering::greater">
+      <Summary>Greater</Summary>
+      <Description>C++ comparison. The result of a strong comparison when the left value is greater.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::weak_ordering::less">
+      <Summary>Less</Summary>
+      <Description>C++ comparison. The result of a weak comparison when the left value is smaller.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::weak_ordering::equivalent">
+      <Summary>Equivalent</Summary>
+      <Description>C++ comparison. The result of a weak comparison when the values are equivalent.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::weak_ordering::greater">
+      <Summary>Greater</Summary>
+      <Description>C++ comparison. The result of a weak comparison when the left value is greater.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::partial_ordering::less">
+      <Summary>Less</Summary>
+      <Description>C++ comparison. The result of a partial comparison when the left value is smaller.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::partial_ordering::equivalent">
+      <Summary>Equivalent</Summary>
+      <Description>C++ comparison. The result of a partial comparison when the values are equivalent.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::partial_ordering::greater">
+      <Summary>Greater</Summary>
+      <Description>C++ comparison. The result of a partial comparison when the left value is greater.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::partial_ordering::unordered">
+      <Summary>Unordered</Summary>
+      <Description>C++ comparison. The result of a partial comparison when the values are unordered.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::compare_three_way" signature="std::compare_three_way(T left, U right)">
+      <Summary>Three-way comparison</Summary>
+      <Description>C++ comparison. Compares two values with the three-way comparison operator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::compare_three_way_result">
+      <Summary>Three-way result</Summary>
+      <Description>C++ comparison. The comparison category returned by the three-way operator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::common_comparison_category">
+      <Summary>Common comparison category</Summary>
+      <Description>C++ comparison. The comparison category common to several categories.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::is_eq" signature="std::is_eq(Ord ord)">
+      <Summary>Equal result</Summary>
+      <Description>C++ comparison. Checks whether a three-way comparison result means equal.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::is_neq" signature="std::is_neq(Ord ord)">
+      <Summary>Not equal result</Summary>
+      <Description>C++ comparison. Checks whether a three-way comparison result means not equal.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::is_lt" signature="std::is_lt(Ord ord)">
+      <Summary>Less result</Summary>
+      <Description>C++ comparison. Checks whether a three-way comparison result means less.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::is_lteq" signature="std::is_lteq(Ord ord)">
+      <Summary>Less or equal result</Summary>
+      <Description>C++ comparison. Checks whether a three-way comparison result means less or equal.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::is_gt" signature="std::is_gt(Ord ord)">
+      <Summary>Greater result</Summary>
+      <Description>C++ comparison. Checks whether a three-way comparison result means greater.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::is_gteq" signature="std::is_gteq(Ord ord)">
+      <Summary>Greater or equal result</Summary>
+      <Description>C++ comparison. Checks whether a three-way comparison result means greater or equal.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::strong_order" signature="std::strong_order(T left, U right)">
+      <Summary>Strong order</Summary>
+      <Description>C++ comparison. Compares two values and returns a strong ordering.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::weak_order" signature="std::weak_order(T left, U right)">
+      <Summary>Weak order</Summary>
+      <Description>C++ comparison. Compares two values and returns a weak ordering.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::partial_order" signature="std::partial_order(T left, U right)">
+      <Summary>Partial order</Summary>
+      <Description>C++ comparison. Compares two values and returns a partial ordering.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::lexicographical_compare_three_way" signature="std::lexicographical_compare_three_way(R1&amp;&amp; range1, R2&amp;&amp; range2)">
+      <Summary>Three-way range compare</Summary>
+      <Description>C++ comparison. Compares two ranges lexicographically with the three-way operator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::bit_cast" signature="std::bit_cast(From value)">
+      <Summary>Reinterpret the bits</Summary>
+      <Description>C++ bit operation. Returns a value of another type with the same object representation.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::byteswap" signature="std::byteswap(T value)">
+      <Summary>Swap the bytes</Summary>
+      <Description>C++ bit operation. Reverses the order of the bytes of an integer.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::popcount" signature="std::popcount(T value)">
+      <Summary>Count set bits</Summary>
+      <Description>C++ bit operation. Returns the number of bits set to one.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::rotl" signature="std::rotl(T value, int shift)">
+      <Summary>Rotate left</Summary>
+      <Description>C++ bit operation. Rotates the bits of an integer to the left.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::rotr" signature="std::rotr(T value, int shift)">
+      <Summary>Rotate right</Summary>
+      <Description>C++ bit operation. Rotates the bits of an integer to the right.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::countl_zero" signature="std::countl_zero(T value)">
+      <Summary>Leading zeros</Summary>
+      <Description>C++ bit operation. Counts the consecutive zero bits at the most significant end.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::countl_one" signature="std::countl_one(T value)">
+      <Summary>Leading ones</Summary>
+      <Description>C++ bit operation. Counts the consecutive one bits at the most significant end.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::countr_zero" signature="std::countr_zero(T value)">
+      <Summary>Trailing zeros</Summary>
+      <Description>C++ bit operation. Counts the consecutive zero bits at the least significant end.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::countr_one" signature="std::countr_one(T value)">
+      <Summary>Trailing ones</Summary>
+      <Description>C++ bit operation. Counts the consecutive one bits at the least significant end.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::has_single_bit" signature="std::has_single_bit(T value)">
+      <Summary>Power of two</Summary>
+      <Description>C++ bit operation. Checks whether the value has exactly one bit set.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::bit_ceil" signature="std::bit_ceil(T value)">
+      <Summary>Round up to a power of two</Summary>
+      <Description>C++ bit operation. Returns the smallest power of two not less than the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::bit_floor" signature="std::bit_floor(T value)">
+      <Summary>Round down to a power of two</Summary>
+      <Description>C++ bit operation. Returns the largest power of two not greater than the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::bit_width" signature="std::bit_width(T value)">
+      <Summary>Bit width</Summary>
+      <Description>C++ bit operation. Returns the number of bits needed to represent the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::endian">
+      <Summary>Byte order</Summary>
+      <Description>C++ bit operation. Describes the byte order of the platform.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::endian::little">
+      <Summary>Little endian</Summary>
+      <Description>C++ bit operation. The platform stores the least significant byte first.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::endian::big">
+      <Summary>Big endian</Summary>
+      <Description>C++ bit operation. The platform stores the most significant byte first.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::endian::native">
+      <Summary>Native byte order</Summary>
+      <Description>C++ bit operation. The byte order of the platform.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::e">
+      <Summary>Euler's number</Summary>
+      <Description>C++ numeric constant. The base of the natural logarithm.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::pi">
+      <Summary>Pi</Summary>
+      <Description>C++ numeric constant. The ratio of a circle's circumference to its diameter.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::sqrt2">
+      <Summary>Square root of two</Summary>
+      <Description>C++ numeric constant. The square root of two.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::sqrt3">
+      <Summary>Square root of three</Summary>
+      <Description>C++ numeric constant. The square root of three.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::phi">
+      <Summary>Golden ratio</Summary>
+      <Description>C++ numeric constant. The golden ratio.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::ln2">
+      <Summary>Natural logarithm of two</Summary>
+      <Description>C++ numeric constant. The natural logarithm of two.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::ln10">
+      <Summary>Natural logarithm of ten</Summary>
+      <Description>C++ numeric constant. The natural logarithm of ten.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::log2e">
+      <Summary>Binary logarithm of e</Summary>
+      <Description>C++ numeric constant. The base-2 logarithm of Euler's number.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::log10e">
+      <Summary>Decimal logarithm of e</Summary>
+      <Description>C++ numeric constant. The base-10 logarithm of Euler's number.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::inv_pi">
+      <Summary>Inverse pi</Summary>
+      <Description>C++ numeric constant. One divided by pi.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::inv_sqrtpi">
+      <Summary>Inverse square root of pi</Summary>
+      <Description>C++ numeric constant. One divided by the square root of pi.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::inv_sqrt3">
+      <Summary>Inverse square root of three</Summary>
+      <Description>C++ numeric constant. One divided by the square root of three.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::numbers::egamma">
+      <Summary>Euler-Mascheroni constant</Summary>
+      <Description>C++ numeric constant. The Euler-Mascheroni constant.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::format" signature="std::format(format_string fmt, T&amp;&amp;... args)">
+      <Summary>Format a string</Summary>
+      <Description>C++ format. Returns a string formatted from the format string and the arguments.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::format_to" signature="std::format_to(O out, format_string fmt, T&amp;&amp;... args)">
+      <Summary>Format to an output</Summary>
+      <Description>C++ format. Writes the formatted text to the output iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::format_to_n" signature="std::format_to_n(O out, N n, format_string fmt, T&amp;&amp;... args)">
+      <Summary>Format to an output</Summary>
+      <Description>C++ format. Writes at most n characters of the formatted text.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::formatted_size" signature="std::formatted_size(format_string fmt, T&amp;&amp;... args)">
+      <Summary>Formatted size</Summary>
+      <Description>C++ format. Returns the number of characters the formatted text would have.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::vformat" signature="std::vformat(string_view fmt, format_args args)">
+      <Summary>Format with an argument list</Summary>
+      <Description>C++ format. Formats the arguments passed as a type-erased argument list.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::vformat_to" signature="std::vformat_to(O out, string_view fmt, format_args args)">
+      <Summary>Format to an output</Summary>
+      <Description>C++ format. Writes the type-erased arguments formatted to the output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::make_format_args" signature="std::make_format_args(T&amp;... args)">
+      <Summary>Build format arguments</Summary>
+      <Description>C++ format. Binds the arguments into a type-erased format argument list.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::make_wformat_args" signature="std::make_wformat_args(T&amp;... args)">
+      <Summary>Build wide format arguments</Summary>
+      <Description>C++ format. Binds the arguments into a wide type-erased format argument list.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::formatter">
+      <Summary>Format specification</Summary>
+      <Description>C++ format. The customization point that formats a type for std::format.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::format_error">
+      <Summary>Format error</Summary>
+      <Description>C++ format. The exception thrown when a format string is invalid.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::format_string">
+      <Summary>Format string</Summary>
+      <Description>C++ format. A compile-time checked format string.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::wformat_string">
+      <Summary>Wide format string</Summary>
+      <Description>C++ format. A compile-time checked wide format string.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_format_string">
+      <Summary>Basic format string</Summary>
+      <Description>C++ format. A compile-time checked format string for a character type.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_format_arg">
+      <Summary>Format argument</Summary>
+      <Description>C++ format. A type-erased single format argument.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_format_args">
+      <Summary>Format arguments</Summary>
+      <Description>C++ format. A type-erased list of format arguments.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::format_args">
+      <Summary>Format arguments</Summary>
+      <Description>C++ format. The type-erased format argument list for char.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::wformat_args">
+      <Summary>Wide format arguments</Summary>
+      <Description>C++ format. The type-erased format argument list for wchar_t.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_format_context">
+      <Summary>Format context</Summary>
+      <Description>C++ format. The context passed to a formatter while formatting.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::format_context">
+      <Summary>Format context</Summary>
+      <Description>C++ format. The formatting context for char output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::wformat_context">
+      <Summary>Wide format context</Summary>
+      <Description>C++ format. The formatting context for wchar_t output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_format_parse_context">
+      <Summary>Format parse context</Summary>
+      <Description>C++ format. The context passed to a formatter while parsing the format specification.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::format_parse_context">
+      <Summary>Format parse context</Summary>
+      <Description>C++ format. The parse context for char format strings.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::wformat_parse_context">
+      <Summary>Wide format parse context</Summary>
+      <Description>C++ format. The parse context for wchar_t format strings.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::print" signature="std::print(format_string fmt, T&amp;&amp;... args)">
+      <Summary>Print formatted text</Summary>
+      <Description>C++ format. Writes the formatted text to the standard output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::println" signature="std::println(format_string fmt, T&amp;&amp;... args)">
+      <Summary>Print a line</Summary>
+      <Description>C++ format. Writes the formatted text followed by a newline.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::vprint_unicode" signature="std::vprint_unicode(string_view fmt, format_args args)">
+      <Summary>Print Unicode text</Summary>
+      <Description>C++ format. Writes type-erased arguments formatted as Unicode text.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::vprint_nonunicode" signature="std::vprint_nonunicode(string_view fmt, format_args args)">
+      <Summary>Print plain text</Summary>
+      <Description>C++ format. Writes type-erased arguments formatted as plain text.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::expected" signature="std::expected(T value)">
+      <Summary>Expected value or error</Summary>
+      <Description>C++ library type. A container that holds either a value or an error.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::unexpected" signature="std::unexpected(E error)">
+      <Summary>Unexpected error</Summary>
+      <Description>C++ library type. Wraps an error value for std::expected.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::unexpect">
+      <Summary>Unexpected tag</Summary>
+      <Description>C++ library type. The tag that constructs an expected object in its error state.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::bad_expected_access" signature="std::bad_expected_access(E error)">
+      <Summary>Missing expected value</Summary>
+      <Description>C++ library type. The exception thrown when an expected error is accessed as a value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::expected::has_value" signature="std::expected::has_value()">
+      <Summary>Has a value</Summary>
+      <Description>C++ library type. Checks whether the expected object holds a value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::expected::value" signature="std::expected::value()">
+      <Summary>Read the value</Summary>
+      <Description>C++ library type. Returns the contained value or throws when it holds an error.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::expected::error" signature="std::expected::error()">
+      <Summary>Read the error</Summary>
+      <Description>C++ library type. Returns the contained error.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::expected::value_or" signature="std::expected::value_or(U default_value)">
+      <Summary>Value or default</Summary>
+      <Description>C++ library type. Returns the contained value or the default.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::expected::emplace" signature="std::expected::emplace(Args&amp;&amp;... args)">
+      <Summary>Construct the value</Summary>
+      <Description>C++ library type. Constructs the value in place.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::expected::swap" signature="std::expected::swap(expected&amp; other)">
+      <Summary>Swap two expected values</Summary>
+      <Description>C++ library type. Exchanges the contents of two expected objects.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::mdspan" signature="std::mdspan(T* data, Extents extents)">
+      <Summary>Multidimensional view</Summary>
+      <Description>C++ library type. A non-owning view over a multidimensional array.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::extents">
+      <Summary>Array extents</Summary>
+      <Description>C++ library type. Describes the shape of a multidimensional array.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::dextents">
+      <Summary>Dynamic extents</Summary>
+      <Description>C++ library type. Array extents whose sizes are known at run time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::layout_left">
+      <Summary>Column-major layout</Summary>
+      <Description>C++ library type. A multidimensional array layout with the first index contiguous.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::layout_right">
+      <Summary>Row-major layout</Summary>
+      <Description>C++ library type. A multidimensional array layout with the last index contiguous.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::layout_stride">
+      <Summary>Strided layout</Summary>
+      <Description>C++ library type. A multidimensional array layout with explicit strides.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::default_accessor">
+      <Summary>Default accessor</Summary>
+      <Description>C++ library type. The accessor that returns a reference to an mdspan element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::mdspan::extents" signature="std::mdspan::extents()">
+      <Summary>Array extents</Summary>
+      <Description>C++ library type. Returns the extents of the multidimensional view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::mdspan::size" signature="std::mdspan::size()">
+      <Summary>Element count</Summary>
+      <Description>C++ library type. Returns the total number of elements in the view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::mdspan::rank" signature="std::mdspan::rank()">
+      <Summary>Number of dimensions</Summary>
+      <Description>C++ library type. Returns the number of dimensions of the view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::mdspan::stride" signature="std::mdspan::stride(R rank)">
+      <Summary>Dimension stride</Summary>
+      <Description>C++ library type. Returns the stride of the given dimension.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::flat_map">
+      <Summary>Flat map</Summary>
+      <Description>C++ library type. A sorted associative container with contiguous storage.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::flat_multimap">
+      <Summary>Flat multimap</Summary>
+      <Description>C++ library type. A sorted associative container that allows duplicate keys.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::flat_set">
+      <Summary>Flat set</Summary>
+      <Description>C++ library type. A sorted set with contiguous storage.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::flat_multiset">
+      <Summary>Flat multiset</Summary>
+      <Description>C++ library type. A sorted set that allows duplicate values.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::generator">
+      <Summary>Coroutine generator</Summary>
+      <Description>C++ library type. A coroutine return type that produces a sequence of values.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::generator::begin" signature="std::generator::begin()">
+      <Summary>Start the generator</Summary>
+      <Description>C++ library type. Starts or resumes the coroutine and returns its first value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::generator::end" signature="std::generator::end()">
+      <Summary>End of the generator</Summary>
+      <Description>C++ library type. Returns the sentinel that marks the end of the generated sequence.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::move_only_function" signature="std::move_only_function(F&amp;&amp; f)">
+      <Summary>Move-only callable wrapper</Summary>
+      <Description>C++ library type. A type-erased wrapper for a callable that can only be moved.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::to_underlying" signature="std::to_underlying(E value)">
+      <Summary>Underlying value</Summary>
+      <Description>C++ library type. Returns the underlying integer value of an enumeration.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::unreachable" signature="std::unreachable()">
+      <Summary>Unreachable code</Summary>
+      <Description>C++ library type. Marks a code path that must never be executed.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::start_lifetime_as" signature="std::start_lifetime_as(T* pointer)">
+      <Summary>Start an object lifetime</Summary>
+      <Description>C++ library type. Starts the lifetime of an object in existing storage.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::allocate_at_least" signature="std::allocate_at_least(Alloc&amp; alloc, size_t n)">
+      <Summary>Allocate at least n</Summary>
+      <Description>C++ library type. Allocates storage for at least n objects.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::is_scoped_enum">
+      <Summary>Scoped enumeration</Summary>
+      <Description>C++ library type. Checks whether a type is a scoped enumeration.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::out_ptr" signature="std::out_ptr(T&amp; pointer, Args&amp;&amp;... args)">
+      <Summary>Output pointer wrapper</Summary>
+      <Description>C++ library type. Wraps a smart pointer for a function that returns an owned pointer.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::inout_ptr" signature="std::inout_ptr(T&amp; pointer, Args&amp;&amp;... args)">
+      <Summary>Input/output pointer wrapper</Summary>
+      <Description>C++ library type. Wraps a smart pointer for a function that takes and replaces a pointer.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::source_location">
+      <Summary>Source location</Summary>
+      <Description>C++ source location. Describes a location in the source code.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::source_location::current" signature="std::source_location::current()">
+      <Summary>Current location</Summary>
+      <Description>C++ source location. Returns the location of the call site.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::source_location::file_name" signature="std::source_location::file_name()">
+      <Summary>File name</Summary>
+      <Description>C++ source location. Returns the name of the source file.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::source_location::function_name" signature="std::source_location::function_name()">
+      <Summary>Function name</Summary>
+      <Description>C++ source location. Returns the name of the enclosing function.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::source_location::line" signature="std::source_location::line()">
+      <Summary>Line number</Summary>
+      <Description>C++ source location. Returns the line number of the location.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::source_location::column" signature="std::source_location::column()">
+      <Summary>Column number</Summary>
+      <Description>C++ source location. Returns the column number of the location.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref" signature="std::atomic_ref(T&amp; value)">
+      <Summary>Atomic reference</Summary>
+      <Description>C++ atomic reference. Provides atomic operations on an existing object.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::load" signature="std::atomic_ref::load(memory_order order)">
+      <Summary>Read the value</Summary>
+      <Description>C++ atomic reference. Atomically loads the referenced value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::store" signature="std::atomic_ref::store(T value, memory_order order)">
+      <Summary>Write the value</Summary>
+      <Description>C++ atomic reference. Atomically stores a value into the referenced object.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::exchange" signature="std::atomic_ref::exchange(T value, memory_order order)">
+      <Summary>Exchange the value</Summary>
+      <Description>C++ atomic reference. Atomically replaces the value and returns the old one.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::compare_exchange_weak" signature="std::atomic_ref::compare_exchange_weak(T&amp; expected, T desired)">
+      <Summary>Weak compare and exchange</Summary>
+      <Description>C++ atomic reference. Atomically compares and replaces the value, allowing spurious failures.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::compare_exchange_strong" signature="std::atomic_ref::compare_exchange_strong(T&amp; expected, T desired)">
+      <Summary>Strong compare and exchange</Summary>
+      <Description>C++ atomic reference. Atomically compares and replaces the value without spurious failures.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::fetch_add" signature="std::atomic_ref::fetch_add(T value)">
+      <Summary>Atomic addition</Summary>
+      <Description>C++ atomic reference. Atomically adds a value and returns the old one.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::fetch_sub" signature="std::atomic_ref::fetch_sub(T value)">
+      <Summary>Atomic subtraction</Summary>
+      <Description>C++ atomic reference. Atomically subtracts a value and returns the old one.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::fetch_and" signature="std::atomic_ref::fetch_and(T value)">
+      <Summary>Atomic bitwise and</Summary>
+      <Description>C++ atomic reference. Atomically applies a bitwise and and returns the old value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::fetch_or" signature="std::atomic_ref::fetch_or(T value)">
+      <Summary>Atomic bitwise or</Summary>
+      <Description>C++ atomic reference. Atomically applies a bitwise or and returns the old value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::fetch_xor" signature="std::atomic_ref::fetch_xor(T value)">
+      <Summary>Atomic bitwise xor</Summary>
+      <Description>C++ atomic reference. Atomically applies a bitwise xor and returns the old value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::wait" signature="std::atomic_ref::wait(T old_value)">
+      <Summary>Wait for a change</Summary>
+      <Description>C++ atomic reference. Blocks until the value differs from the given one.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::notify_one" signature="std::atomic_ref::notify_one()">
+      <Summary>Wake one waiter</Summary>
+      <Description>C++ atomic reference. Wakes one thread waiting on the atomic reference.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_ref::notify_all" signature="std::atomic_ref::notify_all()">
+      <Summary>Wake all waiters</Summary>
+      <Description>C++ atomic reference. Wakes all threads waiting on the atomic reference.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::osyncstream" signature="std::osyncstream(std::ostream&amp; os)">
+      <Summary>Synchronized output stream</Summary>
+      <Description>C++ synchronized stream. Buffers output and writes it atomically to the wrapped stream.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::osyncstream::emit" signature="std::osyncstream::emit()">
+      <Summary>Flush the buffer</Summary>
+      <Description>C++ synchronized stream. Writes the buffered output to the wrapped stream.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::osyncstream::get_wrapped" signature="std::osyncstream::get_wrapped()">
+      <Summary>Wrapped stream</Summary>
+      <Description>C++ synchronized stream. Returns the underlying output stream.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::osyncstream::rdbuf" signature="std::osyncstream::rdbuf()">
+      <Summary>Stream buffer</Summary>
+      <Description>C++ synchronized stream. Returns the buffer that collects the synchronized output.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::stacktrace">
+      <Summary>Stack trace</Summary>
+      <Description>C++ stack trace. A sequence of entries describing the current call stack.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_stacktrace">
+      <Summary>Basic stack trace</Summary>
+      <Description>C++ stack trace. A stack trace with a chosen allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::stacktrace_entry">
+      <Summary>Stack trace entry</Summary>
+      <Description>C++ stack trace. One frame of a stack trace.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_stacktrace::current" signature="std::basic_stacktrace::current()">
+      <Summary>Current stack trace</Summary>
+      <Description>C++ stack trace. Captures the current call stack.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_stacktrace::size" signature="std::basic_stacktrace::size()">
+      <Summary>Entry count</Summary>
+      <Description>C++ stack trace. Returns the number of entries in the stack trace.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_stacktrace::empty" signature="std::basic_stacktrace::empty()">
+      <Summary>Empty stack trace</Summary>
+      <Description>C++ stack trace. Checks whether the stack trace has no entries.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::basic_stacktrace::at" signature="std::basic_stacktrace::at(size_t index)">
+      <Summary>Stack trace entry</Summary>
+      <Description>C++ stack trace. Returns the entry at the index with bounds checking.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::stacktrace_entry::description" signature="std::stacktrace_entry::description()">
+      <Summary>Entry description</Summary>
+      <Description>C++ stack trace. Returns a description of the frame.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::stacktrace_entry::source_file" signature="std::stacktrace_entry::source_file()">
+      <Summary>Source file</Summary>
+      <Description>C++ stack trace. Returns the source file of the frame.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::stacktrace_entry::source_line" signature="std::stacktrace_entry::source_line()">
+      <Summary>Source line</Summary>
+      <Description>C++ stack trace. Returns the source line of the frame.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::iterator_traits">
+      <Summary>Iterator traits</Summary>
+      <Description>C++ iterator. Provides the value, difference, pointer, reference and category types of an iterator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::reverse_iterator" signature="std::reverse_iterator(I current)">
+      <Summary>Reverse iterator</Summary>
+      <Description>C++ iterator. An iterator adaptor that traverses a range backwards.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::move_iterator" signature="std::move_iterator(I current)">
+      <Summary>Move iterator</Summary>
+      <Description>C++ iterator. An iterator adaptor that yields rvalue references.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::back_insert_iterator" signature="std::back_insert_iterator(Container&amp; container)">
+      <Summary>Back insert iterator</Summary>
+      <Description>C++ iterator. An output iterator that appends to a container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::front_insert_iterator" signature="std::front_insert_iterator(Container&amp; container)">
+      <Summary>Front insert iterator</Summary>
+      <Description>C++ iterator. An output iterator that prepends to a container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::insert_iterator" signature="std::insert_iterator(Container&amp; container, I position)">
+      <Summary>Insert iterator</Summary>
+      <Description>C++ iterator. An output iterator that inserts at a position.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::back_inserter" signature="std::back_inserter(Container&amp; container)">
+      <Summary>Back inserter</Summary>
+      <Description>C++ iterator. Creates an iterator that appends to the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::front_inserter" signature="std::front_inserter(Container&amp; container)">
+      <Summary>Front inserter</Summary>
+      <Description>C++ iterator. Creates an iterator that prepends to the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::inserter" signature="std::inserter(Container&amp; container, I position)">
+      <Summary>Inserter</Summary>
+      <Description>C++ iterator. Creates an iterator that inserts at the position.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::istream_iterator" signature="std::istream_iterator(Istream&amp; stream)">
+      <Summary>Input stream iterator</Summary>
+      <Description>C++ iterator. An input iterator that reads values from a stream.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ostream_iterator" signature="std::ostream_iterator(Ostream&amp; stream, const CharT* separator)">
+      <Summary>Output stream iterator</Summary>
+      <Description>C++ iterator. An output iterator that writes values to a stream.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::istreambuf_iterator" signature="std::istreambuf_iterator(Istream&amp; stream)">
+      <Summary>Input buffer iterator</Summary>
+      <Description>C++ iterator. An iterator that reads characters from a stream buffer.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ostreambuf_iterator" signature="std::ostreambuf_iterator(Ostream&amp; stream)">
+      <Summary>Output buffer iterator</Summary>
+      <Description>C++ iterator. An iterator that writes characters to a stream buffer.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::advance" signature="std::advance(I&amp; it, Distance n)">
+      <Summary>Advance an iterator</Summary>
+      <Description>C++ iterator. Moves the iterator forward by the distance.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::distance" signature="std::distance(I first, I last)">
+      <Summary>Iterator distance</Summary>
+      <Description>C++ iterator. Returns the number of steps between two iterators.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::next" signature="std::next(I it, Distance n)">
+      <Summary>Next iterator</Summary>
+      <Description>C++ iterator. Returns the iterator advanced by the distance.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::prev" signature="std::prev(I it, Distance n)">
+      <Summary>Previous iterator</Summary>
+      <Description>C++ iterator. Returns the iterator moved backward by the distance.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::begin" signature="std::begin(C&amp; container)">
+      <Summary>Begin iterator</Summary>
+      <Description>C++ iterator. Returns an iterator to the first element of the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::end" signature="std::end(C&amp; container)">
+      <Summary>End iterator</Summary>
+      <Description>C++ iterator. Returns an iterator one past the last element of the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::cbegin" signature="std::cbegin(const C&amp; container)">
+      <Summary>Const begin iterator</Summary>
+      <Description>C++ iterator. Returns a const iterator to the first element of the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::cend" signature="std::cend(const C&amp; container)">
+      <Summary>Const end iterator</Summary>
+      <Description>C++ iterator. Returns a const iterator one past the last element of the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::rbegin" signature="std::rbegin(C&amp; container)">
+      <Summary>Reverse begin iterator</Summary>
+      <Description>C++ iterator. Returns a reverse iterator to the last element of the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::rend" signature="std::rend(C&amp; container)">
+      <Summary>Reverse end iterator</Summary>
+      <Description>C++ iterator. Returns a reverse iterator before the first element of the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::crbegin" signature="std::crbegin(const C&amp; container)">
+      <Summary>Const reverse begin</Summary>
+      <Description>C++ iterator. Returns a const reverse iterator to the last element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::crend" signature="std::crend(const C&amp; container)">
+      <Summary>Const reverse end</Summary>
+      <Description>C++ iterator. Returns a const reverse iterator before the first element.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::size" signature="std::size(const C&amp; container)">
+      <Summary>Container size</Summary>
+      <Description>C++ iterator. Returns the number of elements in the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::ssize" signature="std::ssize(const C&amp; container)">
+      <Summary>Signed container size</Summary>
+      <Description>C++ iterator. Returns the number of elements as a signed integer.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::empty" signature="std::empty(const C&amp; container)">
+      <Summary>Empty container</Summary>
+      <Description>C++ iterator. Checks whether the container has no elements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::data" signature="std::data(C&amp; container)">
+      <Summary>Container data</Summary>
+      <Description>C++ iterator. Returns a pointer to the first element of the container.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::to_chars" signature="std::to_chars(char* first, char* last, T value)">
+      <Summary>Convert to characters</Summary>
+      <Description>C++ character conversion. Writes the value as characters into the buffer.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::from_chars" signature="std::from_chars(const char* first, const char* last, T&amp; value)">
+      <Summary>Parse characters</Summary>
+      <Description>C++ character conversion. Parses a number from the character range.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chars_format">
+      <Summary>Number format</Summary>
+      <Description>C++ character conversion. Selects the format used by the floating-point character conversions.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chars_format::general">
+      <Summary>General format</Summary>
+      <Description>C++ character conversion. The shortest representation that round-trips the value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chars_format::scientific">
+      <Summary>Scientific format</Summary>
+      <Description>C++ character conversion. The scientific notation with one digit before the decimal point.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chars_format::fixed">
+      <Summary>Fixed format</Summary>
+      <Description>C++ character conversion. The fixed notation without an exponent.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chars_format::hex">
+      <Summary>Hexadecimal format</Summary>
+      <Description>C++ character conversion. The hexadecimal notation without a prefix.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::to_chars_result">
+      <Summary>Conversion result</Summary>
+      <Description>C++ character conversion. The result of std::to_chars with the end pointer and error code.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::from_chars_result">
+      <Summary>Parse result</Summary>
+      <Description>C++ character conversion. The result of std::from_chars with the end pointer and error code.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::memory_resource">
+      <Summary>Memory resource</Summary>
+      <Description>C++ polymorphic memory resource. The abstract base for polymorphic memory resources.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::polymorphic_allocator" signature="std::pmr::polymorphic_allocator(memory_resource* resource)">
+      <Summary>Polymorphic allocator</Summary>
+      <Description>C++ polymorphic memory resource. An allocator that dispatches to a memory resource at run time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::monotonic_buffer_resource" signature="std::pmr::monotonic_buffer_resource(size_t initial_size)">
+      <Summary>Monotonic memory resource</Summary>
+      <Description>C++ polymorphic memory resource. A memory resource that only grows and frees everything at once.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::synchronized_pool_resource" signature="std::pmr::synchronized_pool_resource(pool_options options)">
+      <Summary>Synchronized pool</Summary>
+      <Description>C++ polymorphic memory resource. A thread-safe pool memory resource.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::unsynchronized_pool_resource" signature="std::pmr::unsynchronized_pool_resource(pool_options options)">
+      <Summary>Unsynchronized pool</Summary>
+      <Description>C++ polymorphic memory resource. A pool memory resource for single-threaded use.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::pool_options">
+      <Summary>Pool options</Summary>
+      <Description>C++ polymorphic memory resource. Tunes the block sizes of the pool resources.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::new_delete_resource" signature="std::pmr::new_delete_resource()">
+      <Summary>New and delete resource</Summary>
+      <Description>C++ polymorphic memory resource. Returns the memory resource that uses new and delete.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::null_memory_resource" signature="std::pmr::null_memory_resource()">
+      <Summary>Null memory resource</Summary>
+      <Description>C++ polymorphic memory resource. Returns a memory resource that always fails to allocate.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::get_default_resource" signature="std::pmr::get_default_resource()">
+      <Summary>Default memory resource</Summary>
+      <Description>C++ polymorphic memory resource. Returns the memory resource used by default.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::set_default_resource" signature="std::pmr::set_default_resource(memory_resource* resource)">
+      <Summary>Set the default resource</Summary>
+      <Description>C++ polymorphic memory resource. Changes the memory resource used by default.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::vector">
+      <Summary>Polymorphic vector</Summary>
+      <Description>C++ polymorphic memory resource. A vector that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::string">
+      <Summary>Polymorphic string</Summary>
+      <Description>C++ polymorphic memory resource. A string that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::wstring">
+      <Summary>Polymorphic wide string</Summary>
+      <Description>C++ polymorphic memory resource. A wide string that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::map">
+      <Summary>Polymorphic map</Summary>
+      <Description>C++ polymorphic memory resource. A map that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::set">
+      <Summary>Polymorphic set</Summary>
+      <Description>C++ polymorphic memory resource. A set that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::multimap">
+      <Summary>Polymorphic multimap</Summary>
+      <Description>C++ polymorphic memory resource. A multimap that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::multiset">
+      <Summary>Polymorphic multiset</Summary>
+      <Description>C++ polymorphic memory resource. A multiset that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::unordered_map">
+      <Summary>Polymorphic unordered map</Summary>
+      <Description>C++ polymorphic memory resource. An unordered map that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::unordered_set">
+      <Summary>Polymorphic unordered set</Summary>
+      <Description>C++ polymorphic memory resource. An unordered set that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::deque">
+      <Summary>Polymorphic deque</Summary>
+      <Description>C++ polymorphic memory resource. A deque that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::list">
+      <Summary>Polymorphic list</Summary>
+      <Description>C++ polymorphic memory resource. A list that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::pmr::forward_list">
+      <Summary>Polymorphic forward list</Summary>
+      <Description>C++ polymorphic memory resource. A forward list that uses a polymorphic allocator.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::bind_front" signature="std::bind_front(F&amp;&amp; f, Args&amp;&amp;... args)">
+      <Summary>Bind leading arguments</Summary>
+      <Description>C++ function object. Returns a callable with the first arguments bound.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::bind_back" signature="std::bind_back(F&amp;&amp; f, Args&amp;&amp;... args)">
+      <Summary>Bind trailing arguments</Summary>
+      <Description>C++ function object. Returns a callable with the last arguments bound.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::identity">
+      <Summary>Identity function</Summary>
+      <Description>C++ function object. A function object that returns its argument unchanged.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::default_searcher" signature="std::default_searcher(ForwardIt1 begin, ForwardIt1 end)">
+      <Summary>Default searcher</Summary>
+      <Description>C++ function object. A searcher that finds a subsequence with the default algorithm.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::boyer_moore_searcher" signature="std::boyer_moore_searcher(PatIter first, PatIter last)">
+      <Summary>Boyer-Moore searcher</Summary>
+      <Description>C++ function object. A searcher that uses the Boyer-Moore algorithm.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::boyer_moore_horspool_searcher" signature="std::boyer_moore_horspool_searcher(PatIter first, PatIter last)">
+      <Summary>Boyer-Moore-Horspool searcher</Summary>
+      <Description>C++ function object. A searcher that uses the Boyer-Moore-Horspool algorithm.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::execution::seq">
+      <Summary>Sequential execution</Summary>
+      <Description>C++ function object. Runs the algorithm sequentially in the calling thread.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::execution::par">
+      <Summary>Parallel execution</Summary>
+      <Description>C++ function object. Runs the algorithm in parallel on several threads.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::execution::par_unseq">
+      <Summary>Parallel unsequenced execution</Summary>
+      <Description>C++ function object. Runs the algorithm in parallel with vectorization allowed.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::execution::unseq">
+      <Summary>Unsequenced execution</Summary>
+      <Description>C++ function object. Allows the algorithm to be vectorized in the calling thread.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::year_month_day_last">
+      <Summary>Last day of a month</Summary>
+      <Description>C++ chrono. A year, month and the last day of that month.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::year_month_weekday">
+      <Summary>N-th weekday of a month</Summary>
+      <Description>C++ chrono. A year, month and the n-th weekday of that month.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::year_month_weekday_last">
+      <Summary>Last weekday of a month</Summary>
+      <Description>C++ chrono. A year, month and the last weekday of that month.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::month_day_last">
+      <Summary>Last day of a month</Summary>
+      <Description>C++ chrono. A month and its last day.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::month_weekday">
+      <Summary>N-th weekday of a month</Summary>
+      <Description>C++ chrono. A month and the n-th weekday of that month.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::month_weekday_last">
+      <Summary>Last weekday of a month</Summary>
+      <Description>C++ chrono. A month and its last weekday.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::weekday_indexed">
+      <Summary>Indexed weekday</Summary>
+      <Description>C++ chrono. A weekday with an index from one to five.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::weekday_last">
+      <Summary>Last weekday</Summary>
+      <Description>C++ chrono. The last occurrence of a weekday in a month.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::last_spec">
+      <Summary>Last tag</Summary>
+      <Description>C++ chrono. The tag that selects the last day or weekday of a month.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::sys_time">
+      <Summary>System time point</Summary>
+      <Description>C++ chrono. A time point of a system clock with the given duration.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::local_time">
+      <Summary>Local time point</Summary>
+      <Description>C++ chrono. A time point in the local time zone.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::utc_time">
+      <Summary>UTC time point</Summary>
+      <Description>C++ chrono. A time point of the UTC clock.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::tai_time">
+      <Summary>TAI time point</Summary>
+      <Description>C++ chrono. A time point of the TAI clock.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::gps_time">
+      <Summary>GPS time point</Summary>
+      <Description>C++ chrono. A time point of the GPS clock.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::file_time">
+      <Summary>File time point</Summary>
+      <Description>C++ chrono. A time point of the file clock.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::sys_days">
+      <Summary>System days</Summary>
+      <Description>C++ chrono. A system time point with a duration of days.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::sys_seconds">
+      <Summary>System seconds</Summary>
+      <Description>C++ chrono. A system time point with a duration of seconds.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::local_days">
+      <Summary>Local days</Summary>
+      <Description>C++ chrono. A local time point with a duration of days.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::local_seconds">
+      <Summary>Local seconds</Summary>
+      <Description>C++ chrono. A local time point with a duration of seconds.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::clock_cast" signature="std::chrono::clock_cast(Clock clock, TimePoint time_point)">
+      <Summary>Convert a clock</Summary>
+      <Description>C++ chrono. Converts a time point from one clock to another.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::to_sys" signature="std::chrono::to_sys(TimePoint time_point)">
+      <Summary>Convert to system time</Summary>
+      <Description>C++ chrono. Converts a time point to the system clock.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::to_local" signature="std::chrono::to_local(TimePoint time_point)">
+      <Summary>Convert to local time</Summary>
+      <Description>C++ chrono. Converts a time point to the local time zone.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::to_utc" signature="std::chrono::to_utc(TimePoint time_point)">
+      <Summary>Convert to UTC</Summary>
+      <Description>C++ chrono. Converts a time point to the UTC clock.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::from_stream" signature="std::chrono::from_stream(Istream&amp; stream, const CharT* format, TimePoint&amp; time_point)">
+      <Summary>Parse a time</Summary>
+      <Description>C++ chrono. Parses a time point from the stream with the format.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::parse" signature="std::chrono::parse(Istream&amp; stream, const CharT* format, TimePoint&amp; time_point)">
+      <Summary>Parse a time</Summary>
+      <Description>C++ chrono. Parses a time point from the stream with the format.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::get_tzdb" signature="std::chrono::get_tzdb()">
+      <Summary>Time zone database</Summary>
+      <Description>C++ chrono. Returns the current time zone database.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::get_tzdb_list" signature="std::chrono::get_tzdb_list()">
+      <Summary>Time zone database list</Summary>
+      <Description>C++ chrono. Returns the list of time zone databases.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::reload_tzdb" signature="std::chrono::reload_tzdb()">
+      <Summary>Reload time zones</Summary>
+      <Description>C++ chrono. Reloads the time zone database from disk.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::remote_version" signature="std::chrono::remote_version()">
+      <Summary>Remote database version</Summary>
+      <Description>C++ chrono. Returns the version of the remote time zone database.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::leap_second">
+      <Summary>Leap second</Summary>
+      <Description>C++ chrono. Describes a leap second insertion.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::leap_second_info">
+      <Summary>Leap second information</Summary>
+      <Description>C++ chrono. Describes whether a time point falls in a leap second.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::time_zone_link">
+      <Summary>Time zone link</Summary>
+      <Description>C++ chrono. An alternative name for a time zone.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::zoned_traits">
+      <Summary>Zoned time traits</Summary>
+      <Description>C++ chrono. Customizes the time zone used by zoned_time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::is_clock">
+      <Summary>Clock test</Summary>
+      <Description>C++ chrono. Checks whether a type satisfies the clock requirements.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::year_month_day_last::day" signature="std::chrono::year_month_day_last::day()">
+      <Summary>Last day</Summary>
+      <Description>C++ chrono. Returns the last day of the month.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::year_month_day_last::ok" signature="std::chrono::year_month_day_last::ok()">
+      <Summary>Valid date</Summary>
+      <Description>C++ chrono. Checks whether the date is valid.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::year_month_weekday::index" signature="std::chrono::year_month_weekday::index()">
+      <Summary>Weekday index</Summary>
+      <Description>C++ chrono. Returns the index of the weekday.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::year_month_weekday::ok" signature="std::chrono::year_month_weekday::ok()">
+      <Summary>Valid date</Summary>
+      <Description>C++ chrono. Checks whether the date is valid.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::month_day_last::month" signature="std::chrono::month_day_last::month()">
+      <Summary>Month</Summary>
+      <Description>C++ chrono. Returns the month.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::month_day_last::ok" signature="std::chrono::month_day_last::ok()">
+      <Summary>Valid month</Summary>
+      <Description>C++ chrono. Checks whether the month is valid.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::month_weekday::month" signature="std::chrono::month_weekday::month()">
+      <Summary>Month</Summary>
+      <Description>C++ chrono. Returns the month.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::month_weekday::weekday" signature="std::chrono::month_weekday::weekday()">
+      <Summary>Weekday</Summary>
+      <Description>C++ chrono. Returns the indexed weekday.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::month_weekday::ok" signature="std::chrono::month_weekday::ok()">
+      <Summary>Valid month and weekday</Summary>
+      <Description>C++ chrono. Checks whether the month and weekday are valid.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::weekday_indexed::index" signature="std::chrono::weekday_indexed::index()">
+      <Summary>Weekday index</Summary>
+      <Description>C++ chrono. Returns the index of the weekday.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::weekday_indexed::weekday" signature="std::chrono::weekday_indexed::weekday()">
+      <Summary>Weekday</Summary>
+      <Description>C++ chrono. Returns the weekday.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::weekday_indexed::ok" signature="std::chrono::weekday_indexed::ok()">
+      <Summary>Valid weekday</Summary>
+      <Description>C++ chrono. Checks whether the weekday and index are valid.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::weekday_last::weekday" signature="std::chrono::weekday_last::weekday()">
+      <Summary>Weekday</Summary>
+      <Description>C++ chrono. Returns the weekday.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::weekday_last::ok" signature="std::chrono::weekday_last::ok()">
+      <Summary>Valid weekday</Summary>
+      <Description>C++ chrono. Checks whether the weekday is valid.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::hh_mm_ss::hours" signature="std::chrono::hh_mm_ss::hours()">
+      <Summary>Hours</Summary>
+      <Description>C++ chrono. Returns the hours of the time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::hh_mm_ss::minutes" signature="std::chrono::hh_mm_ss::minutes()">
+      <Summary>Minutes</Summary>
+      <Description>C++ chrono. Returns the minutes of the time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::hh_mm_ss::seconds" signature="std::chrono::hh_mm_ss::seconds()">
+      <Summary>Seconds</Summary>
+      <Description>C++ chrono. Returns the seconds of the time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::hh_mm_ss::subseconds" signature="std::chrono::hh_mm_ss::subseconds()">
+      <Summary>Subseconds</Summary>
+      <Description>C++ chrono. Returns the fractional part of the time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::hh_mm_ss::is_negative" signature="std::chrono::hh_mm_ss::is_negative()">
+      <Summary>Negative time</Summary>
+      <Description>C++ chrono. Checks whether the duration is negative.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::hh_mm_ss::to_duration" signature="std::chrono::hh_mm_ss::to_duration()">
+      <Summary>Duration</Summary>
+      <Description>C++ chrono. Returns the stored duration.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::time_zone::name" signature="std::chrono::time_zone::name()">
+      <Summary>Time zone name</Summary>
+      <Description>C++ chrono. Returns the name of the time zone.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::time_zone::get_info" signature="std::chrono::time_zone::get_info(TimePoint time_point)">
+      <Summary>Time zone information</Summary>
+      <Description>C++ chrono. Returns the offset and daylight saving information at the time point.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::time_zone::to_sys" signature="std::chrono::time_zone::to_sys(LocalTime time_point)">
+      <Summary>Local to system</Summary>
+      <Description>C++ chrono. Converts a local time point to system time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::time_zone::to_local" signature="std::chrono::time_zone::to_local(SysTime time_point)">
+      <Summary>System to local</Summary>
+      <Description>C++ chrono. Converts a system time point to local time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::zoned_time::get_time_zone" signature="std::chrono::zoned_time::get_time_zone()">
+      <Summary>Time zone</Summary>
+      <Description>C++ chrono. Returns the time zone of the zoned time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::zoned_time::get_sys_time" signature="std::chrono::zoned_time::get_sys_time()">
+      <Summary>System time</Summary>
+      <Description>C++ chrono. Returns the stored system time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::zoned_time::get_local_time" signature="std::chrono::zoned_time::get_local_time()">
+      <Summary>Local time</Summary>
+      <Description>C++ chrono. Returns the stored local time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::zoned_time::get_info" signature="std::chrono::zoned_time::get_info()">
+      <Summary>Time zone information</Summary>
+      <Description>C++ chrono. Returns the offset and daylight saving information.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::zoned_time::name" signature="std::chrono::zoned_time::name()">
+      <Summary>Time zone name</Summary>
+      <Description>C++ chrono. Returns the name of the time zone.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::sys_info::offset">
+      <Summary>UTC offset</Summary>
+      <Description>C++ chrono. Returns the offset from UTC.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::sys_info::abbrev">
+      <Summary>Zone abbreviation</Summary>
+      <Description>C++ chrono. Returns the abbreviation of the time zone.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::sys_info::begin">
+      <Summary>Start of the interval</Summary>
+      <Description>C++ chrono. Returns the start of the validity interval.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::sys_info::end">
+      <Summary>End of the interval</Summary>
+      <Description>C++ chrono. Returns the end of the validity interval.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::local_info::result">
+      <Summary>Conversion result</Summary>
+      <Description>C++ chrono. Describes how the local time maps to system time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::utc_clock::now" signature="std::chrono::utc_clock::now()">
+      <Summary>Current UTC time</Summary>
+      <Description>C++ chrono. Returns the current UTC time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::utc_clock::from_sys" signature="std::chrono::utc_clock::from_sys(SysTime time_point)">
+      <Summary>System to UTC</Summary>
+      <Description>C++ chrono. Converts a system time point to UTC.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::utc_clock::to_sys" signature="std::chrono::utc_clock::to_sys(UtcTime time_point)">
+      <Summary>UTC to system</Summary>
+      <Description>C++ chrono. Converts a UTC time point to system time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::tai_clock::now" signature="std::chrono::tai_clock::now()">
+      <Summary>Current TAI time</Summary>
+      <Description>C++ chrono. Returns the current TAI time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::tai_clock::from_utc" signature="std::chrono::tai_clock::from_utc(UtcTime time_point)">
+      <Summary>UTC to TAI</Summary>
+      <Description>C++ chrono. Converts a UTC time point to TAI.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::tai_clock::to_utc" signature="std::chrono::tai_clock::to_utc(TaiTime time_point)">
+      <Summary>TAI to UTC</Summary>
+      <Description>C++ chrono. Converts a TAI time point to UTC.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::gps_clock::now" signature="std::chrono::gps_clock::now()">
+      <Summary>Current GPS time</Summary>
+      <Description>C++ chrono. Returns the current GPS time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::gps_clock::from_utc" signature="std::chrono::gps_clock::from_utc(UtcTime time_point)">
+      <Summary>UTC to GPS</Summary>
+      <Description>C++ chrono. Converts a UTC time point to GPS time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::gps_clock::to_utc" signature="std::chrono::gps_clock::to_utc(GpsTime time_point)">
+      <Summary>GPS to UTC</Summary>
+      <Description>C++ chrono. Converts a GPS time point to UTC.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::file_clock::now" signature="std::chrono::file_clock::now()">
+      <Summary>Current file time</Summary>
+      <Description>C++ chrono. Returns the current file clock time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::file_clock::from_sys" signature="std::chrono::file_clock::from_sys(SysTime time_point)">
+      <Summary>System to file time</Summary>
+      <Description>C++ chrono. Converts a system time point to file time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::chrono::file_clock::to_sys" signature="std::chrono::file_clock::to_sys(FileTime time_point)">
+      <Summary>File to system time</Summary>
+      <Description>C++ chrono. Converts a file time point to system time.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::string::contains" signature="std::string::contains(string_view value)">
+      <Summary>Contains a substring</Summary>
+      <Description>C++ string. Checks whether the string contains the substring.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::string::resize_and_overwrite" signature="std::string::resize_and_overwrite(size_type count, Operation op)">
+      <Summary>Resize with a callback</Summary>
+      <Description>C++ string. Resizes the string and lets the callback fill the characters.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::string_view::contains" signature="std::string_view::contains(string_view value)">
+      <Summary>Contains a substring</Summary>
+      <Description>C++ string. Checks whether the view contains the substring.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::span::size_bytes" signature="std::span::size_bytes()">
+      <Summary>Size in bytes</Summary>
+      <Description>C++ string. Returns the size of the view in bytes.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::span::cbegin" signature="std::span::cbegin()">
+      <Summary>Const begin iterator</Summary>
+      <Description>C++ string. Returns a const iterator to the first element of the view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::span::cend" signature="std::span::cend()">
+      <Summary>Const end iterator</Summary>
+      <Description>C++ string. Returns a const iterator one past the last element of the view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::span::rbegin" signature="std::span::rbegin()">
+      <Summary>Reverse begin iterator</Summary>
+      <Description>C++ string. Returns a reverse iterator to the last element of the view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::span::rend" signature="std::span::rend()">
+      <Summary>Reverse end iterator</Summary>
+      <Description>C++ string. Returns a reverse iterator before the first element of the view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::span::crbegin" signature="std::span::crbegin()">
+      <Summary>Const reverse begin</Summary>
+      <Description>C++ string. Returns a const reverse iterator to the last element of the view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::span::crend" signature="std::span::crend()">
+      <Summary>Const reverse end</Summary>
+      <Description>C++ string. Returns a const reverse iterator before the first element of the view.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic::wait" signature="std::atomic::wait(T old_value)">
+      <Summary>Wait for a change</Summary>
+      <Description>C++ atomic. Blocks until the atomic value differs from the given one.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic::notify_one" signature="std::atomic::notify_one()">
+      <Summary>Wake one waiter</Summary>
+      <Description>C++ atomic. Wakes one thread waiting on the atomic value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic::notify_all" signature="std::atomic::notify_all()">
+      <Summary>Wake all waiters</Summary>
+      <Description>C++ atomic. Wakes all threads waiting on the atomic value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_flag::wait" signature="std::atomic_flag::wait(bool old_value)">
+      <Summary>Wait for a change</Summary>
+      <Description>C++ atomic. Blocks until the flag differs from the given value.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_flag::notify_one" signature="std::atomic_flag::notify_one()">
+      <Summary>Wake one waiter</Summary>
+      <Description>C++ atomic. Wakes one thread waiting on the flag.</Description>
+    </Symbol>
+    <Symbol language="Cpp" name="std::atomic_flag::notify_all" signature="std::atomic_flag::notify_all()">
+      <Summary>Wake all waiters</Summary>
+      <Description>C++ atomic. Wakes all threads waiting on the flag.</Description>
+    </Symbol>
   </Symbols>
 </ApiSymbols>
