@@ -87,6 +87,7 @@ internal static class Program
         Put(data, "unrelated.txt", "x");
         Put(local, "GUIPreferences.xml", GuiXml);
         Put(local, "TftpFirmware.xml", TftpXml);
+        Put(data, "QuickCommands.xml", QuickXml);
         Put(local, "other.dat", "x");
     }
 
@@ -409,6 +410,41 @@ internal static class Program
         RunOpenSshFormatKeyChecks();
         RunCompletionsGzipChecks();
         RunTftpFirmwareChecks();
+        RunQuickCommandsChecks();
+    }
+
+    private const string QuickXml = "<?xml version=\"1.0\"?><QuickCommandList><Items><QuickCommand><Name>MTD</Name><Kind>Command</Kind><Text>cat /proc/mtd</Text><Enabled>true</Enabled></QuickCommand></Items></QuickCommandList>";
+
+    // Tools > Quick commands keeps its list in %APPDATA%\SmarTTY\QuickCommands.xml, next to Settings.xml.
+    private static void RunQuickCommandsChecks()
+    {
+        string srcData = NewDir("quick-srcdata"), srcLocal = NewDir("quick-srclocal");
+        Put(srcData, "QuickCommands.xml", QuickXml);
+        SettingsLocations src = MakeLocations(srcData, srcLocal, null, null, null);
+        Check(SettingsArchive.Describe(src).Available == SettingsParts.QuickCommands, "describe finds the quick commands");
+
+        string archive = Path.Combine(NewDir("quick-out"), "quick.tar.gz");
+        var exported = SettingsArchive.Export(archive, src, SettingsParts.QuickCommands);
+        var entries = ReadArchive(archive);
+        Check(exported.FileCount == 1 && entries.Count == 1 && entries[0].Name == "QuickCommands.xml" && Encoding.UTF8.GetString(entries[0].Data) == QuickXml, "the quick commands go into the archive as QuickCommands.xml, as they are");
+        Check(SettingsArchive.Inspect(archive).Available == SettingsParts.QuickCommands, "inspect offers the quick commands of an archive");
+        Check((SettingsParts.Default & SettingsParts.QuickCommands) != SettingsParts.None, "the quick commands are selected by default");
+
+        string dstData = NewDir("quick-dstdata"), dstLocal = NewDir("quick-dstlocal");
+        Put(dstData, "QuickCommands.xml", "<?xml version=\"1.0\"?><QuickCommandList><Items /></QuickCommandList>");
+        var imported = SettingsArchive.Import(archive, MakeLocations(dstData, dstLocal, null, null, null), SettingsParts.QuickCommands, Path.Combine(NewDir("quick-backup"), "before.tar.gz"));
+        Check(imported.QuickCommandsImported && imported.FileCount == 1 && Read(dstData, "QuickCommands.xml") == QuickXml, "import restores the quick commands next to Settings.xml");
+        Check(imported.BackupPath != null && ReadArchive(imported.BackupPath).Any(e => e.Name == "QuickCommands.xml"), "the quick commands that are replaced are backed up first");
+        Check(!File.Exists(Path.Combine(dstLocal, "QuickCommands.xml")), "the quick commands are not written to the local directory");
+
+        // not selected: the file of the archive is left out
+        string keepData = NewDir("quick-keepdata");
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(archive, MakeLocations(keepData, NewDir("quick-keeplocal"), null, null, null), SettingsParts.MainSettings, null), "an archive with only quick commands has nothing for another part");
+        Check(!File.Exists(Path.Combine(keepData, "QuickCommands.xml")), "the quick commands are imported only when selected");
+
+        string wrongRoot = Path.Combine(NewDir("quick-out"), "wrong-root.tar.gz");
+        MakeArchive(wrongRoot, E("QuickCommands.xml", "<GlobalSettings/>"));
+        ExpectThrows<InvalidDataException>(() => SettingsArchive.Import(wrongRoot, NewDir("quick-x"), NewDir("quick-y"), null), "a quick commands entry with another root element is rejected");
     }
 
     // The TFTP server / U-Boot upload window keeps its settings in %LOCALAPPDATA%\SmarTTY\TftpFirmware.xml.

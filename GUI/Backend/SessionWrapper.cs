@@ -2539,6 +2539,105 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         });
     }
 
+    /// <summary>
+    /// Tools > Quick commands, chosen in the menu of a terminal: a command is put into the command line; a script is uploaded into
+    /// the current folder of that terminal (its home folder when the folder cannot be told), made executable, and "./name" is put
+    /// into the command line. Nothing runs until the user presses Enter.
+    /// </summary>
+    public void InsertQuickCommand(QuickCommand item, TerminalEmulatorControl terminal)
+    {
+        if (item == null || terminal == null)
+        {
+            return;
+        }
+        if (item.Kind == QuickCommandKind.Command)
+        {
+            terminal.InsertCommand(QuickCommandRules.ToCommandLine(item.Text));
+            terminal.Focus();
+            return;
+        }
+        SshSession session = Session;
+        if (session == null || session.IsConnectionClosed)
+        {
+            MessageBoxes.Error("The SSH session is not connected.");
+            return;
+        }
+        if (IsWindowsHost)
+        {
+            MessageBoxes.Error("Shell scripts cannot be run on a Windows server.");
+            return;
+        }
+        string problem = QuickCommandRules.Validate(item);
+        if (problem != null)
+        {
+            MessageBoxes.Error(item.MenuText + ": " + problem);
+            return;
+        }
+        NormalTabContext tab = Tabs.OfType<NormalTabContext>().FirstOrDefault((NormalTabContext candidate) => candidate.Terminal == terminal);
+        string currentDir = tab != null ? TryExtractCurrentDir(tab) : null;
+        byte[] data = QuickCommandRules.ScriptBytes(item.Text);
+        string fileName = item.FileName;
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            string directory = currentDir;
+            string error = null;
+            bool inCurrentFolder = directory != null;
+            try
+            {
+                if (directory == null)
+                {
+                    // An exec channel starts in the home folder of the user.
+                    directory = session.RunCommandChecked("pwd", requireSuccess: true, timeout: TimeSpan.FromSeconds(20))?.FirstOrDefault(line => line.StartsWith("/", StringComparison.Ordinal))?.Trim();
+                    if (directory == null)
+                    {
+                        session.ThrowIfConnectionLost();
+                        throw new IOException("The folder of the terminal cannot be told, and the home folder could not be read.");
+                    }
+                }
+                string remotePath = QuickCommandRules.RemotePath(directory, fileName);
+                List<string> exists = session.RunCommand(QuickCommandRules.BuildExistsCommand(remotePath), out _, timeout: TimeSpan.FromSeconds(20));
+                if (exists != null && exists.Any(line => line.Trim() == "exists"))
+                {
+                    bool replace = _Controller.Dispatcher.Invoke(() => MessageBoxes.Ask(remotePath + " exists already. Replace it with the script \"" + item.MenuText + "\"?"));
+                    if (!replace)
+                    {
+                        return;
+                    }
+                }
+                session.PtyGate.BeginPlainHelper();
+                try
+                {
+                    using SshShellChannel channel = session.OpenShellChannel(QuickCommandRules.BuildUploadCommand(remotePath), null, ExtendedDataMode.Normal);
+                    channel.Input.Write(data, 0, data.Length);
+                    channel.SendEof();
+                    string stderr = new StreamReader(channel.Error).ReadToEnd().Trim();
+                    channel.WaitClosed();
+                    if (!channel.HasExitStatus || channel.ExitStatus != 0)
+                    {
+                        session.ThrowIfConnectionLost();
+                        throw new IOException(stderr.Length > 0 ? stderr : "the upload failed (exit status " + (channel.HasExitStatus ? channel.ExitStatus.ToString(System.Globalization.CultureInfo.InvariantCulture) : "unknown") + ")");
+                    }
+                }
+                finally
+                {
+                    session.PtyGate.EndPlainHelper();
+                }
+                string invocation = inCurrentFolder ? QuickCommandRules.BuildInvocation(fileName) : QuickCommandRules.BuildInvocation(fileName, directory);
+                _Controller.BeginInvoke(() =>
+                {
+                    terminal.InsertCommand(invocation);
+                    terminal.Focus();
+                });
+                return;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+            }
+            _Controller.BeginInvoke(() => MessageBoxes.Error("Cannot put the script " + fileName + " on the server: " + error));
+        });
+    }
+
     public void CloseFirstMatchingPage(Predicate<ITabContext> pred, bool closeSessionIfEmpty)
     {
         for (int tabIndex = 0; tabIndex < Tabs.Count; tabIndex++)

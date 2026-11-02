@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.QuickCommandsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Quick commands" SnapsToDevicePixels="True" WindowStartupLocation="CenterOwner" Width="820" Height="680" MinWidth="560" MinHeight="460" ShowInTaskbar="False" Style="{DynamicResource SecondaryWindowStyle}" FocusManager.FocusedElement="{Binding ElementName=ItemList}">
+  <Window.Resources>
+    <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+  </Window.Resources>
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0 0 0 8">
+      The commands and scripts that the menu of the terminal offers (right click on the terminal). A command is put into the command line;
+      a script is put into the current folder of the terminal, made executable, and ./name is put into the command line. Nothing runs
+      until you press Enter. Untick Show to hide an item from the menu without deleting it.
+    </TextBlock>
+
+    <!-- The list. -->
+    <ListView Name="ItemList" Grid.Row="1" SelectionMode="Single" SelectionChanged="ItemList_SelectionChanged" KeyDown="ItemList_KeyDown">
+      <ListView.View>
+        <GridView>
+          <GridView.Columns>
+            <GridViewColumn Header="Show" Width="48">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate>
+                  <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" ToolTip="Show this item in the menu of the terminal" />
+                </DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn Header="Name" Width="170" DisplayMemberBinding="{Binding MenuText}" />
+            <GridViewColumn Header="Type" Width="70" DisplayMemberBinding="{Binding KindText}" />
+            <GridViewColumn Header="Command / script" Width="460">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Summary}" TextTrimming="CharacterEllipsis" FontFamily="Consolas" ToolTip="{Binding Problem}">
+                    <TextBlock.Style>
+                      <Style TargetType="{x:Type TextBlock}">
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding HasProblem}" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource Theme.Error}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+          </GridView.Columns>
+        </GridView>
+      </ListView.View>
+    </ListView>
+
+    <!-- What can be done with the list. -->
+    <WrapPanel Grid.Row="2" Margin="0 6 0 0">
+      <Button Name="AddCommandButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="AddCommand_Click" ToolTip="A command line, such as cat /proc/mtd or sudo make install">
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/terminal.png" />
+          <TextBlock Margin="4 0 0 0" Text="Add command" />
+        </StackPanel>
+      </Button>
+      <Button Name="AddScriptButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="AddScript_Click" ToolTip="A shell script written here">
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/MainWindow/new16.png" />
+          <TextBlock Margin="4 0 0 0" Text="Add script" />
+        </StackPanel>
+      </Button>
+      <Button Name="ImportScriptButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="ImportScript_Click" ToolTip="A shell script from a file of this computer (.sh)">
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/open16.png" />
+          <TextBlock Margin="4 0 0 0" Text="Add script from file..." />
+        </StackPanel>
+      </Button>
+      <Button Name="DuplicateButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="Duplicate_Click" IsEnabled="False">
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/MainWindow/copy.png" />
+          <TextBlock Margin="4 0 0 0" Text="Duplicate" />
+        </StackPanel>
+      </Button>
+      <Button Name="DeleteButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="Delete_Click" IsEnabled="False" ToolTip="Delete the selected item (Del)">
+        <StackPanel Orientation="Horizontal">
+          <Image Width="16" Height="16" Source="../icons/delete16.png" />
+          <TextBlock Margin="4 0 0 0" Text="Delete" />
+        </StackPanel>
+      </Button>
+      <Button Name="UpButton" Content="Move up" Padding="8 2 8 2" Margin="0 0 6 4" MinWidth="70" Click="Up_Click" IsEnabled="False" ToolTip="The menu shows the items in this order" />
+      <Button Name="DownButton" Content="Move down" Padding="8 2 8 2" Margin="0 0 6 4" MinWidth="70" Click="Down_Click" IsEnabled="False" />
+    </WrapPanel>
+
+    <!-- The selected item. -->
+    <GroupBox Name="EditorBox" Grid.Row="3" Header="Selected item" Margin="0 6 0 0" IsEnabled="False">
+      <Grid Margin="6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="Name in the menu:" VerticalAlignment="Center" Margin="0 0 8 0" />
+        <TextBox Name="NameBox" Grid.Row="0" Grid.Column="1" Margin="0 2 0 2" Style="{DynamicResource ThemedTextBox}" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" ToolTip="Leave it empty to show the command itself" />
+        <TextBlock Grid.Row="1" Text="Type:" VerticalAlignment="Center" Margin="0 0 8 0" />
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0 2 0 2">
+          <RadioButton Name="CommandRadio" GroupName="Kind" Content="Command (put into the command line)" IsChecked="{Binding IsCommand, Mode=TwoWay}" Margin="0 0 16 0" />
+          <RadioButton Name="ScriptRadio" GroupName="Kind" Content="Shell script (put into the current folder and made executable)" IsChecked="{Binding IsScript, Mode=TwoWay}" />
+        </StackPanel>
+        <TextBlock Grid.Row="2" Text="Command:" VerticalAlignment="Center" Margin="0 0 8 0" Visibility="{Binding IsCommand, Converter={StaticResource BoolToVisibility}}" />
+        <TextBox Name="CommandBox" Grid.Row="2" Grid.Column="1" Margin="0 2 0 2" FontFamily="Consolas" Style="{DynamicResource ThemedTextBox}" Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding IsCommand, Converter={StaticResource BoolToVisibility}}" ToolTip="One command line, for example: cat /proc/mtd" />
+        <TextBlock Grid.Row="3" Text="File name:" VerticalAlignment="Center" Margin="0 0 8 0" Visibility="{Binding IsScript, Converter={StaticResource BoolToVisibility}}" />
+        <TextBox Name="FileNameBox" Grid.Row="3" Grid.Column="1" Margin="0 2 0 2" FontFamily="Consolas" Style="{DynamicResource ThemedTextBox}" Text="{Binding FileName, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding IsScript, Converter={StaticResource BoolToVisibility}}" ToolTip="The name of the script in the current folder of the terminal, for example setup.sh" />
+        <DockPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Margin="0 2 0 2" Visibility="{Binding IsScript, Converter={StaticResource BoolToVisibility}}">
+          <DockPanel DockPanel.Dock="Top" Margin="0 0 0 2">
+            <Button Name="LoadFileButton" DockPanel.Dock="Right" Content="Load from file..." Padding="8 1 8 1" Click="LoadFile_Click" ToolTip="Replace the script with the content of a file of this computer" />
+            <TextBlock Text="Script (sh, ash or bash; Windows line ends are turned into Unix ones):" VerticalAlignment="Center" />
+          </DockPanel>
+          <TextBox Name="ScriptBox" Height="180" AcceptsReturn="True" AcceptsTab="True" TextWrapping="NoWrap" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Style="{DynamicResource ThemedTextBox}" Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+        </DockPanel>
+        <TextBlock Name="ProblemText" Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Margin="0 4 0 0" TextWrapping="Wrap" Foreground="{DynamicResource Theme.Error}" Text="{Binding Problem}" Visibility="{Binding HasProblem, Converter={StaticResource BoolToVisibility}}" />
+      </Grid>
+    </GroupBox>
+
+    <DockPanel Grid.Row="4" Margin="0 10 0 0" LastChildFill="False">
+      <TextBlock Name="FileText" DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource Theme.TextSecondary}" TextTrimming="CharacterEllipsis" MaxWidth="460" />
+      <Button DockPanel.Dock="Right" Content="Cancel" MinWidth="80" IsCancel="True" />
+      <Button Name="SaveButton" DockPanel.Dock="Right" Content="_Save" MinWidth="80" Margin="0 0 6 0" IsDefault="True" Click="Save_Click" />
+    </DockPanel>
+  </Grid>
+</Window>

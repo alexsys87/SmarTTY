@@ -300,6 +300,11 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         Controller.MenuCommandHandlers.SetupPublicKey();
     }
 
+    private void QuickCommands_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.ShowQuickCommands();
+    }
+
     private void RunScript_Click(object sender, RoutedEventArgs e)
     {
         Controller.MenuCommandHandlers.RunScript();

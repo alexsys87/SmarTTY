@@ -209,6 +209,10 @@ internal static class SettingsArchiveDialogs
         {
             done.Add("TFTP firmware settings");
         }
+        if (result.QuickCommandsImported)
+        {
+            done.Add("quick commands");
+        }
         if (result.CommandCompletionsImported)
         {
             done.Add("command completions");

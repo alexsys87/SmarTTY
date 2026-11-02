@@ -285,6 +285,11 @@
             <Image Source="../icons/MainWindow/upload.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="_Quick commands..." Click="QuickCommands_Click" ToolTip="Your own commands (cat /proc/mtd, sudo make install...) and shell scripts for the menu of the terminal (right click): a command is put into the command line, a script is put into the current folder and made executable; Enter runs it">
+          <MenuItem.Icon>
+            <Image Source="../icons/terminal.png" />
+          </MenuItem.Icon>
+        </MenuItem>
         <MenuItem Header="Command _completions..." Click="CommandCompletionsEditor_Click" ToolTip="Edit or create the options that the Smart Terminal suggests for commands (CommandCompletions.xml); can store the file compressed">
           <MenuItem.Icon>
             <Image Source="../icons/edit16.png" />

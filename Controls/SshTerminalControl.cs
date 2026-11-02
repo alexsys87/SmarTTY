@@ -1967,6 +1967,28 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         });
     }
 
+    public override void InsertCommand(string text)
+    {
+        if (_inputLine == null)
+        {
+            // A program runs (or the shell is not at its prompt): the text goes to it as typed keys.
+            base.InsertCommand(text);
+            return;
+        }
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+        if (_historySearch != null)
+        {
+            _historySearch.Append(text);
+            ShowHistorySearchLine();
+            return;
+        }
+        PrepareInputForEditing();
+        InsertText(text);
+    }
+
     public override void PasteText(string clipboardText)
     {
         if (_inputLine == null)

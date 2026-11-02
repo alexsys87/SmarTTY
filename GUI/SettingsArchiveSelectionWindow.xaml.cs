@@ -38,6 +38,7 @@ public partial class SettingsArchiveSelectionWindow : Window
         Add(KnownHostsBox, SettingsParts.KnownHosts, available, null);
         Add(GuiPreferencesBox, SettingsParts.GuiPreferences, available, null);
         Add(TftpFirmwareBox, SettingsParts.TftpFirmware, available, null);
+        Add(QuickCommandsBox, SettingsParts.QuickCommands, available, null);
         Add(SshProfilesBox, SettingsParts.SshProfiles, available, available.SshProfiles);
         Add(RawProfilesBox, SettingsParts.RawProfiles, available, available.RawProfiles);
         Add(PasswordsBox, SettingsParts.SavedPasswords, available, null);
