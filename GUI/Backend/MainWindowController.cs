@@ -210,6 +210,8 @@ public class MainWindowController : INotifyPropertyChanged
         internal void NewSession()
         {
             ConnectionSelectionWindow connectionSelectionWindow = new ConnectionSelectionWindow(showRawConnections: true, null);
+            // Owned by the main window: a window that is modal to it but does not belong to it can be left behind it.
+            WindowOwnership.Attach(connectionSelectionWindow, _Controller._Window);
             bool? dialogResult = connectionSelectionWindow.ShowDialog();
             DeviceTerminalSettings pendingDevice = connectionSelectionWindow.Controller.TakePendingRawConnectionSettings();
             if (pendingDevice != null)

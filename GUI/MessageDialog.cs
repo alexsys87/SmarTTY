@@ -92,6 +92,10 @@ internal sealed class MessageDialog : Window
         MessageDialog dialog = new MessageDialog(text, caption, icon, buttons, defaultResult);
         // Owned by the window the user is working in, so the prompt stays above it and is centered on it.
         WindowOwnership.Attach(dialog, owner ?? WindowOwnership.ActiveWindow());
+        // A dialog that has no owner (no window is visible) must at least be reachable from the taskbar, and every dialog
+        // asks for the focus: the window flashes when another program is in front instead of waiting unseen.
+        dialog.ShowInTaskbar = dialog.Owner == null;
+        dialog.Loaded += (sender, e) => dialog.Activate();
         dialog.ShowDialog();
         return dialog._Result;
     }

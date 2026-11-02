@@ -8,30 +8,81 @@ namespace SmarTTY.GUI;
 /// </summary>
 internal static class WindowOwnership
 {
-    /// <summary>The active visible window, or null when the application has none.</summary>
+    /// <summary>
+    /// The window the user is working in: the active visible one. While none of the windows is active (the user has
+    /// switched to another program, which is likely during a connection that takes a while to fail) it is the
+    /// top-most visible window of the application, so that a dialog still has an owner. Null only when no window is visible.
+    /// </summary>
     internal static Window ActiveWindow()
     {
         WindowCollection windows = Application.Current?.Windows;
-        if (windows != null)
+        if (windows == null)
         {
-            foreach (Window window in windows)
+            return null;
+        }
+        foreach (Window window in windows)
+        {
+            if (window.IsActive && window.IsVisible)
             {
-                if (window.IsActive && window.IsVisible)
-                {
-                    return window;
-                }
+                return window;
             }
         }
-        return null;
+        return TopVisibleWindow(windows);
     }
 
     /// <summary>
-    /// Makes <paramref name="dialog"/> a child of <paramref name="owner"/>, centered on it. Without an owner the
-    /// dialog is centered on the screen instead.
+    /// Without an owner a modal dialog that opens while another program is in front is not in the taskbar and stays
+    /// behind that program, while every window of this application is disabled by it: the application seems to ignore
+    /// all clicks. Owned by the window the user left last, the dialog stays on top of it and is brought forward with it.
+    /// </summary>
+    private static Window TopVisibleWindow(WindowCollection windows)
+    {
+        Window current = Application.Current.MainWindow;
+        if (current == null || !current.IsVisible)
+        {
+            current = null;
+            foreach (Window window in windows)
+            {
+                if (window.IsVisible && window.Owner == null)
+                {
+                    current = window;
+                    break;
+                }
+            }
+        }
+        // The dialog the user was in is the deepest of the windows that own each other.
+        while (current != null)
+        {
+            Window deeper = null;
+            foreach (Window owned in current.OwnedWindows)
+            {
+                if (owned.IsVisible)
+                {
+                    deeper = owned;
+                }
+            }
+            if (deeper == null)
+            {
+                break;
+            }
+            current = deeper;
+        }
+        return current;
+    }
+
+    /// <summary>
+    /// Makes <paramref name="dialog"/> a child of <paramref name="owner"/>, centered on it. An owner that is missing, or
+    /// is not on the screen (it would be refused: a window that was never shown cannot own one), is replaced by the
+    /// window the user is working in, because a dialog without an owner may open behind the other windows. Only when the
+    /// application has no visible window at all the dialog is centered on the screen instead.
     /// </summary>
     internal static void Attach(Window dialog, Window owner)
     {
-        if (owner != null)
+        if (owner == null || !owner.IsVisible)
+        {
+            owner = ActiveWindow();
+        }
+        if (owner != null && !ReferenceEquals(owner, dialog))
         {
             dialog.Owner = owner;
             dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
