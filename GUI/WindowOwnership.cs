@@ -71,12 +71,18 @@ internal static class WindowOwnership
     }
 
     /// <summary>
-    /// Makes <paramref name="dialog"/> a child of <paramref name="owner"/>, centered on it. Without an owner the
-    /// dialog is centered on the screen instead.
+    /// Makes <paramref name="dialog"/> a child of <paramref name="owner"/>, centered on it. An owner that is missing, or
+    /// is not on the screen (it would be refused: a window that was never shown cannot own one), is replaced by the
+    /// window the user is working in, because a dialog without an owner may open behind the other windows. Only when the
+    /// application has no visible window at all the dialog is centered on the screen instead.
     /// </summary>
     internal static void Attach(Window dialog, Window owner)
     {
-        if (owner != null)
+        if (owner == null || !owner.IsVisible)
+        {
+            owner = ActiveWindow();
+        }
+        if (owner != null && !ReferenceEquals(owner, dialog))
         {
             dialog.Owner = owner;
             dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
