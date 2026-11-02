@@ -28,7 +28,10 @@ public enum SessionTool
     X11Check,
 
     /// <summary>Tools > TFTP server / U-Boot upload: for a COM or TCP device session.</summary>
-    TftpFirmware
+    TftpFirmware,
+
+    /// <summary>Tools > Backup to tar.gz: runs tar on a Unix host and streams the archive through the SSH channel.</summary>
+    Backup
 }
 
 /// <summary>What is known about the host of a session when the Tools menu is shown.</summary>
@@ -49,13 +52,17 @@ public readonly struct RemoteHostFacts
     /// <summary>The probe in the background found OpenWrt with opkg or apk.</summary>
     public bool HasLocalRepoManager { get; }
 
-    public RemoteHostFacts(bool isDevice, RemoteOsKind os, RemoteKernelKind kernel, bool hasPackageManager, bool hasLocalRepoManager)
+    /// <summary>The probe in the background found tar on the host (false until it has answered).</summary>
+    public bool HasTar { get; }
+
+    public RemoteHostFacts(bool isDevice, RemoteOsKind os, RemoteKernelKind kernel, bool hasPackageManager, bool hasLocalRepoManager, bool hasTar = false)
     {
         IsDevice = isDevice;
         Os = os;
         Kernel = kernel;
         HasPackageManager = hasPackageManager;
         HasLocalRepoManager = hasLocalRepoManager;
+        HasTar = hasTar;
     }
 }
 
@@ -96,6 +103,9 @@ public static class ToolAvailability
             case SessionTool.X11Check:
                 // sh, chmod, /tmp and xauth are tools of a Unix host.
                 return host.Os != RemoteOsKind.Windows;
+            case SessionTool.Backup:
+                // /bin/sh and tar: offered once the probe has found tar, so a host without it (or a Windows one) never sees the item.
+                return host.Os != RemoteOsKind.Windows && host.HasTar;
             default:
                 return true;
         }

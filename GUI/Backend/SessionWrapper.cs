@@ -173,6 +173,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // the previous answer alone, like for the package managers.
     private RemoteKernelKind _Kernel;
 
+    // Whether the host has tar, so that "Tools > Backup to tar.gz" is offered: from the same probe as the kernel, false until it
+    // has answered. A failed probe leaves the previous answer alone.
+    private bool _HasTar;
+
     private RemoteOsKind _RemoteOs;
 
     /// <summary>What the SSH server runs on: from its identification string at connect, confirmed by a command when that said nothing.</summary>
@@ -220,7 +224,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// What the Tools menu needs to know about the host of this session: the one input of <see cref="ToolAvailability"/>, which decides
     /// for every item whether it can work here and so whether it is in the menu at all.
     /// </summary>
-    private RemoteHostFacts HostFacts => new RemoteHostFacts(IsDevice, _RemoteOs, _Kernel, _HasPackageManager, _LocalRepoManager != null);
+    private RemoteHostFacts HostFacts => new RemoteHostFacts(IsDevice, _RemoteOs, _Kernel, _HasPackageManager, _LocalRepoManager != null, _HasTar);
 
     private System.Windows.Visibility ToolVisibility(SessionTool tool)
     {
@@ -234,7 +238,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             nameof(PackageManagerMenuVisibility), nameof(ProcessManagerMenuVisibility), nameof(LocalRepoMenuVisibility),
             nameof(PortForwardingMenuVisibility), nameof(SocksProxyMenuVisibility), nameof(PublicKeyMenuVisibility),
-            nameof(RunScriptMenuVisibility), nameof(X11CheckMenuVisibility), nameof(TftpFirmwareMenuVisibility)
+            nameof(RunScriptMenuVisibility), nameof(X11CheckMenuVisibility), nameof(TftpFirmwareMenuVisibility),
+            nameof(BackupMenuVisibility)
         })
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -257,6 +262,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     public System.Windows.Visibility X11CheckMenuVisibility => ToolVisibility(SessionTool.X11Check);
 
     public System.Windows.Visibility TftpFirmwareMenuVisibility => ToolVisibility(SessionTool.TftpFirmware);
+
+    public System.Windows.Visibility BackupMenuVisibility => ToolVisibility(SessionTool.Backup);
 
     public System.Windows.Visibility SshOnlyVisibility => IsDevice ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
@@ -813,6 +820,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             }
             LocalRepoPackageManager? manager = isWindows ? null : OpenWrtDetector.Detect(output);
             RemoteKernelKind kernel = isWindows ? RemoteKernelKind.Unknown : RemoteOsDetector.FromKernelProbe(output);
+            bool? hasTar = isWindows ? false : SmarTTY.Transport.RemoteBackup.FromTarProbe(output);
             _Controller.BeginInvoke(() =>
             {
                 // A reconnect may have replaced the connection while the probe ran: only the current one counts.
@@ -829,6 +837,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 if (kernel != RemoteKernelKind.Unknown)
                 {
                     _Kernel = kernel;
+                }
+                if (hasTar.HasValue)
+                {
+                    _HasTar = hasTar.Value;
                 }
                 RaiseToolVisibilityChanged();
             });
