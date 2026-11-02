@@ -37,6 +37,14 @@
     <Compile Include="../../IO/PathUtils.cs" Link="IO/PathUtils.cs" />
     <Compile Include="../../IO/RemoteFileOperations.cs" Link="IO/RemoteFileOperations.cs" />
     <Compile Include="../../IO/RemoteScript.cs" Link="IO/RemoteScript.cs" />
+    <!-- Ssh/RemoteReboot.cs wraps its command for sudo the way the package manager does. -->
+    <Compile Include="../../PackageManagers/PackageIndexUpdater.cs" Link="PackageManagers/PackageIndexUpdater.cs" />
+    <Compile Include="../../PackageManagers/WingetPackageManagerClient.cs" Link="PackageManagers/WingetPackageManagerClient.cs" />
+    <Compile Include="../../PackageManagers/PackageManagerSelector.cs" Link="PackageManagers/PackageManagerSelector.cs" />
+    <Compile Include="../../VisualTTY/ILinuxPackageManagerClient.cs" Link="VisualTTY/ILinuxPackageManagerClient.cs" />
+    <Compile Include="../../VisualTTY/ISSHCommandRunner.cs" Link="VisualTTY/ISSHCommandRunner.cs" />
+    <Compile Include="../../VisualTTY/LinuxPackageInfo.cs" Link="VisualTTY/LinuxPackageInfo.cs" />
+    <Compile Include="../../VisualTTY/PackageCommitOptions.cs" Link="VisualTTY/PackageCommitOptions.cs" />
     <Compile Include="../../IO/RemoteProcessList.cs" Link="IO/RemoteProcessList.cs" />
     <Compile Include="../../Terminal/TerminalDirectoryWatcher.cs" Link="Terminal/TerminalDirectoryWatcher.cs" />
     <Compile Include="../../Terminal/TerminalDirectorySync.cs" Link="Terminal/TerminalDirectorySync.cs" />
