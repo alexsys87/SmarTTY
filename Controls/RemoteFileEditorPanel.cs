@@ -27,6 +27,9 @@ internal sealed class RemoteFileEditorPanel : UserControl
 
     private readonly Dictionary<LineTransformKind, ToolStripMenuItem> _transformItems = new Dictionary<LineTransformKind, ToolStripMenuItem>();
 
+    // The submenus of the hex view: highlights, Copy As, byte operations and the view options.
+    private readonly HexEditorMenu _hexMenu;
+
     // The unscaled menu font, and the font for the current monitor (null until the menu is opened).
     private readonly Font _menuFont;
 
@@ -64,6 +67,12 @@ internal sealed class RemoteFileEditorPanel : UserControl
     /// <summary>The toolbar or the context menu switched the word wrap on or off.</summary>
     public event EventHandler WordWrapChanged;
 
+    /// <summary>The byte order, the groups, the row width, the inspector or the colours of the hex view changed.</summary>
+    public event EventHandler HexViewOptionsChanged;
+
+    /// <summary>A command of the hex view needs a dialog of the main window (a colour, a byte pattern, the checksums).</summary>
+    public event EventHandler<HexDialogRequestedEventArgs> HexDialogRequested;
+
     /// <summary>The enabled state of the commands changed (for the WPF tool bar).</summary>
     internal event EventHandler StateChanged;
 
@@ -99,6 +108,20 @@ internal sealed class RemoteFileEditorPanel : UserControl
         }
         // After Word Wrap, with the other commands about how the text looks and is laid out.
         _contextMenu.Items.Insert(_contextMenu.Items.IndexOf(_menuItems[EditorToolbarCommand.WordWrap]) + 1, _textMenu);
+        // After Hex View, shown in the hex view only.
+        _hexMenu = new HexEditorMenu(
+            _editor.HexEditor,
+            kind => HexDialogRequested?.Invoke(this, new HexDialogRequestedEventArgs(kind)),
+            () =>
+            {
+                _editor.FocusActiveView();
+                RefreshState();
+            });
+        int hexMenuIndex = _contextMenu.Items.IndexOf(_menuItems[EditorToolbarCommand.ToggleHex]) + 1;
+        foreach (ToolStripMenuItem menu in _hexMenu.Menus)
+        {
+            _contextMenu.Items.Insert(hexMenuIndex++, menu);
+        }
         _menuFont = _contextMenu.Font;
         _contextMenu.Opening += (sender, e) =>
         {
@@ -129,6 +152,11 @@ internal sealed class RemoteFileEditorPanel : UserControl
         _editor.HexEditor.SaveRequested += (sender, e) => SaveRequested?.Invoke(this, EventArgs.Empty);
         _editor.HexEditor.FindRequested += (sender, e) => FindRequested?.Invoke(this, EventArgs.Empty);
         _editor.HexEditor.GoToOffsetRequested += (sender, e) => GoToLineRequested?.Invoke(this, EventArgs.Empty);
+        _editor.HexEditor.ViewOptionsChanged += (sender, e) =>
+        {
+            ScheduleRefresh();
+            HexViewOptionsChanged?.Invoke(this, EventArgs.Empty);
+        };
 
         ThemeManager.ThemeChanged += OnThemeChanged;
         ApplyTheme();
@@ -336,6 +364,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
             pair.Value.Checked = CommandState.IsChecked(pair.Key);
         }
         _textMenu.Enabled = !CommandState.ReadOnly && !CommandState.HexMode;
+        _hexMenu.Refresh(CommandState.HexMode);
         foreach (KeyValuePair<LineTransformKind, ToolStripMenuItem> pair in _transformItems)
         {
             pair.Value.Enabled = CommandState.IsEnabled(pair.Key);
@@ -405,6 +434,11 @@ internal sealed class RemoteFileEditorPanel : UserControl
         _contextMenu.Font = font;
         _textMenu.DropDown.Font = font;
         _textMenu.DropDown.ImageScalingSize = new Size(imageSize, imageSize);
+        foreach (ToolStripDropDown dropDown in _hexMenu.DropDowns)
+        {
+            dropDown.Font = font;
+            dropDown.ImageScalingSize = new Size(imageSize, imageSize);
+        }
         previousFont?.Dispose();
     }
 
@@ -420,6 +454,10 @@ internal sealed class RemoteFileEditorPanel : UserControl
         _renderer = new ThemedToolStripRenderer(_palette);
         ApplyMenuTheme(_contextMenu);
         ApplyMenuTheme(_textMenu.DropDown);
+        foreach (ToolStripDropDown dropDown in _hexMenu.DropDowns)
+        {
+            ApplyMenuTheme(dropDown);
+        }
     }
 
     private void ApplyMenuTheme(ToolStripDropDown menu)
@@ -439,6 +477,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         {
             ThemeManager.ThemeChanged -= OnThemeChanged;
             _contextMenu.Dispose();
+            _hexMenu.Dispose();
             _scaledMenuFont?.Dispose();
         }
         base.Dispose(disposing);

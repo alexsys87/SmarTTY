@@ -7,7 +7,7 @@ namespace SmarTTY.GUI;
 
 /// <summary>
 /// Asks for the byte offset to show in the hex view (Ctrl+G). Accepts decimal ("1234") and hexadecimal ("0x4D2")
-/// offsets; the editor has the final say on the bytes that exist.
+/// offsets, and distances from the caret ("+0x10", "-16"); the editor has the final say on the bytes that exist.
 /// </summary>
 internal sealed class GoToOffsetWindow : Window
 {
@@ -15,12 +15,15 @@ internal sealed class GoToOffsetWindow : Window
 
     private readonly int _length;
 
+    private readonly int _currentOffset;
+
     /// <summary>The chosen offset, within the document.</summary>
     public int Offset { get; private set; }
 
     public GoToOffsetWindow(int currentOffset, int length)
     {
         _length = Math.Max(0, length);
+        _currentOffset = Math.Max(0, currentOffset);
         Title = "Go to Offset";
         SizeToContent = SizeToContent.WidthAndHeight;
         ResizeMode = ResizeMode.NoResize;
@@ -34,7 +37,8 @@ internal sealed class GoToOffsetWindow : Window
         };
         panel.Children.Add(new TextBlock
         {
-            Text = "Byte offset (decimal or 0x hexadecimal), 0 - 0x" + _length.ToString("X", System.Globalization.CultureInfo.InvariantCulture) + ":",
+            Text = "Byte offset (decimal or 0x hexadecimal), 0 - 0x" + _length.ToString("X", System.Globalization.CultureInfo.InvariantCulture) + ",\n"
+                + "or a distance from the caret (+0x10, -16):",
             Margin = new Thickness(0, 0, 0, 5)
         });
         _offsetBox = new TextBox
@@ -78,9 +82,9 @@ internal sealed class GoToOffsetWindow : Window
 
     private void OK_Click(object sender, RoutedEventArgs e)
     {
-        if (!HexDocument.TryParseOffset(_offsetBox.Text, _length, out int offset))
+        if (!HexDocument.TryParseOffset(_offsetBox.Text, _length, _currentOffset, out int offset))
         {
-            MessageBoxes.Info("Enter an offset from 0 to 0x" + _length.ToString("X", System.Globalization.CultureInfo.InvariantCulture) + ", e.g. 1024 or 0x400.");
+            MessageBoxes.Info("Enter an offset from 0 to 0x" + _length.ToString("X", System.Globalization.CultureInfo.InvariantCulture) + ", e.g. 1024 or 0x400, or a distance such as +0x10 or -16.");
             _offsetBox.Focus();
             return;
         }

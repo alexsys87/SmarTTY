@@ -100,6 +100,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             Searcher.IsReplaceVisible = false;
             Searcher.Activate();
         };
+        EditorPanel.HexDialogRequested += (object sender, HexDialogRequestedEventArgs e) => ShowHexDialog(e.Kind);
         EditorPanel.ReplaceRequested += (object sender, EventArgs e) =>
         {
             if (!Editor.IsHexMode)
@@ -131,6 +132,66 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             _hexFindWindow.Show();
         }
         _hexFindWindow.Activate();
+    }
+
+    /// <summary>Opens a dialog of the hex view (a colour, a byte pattern, the checksums) and applies its answer.</summary>
+    internal void ShowHexDialog(HexDialogKind kind)
+    {
+        if (!Editor.IsHexMode)
+        {
+            return;
+        }
+        HexEditorControl hex = Editor.HexEditor;
+        try
+        {
+            switch (kind)
+            {
+                case HexDialogKind.Highlight:
+                {
+                    HexHighlight current = hex.HighlightAtCaret;
+                    System.Drawing.Color color = (current != null) ? System.Drawing.Color.FromArgb(current.Argb) : HexEditorControl.HighlightColors[0].Color;
+                    int start = hex.HasSelection ? hex.SelectionStart : hex.CaretOffset;
+                    int count = hex.HasSelection ? hex.SelectionLength : 1;
+                    string target = HexEditorControl.FormatByteCount(count) + " at offset 0x" + start.ToString("X8", System.Globalization.CultureInfo.InvariantCulture);
+                    HexHighlightWindow window = new HexHighlightWindow(color, current?.Label ?? "", target);
+                    if (window.ShowDialog() == true)
+                    {
+                        hex.HighlightSelection(window.SelectedColor, window.Label);
+                    }
+                    break;
+                }
+                case HexDialogKind.FillSelection:
+                case HexDialogKind.InsertBytes:
+                {
+                    bool insert = kind == HexDialogKind.InsertBytes;
+                    HexBytePatternWindow window = new HexBytePatternWindow(insert, hex.SelectionLength, hex.HasSelection ? hex.SelectionStart : hex.CaretOffset);
+                    if (window.ShowDialog() == true)
+                    {
+                        if (insert)
+                        {
+                            hex.InsertPattern(window.Count, window.Pattern);
+                        }
+                        else
+                        {
+                            hex.FillSelection(window.Pattern);
+                        }
+                    }
+                    break;
+                }
+                case HexDialogKind.Checksums:
+                {
+                    byte[] bytes = hex.GetChecksumBytes(out string description);
+                    new HexChecksumWindow(HexChecksums.Compute(bytes), description).ShowDialog();
+                    break;
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+        Editor.FocusActiveView();
+        EditorPanel.RefreshState();
     }
 
     private void CloseHexFind()
