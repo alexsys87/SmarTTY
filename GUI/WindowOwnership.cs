@@ -8,21 +8,66 @@ namespace SmarTTY.GUI;
 /// </summary>
 internal static class WindowOwnership
 {
-    /// <summary>The active visible window, or null when the application has none.</summary>
+    /// <summary>
+    /// The window the user is working in: the active visible one. While none of the windows is active (the user has
+    /// switched to another program, which is likely during a connection that takes a while to fail) it is the
+    /// top-most visible window of the application, so that a dialog still has an owner. Null only when no window is visible.
+    /// </summary>
     internal static Window ActiveWindow()
     {
         WindowCollection windows = Application.Current?.Windows;
-        if (windows != null)
+        if (windows == null)
         {
+            return null;
+        }
+        foreach (Window window in windows)
+        {
+            if (window.IsActive && window.IsVisible)
+            {
+                return window;
+            }
+        }
+        return TopVisibleWindow(windows);
+    }
+
+    /// <summary>
+    /// Without an owner a modal dialog that opens while another program is in front is not in the taskbar and stays
+    /// behind that program, while every window of this application is disabled by it: the application seems to ignore
+    /// all clicks. Owned by the window the user left last, the dialog stays on top of it and is brought forward with it.
+    /// </summary>
+    private static Window TopVisibleWindow(WindowCollection windows)
+    {
+        Window current = Application.Current.MainWindow;
+        if (current == null || !current.IsVisible)
+        {
+            current = null;
             foreach (Window window in windows)
             {
-                if (window.IsActive && window.IsVisible)
+                if (window.IsVisible && window.Owner == null)
                 {
-                    return window;
+                    current = window;
+                    break;
                 }
             }
         }
-        return null;
+        // The dialog the user was in is the deepest of the windows that own each other.
+        while (current != null)
+        {
+            Window deeper = null;
+            foreach (Window owned in current.OwnedWindows)
+            {
+                if (owned.IsVisible)
+                {
+                    deeper = owned;
+                }
+            }
+            if (deeper == null)
+            {
+                break;
+            }
+            current = deeper;
+        }
+        return current;
     }
 
     /// <summary>
