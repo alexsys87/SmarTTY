@@ -25,6 +25,7 @@
     <Compile Include="../../Ssh/ToolAvailability.cs" Link="ToolAvailability.cs" />
     <Compile Include="../../Transport/RemoteBackup.cs" Link="RemoteBackup.cs" />
     <Compile Include="../../Transport/MtdFlash.cs" Link="MtdFlash.cs" />
+    <Compile Include="../../Transport/DevMem.cs" Link="DevMem.cs" />
     <Compile Include="../../Transport/TarArchiveReader.cs" Link="TarArchiveReader.cs" />
     <Compile Include="../../Transport/TarArchiveChecker.cs" Link="TarArchiveChecker.cs" />
     <Compile Include="../../Transport/BackupSelection.cs" Link="BackupSelection.cs" />
