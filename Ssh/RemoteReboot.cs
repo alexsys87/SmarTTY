@@ -217,6 +217,10 @@ public static class RemoteReboot
         {
             return null;
         }
-        return system == RebootSystem.Windows ? command : PackageIndexUpdater.WrapForPrivileges(command, isRoot);
+        // Windows has no sudo (it refuses the rights itself); any other host goes through "sudo su -c" for a user other than
+        // root, the way the package manager wraps its command, so that the password is asked for in the terminal. Wrapped here
+        // and not by PackageIndexUpdater.WrapForPrivileges, because tests/SshNetIntegrationTests compiles all of Ssh/ on its own
+        // and that layer does not include PackageManagers.
+        return system == RebootSystem.Windows || isRoot ? command : "sudo su -c \"" + command + "\"";
     }
 }
