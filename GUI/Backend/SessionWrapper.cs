@@ -169,6 +169,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     // A failed probe leaves the previous answer alone, so a reconnect to the same host does not hide the item for good.
     private bool _HasPackageManager;
 
+    /// <summary>Visibility of the "Tools > Reboot server" item: any SSH session has it, a COM/TCP device and the "new connection" placeholder have not.</summary>
+    public System.Windows.Visibility RebootMenuVisibility => (IsDevice || IsPlaceholder) ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+
     // The kernel of the host from the probe that also looks for OpenWrt: unknown until it has answered. A failed probe leaves
     // the previous answer alone, like for the package managers.
     private RemoteKernelKind _Kernel;
@@ -2433,6 +2436,84 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             return;
         }
         RunInTerminal(RemotePackageInstall.BuildInstallCommand(manager.Value, packages), origin ?? ActiveTab);
+    }
+
+    /// <summary>
+    /// Reboots the host after the user has confirmed: finds out what it runs (Windows from the banner of its SSH server or a probe,
+    /// any other host from <see cref="RemoteReboot.ProbeCommand"/>: Linux with or without systemd, OpenWrt, FreeBSD, OpenBSD, NetBSD,
+    /// DragonFly, macOS, Solaris, AIX), tells the user what was found and which command it will run, and types that command in the terminal.
+    /// There it can ask for the password of sudo, and its answer is on the screen. The connection ends with the reboot; the
+    /// automatic reconnection (when it is on) brings it back.
+    /// </summary>
+    public void RebootHost()
+    {
+        SshSession session = Session;
+        if (IsDevice || session == null)
+        {
+            return;
+        }
+        ITabContext origin = ActiveTab;
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            RebootSystem system = RebootSystem.OtherUnix;
+            bool isRoot = false;
+            Exception failure = null;
+            try
+            {
+                if (IsWindowsHost)
+                {
+                    system = RebootSystem.Windows;
+                }
+                else
+                {
+                    List<string> output = session.RunCommand(PosixShell.Wrap(RemoteReboot.ProbeCommand, addAdminDirectoriesToPath: true), out _, timeout: TimeSpan.FromSeconds(20));
+                    RebootSystem? detected = RemoteReboot.Detect(output);
+                    if (detected == null && _RemoteOs == RemoteOsKind.Unknown && DetectWindowsHost())
+                    {
+                        // The banner of the server did not say that it is Windows, and it has no sh to answer the probe.
+                        detected = RebootSystem.Windows;
+                    }
+                    if (detected == null)
+                    {
+                        session.ThrowIfConnectionLost();
+                        throw new Exception("Could not find out what the server runs, so there is no way to tell which command reboots it.");
+                    }
+                    system = detected.Value;
+                }
+                if (system != RebootSystem.Windows)
+                {
+                    isRoot = PackageIndexUpdater.IsRoot(this);
+                }
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+            _Controller.BeginInvoke(() =>
+            {
+                // A reconnect may have replaced the connection while the probe ran: the answer is about the old one.
+                if (!ReferenceEquals(Session, session))
+                {
+                    return;
+                }
+                if (failure != null)
+                {
+                    MessageBoxes.Exception(failure);
+                    return;
+                }
+                string line = RemoteReboot.BuildCommandLine(system, isRoot);
+                if (line == null)
+                {
+                    MessageBoxes.Error("The server is " + RemoteReboot.GetSystemName(system) + ": there is no reboot command that works through its Unix shell. Reboot it with \"shutdown.exe //r //t 0\" typed in this terminal, or connect to its cmd.exe or PowerShell.");
+                    return;
+                }
+                if (!MessageBoxes.AskWarn("Reboot the server now?\n\nDetected system: " + RemoteReboot.GetSystemName(system) + "\nCommand: " + line + "\n\nEvery terminal, transfer and forwarded port of this connection ends with the reboot."))
+                {
+                    return;
+                }
+                RunInTerminal(line, origin ?? ActiveTab);
+            });
+        });
     }
 
     /// <summary>

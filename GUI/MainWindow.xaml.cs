@@ -1019,6 +1019,16 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         ShowPackageManager(activeSession);
     }
 
+    private void Reboot_Click(object sender, RoutedEventArgs e)
+    {
+        SessionWrapper activeSession = Controller.ActiveSession;
+        if (activeSession == null || activeSession.IsDevice || activeSession.Session == null)
+        {
+            return;
+        }
+        activeSession.RebootHost();
+    }
+
     private void ProcessManager_Click(object sender, RoutedEventArgs e)
     {
         SessionWrapper activeSession = Controller.ActiveSession;
