@@ -6,13 +6,31 @@ using VisualTTY;
 
 namespace SmarTTY;
 
-public class OpkgPackageManagerClient : ILinuxPackageManagerClient
+public class OpkgPackageManagerClient : ILinuxPackageManagerClient, ILocalPackageFileInstaller
 {
     /// <summary>
     /// One point below the other managers: a host that has both opkg and apk (OpenWrt 25.12 with a leftover opkg) is
     /// managed by apk, which is what OpenWrtDetector reports for it too.
     /// </summary>
     public const int ProbeScore = PackageManagerSelector.MaxScore - 1;
+
+    public string LocalPackageFileFilter => "opkg packages (*.ipk)|*.ipk";
+
+    public string InstallToolName => "opkg";
+
+    public bool IsPackageFile(string fileName)
+    {
+        return LocalPackageFiles.HasExtension(fileName, ".ipk");
+    }
+
+    public string GetCommandLineForPackageFiles(string[] remotePaths, PackageCommitOptions options)
+    {
+        if (!LocalPackageFiles.HasFiles(remotePaths))
+        {
+            return null;
+        }
+        return "opkg install " + LocalPackageFiles.QuoteAll(remotePaths);
+    }
 
     public int Probe(ISSHCommandRunner runner)
     {

@@ -9,7 +9,7 @@ namespace SmarTTY;
 /// <summary>
 /// Package manager client for apk (apk-tools): Alpine Linux and OpenWrt 25.12+, where apk replaced opkg.
 /// </summary>
-public class ApkPackageManagerClient : ILinuxPackageManagerClient
+public class ApkPackageManagerClient : ILinuxPackageManagerClient, ILocalPackageFileInstaller
 {
     // "apk list" line: name-version arch {origin} (license) [installed] | [upgradable from: name-oldversion]
     private static readonly Regex LineRegex = new Regex(
@@ -20,6 +20,25 @@ public class ApkPackageManagerClient : ILinuxPackageManagerClient
     private static readonly Regex NameVersionRegex = new Regex(@"^(?<name>.+)-(?<ver>[^-]+-r\d+)$", RegexOptions.Compiled);
 
     private static readonly Regex NameVersionFallbackRegex = new Regex(@"^(?<name>.+)-(?<ver>\d[^-]*)$", RegexOptions.Compiled);
+
+    public string LocalPackageFileFilter => "apk packages (*.apk)|*.apk";
+
+    public string InstallToolName => "apk";
+
+    public bool IsPackageFile(string fileName)
+    {
+        return LocalPackageFiles.HasExtension(fileName, ".apk");
+    }
+
+    public string GetCommandLineForPackageFiles(string[] remotePaths, PackageCommitOptions options)
+    {
+        if (!LocalPackageFiles.HasFiles(remotePaths))
+        {
+            return null;
+        }
+        // A package file that was built locally is not signed with a key from /etc/apk/keys, and apk refuses such a file otherwise.
+        return ((options != null && options.NoPrompt) ? "apk " : "apk -i ") + "add --allow-untrusted " + LocalPackageFiles.QuoteAll(remotePaths);
+    }
 
     public int Probe(ISSHCommandRunner runner)
     {

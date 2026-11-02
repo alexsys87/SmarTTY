@@ -49,6 +49,7 @@ internal static class MoreClientsTests
         DoPkgChecks();
         DoHomebrewChecks();
         DoDetectionChecks();
+        DoLocalInstallChecks();
         return _passed;
     }
 
@@ -205,6 +206,49 @@ internal static class MoreClientsTests
         Check(client.GetCommandLineForPackageOperation(chosen, LinuxPackageInfo.PackageAction.Install, quiet) == "brew install htop && brew upgrade git", "brew: install and upgrade are separate commands, NoPrompt changes nothing");
         Check(client.GetCommandLineForPackageOperation(chosen, LinuxPackageInfo.PackageAction.Remove, null) == "brew uninstall htop git", "brew: remove");
         Check(client.GetCommandLineForPackageOperation(null, LinuxPackageInfo.PackageAction.Install, null) == null && client.GetCommandLineForPackageOperation(chosen, LinuxPackageInfo.PackageAction.None, null) == null, "brew: nothing to do -> null");
+    }
+
+    private static void DoLocalInstallChecks()
+    {
+        PackageCommitOptions quiet = new PackageCommitOptions { NoPrompt = true };
+        PackageCommitOptions asking = new PackageCommitOptions();
+        string[] one = { "/tmp/htop_3.3.0_amd64.deb" };
+        string[] two = { "/tmp/a.rpm", "/tmp/b.rpm" };
+
+        Check(LocalPackageFiles.IsSafeFileName("htop_3.3.0-1~bpo12+1_amd64.deb") && LocalPackageFiles.IsSafeFileName("pkg-1%3a2.0.tar.zst") && LocalPackageFiles.IsSafeFileName("a,b=c@d.ipk"), "local install: the usual characters of a package file name are safe");
+        Check(!LocalPackageFiles.IsSafeFileName("my pkg.deb") && !LocalPackageFiles.IsSafeFileName("a\"b.deb") && !LocalPackageFiles.IsSafeFileName("$HOME.deb") && !LocalPackageFiles.IsSafeFileName("a`b`.deb") && !LocalPackageFiles.IsSafeFileName("-rf.deb") && !LocalPackageFiles.IsSafeFileName("a'b.deb") && !LocalPackageFiles.IsSafeFileName("a;b.deb") && !LocalPackageFiles.IsSafeFileName("") && !LocalPackageFiles.IsSafeFileName(null), "local install: a space, a quote, $, a backtick, ; and a leading dash are not");
+        Check(LocalPackageFiles.QuoteAll(new[] { "/tmp/a.deb", "b.deb", "./c.deb", "", null }) == "'/tmp/a.deb' './b.deb' './c.deb'", "local install: paths are quoted, a relative one gets ./ in front, empty ones are dropped");
+        Check(LocalPackageFiles.QuoteAll(new[] { "/tmp/it's.deb" }) == "'/tmp/it'\\''s.deb'", "local install: a quote in a path is closed and escaped");
+        Check(LocalPackageFiles.HasFiles(one) && !LocalPackageFiles.HasFiles(null) && !LocalPackageFiles.HasFiles(new string[0]) && !LocalPackageFiles.HasFiles(new[] { "" }), "local install: HasFiles");
+
+        AptPackageManagerClient apt = new AptPackageManagerClient();
+        Check(apt.IsPackageFile("x.deb") && apt.IsPackageFile("X.DEB") && !apt.IsPackageFile("x.rpm") && !apt.IsPackageFile(null), "apt: takes .deb only");
+        Check(apt.GetCommandLineForPackageFiles(one, asking) == "apt-get install '/tmp/htop_3.3.0_amd64.deb'", "apt: install of a file");
+        Check(apt.GetCommandLineForPackageFiles(two, quiet) == "apt-get install -y '/tmp/a.rpm' '/tmp/b.rpm'", "apt: NoPrompt adds -y, several files in one run");
+        Check(apt.GetCommandLineForPackageFiles(new string[0], quiet) == null && apt.GetCommandLineForPackageFiles(null, quiet) == null, "apt: nothing to install -> null");
+        Check(new DnfPackageManagerClient().GetCommandLineForPackageFiles(two, quiet) == "dnf install -y '/tmp/a.rpm' '/tmp/b.rpm'" && new DnfPackageManagerClient().IsPackageFile("a.rpm") && !new DnfPackageManagerClient().IsPackageFile("a.deb"), "dnf: .rpm files");
+        Check(new YumPackageManagerClient().GetCommandLineForPackageFiles(one, asking) == "yum install '/tmp/htop_3.3.0_amd64.deb'" && new YumPackageManagerClient().IsPackageFile("a.rpm"), "yum: .rpm files");
+        Check(new ZypperPackageManagerClient().GetCommandLineForPackageFiles(two, quiet) == "zypper --non-interactive install '/tmp/a.rpm' '/tmp/b.rpm'" && new ZypperPackageManagerClient().GetCommandLineForPackageFiles(two, asking) == "zypper install '/tmp/a.rpm' '/tmp/b.rpm'", "zypper: install, --non-interactive for NoPrompt");
+        PacmanPackageManagerClient pacman = new PacmanPackageManagerClient();
+        Check(pacman.IsPackageFile("a-1.0-1-x86_64.pkg.tar.zst") && pacman.IsPackageFile("a.pkg.tar.xz") && pacman.IsPackageFile("a.pkg.tar") && pacman.IsPackageFile("A.PKG.TAR.GZ") && !pacman.IsPackageFile("a.tar.gz") && !pacman.IsPackageFile("a.pkg.tar.zst.sig") && !pacman.IsPackageFile("a.zst"), "pacman: .pkg.tar.* files, not a signature or a plain archive");
+        Check(pacman.GetCommandLineForPackageFiles(new[] { "/tmp/a.pkg.tar.zst" }, quiet) == "pacman -U --noconfirm '/tmp/a.pkg.tar.zst'" && pacman.GetCommandLineForPackageFiles(new[] { "/tmp/a.pkg.tar.zst" }, null) == "pacman -U '/tmp/a.pkg.tar.zst'", "pacman: -U, --noconfirm for NoPrompt");
+        OpkgPackageManagerClient opkg = new OpkgPackageManagerClient();
+        Check(opkg.IsPackageFile("a.ipk") && !opkg.IsPackageFile("a.apk") && opkg.GetCommandLineForPackageFiles(new[] { "/tmp/a.ipk" }, quiet) == "opkg install '/tmp/a.ipk'", "opkg: .ipk files");
+        ApkPackageManagerClient apk = new ApkPackageManagerClient();
+        Check(apk.IsPackageFile("a.apk") && !apk.IsPackageFile("a.ipk") && apk.GetCommandLineForPackageFiles(new[] { "/tmp/a.apk" }, quiet) == "apk add --allow-untrusted '/tmp/a.apk'" && apk.GetCommandLineForPackageFiles(new[] { "/tmp/a.apk" }, asking) == "apk -i add --allow-untrusted '/tmp/a.apk'", "apk: .apk files without the signature check, confirmations unless NoPrompt");
+        PkgPackageManagerClient pkg = new PkgPackageManagerClient();
+        Check(pkg.IsPackageFile("a.pkg") && pkg.IsPackageFile("a.txz") && !pkg.IsPackageFile("a.deb") && pkg.GetCommandLineForPackageFiles(new[] { "/tmp/a.pkg" }, quiet) == "pkg add '/tmp/a.pkg'", "pkg: FreeBSD package files");
+
+        Check(!(new XbpsPackageManagerClient() is ILocalPackageFileInstaller) && !(new HomebrewPackageManagerClient() is ILocalPackageFileInstaller) && !(new PortagePackageManagerClient() is ILocalPackageFileInstaller) && !(new WingetPackageManagerClient() is ILocalPackageFileInstaller), "the managers that install from repositories only have no 'install package file' function");
+        ILinuxPackageManagerClient[] all = PackageManagerCatalog.CreateUnixClients();
+        Check(all.OfType<ILocalPackageFileInstaller>().Count() == 8 && all.OfType<ILocalPackageFileInstaller>().All(installer => !string.IsNullOrEmpty(installer.LocalPackageFileFilter) && installer.LocalPackageFileFilter.Contains("|") && !string.IsNullOrEmpty(installer.InstallToolName)), "catalog: eight managers install package files, each with a dialog filter and a tool name");
+        Check(all.OfType<ILocalPackageFileInstaller>().All(installer => installer.GetCommandLineForPackageFiles(one, quiet).Contains("'/tmp/htop_3.3.0_amd64.deb'")), "every installer quotes the path");
+
+        Check(LocalPackageFiles.BuildInstallLine(apt, one, quiet, isRoot: true) == "apt-get install -y '/tmp/htop_3.3.0_amd64.deb'; rm -f -- '/tmp/htop_3.3.0_amd64.deb'", "install line: root runs the command as it is, the file is removed after it");
+        Check(LocalPackageFiles.BuildInstallLine(apt, two, asking, isRoot: false) == "sudo su -c \"apt-get install '/tmp/a.rpm' '/tmp/b.rpm'\"; rm -f -- '/tmp/a.rpm' '/tmp/b.rpm'", "install line: a user goes through sudo, rm is outside of it");
+        Check(LocalPackageFiles.BuildInstallLine(apt, new string[0], asking, isRoot: true) == null && LocalPackageFiles.BuildInstallLine(null, one, asking, isRoot: true) == null, "install line: nothing to install -> null");
+        LocalPackageInstallRequest request = new LocalPackageInstallRequest(new[] { @"C:\pkgs\a.deb" }, apt, quiet, true);
+        Check(request.LocalFiles.Length == 1 && request.Installer == apt && request.Options.NoPrompt && request.IsRoot, "request: keeps what the window chose");
     }
 
     private static void DoDetectionChecks()

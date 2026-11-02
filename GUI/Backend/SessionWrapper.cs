@@ -1447,6 +1447,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         public int Pending;
 
         public readonly List<string> Uploaded = new List<string>();
+
+        // Set for the files that the user picked in the package manager window: they are installed with that window's package manager.
+        public LocalPackageInstallRequest LocalInstall;
     }
 
     // Upload transfers of dropped packages, by job id; used on the UI thread only.
@@ -1509,7 +1512,91 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         // The tab the files were dropped on may have been closed meanwhile: the active terminal is used then.
         ITabContext origin = offer.Origin != null && Tabs.Contains(offer.Origin) ? offer.Origin : null;
+        if (offer.LocalInstall != null)
+        {
+            InstallUploadedLocalPackages(offer.LocalInstall, offer.Uploaded.ToArray(), origin);
+            return;
+        }
         InstallRemotePackages(offer.Uploaded.ToArray(), origin, afterUpload: true);
+    }
+
+    /// <summary>
+    /// Uploads the package files that the user picked in the package manager window to /tmp of the host (the transfers are in the
+    /// transfer list like any other upload) and, when the last of them has arrived, asks whether to install them and types the
+    /// installation in the terminal, so that its output, questions and the password of sudo are there. The uploaded files are
+    /// removed after the installation (or when the user declines it).
+    /// </summary>
+    internal void UploadAndInstallLocalPackages(LocalPackageInstallRequest request)
+    {
+        if (IsDevice || request == null || request.Installer == null)
+        {
+            return;
+        }
+        string[] files = (request.LocalFiles ?? new string[0]).Where(File.Exists).ToArray();
+        if (files.Length == 0)
+        {
+            MessageBoxes.Error("The package files were not found on this computer.");
+            return;
+        }
+        List<FileTransferManager.TransferJob> jobs = UploadFilesToDirectory(files, LocalPackageFiles.RemoteDirectory);
+        if (jobs.Count == 0)
+        {
+            return;
+        }
+        PackageInstallOffer offer = new PackageInstallOffer
+        {
+            Origin = ActiveTab,
+            Pending = jobs.Count,
+            LocalInstall = request
+        };
+        foreach (FileTransferManager.TransferJob job in jobs)
+        {
+            _PackageInstallOffers[job.Id] = offer;
+        }
+    }
+
+    // Runs on the UI thread when the last upload of the picked package files has ended: the files that arrived are installed after a question.
+    private void InstallUploadedLocalPackages(LocalPackageInstallRequest request, string[] remotePaths, ITabContext origin)
+    {
+        string line = LocalPackageFiles.BuildInstallLine(request.Installer, remotePaths, request.Options, request.IsRoot);
+        if (line == null)
+        {
+            return;
+        }
+        string list = string.Join("\n", remotePaths.Take(10).Select((string path) => RemotePathUtils.GetFileName(path)));
+        if (remotePaths.Length > 10)
+        {
+            list += "\n... and " + (remotePaths.Length - 10) + " more";
+        }
+        string note = request.Installer.InstallToolName == "apk" ? "\n\nThe packages are installed without a signature check (apk add --allow-untrusted)." : "";
+        string toolName = request.Installer.InstallToolName;
+        if (!MessageBoxes.Ask("The upload is complete.\n\nInstall " + (remotePaths.Length == 1 ? "this package" : remotePaths.Length + " packages") + " with " + toolName + "?\n\n" + list + note))
+        {
+            RemoveUploadedPackages(remotePaths);
+            return;
+        }
+        RunInTerminal(line, origin ?? ActiveTab);
+    }
+
+    // Best effort, in the background: the files are only a copy of what the user picked on this computer.
+    private void RemoveUploadedPackages(string[] remotePaths)
+    {
+        SshSession session = Session;
+        if (session == null)
+        {
+            return;
+        }
+        string command = PosixShell.Wrap("rm -f -- " + LocalPackageFiles.QuoteAll(remotePaths), addAdminDirectoriesToPath: true);
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            try
+            {
+                session.RunCommand(command, out _, timeout: TimeSpan.FromSeconds(20));
+            }
+            catch
+            {
+            }
+        });
     }
 
     /// <summary>
