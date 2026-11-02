@@ -157,7 +157,7 @@ internal static class Program
 
         // The SQL set covers functions and data types; statement keywords come from the syntax highlighting.
         List<ApiSymbolDatabase.Symbol> sql = database.ForLanguage(L.Sql).ToList();
-        Check(sql.Count >= 140, "the SQL set is broad (" + sql.Count + " symbols)");
+        Check(sql.Count >= 560, "the SQL set is broad (" + sql.Count + " symbols)");
         Equal(sql.Count, sql.Select(s => s.Name).Distinct().Count(), "SQL names are unique");
         Equal(sql.Count, sql.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
             "every SQL symbol has a summary and a description");
@@ -165,7 +165,12 @@ internal static class Program
                  {
                      "CONCAT", "LEFT", "RIGHT", "LPAD", "DATE_TRUNC", "EXTRACT", "ROW_NUMBER", "RANK",
                      "LAG", "LEAD", "STRING_AGG", "JSON_EXTRACT", "JSON_OBJECT", "JSONB",
-                     "INT", "VARCHAR", "TIMESTAMP", "BOOLEAN"
+                     "INT", "VARCHAR", "TIMESTAMP", "BOOLEAN",
+                     "STRING_SPLIT", "REGEXP_LIKE", "BIT_XOR", "PERCENTILE_CONT",
+                     "DATE_BIN", "MAKE_TIMESTAMP", "JSONB_PATH_QUERY", "JSON_TABLE",
+                     "ARRAY_AGG", "UNNEST", "GENERATE_SERIES", "TRY_CAST", "TO_NUMBER",
+                     "TYPEOF", "UUID_GENERATE_V4", "SHA256", "MEDIUMINT", "SERIAL",
+                     "INT4RANGE", "INET"
                  })
         {
             Check(database.Find(L.Sql, name) != null, "the SQL set includes '" + name + "'");
@@ -174,12 +179,40 @@ internal static class Program
             "the description of 'ROW_NUMBER' names a SQL window function");
         Check(database.Find(L.Sql, "CONCAT").Description.Contains("SQL string function"),
             "the description of 'CONCAT' names a SQL string function");
+        Check(database.Find(L.Sql, "BIT_XOR").Description.Contains("SQL aggregate function"),
+            "the description of 'BIT_XOR' names a SQL aggregate function");
+        Check(database.Find(L.Sql, "STRING_SPLIT").Description.Contains("SQL string function"),
+            "the description of 'STRING_SPLIT' names a SQL string function");
+        Check(database.Find(L.Sql, "DATE_BIN").Description.Contains("SQL date and time function"),
+            "the description of 'DATE_BIN' names a SQL date and time function");
+        Check(database.Find(L.Sql, "TRY_CAST").Description.Contains("SQL type conversion function"),
+            "the description of 'TRY_CAST' names a SQL type conversion function");
+        Check(database.Find(L.Sql, "UNNEST").Description.Contains("SQL array function"),
+            "the description of 'UNNEST' names a SQL array function");
+        Check(database.Find(L.Sql, "JSONB_PATH_QUERY").Description.Contains("SQL JSON function"),
+            "the description of 'JSONB_PATH_QUERY' names a SQL JSON function");
+        Check(database.Find(L.Sql, "VERSION").Description.Contains("SQL system function"),
+            "the description of 'VERSION' names a SQL system function");
+        Check(database.Find(L.Sql, "SHA256").Description.Contains("SQL cryptographic function"),
+            "the description of 'SHA256' names a SQL cryptographic function");
+        Check(database.Find(L.Sql, "UUID_GENERATE_V4").Description.Contains("SQL UUID function"),
+            "the description of 'UUID_GENERATE_V4' names a SQL UUID function");
         Check(database.Find(L.Sql, "INT").Description.Contains("SQL data type"),
             "the description of 'INT' names a SQL data type");
+        Check(database.Find(L.Sql, "INT4RANGE").Description.Contains("SQL data type"),
+            "the description of 'INT4RANGE' names a SQL data type");
 
         ParameterSignature sqlConcat = database.FindSignature(L.Sql, "CONCAT");
         Check(sqlConcat != null, "a 'CONCAT' call resolves to the SQL function");
         Equal(sqlConcat.ToString(), "CONCAT(value, ...)", "the SQL signature keeps its parameters");
+        Equal(database.FindSignature(L.Sql, "STRING_SPLIT").ToString(),
+            "STRING_SPLIT(text, separator)", "the SQL string function keeps its signature");
+        Equal(database.FindSignature(L.Sql, "JSONB_PATH_QUERY").ToString(),
+            "JSONB_PATH_QUERY(jsonb, path)", "the SQL JSON function keeps its signature");
+        Equal(database.FindSignature(L.Sql, "DATE_BIN").ParameterCount, 3,
+            "the SQL date function keeps its parameters");
+        Equal(database.FindSignature(L.Sql, "TRY_CAST").ToString(),
+            "TRY_CAST(value AS type)", "the SQL conversion keeps its signature");
 
         // A "module.name" call is resolved to its last segment.
         ParameterSignature pythonSqrt = database.FindSignature(L.Python, "math.sqrt");
@@ -497,6 +530,20 @@ internal static class Program
         Check(varchar != null, "the completion list offers the SQL type 'VARCHAR'");
         Equal(varchar.DetailText, "VARCHAR data type", "the SQL type summary is the detail text");
 
+        ISuggestion stringSplit = Build(L.Sql, "", "STRING_SP", database).FirstOrDefault(s => s.DisplayName == "STRING_SPLIT");
+        Check(stringSplit != null, "the completion list offers the SQL function 'STRING_SPLIT'");
+        Equal(stringSplit.DetailText, "Split a string", "the SQL string summary is the detail text");
+        Check(stringSplit.HintText.StartsWith("STRING_SPLIT("), "the SQL string signature is the hint text");
+
+        ISuggestion jsonbQuery = Build(L.Sql, "", "JSONB_PATH_Q", database).FirstOrDefault(s => s.DisplayName == "JSONB_PATH_QUERY");
+        Check(jsonbQuery != null, "the completion list offers the SQL function 'JSONB_PATH_QUERY'");
+        Equal(jsonbQuery.DetailText, "Query a JSONB path", "the SQL JSON summary is the detail text");
+        Check(jsonbQuery.HintText.StartsWith("JSONB_PATH_QUERY("), "the SQL JSON signature is the hint text");
+
+        ISuggestion mediumint = Build(L.Sql, "", "MEDIUMI", database).FirstOrDefault(s => s.DisplayName == "MEDIUMINT");
+        Check(mediumint != null, "the completion list offers the SQL type 'MEDIUMINT'");
+        Equal(mediumint.DetailText, "Medium-sized integer data type", "the SQL type summary is the detail text");
+
         // The C++ profile offers the STL under the last segment and keeps the inherited C library.
         List<ISuggestion> cppVector = Build(L.Cpp, "", "vec", database);
         ISuggestion vector = cppVector.FirstOrDefault(s => s.DisplayName == "vector");
@@ -661,6 +708,18 @@ internal static class Program
         Check(sql != null, "a bare 'CONCAT(' call finds the SQL function");
         Equal(sql.Name, "CONCAT", "the SQL hint keeps the function name");
         Equal(sql.ParameterCount, 2, "the SQL hint has its parameters");
+
+        ParameterSignature sqlStringSplit = EditorSignatureSource.FindSignature(
+            L.Sql, "STRING_SPLIT(\n", 0, 13, database, out int sqlStringSplitActive);
+        Check(sqlStringSplit != null, "a 'STRING_SPLIT(' call finds the SQL string function");
+        Equal(sqlStringSplit.Name, "STRING_SPLIT", "the SQL string hint keeps the function name");
+        Equal(sqlStringSplit.ParameterCount, 2, "the SQL string hint has its parameters");
+
+        ParameterSignature sqlDateBin = EditorSignatureSource.FindSignature(
+            L.Sql, "DATE_BIN(\n", 0, 9, database, out int sqlDateBinActive);
+        Check(sqlDateBin != null, "a 'DATE_BIN(' call finds the SQL date function");
+        Equal(sqlDateBin.Name, "DATE_BIN", "the SQL date hint keeps the function name");
+        Equal(sqlDateBin.ParameterCount, 3, "the SQL date hint has its parameters");
 
         ParameterSignature python = EditorSignatureSource.FindSignature(
             L.Python, "sqrt(\n", 0, 5, database, out int pythonActive);
