@@ -67,6 +67,13 @@ internal static class Program
                 {
                     foreach (DevMemTool tool in new[] { DevMemTool.DevMem, DevMemTool.BusyBoxDevMem, DevMemTool.DevMem2 })
                     {
+                        if (shell != null && RunsOwnApplet(shell, tool))
+                        {
+                            // A BusyBox built with "prefer applets" (busybox-static of Debian and Ubuntu) runs its own devmem, not the
+                            // stand-in in the PATH, and that one opens the real /dev/mem: there is nothing to test with it here.
+                            Console.WriteLine("SKIP: BusyBox sh, " + DevMem.ToolName(tool) + ": this BusyBox runs its own devmem applet instead of the stand-in");
+                            continue;
+                        }
                         ShellTests(shell, tool);
                     }
                 }
@@ -407,6 +414,14 @@ internal static class Program
         Check(denied.Count == 1 && denied[0].Error != null && denied[0].Error.StartsWith("permission denied"), label + ": no access to /dev/mem is explained (" + denied.FirstOrDefault()?.Error + ")");
         Run(busybox, DevMem.BuildWriteCommand(tool, 0x43C00004, 32, 1, false), deny, out writeOutput, out _);
         Check(!DevMem.ParseWriteStatus(writeOutput.Split('\n'), out message) && message.StartsWith("permission denied"), label + ": a refused write is reported");
+    }
+
+    /// <summary>Whether BusyBox sh resolves the program of the tool to its own applet (no path) instead of the stand-in in the PATH.</summary>
+    private static bool RunsOwnApplet(string busybox, DevMemTool tool)
+    {
+        string program = tool == DevMemTool.BusyBoxDevMem ? "busybox" : tool == DevMemTool.DevMem ? "devmem" : "devmem2";
+        RunWithPath(busybox + " sh -c 'command -v " + program + "'", FakeTools() + ":" + Environment.GetEnvironmentVariable("PATH"), null, out string output, out _);
+        return !output.Trim().Contains("/");
     }
 
     private static int Run(string busybox, string command, Dictionary<string, string> environment, out string stdout, out string stderr)
