@@ -229,7 +229,7 @@ internal static class Program
 
         // C++ is a separate profile: it inherits the C library and adds the STL, while C files stay C-only.
         List<ApiSymbolDatabase.Symbol> cpp = database.ForLanguage(L.Cpp).ToList();
-        Check(cpp.Count > 2400, "the C++ set is broad (" + cpp.Count + " symbols)");
+        Check(cpp.Count > 3000, "the C++ set is broad (" + cpp.Count + " symbols)");
         Equal(cpp.Count, cpp.Select(s => s.Name).Distinct().Count(), "C++ names are unique");
         Equal(cpp.Count, cpp.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
             "every C++ symbol has a summary and a description");
@@ -262,6 +262,53 @@ internal static class Program
         Check(database.Find(L.CLike, "std::vector") == null, "C files do not see 'std::vector'");
         Check(database.Find(L.CLike, "std::sort") == null, "C files do not see 'std::sort'");
         Check(database.Find(L.CLike, "std::string") == null, "C files do not see 'std::string'");
+
+        // C++20 and C++23: ranges, concepts, format, comparison, bit operations and the new vocabulary types.
+        foreach (string name in new[]
+                 {
+                     "std::ranges::sort", "std::ranges::find", "std::ranges::transform",
+                     "std::views::filter", "std::views::transform", "std::views::zip",
+                     "std::ranges::range", "std::ranges::input_range", "std::ranges::view",
+                     "std::same_as", "std::integral", "std::floating_point", "std::copyable",
+                     "std::regular", "std::invocable", "std::predicate",
+                     "std::strong_ordering", "std::weak_ordering", "std::partial_ordering",
+                     "std::is_lt", "std::compare_three_way",
+                     "std::bit_cast", "std::popcount", "std::rotl", "std::countl_zero",
+                     "std::endian", "std::numbers::pi", "std::numbers::e",
+                     "std::format", "std::format_to", "std::print", "std::println",
+                     "std::expected", "std::mdspan", "std::flat_map", "std::generator",
+                     "std::move_only_function", "std::source_location", "std::atomic_ref",
+                     "std::stacktrace", "std::osyncstream",
+                     "std::pmr::vector", "std::pmr::memory_resource", "std::to_chars",
+                     "std::from_chars", "std::bind_front", "std::default_searcher",
+                     "std::execution::par", "std::chrono::year_month_day_last",
+                     "std::chrono::utc_clock::now", "std::chrono::clock_cast",
+                     "std::string::contains", "std::span::size_bytes", "std::atomic::wait"
+                 })
+        {
+            Check(database.Find(L.Cpp, name) != null, "the modern C++ set includes '" + name + "'");
+        }
+        Check(database.Find(L.Cpp, "std::ranges::sort").Description.Contains("C++ ranges algorithm"),
+            "the description of 'std::ranges::sort' names a ranges algorithm");
+        Check(database.Find(L.Cpp, "std::views::filter").Description.Contains("C++ ranges adaptor"),
+            "the description of 'std::views::filter' names a ranges adaptor");
+        Check(database.Find(L.Cpp, "std::same_as").Description.Contains("C++ concept"),
+            "the description of 'std::same_as' names a C++ concept");
+        Check(database.Find(L.Cpp, "std::format").Description.Contains("C++ format"),
+            "the description of 'std::format' names the C++ format library");
+        Check(database.Find(L.Cpp, "std::source_location").Description.Contains("C++ source location"),
+            "the description of 'std::source_location' names the source location type");
+        Check(database.Find(L.Cpp, "std::pmr::vector").Description.Contains("C++ polymorphic memory resource"),
+            "the description of 'std::pmr::vector' names the polymorphic memory resource");
+        Equal(database.FindSignature(L.Cpp, "std::ranges::sort").ToString(),
+            "std::ranges::sort(R&& range, Comp comp, Proj proj)", "the ranges algorithm keeps its signature");
+        Equal(database.FindSignature(L.Cpp, "std::format").ToString(),
+            "std::format(format_string fmt, T&&... args)", "the format function keeps its signature");
+        Equal(database.FindSignature(L.Cpp, "std::expected::value").ToString(),
+            "std::expected::value()", "the expected accessor keeps its qualified name");
+        Equal(database.FindSignature(L.Cpp, "std::source_location::current").ParameterCount, 0,
+            "the source location factory has no parameters");
+        Check(database.Find(L.CLike, "std::ranges::sort") == null, "C files do not see the C++ ranges");
 
         ParameterSignature cppPushBack = database.FindSignature(L.Cpp, "std::vector::push_back");
         Check(cppPushBack != null, "a 'std::vector::push_back' call resolves to the C++ method");
@@ -469,6 +516,30 @@ internal static class Program
         Check(cppPushBack.HintText.StartsWith("std::vector::push_back("),
             "the qualified C++ method signature is the hint text");
 
+        ISuggestion cppFilter = Build(L.Cpp, "", "fil", database).FirstOrDefault(s => s.DisplayName == "filter");
+        Check(cppFilter != null, "the completion list offers 'std::views::filter' as 'filter'");
+        Equal(cppFilter.DetailText, "Filter the elements", "the ranges adaptor summary is the detail text");
+        Check(cppFilter.HintText.StartsWith("std::views::filter("),
+            "the qualified ranges adaptor signature is the hint text");
+
+        ISuggestion cppFormat = Build(L.Cpp, "", "format_t", database).FirstOrDefault(s => s.DisplayName == "format_to");
+        Check(cppFormat != null, "the completion list offers 'std::format_to' as 'format_to'");
+        Equal(cppFormat.DetailText, "Format to an output", "the format summary is the detail text");
+        Check(cppFormat.HintText.StartsWith("std::format_to("), "the qualified format signature is the hint text");
+
+        ISuggestion cppExpected = Build(L.Cpp, "", "expe", database).FirstOrDefault(s => s.DisplayName == "expected");
+        Check(cppExpected != null, "the completion list offers 'std::expected' as 'expected'");
+        Equal(cppExpected.DetailText, "Expected value or error", "the expected summary is the detail text");
+
+        ISuggestion cppBitCast = Build(L.Cpp, "", "bit_c", database).FirstOrDefault(s => s.DisplayName == "bit_cast");
+        Check(cppBitCast != null, "the completion list offers 'std::bit_cast' as 'bit_cast'");
+        Check(Build(L.Cpp, "", "same_", database).Any(s => s.DisplayName == "same_as"),
+            "the completion list offers the C++20 concept 'same_as'");
+        Check(Build(L.Cpp, "", "source_lo", database).Any(s => s.DisplayName == "source_location"),
+            "the completion list offers 'std::source_location'");
+        Check(Build(L.Cpp, "", "flat_m", database).Any(s => s.DisplayName == "flat_map"),
+            "the completion list offers the C++23 'std::flat_map'");
+
         Check(Build(L.Cpp, "", "print", database).Any(s => s.DisplayName == "printf"),
             "the C++ completion list offers the inherited C 'printf'");
         Check(!Build(L.CLike, "", "vec", database).Any(s => s.DisplayName == "vector"),
@@ -637,6 +708,24 @@ internal static class Program
             L.Cpp, "printf(\n", 0, 7, database, out int cppPrintfActive);
         Check(cppPrintf != null, "a 'printf(' call in C++ finds the inherited C function");
         Equal(cppPrintf.Name, "printf", "the inherited C hint keeps its name");
+
+        ParameterSignature cppFilterHint = EditorSignatureSource.FindSignature(
+            L.Cpp, "std::views::filter(\n", 0, 19, database, out int cppFilterActive);
+        Check(cppFilterHint != null, "a 'std::views::filter(' call finds the ranges adaptor");
+        Equal(cppFilterHint.Name, "std::views::filter", "the ranges adaptor hint keeps its qualified name");
+        Equal(cppFilterHint.ParameterCount, 2, "the ranges adaptor hint has its parameters");
+
+        ParameterSignature cppFormatHint = EditorSignatureSource.FindSignature(
+            L.Cpp, "std::format_to(\n", 0, 15, database, out int cppFormatActive);
+        Check(cppFormatHint != null, "a 'std::format_to(' call finds the format function");
+        Equal(cppFormatHint.Name, "std::format_to", "the format hint keeps its qualified name");
+        Equal(cppFormatHint.ParameterCount, 3, "the format hint has its parameters");
+
+        ParameterSignature cppExpectedHint = EditorSignatureSource.FindSignature(
+            L.Cpp, "std::expected(\n", 0, 14, database, out int cppExpectedActive);
+        Check(cppExpectedHint != null, "a 'std::expected(' call finds the expected type");
+        Equal(cppExpectedHint.Name, "std::expected", "the expected hint keeps its qualified name");
+        Equal(cppExpectedHint.ParameterCount, 1, "the expected hint has its parameter");
 
         // Ruby predicates keep the trailing '?' in the name.
         ParameterSignature rubyExistHint = EditorSignatureSource.FindSignature(
