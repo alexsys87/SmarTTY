@@ -601,6 +601,13 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         _Controller.BeginInvoke(() => _Controller.FullScreenMode = !_Controller.FullScreenMode);
     }
 
+    /// <summary>Opens the window of Tools > Quick commands, chosen in the menu of a device terminal.</summary>
+    internal void ShowQuickCommandsFromDevice()
+    {
+        // After the menu has closed: the window is modal.
+        _Controller.BeginInvoke(() => _Controller.ShowQuickCommands());
+    }
+
     /// <summary>Closes a device tab after the key handler that asked for it has returned (Ctrl+W).</summary>
     internal void CloseDeviceTabFromKeyboard(DeviceTabContext tab)
     {

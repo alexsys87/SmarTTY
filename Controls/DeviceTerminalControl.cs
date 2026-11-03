@@ -112,6 +112,9 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// <summary>Raised when the user presses Alt+Enter (full screen on/off, as in SSH tabs).</summary>
     public event EventHandler FullScreenToggleRequested;
 
+    /// <summary>Raised when "Quick commands..." is chosen in the menu of the terminal: the window that edits the list opens.</summary>
+    public event EventHandler QuickCommandsEditRequested;
+
     /// <summary>
     /// Raised when the text terminal opens the command/directory/files completion popup. The controller turns this
     /// into the same suggestion popup that the SSH tabs use.
@@ -2023,8 +2026,78 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
     }
 
+    // The "Quick commands" sub menu (and the separator after it) on top of the context menu, removed and added again each time
+    // the menu opens, from the list as it is saved now (Tools > Quick commands...). Commands only: a script is uploaded over
+    // SSH, and a device has no SSH.
+    private readonly List<ToolStripItem> _quickCommandItems = new List<ToolStripItem>();
+
+    private void RefreshQuickCommandItems()
+    {
+        foreach (ToolStripItem old in _quickCommandItems)
+        {
+            contextMenuStrip1.Items.Remove(old);
+            old.Dispose();
+        }
+        _quickCommandItems.Clear();
+        // The bytes of the HEX view are not a command line, and netconsole has a line input of its own.
+        if (HexMode || IsNetconsole)
+        {
+            return;
+        }
+        bool busy = IsLineClaimed || (_pasteJob != null && _pasteJob.IsActive);
+        ToolStripMenuItem quickCommandsMenu = new ToolStripMenuItem("Quick commands")
+        {
+            ToolTipText = "Your commands (Tools > Quick commands...): the chosen one is put into the command line, Enter runs it"
+        };
+        Icons.Apply(quickCommandsMenu, "terminal");
+        quickCommandsMenu.DropDown.ShowItemToolTips = true;
+        int commandCount = 0;
+        foreach (QuickCommand item in QuickCommandRules.MenuItems(SmarTTY.GUI.Backend.QuickCommandStore.LoadForMenu(), scriptsPossible: false))
+        {
+            QuickCommand chosen = item;
+            ToolStripMenuItem menuItem = new ToolStripMenuItem(chosen.MenuText.Replace("&", "&&"), null, (sender, args) => InsertQuickCommand(chosen))
+            {
+                Enabled = !busy,
+                ToolTipText = QuickCommandRules.ToCommandLine(chosen.Text) + Environment.NewLine + "(press Enter to run it)"
+            };
+            Icons.Apply(menuItem, "terminal");
+            quickCommandsMenu.DropDownItems.Add(menuItem);
+            commandCount++;
+        }
+        if (commandCount > 0)
+        {
+            quickCommandsMenu.DropDownItems.Add(new ToolStripSeparator());
+        }
+        ToolStripMenuItem manage = new ToolStripMenuItem(commandCount == 0 ? "Add quick commands..." : "Quick commands...", null, (sender, args) => QuickCommandsEditRequested?.Invoke(this, EventArgs.Empty))
+        {
+            ToolTipText = "Commands that this menu puts into the command line"
+        };
+        Icons.Apply(manage, "edit");
+        quickCommandsMenu.DropDownItems.Add(manage);
+        _quickCommandItems.Add(quickCommandsMenu);
+        _quickCommandItems.Add(new ToolStripSeparator());
+        for (int i = 0; i < _quickCommandItems.Count; i++)
+        {
+            contextMenuStrip1.Items.Insert(i, _quickCommandItems[i]);
+        }
+        contextMenuStrip1.ShowItemToolTips = true;
+    }
+
+    /// <summary>Puts a quick command into the command line of the terminal; nothing runs until the user presses Enter.</summary>
+    private void InsertQuickCommand(QuickCommand item)
+    {
+        if (item == null || item.Kind != QuickCommandKind.Command || IsLineClaimed)
+        {
+            return;
+        }
+        _serialTerminalControl.InsertCommand(QuickCommandRules.ToCommandLine(item.Text));
+        _serialTerminalControl.Focus();
+    }
+
     private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
     {
+        // Before the menu is painted in the colours of the theme (that handler is added later).
+        RefreshQuickCommandItems();
         copyToolStripMenuItem.Enabled = HexMode ? hexTerminalControl1.HasSelection : ((ReadonlyTextBrowser)_serialTerminalControl).HasSelection;
         _returnToInputLineMenuItem.Enabled = !HexMode && !_serialTerminalControl.HasInputLine;
         _sendRemoteSizeMenuItem.Enabled = !HexMode && _serialTerminalControl.CanSendRemoteSize;
