@@ -1705,7 +1705,7 @@ public class MainWindowController : INotifyPropertyChanged
             // Only the Smart Terminal knows when a command has ended.
             pasteLineByLineItem.Enabled = ((_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal) is SshTerminalControl;
         };
-        // The quick commands go on top of the menu; they are rebuilt each time it opens, from the list as it is saved now.
+        // The "Quick commands" sub menu goes on top of the menu; it is rebuilt each time the menu opens, from the list as it is saved now.
         _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) => AddQuickCommandItems();
         // Painted when it opens, so that it follows the theme chosen in the settings like the other menus.
         _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) => ThemedMenu.Apply(_TerminalContextMenu);
@@ -1735,7 +1735,7 @@ public class MainWindowController : INotifyPropertyChanged
         ApplyGlobalVisualSettings();
     }
 
-    // The items of the quick commands in the menu of the terminal, removed and added again each time it opens.
+    // The "Quick commands" sub menu (and the separator after it) in the menu of the terminal, removed and added again each time it opens.
     private readonly List<ToolStripItem> _QuickCommandItems = new List<ToolStripItem>();
 
     private void AddQuickCommandItems()
@@ -1755,6 +1755,13 @@ public class MainWindowController : INotifyPropertyChanged
             return;
         }
         bool scriptsPossible = session.Session != null && !session.IsWindowsHost;
+        // The commands are not put into the menu itself (a long list pushes Copy, Paste... away): they are in one sub menu.
+        ToolStripMenuItem quickCommandsMenu = new ToolStripMenuItem("Quick commands", Icons.Load("terminal"))
+        {
+            ToolTipText = "Your commands and scripts (Tools > Quick commands...): chosen one is put into the command line, Enter runs it"
+        };
+        quickCommandsMenu.DropDown.ShowItemToolTips = true;
+        int commandCount = 0;
         foreach (QuickCommand item in QuickCommandRules.MenuItems(QuickCommandStore.LoadForMenu(), scriptsPossible))
         {
             QuickCommand chosen = item;
@@ -1764,13 +1771,19 @@ public class MainWindowController : INotifyPropertyChanged
                     ? "Puts the script " + chosen.FileName + " into the current folder, makes it executable and types ./" + chosen.FileName + " (press Enter to run it)"
                     : QuickCommandRules.ToCommandLine(chosen.Text) + Environment.NewLine + "(press Enter to run it)"
             };
-            _QuickCommandItems.Add(menuItem);
+            quickCommandsMenu.DropDownItems.Add(menuItem);
+            commandCount++;
         }
-        ToolStripMenuItem manage = new ToolStripMenuItem(_QuickCommandItems.Count == 0 ? "Add quick commands..." : "Quick commands...", Icons.Load("edit"), (object sender, EventArgs e) => ShowQuickCommands())
+        if (commandCount > 0)
+        {
+            quickCommandsMenu.DropDownItems.Add(new ToolStripSeparator());
+        }
+        ToolStripMenuItem manage = new ToolStripMenuItem(commandCount == 0 ? "Add quick commands..." : "Quick commands...", Icons.Load("edit"), (object sender, EventArgs e) => ShowQuickCommands())
         {
             ToolTipText = "Commands and scripts that this menu puts into the command line"
         };
-        _QuickCommandItems.Add(manage);
+        quickCommandsMenu.DropDownItems.Add(manage);
+        _QuickCommandItems.Add(quickCommandsMenu);
         _QuickCommandItems.Add(new ToolStripSeparator());
         for (int i = 0; i < _QuickCommandItems.Count; i++)
         {
