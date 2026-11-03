@@ -45,7 +45,7 @@ namespace SmarTTY.CodeEditing
             Python,
             Bash,
             Config,  // INI / .conf / .properties / TOML / systemd units
-            CLike,   // C, C#, Java, JavaScript, Go, Rust, CSS, ...: // and /* */ comments
+            CLike,   // C: // and /* */ comments, # preprocessor directives
             Script,  // R, AWK, Tcl, Nix: the generic # comment profile
             Sql,     // SQL: -- comments
             Markup,  // HTML, XML: <!-- --> comments and tag names
@@ -63,7 +63,22 @@ namespace SmarTTY.CodeEditing
             Ruby,    // Ruby: # comments, def/end blocks
             Perl,    // Perl: # comments, sub blocks
             CMake,   // CMake: commands, variables and # comments
-            Dockerfile // Dockerfile: instructions and # comments
+            Dockerfile, // Dockerfile: instructions and # comments
+            CSharp,  // C#: // and /* */ comments, # preprocessor directives
+            Java,    // Java: // and /* */ comments, text blocks
+            Kotlin,  // Kotlin: // and /* */ comments, raw strings
+            Scala,   // Scala: // and /* */ comments, raw strings
+            Groovy,  // Groovy: // and /* */ comments, raw strings
+            Go,      // Go: // and /* */ comments, raw strings
+            Rust,    // Rust: // and /* */ comments, raw strings and lifetimes
+            Swift,   // Swift: // and /* */ comments, multi-line strings
+            Dart,    // Dart: // and /* */ comments, multi-line strings
+            JavaScript, // JavaScript: // and /* */ comments, template strings
+            TypeScript, // TypeScript: the JavaScript profile plus type keywords
+            Php,     // PHP: //, # and /* */ comments
+            Css,     // CSS, SCSS and Less: /* */ comments
+            Protobuf, // Protocol Buffers: // and /* */ comments
+            DeviceTree // Device Tree source: C-like comments, no API set
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -71,7 +86,10 @@ namespace SmarTTY.CodeEditing
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Lua, Language.Makefile, Language.Json, Language.Config,
             Language.Systemd, Language.Nginx, Language.SshConfig, Language.Log,
-            Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.Script, Language.Ruby, Language.Perl,
+            Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
+            Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust, Language.Swift,
+            Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
+            Language.DeviceTree, Language.Script, Language.Ruby, Language.Perl,
             Language.CMake, Language.Dockerfile, Language.Sql, Language.Markup, Language.Diff
         };
 
@@ -93,8 +111,23 @@ namespace SmarTTY.CodeEditing
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
-                case Language.CLike: return "C, C#, Java, JavaScript";
+                case Language.CLike: return "C";
                 case Language.Cpp: return "C++";
+                case Language.CSharp: return "C#";
+                case Language.Java: return "Java";
+                case Language.Kotlin: return "Kotlin";
+                case Language.Scala: return "Scala";
+                case Language.Groovy: return "Groovy";
+                case Language.Go: return "Go";
+                case Language.Rust: return "Rust";
+                case Language.Swift: return "Swift";
+                case Language.Dart: return "Dart";
+                case Language.JavaScript: return "JavaScript";
+                case Language.TypeScript: return "TypeScript";
+                case Language.Php: return "PHP";
+                case Language.Css: return "CSS, SCSS, Less";
+                case Language.Protobuf: return "Protocol Buffers";
+                case Language.DeviceTree: return "Device Tree";
                 case Language.Script: return "Script (R, AWK, Tcl, Nix)";
                 case Language.Ruby: return "Ruby";
                 case Language.Perl: return "Perl";
@@ -383,30 +416,66 @@ namespace SmarTTY.CodeEditing
 
                 case "c":
                 case "h":
+                    return Language.CLike;
+
                 case "cs":
+                    return Language.CSharp;
+
                 case "java":
+                    return Language.Java;
+
                 case "kt":
+                case "kts":
+                    return Language.Kotlin;
+
                 case "scala":
+                case "sc":
+                    return Language.Scala;
+
                 case "groovy":
                 case "gradle":
+                    return Language.Groovy;
+
                 case "go":
+                    return Language.Go;
+
                 case "rs":
+                    return Language.Rust;
+
                 case "swift":
+                    return Language.Swift;
+
                 case "dart":
+                    return Language.Dart;
+
                 case "js":
                 case "mjs":
                 case "cjs":
                 case "jsx":
+                    return Language.JavaScript;
+
                 case "ts":
                 case "tsx":
+                case "mts":
+                case "cts":
+                    return Language.TypeScript;
+
                 case "php":
+                case "phtml":
+                    return Language.Php;
+
                 case "css":
                 case "scss":
+                case "sass":
                 case "less":
+                    return Language.Css;
+
                 case "proto":
+                    return Language.Protobuf;
+
                 case "dts":
                 case "dtsi":
-                    return Language.CLike;
+                    return Language.DeviceTree;
 
                 case "cpp":
                 case "cxx":
@@ -531,7 +600,43 @@ namespace SmarTTY.CodeEditing
             }
             if (program == "node" || program == "nodejs" || program == "deno" || program == "bun")
             {
-                return Language.CLike;
+                return Language.JavaScript;
+            }
+            if (program == "ts-node" || program == "ts-node-esm" || program == "tsx")
+            {
+                return Language.TypeScript;
+            }
+            if (program.StartsWith("php", StringComparison.Ordinal))
+            {
+                return Language.Php;
+            }
+            if (program.StartsWith("kotlin", StringComparison.Ordinal))
+            {
+                return Language.Kotlin;
+            }
+            if (program.StartsWith("scala", StringComparison.Ordinal) || program == "amm")
+            {
+                return Language.Scala;
+            }
+            if (program.StartsWith("groovy", StringComparison.Ordinal))
+            {
+                return Language.Groovy;
+            }
+            if (program == "swift")
+            {
+                return Language.Swift;
+            }
+            if (program == "dart")
+            {
+                return Language.Dart;
+            }
+            if (program == "dotnet-script" || program == "csi" || program == "scriptcs")
+            {
+                return Language.CSharp;
+            }
+            if (program == "rust-script" || program == "cargo-script")
+            {
+                return Language.Rust;
             }
             switch (program)
             {
@@ -588,6 +693,21 @@ namespace SmarTTY.CodeEditing
                 case Language.Config: return TokenizeConfig;
                 case Language.CLike: return CLikeTokenizer;
                 case Language.Cpp: return CppTokenizer;
+                case Language.CSharp: return CSharpTokenizer;
+                case Language.Java: return JavaTokenizer;
+                case Language.Kotlin: return KotlinTokenizer;
+                case Language.Scala: return ScalaTokenizer;
+                case Language.Groovy: return GroovyTokenizer;
+                case Language.Go: return GoTokenizer;
+                case Language.Rust: return RustTokenizer;
+                case Language.Swift: return SwiftTokenizer;
+                case Language.Dart: return DartTokenizer;
+                case Language.JavaScript: return JavaScriptTokenizer;
+                case Language.TypeScript: return TypeScriptTokenizer;
+                case Language.Php: return PhpTokenizer;
+                case Language.Css: return CssTokenizer;
+                case Language.Protobuf: return ProtobufTokenizer;
+                case Language.DeviceTree: return DeviceTreeTokenizer;
                 case Language.Script: return ScriptTokenizer;
                 case Language.Ruby: return RubyTokenizer;
                 case Language.Perl: return PerlTokenizer;
@@ -636,9 +756,39 @@ namespace SmarTTY.CodeEditing
                 case Language.Lua:
                     return Combine(LuaKeywords);
                 case Language.CLike:
-                    return Combine(CLikeKeywords, PreprocessorDirectives);
+                    return Combine(CKeywords, PreprocessorDirectives);
                 case Language.Cpp:
                     return Combine(CppKeywords, PreprocessorDirectives);
+                case Language.CSharp:
+                    return Combine(CSharpKeywords, CSharpPreprocessorDirectives);
+                case Language.Java:
+                    return Combine(JavaKeywords);
+                case Language.Kotlin:
+                    return Combine(KotlinKeywords);
+                case Language.Scala:
+                    return Combine(ScalaKeywords);
+                case Language.Groovy:
+                    return Combine(GroovyKeywords);
+                case Language.Go:
+                    return Combine(GoKeywords);
+                case Language.Rust:
+                    return Combine(RustKeywords);
+                case Language.Swift:
+                    return Combine(SwiftKeywords);
+                case Language.Dart:
+                    return Combine(DartKeywords);
+                case Language.JavaScript:
+                    return Combine(JavaScriptKeywords);
+                case Language.TypeScript:
+                    return Combine(TypeScriptKeywords);
+                case Language.Php:
+                    return Combine(PhpKeywords);
+                case Language.Css:
+                    return Combine(CssKeywords);
+                case Language.Protobuf:
+                    return Combine(ProtobufKeywords);
+                case Language.DeviceTree:
+                    return Combine(DeviceTreeKeywords);
                 case Language.Script:
                     return Combine(ScriptKeywords);
                 case Language.Ruby:
@@ -1705,21 +1855,188 @@ namespace SmarTTY.CodeEditing
         private const int StVerbatim = 0x20;
         private const int StInTag = 0x40;
 
-        private static readonly HashSet<string> CLikeKeywords = new HashSet<string>(StringComparer.Ordinal)
+        /// <summary>The C keywords; the C profile stays separate from the other C-like languages.</summary>
+        private static readonly HashSet<string> CKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
-            "if", "else", "for", "foreach", "while", "do", "switch", "case", "default", "break", "continue",
-            "return", "goto", "try", "catch", "finally", "throw", "throws", "new", "delete", "class", "struct",
-            "union", "enum", "interface", "namespace", "using", "package", "import", "export", "from",
-            "public", "private", "protected", "internal", "static", "const", "constexpr", "volatile", "extern",
-            "inline", "virtual", "override", "abstract", "sealed", "final", "readonly", "typedef", "typename",
-            "template", "this", "base", "super", "void", "int", "char", "short", "long", "float", "double",
-            "bool", "boolean", "byte", "unsigned", "signed", "auto", "var", "let", "val", "fn", "func", "function",
-            "def", "impl", "trait", "mut", "pub", "self", "async", "await", "yield", "typeof", "sizeof",
-            "instanceof", "in", "is", "as", "true", "false", "null", "nullptr", "nil", "undefined", "string",
-            "defer"
+            "alignas", "alignof", "auto", "bool", "break", "case", "char", "const", "constexpr", "continue",
+            "default", "do", "double", "else", "enum", "extern", "false", "float", "for", "goto", "if",
+            "inline", "int", "long", "nullptr", "register", "restrict", "return", "short", "signed", "sizeof",
+            "static", "static_assert", "struct", "switch", "thread_local", "true", "typedef", "typeof",
+            "typeof_unqual", "union", "unsigned", "void", "volatile", "while",
+            "_Alignas", "_Alignof", "_Atomic", "_BitInt", "_Bool", "_Complex", "_Decimal128", "_Decimal32",
+            "_Decimal64", "_Generic", "_Imaginary", "_Noreturn", "_Static_assert", "_Thread_local"
         };
 
-        /// <summary>The C and C++ keywords; the C++ profile keeps them separate from the C-like languages.</summary>
+        private static readonly HashSet<string> CSharpPreprocessorDirectives = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "if", "else", "elif", "endif", "define", "undef", "warning", "error", "line", "region", "endregion",
+            "pragma", "nullable", "checksum"
+        };
+
+        private static readonly HashSet<string> CSharpKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "abstract", "add", "alias", "and", "as", "ascending", "async", "await", "base", "bool", "break",
+            "by", "byte", "case", "catch", "char", "checked", "class", "const", "continue", "decimal",
+            "default", "delegate", "descending", "do", "double", "dynamic", "else", "enum", "equals", "event",
+            "explicit", "extern", "false", "file", "finally", "fixed", "float", "for", "foreach", "from",
+            "get", "global", "goto", "group", "if", "implicit", "in", "init", "int", "interface", "internal",
+            "into", "is", "join", "let", "lock", "long", "managed", "nameof", "namespace", "new", "nint",
+            "not", "notnull", "nuint", "null", "object", "on", "operator", "or", "orderby", "out", "override",
+            "params", "partial", "private", "protected", "public", "readonly", "record", "ref", "remove",
+            "required", "return", "sbyte", "scoped", "sealed", "select", "set", "short", "sizeof", "stackalloc",
+            "static", "string", "struct", "switch", "this", "throw", "true", "try", "typeof", "uint", "ulong",
+            "unchecked", "unmanaged", "unsafe", "ushort", "using", "value", "var", "virtual", "void",
+            "volatile", "when", "where", "while", "with", "yield"
+        };
+
+        private static readonly HashSet<string> JavaKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const",
+            "continue", "default", "do", "double", "else", "enum", "exports", "extends", "false", "final",
+            "finally", "float", "for", "goto", "if", "implements", "import", "instanceof", "int", "interface",
+            "long", "module", "native", "new", "null", "open", "opens", "package", "permits", "private",
+            "protected", "provides", "public", "record", "requires", "return", "sealed", "short", "static",
+            "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "to", "transient", "true",
+            "transitive", "try", "uses", "var", "void", "volatile", "while", "with", "yield"
+        };
+
+        private static readonly HashSet<string> KotlinKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "abstract", "actual", "annotation", "as", "break", "by", "catch", "class", "companion", "const",
+            "constructor", "context", "continue", "crossinline", "data", "delegate", "do", "dynamic", "else",
+            "enum", "expect", "external", "false", "field", "file", "final", "finally", "for", "fun", "get",
+            "if", "import", "in", "infix", "init", "inline", "inner", "interface", "internal", "is", "lateinit",
+            "noinline", "null", "object", "open", "operator", "out", "override", "package", "param", "private",
+            "property", "protected", "public", "receiver", "reified", "return", "sealed", "set", "setparam",
+            "super", "suspend", "tailrec", "this", "throw", "true", "try", "typealias", "typeof", "val",
+            "value", "var", "vararg", "when", "where", "while"
+        };
+
+        private static readonly HashSet<string> ScalaKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "abstract", "case", "catch", "class", "def", "derives", "do", "else", "end", "enum", "export",
+            "extends", "extension", "false", "final", "finally", "for", "forSome", "given", "if", "implicit",
+            "import", "infix", "inline", "lazy", "match", "new", "null", "object", "opaque", "open", "override",
+            "package", "private", "protected", "return", "sealed", "super", "then", "this", "throw", "trait",
+            "transparent", "true", "try", "type", "using", "val", "var", "while", "with", "yield"
+        };
+
+        private static readonly HashSet<string> GroovyKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "abstract", "as", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const",
+            "continue", "def", "default", "do", "double", "else", "enum", "extends", "false", "final",
+            "finally", "float", "for", "goto", "if", "implements", "import", "in", "instanceof", "int",
+            "interface", "long", "native", "new", "null", "package", "permits", "private", "protected",
+            "public", "record", "return", "sealed", "short", "static", "strictfp", "super", "switch",
+            "synchronized", "this", "throw", "throws", "trait", "transient", "true", "try", "var", "void",
+            "volatile", "while", "yield"
+        };
+
+        private static readonly HashSet<string> GoKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough", "for",
+            "func", "go", "goto", "if", "import", "interface", "map", "package", "range", "return", "select",
+            "struct", "switch", "type", "var", "false", "iota", "nil", "true"
+        };
+
+        private static readonly HashSet<string> RustKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "crate", "do",
+            "dyn", "else", "enum", "extern", "false", "final", "fn", "for", "if", "impl", "in", "let", "loop",
+            "macro", "macro_rules", "match", "mod", "move", "mut", "override", "priv", "pub", "ref", "return",
+            "self", "Self", "static", "struct", "super", "trait", "true", "try", "type", "typeof", "union",
+            "unsafe", "unsized", "use", "virtual", "where", "while", "yield"
+        };
+
+        private static readonly HashSet<string> SwiftKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "actor", "any", "Any", "as", "associatedtype", "async", "await", "borrowing", "break", "case",
+            "catch", "class", "consuming", "continue", "default", "defer", "deinit", "didSet", "distributed",
+            "do", "else", "enum", "extension", "fallthrough", "false", "fileprivate", "final", "for", "func",
+            "get", "guard", "if", "import", "in", "indirect", "infix", "init", "inout", "internal", "is",
+            "isolated", "let", "macro", "nil", "nonisolated", "open", "operator", "optional", "override",
+            "package", "postfix", "precedencegroup", "prefix", "private", "protocol", "public", "repeat",
+            "required", "rethrows", "return", "self", "Self", "sending", "set", "some", "static", "struct",
+            "subscript", "super", "switch", "throw", "throws", "true", "try", "typealias", "var", "where",
+            "while", "willSet"
+        };
+
+        private static readonly HashSet<string> DartKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "abstract", "as", "assert", "async", "await", "base", "break", "case", "catch", "class", "const",
+            "continue", "covariant", "default", "deferred", "do", "dynamic", "else", "enum", "export",
+            "extends", "extension", "external", "factory", "false", "final", "finally", "for", "Function",
+            "get", "hide", "if", "implements", "import", "in", "interface", "is", "late", "library", "macro",
+            "mixin", "new", "null", "on", "operator", "part", "required", "rethrow", "return", "sealed", "set",
+            "show", "static", "super", "switch", "sync", "this", "throw", "true", "try", "typedef", "var",
+            "void", "when", "while", "with", "yield"
+        };
+
+        private static readonly HashSet<string> JavaScriptKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "as", "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger",
+            "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "from",
+            "function", "get", "if", "implements", "import", "in", "instanceof", "interface", "let", "new",
+            "null", "of", "package", "private", "protected", "public", "return", "set", "static", "super",
+            "switch", "this", "throw", "true", "try", "typeof", "undefined", "var", "void", "while", "with",
+            "yield"
+        };
+
+        private static readonly HashSet<string> TypeScriptKeywords =
+            new HashSet<string>(JavaScriptKeywords, StringComparer.Ordinal)
+            {
+                "abstract", "any", "asserts", "bigint", "boolean", "declare", "infer", "keyof", "module",
+                "namespace", "never", "number", "object", "override", "readonly", "require", "satisfies",
+                "string", "symbol", "type", "unique", "unknown", "using"
+            };
+
+        private static readonly HashSet<string> PhpKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "abstract", "and", "array", "as", "break", "callable", "case", "catch", "class", "clone", "const",
+            "continue", "declare", "default", "do", "echo", "else", "elseif", "empty", "enddeclare", "endfor",
+            "endforeach", "endif", "endswitch", "endwhile", "enum", "eval", "exit", "extends", "false", "final",
+            "finally", "fn", "for", "foreach", "function", "global", "goto", "if", "implements", "include",
+            "include_once", "instanceof", "insteadof", "interface", "isset", "list", "match", "namespace",
+            "new", "null", "or", "parent", "print", "private", "protected", "public", "readonly", "require",
+            "require_once", "return", "self", "static", "switch", "throw", "trait", "true", "try", "unset",
+            "use", "var", "while", "xor", "yield"
+        };
+
+        /// <summary>The CSS properties, values and at-rule names offered by the CSS profile.</summary>
+        private static readonly HashSet<string> CssKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "align-content", "align-items", "align-self", "animation", "background", "border", "bottom",
+            "box-shadow", "box-sizing", "color", "content", "cursor", "display", "flex", "flex-direction",
+            "flex-wrap", "font", "font-family", "font-size", "font-style", "font-weight", "gap", "grid",
+            "grid-area", "grid-column", "grid-row", "grid-template", "height", "justify-content", "left",
+            "line-height", "list-style", "margin", "max-height", "max-width", "min-height", "min-width",
+            "opacity", "outline", "overflow", "padding", "pointer-events", "position", "right", "text-align",
+            "text-decoration", "text-transform", "top", "transform", "transition", "visibility", "white-space",
+            "width", "z-index", "absolute", "auto", "block", "bold", "border-box", "center", "column",
+            "contain", "cover", "dashed", "dotted", "fixed", "hidden", "inherit", "initial", "inline",
+            "inline-block", "italic", "none", "no-repeat", "normal", "relative", "repeat", "revert", "row",
+            "scroll", "solid", "static", "sticky", "transparent", "unset", "visible", "wrap", "important",
+            "media", "supports", "keyframes", "font-face", "charset", "import", "layer", "namespace", "page",
+            "property", "scope", "container"
+        };
+
+        private static readonly HashSet<string> ProtobufKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "syntax", "edition", "package", "import", "option", "message", "enum", "service", "rpc", "returns",
+            "stream", "repeated", "optional", "required", "oneof", "map", "reserved", "extensions", "extend",
+            "group", "to", "max", "public", "weak", "deprecated", "true", "false", "json_name", "default"
+        };
+
+        /// <summary>The Device Tree directives and the common node properties; the format has no API set.</summary>
+        private static readonly HashSet<string> DeviceTreeKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "include", "memreserve", "plugin", "compatible", "model", "status", "reg", "ranges", "interrupts",
+            "interrupt-parent", "clocks", "clock-names", "resets", "reset-names", "dmas", "dma-names",
+            "pinctrl-names", "gpios", "phandle", "chosen", "memory", "cpus", "soc", "aliases",
+            "address-cells", "size-cells"
+        };
+
+        /// <summary>The C++ keywords; the C++ profile keeps them separate from C.</summary>
         private static readonly HashSet<string> CppKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
             "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor", "bool", "break",
@@ -1834,9 +2151,11 @@ namespace SmarTTY.CodeEditing
             public bool TripleQuoteStrings;    // """...""" strings that may span lines
             public bool VerbatimStrings;       // C# @"..." strings that may span lines
             public bool RustLiterals;          // 'a lifetimes and labels are not strings; r"..." and r#"..."# raw strings
+            public bool HyphenatedKeywords;    // CSS and Device Tree words such as font-size and interrupt-parent
             public string BlockCommentStart;
             public string BlockCommentEnd;
             public HashSet<string> Keywords;
+            public HashSet<string> PreprocessorWords = PreprocessorDirectives;
 
             private bool IsLineComment(string text, int i)
             {
@@ -2027,7 +2346,7 @@ namespace SmarTTY.CodeEditing
                         {
                             wordEnd++;
                         }
-                        if (wordEnd > wordStart && PreprocessorDirectives.Contains(text.Substring(wordStart, wordEnd - wordStart)))
+                        if (wordEnd > wordStart && PreprocessorWords.Contains(text.Substring(wordStart, wordEnd - wordStart)))
                         {
                             Normal(ref last, last, hash, sink);
                             sink.AddToken(TypePreprocessor, hash, wordEnd);
@@ -2161,7 +2480,7 @@ namespace SmarTTY.CodeEditing
                     if (IsIdStart(c))
                     {
                         int s = i;
-                        while (i < len && IsIdChar(text[i]))
+                        while (i < len && (IsIdChar(text[i]) || (HyphenatedKeywords && text[i] == '-')))
                         {
                             i++;
                         }
@@ -2222,20 +2541,78 @@ namespace SmarTTY.CodeEditing
             }
         }
 
-        private static readonly TokenCache.LineTokenizer CLikeTokenizer = new GenericSyntax
+        private static TokenCache.LineTokenizer CreateCLikeTokenizer(HashSet<string> keywords, bool preprocessor = false,
+            bool slashComments = true, bool hashComments = false, bool backticks = false, bool tripleQuotes = false,
+            bool verbatim = false, bool rustLiterals = false, bool hyphenatedKeywords = false,
+            HashSet<string> preprocessorWords = null)
         {
-            SlashComments = true,
-            Preprocessor = true,
-            Brackets = true,
-            FoldCurlyBraces = true,
-            BacktickStrings = true,
-            TripleQuoteStrings = true,
-            VerbatimStrings = true,
-            RustLiterals = true,
-            BlockCommentStart = "/*",
-            BlockCommentEnd = "*/",
-            Keywords = CLikeKeywords
-        }.Tokenize;
+            return new GenericSyntax
+            {
+                SlashComments = slashComments,
+                HashComments = hashComments,
+                Preprocessor = preprocessor,
+                PreprocessorWords = preprocessorWords ?? PreprocessorDirectives,
+                Brackets = true,
+                FoldCurlyBraces = true,
+                BacktickStrings = backticks,
+                TripleQuoteStrings = tripleQuotes,
+                VerbatimStrings = verbatim,
+                RustLiterals = rustLiterals,
+                HyphenatedKeywords = hyphenatedKeywords,
+                BlockCommentStart = "/*",
+                BlockCommentEnd = "*/",
+                Keywords = keywords
+            }.Tokenize;
+        }
+
+        private static readonly TokenCache.LineTokenizer CLikeTokenizer =
+            CreateCLikeTokenizer(CKeywords, preprocessor: true);
+
+        private static readonly TokenCache.LineTokenizer CSharpTokenizer =
+            CreateCLikeTokenizer(CSharpKeywords, preprocessor: true, tripleQuotes: true, verbatim: true,
+                preprocessorWords: CSharpPreprocessorDirectives);
+
+        private static readonly TokenCache.LineTokenizer JavaTokenizer =
+            CreateCLikeTokenizer(JavaKeywords, tripleQuotes: true);
+
+        private static readonly TokenCache.LineTokenizer KotlinTokenizer =
+            CreateCLikeTokenizer(KotlinKeywords, tripleQuotes: true);
+
+        private static readonly TokenCache.LineTokenizer ScalaTokenizer =
+            CreateCLikeTokenizer(ScalaKeywords, tripleQuotes: true);
+
+        private static readonly TokenCache.LineTokenizer GroovyTokenizer =
+            CreateCLikeTokenizer(GroovyKeywords, tripleQuotes: true);
+
+        private static readonly TokenCache.LineTokenizer GoTokenizer =
+            CreateCLikeTokenizer(GoKeywords, backticks: true);
+
+        private static readonly TokenCache.LineTokenizer RustTokenizer =
+            CreateCLikeTokenizer(RustKeywords, rustLiterals: true);
+
+        private static readonly TokenCache.LineTokenizer SwiftTokenizer =
+            CreateCLikeTokenizer(SwiftKeywords, tripleQuotes: true);
+
+        private static readonly TokenCache.LineTokenizer DartTokenizer =
+            CreateCLikeTokenizer(DartKeywords, tripleQuotes: true);
+
+        private static readonly TokenCache.LineTokenizer JavaScriptTokenizer =
+            CreateCLikeTokenizer(JavaScriptKeywords, backticks: true);
+
+        private static readonly TokenCache.LineTokenizer TypeScriptTokenizer =
+            CreateCLikeTokenizer(TypeScriptKeywords, backticks: true);
+
+        private static readonly TokenCache.LineTokenizer PhpTokenizer =
+            CreateCLikeTokenizer(PhpKeywords, hashComments: true, backticks: true);
+
+        private static readonly TokenCache.LineTokenizer CssTokenizer =
+            CreateCLikeTokenizer(CssKeywords, slashComments: false, hyphenatedKeywords: true);
+
+        private static readonly TokenCache.LineTokenizer ProtobufTokenizer =
+            CreateCLikeTokenizer(ProtobufKeywords);
+
+        private static readonly TokenCache.LineTokenizer DeviceTreeTokenizer =
+            CreateCLikeTokenizer(DeviceTreeKeywords, preprocessor: true, hyphenatedKeywords: true);
 
         private static readonly TokenCache.LineTokenizer CppTokenizer = new GenericSyntax
         {

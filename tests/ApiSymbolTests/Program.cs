@@ -260,6 +260,19 @@ internal static class Program
         Check(database.Find(L.CLike, "bsearch_s").Signature.Contains("rsize_t count"),
             "the 'bsearch_s' signature uses rsize_t bounds");
 
+        // The split C-like profiles start without an API set; the C library is not inherited by them.
+        foreach (L language in new[]
+                 {
+                     L.CSharp, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
+                     L.JavaScript, L.TypeScript, L.Php, L.Css, L.Protobuf, L.DeviceTree
+                 })
+        {
+            Equal(database.ForLanguage(language).Count, 0,
+                SyntaxHighlighting.GetDisplayName(language) + " has no API symbols of its own");
+            Check(database.Find(language, "printf") == null,
+                SyntaxHighlighting.GetDisplayName(language) + " does not inherit the C library");
+        }
+
         // C++ is a separate profile: it inherits the C library and adds the STL, while C files stay C-only.
         List<ApiSymbolDatabase.Symbol> cpp = database.ForLanguage(L.Cpp).ToList();
         Check(cpp.Count > 3000, "the C++ set is broad (" + cpp.Count + " symbols)");

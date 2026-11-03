@@ -66,6 +66,28 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.CMake).Contains("add_executable"), "CMake keywords contain 'add_executable'");
         Check(SyntaxHighlighting.GetKeywords(L.Dockerfile).Contains("FROM"), "Dockerfile keywords contain 'FROM'");
         Check(SyntaxHighlighting.GetKeywords(L.Markup).Count == 0, "Markup has no keyword list of its own");
+
+        // The C-like profiles keep their own keyword sets: the signature word of one is not offered by another.
+        (L Language, string Keyword, string Foreign)[] profiles =
+        {
+            (L.CSharp, "namespace", "fun"), (L.Java, "synchronized", "fun"), (L.Kotlin, "fun", "synchronized"),
+            (L.Scala, "implicit", "fun"), (L.Groovy, "def", "sub"), (L.Go, "defer", "class"),
+            (L.Rust, "impl", "class"), (L.Swift, "guard", "impl"), (L.Dart, "mixin", "guard"),
+            (L.JavaScript, "function", "fun"), (L.TypeScript, "interface", "fun"), (L.Php, "echo", "fun"),
+            (L.Css, "display", "message"), (L.Protobuf, "message", "impl"), (L.DeviceTree, "compatible", "message")
+        };
+        foreach ((L language, string keyword, string foreign) in profiles)
+        {
+            string name = SyntaxHighlighting.GetDisplayName(language);
+            Check(SyntaxHighlighting.GetKeywords(language).Contains(keyword), name + " keywords contain '" + keyword + "'");
+            Check(!SyntaxHighlighting.GetKeywords(language).Contains(foreign), name + " does not see the foreign '" + foreign + "'");
+        }
+        Check(SyntaxHighlighting.GetKeywords(L.CSharp).Contains("region"), "C# keywords contain the 'region' directive");
+        Check(!SyntaxHighlighting.GetKeywords(L.CSharp).Contains("include"), "C# keywords do not contain the C 'include' directive");
+        Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
+        Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
+        Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");
+        Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("message"), "C keywords do not include the Protobuf 'message'");
     }
 
     private static void SourceChecks()
@@ -135,6 +157,18 @@ internal static class Program
         L shell = SyntaxHighlighting.DetectLanguage("/usr/local/bin/backup", "#!/bin/bash");
         Equal(shell, L.Bash, "a #!/bin/bash script without an extension is detected as Bash");
         Check(Names(shell, "", "").Contains("fi"), "a Bash script is offered the keyword 'fi'");
+
+        L csharp = SyntaxHighlighting.DetectLanguage("/srv/Program.cs");
+        Equal(csharp, L.CSharp, "Program.cs is detected as C#");
+        List<string> csharpWords = Names(csharp, "", "");
+        Check(csharpWords.Contains("namespace"), "a .cs file is offered the C# keyword 'namespace'");
+        Check(!csharpWords.Contains("fun"), "a .cs file is not offered the Kotlin keyword 'fun'");
+
+        L typescript = SyntaxHighlighting.DetectLanguage("/srv/app.ts");
+        Equal(typescript, L.TypeScript, "app.ts is detected as TypeScript");
+        List<string> typeScriptWords = Names(typescript, "", "");
+        Check(typeScriptWords.Contains("interface"), "a .ts file is offered the TypeScript keyword 'interface'");
+        Check(!typeScriptWords.Contains("include"), "a .ts file is not offered the C preprocessor word 'include'");
 
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/notes.unknown"), L.Plain, "an unknown extension is plain text");
     }

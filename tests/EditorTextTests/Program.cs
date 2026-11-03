@@ -121,6 +121,67 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/src/main.cppm"), L.Cpp, ".cppm is a C++ module");
         Equal(SyntaxHighlighting.DetectLanguage("/src/sketch.ino"), L.Cpp, ".ino is a C++ sketch");
         Equal(SyntaxHighlighting.DetectLanguage("/src/main.h"), L.CLike, "C headers stay C-like");
+
+        (string Path, L Language)[] cLikeExtensions =
+        {
+            ("/src/Program.cs", L.CSharp), ("/src/Main.java", L.Java), ("/src/Main.kt", L.Kotlin),
+            ("/src/build.kts", L.Kotlin), ("/src/Main.scala", L.Scala), ("/src/main.sc", L.Scala),
+            ("/src/build.groovy", L.Groovy), ("/src/build.gradle", L.Groovy), ("/src/main.go", L.Go),
+            ("/src/main.rs", L.Rust), ("/src/Main.swift", L.Swift), ("/src/main.dart", L.Dart),
+            ("/src/app.js", L.JavaScript), ("/src/app.mjs", L.JavaScript), ("/src/app.cjs", L.JavaScript),
+            ("/src/App.jsx", L.JavaScript), ("/src/app.ts", L.TypeScript), ("/src/App.tsx", L.TypeScript),
+            ("/src/app.mts", L.TypeScript), ("/src/app.cts", L.TypeScript), ("/src/index.php", L.Php),
+            ("/src/page.phtml", L.Php), ("/src/site.css", L.Css), ("/src/site.scss", L.Css),
+            ("/src/site.sass", L.Css), ("/src/site.less", L.Css), ("/src/message.proto", L.Protobuf),
+            ("/src/board.dts", L.DeviceTree), ("/src/board.dtsi", L.DeviceTree)
+        };
+        foreach ((string path, L language) in cLikeExtensions)
+        {
+            Equal(SyntaxHighlighting.DetectLanguage(path), language,
+                path + " is " + SyntaxHighlighting.GetDisplayName(language));
+        }
+
+        (L Language, string Name)[] cLikeNames =
+        {
+            (L.CSharp, "C#"), (L.Java, "Java"), (L.Kotlin, "Kotlin"), (L.Scala, "Scala"),
+            (L.Groovy, "Groovy"), (L.Go, "Go"), (L.Rust, "Rust"), (L.Swift, "Swift"), (L.Dart, "Dart"),
+            (L.JavaScript, "JavaScript"), (L.TypeScript, "TypeScript"), (L.Php, "PHP"),
+            (L.Css, "CSS, SCSS, Less"), (L.Protobuf, "Protocol Buffers"), (L.DeviceTree, "Device Tree")
+        };
+        foreach ((L language, string name) in cLikeNames)
+        {
+            Equal(SyntaxHighlighting.GetDisplayName(language), name, name + " has its own display name");
+            Check(SyntaxHighlighting.SelectableLanguages.Contains(language), name + " is in the syntax menu");
+        }
+
+        (L Language, string Keyword)[] cLikeKeywords =
+        {
+            (L.CSharp, "namespace"), (L.Java, "synchronized"), (L.Kotlin, "fun"), (L.Scala, "implicit"),
+            (L.Groovy, "def"), (L.Go, "defer"), (L.Rust, "impl"), (L.Swift, "guard"), (L.Dart, "mixin"),
+            (L.JavaScript, "function"), (L.TypeScript, "interface"), (L.Php, "echo"),
+            (L.Css, "display"), (L.Protobuf, "message"), (L.DeviceTree, "compatible")
+        };
+        foreach ((L language, string keyword) in cLikeKeywords)
+        {
+            Check(SyntaxHighlighting.GetKeywords(language).Contains(keyword),
+                SyntaxHighlighting.GetDisplayName(language) + " keywords contain '" + keyword + "'");
+        }
+        Check(SyntaxHighlighting.GetKeywords(L.CSharp).Contains("region"), "C# keywords contain the 'region' directive");
+        Check(!SyntaxHighlighting.GetKeywords(L.CSharp).Contains("include"), "C# keywords do not contain the C 'include' directive");
+        Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
+        Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
+        Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");
+        Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("message"), "C keywords do not include the Protobuf 'message'");
+        foreach (L language in new[]
+                 {
+                     L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart, L.JavaScript,
+                     L.TypeScript, L.Php, L.Css, L.Protobuf, L.DeviceTree
+                 })
+        {
+            Check(!SyntaxHighlighting.GetKeywords(language).Contains("sizeof"),
+                SyntaxHighlighting.GetDisplayName(language) + " does not see the C 'sizeof'");
+        }
+
         Equal(SyntaxHighlighting.GetDisplayName(L.Cpp), "C++", "C++ has its own display name");
         Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Cpp), "C++ is in the syntax menu");
         Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("constexpr"), "C++ keywords contain 'constexpr'");
@@ -154,7 +215,20 @@ internal static class Program
         Check(!SyntaxHighlighting.GetKeywords(L.Dockerfile).Contains("add_executable"), "Dockerfile keywords do not contain the CMake commands");
         Equal(SyntaxHighlighting.DetectLanguage("/src/Makefile.am"), L.Makefile, "Makefile.am is a makefile");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/bin/busybox sh"), L.Bash, "#!/bin/busybox sh is shell");
-        Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/env node"), L.CLike, "#!/usr/bin/env node is JavaScript");
+        (string Line, L Language)[] cLikeShebangs =
+        {
+            ("#!/usr/bin/env node", L.JavaScript), ("#!/usr/bin/env ts-node", L.TypeScript),
+            ("#!/usr/bin/env php", L.Php), ("#!/usr/bin/env kotlin", L.Kotlin),
+            ("#!/usr/bin/env scala", L.Scala), ("#!/usr/bin/env amm", L.Scala),
+            ("#!/usr/bin/env groovy", L.Groovy), ("#!/usr/bin/env swift", L.Swift),
+            ("#!/usr/bin/env dart", L.Dart), ("#!/usr/bin/env dotnet-script", L.CSharp),
+            ("#!/usr/bin/env rust-script", L.Rust)
+        };
+        foreach ((string line, L language) in cLikeShebangs)
+        {
+            Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", line), language,
+                line + " is " + SyntaxHighlighting.GetDisplayName(language));
+        }
         Equal(SyntaxHighlighting.DetectLanguage("/var/log/syslog.log"), L.Log, "logs get the colours of their timestamps and levels");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.txt"), L.Plain, "text files are not highlighted");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/README.md"), L.Plain, "markdown is not highlighted");
@@ -299,14 +373,15 @@ internal static class Program
 
     private static void GenericChecks()
     {
-        Highlighted c = new Highlighted(L.CLike, "#include <stdio.h>\nint main() { /* a\n b */ return 0; }\nconst char *u = \"http://x\"; // c\n#fff {");
+        Highlighted c = new Highlighted(L.CLike, "#include <stdio.h>\nint main() { /* a\n b */ return 0; }\nconst char *u = \"http://x\"; // c\nint n = `z`; char q = 'y';");
         Equal(Join(c.Tokens(0, SyntaxHighlighting.TypePreprocessor)), "#include", "preprocessor directive");
         Equal(Join(c.Tokens(1, SyntaxHighlighting.TypeComment)), "/* a", "block comment starts");
         Equal(Join(c.Tokens(2, SyntaxHighlighting.TypeComment)), " b */", "block comment continues on the next line");
         Equal(Join(c.Tokens(2, SyntaxHighlighting.TypeKeyword)), "return", "code after the block comment");
         Equal(Join(c.Tokens(3, SyntaxHighlighting.TypeString)), "\"http://x\"", "'//' inside a string is not a comment");
         Equal(Join(c.Tokens(3, SyntaxHighlighting.TypeComment)), "// c", "line comment");
-        Equal(Join(c.Tokens(4, SyntaxHighlighting.TypePreprocessor)), "", "a CSS '#id' is not a directive");
+        Equal(Join(c.Tokens(4, SyntaxHighlighting.TypeString)), "'y'", "C has no template strings; a backtick is not a string");
+        Equal(Join(c.Tokens(4, SyntaxHighlighting.TypePreprocessor)), "", "a backtick is not a preprocessor directive");
 
         TokenCache.Token brace = c.At(1, 11);
         Check(brace != null && brace.Partner != null && brace.Partner.LineNumber == 2, "'{' is paired with '}' on the next line");
@@ -322,17 +397,53 @@ internal static class Program
         Equal(Join(html.Tokens(1, SyntaxHighlighting.TypeKeyword)), "</p", "closing tag");
 
         // Strings that go on over lines, and quotes that are not strings.
-        Highlighted multi = new Highlighted(L.CLike, "const a = `x ${y}\nsecond` + 'z';\nlet t = \"\"\"\nbody \"quote\"\n\"\"\";\nvar v = @\"a\"\"b\nc\";\nx = ['a b', 'c d'];");
-        Equal(Join(multi.Tokens(0, SyntaxHighlighting.TypeString)), "`x ${y}", "a template string starts");
-        Equal(Join(multi.Tokens(1, SyntaxHighlighting.TypeString)), "second`|'z'", "...goes on, and the code after it is highlighted");
-        Equal(Join(multi.Tokens(3, SyntaxHighlighting.TypeString)), "body \"quote\"", "the body of a \"\"\" string is text");
-        Equal(Join(multi.Tokens(4, SyntaxHighlighting.TypeString)), "\"\"\"", "the closing \"\"\"");
-        Equal(Join(multi.Tokens(5, SyntaxHighlighting.TypeString)), "@\"a\"\"b", "a verbatim string with a doubled quote");
-        Equal(Join(multi.Tokens(6, SyntaxHighlighting.TypeString)), "c\"", "...goes on to its closing quote");
-        Equal(Join(multi.Tokens(7, SyntaxHighlighting.TypeString)), "'a b'|'c d'", "strings in an array are not lifetimes");
-        Highlighted rust = new Highlighted(L.CLike, "fn f<'a>(x: &'a str) -> &'static str { 'outer: loop { break 'outer; } }\nlet c = 'x'; let r = r#\"a \"b\" c\"#;");
-        Equal(Join(rust.Tokens(0, SyntaxHighlighting.TypeString)), "", "lifetimes and labels are not strings");
-        Equal(Join(rust.Tokens(1, SyntaxHighlighting.TypeString)), "'x'|r#\"a \"b\" c\"#", "a character literal and a raw string");
+        Highlighted js = new Highlighted(L.JavaScript, "const a = `x ${y}\nsecond` + 'z';");
+        Equal(Join(js.Tokens(0, SyntaxHighlighting.TypeString)), "`x ${y}", "a JavaScript template string starts");
+        Equal(Join(js.Tokens(1, SyntaxHighlighting.TypeString)), "second`|'z'", "...goes on, and the code after it is highlighted");
+        Highlighted csharp = new Highlighted(L.CSharp, "string t = \"\"\"\nbody \"quote\"\n\"\"\";\nstring v = @\"a\"\"b\nc\";");
+        Equal(Join(csharp.Tokens(0, SyntaxHighlighting.TypeString)), "\"\"\"", "a C# raw string starts");
+        Equal(Join(csharp.Tokens(1, SyntaxHighlighting.TypeString)), "body \"quote\"", "the body of a C# raw string is text");
+        Equal(Join(csharp.Tokens(2, SyntaxHighlighting.TypeString)), "\"\"\"", "the closing \"\"\"");
+        Equal(Join(csharp.Tokens(3, SyntaxHighlighting.TypeString)), "@\"a\"\"b", "a verbatim string with a doubled quote");
+        Equal(Join(csharp.Tokens(4, SyntaxHighlighting.TypeString)), "c\"", "...goes on to its closing quote");
+        Highlighted csharpDirective = new Highlighted(L.CSharp, "#region Helpers\nclass C { }");
+        Equal(Join(csharpDirective.Tokens(0, SyntaxHighlighting.TypePreprocessor)), "#region", "a C# preprocessor directive");
+        Highlighted java = new Highlighted(L.Java, "String t = \"\"\"\nbody\n\"\"\";");
+        Equal(Join(java.Tokens(1, SyntaxHighlighting.TypeString)), "body", "a Java text block is a string");
+        foreach (L tripleQuote in new[] { L.Kotlin, L.Scala, L.Groovy, L.Swift, L.Dart })
+        {
+            Highlighted multi = new Highlighted(tripleQuote, "x = \"\"\"\nbody\n\"\"\";");
+            Equal(Join(multi.Tokens(1, SyntaxHighlighting.TypeString)), "body",
+                SyntaxHighlighting.GetDisplayName(tripleQuote) + " supports triple-quoted strings");
+        }
+        Highlighted rust = new Highlighted(L.Rust, "fn f<'a>(x: &'a str) -> &'static str { 'outer: loop { break 'outer; } }\nlet c = 'x'; let r = r#\"a \"b\" c\"#;");
+        Equal(Join(rust.Tokens(0, SyntaxHighlighting.TypeString)), "", "Rust lifetimes and labels are not strings");
+        Equal(Join(rust.Tokens(1, SyntaxHighlighting.TypeString)), "'x'|r#\"a \"b\" c\"#", "a Rust character literal and a raw string");
+        Highlighted go = new Highlighted(L.Go, "func f() { s := `raw\nstring` } // note");
+        Equal(Join(go.Tokens(0, SyntaxHighlighting.TypeString)), "`raw", "a Go raw string starts");
+        Equal(Join(go.Tokens(1, SyntaxHighlighting.TypeString)), "string`", "...goes on to its closing backtick");
+        Equal(Join(go.Tokens(1, SyntaxHighlighting.TypeComment)), "// note", "a Go line comment");
+        Highlighted ts = new Highlighted(L.TypeScript, "interface I { value: number; } // note");
+        Equal(Join(ts.Tokens(0, SyntaxHighlighting.TypeKeyword)), "interface|number", "TypeScript keywords are highlighted");
+        Equal(Join(ts.Tokens(0, SyntaxHighlighting.TypeComment)), "// note", "a TypeScript line comment");
+        Highlighted php = new Highlighted(L.Php, "<?php # note\n// note2\n/* block */\nfunction f() { echo 1; }");
+        Equal(Join(php.Tokens(0, SyntaxHighlighting.TypeComment)), "# note", "a PHP '#' comment");
+        Equal(Join(php.Tokens(1, SyntaxHighlighting.TypeComment)), "// note2", "a PHP line comment");
+        Equal(Join(php.Tokens(2, SyntaxHighlighting.TypeComment)), "/* block */", "a PHP block comment");
+        Equal(Join(php.Tokens(3, SyntaxHighlighting.TypeKeyword)), "function|echo", "PHP keywords are highlighted");
+        Highlighted css = new Highlighted(L.Css, "/* note */\n#fff { font-size: 12px; } // not a comment");
+        Equal(Join(css.Tokens(0, SyntaxHighlighting.TypeComment)), "/* note */", "a CSS block comment");
+        Equal(Join(css.Tokens(1, SyntaxHighlighting.TypeComment)), "", "CSS has no '//' line comments");
+        Equal(Join(css.Tokens(1, SyntaxHighlighting.TypePreprocessor)), "", "CSS '#fff' is not a preprocessor directive");
+        Equal(Join(css.Tokens(1, SyntaxHighlighting.TypeKeyword)), "font-size", "a hyphenated CSS property is highlighted");
+        Highlighted proto = new Highlighted(L.Protobuf, "message User { // note\n  string name = 1;\n}");
+        Equal(Join(proto.Tokens(0, SyntaxHighlighting.TypeKeyword)), "message", "a Protobuf message keyword");
+        Equal(Join(proto.Tokens(0, SyntaxHighlighting.TypeComment)), "// note", "a Protobuf line comment");
+        Highlighted dt = new Highlighted(L.DeviceTree, "/dts-v1/;\n/include/ \"board.dtsi\"\n/ { interrupt-parent = <&gic>; compatible = \"board\"; }; // note");
+        Equal(Join(dt.Tokens(1, SyntaxHighlighting.TypeKeyword)), "include", "a Device Tree include directive");
+        Equal(Join(dt.Tokens(1, SyntaxHighlighting.TypeString)), "\"board.dtsi\"", "a Device Tree include path");
+        Equal(Join(dt.Tokens(2, SyntaxHighlighting.TypeKeyword)), "interrupt-parent|compatible", "hyphenated Device Tree properties");
+        Equal(Join(dt.Tokens(2, SyntaxHighlighting.TypeComment)), "// note", "a Device Tree line comment");
         Highlighted html2 = new Highlighted(L.Markup, "<p>He said \"hi</p>\n<a href=\"u\"\n   title=\"t\">x</a>\n<!DOCTYPE html>");
         Equal(Join(html2.Tokens(0, SyntaxHighlighting.TypeString)), "", "a quote in the text between tags is not a string");
         Equal(Join(html2.Tokens(1, SyntaxHighlighting.TypeString)), "\"u\"", "an attribute value is");
@@ -483,10 +594,16 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/etc/board.json"), L.Json, ".json is JSON");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/tsconfig.jsonc"), L.Json, ".jsonc is JSON");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/config.d/x"), L.Plain, "only /etc/config/ is UCI");
+        L[] selfNamed =
+        {
+            L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
+            L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
+            L.JavaScript, L.TypeScript, L.Protobuf
+        };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is offered in the syntax menu");
-            Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString() || language == L.Lua || language == L.Json || language == L.Makefile || language == L.Python || language == L.Sql || language == L.Diff || language == L.Plain || language == L.Ruby || language == L.Perl || language == L.CMake || language == L.Dockerfile, language + " has a display name");
+            Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString() || Array.IndexOf(selfNamed, language) >= 0, language + " has a display name");
         }
     }
 
@@ -943,6 +1060,16 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Perl).Toggle(new[] { "print 1" })), "# print 1", "Perl comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CMake).Toggle(new[] { "set(X 1)" })), "# set(X 1)", "CMake comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Dockerfile).Toggle(new[] { "FROM alpine" })), "# FROM alpine", "Dockerfile comment");
+        foreach (L language in new[]
+                 {
+                     L.CSharp, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
+                     L.JavaScript, L.TypeScript, L.Php, L.Protobuf, L.DeviceTree
+                 })
+        {
+            Equal(Join(CommentStyle.ForLanguage(language).Toggle(new[] { "x" })), "// x",
+                SyntaxHighlighting.GetDisplayName(language) + " uses '//' comments");
+        }
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Css).Toggle(new[] { "a" })), "/* a */", "CSS uses block comments");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Sql).Toggle(new[] { "select 1" })), "-- select 1", "SQL comment");
         Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Plain) == null, "plain text has no comments");
         Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Diff) == null, "a diff has no comments");

@@ -70,6 +70,36 @@ internal static class Program
         Check(!Definitions(L.CLike, "return foo(1);\n").Any(), "c-like: a call after return is not a definition");
         Check(!Definitions(L.CLike, "if (foo(a)) {\n}\n").Any(), "c-like: a control statement is not a definition");
 
+        // The split C-like profiles parse their own function declaration forms.
+        Equal(string.Join("|", Definitions(L.CSharp, "public static int Add(int a, int b) {\n    return a + b;\n}\n")),
+            "Add(int a, int b)", "c#: a method definition");
+        Equal(string.Join("|", Definitions(L.Java, "public int add(int a, int b) {\n    return a + b;\n}\n")),
+            "add(int a, int b)", "java: a method definition");
+        Equal(string.Join("|", Definitions(L.Kotlin, "fun add(a: Int, b: Int): Int {\n    return a + b\n}\n")),
+            "add(a: Int, b: Int)", "kotlin: fun");
+        Equal(string.Join("|", Definitions(L.Scala, "def add(a: Int, b: Int): Int = {\n    a + b\n}\n")),
+            "add(a: Int, b: Int)", "scala: def");
+        Equal(string.Join("|", Definitions(L.Groovy, "def add(int a, int b) {\n    a + b\n}\n")),
+            "add(int a, int b)", "groovy: def");
+        Equal(string.Join("|", Definitions(L.Go, "func add(a int, b int) int {\n    return a + b\n}\n")),
+            "add(a int, b int)", "go: func");
+        Equal(string.Join("|", Definitions(L.Rust, "fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n")),
+            "add(a: i32, b: i32)", "rust: fn");
+        Equal(string.Join("|", Definitions(L.Swift, "func add(_ a: Int, _ b: Int) -> Int {\n    return a + b\n}\n")),
+            "add(_ a: Int, _ b: Int)", "swift: func");
+        Equal(string.Join("|", Definitions(L.Dart, "int add(int a, int b) {\n    return a + b;\n}\n")),
+            "add(int a, int b)", "dart: a function definition");
+        Equal(string.Join("|", Definitions(L.JavaScript, "function add(a, b) {\n    return a + b;\n}\n")),
+            "add(a, b)", "javascript: function");
+        Equal(string.Join("|", Definitions(L.TypeScript, "function add(a: number, b: number): number {\n    return a + b;\n}\n")),
+            "add(a: number, b: number)", "typescript: function");
+        Equal(string.Join("|", Definitions(L.Php, "function add($a, $b) {\n    return $a + $b;\n}\n")),
+            "add($a, $b)", "php: function");
+        Check(!Definitions(L.Css, ".card {\n    color: red;\n}\n").Any(), "css: no function definitions");
+        Check(!Definitions(L.Protobuf, "rpc Get(User) returns (User);\n").Any(), "protobuf: rpc is not a function definition");
+        Check(!Definitions(L.DeviceTree, "/ { compatible = \"board\"; };\n").Any(), "device tree: no function definitions");
+        Check(!Definitions(L.Php, "# function hidden(a) {\n").Any(), "php: a '#' comment is not a definition");
+
         // Languages without a recognized declaration form.
         Check(!Definitions(L.Json, "{ \"a\": 1 }\n").Any(), "json: no definitions");
         Check(!Definitions(L.Plain, "def f(a)\n").Any(), "plain text: no definitions");
@@ -103,6 +133,12 @@ internal static class Program
         // C-like.
         string c = "int add(int a, int b) {\n    return a + b;\n}\n\nint main() {\n    add(1, \n}\n";
         Equal(Signature(L.CLike, c, 5, 11), "add(int a, int b)@1", "c-like: the call shows its signature, second parameter");
+
+        // The same call hint works for the split profiles that use a C-style call.
+        string java = "public int add(int a, int b) {\n    return a + b;\n}\n\nadd(1, \n";
+        Equal(Signature(L.Java, java, 4, 7), "add(int a, int b)@1", "java: the call shows its signature, second parameter");
+        string rust = "fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n\nadd(1, \n";
+        Equal(Signature(L.Rust, rust, 4, 7), "add(a: i32, b: i32)@1", "rust: the call shows its signature, second parameter");
 
         // The active parameter never runs past the last one.
         Equal(Signature(L.Python, py + "1, 2, 3, ", 3, 13), "add(a, b)@1", "python: the active parameter is clamped to the last one");
