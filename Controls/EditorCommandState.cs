@@ -23,7 +23,8 @@ internal enum EditorToolbarCommand
     ShowChanges,
     RunFile,
     FollowLog,
-    ToggleHex
+    ToggleHex,
+    DataInspector
 }
 
 /// <summary>
@@ -61,6 +62,9 @@ internal struct EditorCommandState
 
     /// <summary>The editor shows the bytes in the hex view.</summary>
     public bool HexMode { get; set; }
+
+    /// <summary>The hex view shows the data inspector beside the bytes.</summary>
+    public bool ShowDataInspector { get; set; }
 
     /// <summary>The selection covers two lines or more: they can be sorted.</summary>
     public bool HasLineSelection { get; set; }
@@ -119,6 +123,9 @@ internal struct EditorCommandState
                 return true;
             case EditorToolbarCommand.ToggleHex:
                 return CanUseHex && !IsSaving;
+            case EditorToolbarCommand.DataInspector:
+                // In the text view it opens the hex view with the inspector.
+                return HexMode || (CanUseHex && !IsSaving);
             default:
                 return false;
         }
@@ -138,7 +145,8 @@ internal struct EditorCommandState
     {
         return (command == EditorToolbarCommand.ShowAllCharacters && ShowAllCharacters)
             || (command == EditorToolbarCommand.WordWrap && WordWrap)
-            || (command == EditorToolbarCommand.ToggleHex && HexMode);
+            || (command == EditorToolbarCommand.ToggleHex && HexMode)
+            || (command == EditorToolbarCommand.DataInspector && HexMode && ShowDataInspector);
     }
 }
 
@@ -198,7 +206,8 @@ internal static class EditorCommandCatalog
         null,
         EditorToolbarCommand.ShowAllCharacters,
         EditorToolbarCommand.WordWrap,
-        EditorToolbarCommand.ToggleHex
+        EditorToolbarCommand.ToggleHex,
+        EditorToolbarCommand.DataInspector
     };
 
     public static readonly EditorToolbarCommand?[] ContextMenuLayout =
@@ -220,6 +229,7 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.WordWrap,
         null,
         EditorToolbarCommand.ToggleHex,
+        EditorToolbarCommand.DataInspector,
         null,
         EditorToolbarCommand.Save,
         EditorToolbarCommand.Reload,
@@ -268,6 +278,8 @@ internal static class EditorCommandCatalog
                 return new EditorCommandDescription("Follow Log (tail -f)...", "follow", "editor/follow.png", "");
             case EditorToolbarCommand.ToggleHex:
                 return new EditorCommandDescription("Hex Editor", "hex", "editor/hex.png", "");
+            case EditorToolbarCommand.DataInspector:
+                return new EditorCommandDescription("Data Inspector", "data-inspector", "editor/data-inspector.png", "Ctrl+I");
             default:
                 throw new ArgumentOutOfRangeException(nameof(command));
         }
