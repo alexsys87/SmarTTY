@@ -406,7 +406,7 @@ public class MainWindowController : INotifyPropertyChanged
                 _Controller.Settings.Editor.HexGroupSize = hex.GroupSize;
                 _Controller.Settings.Editor.HexBigEndian = hex.BigEndian;
                 _Controller.Settings.Editor.HexColorByValue = hex.ColorByValue;
-                _Controller.Settings.Editor.HexHideDataInspector = !hex.ShowDataInspector;
+                _Controller.Settings.Editor.HexShowDataInspector = hex.ShowDataInspector;
                 _Controller.Settings.Save();
             };
         }
@@ -574,6 +574,15 @@ public class MainWindowController : INotifyPropertyChanged
                     case Keys.G:
                         e.SuppressKeyPress = true;
                         GoToLine(sender as RemoteFileEditor);
+                        break;
+                    case Keys.I:
+                        // Ctrl+I is also Tab as a character. In the text view it opens the bytes with the data
+                        // inspector; the hex view handles the key itself.
+                        e.SuppressKeyPress = true;
+                        if (sender is RemoteFileEditor inspected && inspected.Tag is EditorTabContext inspectedTab)
+                        {
+                            inspectedTab.EditorPanel.RunCommand(EditorToolbarCommand.DataInspector);
+                        }
                         break;
                 }
             }
@@ -1588,7 +1597,7 @@ public class MainWindowController : INotifyPropertyChanged
             Settings.Editor.HexGroupSize > 0 ? Settings.Editor.HexGroupSize : 1,
             Settings.Editor.HexBigEndian,
             Settings.Editor.HexColorByValue,
-            !Settings.Editor.HexHideDataInspector);
+            Settings.Editor.HexShowDataInspector);
         edit.FontZoom = Settings.Editor.FontZoom > 0f ? Settings.Editor.FontZoom : 1f;
         edit.CompletionEnabled = Settings.Editor.Autocompletion;
         edit.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;

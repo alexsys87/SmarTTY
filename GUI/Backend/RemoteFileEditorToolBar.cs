@@ -44,7 +44,8 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
             // Commands that switch something on are toggle buttons; the state below keeps them in step with the editor.
             bool isToggle = command.Value == EditorToolbarCommand.ShowAllCharacters
                 || command.Value == EditorToolbarCommand.WordWrap
-                || command.Value == EditorToolbarCommand.ToggleHex;
+                || command.Value == EditorToolbarCommand.ToggleHex
+                || command.Value == EditorToolbarCommand.DataInspector;
             ButtonBase button = isToggle
                 ? new ToggleButton { Content = icon, ToolTip = description.ToolTip }
                 : new Button { Content = icon, ToolTip = description.ToolTip };

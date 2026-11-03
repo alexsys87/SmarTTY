@@ -292,6 +292,18 @@ internal sealed class RemoteFileEditorPanel : UserControl
                 case EditorToolbarCommand.ToggleHex:
                     _editor.ToggleHexMode();
                     break;
+                case EditorToolbarCommand.DataInspector:
+                    if (_editor.IsHexMode)
+                    {
+                        _editor.HexEditor.ShowDataInspector = !_editor.HexEditor.ShowDataInspector;
+                    }
+                    else
+                    {
+                        // From the text view: open the bytes with the inspector beside them.
+                        _editor.HexEditor.ShowDataInspector = true;
+                        _editor.ToggleHexMode();
+                    }
+                    break;
             }
         }
         catch (Exception exception)
@@ -322,6 +334,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
                 IsNewFile = _editor.IsNewFile,
                 IsSaving = _editor.IsSaving,
                 HexMode = true,
+                ShowDataInspector = hexEditor.ShowDataInspector,
                 CanRun = _editor.CanRunInTerminal,
                 CanFollow = _editor.CanFollowLog,
                 CanUseHex = _editor.CanToggleHexMode,

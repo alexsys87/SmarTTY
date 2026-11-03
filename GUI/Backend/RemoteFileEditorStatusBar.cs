@@ -293,7 +293,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
             AddHexViewItem(menu, count.ToString(System.Globalization.CultureInfo.InvariantCulture), hexEditor.BytesPerRow == count, () => hexEditor.BytesPerRow = chosen);
         }
         menu.Items.Add(new Separator());
-        AddHexViewItem(menu, "Data inspector", hexEditor.ShowDataInspector, () => hexEditor.ShowDataInspector = !hexEditor.ShowDataInspector);
+        AddHexViewItem(menu, "Data inspector (Ctrl+I)", hexEditor.ShowDataInspector, () => hexEditor.ShowDataInspector = !hexEditor.ShowDataInspector);
         AddHexViewItem(menu, "Color bytes by value", hexEditor.ColorByValue, () => hexEditor.ColorByValue = !hexEditor.ColorByValue);
         OpenMenu(button, menu);
     }

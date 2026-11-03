@@ -126,6 +126,15 @@ internal static class Program
         Check(!hex.IsEnabled(EditorToolbarCommand.Replace), "hex view: Replace is off");
         Check(hex.IsEnabled(EditorToolbarCommand.Find), "hex view: Find is on");
 
+        // The data inspector: off by default, a toggle in the hex view, and in the text view it opens the hex view.
+        Check(hex.IsEnabled(EditorToolbarCommand.DataInspector) && !hex.IsChecked(EditorToolbarCommand.DataInspector), "hex view: Data Inspector is on and not shown by default");
+        Check(new EditorCommandState { HexMode = true, ShowDataInspector = true }.IsChecked(EditorToolbarCommand.DataInspector), "hex view: a shown inspector is checked");
+        Check(!new EditorCommandState { HexMode = false, ShowDataInspector = true, CanUseHex = true }.IsChecked(EditorToolbarCommand.DataInspector), "text view: the inspector is not checked");
+        Check(new EditorCommandState { CanUseHex = true }.IsEnabled(EditorToolbarCommand.DataInspector), "text view: Data Inspector opens the hex view");
+        Check(!new EditorCommandState { CanUseHex = false }.IsEnabled(EditorToolbarCommand.DataInspector), "not loaded: Data Inspector is off");
+        Check(!new EditorCommandState { CanUseHex = true, IsSaving = true }.IsEnabled(EditorToolbarCommand.DataInspector), "saving: Data Inspector cannot open the hex view");
+        Check(EditorCommandCatalog.Describe(EditorToolbarCommand.DataInspector).ToolTip == "Data Inspector (Ctrl+I)", "catalog: Data Inspector shows its key");
+
         // The tool bar and the context menu list every command once, and each has a label and an icon.
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {

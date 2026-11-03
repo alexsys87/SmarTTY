@@ -93,7 +93,11 @@ public sealed class HexEditorControl : Control
 
     private bool _colorByValue;
 
-    private bool _showInspector = true;
+    // The data inspector is off until the user asks for it (Ctrl+I, the tool bar, the header link).
+    private bool _showInspector;
+
+    // Where the "Data inspector" link is drawn in the header while the inspector is hidden (empty: not drawn).
+    private Rectangle _inspectorLinkBounds;
 
     // Whether the inspector is laid out: Control.Visible reads false while the editor itself is hidden.
     private bool _inspectorShown;
@@ -1028,6 +1032,9 @@ public sealed class HexEditorControl : Control
                 case Keys.G:
                     GoToOffsetRequested?.Invoke(this, EventArgs.Empty);
                     break;
+                case Keys.I:
+                    ShowDataInspector = !ShowDataInspector;
+                    break;
                 case Keys.S:
                     SaveRequested?.Invoke(this, EventArgs.Empty);
                     break;
@@ -1219,10 +1226,43 @@ public sealed class HexEditorControl : Control
         OnStateChanged();
     }
 
+    /// <summary>
+    /// While the data inspector is hidden, the header shows a link that opens it, at its right end when it does not
+    /// cover the column titles.
+    /// </summary>
+    private void DrawInspectorLink(Graphics graphics, int width)
+    {
+        _inspectorLinkBounds = Rectangle.Empty;
+        if (_inspectorShown)
+        {
+            return;
+        }
+        string text = _showInspector ? "Data inspector: the window is too narrow" : "Data inspector (Ctrl+I)";
+        Size size = TextRenderer.MeasureText(graphics, text, Font, new Size(int.MaxValue, int.MaxValue), TextFlags);
+        int x = width - size.Width - Margin;
+        int titlesEnd = _asciiStart - _scrollX + 6 * _charWidth;
+        if (x < titlesEnd)
+        {
+            return;
+        }
+        bool dark = BackColor.GetBrightness() < 0.5f;
+        Color link = dark ? Color.FromArgb(120, 180, 255) : Color.FromArgb(0, 90, 200);
+        TextRenderer.DrawText(graphics, text, Font, new Point(x, 2), _showInspector ? Blend(BackColor, ForeColor, 0.55f) : link, TextFlags);
+        if (!_showInspector)
+        {
+            _inspectorLinkBounds = new Rectangle(x, 0, size.Width, _headerHeight - 2);
+        }
+    }
+
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
         Focus();
+        if (e.Button == MouseButtons.Left && _inspectorLinkBounds.Contains(e.Location))
+        {
+            ShowDataInspector = true;
+            return;
+        }
         if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Right)
         {
             return;
@@ -1269,6 +1309,7 @@ public sealed class HexEditorControl : Control
         base.OnMouseMove(e);
         if (!_dragging || e.Button != MouseButtons.Left)
         {
+            Cursor = _inspectorLinkBounds.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
             UpdateToolTip(e.Location);
             return;
         }
@@ -1436,6 +1477,11 @@ public sealed class HexEditorControl : Control
         _inspector.Width = _inspector.PreferredWidth;
         // In a narrow window the bytes come first: the inspector returns when the window grows.
         bool visible = _showInspector && ClientSize.Width >= _inspector.Width + _hexStart + 8 * 3 * _charWidth;
+        if (!visible)
+        {
+            // The header link changes with it.
+            Invalidate();
+        }
         if (_inspectorShown != visible)
         {
             _inspectorShown = visible;
@@ -1513,6 +1559,7 @@ public sealed class HexEditorControl : Control
                 TextRenderer.DrawText(graphics, index.ToString("X2", CultureInfo.InvariantCulture), Font, new Point(x, 2), dimBrush.Color, TextFlags);
             }
             TextRenderer.DrawText(graphics, "ASCII", Font, new Point(_asciiStart - _scrollX, 2), dimBrush.Color, TextFlags);
+            DrawInspectorLink(graphics, width);
             graphics.DrawLine(separatorPen, 0, _headerHeight - 2, width, _headerHeight - 2);
 
             int textYOffset = Math.Max(0, (_rowHeight - Font.Height) / 2);

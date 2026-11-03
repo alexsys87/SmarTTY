@@ -84,8 +84,6 @@ internal sealed class HexEditorMenu : IDisposable
 
     private readonly Dictionary<int, ToolStripMenuItem> _rowItems = new Dictionary<int, ToolStripMenuItem>();
 
-    private readonly ToolStripMenuItem _inspector;
-
     private readonly ToolStripMenuItem _colorByValue;
 
     public HexEditorMenu(HexEditorControl editor, Action<HexDialogKind> requestDialog, Action afterCommand)
@@ -143,7 +141,6 @@ internal sealed class HexEditorMenu : IDisposable
             _rowItems[count] = AddItem(_viewMenu, count.ToString(CultureInfo.InvariantCulture) + " Bytes per Row", () => _editor.BytesPerRow = chosen);
         }
         _viewMenu.DropDownItems.Add(new ToolStripSeparator());
-        _inspector = AddItem(_viewMenu, "Data Inspector", () => _editor.ShowDataInspector = !_editor.ShowDataInspector);
         _colorByValue = AddItem(_viewMenu, "Color Bytes by Value", () => _editor.ColorByValue = !_editor.ColorByValue);
     }
 
@@ -204,7 +201,6 @@ internal sealed class HexEditorMenu : IDisposable
         {
             pair.Value.Checked = pair.Key == _editor.BytesPerRow;
         }
-        _inspector.Checked = _editor.ShowDataInspector;
         _colorByValue.Checked = _editor.ColorByValue;
     }
 

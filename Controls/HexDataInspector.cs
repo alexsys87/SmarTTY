@@ -88,6 +88,8 @@ internal sealed class HexDataInspector : Control
         int width = Width - valueX - InnerMargin;
         int y = 2;
         TextRenderer.DrawText(graphics, "DATA INSPECTOR", Font, new Point(InnerMargin, y), dim, TextFlags);
+        Rectangle hide = HideLinkBounds;
+        TextRenderer.DrawText(graphics, HideText, Font, new Point(hide.X, y), link, TextFlags);
         y += rowHeight + 4;
 
         DrawText(graphics, "Byte order", new Rectangle(InnerMargin, y, valueX - InnerMargin, rowHeight), dim);
@@ -164,6 +166,18 @@ internal sealed class HexDataInspector : Control
         TextRenderer.DrawText(graphics, text, Font, new Rectangle(bounds.X, y, Math.Max(1, bounds.Width), Font.Height), color, TextFlags);
     }
 
+    private const string HideText = "Hide (Ctrl+I)";
+
+    // The link in the title row that hides the inspector.
+    private Rectangle HideLinkBounds
+    {
+        get
+        {
+            Size size = TextRenderer.MeasureText(HideText, Font, new Size(int.MaxValue, int.MaxValue), TextFlags);
+            return new Rectangle(Width - InnerMargin - size.Width, 0, size.Width, RowHeight + 4);
+        }
+    }
+
     /// <summary>The value row under <paramref name="y"/>, or -1; -2 for the byte order.</summary>
     private int RowAt(int y)
     {
@@ -192,7 +206,7 @@ internal sealed class HexDataInspector : Control
     {
         base.OnMouseMove(e);
         int row = RowAt(e.Y);
-        Cursor = (row == -2 && e.X >= ValueX) ? Cursors.Hand : Cursors.Default;
+        Cursor = ((row == -2 && e.X >= ValueX) || HideLinkBounds.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
         int hover = Math.Max(-1, row);
         if (hover != _hoverRow)
         {
@@ -216,6 +230,12 @@ internal sealed class HexDataInspector : Control
         base.OnMouseDown(e);
         if (e.Button != MouseButtons.Left)
         {
+            return;
+        }
+        if (HideLinkBounds.Contains(e.Location))
+        {
+            _owner.ShowDataInspector = false;
+            _owner.Focus();
             return;
         }
         int row = RowAt(e.Y);
@@ -272,6 +292,10 @@ internal sealed class HexDataInspector : Control
                 }
                 break;
             case Keys.Escape:
+                _owner.Focus();
+                break;
+            case Keys.I when e.Control:
+                _owner.ShowDataInspector = false;
                 _owner.Focus();
                 break;
             case Keys.C when e.Control:
