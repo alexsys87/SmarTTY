@@ -670,6 +670,46 @@ internal static class Program
         Directory.Delete(dir, true);
     }
 
+    private static void BusyDeviceCases()
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        // Random data does not compress: the base64 text is far bigger than the pipes of the device (64 KB each) and its terminal.
+        string binary = Path.Combine(dir, "busy.bin");
+        File.WriteAllBytes(binary, RandomBytes(600_000, 21));
+        using (Device device = Ash())
+        {
+            Section("busybox ash: a device that stops writing for a while (a busy flash)");
+            // The unpacked data is held for 20 s, as a busy flash file system does: the pipes fill up, sed stops reading and the
+            // terminal of the device stops taking (and echoing) what is typed until the writer goes on.
+            device.Run("gunzip() { busybox gunzip \"$@\" | ( sleep 20; cat ); }");
+            StringBuilder log = new StringBuilder();
+            GzipBase64Transfer.Options options = Fast();
+            options.Log = line => { lock (log) log.AppendLine(line); };
+            string onDevice = Path.Combine(remoteDir, "busy.bin");
+            Run run = RunSend(device, binary, onDevice, options);
+            Check(run.Error == null && run.Result && File.Exists(onDevice) && File.ReadAllBytes(onDevice).SequenceEqual(File.ReadAllBytes(binary)),
+                "send waits for a device that is busy writing", Describe(run));
+            string text = log.ToString();
+            Check(text.Contains("the device is busy") && !text.Contains("ECHO MISMATCH") && run.Errors == 0,
+                "a busy device is waited for, not taken for noise (no line typed again)", "errors " + run.Errors);
+            device.Run("unset -f gunzip");
+
+            // A big file on a small device: its checksum takes longer than the 30 s that the data lines may be apart.
+            device.Run("sha256sum() { sleep 33; busybox sha256sum \"$@\"; }");
+            string big = Path.Combine(remoteDir, "big.bin");
+            File.WriteAllBytes(big, RandomBytes(4_000_000, 22));
+            string local = Path.Combine(dir, "slow-checksum.bin");
+            run = RunReceive(device, big, local, Fast());
+            Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(big)),
+                "receive waits for the checksum of a big file", Describe(run));
+            device.Run("unset -f sha256sum");
+            Check(device.Run("echo alive9").Contains("alive9"), "the shell answers after the busy device cases");
+        }
+        Directory.Delete(dir, true);
+    }
+
     /// <summary>True when the shell of the device executes a command (and is not stuck in a reader that eats what is typed).</summary>
     private static bool Responds(Device device)
     {
@@ -915,7 +955,7 @@ internal static class Program
             return 2;
         }
         bool gnuUu = Has("uuencode") && Has("uudecode");
-        // Optional first argument: run one group only (units, send-ash, receive-ash, fault, receive-fault, cancel, send-bash, receive-bash).
+        // Optional first argument: run one group only (units, silent, finalize, recovery, slow, busy, send-ash, receive-ash, fault, receive-fault, cancel, send-bash, receive-bash).
         string only = args.Length > 0 ? args[0] : null;
         bool Want(string group) => only == null || only == group;
         if (Want("units")) UnitCases();
@@ -923,6 +963,7 @@ internal static class Program
         if (Want("finalize")) FinalizeCases();
         if (Want("recovery")) RecoveryCases();
         if (Want("slow")) SlowLineCases();
+        if (Want("busy")) BusyDeviceCases();
         if (Want("send-ash")) SendCases(Ash, gnuUu: true, cksum: false);
         if (Want("receive-ash")) ReceiveCases(Ash, gnuUu: true, cksum: false);
         if (Want("fault")) FaultCases();
