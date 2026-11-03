@@ -271,7 +271,21 @@ public static class EditorSignatureSource
                     || TryBareDefinition(text, i, out name, out openParen);
             case SyntaxHighlighting.Language.CLike:
             case SyntaxHighlighting.Language.Cpp:
-                return TryKeywordDefinition(text, i, out name, out openParen, "function", "func", "fn")
+            case SyntaxHighlighting.Language.CSharp:
+            case SyntaxHighlighting.Language.Java:
+            case SyntaxHighlighting.Language.Kotlin:
+            case SyntaxHighlighting.Language.Scala:
+            case SyntaxHighlighting.Language.Groovy:
+            case SyntaxHighlighting.Language.Go:
+            case SyntaxHighlighting.Language.Rust:
+            case SyntaxHighlighting.Language.Swift:
+            case SyntaxHighlighting.Language.Dart:
+            case SyntaxHighlighting.Language.JavaScript:
+            case SyntaxHighlighting.Language.TypeScript:
+            case SyntaxHighlighting.Language.Php:
+            case SyntaxHighlighting.Language.Css:
+            case SyntaxHighlighting.Language.Protobuf:
+                return TryKeywordDefinition(text, i, out name, out openParen, "function", "func", "fn", "fun", "def")
                     || TryCStyleDefinition(text, i, out name, out openParen);
             default:
                 return false;
@@ -619,7 +633,22 @@ public static class EditorSignatureSource
         {
             case SyntaxHighlighting.Language.CLike:
             case SyntaxHighlighting.Language.Cpp:
+            case SyntaxHighlighting.Language.CSharp:
+            case SyntaxHighlighting.Language.Java:
+            case SyntaxHighlighting.Language.Kotlin:
+            case SyntaxHighlighting.Language.Scala:
+            case SyntaxHighlighting.Language.Groovy:
+            case SyntaxHighlighting.Language.Go:
+            case SyntaxHighlighting.Language.Rust:
+            case SyntaxHighlighting.Language.Swift:
+            case SyntaxHighlighting.Language.Dart:
+            case SyntaxHighlighting.Language.JavaScript:
+            case SyntaxHighlighting.Language.TypeScript:
+            case SyntaxHighlighting.Language.Protobuf:
+            case SyntaxHighlighting.Language.DeviceTree:
                 return c == '/' && next == '/';
+            case SyntaxHighlighting.Language.Php:
+                return (c == '/' && next == '/') || c == '#';
             case SyntaxHighlighting.Language.Sql:
             case SyntaxHighlighting.Language.Lua:
                 return c == '-' && next == '-';
@@ -649,12 +678,30 @@ public static class EditorSignatureSource
         {
             return false;
         }
-        if (language != SyntaxHighlighting.Language.CLike && language != SyntaxHighlighting.Language.Cpp &&
-            language != SyntaxHighlighting.Language.Sql)
+        switch (language)
         {
-            return false;
+            case SyntaxHighlighting.Language.CLike:
+            case SyntaxHighlighting.Language.Cpp:
+            case SyntaxHighlighting.Language.CSharp:
+            case SyntaxHighlighting.Language.Java:
+            case SyntaxHighlighting.Language.Kotlin:
+            case SyntaxHighlighting.Language.Scala:
+            case SyntaxHighlighting.Language.Groovy:
+            case SyntaxHighlighting.Language.Go:
+            case SyntaxHighlighting.Language.Rust:
+            case SyntaxHighlighting.Language.Swift:
+            case SyntaxHighlighting.Language.Dart:
+            case SyntaxHighlighting.Language.JavaScript:
+            case SyntaxHighlighting.Language.TypeScript:
+            case SyntaxHighlighting.Language.Php:
+            case SyntaxHighlighting.Language.Css:
+            case SyntaxHighlighting.Language.Protobuf:
+            case SyntaxHighlighting.Language.DeviceTree:
+            case SyntaxHighlighting.Language.Sql:
+                return text[i + 1] == '*';
+            default:
+                return false;
         }
-        return text[i + 1] == '*';
     }
 
     private static int SkipString(string text, int i, int limit)

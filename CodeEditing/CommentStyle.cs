@@ -36,7 +36,23 @@ namespace SmarTTY.CodeEditing
                     return new CommentStyle("# ");
                 case SyntaxHighlighting.Language.CLike:
                 case SyntaxHighlighting.Language.Cpp:
+                case SyntaxHighlighting.Language.CSharp:
+                case SyntaxHighlighting.Language.Java:
+                case SyntaxHighlighting.Language.Kotlin:
+                case SyntaxHighlighting.Language.Scala:
+                case SyntaxHighlighting.Language.Groovy:
+                case SyntaxHighlighting.Language.Go:
+                case SyntaxHighlighting.Language.Rust:
+                case SyntaxHighlighting.Language.Swift:
+                case SyntaxHighlighting.Language.Dart:
+                case SyntaxHighlighting.Language.JavaScript:
+                case SyntaxHighlighting.Language.TypeScript:
+                case SyntaxHighlighting.Language.Php:
+                case SyntaxHighlighting.Language.Protobuf:
+                case SyntaxHighlighting.Language.DeviceTree:
                     return new CommentStyle("// ");
+                case SyntaxHighlighting.Language.Css:
+                    return new CommentStyle("/* ", " */");
                 case SyntaxHighlighting.Language.Sql:
                     return new CommentStyle("-- ");
                 case SyntaxHighlighting.Language.Markup:
