@@ -901,14 +901,29 @@ public static class GzipBase64Transfer
             throw new IOException("Unexpected answer of the device: " + result);
         }
 
-        /// <summary>Waits for the device's verdict (the checksum is compared after the data has been unpacked, which takes a while for a big file).</summary>
+        /// <summary>
+        /// Waits for the device's verdict. The checksum is compared after the data has been unpacked: a device that writes slower
+        /// than the line brings the data still has the contents of its pipes to write, and the checksum then reads the whole file
+        /// again, which takes a while for a big file on a small device (500 KB/s is allowed for the checksum).
+        /// </summary>
         private string WaitForResult(Prepared prepared)
         {
-            int timeout = 30000 + (int)Math.Min(int.MaxValue / 4, prepared.EncodedLength / 200);
-            return WaitForMarker(timeout, "result of the transfer");
+            long timeout = 60000L + prepared.EncodedLength / 200 + prepared.OriginalLength / 500;
+            return WaitForMarker((int)Math.Min(int.MaxValue / 4, timeout), "result of the transfer");
         }
 
         private const int MaxLineAttempts = 8;
+
+        // How long a device that has stopped taking the data (its echo stopped in the middle of a correct line) is waited for
+        // before the line is taken for lost. A device writes to its flash slower than a fast line brings the data, and a flash
+        // file system stops now and then for seconds (garbage collection): once the pipes on the device are full, its terminal
+        // takes nothing more (and echoes nothing) until the writer goes on. The time starts again with every echoed character.
+        private const int BusyDeviceTimeoutMs = 60000;
+
+        // Where the sending is, for the status shown while the device is busy.
+        private long _dataSent;
+        private long _dataTotal;
+        private string _dataStatus;
 
         private static readonly byte[] NewLine = { (byte)'\n' };
 
@@ -933,6 +948,8 @@ public static class GzipBase64Transfer
                 int rate = Math.Max(500, _options.NoEchoBytesPerSecond);
                 long sent = 0;
                 int lineNumber = 0;
+                _dataTotal = prepared.EncodedLength;
+                _dataStatus = status;
                 Trace("Sending " + prepared.EncodedLength + " bytes of text in lines of up to " + BlockChars() + " characters, each checked against the echo; without echo " + rate + " bytes/s");
                 using (StreamReader reader = new StreamReader(prepared.EncodedPath, Encoding.ASCII))
                 {
@@ -946,6 +963,7 @@ public static class GzipBase64Transfer
                         {
                             Trace("Line " + lineNumber + ": " + line.Length + " characters, " + sent + " of " + prepared.EncodedLength + " bytes done; starts with " + Escape(line.Substring(0, Math.Min(line.Length, 40)), 80));
                         }
+                        _dataSent = sent;
                         if (!SendVerifiedLine(line, lineNumber, ref echoWorks, rate))
                         {
                             return false;
@@ -979,6 +997,8 @@ public static class GzipBase64Transfer
         private bool SendVerifiedLine(string line, int lineNumber, ref bool echoWorks, int rate)
         {
             byte[] text = Encoding.ASCII.GetBytes(line);
+            bool waitedForBusyDevice = false; // once per line: a device that takes nothing at all is not waited for again and again
+            bool busyTimedOut = false;
             for (int attempt = 1; attempt <= MaxLineAttempts; attempt++)
             {
                 _token.ThrowIfCancellationRequested();
@@ -991,13 +1011,9 @@ public static class GzipBase64Transfer
 
                 // 1 s plus what the line itself needs on the wire; the first line has more time, it also finds out whether there is an echo.
                 int timeout = (lineNumber == 1 && attempt == 1 ? 2500 : 1000) + (int)(line.Length * 1000L / rate) * 3;
-                string echoed = ReadEcho(line.Length, timeout);
-                if (echoed == line)
-                {
-                    _send(NewLine, 0, 1);
-                    WaitForLineEnd(1000);
-                    return true;
-                }
+                StringBuilder echo = new StringBuilder();
+                ReadEcho(echo, line, timeout, idle: false);
+                string echoed = echo.ToString();
 
                 if (lineNumber == 1 && attempt == 1 && echoed.Length == 0)
                 {
@@ -1005,6 +1021,33 @@ public static class GzipBase64Transfer
                     echoWorks = false;
                     EraseLine();
                     continue;
+                }
+
+                if (echoed != line && !waitedForBusyDevice && line.StartsWith(echoed, StringComparison.Ordinal))
+                {
+                    // The echo stopped in the middle of the line, and what came is right: the device is busy (it writes the data
+                    // slower than the line brings it, and its terminal takes nothing until the reader has room again). Erasing and
+                    // typing the line again would not help: that too would wait in the device's input and come back as noise later.
+                    waitedForBusyDevice = true;
+                    Trace("The echo of line " + lineNumber + " stopped after " + echoed.Length + " of " + line.Length
+                        + " characters: the device is busy (it takes the data slower than it comes), waiting for it");
+                    Report(_dataSent, _dataTotal, _dataStatus + " - the device is busy writing, waiting...");
+                    int waitStarted = Environment.TickCount;
+                    ReadEcho(echo, line, BusyDeviceTimeoutMs, idle: true);
+                    echoed = echo.ToString();
+                    Trace("The device went on after " + (Environment.TickCount - waitStarted) + " ms: " + echoed.Length + " of " + line.Length + " characters echoed");
+                    if (echoed != line && line.StartsWith(echoed, StringComparison.Ordinal))
+                    {
+                        busyTimedOut = true;
+                        Trace("The device has taken nothing for " + BusyDeviceTimeoutMs / 1000 + " s: the rest of the line is taken for lost");
+                    }
+                }
+
+                if (echoed == line)
+                {
+                    _send(NewLine, 0, 1);
+                    WaitForLineEnd(1000);
+                    return true;
                 }
 
                 _errors++;
@@ -1024,29 +1067,52 @@ public static class GzipBase64Transfer
                 }
                 EraseLine();
             }
+            if (busyTimedOut)
+            {
+                throw new IOException("The device stopped taking the data: nothing came back for " + BusyDeviceTimeoutMs / 1000
+                    + " s while a line was typed. Is it still running, and is there room left on its disk?" + RecentOutput());
+            }
             throw new IOException("A line of the data could not be typed to the device without damage in " + MaxLineAttempts
                 + " attempts: the line is too noisy (a smaller block size, a lower baud rate or flow control may help)." + RecentOutput());
         }
 
-        /// <summary>Takes what the device echoes of a line that was typed: until all of it is there and the line has been quiet for a moment, or until the time is up.</summary>
-        private string ReadEcho(int expectedLength, int timeoutMs)
+        /// <summary>
+        /// Takes what the device echoes of a typed <paramref name="line"/> into <paramref name="echoed"/>: until all of it is there
+        /// and the line has been quiet for a moment, or until the time is up. With <paramref name="idle"/> the time starts again with
+        /// every character (waiting for a busy device), and the wait also ends when the echo has gone wrong and is quiet. Line ends
+        /// that come before the first character are the late echo of the line end typed before (the device was busy then) and
+        /// are skipped: no line of the data starts with one.
+        /// </summary>
+        private void ReadEcho(StringBuilder echoed, string line, int timeoutMs, bool idle)
         {
-            StringBuilder echoed = new StringBuilder();
             int deadline = Environment.TickCount + timeoutMs;
+            int lastByteAt = Environment.TickCount;
             while (Environment.TickCount - deadline < 0)
             {
                 _token.ThrowIfCancellationRequested();
-                bool enough = echoed.Length >= expectedLength;
+                bool enough = echoed.Length >= line.Length;
                 if (PumpKeepingAnswers(enough ? 12 : 50, out _))
                 {
+                    lastByteAt = Environment.TickCount;
+                    if (idle)
+                    {
+                        deadline = lastByteAt + timeoutMs;
+                    }
+                    if (echoed.Length == 0 && (_lastByte == (byte)'\r' || _lastByte == (byte)'\n'))
+                    {
+                        continue;
+                    }
                     echoed.Append((char)_lastByte);
                 }
                 else if (enough)
                 {
                     break; // all of it is there and nothing more comes
                 }
+                else if (idle && Environment.TickCount - lastByteAt >= 300 && !line.StartsWith(echoed.ToString(), StringComparison.Ordinal))
+                {
+                    break; // the echo has gone wrong: no use waiting for the rest
+                }
             }
-            return echoed.ToString();
         }
 
         /// <summary>Waits for the line end that was typed to come back (the device's terminal echoes it as a line break).</summary>
@@ -1331,7 +1397,7 @@ public static class GzipBase64Transfer
                     while (true)
                     {
                         _token.ThrowIfCancellationRequested();
-                        string line = ReadLine(30000);
+                        string line = ReadDataLine(originalLength, () => Interlocked.Read(ref produced));
                         if (line == null)
                         {
                             throw new IOException("The device stopped sending data.");
@@ -1408,6 +1474,32 @@ public static class GzipBase64Transfer
                 Trace("The received data was refused: " + decodeError);
             }
             return decodeError;
+        }
+
+        /// <summary>
+        /// The next line of the data the device sends, or null when it has been quiet for too long. After the last line of the data
+        /// the device reads the whole file once more for its checksum, and prints nothing until that is done: for a big file on a
+        /// small device that takes longer than the usual 30 s, so once all of the file has come (or as much as has come, when its
+        /// size is not known) 500 KB/s is allowed for the checksum.
+        /// </summary>
+        private string ReadDataLine(long originalLength, Func<long> produced)
+        {
+            int quietSince = Environment.TickCount;
+            while (true)
+            {
+                // In slices: the unpacker (another thread) is still at work on the last lines, and a line only half there is kept.
+                string line = ReadLine(1000);
+                if (line != null)
+                {
+                    return line;
+                }
+                long unpacked = produced();
+                long checksumBytes = originalLength >= 0 ? (unpacked >= originalLength ? originalLength : 0) : unpacked;
+                if (Environment.TickCount - quietSince >= 30000L + checksumBytes / 500)
+                {
+                    return null;
+                }
+            }
         }
 
         private static bool SameChecksum(string a, string b)
