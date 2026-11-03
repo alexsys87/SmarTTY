@@ -33,6 +33,8 @@
     <Compile Include="ThemeManagerStub.cs" />
     <!-- Implemented by Controls/SshTerminalControl.cs; plain code, unlike the rest of GUI/. -->
     <Compile Include="../../GUI/Backend/IFileListHost.cs" />
+    <!-- Used by Controls/DeviceTerminalControl.cs for its "Quick commands" menu; plain code, unlike the rest of GUI/. -->
+    <Compile Include="../../GUI/Backend/QuickCommandStore.cs" />
     <Compile Include="../../**/*.cs" Exclude="../../GUI/**;../../App.xaml.cs;../../tests/**;../../obj/**;../../bin/**;../../Properties/AssemblyInfo.cs" />
     <PackageReference Include="SSH.NET" Version="$(SmarTTY_SshNetVersion)" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />

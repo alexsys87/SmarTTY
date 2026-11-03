@@ -71,6 +71,7 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         Terminal.StatusChanged += OnTerminalStatusChanged;
         Terminal.CloseTabRequested += OnTerminalCloseTabRequested;
         Terminal.FullScreenToggleRequested += OnTerminalFullScreenToggleRequested;
+        Terminal.QuickCommandsEditRequested += OnTerminalQuickCommandsEditRequested;
         Terminal.DisplayModeChanged += OnTerminalDisplayModeChanged;
         WinFormsHostWrapper host = new WinFormsHostWrapper();
         ((WindowsFormsHost)host).Child = Terminal;
@@ -135,6 +136,11 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     private void OnTerminalFullScreenToggleRequested(object sender, EventArgs e)
     {
         _Session.ToggleFullScreenFromDevice();
+    }
+
+    private void OnTerminalQuickCommandsEditRequested(object sender, EventArgs e)
+    {
+        _Session.ShowQuickCommandsFromDevice();
     }
 
     private void OnTerminalStatusChanged(object sender, EventArgs e)
@@ -210,6 +216,7 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         Terminal.StatusChanged -= OnTerminalStatusChanged;
         Terminal.CloseTabRequested -= OnTerminalCloseTabRequested;
         Terminal.FullScreenToggleRequested -= OnTerminalFullScreenToggleRequested;
+        Terminal.QuickCommandsEditRequested -= OnTerminalQuickCommandsEditRequested;
         Terminal.DisplayModeChanged -= OnTerminalDisplayModeChanged;
         Terminal.Dispose();
     }

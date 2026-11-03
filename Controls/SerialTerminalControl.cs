@@ -1823,6 +1823,32 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
     }
 
+    /// <summary>
+    /// Tools > Quick commands: the command goes into the input line at the caret and is not sent; the user checks it and
+    /// presses Enter. While a program of the device has the keys (no input line is shown) it is typed to the device instead.
+    /// </summary>
+    public override void InsertCommand(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+        if (_inputLine == null)
+        {
+            base.InsertCommand(text);
+            return;
+        }
+        // The command continues from the text that a history search shows now.
+        _historySearch = null;
+        ReplaceInputLineText(_inputLine.CaretIndex, 0, text);
+        UpdateCaretFromInputLine();
+        // Like a pasted text: with "Echo typed characters" the device gets the characters as they are put in.
+        if (_localEcho)
+        {
+            SendText(text, InputKind.Paste);
+        }
+    }
+
     public override void PasteText(string clipboardText)
     {
         if (UsesTerminalInput)
