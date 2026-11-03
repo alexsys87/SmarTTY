@@ -168,6 +168,11 @@ internal static class Program
         }
         Check(SyntaxHighlighting.GetKeywords(L.CSharp).Contains("region"), "C# keywords contain the 'region' directive");
         Check(!SyntaxHighlighting.GetKeywords(L.CSharp).Contains("include"), "C# keywords do not contain the C 'include' directive");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("dts-v1"), "Device Tree keywords contain '/dts-v1/'");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("delete-node"), "Device Tree keywords contain '/delete-node/'");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("gpio-controller"), "Device Tree keywords contain 'gpio-controller'");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("pinctrl-names"), "Device Tree keywords contain 'pinctrl-names'");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("address-cells"), "Device Tree keywords contain '#address-cells'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");
@@ -439,11 +444,26 @@ internal static class Program
         Highlighted proto = new Highlighted(L.Protobuf, "message User { // note\n  string name = 1;\n}");
         Equal(Join(proto.Tokens(0, SyntaxHighlighting.TypeKeyword)), "message", "a Protobuf message keyword");
         Equal(Join(proto.Tokens(0, SyntaxHighlighting.TypeComment)), "// note", "a Protobuf line comment");
-        Highlighted dt = new Highlighted(L.DeviceTree, "/dts-v1/;\n/include/ \"board.dtsi\"\n/ { interrupt-parent = <&gic>; compatible = \"board\"; }; // note");
-        Equal(Join(dt.Tokens(1, SyntaxHighlighting.TypeKeyword)), "include", "a Device Tree include directive");
-        Equal(Join(dt.Tokens(1, SyntaxHighlighting.TypeString)), "\"board.dtsi\"", "a Device Tree include path");
-        Equal(Join(dt.Tokens(2, SyntaxHighlighting.TypeKeyword)), "interrupt-parent|compatible", "hyphenated Device Tree properties");
-        Equal(Join(dt.Tokens(2, SyntaxHighlighting.TypeComment)), "// note", "a Device Tree line comment");
+        Highlighted dt = new Highlighted(L.DeviceTree,
+            "/dts-v1/;\n#include <dt-bindings/gpio/gpio.h>\n/include/ \"board.dtsi\"\n/delete-node/ &old;\n" +
+            "/ {\n    myboard: board@10000000 {\n        #address-cells = <1>;\n" +
+            "        interrupt-parent = <&gic>;\n        pinctrl-names = \"default\";\n" +
+            "        compatible = \"vendor,board\";\n        /delete-property/ status;\n" +
+            "        ref = &{/soc};\n    };\n}; // note");
+        Equal(Join(dt.Tokens(0, SyntaxHighlighting.TypeKeyword)), "/dts-v1/", "a Device Tree version directive");
+        Equal(Join(dt.Tokens(1, SyntaxHighlighting.TypePreprocessor)), "#include", "a C preprocessor include");
+        Equal(Join(dt.Tokens(2, SyntaxHighlighting.TypeKeyword)), "/include/", "a Device Tree include directive");
+        Equal(Join(dt.Tokens(2, SyntaxHighlighting.TypeString)), "\"board.dtsi\"", "a Device Tree include path");
+        Equal(Join(dt.Tokens(3, SyntaxHighlighting.TypeKeyword)), "/delete-node/|&old", "a delete directive and a reference");
+        Equal(Join(dt.Tokens(5, SyntaxHighlighting.TypeKeyword)), "myboard|board", "a label and a node name");
+        Equal(Join(dt.Tokens(5, SyntaxHighlighting.TypeNumber)), "10000000", "a node unit address");
+        Equal(Join(dt.Tokens(6, SyntaxHighlighting.TypeKeyword)), "#address-cells", "a cell-count property");
+        Equal(Join(dt.Tokens(7, SyntaxHighlighting.TypeKeyword)), "interrupt-parent|&gic", "a property and a reference");
+        Equal(Join(dt.Tokens(8, SyntaxHighlighting.TypeKeyword)), "pinctrl-names", "another hyphenated property");
+        Equal(Join(dt.Tokens(9, SyntaxHighlighting.TypeKeyword)), "compatible", "a standard property");
+        Equal(Join(dt.Tokens(10, SyntaxHighlighting.TypeKeyword)), "/delete-property/|status", "a delete-property directive");
+        Equal(Join(dt.Tokens(11, SyntaxHighlighting.TypeKeyword)), "&{/soc}", "a path reference");
+        Equal(Join(dt.Tokens(13, SyntaxHighlighting.TypeComment)), "// note", "a Device Tree line comment");
         Highlighted html2 = new Highlighted(L.Markup, "<p>He said \"hi</p>\n<a href=\"u\"\n   title=\"t\">x</a>\n<!DOCTYPE html>");
         Equal(Join(html2.Tokens(0, SyntaxHighlighting.TypeString)), "", "a quote in the text between tags is not a string");
         Equal(Join(html2.Tokens(1, SyntaxHighlighting.TypeString)), "\"u\"", "an attribute value is");

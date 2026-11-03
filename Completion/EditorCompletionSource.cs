@@ -140,7 +140,7 @@ public static class EditorCompletionSource
         {
             return;
         }
-        if (!IsIdentifier(word) || !MatchesPrefix(word, prefix))
+        if (!IsCompletionWord(word) || !MatchesPrefix(word, prefix))
         {
             return;
         }
@@ -150,6 +150,45 @@ public static class EditorCompletionSource
             return;
         }
         words.Add(new Word(word, rank, symbol));
+    }
+
+    /// <summary>
+    /// A word the completion list can offer: an identifier, or a hyphenated property name such as
+    /// "font-size" (CSS) or "interrupt-parent" (Device Tree). The editor's word reader still stops at
+    /// the hyphen, so the hyphenated names are offered while the first part is being typed.
+    /// </summary>
+    private static bool IsCompletionWord(string word)
+    {
+        if (IsIdentifier(word))
+        {
+            return true;
+        }
+        if (string.IsNullOrEmpty(word) || (!char.IsLetter(word[0]) && word[0] != '_'))
+        {
+            return false;
+        }
+        bool afterHyphen = false;
+        for (int i = 1; i < word.Length; i++)
+        {
+            char c = word[i];
+            if (c == '-')
+            {
+                if (afterHyphen || i == word.Length - 1)
+                {
+                    return false;
+                }
+                afterHyphen = true;
+            }
+            else if (IsIdentifierChar(c))
+            {
+                afterHyphen = false;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool MatchesPrefix(string word, string prefix)
