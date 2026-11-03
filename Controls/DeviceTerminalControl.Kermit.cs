@@ -38,6 +38,12 @@ public partial class DeviceTerminalControl
             return;
         }
 
+        StartKermitSend(fileNames);
+    }
+
+    /// <summary>Must be called on the UI thread, with the line free and the connection open.</summary>
+    private void StartKermitSend(string[] fileNames)
+    {
         List<KermitTransfer.Source> sources = new List<KermitTransfer.Source>();
         foreach (string path in fileNames)
         {

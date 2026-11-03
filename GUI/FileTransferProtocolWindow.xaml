@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="SmarTTY.GUI.FileTransferProtocolWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Send file to the device" Width="520" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid Margin="14">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TextBlock x:Name="HeaderText" Grid.Row="0" TextWrapping="Wrap" FontWeight="SemiBold" />
+    <ListBox x:Name="FilesList" Grid.Row="1" Margin="0 6 0 0" MaxHeight="90" />
+    <TextBlock Grid.Row="2" Text="Send with the protocol:" Margin="0 12 0 4" />
+    <StackPanel Grid.Row="3" Margin="8 0 0 0">
+      <RadioButton x:Name="XModemButton" GroupName="Protocol" Margin="0 3 0 3" Content="XMODEM (128-byte blocks, one file)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="XModem1KButton" GroupName="Protocol" Margin="0 3 0 3" Content="XMODEM-1K (1024-byte blocks, one file)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="YModemButton" GroupName="Protocol" Margin="0 3 0 3" Content="YMODEM (one or more files, with name and size)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="ZModemButton" GroupName="Protocol" Margin="0 3 0 3" Content="ZMODEM (one or more files, the device's rz is started at a shell prompt)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="KermitButton" GroupName="Protocol" Margin="0 3 0 3" Content="Kermit (one or more files)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="RawButton" GroupName="Protocol" Margin="0 3 0 3" Content="Raw data (the bytes of one file are written to the line, no protocol)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+    </StackPanel>
+    <TextBlock x:Name="HintText" Grid.Row="4" TextWrapping="Wrap" Margin="0 10 0 0" Opacity="0.7" />
+    <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 14 0 0">
+      <Button x:Name="SendButton" Content="_Send" IsDefault="True" MinWidth="80" Margin="0 0 5 0" Click="Send_Click" />
+      <Button Content="Cancel" IsCancel="True" MinWidth="80" />
+    </StackPanel>
+  </Grid>
+</Window>
