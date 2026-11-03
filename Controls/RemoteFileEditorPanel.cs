@@ -293,16 +293,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
                     _editor.ToggleHexMode();
                     break;
                 case EditorToolbarCommand.DataInspector:
-                    if (_editor.IsHexMode)
-                    {
-                        _editor.HexEditor.ShowDataInspector = !_editor.HexEditor.ShowDataInspector;
-                    }
-                    else
-                    {
-                        // From the text view: open the bytes with the inspector beside them.
-                        _editor.HexEditor.ShowDataInspector = true;
-                        _editor.ToggleHexMode();
-                    }
+                    _editor.HexEditor.ShowDataInspector = !_editor.HexEditor.ShowDataInspector;
                     break;
             }
         }
@@ -375,6 +366,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         {
             pair.Value.Enabled = CommandState.IsEnabled(pair.Key);
             pair.Value.Checked = CommandState.IsChecked(pair.Key);
+            pair.Value.Visible = CommandState.IsVisible(pair.Key);
         }
         _textMenu.Enabled = !CommandState.ReadOnly && !CommandState.HexMode;
         _hexMenu.Refresh(CommandState.HexMode);

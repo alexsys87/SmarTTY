@@ -1,6 +1,7 @@
 using SmarTTY.Controls;
 using System;
 using System.Collections.Generic;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -67,6 +68,8 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
         foreach (KeyValuePair<EditorToolbarCommand, ButtonBase> pair in _buttons)
         {
             pair.Value.IsEnabled = state.IsEnabled(pair.Key);
+            // The hex view commands (the data inspector) are hidden in the text view.
+            pair.Value.Visibility = state.IsVisible(pair.Key) ? Visibility.Visible : Visibility.Collapsed;
             if (pair.Value is ToggleButton toggle)
             {
                 toggle.IsChecked = state.IsChecked(pair.Key);
