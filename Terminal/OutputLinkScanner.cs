@@ -81,6 +81,10 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
 
         private string _numberBuffer;
 
+        // An absolute name of an unknown kind that is a link only for the position after it: "/etc/passwd:3" is a link, and the
+        // directory in "bash: /tmp: Is a directory" is not.
+        private bool _needsLine;
+
         public bool IsActive => State == CandidateState.Position;
 
         public string PathText => _path.ToString();
@@ -159,7 +163,15 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             }
             if (State == CandidateState.Position)
             {
-                return ParsePositionChar(ch);
+                if (ParsePositionChar(ch))
+                {
+                    return true;
+                }
+                if (_needsLine && !_line.HasValue)
+                {
+                    State = CandidateState.Rejected;
+                }
+                return false;
             }
             if (ch == '.')
             {
@@ -190,11 +202,33 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
                     ParsePositionChar('\0');
                     _numberBuffer = null;
                 }
+                if (_needsLine && !_line.HasValue)
+                {
+                    State = CandidateState.Rejected;
+                }
                 return;
             }
             if (State == CandidateState.AbsolutePath)
             {
-                State = (_strictAbsolute && !positionMayFollow && !IsKnownFile()) ? CandidateState.Rejected : CandidateState.Position;
+                if (IsKnownFile())
+                {
+                    State = CandidateState.Position;
+                }
+                else if (positionMayFollow)
+                {
+                    // "/var/log: Is a directory", "bash: /temp: No such file or directory": a message about a name is no
+                    // reason to open it, a line number after the colon is.
+                    State = CandidateState.Position;
+                    _needsLine = true;
+                }
+                else if (!_strictAbsolute && LooksLikeFile())
+                {
+                    State = CandidateState.Position;
+                }
+                else
+                {
+                    State = CandidateState.Rejected;
+                }
             }
             else if (State == CandidateState.Word && (IsKnownFile()))
             {
@@ -204,6 +238,30 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             {
                 State = CandidateState.Rejected;
             }
+        }
+
+        /// <summary>
+        /// An absolute name of an unknown kind that may be a file ("/etc/hosts", "/var/log/syslog"). A name right under the root
+        /// ("/tmp", "/temp") is a directory nearly always, and the "/24" of a network mask ("10.0.0.0 /24", "2001:db8::/32") is
+        /// no name at all; a name that ends with "/" is a directory, and one whose last part has no letter ("/proc/1") is no
+        /// file to edit either.
+        /// </summary>
+        private bool LooksLikeFile()
+        {
+            string path = _path.ToString();
+            int lastSlash = path.LastIndexOf('/');
+            if (lastSlash <= 0 || lastSlash == path.Length - 1)
+            {
+                return false;
+            }
+            for (int i = lastSlash + 1; i < path.Length; i++)
+            {
+                if (char.IsLetter(path[i]))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private bool IsKnownFile()

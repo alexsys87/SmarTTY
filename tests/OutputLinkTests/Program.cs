@@ -214,6 +214,23 @@ internal static class Program
         Output smart = new Output("/w", "find /etc -name 'h*'", "/etc/hosts\n", "/etc/hostname\n", "~/b.txt\n", "dir/~/c.txt\n");
         Equal(smart.Covered.Count, 2, "not strict: every absolute name is a link, but nothing behind a '~/'");
         Equal(smart.Click(1), "/etc/hostname|-|-", "...and the one after it is the next one");
+
+        // Not strict either: a directory right under the root, a network mask and a name that ends with "/" are no files.
+        Output folders = new Output("/w", "ls -d /temp", "/temp\n", "/tmp /\n", "/var/log/\n", "/proc/1\n", "10.0.0.0 /24\n",
+            "inet 192.168.1.5/24 brd 192.168.1.255\n", "2001:db8::/32\n", "/run.sh /etc/hosts\n");
+        Equal(folders.Covered.Count, 2, "not strict: '/temp', '/24', '/var/log/' and '/proc/1' are not links");
+        Equal(folders.Click(0), "/run.sh|-|-", "...a known kind of file right under the root still is");
+        Equal(folders.Click(1), "/etc/hosts|-|-", "...and so is a name deeper than the root");
+
+        // A colon after an absolute name of an unknown kind makes it a link only when a line number follows.
+        Output colon = new Output("/w", "cd /temp", "bash: cd: /temp: No such file or directory\n", "/var/log: Is a directory\n",
+            "/etc/passwd:3:x\n", "/opt/x:");
+        Equal(colon.Covered.Count, 1, "a directory in an error message is not a link, even with a colon after it");
+        Equal(colon.Click(0), "/etc/passwd|2|-", "...the name with a line number is");
+
+        Output classicColon = new Output("", null, true, "/var/log: Is a directory\n", "/etc/passwd:3\n");
+        Equal(classicColon.Covered.Count, 1, "strict: the same for a classic tab");
+        Equal(classicColon.Click(0), "/etc/passwd|2|-", "...the name with a line number stays a link");
     }
 
     private static void OscDirectoryChecks()
