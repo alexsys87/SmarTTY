@@ -2027,13 +2027,49 @@ namespace SmarTTY.CodeEditing
             "group", "to", "max", "public", "weak", "deprecated", "true", "false", "json_name", "default"
         };
 
-        /// <summary>The Device Tree directives and the common node properties; the format has no API set.</summary>
+        /// <summary>The Device Tree directives, standard properties and common node names.</summary>
         private static readonly HashSet<string> DeviceTreeKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
-            "include", "memreserve", "plugin", "compatible", "model", "status", "reg", "ranges", "interrupts",
-            "interrupt-parent", "clocks", "clock-names", "resets", "reset-names", "dmas", "dma-names",
-            "pinctrl-names", "gpios", "phandle", "chosen", "memory", "cpus", "soc", "aliases",
-            "address-cells", "size-cells"
+            // Directives.
+            "dts-v1", "plugin", "memreserve", "include", "delete-node", "delete-property", "omit-if-no-ref",
+            "bits",
+            // Core properties and node names.
+            "compatible", "model", "status", "reg", "reg-names", "ranges", "dma-ranges", "device_type",
+            "phandle", "chosen", "memory", "cpus", "cpu", "soc", "aliases", "reserved-memory", "firmware",
+            "symbols", "bootargs", "stdout-path", "simple-bus", "simple-mfd", "syscon", "syscon-reboot",
+            "syscon-poweroff",
+            // Cell counts.
+            "address-cells", "size-cells", "interrupt-cells", "clock-cells", "gpio-cells", "dma-cells",
+            "pwm-cells", "reset-cells", "phy-cells", "thermal-sensor-cells", "sound-dai-cells",
+            "iommu-cells", "mbox-cells", "power-domain-cells",
+            // Interrupts, clocks, resets and DMA.
+            "interrupts", "interrupt-parent", "interrupts-extended", "interrupt-names",
+            "interrupt-controller", "interrupt-map", "interrupt-map-mask", "clocks", "clock-names",
+            "clock-frequency", "clock-output-names", "assigned-clocks", "assigned-clock-parents",
+            "assigned-clock-rates", "resets", "reset-names", "reset-gpios", "dmas", "dma-names",
+            "dma-coherent", "dma-noncoherent", "iommus", "iommu-map", "iommu-map-mask", "msi-controller",
+            "msi-parent", "mboxes", "mbox-names",
+            // GPIO, pin control and power.
+            "gpios", "gpio-controller", "gpio-ranges", "gpio-line-names", "gpio-reserved-ranges",
+            "gpio-keys", "gpio-leds", "ngpios", "wakeup-source", "pinctrl-names", "pinctrl-0", "pinctrl-1",
+            "pinctrl-2", "pinctrl-3", "pinctrl-4", "pinctrl-5", "pinctrl-6", "pinctrl-7", "pinctrl-8",
+            "pinctrl-9", "pinctrl-assert-gpios", "power-domains", "power-domain-names", "opp-shared",
+            "operating-points", "operating-points-v2", "opp-hz", "opp-microvolt", "opp-supported-hw",
+            // Buses, storage and network.
+            "phys", "phy-names", "phy-handle", "phy-mode", "phy-supply", "mdio", "mdio-parent-bus",
+            "ethernet", "local-mac-address", "mac-address", "max-speed", "fixed-link", "speed", "duplex",
+            "non-removable", "removable", "broken-cd", "cd-gpios", "wp-gpios", "bus-width", "max-frequency",
+            "no-1-8-v", "no-sd", "no-sdio", "no-mmc", "sd-uhs-sdr104", "mmc-hs200-1_8v", "mmc-hs400-1_8v",
+            "current-speed", "reg-shift", "reg-io-width", "regulator-name", "regulator-min-microvolt",
+            "regulator-max-microvolt", "regulator-always-on", "regulator-boot-on", "vin-supply", "vdd-supply",
+            // Common node names.
+            "pmu", "l2-cache", "l2-cache-controller", "clock-controller", "reset-controller", "pinctrl",
+            "gpio", "leds", "backlight", "regulator", "thermal-zones", "thermal", "cooling-device", "sound",
+            "codec", "spi", "i2c", "uart", "serial", "usb", "usb-phy", "pcie", "pci", "mmc", "sdhci",
+            "nand", "nor", "flash", "mtd", "ramoops", "nvmem", "eeprom", "rtc", "watchdog", "timer",
+            "dma-controller", "dma", "mailbox", "power-domain", "display", "gpu", "video", "camera",
+            "audio", "can", "adc", "dac", "pwm", "fan", "hwmon", "sensor", "keypad", "touchscreen",
+            "chassis", "no-map", "reusable", "shared-dma-pool"
         };
 
         /// <summary>The C++ keywords; the C++ profile keeps them separate from C.</summary>
@@ -2152,6 +2188,7 @@ namespace SmarTTY.CodeEditing
             public bool VerbatimStrings;       // C# @"..." strings that may span lines
             public bool RustLiterals;          // 'a lifetimes and labels are not strings; r"..." and r#"..."# raw strings
             public bool HyphenatedKeywords;    // CSS and Device Tree words such as font-size and interrupt-parent
+            public bool DeviceTreeSyntax;      // /directive/, &label, #cell-count, labels and node names
             public string BlockCommentStart;
             public string BlockCommentEnd;
             public HashSet<string> Keywords;
@@ -2385,6 +2422,69 @@ namespace SmarTTY.CodeEditing
                         return true;
                     }
 
+                    // Device Tree directives are words between slashes: /include/, /delete-node/, /bits/.
+                    if (DeviceTreeSyntax && c == '/' && i + 2 < len && IsIdStart(text[i + 1]))
+                    {
+                        int wordStart = i + 1;
+                        int wordEnd = wordStart;
+                        while (wordEnd < len && (IsIdChar(text[wordEnd]) || text[wordEnd] == '-'))
+                        {
+                            wordEnd++;
+                        }
+                        if (wordEnd < len && text[wordEnd] == '/' && Keywords != null &&
+                            Keywords.Contains(text.Substring(wordStart, wordEnd - wordStart)))
+                        {
+                            Normal(ref last, last, i, sink);
+                            sink.AddToken(TypeKeyword, i, wordEnd + 1);
+                            i = wordEnd + 1;
+                            last = i;
+                            continue;
+                        }
+                    }
+
+                    // A reference to a label or to a path: &gic, &{/soc/serial@10000000}.
+                    if (DeviceTreeSyntax && c == '&' && i + 1 < len &&
+                        (IsIdStart(text[i + 1]) || text[i + 1] == '{'))
+                    {
+                        int referenceStart = i;
+                        i++;
+                        if (text[i] == '{')
+                        {
+                            int close = text.IndexOf('}', i + 1);
+                            i = (close < 0) ? len : close + 1;
+                        }
+                        else
+                        {
+                            while (i < len && (IsIdChar(text[i]) || text[i] == '-'))
+                            {
+                                i++;
+                            }
+                        }
+                        Normal(ref last, last, referenceStart, sink);
+                        sink.AddToken(TypeKeyword, referenceStart, i);
+                        last = i;
+                        continue;
+                    }
+
+                    // A cell-count property: #address-cells, #gpio-cells, #interrupt-cells.
+                    if (DeviceTreeSyntax && c == '#' && i + 1 < len && IsIdStart(text[i + 1]))
+                    {
+                        int wordStart = i + 1;
+                        int wordEnd = wordStart;
+                        while (wordEnd < len && (IsIdChar(text[wordEnd]) || text[wordEnd] == '-'))
+                        {
+                            wordEnd++;
+                        }
+                        if (Keywords != null && Keywords.Contains(text.Substring(wordStart, wordEnd - wordStart)))
+                        {
+                            Normal(ref last, last, i, sink);
+                            sink.AddToken(TypeKeyword, i, wordEnd);
+                            i = wordEnd;
+                            last = i;
+                            continue;
+                        }
+                    }
+
                     // Strings that go on over lines.
                     int multiLineKind = 0;
                     int multiLineStart = i;
@@ -2485,6 +2585,17 @@ namespace SmarTTY.CodeEditing
                             i++;
                         }
                         string word = text.Substring(s, i - s);
+                        // A Device Tree label ("myboard:") or the name of a node with a unit address ("uart@...").
+                        bool deviceTreeLabel = DeviceTreeSyntax && i < len && text[i] == ':' &&
+                            !(i + 1 < len && text[i + 1] == ':');
+                        bool deviceTreeNode = DeviceTreeSyntax && i < len && text[i] == '@';
+                        if (deviceTreeLabel || deviceTreeNode)
+                        {
+                            Normal(ref last, last, s, sink);
+                            sink.AddToken(TypeKeyword, s, i);
+                            last = i;
+                            continue;
+                        }
                         if (RustLiterals && (word == "r" || word == "br") && i < len && (text[i] == '"' || text[i] == '#'))
                         {
                             // Raw string r"..." / r#"..."#: no escapes, the quotes inside need the same number of #.
@@ -2544,7 +2655,7 @@ namespace SmarTTY.CodeEditing
         private static TokenCache.LineTokenizer CreateCLikeTokenizer(HashSet<string> keywords, bool preprocessor = false,
             bool slashComments = true, bool hashComments = false, bool backticks = false, bool tripleQuotes = false,
             bool verbatim = false, bool rustLiterals = false, bool hyphenatedKeywords = false,
-            HashSet<string> preprocessorWords = null)
+            bool deviceTreeSyntax = false, HashSet<string> preprocessorWords = null)
         {
             return new GenericSyntax
             {
@@ -2559,6 +2670,7 @@ namespace SmarTTY.CodeEditing
                 VerbatimStrings = verbatim,
                 RustLiterals = rustLiterals,
                 HyphenatedKeywords = hyphenatedKeywords,
+                DeviceTreeSyntax = deviceTreeSyntax,
                 BlockCommentStart = "/*",
                 BlockCommentEnd = "*/",
                 Keywords = keywords
@@ -2612,7 +2724,7 @@ namespace SmarTTY.CodeEditing
             CreateCLikeTokenizer(ProtobufKeywords);
 
         private static readonly TokenCache.LineTokenizer DeviceTreeTokenizer =
-            CreateCLikeTokenizer(DeviceTreeKeywords, preprocessor: true, hyphenatedKeywords: true);
+            CreateCLikeTokenizer(DeviceTreeKeywords, preprocessor: true, hyphenatedKeywords: true, deviceTreeSyntax: true);
 
         private static readonly TokenCache.LineTokenizer CppTokenizer = new GenericSyntax
         {
