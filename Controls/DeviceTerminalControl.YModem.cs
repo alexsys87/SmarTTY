@@ -54,8 +54,13 @@ public partial class DeviceTerminalControl
             return;
         }
 
-        // The files are opened later, on the worker thread: the names are already taken above.
+        StartYModemSend(fileNames);
+    }
 
+    /// <summary>Must be called on the UI thread, with the line free and the connection open.</summary>
+    private void StartYModemSend(string[] fileNames)
+    {
+        // The files are opened later, on the worker thread: only the names are needed here.
         StartLineTransfer("YMODEM Send", "YMODEM", "send", (sendData, progress, token) =>
         {
             List<FileStream> opened = new List<FileStream>();

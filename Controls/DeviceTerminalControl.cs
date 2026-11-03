@@ -364,6 +364,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         InitializeGzipBase64Menu();
         InitializeTftpSupport();
         InitializeNetconsoleSupport();
+        InitializeFileDrop();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
         ThemeManager.ThemeChanged += OnThemeChanged;
         ApplyToolbarTheme();
@@ -1743,6 +1744,13 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
+        StartXModemSend(fileName, useLargeBlocks);
+    }
+
+    /// <summary>Must be called on the UI thread, with the line free (see <see cref="IsLineBusy"/>) and the connection open.</summary>
+    private void StartXModemSend(string fileName, bool useLargeBlocks)
+    {
+        string protocolName = useLargeBlocks ? "XMODEM-1K" : "XMODEM";
         // The stream is opened later, on the worker thread: only the name is needed here.
         StartXModemTransfer(protocolName + " Send", "send", fileStream: () => File.OpenRead(fileName), isSend: true, useLargeBlocks: useLargeBlocks);
     }
