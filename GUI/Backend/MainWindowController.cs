@@ -575,15 +575,6 @@ public class MainWindowController : INotifyPropertyChanged
                         e.SuppressKeyPress = true;
                         GoToLine(sender as RemoteFileEditor);
                         break;
-                    case Keys.I:
-                        // Ctrl+I is also Tab as a character. In the text view it opens the bytes with the data
-                        // inspector; the hex view handles the key itself.
-                        e.SuppressKeyPress = true;
-                        if (sender is RemoteFileEditor inspected && inspected.Tag is EditorTabContext inspectedTab)
-                        {
-                            inspectedTab.EditorPanel.RunCommand(EditorToolbarCommand.DataInspector);
-                        }
-                        break;
                 }
             }
             else if (!e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.F5)

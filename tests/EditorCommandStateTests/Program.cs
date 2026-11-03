@@ -130,9 +130,10 @@ internal static class Program
         Check(hex.IsEnabled(EditorToolbarCommand.DataInspector) && !hex.IsChecked(EditorToolbarCommand.DataInspector), "hex view: Data Inspector is on and not shown by default");
         Check(new EditorCommandState { HexMode = true, ShowDataInspector = true }.IsChecked(EditorToolbarCommand.DataInspector), "hex view: a shown inspector is checked");
         Check(!new EditorCommandState { HexMode = false, ShowDataInspector = true, CanUseHex = true }.IsChecked(EditorToolbarCommand.DataInspector), "text view: the inspector is not checked");
-        Check(new EditorCommandState { CanUseHex = true }.IsEnabled(EditorToolbarCommand.DataInspector), "text view: Data Inspector opens the hex view");
-        Check(!new EditorCommandState { CanUseHex = false }.IsEnabled(EditorToolbarCommand.DataInspector), "not loaded: Data Inspector is off");
-        Check(!new EditorCommandState { CanUseHex = true, IsSaving = true }.IsEnabled(EditorToolbarCommand.DataInspector), "saving: Data Inspector cannot open the hex view");
+        Check(!new EditorCommandState { CanUseHex = true }.IsEnabled(EditorToolbarCommand.DataInspector), "text view: Data Inspector is off");
+        Check(!new EditorCommandState { CanUseHex = true }.IsVisible(EditorToolbarCommand.DataInspector), "text view: Data Inspector is hidden");
+        Check(hex.IsVisible(EditorToolbarCommand.DataInspector), "hex view: Data Inspector is shown");
+        Check(new EditorCommandState().IsVisible(EditorToolbarCommand.ToggleHex) && hex.IsVisible(EditorToolbarCommand.ToggleHex), "Hex Editor is shown in both views");
         Check(EditorCommandCatalog.Describe(EditorToolbarCommand.DataInspector).ToolTip == "Data Inspector (Ctrl+I)", "catalog: Data Inspector shows its key");
 
         // The tool bar and the context menu list every command once, and each has a label and an icon.
@@ -179,8 +180,13 @@ internal static class Program
         // Every command has a rule (an unknown value is off).
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {
-            bool everythingOn = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true, CanUseHex = true, CanRun = true, CanFollow = true }.IsEnabled(command);
-            Check(everythingOn, "all conditions met: " + command + " is on");
+            // A command shown only in the hex view is checked there.
+            EditorCommandState everything = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true, CanUseHex = true, CanRun = true, CanFollow = true };
+            if (!everything.IsVisible(command))
+            {
+                everything.HexMode = true;
+            }
+            Check(everything.IsEnabled(command), "all conditions met: " + command + " is on");
         }
         Check(!empty.IsEnabled((EditorToolbarCommand)999), "unknown command is off");
 

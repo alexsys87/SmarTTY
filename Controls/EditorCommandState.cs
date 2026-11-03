@@ -124,8 +124,8 @@ internal struct EditorCommandState
             case EditorToolbarCommand.ToggleHex:
                 return CanUseHex && !IsSaving;
             case EditorToolbarCommand.DataInspector:
-                // In the text view it opens the hex view with the inspector.
-                return HexMode || (CanUseHex && !IsSaving);
+                // The inspector reads the bytes: it belongs to the hex view only.
+                return HexMode;
             default:
                 return false;
         }
@@ -138,6 +138,15 @@ internal struct EditorCommandState
     public bool IsEnabled(LineTransformKind kind)
     {
         return !ReadOnly && !HexMode && (!LineTransforms.NeedsSelection(kind) || HasLineSelection);
+    }
+
+    /// <summary>
+    /// Whether the command is shown on the tool bar and in the context menu: the commands of the hex view only while
+    /// the hex view is open.
+    /// </summary>
+    public bool IsVisible(EditorToolbarCommand command)
+    {
+        return command != EditorToolbarCommand.DataInspector || HexMode;
     }
 
     /// <summary>Whether a command that switches something on is currently on.</summary>
