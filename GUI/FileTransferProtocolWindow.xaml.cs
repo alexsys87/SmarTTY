@@ -9,7 +9,7 @@ namespace SmarTTY.GUI;
 
 /// <summary>
 /// Opens when files are dropped on a COM-port / TCP terminal: asks which file transfer protocol (XMODEM, YMODEM, ZMODEM,
-/// Kermit or raw data) to send them with. The protocol picked last time is offered again (until the program ends).
+/// Kermit, gzip + base64 or + cat through the shell, or raw data) to send them with. The protocol picked last time is offered again (until the program ends).
 /// </summary>
 public partial class FileTransferProtocolWindow : Window
 {
@@ -39,13 +39,14 @@ public partial class FileTransferProtocolWindow : Window
                 FilesList.Items.Add(Path.GetFileName(file) + (length >= 0 ? "  (" + FormatSize(length) + ")" : string.Empty));
             }
         }
-        // XMODEM, gzip + base64 and a raw send carry one file only.
+        // XMODEM, gzip + base64, gzip + cat and a raw send carry one file only.
         XModemButton.IsEnabled = _singleFile;
         XModem1KButton.IsEnabled = _singleFile;
         RawButton.IsEnabled = _singleFile;
         GzipButton.IsEnabled = _singleFile;
+        GzipCatButton.IsEnabled = _singleFile;
         DeviceFileDropProtocol start = _lastProtocol;
-        if (!_singleFile && (start == DeviceFileDropProtocol.XModem || start == DeviceFileDropProtocol.XModem1K || start == DeviceFileDropProtocol.RawSend || start == DeviceFileDropProtocol.GzipBase64))
+        if (!_singleFile && (start == DeviceFileDropProtocol.XModem || start == DeviceFileDropProtocol.XModem1K || start == DeviceFileDropProtocol.RawSend || start == DeviceFileDropProtocol.GzipBase64 || start == DeviceFileDropProtocol.GzipCat))
         {
             start = DeviceFileDropProtocol.YModem;
         }
@@ -75,6 +76,7 @@ public partial class FileTransferProtocolWindow : Window
             case DeviceFileDropProtocol.ZModem: return ZModemButton;
             case DeviceFileDropProtocol.Kermit: return KermitButton;
             case DeviceFileDropProtocol.GzipBase64: return GzipButton;
+            case DeviceFileDropProtocol.GzipCat: return GzipCatButton;
             case DeviceFileDropProtocol.RawSend: return RawButton;
             default: return YModemButton;
         }
@@ -87,6 +89,7 @@ public partial class FileTransferProtocolWindow : Window
         if (ZModemButton.IsChecked == true) return DeviceFileDropProtocol.ZModem;
         if (KermitButton.IsChecked == true) return DeviceFileDropProtocol.Kermit;
         if (GzipButton.IsChecked == true) return DeviceFileDropProtocol.GzipBase64;
+        if (GzipCatButton.IsChecked == true) return DeviceFileDropProtocol.GzipCat;
         if (RawButton.IsChecked == true) return DeviceFileDropProtocol.RawSend;
         return DeviceFileDropProtocol.YModem;
     }
@@ -119,6 +122,9 @@ public partial class FileTransferProtocolWindow : Window
                 break;
             case DeviceFileDropProtocol.GzipBase64:
                 HintText.Text = "Needs an idle shell prompt of a Linux device (OpenWrt too) with gzip, base64 and sha256sum; busybox is enough. The next window asks where to put the file on the device.";
+                break;
+            case DeviceFileDropProtocol.GzipCat:
+                HintText.Text = "Needs only an idle shell prompt with gunzip, stty, cat and sha256sum (busybox is enough). The archive is sent as it is, without base64, so keep the speed in the next window under what the device can take. The next window also asks where to put the file on the device.";
                 break;
             default:
                 HintText.Text = "The file is sent as it is. Make the device ready to take the data before you drop the file (for example \"cat > file\" in a shell). Nothing checks that the data arrived.";

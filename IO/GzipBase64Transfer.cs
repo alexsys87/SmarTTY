@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -18,6 +19,9 @@ namespace SmarTTY.IO;
 /// and head (or dd). Nothing is installed on the device and no temporary file is kept on it except the unfinished
 /// "name.smtty~" next to the destination, which is renamed to the real name only after the checksum matched.
 /// The protocol is the same one the user would type by hand, so it is easy to repeat in any terminal.
+/// The "gzip + cat" form (<see cref="EncodingKind.Raw"/>) sends the gzip archive as it is, without any text form: the device puts its
+/// terminal in raw mode and reads exactly as many bytes as the archive has (head -c, a counted cat), the checksum at the end is the
+/// only check. It is 1:1 on the line instead of 4:3, but nothing can be checked on the way (the device does not echo in raw mode).
 /// </summary>
 public static class GzipBase64Transfer
 {
@@ -26,7 +30,14 @@ public static class GzipBase64Transfer
         /// <summary>base64 when the device has it, otherwise uuencode.</summary>
         Auto,
         Base64,
-        UuEncode
+        UuEncode,
+        /// <summary>
+        /// No text form ("gzip + cat"): the archive goes to the device as it is, to a reader that runs on its terminal in raw mode:
+        /// head -c with the length of the archive (dd bs=1 count= when head has no -c, a plain cat that ends when the line has been
+        /// quiet for a few seconds when there is no dd either). Raw mode has no echo, so nothing is checked per line: the checksum at the
+        /// end is the check, and a transfer that fails it is repeated. Auto never picks this form.
+        /// </summary>
+        Raw
     }
 
     public enum ChecksumKind
@@ -67,7 +78,10 @@ public static class GzipBase64Transfer
         /// </summary>
         public int WindowBytes = 1024;
 
-        /// <summary>The speed limit used when the device does not echo (the echo is what tells that a line has arrived undamaged).</summary>
+        /// <summary>
+        /// The speed limit used when the device does not echo (the echo is what tells that a line has arrived undamaged), and the speed
+        /// of the raw "gzip + cat" stream, which has no echo to wait for: too fast for the device and the tty buffer on it overflows.
+        /// </summary>
         public int NoEchoBytesPerSecond = 6000;
 
         /// <summary>
@@ -283,6 +297,13 @@ public static class GzipBase64Transfer
         // True while the device's reader waits for the lines of the data (it ends on the end marker): ending it is how a
         // transfer is stopped, and how a damaged one is told to give up.
         private bool _readerWaiting;
+
+        // The raw "gzip + cat" form. While the device reads the archive from its terminal in raw mode, Ctrl-C and the end marker are data and
+        // cannot stop it: it ends by itself when the line has been quiet for RawIdleDeciseconds. While it sends the archive in raw mode
+        // (receive), its terminal has no output processing and no echo until the script restores it: a Ctrl-C that stops the sender has to be
+        // followed by the restore.
+        private bool _rawSend;
+        private bool _rawReceive;
 
         // For the debug log and for the error texts: when did the transfer start, what did the device print last.
         private readonly int _startedAt = Environment.TickCount;
@@ -567,12 +588,23 @@ public static class GzipBase64Transfer
 
         // ----- what the device can do -----
 
-        private Capabilities Probe()
+        private Capabilities Probe(bool raw = false)
         {
             Report(0, 0, "Checking the tools on the device...");
-            TypeLines(
-                "c=; for t in base64 uudecode uuencode gzip gunzip sha256sum md5sum cksum sed wc cat mv rm; do command -v $t >/dev/null 2>&1 && c=\"$c $t\"; done",
-                "printf " + Say("CAPS:%s") + " \"$c\"");
+            List<string> lines = new List<string>
+            {
+                "c=; for t in base64 uudecode uuencode gzip gunzip sha256sum md5sum cksum sed wc cat mv rm" + (raw ? " stty" : string.Empty)
+                    + "; do command -v $t >/dev/null 2>&1 && c=\"$c $t\"; done"
+            };
+            if (raw)
+            {
+                // The raw reader has to count: whether head takes -c and dd takes bs=/count= is tried, not assumed (a busybox built without
+                // FEATURE_FANCY_HEAD has a head that does not know -c). \"head-c\" and \"dd-c\" in the answer say that the try worked.
+                lines.Add("[ \"$(printf ab | head -c 1 2>/dev/null)\" = a ] && c=\"$c head-c\"");
+                lines.Add("[ \"$(printf ab | dd bs=1 count=1 2>/dev/null)\" = a ] && c=\"$c dd-c\"");
+            }
+            lines.Add("printf " + Say("CAPS:%s") + " \"$c\"");
+            TypeLines(lines.ToArray());
             string answer = WaitForMarker(15000, "tool check");
             if (!answer.StartsWith("CAPS:", StringComparison.Ordinal))
             {
@@ -624,6 +656,10 @@ public static class GzipBase64Transfer
         /// <summary>Picks the text form: base64 if the device has the tool for the direction in question, uuencode otherwise.</summary>
         private EncodingKind ChooseEncoding(Capabilities caps, bool sending)
         {
+            if (_options.Encoding == EncodingKind.Raw)
+            {
+                return EncodingKind.Raw; // no text form, so no tool for one; the raw paths check what they need
+            }
             string base64Tool = "base64";
             string uuTool = sending ? "uudecode" : "uuencode";
             EncodingKind wanted = _options.Encoding;
@@ -678,7 +714,8 @@ public static class GzipBase64Transfer
         {
             Prepared prepared = new Prepared();
             string compressedPath = Path.GetTempFileName();
-            prepared.EncodedPath = Path.GetTempFileName();
+            bool archiveIsSent = false; // raw: the archive is the file that is sent, it is not deleted with the other temporary file
+            prepared.EncodedPath = encoding == EncodingKind.Raw ? null : Path.GetTempFileName();
             try
             {
                 using (RunningChecksum sum = new RunningChecksum(checksum))
@@ -707,6 +744,13 @@ public static class GzipBase64Transfer
                     File.WriteAllBytes(compressedPath, EmptyGzip);
                 }
                 prepared.CompressedLength = new FileInfo(compressedPath).Length;
+                if (encoding == EncodingKind.Raw)
+                {
+                    archiveIsSent = true;
+                    prepared.EncodedPath = compressedPath;
+                    prepared.EncodedLength = prepared.CompressedLength;
+                    return prepared;
+                }
                 using (FileStream compressed = new FileStream(compressedPath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (FileStream encodedOut = new FileStream(prepared.EncodedPath, FileMode.Create, FileAccess.Write))
                 {
@@ -722,12 +766,15 @@ public static class GzipBase64Transfer
             }
             finally
             {
-                try
+                if (!archiveIsSent)
                 {
-                    File.Delete(compressedPath);
-                }
-                catch (IOException)
-                {
+                    try
+                    {
+                        File.Delete(compressedPath);
+                    }
+                    catch (IOException)
+                    {
+                    }
                 }
             }
         }
@@ -744,8 +791,9 @@ public static class GzipBase64Transfer
             try
             {
                 StartShell();
-                Capabilities caps = Probe();
-                string missing = Missing(caps, "gunzip", "mv", "rm", "cat", "sed");
+                bool raw = _options.Encoding == EncodingKind.Raw;
+                Capabilities caps = Probe(raw);
+                string missing = raw ? Missing(caps, "gunzip", "mv", "rm", "cat", "stty") : Missing(caps, "gunzip", "mv", "rm", "cat", "sed");
                 if (missing != null)
                 {
                     throw new IOException("The device has no: " + missing + ".");
@@ -754,8 +802,10 @@ public static class GzipBase64Transfer
                 ChecksumKind checksum = ChooseChecksum(caps);
 
                 prepared = Prepare(localPath, name, encoding, checksum);
-                string summary = FormatSize(prepared.OriginalLength) + " -> gzip " + FormatSize(prepared.CompressedLength)
-                    + " -> " + (encoding == EncodingKind.Base64 ? "base64 " : "uuencode ") + FormatSize(prepared.EncodedLength);
+                string summary = raw
+                    ? FormatSize(prepared.OriginalLength) + " -> gzip " + FormatSize(prepared.CompressedLength) + " -> cat (raw, no text form)"
+                    : FormatSize(prepared.OriginalLength) + " -> gzip " + FormatSize(prepared.CompressedLength)
+                        + " -> " + (encoding == EncodingKind.Base64 ? "base64 " : "uuencode ") + FormatSize(prepared.EncodedLength);
 
                 int attempts = Math.Max(1, _options.Attempts);
                 for (int attempt = 1; attempt <= attempts; attempt++)
@@ -805,6 +855,10 @@ public static class GzipBase64Transfer
         private string SendAttempt(Prepared prepared, Capabilities caps, EncodingKind encoding, ChecksumKind checksum, string name, string remotePath,
             string summary, string attemptText)
         {
+            if (encoding == EncodingKind.Raw)
+            {
+                return SendRawAttempt(prepared, caps, checksum, name, remotePath, summary, attemptText);
+            }
             string decoder = encoding == EncodingKind.Base64 ? "base64 -d" : "uudecode -o /dev/stdout";
             string sumTool = ChecksumTool(checksum);
             string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
@@ -823,8 +877,7 @@ public static class GzipBase64Transfer
             string[] script =
             {
                 DestinationScript(remotePath, name) + "; p=\"$d.smtty~\"",
-                "_smtty_end() { s=$(" + sumTool + " <\"$p\");" + trim + " if [ $r -eq 0 ] && [ \"$s\" = " + ShellQuote(prepared.Checksum) + " ]; then mv -f \"$p\" \"$d\" && printf "
-                    + Say("OK:%s") + " \"$s\"; else z=$(wc -c <\"$p\" 2>/dev/null); rm -f \"$p\"; printf " + Say("FAIL:%s:%s:%s") + " \"$r\" \"$s\" \"$z\"; fi; }",
+                EndFunctionScript(prepared, sumTool, trim),
                 overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else trap '' INT QUIT TSTP; printf " + Say("READY")
                     + "; sed -n " + ShellQuote("/^" + _endMarker + "$/q;p") + " | ( " + decoder
                     + " | gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; trap - INT QUIT TSTP; _smtty_end; unset -f _smtty_end 2>/dev/null; fi"
@@ -875,6 +928,22 @@ public static class GzipBase64Transfer
             {
                 return "A damaged line reached the device before it could be taken back.";
             }
+            return CheckSendResult(prepared, result, "text");
+        }
+
+        /// <summary>
+        /// The shell function that ends a send on the device: it compares the checksum of what was unpacked into "$p" with the one of the
+        /// original and renames "$p" to "$d" only when they are the same (the unpacker's status is in $r). It prints OK:sum or FAIL:status:sum:size.
+        /// </summary>
+        private string EndFunctionScript(Prepared prepared, string sumTool, string trim)
+        {
+            return "_smtty_end() { s=$(" + sumTool + " <\"$p\");" + trim + " if [ $r -eq 0 ] && [ \"$s\" = " + ShellQuote(prepared.Checksum) + " ]; then mv -f \"$p\" \"$d\" && printf "
+                + Say("OK:%s") + " \"$s\"; else z=$(wc -c <\"$p\" 2>/dev/null); rm -f \"$p\"; printf " + Say("FAIL:%s:%s:%s") + " \"$r\" \"$s\" \"$z\"; fi; }";
+        }
+
+        /// <summary>Reads the device's verdict of a send. Null on success, the reason when the data did not arrive intact; throws for an answer that makes no sense.</summary>
+        private string CheckSendResult(Prepared prepared, string result, string dataWord)
+        {
             if (result.StartsWith("OK:", StringComparison.Ordinal))
             {
                 string deviceSum = result.Substring(3).Trim();
@@ -896,9 +965,165 @@ public static class GzipBase64Transfer
                 {
                     return "Checksum mismatch: the device has " + deviceSum + ", expected " + prepared.Checksum + "." + size;
                 }
-                return "The device could not unpack the data (gunzip status " + code + "): the text was damaged on the way, or a tool on the device failed." + size + RecentOutput();
+                return "The device could not unpack the data (gunzip status " + code + "): the " + dataWord + " was damaged on the way, or a tool on the device failed." + size + RecentOutput();
             }
             throw new IOException("Unexpected answer of the device: " + result);
+        }
+
+        /// <summary>Deciseconds of silence on the line after which the device's raw reader gives up (the tty's VTIME: 255 at most). The only way a raw reader ends without its data.</summary>
+        private const int RawIdleDeciseconds = 80;
+
+        /// <summary>Bytes sent at once in the raw form, before the speed limit makes the sender wait; well under the 4 KB that the tty on the device buffers.</summary>
+        private const int RawBlockBytes = 512;
+
+        /// <summary>The command that reads the archive on the device: exactly its length when the device can count, else whatever ends on silence.</summary>
+        private static string RawReaderCommand(Capabilities caps, long length)
+        {
+            if (caps.Has("head-c"))
+            {
+                return "head -c " + length.ToString(CultureInfo.InvariantCulture);
+            }
+            if (caps.Has("dd-c"))
+            {
+                return "dd bs=1 count=" + length.ToString(CultureInfo.InvariantCulture) + " 2>/dev/null";
+            }
+            return "cat"; // no count: it ends when the line has been quiet for RawIdleDeciseconds, which costs that time at the end
+        }
+
+        /// <summary>
+        /// One try of a raw send ("gzip + cat"). The device puts its terminal in raw mode (no echo, no signals, no line editing, no end of file
+        /// from Ctrl-D: every byte is data) with a read timeout, reads the archive and pipes it into gunzip; its terminal is restored before the
+        /// checksum is compared, whatever happened. Null on success, the reason when the data did not arrive intact.
+        /// </summary>
+        private string SendRawAttempt(Prepared prepared, Capabilities caps, ChecksumKind checksum, string name, string remotePath, string summary, string attemptText)
+        {
+            string reader = RawReaderCommand(caps, prepared.EncodedLength);
+            string sumTool = ChecksumTool(checksum);
+            string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
+            Trace("The reader on the device: " + reader);
+
+            // Three complete lines, as for the text forms. After the reader the pipe is drained by cat so that gunzip giving up early (a damaged
+            // archive) never leaves the rest of the archive in the pipe, and the terminal is drained for 0.3 s of quiet before it gets its settings
+            // back: bytes that the line added after the end of the archive must not reach the shell, which would take them for typed commands.
+            string overwriteCheck = _options.Overwrite
+                ? "if false; then :; "
+                : "if [ -e \"$d\" ]; then printf " + Say("EXISTS") + "; ";
+            string[] script =
+            {
+                DestinationScript(remotePath, name) + "; p=\"$d.smtty~\"",
+                EndFunctionScript(prepared, sumTool, trim),
+                overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else o=$(stty -g); stty raw -echo min 0 time "
+                    + RawIdleDeciseconds.ToString(CultureInfo.InvariantCulture) + "; printf " + Say("READY") + "; " + reader
+                    + " | ( gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; stty min 0 time 3; cat >/dev/null; stty \"$o\"; unset o; _smtty_end; unset -f _smtty_end 2>/dev/null; fi"
+            };
+
+            Report(0, prepared.EncodedLength, "Starting the receiver on the device...");
+            _pendingCleanup = DestinationScript(remotePath, name);
+            _readerWaiting = false;
+            _rawSend = true;
+            TypeLines(script);
+            string answer = WaitForMarker(20000, "receiver start");
+            if (answer == "EXISTS" || answer == "NOWRITE")
+            {
+                _pendingCleanup = null;
+            }
+            _readerWaiting = answer == "READY"; // for the raw form: the device is in its raw reader
+            if (answer == "EXISTS")
+            {
+                throw new IOException("The file already exists on the device. Choose \"Overwrite\" to replace it.");
+            }
+            if (answer == "NOWRITE")
+            {
+                throw new IOException("The device cannot write to the destination.");
+            }
+            if (answer != "READY")
+            {
+                throw new IOException("Unexpected answer of the device: " + answer);
+            }
+            Pause(250);
+
+            SendRawData(prepared, summary + attemptText);
+
+            Report(prepared.EncodedLength, prepared.EncodedLength, "Unpacking and checking on the device...");
+            string result = WaitForResult(prepared);
+            _readerWaiting = false;
+            _pendingCleanup = null; // the script is over, and it has removed its partial file itself when it failed
+            return CheckSendResult(prepared, result, "data");
+        }
+
+        /// <summary>
+        /// Sends the archive as it is, in blocks, never faster than the speed limit. Nothing comes back to check it against (the device's
+        /// terminal does not echo in raw mode), and a byte lost on the way is found out by the checksum at the end.
+        /// </summary>
+        private void SendRawData(Prepared prepared, string status)
+        {
+            int rate = Math.Max(500, _options.NoEchoBytesPerSecond);
+            long total = prepared.EncodedLength;
+            Trace("Sending " + total + " bytes of the archive as they are, in blocks of " + RawBlockBytes + " bytes, at most " + rate
+                + " bytes/s; nothing can be checked on the way, the checksum at the end tells");
+            long sent = 0;
+            Stopwatch clock = Stopwatch.StartNew();
+            using (FileStream input = new FileStream(prepared.EncodedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
+            {
+                byte[] block = new byte[RawBlockBytes];
+                int count;
+                while ((count = ReadFull(input, block)) > 0)
+                {
+                    _token.ThrowIfCancellationRequested();
+                    byte[] chunk = new byte[count]; // the line may keep the array until it has written it
+                    Buffer.BlockCopy(block, 0, chunk, 0, count);
+                    _send(chunk, 0, count);
+                    sent += count;
+                    Report(sent, total, status + " - sending " + FormatSize(sent) + " of " + FormatSize(total));
+                    long due = sent * 1000L / rate;
+                    while (clock.ElapsedMilliseconds < due)
+                    {
+                        _token.ThrowIfCancellationRequested();
+                        // The device says nothing now, but what it does say (a kernel message, an early verdict) must not be lost.
+                        PumpKeepingAnswers((int)Math.Max(1, Math.Min(50, due - clock.ElapsedMilliseconds)), out _);
+                    }
+                }
+            }
+            Trace("All " + sent + " bytes sent in " + clock.ElapsedMilliseconds + " ms");
+        }
+
+        /// <summary>
+        /// Raw mode ignores Ctrl-C and the end marker (to the terminal they are data), so a raw send cannot be stopped by typing: the reader on
+        /// the device ends by itself when the line has been quiet for <see cref="RawIdleDeciseconds"/>, and its script then restores the terminal,
+        /// removes the unfinished file and answers. This waits for that answer. It also runs after a cancel, so it does not use the cancellable readers.
+        /// </summary>
+        private void WaitForRawReader()
+        {
+            foreach (string waiting in _early)
+            {
+                if (waiting.IndexOf(_marker + "OK:", StringComparison.Ordinal) >= 0 || waiting.IndexOf(_marker + "FAIL:", StringComparison.Ordinal) >= 0)
+                {
+                    return; // the script is over already
+                }
+            }
+            Trace("Waiting for the raw reader on the device to give up (it does when the line has been quiet for " + RawIdleDeciseconds / 10 + " s)");
+            int deadline = Environment.TickCount + RawIdleDeciseconds * 100 + 15000;
+            StringBuilder seen = new StringBuilder();
+            while (Environment.TickCount - deadline < 0)
+            {
+                byte? b = _readByte(200);
+                if (b == null)
+                {
+                    continue;
+                }
+                seen.Append((char)b.Value);
+                if (seen.Length > 4000)
+                {
+                    seen.Remove(0, 2000);
+                }
+                string text = seen.ToString();
+                if (text.IndexOf(_marker + "OK:", StringComparison.Ordinal) >= 0 || text.IndexOf(_marker + "FAIL:", StringComparison.Ordinal) >= 0)
+                {
+                    Thread.Sleep(300);
+                    return;
+                }
+            }
+            Trace("The device did not answer in time; going on");
         }
 
         /// <summary>
@@ -908,7 +1133,8 @@ public static class GzipBase64Transfer
         /// </summary>
         private string WaitForResult(Prepared prepared)
         {
-            long timeout = 60000L + prepared.EncodedLength / 200 + prepared.OriginalLength / 500;
+            long timeout = 60000L + prepared.EncodedLength / 200 + prepared.OriginalLength / 500
+                + (_options.Encoding == EncodingKind.Raw ? RawIdleDeciseconds * 100L : 0); // a byte lost on the way is noticed when the reader's idle time is over
             return WaitForMarker((int)Math.Min(int.MaxValue / 4, timeout), "result of the transfer");
         }
 
@@ -1167,13 +1393,26 @@ public static class GzipBase64Transfer
             {
                 if (readerWaiting)
                 {
-                    EndReader();
-                    Thread.Sleep(600);
+                    if (_rawSend)
+                    {
+                        WaitForRawReader();
+                    }
+                    else
+                    {
+                        EndReader();
+                        Thread.Sleep(600);
+                    }
                 }
                 SendBytes(new byte[] { 0x03 });
                 Thread.Sleep(200);
                 SendBytes(new byte[] { 0x03, (byte)'\r' });
                 Thread.Sleep(300);
+                if (_rawReceive)
+                {
+                    // The sender was stopped with its terminal still in the raw output mode of the script (no echo, no CR before LF).
+                    SendBytes(Ascii(RestoreTerminalScript + "\r"));
+                    Thread.Sleep(100);
+                }
                 if (cleanup.Length > 0)
                 {
                     SendBytes(Ascii("trap - INT QUIT TSTP; " + cleanup + "; rm -f \"$d.smtty~\"\r"));
@@ -1207,12 +1446,25 @@ public static class GzipBase64Transfer
         /// </summary>
         private byte[] BuildRecovery(string cleanup)
         {
+            if (_rawReceive)
+            {
+                return Ascii("\u0003\r" + RestoreTerminalScript + "\r"); // Ctrl-C ends the sender, then the terminal gets its settings back
+            }
+            if (_rawSend)
+            {
+                // The raw reader ends by itself when the line is quiet, and its script removes the unfinished file: all that is left to do is
+                // to get a fresh prompt (these two bytes are harmless as data if the reader is still there).
+                return new byte[] { 0x03, (byte)'\r' };
+            }
             if (cleanup.Length == 0)
             {
                 return new byte[] { 0x03, (byte)'\r' };
             }
             return Ascii("\u0015" + _endMarker + "\n\ntrap - INT QUIT TSTP\r" + cleanup + "; rm -f \"$d.smtty~\"\r");
         }
+
+        /// <summary>The shell text that puts the terminal back as the receive script found it (the script keeps its settings in $o).</summary>
+        private const string RestoreTerminalScript = "[ -n \"$o\" ] && stty \"$o\"; unset o";
 
         // ----- receiving -----
 
@@ -1233,8 +1485,9 @@ public static class GzipBase64Transfer
             try
             {
                 StartShell();
-                Capabilities caps = Probe();
-                string missing = Missing(caps, "gzip");
+                bool raw = _options.Encoding == EncodingKind.Raw;
+                Capabilities caps = Probe(raw);
+                string missing = raw ? Missing(caps, "gzip", "stty", "wc") : Missing(caps, "gzip");
                 if (missing != null)
                 {
                     throw new IOException("The device has no: " + missing + ".");
@@ -1318,6 +1571,10 @@ public static class GzipBase64Transfer
         private string ReceiveAttempt(Capabilities caps, EncodingKind encoding, ChecksumKind checksum, string remotePath, string storedName,
             string partPath, string attemptText)
         {
+            if (encoding == EncodingKind.Raw)
+            {
+                return ReceiveRawAttempt(checksum, remotePath, partPath, attemptText);
+            }
             string encoder = encoding == EncodingKind.Base64 ? "base64" : "uuencode " + ShellQuote(storedName);
             string sumTool = ChecksumTool(checksum);
             string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
@@ -1474,6 +1731,139 @@ public static class GzipBase64Transfer
                 Trace("The received data was refused: " + decodeError);
             }
             return decodeError;
+        }
+
+        /// <summary>
+        /// One try of a raw receive ("gzip + cat"). The device compresses the file once to learn the length of the archive (nothing is kept on
+        /// it), says that length, switches its output to raw (no CR before LF) and writes the archive as it is; this side reads exactly that
+        /// many bytes, unpacks them on the fly, and compares the checksum with the one the device prints at the end. Null on success.
+        /// </summary>
+        private string ReceiveRawAttempt(ChecksumKind checksum, string remotePath, string partPath, string attemptText)
+        {
+            string sumTool = ChecksumTool(checksum);
+            string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
+            // The archive goes through cat: GNU gzip refuses to write compressed data to a terminal (its output here is the terminal), a pipe it takes.
+            string[] script =
+            {
+                "f=" + ShellPath(remotePath),
+                "if [ ! -f \"$f\" ] || [ ! -r \"$f\" ]; then printf " + Say("NOFILE") + "; else printf " + Say("SIZE:%s") + " \"$(wc -c <\"$f\")\"; z=$(gzip -c <\"$f\" | wc -c); printf "
+                    + Say("ZSIZE:%s") + " \"$z\"; o=$(stty -g); stty -opost -echo; printf " + Say("BEGIN") + "; gzip -c <\"$f\" | cat; stty \"$o\"; unset o; s=$(" + sumTool + " <\"$f\");"
+                    + trim + " printf " + Say("END:%s") + " \"$s\"; fi"
+            };
+
+            Report(0, 0, "Starting the sender on the device...");
+            _pendingCleanup = string.Empty;
+            _rawReceive = true;
+            TypeLines(script);
+
+            long originalLength = -1;
+            long archiveLength = -1;
+            string answer;
+            while (true)
+            {
+                // Before the data the device compresses the file once to count the archive: that takes as long as gzip takes there.
+                long waitMs = 30000L + (originalLength > 0 ? originalLength / 20 : 0);
+                answer = WaitForMarker((int)Math.Min(int.MaxValue / 4, waitMs), "start of the data");
+                if (answer.StartsWith("SIZE:", StringComparison.Ordinal))
+                {
+                    long.TryParse(answer.Substring(5).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out originalLength);
+                    continue;
+                }
+                if (answer.StartsWith("ZSIZE:", StringComparison.Ordinal))
+                {
+                    long.TryParse(answer.Substring(6).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out archiveLength);
+                    continue;
+                }
+                break;
+            }
+            if (answer == "NOFILE")
+            {
+                _pendingCleanup = null;
+                throw new IOException("The file was not found on the device, or it cannot be read: " + remotePath);
+            }
+            if (answer != "BEGIN")
+            {
+                throw new IOException("Unexpected answer of the device: " + answer);
+            }
+            if (archiveLength < 0)
+            {
+                throw new IOException("The device did not tell how long the archive is (it needs wc).");
+            }
+
+            string failure;
+            using (Unpacker unpacker = new Unpacker(checksum, partPath))
+            {
+                long received = 0;
+                byte[] chunk = new byte[4096];
+                int filled = 0;
+                int quietSince = Environment.TickCount;
+                Trace("Receiving " + archiveLength + " bytes of the archive as they are (" + originalLength + " bytes unpacked)");
+                while (received < archiveLength)
+                {
+                    _token.ThrowIfCancellationRequested();
+                    byte? b = _readByte(200);
+                    if (b == null)
+                    {
+                        if (filled > 0)
+                        {
+                            unpacker.Write(chunk, filled);
+                            filled = 0;
+                        }
+                        if (Environment.TickCount - quietSince >= 30000)
+                        {
+                            throw new IOException("The device stopped sending data after " + received + " of " + archiveLength + " bytes." + RecentOutput());
+                        }
+                        continue;
+                    }
+                    quietSince = Environment.TickCount;
+                    chunk[filled++] = b.Value;
+                    received++;
+                    if (filled == chunk.Length || received == archiveLength)
+                    {
+                        unpacker.Write(chunk, filled);
+                        filled = 0;
+                        long shown = unpacker.Produced;
+                        if (originalLength > 0)
+                        {
+                            Report(Math.Min(shown, originalLength), originalLength, "Receiving " + FormatSize(received) + " of " + FormatSize(archiveLength) + ", unpacked " + FormatSize(shown) + " of " + FormatSize(originalLength) + attemptText);
+                        }
+                        else
+                        {
+                            Report(shown, 0, "Receiving " + FormatSize(received) + " of " + FormatSize(archiveLength) + attemptText);
+                        }
+                    }
+                }
+                Trace("The archive has arrived: " + received + " bytes, " + unpacker.Produced + " bytes unpacked so far");
+                string mine;
+                string unpackError = unpacker.Finish(out mine);
+
+                // After the archive the device restores its terminal and reads the whole file once more for its checksum.
+                string end = WaitForMarker((int)Math.Min(int.MaxValue / 4, 30000L + Math.Max(0, originalLength) / 500), "the checksum of the file");
+                _pendingCleanup = null; // the sender is done
+                _rawReceive = false;
+                if (!end.StartsWith("END:", StringComparison.Ordinal))
+                {
+                    throw new IOException("Unexpected answer of the device: " + end);
+                }
+                string deviceSum = end.Substring(4).Trim();
+                if (unpackError != null)
+                {
+                    failure = "The data could not be unpacked (" + unpackError + "): it was damaged on the way.";
+                }
+                else if (!SameChecksum(mine, deviceSum))
+                {
+                    failure = "Checksum mismatch: received " + mine + ", the device has " + deviceSum + ".";
+                }
+                else
+                {
+                    failure = null;
+                }
+            }
+            if (failure != null)
+            {
+                Trace("The received data was refused: " + failure);
+            }
+            return failure;
         }
 
         /// <summary>
@@ -1676,6 +2066,84 @@ public static class GzipBase64Transfer
                 return -1;
             }
             return (c - 32) & 0x3F;
+        }
+    }
+
+    /// <summary>
+    /// Unpacks a gzip archive that arrives in pieces: what is written goes through a pipe to a thread that inflates it into a file and
+    /// calculates the checksum of the result on the way.
+    /// </summary>
+    private sealed class Unpacker : IDisposable
+    {
+        private readonly RunningChecksum _sum;
+        private readonly BlockingPipe _pipe = new BlockingPipe();
+        private readonly FileStream _output;
+        private readonly Thread _thread;
+        private Exception _error;
+        private long _produced;
+
+        public Unpacker(ChecksumKind checksum, string path)
+        {
+            _sum = new RunningChecksum(checksum);
+            _output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+            _thread = new Thread(Inflate) { IsBackground = true, Name = "gzip-cat inflater" };
+            _thread.Start();
+        }
+
+        /// <summary>Bytes unpacked so far.</summary>
+        public long Produced => Interlocked.Read(ref _produced);
+
+        private void Inflate()
+        {
+            try
+            {
+                using (GZipStream gzip = new GZipStream(_pipe, CompressionMode.Decompress))
+                {
+                    byte[] buffer = new byte[16384];
+                    int count;
+                    while ((count = gzip.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        _sum.Update(buffer, 0, count);
+                        _output.Write(buffer, 0, count);
+                        Interlocked.Add(ref _produced, count);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _error = ex;
+                _pipe.Abandon(); // whatever still arrives is not wanted
+            }
+        }
+
+        /// <summary>Hands a piece of the archive over (it is copied, the buffer may be reused).</summary>
+        public void Write(byte[] data, int count)
+        {
+            _pipe.Write(data, 0, count);
+        }
+
+        /// <summary>The archive is complete: waits for the unpacking to end. Null on success (<paramref name="checksum"/> is then the checksum of the result), else what went wrong.</summary>
+        public string Finish(out string checksum)
+        {
+            _pipe.Complete();
+            _thread.Join();
+            checksum = null;
+            if (_error != null)
+            {
+                return _error.Message;
+            }
+            _output.Flush();
+            checksum = _sum.Finish();
+            return null;
+        }
+
+        public void Dispose()
+        {
+            _pipe.Abandon();
+            _thread.Join(2000);
+            _output.Dispose();
+            _sum.Dispose();
+            _pipe.Dispose();
         }
     }
 

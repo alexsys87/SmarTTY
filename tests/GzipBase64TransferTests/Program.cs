@@ -6,9 +6,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
-// Regression harness for the gzip + base64 transfer (IO/GzipBase64Transfer.cs). The "device" is a real shell on a pseudo
+// Regression harness for the gzip + base64 transfer and its raw form, gzip + cat (IO/GzipBase64Transfer.cs). The "device" is a real shell on a pseudo
 // terminal (socat pty, cooked mode with echo, like a serial console): busybox ash, which is what OpenWrt has, and bash with the
 // GNU tools. The code under test types into it and reads from it exactly as it does on a COM port, and the bytes that go in
 // and out can be damaged on the way. Needs: socat, busybox (static), bash, gzip, base64, coreutils (and sharutils for the
@@ -930,6 +931,409 @@ internal static class Program
         Check(GzipBase64Transfer.Cksum(Encoding.ASCII.GetBytes("123456789")) == 930766865u, "Cksum matches the POSIX test value", GzipBase64Transfer.Cksum(Encoding.ASCII.GetBytes("123456789")).ToString());
     }
 
+    // ---------- the raw form: gzip + cat ----------
+
+    private static GzipBase64Transfer.Options FastRaw(GzipBase64Transfer.ChecksumKind checksum = GzipBase64Transfer.ChecksumKind.Auto, int attempts = 2, bool overwrite = false)
+    {
+        return new GzipBase64Transfer.Options
+        {
+            Encoding = GzipBase64Transfer.EncodingKind.Raw,
+            Checksum = checksum,
+            Attempts = attempts,
+            Overwrite = overwrite,
+            NoEchoBytesPerSecond = 400000
+        };
+    }
+
+    /// <summary>
+    /// What "stty -a" says about the terminal of the device after a raw transfer: echo, line editing, signals and output processing must
+    /// all be back (device.Run itself needs the echo, so a terminal left in raw mode would fail here already).
+    /// </summary>
+    private static bool TerminalIsNormal(Device device, out string settings)
+    {
+        settings = device.Run("stty -a");
+        return Regex.IsMatch(settings, @"(?<![-\w])icanon(?!\w)") && Regex.IsMatch(settings, @"(?<![-\w])echo(?!\w)")
+            && Regex.IsMatch(settings, @"(?<![-\w])isig(?!\w)") && Regex.IsMatch(settings, @"(?<![-\w])opost(?!\w)");
+    }
+
+    private static void RawSendCases(Func<Device> make, bool cksum)
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        // Random data does not compress: the archive holds every byte value, Ctrl-C, Ctrl-D, Ctrl-Z, Ctrl-\, XON/XOFF, CR, LF, NUL and 0xFF included.
+        string binary = Path.Combine(dir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(150_000, 31));
+        string text = Path.Combine(dir, "text.txt");
+        File.WriteAllBytes(text, TextBytes(4000));
+        string empty = Path.Combine(dir, "empty.dat");
+        File.WriteAllBytes(empty, new byte[0]);
+
+        using (Device device = make())
+        {
+            Section(device + ": raw send (gzip + cat)");
+            foreach (GzipBase64Transfer.ChecksumKind kind in new[] { GzipBase64Transfer.ChecksumKind.Auto, GzipBase64Transfer.ChecksumKind.Sha256, GzipBase64Transfer.ChecksumKind.Md5 }
+                .Concat(cksum ? new[] { GzipBase64Transfer.ChecksumKind.Cksum } : new GzipBase64Transfer.ChecksumKind[0]))
+            {
+                string target = Path.Combine(remoteDir, "bin-" + kind + ".bin");
+                Run run = RunSend(device, binary, target, FastRaw(kind));
+                Check(run.Error == null && run.Result && File.Exists(target) && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "binary file, raw, checksum " + kind, Describe(run));
+                Check(run.Errors == 0, "no attempt had to be repeated (" + kind + ")", "errors " + run.Errors);
+            }
+            {
+                List<string> log = new List<string>();
+                GzipBase64Transfer.Options options = FastRaw();
+                options.Log = log.Add;
+                string target = Path.Combine(remoteDir, "text.txt");
+                Run run = RunSend(device, text, target, options);
+                string all = string.Join("\n", log);
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(text)), "text file, raw", Describe(run));
+                Check(all.Contains("The device has:") && all.Contains("head-c") && all.Contains("The reader on the device: head -c ") && all.Contains(":READY") && all.Contains("All "),
+                    "the debug log names the reader and the answers", all.Length > 800 ? all.Substring(0, 800) : all);
+                Check(!all.Contains("ECHO MISMATCH"), "no echo check is made (there is no echo in raw mode)");
+                int longest = log.Where(l => l.Contains("] TX ") && l.Contains(" bytes: ")).Select(l => int.Parse(l.Substring(l.IndexOf("TX ") + 3, l.IndexOf(" bytes") - l.IndexOf("TX ") - 3))).DefaultIfEmpty(0).Max();
+                Check(longest > 100 && longest <= 481, "the typed commands are complete lines of at most 480 characters", "longest " + longest);
+                Check(!log.Any(l => l.Contains("] TX ") && l.Contains(" bytes: ") && int.Parse(l.Substring(l.IndexOf("TX ") + 3, l.IndexOf(" bytes") - l.IndexOf("TX ") - 3)) > 481), "no typed command is longer than a router's line editor keeps");
+            }
+            {
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal of the device is back to normal after the transfer", settings);
+            }
+            {
+                string cyr = Path.Combine(dir, "файл №1.txt");
+                File.WriteAllBytes(cyr, TextBytes(30));
+                Run run = RunSend(device, cyr, remoteDir, FastRaw());
+                string target = Path.Combine(remoteDir, "файл №1.txt");
+                Check(run.Error == null && run.Result && File.Exists(target) && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(cyr)), "a file name with national letters", Describe(run));
+            }
+            {
+                string target = Path.Combine(remoteDir, "empty.dat");
+                Run run = RunSend(device, empty, target, FastRaw());
+                Check(run.Error == null && run.Result && File.Exists(target) && new FileInfo(target).Length == 0, "empty file", Describe(run));
+            }
+            {
+                string odd = Path.Combine(dir, "it's a $file; name.txt");
+                File.WriteAllBytes(odd, TextBytes(50));
+                Run run = RunSend(device, odd, remoteDir, FastRaw());
+                string target = Path.Combine(remoteDir, "it's a $file; name.txt");
+                Check(run.Error == null && run.Result && File.Exists(target) && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(odd)), "directory destination, name with quote, $ and ;", Describe(run));
+            }
+            {
+                string target = Path.Combine(remoteDir, "text.txt");
+                Run run = RunSend(device, binary, target, FastRaw());
+                Check(run.Error != null && run.Error.Message.Contains("already exists") && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(text)), "existing destination is kept without Overwrite", Describe(run));
+                Check(!File.Exists(target + ".smtty~"), "no unfinished file left after \"already exists\"");
+                run = RunSend(device, binary, target, FastRaw(overwrite: true));
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "Overwrite replaces it", Describe(run));
+            }
+            {
+                Run run = RunSend(device, text, Path.Combine(remoteDir, "no-such-dir", "x.txt"), FastRaw());
+                Check(run.Error != null && run.Error.Message.Contains("cannot write"), "unwritable destination is reported", Describe(run));
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal is untouched when the transfer was refused before the raw mode", settings);
+            }
+            Check(device.Run("echo alive").Contains("alive"), "the shell is still alive after the cases above");
+        }
+        Directory.Delete(dir, true);
+    }
+
+    private static void RawReceiveCases(Func<Device> make, bool cksum)
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        string binary = Path.Combine(remoteDir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(200_000, 32));
+        string text = Path.Combine(remoteDir, "text file's.txt");
+        File.WriteAllBytes(text, TextBytes(5000));
+        string empty = Path.Combine(remoteDir, "empty.dat");
+        File.WriteAllBytes(empty, new byte[0]);
+        string localDir = Path.Combine(dir, "local");
+        Directory.CreateDirectory(localDir);
+
+        using (Device device = make())
+        {
+            Section(device + ": raw receive (gzip + cat)");
+            foreach (GzipBase64Transfer.ChecksumKind kind in new[] { GzipBase64Transfer.ChecksumKind.Auto, GzipBase64Transfer.ChecksumKind.Sha256, GzipBase64Transfer.ChecksumKind.Md5 }
+                .Concat(cksum ? new[] { GzipBase64Transfer.ChecksumKind.Cksum } : new GzipBase64Transfer.ChecksumKind[0]))
+            {
+                string local = Path.Combine(localDir, "b-" + kind + ".bin");
+                Run run = RunReceive(device, binary, local, FastRaw(kind));
+                Check(run.Error == null && run.Result && File.Exists(local) && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "binary file, raw, checksum " + kind, Describe(run));
+                Check(run.Errors == 0, "no attempt had to be repeated (" + kind + ")", "errors " + run.Errors);
+            }
+            {
+                List<string> log = new List<string>();
+                GzipBase64Transfer.Options options = FastRaw();
+                options.Log = log.Add;
+                string local = Path.Combine(localDir, "t.txt");
+                Run run = RunReceive(device, text, local, options);
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(text)), "text file with a quote in its name", Describe(run));
+                Check(run.ProgressTotal > 0 && run.ProgressDone == run.ProgressTotal || run.LastStatus.StartsWith("Done"), "progress reaches the end", run.ProgressDone + "/" + run.ProgressTotal + " " + run.LastStatus);
+                string all = string.Join("\n", log);
+                Check(all.Contains(":ZSIZE:") && all.Contains(":BEGIN") && all.Contains("The archive has arrived"), "the debug log has the size of the archive and the start of the data", all.Length > 800 ? all.Substring(0, 800) : all);
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal of the device is back to normal after the transfer", settings);
+            }
+            {
+                string local = Path.Combine(localDir, "e.dat");
+                Run run = RunReceive(device, empty, local, FastRaw());
+                Check(run.Error == null && run.Result && new FileInfo(local).Length == 0, "empty file", Describe(run));
+            }
+            {
+                string local = Path.Combine(localDir, "nofile.bin");
+                Run run = RunReceive(device, Path.Combine(remoteDir, "no-such-file"), local, FastRaw());
+                Check(run.Error != null && run.Error.Message.Contains("not found") && !File.Exists(local), "missing file on the device is reported", Describe(run));
+            }
+            {
+                string local = Path.Combine(localDir, "t.txt");
+                Run run = RunReceive(device, text, local, FastRaw());
+                Check(run.Error != null && run.Error.Message.Contains("already exists"), "existing local file is refused", Describe(run));
+                run = RunReceive(device, binary, local, FastRaw(overwrite: true));
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "Overwrite replaces the existing local file", Describe(run));
+            }
+            Check(device.Run("echo alive").Contains("alive"), "the shell is alive");
+        }
+        Directory.Delete(dir, true);
+    }
+
+    private static void RawFaultCases()
+    {
+        string dir = NewWorkDir();
+        string binary = Path.Combine(dir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(60_000, 33));
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+
+        using (Device device = Ash())
+        {
+            Section("busybox ash: raw send, damaged data (there is no echo: the checksum at the end is the only check)");
+            {
+                // One flipped byte in the first attempt only: the device cannot tell while it reads, the end of the transfer does.
+                int hits = 0;
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length == 512 && Interlocked.Increment(ref hits) == 5)
+                    {
+                        chunk[100] ^= 0x55;
+                    }
+                    return chunk;
+                };
+                string target = Path.Combine(remoteDir, "retry.bin");
+                Run run = RunSend(device, binary, target, FastRaw());
+                device.TxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a flipped byte is caught at the end, the transfer is repeated and arrives intact", Describe(run) + " errors=" + run.Errors);
+                Check(!File.Exists(target + ".smtty~"), "no unfinished file left");
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal is back to normal after a failed attempt", settings);
+            }
+            {
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length == 512)
+                    {
+                        chunk[10] ^= 0x55;
+                    }
+                    return chunk;
+                };
+                string target = Path.Combine(remoteDir, "always-bad.bin");
+                Run run = RunSend(device, binary, target, FastRaw(attempts: 2));
+                device.TxFilter = null;
+                Check(run.Error is IOException && !File.Exists(target) && !File.Exists(target + ".smtty~"), "damage in every attempt fails and leaves nothing behind", Describe(run));
+                Check(run.Error != null && (run.Error.Message.Contains("could not unpack") || run.Error.Message.Contains("Checksum mismatch")), "the failure says that the data did not arrive intact", Describe(run));
+                Check(device.Run("echo alive2").Contains("alive2"), "the shell is alive after a failed transfer");
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal is normal after a failed transfer", settings);
+            }
+            {
+                // A byte that never arrives: the device waits for it until the line has been quiet for a few seconds, then the check fails and the
+                // transfer is repeated.
+                int hits = 0;
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length == 512 && Interlocked.Increment(ref hits) == 4)
+                    {
+                        byte[] shorter = new byte[chunk.Length - 1];
+                        Array.Copy(chunk, 0, shorter, 0, 300);
+                        Array.Copy(chunk, 301, shorter, 300, chunk.Length - 301);
+                        return shorter;
+                    }
+                    return chunk;
+                };
+                string target = Path.Combine(remoteDir, "lost.bin");
+                Run run = RunSend(device, binary, target, FastRaw());
+                device.TxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a lost byte ends the reader by its idle time, the check fails and the repeat arrives intact", Describe(run) + " errors=" + run.Errors);
+                Check(device.Run("echo alive3").Contains("alive3"), "the shell is alive after a lost byte");
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal is normal after a lost byte", settings);
+            }
+            {
+                // The line adds bytes after the archive (noise, a stray keystroke): some in the same burst, some a little later. Once the terminal
+                // is cooked again they are text for the shell, and must never get there.
+                string pwned = Path.Combine(remoteDir, "PWNED");
+                string pwnedLate = Path.Combine(remoteDir, "PWNED-LATE");
+                bool sawFull = false;
+                bool injected = false;
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length == 512)
+                    {
+                        sawFull = true;
+                    }
+                    else if (sawFull && chunk.Length > 0 && !Encoding.ASCII.GetString(chunk).Contains("smtty"))
+                    {
+                        // This is the last, partial block of the archive.
+                        byte[] junk = Encoding.ASCII.GetBytes("\necho x > " + pwned + "\n");
+                        byte[] more = new byte[chunk.Length + junk.Length];
+                        Array.Copy(chunk, more, chunk.Length);
+                        Array.Copy(junk, 0, more, chunk.Length, junk.Length);
+                        byte[] late = Encoding.ASCII.GetBytes("\necho x > " + pwnedLate + "\n");
+                        new Thread(() => { Thread.Sleep(100); device.Write(late, 0, late.Length); }).Start();
+                        sawFull = false;
+                        injected = true;
+                        return more;
+                    }
+                    return chunk;
+                };
+                string target = Path.Combine(remoteDir, "extra.bin");
+                Run run = RunSend(device, binary, target, FastRaw());
+                device.TxFilter = null;
+                Thread.Sleep(1000);
+                Check(injected, "the extra bytes were really added after the archive");
+                Check(!File.Exists(pwned) && !File.Exists(pwnedLate), "bytes added after the archive, at once or a little later, never reach the shell as commands");
+                Check(device.Run("echo alive4").Contains("alive4"), "the shell is alive after extra bytes", Describe(run));
+            }
+        }
+        Directory.Delete(dir, true);
+    }
+
+    private static void RawFallbackCases()
+    {
+        string dir = NewWorkDir();
+        string binary = Path.Combine(dir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(30_000, 34));
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+
+        using (Device device = Ash())
+        {
+            Section("busybox ash: raw send on a device whose head has no -c");
+            device.Run("head() { return 1; }");
+            List<string> log = new List<string>();
+            GzipBase64Transfer.Options options = FastRaw();
+            options.Log = log.Add;
+            string target = Path.Combine(remoteDir, "dd.bin");
+            Run run = RunSend(device, binary, target, options);
+            string all = string.Join("\n", log);
+            Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "dd bs=1 count= reads the archive", Describe(run));
+            Check(all.Contains("The reader on the device: dd bs=1 count="), "the log names dd as the reader", all.Length > 800 ? all.Substring(0, 800) : all);
+
+            Section("busybox ash: raw send on a device with neither head -c nor dd");
+            device.Run("dd() { return 1; }");
+            log.Clear();
+            target = Path.Combine(remoteDir, "cat.bin");
+            run = RunSend(device, binary, target, options);
+            all = string.Join("\n", log);
+            Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "a plain cat reads the archive and ends when the line is quiet", Describe(run));
+            Check(all.Contains("The reader on the device: cat"), "the log names cat as the reader", all.Length > 800 ? all.Substring(0, 800) : all);
+            device.Run("unset -f head dd");
+            string settings;
+            Check(TerminalIsNormal(device, out settings), "the terminal is normal after the fallbacks", settings);
+        }
+        Directory.Delete(dir, true);
+    }
+
+    private static void RawSlowLineCases()
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        string binary = Path.Combine(dir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(25_000, 35));
+        string onDevice = Path.Combine(remoteDir, "big.bin");
+
+        using (Device device = Ash())
+        {
+            device.BytesPerSecond = 11520; // 115200 baud, both ways, with the time it takes
+            Section("busybox ash on a 115200 baud line, raw");
+            GzipBase64Transfer.Options options = FastRaw();
+            options.NoEchoBytesPerSecond = 11000;
+            Run run = RunSend(device, binary, Path.Combine(remoteDir, "slow-send.bin"), options);
+            Check(run.Error == null && run.Result && File.ReadAllBytes(Path.Combine(remoteDir, "slow-send.bin")).SequenceEqual(File.ReadAllBytes(binary)), "raw send at the speed of a real line", Describe(run));
+            File.Copy(binary, onDevice);
+            string local = Path.Combine(dir, "slow-receive.bin");
+            run = RunReceive(device, onDevice, local, FastRaw());
+            Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "raw receive at the speed of a real line", Describe(run));
+        }
+        Directory.Delete(dir, true);
+    }
+
+    private static void RawCancelCases()
+    {
+        string dir = NewWorkDir();
+        string binary = Path.Combine(dir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(400_000, 36));
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+
+        using (Device device = Ash())
+        {
+            Section("busybox ash: raw cancel");
+            {
+                CancellationTokenSource cts = new CancellationTokenSource();
+                string target = Path.Combine(remoteDir, "cancelled.bin");
+                Run run = new Run();
+                GzipBase64Transfer.Options options = FastRaw();
+                options.NoEchoBytesPerSecond = 100000;
+                Thread worker = new Thread(() => { run = RunSend(device, binary, target, options, cts.Token); });
+                worker.Start();
+                int deadline = Environment.TickCount + 20000;
+                while (Interlocked.Read(ref device.SentBytes) < 100_000 && Environment.TickCount < deadline)
+                {
+                    Thread.Sleep(20);
+                }
+                cts.Cancel();
+                // The raw reader cannot be stopped by typing: it gives up when the line has been quiet, and the transfer waits for that.
+                worker.Join(40000);
+                Check(!worker.IsAlive && run.Error == null && run.Result == false, "cancel while sending returns false", Describe(run));
+                Thread.Sleep(500);
+                device.Drain();
+                Check(device.Run("echo alive5; ls " + remoteDir).Contains("alive5"), "the shell answers after the cancel");
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal is back to normal after the cancel", settings);
+                Check(!File.Exists(target) && !File.Exists(target + ".smtty~"), "no file and no unfinished file after the cancel");
+            }
+            {
+                string onDevice = Path.Combine(remoteDir, "big.bin");
+                File.Copy(binary, onDevice);
+                device.BytesPerSecond = 60000;
+                CancellationTokenSource cts = new CancellationTokenSource();
+                string local = Path.Combine(dir, "cancelled-receive.bin");
+                Run run = new Run();
+                Thread worker = new Thread(() => { run = RunReceive(device, onDevice, local, FastRaw(), cts.Token, run); });
+                worker.Start();
+                int deadline = Environment.TickCount + 30000;
+                while (run.ProgressDone < 30_000 && Environment.TickCount < deadline)
+                {
+                    Thread.Sleep(20);
+                }
+                cts.Cancel();
+                worker.Join(30000);
+                device.BytesPerSecond = 0;
+                Check(!worker.IsAlive && run.Error == null && run.Result == false, "cancel while receiving returns false", Describe(run));
+                Thread.Sleep(800);
+                device.Drain();
+                Check(device.Run("echo alive6").Contains("alive6"), "the shell answers after the receive was cancelled");
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal is back to normal after the receive was cancelled", settings);
+                Check(!File.Exists(local) && !File.Exists(local + ".smtty~"), "no local file and no unfinished file after the cancel");
+                Check(File.ReadAllBytes(onDevice).SequenceEqual(File.ReadAllBytes(binary)), "the file on the device is untouched");
+            }
+        }
+        Directory.Delete(dir, true);
+    }
+
     private static bool Has(string tool)
     {
         try
@@ -955,7 +1359,8 @@ internal static class Program
             return 2;
         }
         bool gnuUu = Has("uuencode") && Has("uudecode");
-        // Optional first argument: run one group only (units, silent, finalize, recovery, slow, busy, send-ash, receive-ash, fault, receive-fault, cancel, send-bash, receive-bash).
+        // Optional first argument: run one group only (units, silent, finalize, recovery, slow, busy, send-ash, receive-ash, fault, receive-fault, cancel, send-bash, receive-bash;
+        // the raw form, gzip + cat: raw-send-ash, raw-receive-ash, raw-fault, raw-fallback, raw-slow, raw-cancel, raw-send-bash, raw-receive-bash).
         string only = args.Length > 0 ? args[0] : null;
         bool Want(string group) => only == null || only == group;
         if (Want("units")) UnitCases();
@@ -971,6 +1376,14 @@ internal static class Program
         if (Want("cancel")) CancelCases();
         if (Want("send-bash")) SendCases(Bash, gnuUu: gnuUu, cksum: true);
         if (Want("receive-bash")) ReceiveCases(Bash, gnuUu: gnuUu, cksum: true);
+        if (Want("raw-send-ash")) RawSendCases(Ash, cksum: false);
+        if (Want("raw-receive-ash")) RawReceiveCases(Ash, cksum: false);
+        if (Want("raw-fault")) RawFaultCases();
+        if (Want("raw-fallback")) RawFallbackCases();
+        if (Want("raw-slow")) RawSlowLineCases();
+        if (Want("raw-cancel")) RawCancelCases();
+        if (Want("raw-send-bash")) RawSendCases(Bash, cksum: true);
+        if (Want("raw-receive-bash")) RawReceiveCases(Bash, cksum: true);
 
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed, " + Failures.Count + " failed" + (gnuUu ? string.Empty : " (GNU uuencode cases skipped: sharutils missing)"));
