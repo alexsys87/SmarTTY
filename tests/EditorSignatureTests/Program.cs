@@ -54,6 +54,11 @@ internal static class Program
         Equal(string.Join("|", Definitions(L.Lua, "function M.add(a, b)\nend\n")), "add(a, b)", "lua: method name keeps the last identifier");
         Check(!Definitions(L.Lua, "-- function f(a)\n").Any(), "lua: a comment is not a definition");
 
+        // AWK has its own profile and parses its "function" declaration form.
+        Equal(string.Join("|", Definitions(L.Awk, "function add(a, b) {\n    return a + b\n}\n")), "add(a, b)", "awk: function");
+        Equal(string.Join("|", Definitions(L.Awk, "func trim(s) {\n    return s\n}\n")), "trim(s)", "awk: func");
+        Check(!Definitions(L.Awk, "# function hidden(a)\n").Any(), "awk: a comment is not a definition");
+
         // Ruby, Perl and CMake have their own profiles; Dockerfile has no functions.
         Equal(string.Join("|", Definitions(L.Ruby, "def render(item, style)\nend\n")), "render(item, style)", "ruby: def");
         Equal(string.Join("|", Definitions(L.Ruby, "def self.render(item)\nend\n")), "render(item)", "ruby: a singleton method keeps the callable name");
@@ -147,6 +152,10 @@ internal static class Program
 
         // The caret on the closing parenthesis still belongs to the call.
         Equal(Signature(L.Python, py + "1, 2)", 3, 8), "add(a, b)@1", "python: the caret just before ')' is still inside the call");
+
+        // AWK function definitions feed the hint of a call in an action block.
+        string awk = "function add(a, b) {\n    return a + b\n}\n\nBEGIN { add(1, \n}\n";
+        Equal(Signature(L.Awk, awk, 4, 15), "add(a, b)@1", "awk: the call shows its signature");
 
         // A CRLF document (the editor's usual line ending) is handled.
         string crlf = "def add(a, b):\r\n    return a + b\r\n\r\nadd(\r\n";

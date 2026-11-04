@@ -75,7 +75,7 @@ internal static class Program
             (L.Rust, "impl", "class"), (L.Swift, "guard", "impl"), (L.Dart, "mixin", "guard"),
             (L.JavaScript, "function", "fun"), (L.TypeScript, "interface", "fun"), (L.Php, "echo", "fun"),
             (L.Css, "display", "message"), (L.Protobuf, "message", "impl"), (L.DeviceTree, "compatible", "message"),
-            (L.Tcl, "proc", "sizeof")
+            (L.Awk, "BEGIN", "sizeof"), (L.Tcl, "proc", "sizeof")
         };
         foreach ((L language, string keyword, string foreign) in profiles)
         {

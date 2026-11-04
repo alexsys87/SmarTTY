@@ -46,7 +46,7 @@ namespace SmarTTY.CodeEditing
             Bash,
             Config,  // INI / .conf / .properties / TOML / systemd units
             CLike,   // C: // and /* */ comments, # preprocessor directives
-            Script,  // R, AWK, Nix: the generic # comment profile
+            Script,  // R, Nix: the generic # comment profile
             Sql,     // SQL: -- comments
             Markup,  // HTML, XML: <!-- --> comments and tag names
             Diff,    // unified diffs
@@ -79,7 +79,8 @@ namespace SmarTTY.CodeEditing
             Css,     // CSS, SCSS and Less: /* */ comments
             Protobuf, // Protocol Buffers: // and /* */ comments
             DeviceTree, // Device Tree source: C-like comments, no API set
-            Tcl      // Tcl: # comments, command words, foldable { } bodies, no API set
+            Tcl,     // Tcl: # comments, command words, foldable { } bodies, no API set
+            Awk      // AWK: # comments, BEGIN/END blocks, foldable { } bodies, no API set
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -90,7 +91,7 @@ namespace SmarTTY.CodeEditing
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust, Language.Swift,
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
-            Language.DeviceTree, Language.Script, Language.Tcl, Language.Ruby, Language.Perl,
+            Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Ruby, Language.Perl,
             Language.CMake, Language.Dockerfile, Language.Sql, Language.Markup, Language.Diff
         };
 
@@ -129,7 +130,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Css: return "CSS, SCSS, Less";
                 case Language.Protobuf: return "Protocol Buffers";
                 case Language.DeviceTree: return "Device Tree";
-                case Language.Script: return "Script (R, AWK, Nix)";
+                case Language.Script: return "Script (R, Nix)";
+                case Language.Awk: return "AWK";
                 case Language.Tcl: return "Tcl";
                 case Language.Ruby: return "Ruby";
                 case Language.Perl: return "Perl";
@@ -515,9 +517,11 @@ namespace SmarTTY.CodeEditing
                     return Language.Dockerfile;
 
                 case "r":
-                case "awk":
                 case "nix":
                     return Language.Script;
+
+                case "awk":
+                    return Language.Awk;
 
                 case "tcl":
                 case "tk":
@@ -678,8 +682,11 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.Tcl;
             }
-            if (program.EndsWith("awk", StringComparison.Ordinal) || program == "rscript" ||
-                program.StartsWith("nix", StringComparison.Ordinal))
+            if (program.EndsWith("awk", StringComparison.Ordinal))
+            {
+                return Language.Awk;
+            }
+            if (program == "rscript" || program.StartsWith("nix", StringComparison.Ordinal))
             {
                 return Language.Script;
             }
@@ -718,6 +725,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Protobuf: return ProtobufTokenizer;
                 case Language.DeviceTree: return DeviceTreeTokenizer;
                 case Language.Script: return ScriptTokenizer;
+                case Language.Awk: return AwkTokenizer;
                 case Language.Tcl: return TclTokenizer;
                 case Language.Ruby: return RubyTokenizer;
                 case Language.Perl: return PerlTokenizer;
@@ -801,6 +809,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(DeviceTreeKeywords);
                 case Language.Script:
                     return Combine(ScriptKeywords);
+                case Language.Awk:
+                    return Combine(AwkKeywords);
                 case Language.Tcl:
                     return Combine(TclKeywords);
                 case Language.Ruby:
@@ -2105,10 +2115,30 @@ namespace SmarTTY.CodeEditing
             // R.
             "if", "else", "repeat", "while", "function", "for", "in", "next", "break", "library", "require",
             "source", "TRUE", "FALSE", "NULL", "NA", "NaN", "Inf",
-            // AWK.
-            "BEGIN", "END", "do", "continue", "nextfile", "exit", "delete", "getline", "print", "printf",
             // Nix.
             "let", "with", "rec", "inherit", "assert", "or"
+        };
+
+        /// <summary>The AWK keywords, built-in functions and variables; the language has no API set.</summary>
+        private static readonly HashSet<string> AwkKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // Pattern blocks and control flow.
+            "BEGIN", "END", "BEGINFILE", "ENDFILE", "function", "func", "if", "else", "for", "while",
+            "do", "break", "continue", "next", "nextfile", "exit", "return", "delete", "in", "getline",
+            // Output.
+            "print", "printf",
+            // Strings, numbers and types.
+            "length", "substr", "index", "split", "patsplit", "sub", "gsub", "match", "sprintf", "tolower",
+            "toupper", "asort", "asorti", "gensub", "strtonum", "int", "rand", "srand", "atan2", "cos", "sin",
+            "exp", "log", "sqrt", "isarray", "typeof",
+            // Bitwise operations and internationalization.
+            "and", "or", "xor", "compl", "lshift", "rshift", "dcgettext", "dcngettext", "bindtextdomain",
+            // Time, files and the environment.
+            "close", "fflush", "system", "mktime", "strftime", "systime",
+            // Built-in variables.
+            "ARGC", "ARGV", "ARGIND", "CONVFMT", "ENVIRON", "ERRNO", "FIELDWIDTHS", "FILENAME", "FNR", "FPAT",
+            "FS", "IGNORECASE", "NF", "NR", "OFMT", "OFS", "ORS", "RLENGTH", "RS", "RSTART", "RT", "SUBSEP",
+            "PROCINFO", "BINMODE", "LINT", "TEXTDOMAIN"
         };
 
         /// <summary>The Tcl commands and control words; the language has no API set.</summary>
@@ -2785,6 +2815,16 @@ namespace SmarTTY.CodeEditing
         {
             HashComments = true,
             Keywords = ScriptKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer AwkTokenizer = new GenericSyntax
+        {
+            HashComments = true,
+            // AWK has no single-quoted strings: an apostrophe is an ordinary character.
+            SingleQuoteStrings = false,
+            Brackets = true,
+            FoldCurlyBraces = true,
+            Keywords = AwkKeywords
         }.Tokenize;
 
         private static readonly TokenCache.LineTokenizer TclTokenizer = new GenericSyntax
