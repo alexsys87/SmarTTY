@@ -105,6 +105,8 @@ internal static class Program
         Check(!Definitions(L.DeviceTree, "/ { compatible = \"board\"; };\n").Any(), "device tree: no function definitions");
         Check(!Definitions(L.Tcl, "proc add {a b} {\n    expr {$a + $b}\n}\n").Any(), "tcl: a proc is not parsed as a function definition");
         Check(!Definitions(L.Tcl, "# proc hidden {a} {\n}\n").Any(), "tcl: a '#' comment is not a definition");
+        Check(!Definitions(L.Assembly, "add:\n    mov eax, 1\n    ret\n").Any(), "assembly: a label is not a function definition");
+        Check(!Definitions(L.Assembly, "; add(a, b)\n").Any(), "assembly: a ';' comment is not a definition");
         Check(!Definitions(L.Php, "# function hidden(a) {\n").Any(), "php: a '#' comment is not a definition");
 
         // Languages without a recognized declaration form.

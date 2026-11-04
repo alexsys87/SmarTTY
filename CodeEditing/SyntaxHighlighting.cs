@@ -80,7 +80,8 @@ namespace SmarTTY.CodeEditing
             Protobuf, // Protocol Buffers: // and /* */ comments
             DeviceTree, // Device Tree source: C-like comments, no API set
             Tcl,     // Tcl: # comments, command words, foldable { } bodies, no API set
-            Awk      // AWK: # comments, BEGIN/END blocks, foldable { } bodies, no API set
+            Awk,     // AWK: # comments, BEGIN/END blocks, foldable { } bodies, no API set
+            Assembly // Assembly: ;, # and @ comments, labels, directives, instructions and registers, no API set
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -91,8 +92,8 @@ namespace SmarTTY.CodeEditing
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust, Language.Swift,
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
-            Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Ruby, Language.Perl,
-            Language.CMake, Language.Dockerfile, Language.Sql, Language.Markup, Language.Diff
+            Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Assembly, Language.Ruby,
+            Language.Perl, Language.CMake, Language.Dockerfile, Language.Sql, Language.Markup, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -133,6 +134,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Script: return "Script (R, Nix)";
                 case Language.Awk: return "AWK";
                 case Language.Tcl: return "Tcl";
+                case Language.Assembly: return "Assembly";
                 case Language.Ruby: return "Ruby";
                 case Language.Perl: return "Perl";
                 case Language.CMake: return "CMake";
@@ -527,6 +529,11 @@ namespace SmarTTY.CodeEditing
                 case "tk":
                     return Language.Tcl;
 
+                case "asm":
+                case "s":
+                case "nasm":
+                    return Language.Assembly;
+
                 case "sql":
                     return Language.Sql;
 
@@ -727,6 +734,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Script: return ScriptTokenizer;
                 case Language.Awk: return AwkTokenizer;
                 case Language.Tcl: return TclTokenizer;
+                case Language.Assembly: return AssemblyTokenizer;
                 case Language.Ruby: return RubyTokenizer;
                 case Language.Perl: return PerlTokenizer;
                 case Language.CMake: return CMakeTokenizer;
@@ -813,6 +821,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(AwkKeywords);
                 case Language.Tcl:
                     return Combine(TclKeywords);
+                case Language.Assembly:
+                    return Combine(AssemblyKeywords, AssemblyRegisters);
                 case Language.Ruby:
                     return Combine(RubyKeywords);
                 case Language.Perl:
@@ -2172,6 +2182,168 @@ namespace SmarTTY.CodeEditing
             "in", "ni", "eq", "ne", "and", "or", "not", "true", "false", "yes", "no", "on", "off"
         };
 
+        /// <summary>
+        /// The Assembly instructions and directives of the common x86, ARM, AArch64, MIPS and RISC-V
+        /// assemblers. Registers are a separate set: the tokenizer colours them as variables, not keywords.
+        /// </summary>
+        private static readonly HashSet<string> AssemblyKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // x86 and x86-64 data transfer.
+            "mov", "movabs", "movapd", "movaps", "movbe", "movd", "movdqa", "movdqu", "movnti", "movntdq",
+            "movntdqa", "movntpd", "movntps", "movntq", "movq", "movsb", "movsd", "movsq", "movss", "movsw",
+            "movsx", "movsxd", "movupd", "movups", "movzx", "lea", "xchg", "xadd", "cmpxchg", "cmpxchg8b",
+            "cmpxchg16b", "push", "pop", "pusha", "pushad", "pushf", "pushfd", "pushfq", "popa", "popad",
+            "popf", "popfd", "popfq", "bswap", "xlat", "xlatb",
+            // x86 arithmetic and logic.
+            "add", "adc", "sub", "sbb", "mul", "imul", "div", "idiv", "inc", "dec", "neg", "cmp", "test",
+            "and", "or", "xor", "not", "shl", "sal", "shr", "sar", "shld", "shrd", "rol", "ror", "rcl", "rcr",
+            "bt", "btc", "btr", "bts", "bsf", "bsr", "popcnt", "lzcnt", "tzcnt", "andn", "bextr", "blsi",
+            "blsmsk", "blsr", "bzhi", "pdep", "pext", "rorx", "sarx", "shlx", "shrx", "crc32",
+            // x86 floating point, MMX, SSE and AVX.
+            "fadd", "faddp", "fchs", "fdiv", "fdivp", "fild", "fist", "fistp", "fld", "fld1", "fldz",
+            "fmul", "fmulp", "fst", "fstp", "fsub", "fsubp", "fxch", "fyl2x", "fwait",
+            "emms", "movd", "movq", "packssdw", "packsswb", "packuswb", "paddb", "paddd", "paddq", "paddw",
+            "pand", "pandn", "pcmpeqb", "pcmpeqd", "pcmpeqw", "pcmpgtb", "pcmpgtd", "pcmpgtw", "pmaddwd",
+            "pmulhw", "pmullw", "por", "pshufd", "pshufhw", "pshuflw", "pslld", "psllq", "psllw", "psrad",
+            "psraw", "psrld", "psrlq", "psrlw", "psubb", "psubd", "psubq", "psubw", "punpckhbw", "punpckhdq",
+            "punpckhqdq", "punpckhwd", "punpcklbw", "punpckldq", "punpcklqdq", "punpcklwd", "pxor",
+            "addpd", "addps", "addsd", "addss", "andnpd", "andnps", "andpd", "andps", "cmppd", "cmpps",
+            "cmpsd", "cmpss", "comisd", "comiss", "cvtdq2pd", "cvtdq2ps", "cvtpd2dq", "cvtpd2ps", "cvtps2dq",
+            "cvtps2pd", "cvtsd2si", "cvtsd2ss", "cvtsi2sd", "cvtsi2ss", "cvtss2sd", "cvtss2si", "cvttpd2dq",
+            "cvttps2dq", "cvttsd2si", "cvttss2si", "divpd", "divps", "divsd", "divss", "dppd", "dpps",
+            "maxpd", "maxps", "maxsd", "maxss", "minpd", "minps", "minsd", "minss", "mpsadbw", "mulpd",
+            "mulps", "mulsd", "mulss", "orpd", "orps", "pabsb", "pabsd", "pabsw", "packusdw", "paddsb",
+            "paddsw", "paddusb", "paddusw", "palignr", "pavgb", "pavgw", "pblendvb", "pblendw", "pcmpeqq",
+            "pcmpgtq", "pextrb", "pextrd", "pextrq", "pextrw", "phaddd", "phaddsw", "phaddw", "phminposuw",
+            "phsubd", "phsubsw", "phsubw", "pinsrb", "pinsrd", "pinsrq", "pinsrw", "pmaxsb", "pmaxsd",
+            "pmaxsw", "pmaxub", "pmaxud", "pmaxuw", "pminsb", "pminsd", "pminsw", "pminub", "pminud",
+            "pminuw", "pmovmskb", "pmovsxbd", "pmovsxbq", "pmovsxbw", "pmovsxdq", "pmovsxwd", "pmovsxwq",
+            "pmovzxbd", "pmovzxbq", "pmovzxbw", "pmovzxdq", "pmovzxwd", "pmovzxwq", "pmuldq", "pmulld",
+            "pmuludq", "psadbw", "pshufb", "psignb", "psignd", "psignw", "ptest", "rcpps", "rcpss",
+            "roundpd", "roundps", "roundsd", "roundss", "rsqrtps", "rsqrtss", "sqrtpd", "sqrtps", "sqrtsd",
+            "sqrtss", "subpd", "subps", "subsd", "subss", "ucomisd", "ucomiss", "unpckhpd", "unpckhps",
+            "unpcklpd", "unpcklps", "xorpd", "xorps",
+            // x86 control flow and strings.
+            "call", "ret", "retf", "retn", "jmp", "ja", "jae", "jb", "jbe", "jc", "jcxz", "je", "jecxz",
+            "jg", "jge", "jl", "jle", "jna", "jnae", "jnb", "jnbe", "jnc", "jne", "jng", "jnge", "jnl",
+            "jnle", "jno", "jnp", "jns", "jnz", "jo", "jp", "jpe", "jpo", "js", "jz", "loop", "loope",
+            "loopne", "loopnz", "loopz", "into", "int", "int3", "iret", "iretq", "syscall", "sysenter",
+            "sysexit", "sysret", "ud2", "hlt", "nop", "pause", "wait", "leave", "enter", "bound",
+            "cmps", "cmpsb", "cmpsd", "cmpsq", "cmpsw", "lods", "lodsb", "lodsd", "lodsq", "lodsw",
+            "movs", "scas", "scasb", "scasd", "scasq", "scasw", "stos", "stosb", "stosd", "stosq", "stosw",
+            "ins", "insb", "insd", "insw", "outs", "outsb", "outsd", "outsw", "in", "out",
+            "rep", "repe", "repne", "repnz", "repz", "lock",
+            "seta", "setae", "setb", "setbe", "sete", "setg", "setge", "setl", "setle", "setne", "setno",
+            "setnp", "setns", "seto", "setp", "sets", "setz", "cmova", "cmovae", "cmovb", "cmovbe", "cmove",
+            "cmovg", "cmovge", "cmovl", "cmovle", "cmovne", "cmovno", "cmovnp", "cmovns", "cmovnz", "cmovo",
+            "cmovp", "cmovs", "cmovz",
+            // x86 flags, conversion and system.
+            "clc", "cld", "cli", "cmc", "stc", "std", "sti", "lahf", "sahf", "cbw", "cwde", "cdqe", "cwd",
+            "cdq", "cqo", "aaa", "aad", "aam", "aas", "daa", "das", "arpl", "bound", "clflush", "clts",
+            "cpuid", "invd", "invlpg", "lfence", "mfence", "sfence", "monitor", "mwait", "rdmsr", "wrmsr",
+            "rdpmc", "rdrand", "rdseed", "rdtsc", "rdtscp", "rsm", "swapgs", "wbinvd", "xgetbv", "xsetbv",
+            "xsave", "xrstor", "xsaveopt", "lgdt", "sgdt", "lidt", "sidt", "lldt", "sldt", "lmsw", "smsw",
+            "lar", "lsl", "verr", "verw", "ltr", "str", "prefetchnta", "prefetcht0", "prefetcht1", "prefetcht2",
+            "vmcall", "vmlaunch", "vmload", "vmmcall", "vmptrld", "vmptrst", "vmread", "vmresume", "vmrun",
+            "vmsave", "vmwrite", "vmxoff", "vmxon",
+            // ARM and AArch64.
+            "adc", "adcs", "add", "adds", "adr", "adrp", "and", "ands", "asr", "b", "beq", "bne", "bcs",
+            "bhs", "bcc", "blo", "bmi", "bpl", "bvs", "bvc", "bhi", "bls", "bge", "blt", "bgt", "ble",
+            "bal", "bkpt", "bl", "blr", "br", "bx", "bxj", "cbz", "cbnz", "tbnz", "tbz", "cmn", "cmp",
+            "csel", "csinc", "csinv", "csneg", "cpsid", "cpsie", "dc", "dmb", "dsb", "isb", "eor", "eret",
+            "ic", "ldm", "ldmia", "ldmdb", "ldp", "ldr", "ldrb", "ldrh", "ldrsb", "ldrsh", "ldrsw", "ldur",
+            "lsl", "lsr", "mcr", "mrc", "mov", "movk", "movn", "movz", "mrs", "msr", "mul", "mvn", "neg",
+            "negs", "nop", "orn", "orr", "ret", "ror", "rrx", "sbc", "sbcs", "sbfiz", "sbfm", "sdiv",
+            "smaddl", "smc", "smull", "stm", "stmia", "stmdb", "stp", "str", "strb", "strh", "stur", "sub",
+            "subs", "svc", "sxtb", "sxth", "sxtw", "tst", "ubfiz", "ubfm", "udiv", "umaddl", "umull",
+            "uxtb", "uxth", "wfe", "wfi", "yield",
+            // MIPS.
+            "addi", "addiu", "addu", "andi", "bgez", "bgtz", "blez", "bltz", "bne", "div", "divu", "j",
+            "jal", "jalr", "jr", "lb", "lbu", "lh", "lhu", "lui", "lw", "lwl", "lwr", "mfhi", "mflo",
+            "mthi", "mtlo", "mult", "multu", "ori", "sb", "sh", "sll", "sllv", "slt", "slti", "sltiu",
+            "sltu", "sra", "srav", "srl", "srlv", "sub", "subu", "sw", "swl", "swr", "xori", "mfc0",
+            "mtc0",
+            // RISC-V.
+            "auipc", "beqz", "bgeu", "bgez", "bltu", "bltz", "csrc", "csrr", "csrs", "csrw", "ecall",
+            "ebreak", "fence", "jalr", "la", "li", "lwu", "mv", "sd", "slli", "sltiu", "sltu", "srai",
+            "srli", "xor", "xori",
+            // Common assembler directives (also accepted without the leading dot).
+            "section", "segment", "global", "globl", "local", "extern", "public", "weak", "hidden",
+            "protected", "internal", "visibility", "default", "bits", "org", "align", "balign", "p2align",
+            "alignb", "times", "equ", "equiv", "eqv", "set", "db", "dw", "dd", "dq", "dt", "do", "dy", "dz",
+            "resb", "resw", "resd", "resq", "rest", "byte", "short", "word", "long", "quad", "value",
+            "zero", "space", "skip", "fill", "ascii", "asciz", "string", "string8", "string16", "uleb128",
+            "sleb128", "float", "double", "single", "incbin", "include", "struc", "endstruc", "istruc",
+            "iend", "at", "macro", "endmacro", "endm", "rept", "endrep", "irp", "irpc", "endr", "if",
+            "ifdef", "ifndef", "ifmacro", "ifctx", "ifidn", "ifidni", "ifnum", "ifstr", "ifn", "ifnn",
+            "else", "elif", "endif", "while", "endwhile", "assign", "iassign", "define", "xdefine",
+            "idefine", "undef", "error", "warning", "fatal", "pragma", "rotate", "use16", "use32", "use64",
+            "code16", "code32", "code64", "intel_syntax", "att_syntax", "syntax", "arch", "cpu", "fpu",
+            "thumb", "arm", "thumb_func", "thumb_set", "func", "endfunc", "type", "size", "file", "ident",
+            "loc", "comm", "lcomm", "symver", "previous", "pushsection", "popsection", "subsection",
+            "cfi_startproc", "cfi_endproc", "cfi_def_cfa", "cfi_offset", "cfi_restore"
+        };
+
+        /// <summary>The registers of the common architectures, coloured as variables rather than keywords.</summary>
+        private static readonly HashSet<string> AssemblyRegisters = BuildAssemblyRegisters();
+
+        private static HashSet<string> BuildAssemblyRegisters()
+        {
+            HashSet<string> registers = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                // x86 8/16/32-bit registers.
+                "al", "ah", "ax", "eax", "bl", "bh", "bx", "ebx", "cl", "ch", "cx", "ecx", "dl", "dh", "dx",
+                "edx", "sil", "si", "esi", "dil", "di", "edi", "bpl", "bp", "ebp", "spl", "sp", "esp",
+                "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp", "rip", "rflags", "eflags", "flags",
+                "cs", "ds", "es", "fs", "gs", "ss", "st", "xmm0", "ymm0", "zmm0",
+                // ARM, AArch64 and RISC-V special registers.
+                "lr", "pc", "cpsr", "spsr", "apsr", "fpscr", "xzr", "wzr", "zero", "ra", "gp", "tp"
+            };
+            for (int i = 0; i <= 15; i++)
+            {
+                registers.Add("r" + i);
+                registers.Add("cr" + i);
+                registers.Add("dr" + i);
+                registers.Add("tr" + i);
+            }
+            for (int i = 8; i <= 15; i++)
+            {
+                registers.Add("r" + i + "d");
+                registers.Add("r" + i + "w");
+                registers.Add("r" + i + "b");
+            }
+            for (int i = 0; i <= 7; i++)
+            {
+                registers.Add("mm" + i);
+                registers.Add("k" + i);
+                registers.Add("st" + i);
+            }
+            for (int i = 0; i <= 31; i++)
+            {
+                registers.Add("xmm" + i);
+                registers.Add("ymm" + i);
+                registers.Add("zmm" + i);
+                registers.Add("x" + i);
+                registers.Add("w" + i);
+                registers.Add("v" + i);
+                registers.Add("q" + i);
+                registers.Add("d" + i);
+                registers.Add("s" + i);
+                registers.Add("h" + i);
+                registers.Add("b" + i);
+            }
+            for (int i = 0; i <= 11; i++)
+            {
+                registers.Add("s" + i);
+                registers.Add("a" + i);
+            }
+            for (int i = 0; i <= 7; i++)
+            {
+                registers.Add("t" + i);
+            }
+            return registers;
+        }
+
         private static readonly HashSet<string> RubyKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
             "BEGIN", "END", "alias", "and", "begin", "break", "case", "class", "def", "do", "else", "elsif",
@@ -2245,9 +2417,12 @@ namespace SmarTTY.CodeEditing
         {
             public bool HashComments;          // '#' starts a comment at the start of a line or after whitespace
             public bool HashCommentsAnywhere;  // '#' starts a comment even directly after code (Ruby, Perl, CMake)
+            public bool HashCommentsAtLineStart; // '#' starts a comment only as the first non-blank character (Assembly)
             public bool KeywordsAtLineStart;   // only the first word of a line is a keyword (Dockerfile, CMake)
             public bool SlashComments;         // "//" comments
             public bool DashDashComments;      // "--" comments
+            public bool SemicolonComments;     // ";" comments (Assembly)
+            public bool AtComments;            // "@" comments at the start of a line or after whitespace (Assembly)
             public bool Preprocessor;          // #include-style directives at the start of a line
             public bool SingleQuoteStrings = true;
             public bool MarkupTags;            // <tag> and </tag> names are colored as keywords
@@ -2259,9 +2434,11 @@ namespace SmarTTY.CodeEditing
             public bool RustLiterals;          // 'a lifetimes and labels are not strings; r"..." and r#"..."# raw strings
             public bool HyphenatedKeywords;    // CSS and Device Tree words such as font-size and interrupt-parent
             public bool DeviceTreeSyntax;      // /directive/, &label, #cell-count, labels and node names
+            public bool AssemblySyntax;        // label:, .directive, %directive and registers
             public string BlockCommentStart;
             public string BlockCommentEnd;
             public HashSet<string> Keywords;
+            public HashSet<string> Registers;
             public HashSet<string> PreprocessorWords = PreprocessorDirectives;
 
             private bool IsLineComment(string text, int i)
@@ -2275,8 +2452,38 @@ namespace SmarTTY.CodeEditing
                 {
                     return true;
                 }
+                if (SemicolonComments && c == ';')
+                {
+                    return true;
+                }
+                if (AtComments && c == '@' && (i == 0 || char.IsWhiteSpace(text[i - 1])))
+                {
+                    return true;
+                }
+                if (HashCommentsAtLineStart && c == '#')
+                {
+                    int start = 0;
+                    while (start < i && IsBlank(text[start]))
+                    {
+                        start++;
+                    }
+                    return start == i;
+                }
                 return HashComments && c == '#' &&
                     (HashCommentsAnywhere || i == 0 || char.IsWhiteSpace(text[i - 1]));
+            }
+
+            /// <summary>True when only blanks stand between the start of the line and the index.</summary>
+            private static bool IsAtLineStart(string text, int index)
+            {
+                for (int i = 0; i < index; i++)
+                {
+                    if (!IsBlank(text[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
             }
 
             /// <summary>The index after the end of a string of the given kind (a state bit) searched from an index, or -1.</summary>
@@ -2492,6 +2699,49 @@ namespace SmarTTY.CodeEditing
                         return true;
                     }
 
+                    // Assembly directives: ".text", ".globl", ".section" of the GNU assembler.
+                    // A dot-prefixed name with a colon at the start of the line is a local label.
+                    if (AssemblySyntax && c == '.' && i + 1 < len && IsIdStart(text[i + 1]))
+                    {
+                        int wordEnd = i + 2;
+                        while (wordEnd < len && IsIdChar(text[wordEnd]))
+                        {
+                            wordEnd++;
+                        }
+                        bool label = wordEnd < len && text[wordEnd] == ':' &&
+                            !(wordEnd + 1 < len && text[wordEnd + 1] == ':') && IsAtLineStart(text, i);
+                        Normal(ref last, last, i, sink);
+                        if (label)
+                        {
+                            sink.AddToken(TypeSection, i, wordEnd + 1);
+                            i = wordEnd + 1;
+                        }
+                        else
+                        {
+                            sink.AddToken(TypePreprocessor, i, wordEnd);
+                            i = wordEnd;
+                        }
+                        last = i;
+                        continue;
+                    }
+
+                    // NASM preprocessor directives ("%define", "%include") and AT&T registers ("%eax", "%r8").
+                    if (AssemblySyntax && c == '%' && i + 1 < len && IsIdStart(text[i + 1]))
+                    {
+                        int wordEnd = i + 2;
+                        while (wordEnd < len && IsIdChar(text[wordEnd]))
+                        {
+                            wordEnd++;
+                        }
+                        string word = text.Substring(i + 1, wordEnd - i - 1);
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(Registers != null && Registers.Contains(word) ? TypeVariable : TypePreprocessor,
+                            i, wordEnd);
+                        i = wordEnd;
+                        last = i;
+                        continue;
+                    }
+
                     // Device Tree directives are words between slashes: /include/, /delete-node/, /bits/.
                     if (DeviceTreeSyntax && c == '/' && i + 2 < len && IsIdStart(text[i + 1]))
                     {
@@ -2641,6 +2891,15 @@ namespace SmarTTY.CodeEditing
                         {
                             i++;
                         }
+                        // A numeric local label of the GNU assembler: "1:".
+                        if (AssemblySyntax && i < len && text[i] == ':' && IsAtLineStart(text, s))
+                        {
+                            Normal(ref last, last, s, sink);
+                            sink.AddToken(TypeSection, s, i + 1);
+                            i++;
+                            last = i;
+                            continue;
+                        }
                         Normal(ref last, last, s, sink);
                         sink.AddToken(TypeNumber, s, i);
                         last = i;
@@ -2655,6 +2914,23 @@ namespace SmarTTY.CodeEditing
                             i++;
                         }
                         string word = text.Substring(s, i - s);
+                        // An Assembly label is the first word of a line followed by a single colon.
+                        if (AssemblySyntax && i < len && text[i] == ':' &&
+                            !(i + 1 < len && text[i + 1] == ':') && IsAtLineStart(text, s))
+                        {
+                            Normal(ref last, last, s, sink);
+                            sink.AddToken(TypeSection, s, i + 1);
+                            i++;
+                            last = i;
+                            continue;
+                        }
+                        if (AssemblySyntax && Registers != null && Registers.Contains(word))
+                        {
+                            Normal(ref last, last, s, sink);
+                            sink.AddToken(TypeVariable, s, i);
+                            last = i;
+                            continue;
+                        }
                         // A Device Tree label ("myboard:") or the name of a node with a unit address ("uart@...").
                         bool deviceTreeLabel = DeviceTreeSyntax && i < len && text[i] == ':' &&
                             !(i + 1 < len && text[i + 1] == ':');
@@ -2835,6 +3111,22 @@ namespace SmarTTY.CodeEditing
             Brackets = true,
             FoldCurlyBraces = true,
             Keywords = TclKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer AssemblyTokenizer = new GenericSyntax
+        {
+            // NASM uses ';', GNU as uses '#', ARM assembly uses '@'; '//' and '/* */' are also common.
+            // '#' counts only at the start of a line: elsewhere it introduces an immediate ('#1').
+            SemicolonComments = true,
+            HashCommentsAtLineStart = true,
+            AtComments = true,
+            SlashComments = true,
+            BlockCommentStart = "/*",
+            BlockCommentEnd = "*/",
+            AssemblySyntax = true,
+            Brackets = true,
+            Keywords = AssemblyKeywords,
+            Registers = AssemblyRegisters
         }.Tokenize;
 
         private static readonly TokenCache.LineTokenizer RubyTokenizer = new GenericSyntax

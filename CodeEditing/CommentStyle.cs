@@ -57,6 +57,8 @@ namespace SmarTTY.CodeEditing
                     return new CommentStyle("/* ", " */");
                 case SyntaxHighlighting.Language.Sql:
                     return new CommentStyle("-- ");
+                case SyntaxHighlighting.Language.Assembly:
+                    return new CommentStyle("; ");
                 case SyntaxHighlighting.Language.Markup:
                     return new CommentStyle("<!-- ", " -->");
                 default:

@@ -264,7 +264,8 @@ internal static class Program
         foreach (L language in new[]
                  {
                      L.CSharp, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
-                     L.JavaScript, L.TypeScript, L.Php, L.Css, L.Protobuf, L.DeviceTree, L.Awk, L.Tcl
+                     L.JavaScript, L.TypeScript, L.Php, L.Css, L.Protobuf, L.DeviceTree, L.Awk, L.Tcl,
+                     L.Assembly
                  })
         {
             Equal(database.ForLanguage(language).Count, 0,
