@@ -46,7 +46,7 @@ namespace SmarTTY.CodeEditing
             Bash,
             Config,  // INI / .conf / .properties / TOML / systemd units
             CLike,   // C: // and /* */ comments, # preprocessor directives
-            Script,  // R, AWK, Tcl, Nix: the generic # comment profile
+            Script,  // R, AWK, Nix: the generic # comment profile
             Sql,     // SQL: -- comments
             Markup,  // HTML, XML: <!-- --> comments and tag names
             Diff,    // unified diffs
@@ -78,7 +78,8 @@ namespace SmarTTY.CodeEditing
             Php,     // PHP: //, # and /* */ comments
             Css,     // CSS, SCSS and Less: /* */ comments
             Protobuf, // Protocol Buffers: // and /* */ comments
-            DeviceTree // Device Tree source: C-like comments, no API set
+            DeviceTree, // Device Tree source: C-like comments, no API set
+            Tcl      // Tcl: # comments, command words, foldable { } bodies, no API set
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -89,7 +90,7 @@ namespace SmarTTY.CodeEditing
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust, Language.Swift,
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
-            Language.DeviceTree, Language.Script, Language.Ruby, Language.Perl,
+            Language.DeviceTree, Language.Script, Language.Tcl, Language.Ruby, Language.Perl,
             Language.CMake, Language.Dockerfile, Language.Sql, Language.Markup, Language.Diff
         };
 
@@ -128,7 +129,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Css: return "CSS, SCSS, Less";
                 case Language.Protobuf: return "Protocol Buffers";
                 case Language.DeviceTree: return "Device Tree";
-                case Language.Script: return "Script (R, AWK, Tcl, Nix)";
+                case Language.Script: return "Script (R, AWK, Nix)";
+                case Language.Tcl: return "Tcl";
                 case Language.Ruby: return "Ruby";
                 case Language.Perl: return "Perl";
                 case Language.CMake: return "CMake";
@@ -513,10 +515,13 @@ namespace SmarTTY.CodeEditing
                     return Language.Dockerfile;
 
                 case "r":
-                case "tcl":
                 case "awk":
                 case "nix":
                     return Language.Script;
+
+                case "tcl":
+                case "tk":
+                    return Language.Tcl;
 
                 case "sql":
                     return Language.Sql;
@@ -668,8 +673,12 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.CMake;
             }
-            if (program.EndsWith("awk", StringComparison.Ordinal) ||
-                program == "tclsh" || program == "wish" || program == "rscript" ||
+            if (program.StartsWith("tclsh", StringComparison.Ordinal) ||
+                program.StartsWith("wish", StringComparison.Ordinal) || program == "expect")
+            {
+                return Language.Tcl;
+            }
+            if (program.EndsWith("awk", StringComparison.Ordinal) || program == "rscript" ||
                 program.StartsWith("nix", StringComparison.Ordinal))
             {
                 return Language.Script;
@@ -709,6 +718,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Protobuf: return ProtobufTokenizer;
                 case Language.DeviceTree: return DeviceTreeTokenizer;
                 case Language.Script: return ScriptTokenizer;
+                case Language.Tcl: return TclTokenizer;
                 case Language.Ruby: return RubyTokenizer;
                 case Language.Perl: return PerlTokenizer;
                 case Language.CMake: return CMakeTokenizer;
@@ -791,6 +801,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(DeviceTreeKeywords);
                 case Language.Script:
                     return Combine(ScriptKeywords);
+                case Language.Tcl:
+                    return Combine(TclKeywords);
                 case Language.Ruby:
                     return Combine(RubyKeywords);
                 case Language.Perl:
@@ -2095,11 +2107,39 @@ namespace SmarTTY.CodeEditing
             "source", "TRUE", "FALSE", "NULL", "NA", "NaN", "Inf",
             // AWK.
             "BEGIN", "END", "do", "continue", "nextfile", "exit", "delete", "getline", "print", "printf",
-            // Tcl.
-            "proc", "elseif", "then", "foreach", "switch", "case", "default", "set", "unset", "expr", "return",
-            "namespace", "variable", "global", "upvar", "uplevel", "catch", "error",
             // Nix.
             "let", "with", "rec", "inherit", "assert", "or"
+        };
+
+        /// <summary>The Tcl commands and control words; the language has no API set.</summary>
+        private static readonly HashSet<string> TclKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // Control flow and procedures.
+            "if", "then", "else", "elseif", "for", "foreach", "while", "switch", "case", "default", "break",
+            "continue", "return", "proc", "apply", "tailcall", "catch", "try", "finally", "throw", "error",
+            "exit", "yield", "yieldto", "coroutine", "uplevel", "upvar", "variable", "global", "namespace",
+            "eval", "expr", "rename", "unset", "set", "incr", "append", "lappend", "lassign", "lindex",
+            "linsert", "list", "llength", "lmap", "lrange", "lrepeat", "lreplace", "lreverse", "lsearch",
+            "lset", "lsort", "concat", "join", "split", "string", "subst", "format", "scan", "regexp",
+            "regsub", "binary", "encoding", "clock", "time", "after", "update", "vwait",
+            // Packages, introspection and the runtime.
+            "package", "source", "load", "unload", "interp", "info", "trace", "history", "unknown", "bgerror",
+            "tkerror", "pid", "exec", "platform", "msgcat", "zlib",
+            // Channels and files.
+            "open", "close", "read", "gets", "puts", "flush", "eof", "seek", "tell", "fblocked", "fconfigure",
+            "fcopy", "fileevent", "glob", "cd", "pwd", "file", "socket", "chan", "refchan", "registry",
+            // Data structures.
+            "array", "dict", "parray",
+            // Tk widgets and window management.
+            "bell", "bind", "bindtags", "bitmap", "button", "canvas", "checkbutton", "clipboard", "destroy",
+            "entry", "event", "focus", "font", "frame", "grab", "grid", "image", "label", "labelframe",
+            "listbox", "lower", "menu", "menubutton", "message", "option", "pack", "panedwindow", "place",
+            "radiobutton", "raise", "scale", "scrollbar", "selection", "send", "spinbox", "text", "tk",
+            "tk_bisque", "tk_chooseColor", "tk_chooseDirectory", "tk_dialog", "tk_focusFollowsMouse",
+            "tk_focusNext", "tk_focusPrev", "tk_getOpenFile", "tk_getSaveFile", "tk_messageBox", "tk_popup",
+            "tk_setPalette", "tk_textCopy", "tk_textCut", "tk_textPaste", "tkwait", "toplevel", "winfo", "wm",
+            // Operators and constants of expr.
+            "in", "ni", "eq", "ne", "and", "or", "not", "true", "false", "yes", "no", "on", "off"
         };
 
         private static readonly HashSet<string> RubyKeywords = new HashSet<string>(StringComparer.Ordinal)
@@ -2745,6 +2785,16 @@ namespace SmarTTY.CodeEditing
         {
             HashComments = true,
             Keywords = ScriptKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer TclTokenizer = new GenericSyntax
+        {
+            HashComments = true,
+            // Tcl has no single-quoted strings: an apostrophe is an ordinary character.
+            SingleQuoteStrings = false,
+            Brackets = true,
+            FoldCurlyBraces = true,
+            Keywords = TclKeywords
         }.Tokenize;
 
         private static readonly TokenCache.LineTokenizer RubyTokenizer = new GenericSyntax

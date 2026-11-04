@@ -202,6 +202,15 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/job.r"), L.Script, "R stays in the generic script profile");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/run.awk"), L.Script, "AWK stays in the generic script profile");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/default.nix"), L.Script, "Nix stays in the generic script profile");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/deploy.tcl"), L.Tcl, ".tcl is Tcl");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/panel.tk"), L.Tcl, ".tk is Tcl");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Tcl), "Tcl", "Tcl has its own display name");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Tcl), "Tcl is in the syntax menu");
+        Check(SyntaxHighlighting.GetKeywords(L.Tcl).Contains("proc"), "Tcl keywords contain 'proc'");
+        Check(SyntaxHighlighting.GetKeywords(L.Tcl).Contains("namespace"), "Tcl keywords contain 'namespace'");
+        Check(SyntaxHighlighting.GetKeywords(L.Tcl).Contains("puts"), "Tcl keywords contain 'puts'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Tcl).Contains("sizeof"), "Tcl keywords do not include the C 'sizeof'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("proc"), "the generic Script profile no longer carries the Tcl 'proc'");
         Equal(SyntaxHighlighting.GetDisplayName(L.Ruby), "Ruby", "Ruby has its own display name");
         Equal(SyntaxHighlighting.GetDisplayName(L.Perl), "Perl", "Perl has its own display name");
         Equal(SyntaxHighlighting.GetDisplayName(L.CMake), "CMake", "CMake has its own display name");
@@ -244,6 +253,9 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env -S perl -w"), L.Perl, "env options are skipped and Perl is recognized");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env ruby"), L.Ruby, "#!/usr/bin/env ruby is Ruby");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/cmake -P"), L.CMake, "a CMake script is CMake");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/tclsh"), L.Tcl, "tclsh is Tcl");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env wish8.6"), L.Tcl, "wish is Tcl");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/expect -f"), L.Tcl, "an Expect script is Tcl");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/Rscript"), L.Script, "Rscript stays in the generic script profile");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "hello"), L.Plain, "no shebang: plain");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/x.sh", "#!/usr/bin/python"), L.Bash, "the extension wins over the shebang");
@@ -464,6 +476,16 @@ internal static class Program
         Equal(Join(dt.Tokens(10, SyntaxHighlighting.TypeKeyword)), "/delete-property/|status", "a delete-property directive");
         Equal(Join(dt.Tokens(11, SyntaxHighlighting.TypeKeyword)), "&{/soc}", "a path reference");
         Equal(Join(dt.Tokens(13, SyntaxHighlighting.TypeComment)), "// note", "a Device Tree line comment");
+        Highlighted tcl = new Highlighted(L.Tcl,
+            "# note\nproc greet {name} {\n    puts \"Hello, $name\"\n" +
+            "    if {$name eq \"\"} { return }\n}\nset x 'literal'");
+        Equal(Join(tcl.Tokens(0, SyntaxHighlighting.TypeComment)), "# note", "a Tcl line comment");
+        Equal(Join(tcl.Tokens(1, SyntaxHighlighting.TypeKeyword)), "proc", "a Tcl procedure keyword");
+        Equal(Join(tcl.Tokens(2, SyntaxHighlighting.TypeKeyword)), "puts", "a Tcl built-in command");
+        Equal(Join(tcl.Tokens(2, SyntaxHighlighting.TypeString)), "\"Hello, $name\"", "a Tcl quoted string");
+        Equal(Join(tcl.Tokens(3, SyntaxHighlighting.TypeKeyword)), "if|eq|return", "Tcl control words and operators");
+        Equal(Join(tcl.Tokens(3, SyntaxHighlighting.TypeString)), "\"\"", "an empty Tcl string");
+        Equal(Join(tcl.Tokens(5, SyntaxHighlighting.TypeString)), "", "Tcl single quotes are not strings");
         Highlighted html2 = new Highlighted(L.Markup, "<p>He said \"hi</p>\n<a href=\"u\"\n   title=\"t\">x</a>\n<!DOCTYPE html>");
         Equal(Join(html2.Tokens(0, SyntaxHighlighting.TypeString)), "", "a quote in the text between tags is not a string");
         Equal(Join(html2.Tokens(1, SyntaxHighlighting.TypeString)), "\"u\"", "an attribute value is");
@@ -618,7 +640,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -1076,6 +1098,7 @@ internal static class Program
         Equal(Join(markup.Toggle(new[] { "<!-- <a/> -->" })), "<a/>", "markup comment is removed");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CLike).Toggle(new[] { "int a;" })), "// int a;", "C-like comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Cpp).Toggle(new[] { "int a;" })), "// int a;", "C++ comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Tcl).Toggle(new[] { "set x 1" })), "# set x 1", "Tcl comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Ruby).Toggle(new[] { "puts 1" })), "# puts 1", "Ruby comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Perl).Toggle(new[] { "print 1" })), "# print 1", "Perl comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CMake).Toggle(new[] { "set(X 1)" })), "# set(X 1)", "CMake comment");

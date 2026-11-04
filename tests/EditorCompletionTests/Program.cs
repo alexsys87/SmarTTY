@@ -74,7 +74,8 @@ internal static class Program
             (L.Scala, "implicit", "fun"), (L.Groovy, "def", "sub"), (L.Go, "defer", "class"),
             (L.Rust, "impl", "class"), (L.Swift, "guard", "impl"), (L.Dart, "mixin", "guard"),
             (L.JavaScript, "function", "fun"), (L.TypeScript, "interface", "fun"), (L.Php, "echo", "fun"),
-            (L.Css, "display", "message"), (L.Protobuf, "message", "impl"), (L.DeviceTree, "compatible", "message")
+            (L.Css, "display", "message"), (L.Protobuf, "message", "impl"), (L.DeviceTree, "compatible", "message"),
+            (L.Tcl, "proc", "sizeof")
         };
         foreach ((L language, string keyword, string foreign) in profiles)
         {

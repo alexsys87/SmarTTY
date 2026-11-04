@@ -98,6 +98,8 @@ internal static class Program
         Check(!Definitions(L.Css, ".card {\n    color: red;\n}\n").Any(), "css: no function definitions");
         Check(!Definitions(L.Protobuf, "rpc Get(User) returns (User);\n").Any(), "protobuf: rpc is not a function definition");
         Check(!Definitions(L.DeviceTree, "/ { compatible = \"board\"; };\n").Any(), "device tree: no function definitions");
+        Check(!Definitions(L.Tcl, "proc add {a b} {\n    expr {$a + $b}\n}\n").Any(), "tcl: a proc is not parsed as a function definition");
+        Check(!Definitions(L.Tcl, "# proc hidden {a} {\n}\n").Any(), "tcl: a '#' comment is not a definition");
         Check(!Definitions(L.Php, "# function hidden(a) {\n").Any(), "php: a '#' comment is not a definition");
 
         // Languages without a recognized declaration form.
