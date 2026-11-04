@@ -655,6 +655,7 @@ public static class EditorSignatureSource
             case SyntaxHighlighting.Language.Python:
             case SyntaxHighlighting.Language.Bash:
             case SyntaxHighlighting.Language.Script:
+            case SyntaxHighlighting.Language.Tcl:
             case SyntaxHighlighting.Language.Ruby:
             case SyntaxHighlighting.Language.Perl:
             case SyntaxHighlighting.Language.CMake:
