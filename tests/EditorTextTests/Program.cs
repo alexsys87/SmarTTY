@@ -220,6 +220,17 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Tcl).Contains("puts"), "Tcl keywords contain 'puts'");
         Check(!SyntaxHighlighting.GetKeywords(L.Tcl).Contains("sizeof"), "Tcl keywords do not include the C 'sizeof'");
         Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("proc"), "the generic Script profile no longer carries the Tcl 'proc'");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/start.asm"), L.Assembly, ".asm is Assembly");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/crt0.s"), L.Assembly, ".s is Assembly");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/boot.S"), L.Assembly, ".S is Assembly too");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/mbr.nasm"), L.Assembly, ".nasm is Assembly");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Assembly), "Assembly", "Assembly has its own display name");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Assembly), "Assembly is in the syntax menu");
+        Check(SyntaxHighlighting.GetKeywords(L.Assembly).Contains("mov"), "Assembly keywords contain 'mov'");
+        Check(SyntaxHighlighting.GetKeywords(L.Assembly).Contains("section"), "Assembly keywords contain 'section'");
+        Check(SyntaxHighlighting.GetKeywords(L.Assembly).Contains("rax"), "Assembly keywords contain the register 'rax'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Assembly).Contains("sizeof"), "Assembly keywords do not include the C 'sizeof'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("mov"), "the generic Script profile does not carry Assembly instructions");
         Equal(SyntaxHighlighting.GetDisplayName(L.Ruby), "Ruby", "Ruby has its own display name");
         Equal(SyntaxHighlighting.GetDisplayName(L.Perl), "Perl", "Perl has its own display name");
         Equal(SyntaxHighlighting.GetDisplayName(L.CMake), "CMake", "CMake has its own display name");
@@ -516,6 +527,30 @@ internal static class Program
         TokenCache.Token awkBrace = awk.At(1, 6);
         Check(awkBrace != null && awkBrace.Partner != null, "AWK braces are paired");
         Check(awkBrace.Style != null, "AWK braces are foldable");
+        Highlighted assembly = new Highlighted(L.Assembly,
+            "; nasm comment\n# gas comment\n@ arm comment\n.text\n.globl _start\n_start:\n" +
+            "    mov %eax, %ebx ; set ebx\n    ldr r0, [r1, #4] @ load\n%define SIZE 16\n" +
+            ".loop:\n1:\n    db \"hi\" /* note */");
+        Equal(Join(assembly.Tokens(0, SyntaxHighlighting.TypeComment)), "; nasm comment", "an Assembly ';' comment");
+        Equal(Join(assembly.Tokens(1, SyntaxHighlighting.TypeComment)), "# gas comment", "an Assembly '#' comment at the start of a line");
+        Equal(Join(assembly.Tokens(2, SyntaxHighlighting.TypeComment)), "@ arm comment", "an Assembly '@' comment");
+        Equal(Join(assembly.Tokens(3, SyntaxHighlighting.TypePreprocessor)), ".text", "an Assembly dot directive");
+        Equal(Join(assembly.Tokens(4, SyntaxHighlighting.TypePreprocessor)), ".globl", "another Assembly dot directive");
+        Equal(Join(assembly.Tokens(5, SyntaxHighlighting.TypeSection)), "_start:", "an Assembly label");
+        Equal(Join(assembly.Tokens(6, SyntaxHighlighting.TypeKeyword)), "mov", "an Assembly instruction");
+        Equal(Join(assembly.Tokens(6, SyntaxHighlighting.TypeVariable)), "%eax|%ebx", "AT&T registers");
+        Equal(Join(assembly.Tokens(6, SyntaxHighlighting.TypeComment)), "; set ebx", "an Assembly comment after code");
+        Equal(Join(assembly.Tokens(7, SyntaxHighlighting.TypeKeyword)), "ldr", "an ARM instruction");
+        Equal(Join(assembly.Tokens(7, SyntaxHighlighting.TypeVariable)), "r0|r1", "ARM registers");
+        Equal(Join(assembly.Tokens(7, SyntaxHighlighting.TypeNumber)), "4", "an ARM immediate is not a '#' comment");
+        Equal(Join(assembly.Tokens(7, SyntaxHighlighting.TypeComment)), "@ load", "an '@' comment after code");
+        Equal(Join(assembly.Tokens(8, SyntaxHighlighting.TypePreprocessor)), "%define", "a NASM preprocessor directive");
+        Equal(Join(assembly.Tokens(8, SyntaxHighlighting.TypeNumber)), "16", "a NASM constant value");
+        Equal(Join(assembly.Tokens(9, SyntaxHighlighting.TypeSection)), ".loop:", "a local Assembly label");
+        Equal(Join(assembly.Tokens(10, SyntaxHighlighting.TypeSection)), "1:", "a numeric local label");
+        Equal(Join(assembly.Tokens(11, SyntaxHighlighting.TypeKeyword)), "db", "a data directive");
+        Equal(Join(assembly.Tokens(11, SyntaxHighlighting.TypeString)), "\"hi\"", "an Assembly string");
+        Equal(Join(assembly.Tokens(11, SyntaxHighlighting.TypeComment)), "/* note */", "an Assembly block comment");
         Highlighted html2 = new Highlighted(L.Markup, "<p>He said \"hi</p>\n<a href=\"u\"\n   title=\"t\">x</a>\n<!DOCTYPE html>");
         Equal(Join(html2.Tokens(0, SyntaxHighlighting.TypeString)), "", "a quote in the text between tags is not a string");
         Equal(Join(html2.Tokens(1, SyntaxHighlighting.TypeString)), "\"u\"", "an attribute value is");
@@ -670,7 +705,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -1130,6 +1165,7 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Cpp).Toggle(new[] { "int a;" })), "// int a;", "C++ comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Awk).Toggle(new[] { "print $1" })), "# print $1", "AWK comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Tcl).Toggle(new[] { "set x 1" })), "# set x 1", "Tcl comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Assembly).Toggle(new[] { "mov eax, 1" })), "; mov eax, 1", "Assembly comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Ruby).Toggle(new[] { "puts 1" })), "# puts 1", "Ruby comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Perl).Toggle(new[] { "print 1" })), "# print 1", "Perl comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CMake).Toggle(new[] { "set(X 1)" })), "# set(X 1)", "CMake comment");

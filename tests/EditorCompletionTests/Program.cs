@@ -75,7 +75,8 @@ internal static class Program
             (L.Rust, "impl", "class"), (L.Swift, "guard", "impl"), (L.Dart, "mixin", "guard"),
             (L.JavaScript, "function", "fun"), (L.TypeScript, "interface", "fun"), (L.Php, "echo", "fun"),
             (L.Css, "display", "message"), (L.Protobuf, "message", "impl"), (L.DeviceTree, "compatible", "message"),
-            (L.Awk, "BEGIN", "sizeof"), (L.Tcl, "proc", "sizeof")
+            (L.Awk, "BEGIN", "sizeof"), (L.Tcl, "proc", "sizeof"),
+            (L.Assembly, "mov", "def")
         };
         foreach ((L language, string keyword, string foreign) in profiles)
         {
@@ -173,6 +174,13 @@ internal static class Program
         List<string> typeScriptWords = Names(typescript, "", "");
         Check(typeScriptWords.Contains("interface"), "a .ts file is offered the TypeScript keyword 'interface'");
         Check(!typeScriptWords.Contains("include"), "a .ts file is not offered the C preprocessor word 'include'");
+
+        L assembly = SyntaxHighlighting.DetectLanguage("/srv/boot.S");
+        Equal(assembly, L.Assembly, "boot.S is detected as Assembly");
+        List<string> assemblyWords = Names(assembly, "", "");
+        Check(assemblyWords.Contains("mov"), "an Assembly file is offered the instruction 'mov'");
+        Check(assemblyWords.Contains("rax"), "an Assembly file is offered the register 'rax'");
+        Check(!assemblyWords.Contains("def"), "an Assembly file is not offered the Python keyword 'def'");
 
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/notes.unknown"), L.Plain, "an unknown extension is plain text");
     }
