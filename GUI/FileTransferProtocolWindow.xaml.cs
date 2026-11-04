@@ -106,22 +106,22 @@ public partial class FileTransferProtocolWindow : Window
         {
             case DeviceFileDropProtocol.XModem:
             case DeviceFileDropProtocol.XModem1K:
-                HintText.Text = "Start the XMODEM receiver on the device first (for example \"rx file\" in a shell or the loadx command of the boot loader), then press Send.";
+                HintText.Text = "The receiver must already be running on the device (for example \"rx file\" in a shell or the loadx command of the boot loader): while the file is being sent, the terminal belongs to the transfer. The sender waits up to 90 seconds for it.";
                 break;
             case DeviceFileDropProtocol.YModem:
-                HintText.Text = "Start the YMODEM receiver on the device first (for example \"rb\" or the loady command of the boot loader), then press Send.";
+                HintText.Text = "The receiver must already be running on the device (for example \"rb\" or the loady command of the boot loader): while the files are being sent, the terminal belongs to the transfer. The sender waits up to 90 seconds for it.";
                 break;
             case DeviceFileDropProtocol.ZModem:
-                HintText.Text = "At an idle shell prompt of the device rz is started automatically. Otherwise start it yourself (\"rz\") before pressing Send.";
+                HintText.Text = "At an idle shell prompt of the device rz is started automatically. In any other program (a boot loader, for example) start the ZMODEM receiver on the device before you drop the file.";
                 break;
             case DeviceFileDropProtocol.Kermit:
-                HintText.Text = "Start the Kermit receiver on the device first (for example \"kermit -r\" or the loadb command of the boot loader), then press Send.";
+                HintText.Text = "The receiver must already be running on the device (for example \"kermit -r\" or the loadb command of the boot loader): while the files are being sent, the terminal belongs to the transfer. The sender offers the file for up to 60 seconds.";
                 break;
             case DeviceFileDropProtocol.GzipBase64:
-                HintText.Text = "Needs only an idle shell prompt with gzip, base64 and sha256sum (busybox is enough). The next window asks where to put the file on the device.";
+                HintText.Text = "Needs an idle shell prompt of a Linux device (OpenWrt too) with gzip, base64 and sha256sum; busybox is enough. The next window asks where to put the file on the device.";
                 break;
             default:
-                HintText.Text = "The file is sent as it is. Make the device ready to take the data first (for example \"cat > file\" in a shell). Nothing checks that the data arrived.";
+                HintText.Text = "The file is sent as it is. Make the device ready to take the data before you drop the file (for example \"cat > file\" in a shell). Nothing checks that the data arrived.";
                 break;
         }
     }
