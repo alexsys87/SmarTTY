@@ -238,6 +238,69 @@ public static class QuickCommandRules
     }
 
     /// <summary>
+    /// The longest line of a script (in bytes) that is typed into a device: the terminal line of Linux keeps 4095 characters of a
+    /// line in canonical mode and loses the rest, so a longer line would arrive cut.
+    /// </summary>
+    public const int MaxSerialLineLength = 4000;
+
+    /// <summary>
+    /// Why the script cannot be typed into a device over a COM port or Telnet (where there is no SSH to upload it); null when it
+    /// can. The text goes through the terminal line of the device, which takes some bytes for keys: Ctrl-C (0x03) would stop
+    /// the upload, Ctrl-D (0x04) would end it, Ctrl-U (0x15), Ctrl-W (0x17), Ctrl-V (0x16), DEL (0x7F) and the others would edit
+    /// the line. Tab and the line break are the only control characters that pass. A command (one line, typed at the prompt) has
+    /// no such limits.
+    /// </summary>
+    public static string ValidateForSerial(QuickCommand item)
+    {
+        string problem = Validate(item);
+        if (problem != null)
+        {
+            return problem;
+        }
+        if (item.Kind != QuickCommandKind.Script)
+        {
+            return null;
+        }
+        byte[] data = ScriptBytes(item.Text);
+        int line = 1;
+        int lineStart = 0;
+        for (int i = 0; i < data.Length; i++)
+        {
+            byte value = data[i];
+            if (value == (byte)'\n')
+            {
+                line++;
+                lineStart = i + 1;
+                continue;
+            }
+            if ((value < 0x20 && value != (byte)'\t') || value == 0x7F)
+            {
+                return "Line " + line + " has the control character 0x" + value.ToString("X2") + ", which the terminal line of the device would take for a key. "
+                    + "A script cannot be typed into a device with it: remove it (write \\033 or $(printf '\\033') instead of a raw ESC).";
+            }
+            if (i - lineStart + 1 > MaxSerialLineLength)
+            {
+                return "Line " + line + " is longer than " + MaxSerialLineLength + " bytes: the terminal line of the device would cut it. Split it with a backslash at the end of the line.";
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The command line that is typed into the shell of a device to store the lines that follow it as the script and make it
+    /// executable: <see cref="BuildUploadCommand"/> for a terminal that has no SSH. The script is typed after the command and ends
+    /// with Ctrl-D at the start of a line. Ctrl-C (a cancelled upload) ends cat and the trap removes the temporary file, so that
+    /// neither half a script nor a stray file is left. Only cat, chmod, mv and rm are used, which BusyBox has.
+    /// </summary>
+    public static string BuildSerialUploadCommand(string remotePath)
+    {
+        string target = RemotePathUtils.ShellQuote(remotePath);
+        string temporary = RemotePathUtils.ShellQuote(remotePath + ".smartty-part");
+        string cleanup = RemotePathUtils.ShellQuote("rm -f " + temporary);
+        return SmarTTY.Utilities.PosixShell.Wrap("umask 022; trap " + cleanup + " INT TERM HUP; cat > " + temporary + " && chmod 755 " + temporary + " && mv -f " + temporary + " " + target + " || { rm -f " + temporary + "; exit 1; }");
+    }
+
+    /// <summary>
     /// What is put into the command line to run the script: "./setup.sh" in the current folder (quoted when the name needs it),
     /// or its full path when it was put into another folder.
     /// </summary>

@@ -2035,8 +2035,8 @@ public partial class DeviceTerminalControl : DpiAwareControl
     }
 
     // The "Quick commands" sub menu (and the separator after it) on top of the context menu, removed and added again each time
-    // the menu opens, from the list as it is saved now (Tools > Quick commands...). Commands only: a script is uploaded over
-    // SSH, and a device has no SSH.
+    // the menu opens, from the list as it is saved now (Tools > Quick commands...). A command is put into the command line; a
+    // script is typed into the shell of the device with cat, as a device has no SSH to upload it (DeviceTerminalControl.QuickScript.cs).
     private readonly List<ToolStripItem> _quickCommandItems = new List<ToolStripItem>();
 
     private void RefreshQuickCommandItems()
@@ -2055,20 +2055,22 @@ public partial class DeviceTerminalControl : DpiAwareControl
         bool busy = IsLineClaimed || (_pasteJob != null && _pasteJob.IsActive);
         ToolStripMenuItem quickCommandsMenu = new ToolStripMenuItem("Quick commands")
         {
-            ToolTipText = "Your commands (Tools > Quick commands...): the chosen one is put into the command line, Enter runs it"
+            ToolTipText = "Your commands and scripts (Tools > Quick commands...): a command is put into the command line, a script is typed into the shell of the device; Enter runs it"
         };
         Icons.Apply(quickCommandsMenu, "terminal");
         quickCommandsMenu.DropDown.ShowItemToolTips = true;
         int commandCount = 0;
-        foreach (QuickCommand item in QuickCommandRules.MenuItems(SmarTTY.GUI.Backend.QuickCommandStore.LoadForMenu(), scriptsPossible: false))
+        foreach (QuickCommand item in QuickCommandRules.MenuItems(SmarTTY.GUI.Backend.QuickCommandStore.LoadForMenu(), scriptsPossible: true))
         {
             QuickCommand chosen = item;
             ToolStripMenuItem menuItem = new ToolStripMenuItem(chosen.MenuText.Replace("&", "&&"), null, (sender, args) => InsertQuickCommand(chosen))
             {
                 Enabled = !busy,
-                ToolTipText = QuickCommandRules.ToCommandLine(chosen.Text) + Environment.NewLine + "(press Enter to run it)"
+                ToolTipText = chosen.Kind == QuickCommandKind.Script
+                    ? "Types the script " + chosen.FileName + " into the shell of the device with cat (the current folder, made executable; needs the prompt of a Linux shell), then puts ./" + chosen.FileName + " into the command line (press Enter to run it)"
+                    : QuickCommandRules.ToCommandLine(chosen.Text) + Environment.NewLine + "(press Enter to run it)"
             };
-            Icons.Apply(menuItem, "terminal");
+            Icons.Apply(menuItem, chosen.Kind == QuickCommandKind.Script ? "run" : "terminal");
             quickCommandsMenu.DropDownItems.Add(menuItem);
             commandCount++;
         }
@@ -2078,7 +2080,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         }
         ToolStripMenuItem manage = new ToolStripMenuItem(commandCount == 0 ? "Add quick commands..." : "Quick commands...", null, (sender, args) => QuickCommandsEditRequested?.Invoke(this, EventArgs.Empty))
         {
-            ToolTipText = "Commands that this menu puts into the command line"
+            ToolTipText = "Commands and scripts that this menu puts into the command line"
         };
         Icons.Apply(manage, "edit");
         quickCommandsMenu.DropDownItems.Add(manage);
@@ -2091,11 +2093,19 @@ public partial class DeviceTerminalControl : DpiAwareControl
         contextMenuStrip1.ShowItemToolTips = true;
     }
 
-    /// <summary>Puts a quick command into the command line of the terminal; nothing runs until the user presses Enter.</summary>
+    /// <summary>
+    /// Puts a quick command into the command line of the terminal; nothing runs until the user presses Enter. A script is first
+    /// typed into the shell of the device (see <see cref="UploadQuickScript"/>), then its "./name" is put into the command line.
+    /// </summary>
     private void InsertQuickCommand(QuickCommand item)
     {
-        if (item == null || item.Kind != QuickCommandKind.Command || IsLineClaimed)
+        if (item == null || IsLineClaimed)
         {
+            return;
+        }
+        if (item.Kind == QuickCommandKind.Script)
+        {
+            UploadQuickScript(item);
             return;
         }
         _serialTerminalControl.InsertCommand(QuickCommandRules.ToCommandLine(item.Text));
