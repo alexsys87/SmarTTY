@@ -267,7 +267,7 @@ public static class RemoteFileTypes
         Add(t, ItemIcon.Presentation, "ppt pptx pps ppsx odp");
         Add(t, ItemIcon.Config, "conf cfg config ini toml yaml yml properties env cnf desktop service timer socket mount rules netdev network link preset repo list sources ovpn cron editorconfig");
         Add(t, ItemIcon.Log, "log journal");
-        Add(t, ItemIcon.Shell, "sh bash zsh fish ksh csh tcsh ash dash command bats bat cmd ps1");
+        Add(t, ItemIcon.Shell, "sh bash zsh fish ksh csh tcsh ash dash command bats bat cmd ps1 psm1 psd1 ps1xml pssc psrc");
         Add(t, ItemIcon.Python, "py pyw pyc pyo pyi ipynb");
         Add(t, ItemIcon.CSource, "c h cc cpp cxx c++ hpp hh hxx h++ ipp inl ino");
         Add(t, ItemIcon.Code, "vue kt kts swift cs vb fs scala groovy gradle r jl dart ex exs erl hrl hs ml clj lisp el vim awk asm s nasm bzl sol tcl sv zig nim cr qml ld lds dts dtsi uc ut");

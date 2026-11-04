@@ -81,7 +81,8 @@ namespace SmarTTY.CodeEditing
             DeviceTree, // Device Tree source: C-like comments, no API set
             Tcl,     // Tcl: # comments, command words, foldable { } bodies, no API set
             Awk,     // AWK: # comments, BEGIN/END blocks, foldable { } bodies, no API set
-            Assembly // Assembly: ;, # and @ comments, labels, directives, instructions and registers, no API set
+            Assembly, // Assembly: ;, # and @ comments, labels, directives, instructions and registers, no API set
+            PowerShell // PowerShell: # and <# #> comments, $variables, Verb-Noun commands, here-strings, no API set
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -92,8 +93,9 @@ namespace SmarTTY.CodeEditing
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust, Language.Swift,
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
-            Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Assembly, Language.Ruby,
-            Language.Perl, Language.CMake, Language.Dockerfile, Language.Sql, Language.Markup, Language.Diff
+            Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Assembly,
+            Language.PowerShell, Language.Ruby, Language.Perl, Language.CMake, Language.Dockerfile,
+            Language.Sql, Language.Markup, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -135,6 +137,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Awk: return "AWK";
                 case Language.Tcl: return "Tcl";
                 case Language.Assembly: return "Assembly";
+                case Language.PowerShell: return "PowerShell";
                 case Language.Ruby: return "Ruby";
                 case Language.Perl: return "Perl";
                 case Language.CMake: return "CMake";
@@ -382,6 +385,14 @@ namespace SmarTTY.CodeEditing
                 case "pyx":
                     return Language.Python;
 
+                case "ps1":
+                case "psm1":
+                case "psd1":
+                case "ps1xml":
+                case "pssc":
+                case "psrc":
+                    return Language.PowerShell;
+
                 case "sh":
                 case "bash":
                 case "zsh":
@@ -614,6 +625,11 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.Python;
             }
+            if (program.StartsWith("pwsh", StringComparison.Ordinal) ||
+                program.StartsWith("powershell", StringComparison.Ordinal))
+            {
+                return Language.PowerShell;
+            }
             if (program == "node" || program == "nodejs" || program == "deno" || program == "bun")
             {
                 return Language.JavaScript;
@@ -735,6 +751,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Awk: return AwkTokenizer;
                 case Language.Tcl: return TclTokenizer;
                 case Language.Assembly: return AssemblyTokenizer;
+                case Language.PowerShell: return PowerShellTokenizer;
                 case Language.Ruby: return RubyTokenizer;
                 case Language.Perl: return PerlTokenizer;
                 case Language.CMake: return CMakeTokenizer;
@@ -823,6 +840,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(TclKeywords);
                 case Language.Assembly:
                     return Combine(AssemblyKeywords, AssemblyRegisters);
+                case Language.PowerShell:
+                    return Combine(PowerShellKeywords);
                 case Language.Ruby:
                     return Combine(RubyKeywords);
                 case Language.Perl:
@@ -1886,6 +1905,12 @@ namespace SmarTTY.CodeEditing
         private const int StTripleQuote = 0x10;
         private const int StVerbatim = 0x20;
         private const int StInTag = 0x40;
+        // PowerShell here-strings, closed by "@ or '@ at the start of a line, and ordinary quoted strings,
+        // which may also go on over lines.
+        private const int StPowerShellHereDouble = 0x80;
+        private const int StPowerShellHereSingle = 0x100;
+        private const int StPowerShellDouble = 0x200;
+        private const int StPowerShellSingle = 0x400;
 
         /// <summary>The C keywords; the C profile stays separate from the other C-like languages.</summary>
         private static readonly HashSet<string> CKeywords = new HashSet<string>(StringComparer.Ordinal)
@@ -2344,6 +2369,31 @@ namespace SmarTTY.CodeEditing
             return registers;
         }
 
+        /// <summary>
+        /// The PowerShell keywords. The commands themselves are not listed: a word of the Verb-Noun shape
+        /// ("Get-ChildItem", "Where-Object", including commands of installed modules) is coloured as a keyword.
+        /// </summary>
+        private static readonly HashSet<string> PowerShellKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "begin", "break", "catch", "class", "configuration", "continue", "data", "default", "do",
+            "dynamicparam", "else", "elseif", "end", "enum", "exit", "filter", "finally", "for",
+            "foreach", "function", "hidden", "if", "in", "inlinescript", "node", "parallel", "param",
+            "process", "return", "sequence", "static", "switch", "throw", "trap", "try", "until",
+            "using", "while", "workflow"
+        };
+
+        /// <summary>The comparison, logical, bitwise and formatting operators of PowerShell, e.g. "-eq" and "-replace".</summary>
+        private static readonly HashSet<string> PowerShellOperators = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "-and", "-or", "-xor", "-not", "-band", "-bor", "-bxor", "-bnot", "-shl", "-shr",
+            "-eq", "-ne", "-gt", "-ge", "-lt", "-le", "-ceq", "-cne", "-cgt", "-cge", "-clt", "-cle",
+            "-ieq", "-ine", "-igt", "-ige", "-ilt", "-ile", "-like", "-notlike", "-clike", "-cnotlike",
+            "-ilike", "-inotlike", "-match", "-notmatch", "-cmatch", "-cnotmatch", "-imatch", "-inotmatch",
+            "-contains", "-notcontains", "-ccontains", "-cnotcontains", "-icontains", "-inotcontains",
+            "-in", "-notin", "-cin", "-cnotin", "-iin", "-inotin", "-is", "-isnot", "-as",
+            "-replace", "-creplace", "-ireplace", "-split", "-csplit", "-isplit", "-join", "-f"
+        };
+
         private static readonly HashSet<string> RubyKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
             "BEGIN", "END", "alias", "and", "begin", "break", "case", "class", "def", "do", "else", "elsif",
@@ -2435,6 +2485,7 @@ namespace SmarTTY.CodeEditing
             public bool HyphenatedKeywords;    // CSS and Device Tree words such as font-size and interrupt-parent
             public bool DeviceTreeSyntax;      // /directive/, &label, #cell-count, labels and node names
             public bool AssemblySyntax;        // label:, .directive, %directive and registers
+            public bool PowerShellSyntax;      // $variable, Verb-Noun commands, -eq operators, here-strings
             public string BlockCommentStart;
             public string BlockCommentEnd;
             public HashSet<string> Keywords;
@@ -2532,6 +2583,110 @@ namespace SmarTTY.CodeEditing
                 return -1;
             }
 
+            /// <summary>The index after the closing quote of a PowerShell string searched from an index, or -1.</summary>
+            private static int FindPowerShellStringEnd(string text, int from, char quote)
+            {
+                for (int i = from; i < text.Length; i++)
+                {
+                    char c = text[i];
+                    if (c == '`' && quote == '"')
+                    {
+                        i++;
+                    }
+                    else if (c == quote)
+                    {
+                        if (i + 1 < text.Length && text[i + 1] == quote)
+                        {
+                            i++;
+                        }
+                        else
+                        {
+                            return i + 1;
+                        }
+                    }
+                }
+                return -1;
+            }
+
+            private static int FindPowerShellQuoteEnd(string text, int start, char quote)
+            {
+                return FindPowerShellStringEnd(text, start + 1, quote);
+            }
+
+            /// <summary>The end of a PowerShell variable at "$" or "@": $name, ${name}, $env:PATH, $1, @args.</summary>
+            private static int ReadPowerShellVariable(string text, int start)
+            {
+                int i = start + 1;
+                if (i >= text.Length)
+                {
+                    return i;
+                }
+                if (text[i] == '{')
+                {
+                    int close = text.IndexOf('}', i + 1);
+                    return close < 0 ? text.Length : close + 1;
+                }
+                if (char.IsDigit(text[i]))
+                {
+                    i++;
+                    while (i < text.Length && char.IsDigit(text[i]))
+                    {
+                        i++;
+                    }
+                    return i;
+                }
+                if (text[i] != '?' && text[i] != '^' && text[i] != '$' && !IsIdStart(text[i]))
+                {
+                    return i;
+                }
+                i++;
+                while (i < text.Length && IsIdChar(text[i]))
+                {
+                    i++;
+                }
+                // A scope or drive qualifier: $env:PATH, $global:name, $script:name.
+                if (i < text.Length && text[i] == ':' && i + 1 < text.Length && IsIdStart(text[i + 1]))
+                {
+                    i++;
+                    while (i < text.Length && IsIdChar(text[i]))
+                    {
+                        i++;
+                    }
+                }
+                return i;
+            }
+
+            /// <summary>A command name of the Verb-Noun shape, including commands from installed modules.</summary>
+            private static bool IsPowerShellCommand(string word)
+            {
+                int start = 0;
+                bool hyphen = false;
+                for (int i = 0; i <= word.Length; i++)
+                {
+                    if (i < word.Length && word[i] != '-')
+                    {
+                        continue;
+                    }
+                    if (i == start || !IsIdStart(word[start]))
+                    {
+                        return false;
+                    }
+                    for (int j = start + 1; j < i; j++)
+                    {
+                        if (!IsIdChar(word[j]))
+                        {
+                            return false;
+                        }
+                    }
+                    if (i < word.Length)
+                    {
+                        hyphen = true;
+                    }
+                    start = i + 1;
+                }
+                return hyphen;
+            }
+
             /// <summary>
             /// A Rust lifetime ('a, 'static) or loop label ('outer:) at index: not a string. Only forms that cannot be
             /// a short string are taken (after &amp;, inside &lt;&gt;, after break/continue, in front of a loop).
@@ -2614,7 +2769,59 @@ namespace SmarTTY.CodeEditing
                 int last = 0;
                 bool inTag = MarkupTags && (startState & StInTag) != 0;
 
+                if (PowerShellSyntax)
+                {
+                    int hereString = startState & (StPowerShellHereDouble | StPowerShellHereSingle);
+                    if (hereString != 0)
+                    {
+                        char closeQuote = (hereString == StPowerShellHereDouble) ? '"' : '\'';
+                        if (len >= 2 && text[0] == closeQuote && text[1] == '@')
+                        {
+                            sink.AddToken(TypeString, 0, 2);
+                            i = 2;
+                            last = 2;
+                        }
+                        else
+                        {
+                            if (len > 0)
+                            {
+                                sink.AddToken(TypeString, 0, len);
+                            }
+                            endState = hereString;
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        int quoted = startState & (StPowerShellDouble | StPowerShellSingle);
+                        if (quoted != 0)
+                        {
+                            char quote = (quoted == StPowerShellDouble) ? '"' : '\'';
+                            int stringClose = FindPowerShellStringEnd(text, 0, quote);
+                            if (stringClose < 0)
+                            {
+                                if (len > 0)
+                                {
+                                    sink.AddToken(TypeString, 0, len);
+                                }
+                                endState = quoted;
+                                return true;
+                            }
+                            sink.AddToken(TypeString, 0, stringClose);
+                            i = stringClose;
+                            last = i;
+                        }
+                    }
+                }
+
                 int continuedString = startState & (StBacktick | StTripleQuote | StVerbatim);
+                // The PowerShell states are handled above; a synthetic state may also carry the bits of another
+                // language, and those must not be read a second time from the same line.
+                if (PowerShellSyntax &&
+                    (startState & (StPowerShellHereDouble | StPowerShellHereSingle | StPowerShellDouble | StPowerShellSingle)) != 0)
+                {
+                    continuedString = 0;
+                }
                 if (continuedString != 0)
                 {
                     int stringClose = FindStringEnd(text, 0, continuedString);
@@ -2696,6 +2903,16 @@ namespace SmarTTY.CodeEditing
                         Normal(ref last, last, i, sink);
                         sink.AddToken(TypeComment, i, len);
                         endState = 0;
+                        return true;
+                    }
+
+                    // PowerShell here-strings: @" ... "@ and @' ... '@, opened at the end of a line.
+                    if (PowerShellSyntax && c == '@' && i + 1 < len &&
+                        (text[i + 1] == '"' || text[i + 1] == '\'') && SkipBlanks(text, i + 2) == len)
+                    {
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(TypeString, i, len);
+                        endState = (text[i + 1] == '"') ? StPowerShellHereDouble : StPowerShellHereSingle;
                         return true;
                     }
 
@@ -2850,12 +3067,50 @@ namespace SmarTTY.CodeEditing
                     // In HTML and XML a quote is not special in the text between the tags.
                     if ((c == '"' || (c == '\'' && SingleQuoteStrings)) && (!MarkupTags || inTag))
                     {
-                        int end = FindQuoteEnd(text, i, c);
+                        int end = PowerShellSyntax ? FindPowerShellQuoteEnd(text, i, c) : FindQuoteEnd(text, i, c);
                         Normal(ref last, last, i, sink);
+                        if (PowerShellSyntax && end < 0)
+                        {
+                            sink.AddToken(TypeString, i, len);
+                            endState = (c == '"') ? StPowerShellDouble : StPowerShellSingle;
+                            return true;
+                        }
                         sink.AddToken(TypeString, i, (end < 0) ? len : end);
                         i = (end < 0) ? len : end;
                         last = i;
                         continue;
+                    }
+
+                    // PowerShell variables: $name, ${name}, $env:PATH, $1; splatting: @args.
+                    if (PowerShellSyntax && (c == '$' || (c == '@' && i + 1 < len && IsIdStart(text[i + 1]))))
+                    {
+                        int variableEnd = ReadPowerShellVariable(text, i);
+                        if (variableEnd > i + 1)
+                        {
+                            Normal(ref last, last, i, sink);
+                            sink.AddToken(TypeVariable, i, variableEnd);
+                            i = variableEnd;
+                            last = i;
+                            continue;
+                        }
+                    }
+
+                    // PowerShell comparison, logical and formatting operators: -eq, -not, -replace.
+                    if (PowerShellSyntax && c == '-' && i + 1 < len && IsIdStart(text[i + 1]))
+                    {
+                        int operatorEnd = i + 2;
+                        while (operatorEnd < len && IsIdChar(text[operatorEnd]))
+                        {
+                            operatorEnd++;
+                        }
+                        if (PowerShellOperators.Contains(text.Substring(i, operatorEnd - i)))
+                        {
+                            Normal(ref last, last, i, sink);
+                            sink.AddToken(TypeKeyword, i, operatorEnd);
+                            i = operatorEnd;
+                            last = i;
+                            continue;
+                        }
                     }
 
                     if (MarkupTags && c == '>')
@@ -2963,6 +3218,10 @@ namespace SmarTTY.CodeEditing
                             }
                         }
                         bool keyword = Keywords != null && Keywords.Contains(word);
+                        if (!keyword && PowerShellSyntax && IsPowerShellCommand(word))
+                        {
+                            keyword = true;
+                        }
                         if (keyword && KeywordsAtLineStart)
                         {
                             // Dockerfile instructions and CMake commands are the first word of a line;
@@ -3127,6 +3386,20 @@ namespace SmarTTY.CodeEditing
             Brackets = true,
             Keywords = AssemblyKeywords,
             Registers = AssemblyRegisters
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer PowerShellTokenizer = new GenericSyntax
+        {
+            // PowerShell comments and strings; commands are Verb-Noun words, operators start with '-'.
+            HashComments = true,
+            HashCommentsAnywhere = true,
+            BlockCommentStart = "<#",
+            BlockCommentEnd = "#>",
+            PowerShellSyntax = true,
+            HyphenatedKeywords = true,
+            Brackets = true,
+            FoldCurlyBraces = true,
+            Keywords = PowerShellKeywords
         }.Tokenize;
 
         private static readonly TokenCache.LineTokenizer RubyTokenizer = new GenericSyntax
