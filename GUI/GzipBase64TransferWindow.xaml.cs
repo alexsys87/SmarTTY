@@ -27,7 +27,7 @@ public partial class GzipBase64TransferWindow : Window
 
     internal GzipBase64Transfer.Request Request { get; private set; }
 
-    private GzipBase64TransferWindow(bool sending)
+    private GzipBase64TransferWindow(bool sending, string localPath = null)
     {
         InitializeComponent();
         _sending = sending;
@@ -46,6 +46,10 @@ public partial class GzipBase64TransferWindow : Window
             RemoteHint.Text = "A file name, or a folder (the file keeps its name), e.g. /tmp/ or /root/firmware.bin.";
             OverwriteBox.Content = "Replace the file on the device if it exists";
             StartButton.Content = "_Send";
+            if (!string.IsNullOrEmpty(localPath))
+            {
+                LocalBox.Text = localPath;
+            }
         }
         else
         {
@@ -61,9 +65,9 @@ public partial class GzipBase64TransferWindow : Window
     }
 
     /// <summary>Returns the request, or null when the user cancelled.</summary>
-    internal static GzipBase64Transfer.Request ShowSend(Window owner)
+    internal static GzipBase64Transfer.Request ShowSend(Window owner, string localPath = null)
     {
-        return Show(owner, sending: true);
+        return Show(owner, sending: true, localPath);
     }
 
     /// <summary>Returns the request, or null when the user cancelled.</summary>
@@ -72,9 +76,9 @@ public partial class GzipBase64TransferWindow : Window
         return Show(owner, sending: false);
     }
 
-    private static GzipBase64Transfer.Request Show(Window owner, bool sending)
+    private static GzipBase64Transfer.Request Show(Window owner, bool sending, string localPath = null)
     {
-        GzipBase64TransferWindow window = new GzipBase64TransferWindow(sending);
+        GzipBase64TransferWindow window = new GzipBase64TransferWindow(sending, localPath);
         WindowOwnership.Attach(window, owner ?? WindowOwnership.ActiveWindow());
         return window.ShowDialog() == true ? window.Request : null;
     }

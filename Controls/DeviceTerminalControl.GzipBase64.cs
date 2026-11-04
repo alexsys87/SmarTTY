@@ -49,7 +49,7 @@ public partial class DeviceTerminalControl
     }
 
     /// <summary>Asks what to transfer and runs the transfer over the shared line runner. Must be called on the UI thread.</summary>
-    private void StartGzipBase64Transfer(bool sending)
+    private void StartGzipBase64Transfer(bool sending, string droppedFile = null)
     {
         string caption = sending ? "gzip + base64 Send" : "gzip + base64 Receive";
         if (IsLineBusy())
@@ -61,7 +61,11 @@ public partial class DeviceTerminalControl
             ThemedMessageBox.Show("Please connect first before using gzip + base64 transfer.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        Func<bool, GzipBase64Transfer.Request> prompt = GzipBase64RequestPrompt;
+        // A dropped file is already chosen: the window asks only for the rest (the path on the device and the options).
+        Func<string, GzipBase64Transfer.Request> dropPrompt = GzipBase64DropPrompt;
+        Func<bool, GzipBase64Transfer.Request> prompt = droppedFile != null && dropPrompt != null
+            ? (Func<bool, GzipBase64Transfer.Request>)(s => dropPrompt(droppedFile))
+            : GzipBase64RequestPrompt;
         if (prompt == null)
         {
             ThemedMessageBox.Show("The gzip + base64 transfer window is not available.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);

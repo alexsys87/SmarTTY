@@ -39,12 +39,13 @@ public partial class FileTransferProtocolWindow : Window
                 FilesList.Items.Add(Path.GetFileName(file) + (length >= 0 ? "  (" + FormatSize(length) + ")" : string.Empty));
             }
         }
-        // XMODEM and a raw send carry one file only.
+        // XMODEM, gzip + base64 and a raw send carry one file only.
         XModemButton.IsEnabled = _singleFile;
         XModem1KButton.IsEnabled = _singleFile;
         RawButton.IsEnabled = _singleFile;
+        GzipButton.IsEnabled = _singleFile;
         DeviceFileDropProtocol start = _lastProtocol;
-        if (!_singleFile && (start == DeviceFileDropProtocol.XModem || start == DeviceFileDropProtocol.XModem1K || start == DeviceFileDropProtocol.RawSend))
+        if (!_singleFile && (start == DeviceFileDropProtocol.XModem || start == DeviceFileDropProtocol.XModem1K || start == DeviceFileDropProtocol.RawSend || start == DeviceFileDropProtocol.GzipBase64))
         {
             start = DeviceFileDropProtocol.YModem;
         }
@@ -73,6 +74,7 @@ public partial class FileTransferProtocolWindow : Window
             case DeviceFileDropProtocol.XModem1K: return XModem1KButton;
             case DeviceFileDropProtocol.ZModem: return ZModemButton;
             case DeviceFileDropProtocol.Kermit: return KermitButton;
+            case DeviceFileDropProtocol.GzipBase64: return GzipButton;
             case DeviceFileDropProtocol.RawSend: return RawButton;
             default: return YModemButton;
         }
@@ -84,6 +86,7 @@ public partial class FileTransferProtocolWindow : Window
         if (XModem1KButton.IsChecked == true) return DeviceFileDropProtocol.XModem1K;
         if (ZModemButton.IsChecked == true) return DeviceFileDropProtocol.ZModem;
         if (KermitButton.IsChecked == true) return DeviceFileDropProtocol.Kermit;
+        if (GzipButton.IsChecked == true) return DeviceFileDropProtocol.GzipBase64;
         if (RawButton.IsChecked == true) return DeviceFileDropProtocol.RawSend;
         return DeviceFileDropProtocol.YModem;
     }
@@ -113,6 +116,9 @@ public partial class FileTransferProtocolWindow : Window
                 break;
             case DeviceFileDropProtocol.Kermit:
                 HintText.Text = "Start the Kermit receiver on the device first (for example \"kermit -r\" or the loadb command of the boot loader), then press Send.";
+                break;
+            case DeviceFileDropProtocol.GzipBase64:
+                HintText.Text = "Needs only an idle shell prompt with gzip, base64 and sha256sum (busybox is enough). The next window asks where to put the file on the device.";
                 break;
             default:
                 HintText.Text = "The file is sent as it is. Make the device ready to take the data first (for example \"cat > file\" in a shell). Nothing checks that the data arrived.";
