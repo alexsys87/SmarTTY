@@ -15,11 +15,11 @@
     <StackPanel Grid.Row="3" Margin="8 0 0 0">
       <RadioButton x:Name="XModemButton" GroupName="Protocol" Margin="0 3 0 3" Content="XMODEM (128-byte blocks, one file)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
       <RadioButton x:Name="XModem1KButton" GroupName="Protocol" Margin="0 3 0 3" Content="XMODEM-1K (1024-byte blocks, one file)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
-      <RadioButton x:Name="YModemButton" GroupName="Protocol" Margin="0 3 0 3" Content="YMODEM (one or more files, with name and size)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
-      <RadioButton x:Name="ZModemButton" GroupName="Protocol" Margin="0 3 0 3" Content="ZMODEM (one or more files, the device's rz is started at a shell prompt)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="YModemButton" GroupName="Protocol" Margin="0 3 0 3" Content="YMODEM (one or more files)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="ZModemButton" GroupName="Protocol" Margin="0 3 0 3" Content="ZMODEM (one or more files)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
       <RadioButton x:Name="KermitButton" GroupName="Protocol" Margin="0 3 0 3" Content="Kermit (one or more files)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
-      <RadioButton x:Name="GzipButton" GroupName="Protocol" Margin="0 3 0 3" Content="gzip + base64 through the shell (Linux, OpenWrt; one file, checksum checked)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
-      <RadioButton x:Name="RawButton" GroupName="Protocol" Margin="0 3 0 3" Content="Raw data (the bytes of one file are written to the line, no protocol)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="GzipButton" GroupName="Protocol" Margin="0 3 0 3" Content="gzip + base64 through the shell (one file)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="RawButton" GroupName="Protocol" Margin="0 3 0 3" Content="Raw data (one file, no protocol)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
     </StackPanel>
     <TextBlock x:Name="HintText" Grid.Row="4" TextWrapping="Wrap" Margin="0 10 0 0" Opacity="0.7" />
     <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 14 0 0">
