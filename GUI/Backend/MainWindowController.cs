@@ -338,6 +338,11 @@ public class MainWindowController : INotifyPropertyChanged
         /// <param name="columnUnit">What the column of <paramref name="initialLoc"/> counts (a compiler message says it in screen columns or bytes).</param>
         public void CreateNewEditorTab(SessionWrapper session, string fn, TextDocument.TextPosition initialLoc = default(TextDocument.TextPosition), ColumnUnit columnUnit = ColumnUnit.Characters)
         {
+            if (session.IsWindowsHost)
+            {
+                // "C:\Users\me\a.txt" and "/c:/Users/me/a.txt" are one file, and SFTP wants the second form.
+                fn = SmarTTY.Ssh.WindowsSftpPath.Normalize(fn);
+            }
             EditorTabContext editorTabContext = session.TryActivateEditorForFile(fn);
             if (editorTabContext != null)
             {

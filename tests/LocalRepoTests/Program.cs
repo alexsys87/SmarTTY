@@ -1492,6 +1492,11 @@ internal static class Program
         Check(ToolAvailability.IsAvailable(SessionTool.MemoryEditor, Host(RemoteOsKind.Unknown, RemoteKernelKind.Linux, devmem: true)), "Linux host with devmem offers the memory window");
         Check(!ToolAvailability.IsAvailable(SessionTool.MemoryEditor, Host(RemoteOsKind.Windows, devmem: true)), "Windows host never offers the memory window");
 
+        // The directory commands of the SCP menu pack with tar and compare with find and stat: Unix hosts, probed or not, have them.
+        Check(ToolAvailability.IsAvailable(SessionTool.DirectoryTransfer, linux) && ToolAvailability.IsAvailable(SessionTool.DirectoryTransfer, Host(RemoteOsKind.Unix, RemoteKernelKind.Other)) && ToolAvailability.IsAvailable(SessionTool.DirectoryTransfer, Host(RemoteOsKind.Unknown)), "Unix hosts, found by the probes or not yet, offer the directory commands of the SCP menu");
+        Check(!ToolAvailability.IsAvailable(SessionTool.DirectoryTransfer, Host(RemoteOsKind.Windows, packageManager: true)) && !ToolAvailability.IsAvailable(SessionTool.DirectoryTransfer, Host(RemoteOsKind.Windows, tar: true)), "A Windows host does not get them, even with tar.exe: its folders go through the file list");
+        Check(!ToolAvailability.IsAvailable(SessionTool.DirectoryTransfer, Host(RemoteOsKind.Unix, isDevice: true)), "A device has no SCP menu to begin with");
+
         // A host that has not answered a probe yet: the tools that do not wait for a probe are offered, the others are not.
         RemoteHostFacts unprobed = Host(RemoteOsKind.Unknown);
         Check(ToolAvailability.IsAvailable(SessionTool.ProcessManager, unprobed) && ToolAvailability.IsAvailable(SessionTool.RunScript, unprobed), "Unprobed host: the Unix tools are offered");

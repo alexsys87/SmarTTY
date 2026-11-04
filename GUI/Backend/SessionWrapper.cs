@@ -252,7 +252,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             nameof(PackageManagerMenuVisibility), nameof(ProcessManagerMenuVisibility), nameof(LocalRepoMenuVisibility),
             nameof(PortForwardingMenuVisibility), nameof(SocksProxyMenuVisibility), nameof(PublicKeyMenuVisibility),
             nameof(RunScriptMenuVisibility), nameof(X11CheckMenuVisibility), nameof(TftpFirmwareMenuVisibility),
-            nameof(BackupMenuVisibility), nameof(MtdFlashMenuVisibility), nameof(MemoryEditorMenuVisibility)
+            nameof(BackupMenuVisibility), nameof(MtdFlashMenuVisibility), nameof(MemoryEditorMenuVisibility), nameof(DirectoryTransferMenuVisibility)
         })
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -281,6 +281,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     public System.Windows.Visibility MtdFlashMenuVisibility => ToolVisibility(SessionTool.MtdFlash);
 
     public System.Windows.Visibility MemoryEditorMenuVisibility => ToolVisibility(SessionTool.MemoryEditor);
+
+    // The directory commands of the SCP menu (download or upload a directory, copy between hosts, synchronize).
+    public System.Windows.Visibility DirectoryTransferMenuVisibility => ToolVisibility(SessionTool.DirectoryTransfer);
 
     public System.Windows.Visibility SshOnlyVisibility => IsDevice ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
@@ -540,6 +543,10 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 Icon = IconType.AddVirtual,
                 ActivationHandler = (ITabContext tabContext) =>
                 {
+                    if (IsWindowsHost)
+                    {
+                        MessageBoxes.Info("The Smart Terminal needs a Unix shell (it runs its commands with sh). A Windows host gets the ordinary terminal.");
+                    }
                     CreateNewTerminalPage(virtualMode: true);
                 },
                 ToolTip = "Open another Smart Terminal tab"
@@ -1172,10 +1179,19 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         try
         {
             string home;
-            using (SshShellChannel sshShellChannel = Session.OpenShellChannel("pwd"))
-            using (StreamReader streamReader = new StreamReader(sshShellChannel.Output))
+            if (IsWindowsHost)
             {
-                home = streamReader.ReadLine();
+                // There is no pwd, and the profile is where the SFTP server starts.
+                using SftpChannel sftp = SftpChannel.Open(Session);
+                home = WindowsSftpPath.Normalize(sftp.RealPath("."));
+            }
+            else
+            {
+                using (SshShellChannel sshShellChannel = Session.OpenShellChannel("pwd"))
+                using (StreamReader streamReader = new StreamReader(sshShellChannel.Output))
+                {
+                    home = streamReader.ReadLine();
+                }
             }
             if (!string.IsNullOrEmpty(home))
             {
@@ -1283,8 +1299,26 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             return;
         }
-        X11RemoteStatus status = X11RemoteStatus.Check(session);
-        string text = status.DescribeRefusal(session.HostName) + "\r\n\r\nTerminal tabs work as usual. X11 forwarding can be turned off in the connection settings.";
+        string text;
+        try
+        {
+            if (session.RemoteOs == RemoteOsKind.Windows)
+            {
+                // The SSH server of Windows has no X11 forwarding; there is no xauth to look for either.
+                text = "The SSH server of " + session.HostName + " runs on Windows, which does not support X11 forwarding, so it was refused.";
+            }
+            else
+            {
+                text = X11RemoteStatus.Check(session).DescribeRefusal(session.HostName);
+            }
+            text += "\r\n\r\nTerminal tabs work as usual. X11 forwarding can be turned off in the connection settings.";
+        }
+        catch (Exception)
+        {
+            // This runs on the thread of the connection: a connection that went away while the explanation was prepared is no
+            // reason to bring the program down for a warning.
+            return;
+        }
         _Controller.BeginInvoke(() => MessageBoxes.Warning(text));
     }
 
@@ -1672,6 +1706,16 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public void ExecuteAsyncCommand(string command, string args, ref IRemoteCommand job)
     {
+        if (Session.RemoteOs == RemoteOsKind.Windows)
+        {
+            // The file and folder dialogs ask for "ls", which a Windows host does not have: they get the answer over SFTP.
+            if (command != "ls")
+            {
+                throw new RemoteOperationException("The command \"" + command + "\" is not available for a Windows host.");
+            }
+            job = new SftpListingCommand(Session, args);
+            return;
+        }
         SshShellChannel sshShellChannel = Session.OpenShellChannel(command + " " + args);
         if (sshShellChannel != null)
         {
@@ -2076,7 +2120,14 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public string TryExtractCurrentDir(ITabContext activeTab = null)
     {
-        TerminalEmulatorControl terminalEmulatorControl = ((activeTab ?? ActiveTab) as NormalTabContext)?.Terminal;
+        ITabContext tab = activeTab ?? ActiveTab;
+        if (IsWindowsHost && tab is NormalTabContext windowsTab)
+        {
+            // Nothing can be read from the title or the prompt line of cmd.exe and PowerShell (the title is the path of cmd.exe
+            // itself, and the prompt has no $ or # to look for): the file list keeps the directory of the tab, in SFTP form.
+            return windowsTab.FileExplorer?.WorkingDirectory;
+        }
+        TerminalEmulatorControl terminalEmulatorControl = (tab as NormalTabContext)?.Terminal;
         if (terminalEmulatorControl == null)
         {
             return null;
@@ -2123,6 +2174,13 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             // One owner per device: a second terminal on the same COM port (or a clone of the connection) is not offered.
             MessageBoxes.Info("A COM/TCP session has a single terminal. Open another port from the 'Connect to another target' list, or close this tab first.");
             return;
+        }
+        if (virtualMode && IsWindowsHost)
+        {
+            // The Smart Terminal runs its commands with sh and takes its directory from pwd, which cmd.exe and PowerShell do not
+            // answer like a Unix shell: a Windows host gets the ordinary terminal (a tab that fails to open is no tab at all).
+            virtualMode = false;
+            initialDirForVirtualMode = null;
         }
         try
         {

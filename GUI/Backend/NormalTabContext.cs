@@ -94,7 +94,17 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             // cmd.exe and PowerShell do not report their directory: it is read from their prompt, so the list follows a "cd".
             SmarTTY.Terminal.TerminalDirectoryWatcher directoryWatcher = new SmarTTY.Terminal.TerminalDirectoryWatcher();
             directoryWatcher.DirectoryReported += fileListHost.ReportTerminalDirectory;
-            term.OutputReceived += directoryWatcher.Observe;
+            term.OutputReceived += (string output) =>
+            {
+                try
+                {
+                    directoryWatcher.Observe(output);
+                }
+                catch
+                {
+                    // Reading the prompt is a courtesy and runs for every chunk of output: it must never break the terminal.
+                }
+            };
             // And the other way: a folder opened in the list is entered in the shell too, when the shell waits at a prompt.
             SmarTTY.Terminal.TerminalDirectorySync directorySync = new SmarTTY.Terminal.TerminalDirectorySync(directoryWatcher, term.TypeText);
             fileListHost.Navigated += directorySync.Request;
