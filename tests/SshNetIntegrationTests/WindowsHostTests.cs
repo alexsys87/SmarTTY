@@ -22,6 +22,7 @@ internal static class WindowsHostTests
         Certutil();
         IdlePrompt();
         Sync();
+        WhatWindowsAnswers();
     }
 
     private static void Paths()
@@ -170,6 +171,84 @@ internal static class WindowsHostTests
         Test.Equal("", string.Join("|", Reports(esc + "]7;file://host/home/user\u0007", esc + "]9;9;/not/windows\u0007", esc + "]0;C:\\Windows\\system32\\cmd.exe\u0007")), "a Unix OSC 7, a path without a drive and a window title are not directories");
         Test.Equal(@"C:\", string.Join("|", Reports(esc + "]0;C:\\Windows\\system32\\cmd.exe\u0007C:\\>")), "a title with a path in it does not hide the prompt after it");
         Test.Equal("", string.Join("|", Reports("", null, "plain output\r\n")), "empty chunks and plain output report nothing");
+    }
+
+    /// <summary>
+    /// A Windows host answers every command that is written for a Unix shell with an error in the words of its own language, or
+    /// with nothing. The code that reads those answers (the probes at the start of a session, the dialogs, the tools) must take
+    /// them for what they are: no exception on a thread of the program (that ends the program), and no feature that is found where
+    /// it is not.
+    /// </summary>
+    private static void WhatWindowsAnswers()
+    {
+        string[][] answers =
+        {
+            new string[0],
+            new[] { "" },
+            new[] { "'/bin' is not recognized as an internal or external command,", "operable program or batch file." },
+            new[] { "'uname' is not recognized as an internal or external command,", "operable program or batch file.", "" },
+            new[] { "'uname' \u043d\u0435 \u044f\u0432\u043b\u044f\u0435\u0442\u0441\u044f \u0432\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u0435\u0439 \u0438\u043b\u0438 \u0432\u043d\u0435\u0448\u043d\u0435\u0439 \u043a\u043e\u043c\u0430\u043d\u0434\u043e\u0439, \u0438\u0441\u043f\u043e\u043b\u043d\u044f\u0435\u043c\u043e\u0439 \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u043e\u0439 \u0438\u043b\u0438 \u043f\u0430\u043a\u0435\u0442\u043d\u044b\u043c \u0444\u0430\u0439\u043b\u043e\u043c." },
+            new[]
+            {
+                "/bin/sh : The term '/bin/sh' is not recognized as the name of a cmdlet, function, script file, or operable program.",
+                "Check the spelling of the name, or if a path was included, verify that the path is correct and try again.",
+                "At line:1 char:1",
+                "+ /bin/sh -c 'if [ -f /etc/openwrt_release ] || [ -d /etc ]; then echo SMARTTY_OS=openwrt; fi'",
+                "+ ~~~~~~~",
+                "    + CategoryInfo          : ObjectNotFound: (/bin/sh:String) [], CommandNotFoundException",
+                "    + FullyQualifiedErrorId : CommandNotFoundException",
+                ""
+            },
+            new[] { "FIND: Parameter format not correct", "The syntax of the command is incorrect.", "Access is denied.", "The system cannot find the path specified." },
+            new[] { new string('x', 100000), "\u0000\u0001\u001b[31m\u001b]0;title\u0007", "C:\\Users\\me>", "   ", "\t" }
+        };
+        System.Collections.Generic.List<string> failed = new System.Collections.Generic.List<string>();
+        System.Collections.Generic.List<string> foundWhereItIsNot = new System.Collections.Generic.List<string>();
+        int index = 0;
+        foreach (string[] lines in answers)
+        {
+            index++;
+            string name = "answer " + index;
+            void Run(string what, Action action)
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception exception)
+                {
+                    failed.Add(name + " / " + what + ": " + exception.GetType().Name + " " + exception.Message);
+                }
+            }
+            Run("OpenWrtDetector.Detect", () => { if (SmarTTY.LocalRepo.OpenWrtDetector.Detect(lines) != null) { foundWhereItIsNot.Add(name + ": OpenWrt"); } });
+            Run("OpenWrtDetector.IsAnswer", () => SmarTTY.LocalRepo.OpenWrtDetector.IsAnswer(lines));
+            Run("RemoteOsDetector.FromKernelProbe", () => { if (RemoteOsDetector.FromKernelProbe(lines) != RemoteKernelKind.Unknown) { foundWhereItIsNot.Add(name + ": a kernel"); } });
+            Run("RemoteOsDetector.FromWindowsProbe", () => RemoteOsDetector.FromWindowsProbe(lines));
+            Run("X11RemoteStatus.Parse", () => X11RemoteStatus.Parse(lines));
+            Run("ByteColumns.ParseProbe", () => { if (SmarTTY.Terminal.ByteColumns.ParseProbe(lines)) { foundWhereItIsNot.Add(name + ": byte columns"); } });
+            Run("DfOutputParser.Parse", () => { if (SmarTTY.IO.DfOutputParser.Parse(lines).Count != 0) { foundWhereItIsNot.Add(name + ": a disk"); } });
+            Run("LsOutputParser.ParseLine", () => { foreach (string line in lines) { SmarTTY.IO.LsOutputParser.LsParser.ParseLine(line); } });
+            Run("RemoteProcessList.Parse", () => SmarTTY.IO.RemoteProcessList.Parse(lines, null));
+            Run("RemoteBackup.FromTarProbe", () => { if (SmarTTY.Transport.RemoteBackup.FromTarProbe(lines) == true) { foundWhereItIsNot.Add(name + ": tar"); } });
+            Run("RemoteBackup.ParseHostInfo", () => SmarTTY.Transport.RemoteBackup.ParseHostInfo(lines));
+            Run("RemoteBackup.ParseListing", () => SmarTTY.Transport.RemoteBackup.ParseListing(lines));
+            Run("RemoteBackup.ParseSizeOutput", () => SmarTTY.Transport.RemoteBackup.ParseSizeOutput(lines));
+            Run("WindowsAuthorizedKeys.IsAdministratorListed", () => { if (WindowsAuthorizedKeys.IsAdministratorListed(lines)) { foundWhereItIsNot.Add(name + ": administrator"); } });
+            Run("WindowsAuthorizedKeys.ParseProgramData", () => { if (WindowsAuthorizedKeys.ParseProgramData(lines) != null) { foundWhereItIsNot.Add(name + ": ProgramData"); } });
+            Run("WindowsAuthorizedKeys.ParseAdminKeysFile", () => WindowsAuthorizedKeys.ParseAdminKeysFile(lines));
+            Run("SftpListingCommand arguments", () => { });
+            Run("WindowsRemoteFileTools.ParseChecksum", () => { if (Transport.WindowsRemoteFileTools.ParseChecksum(lines) != null) { foundWhereItIsNot.Add(name + ": a checksum"); } });
+            Run("TerminalDirectoryWatcher", () =>
+            {
+                SmarTTY.Terminal.TerminalDirectoryWatcher watcher = new SmarTTY.Terminal.TerminalDirectoryWatcher();
+                foreach (string line in lines)
+                {
+                    watcher.Observe(line + "\r\n");
+                }
+            });
+        }
+        Test.Check(failed.Count == 0, "no parser throws on what a Windows host answers to Unix commands (" + string.Join("; ", failed) + ")");
+        Test.Check(foundWhereItIsNot.Count == 0, "and none finds a feature in it: " + string.Join("; ", foundWhereItIsNot));
     }
 
     private static void IdlePrompt()

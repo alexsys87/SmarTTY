@@ -46,6 +46,15 @@
     <Compile Include="../../VisualTTY/LinuxPackageInfo.cs" Link="VisualTTY/LinuxPackageInfo.cs" />
     <Compile Include="../../VisualTTY/PackageCommitOptions.cs" Link="VisualTTY/PackageCommitOptions.cs" />
     <Compile Include="../../IO/RemoteProcessList.cs" Link="IO/RemoteProcessList.cs" />
+    <Compile Include="../../IO/IRemoteCommand.cs" Link="IO/IRemoteCommand.cs" />
+    <Compile Include="../../IO/SftpListingCommand.cs" Link="IO/SftpListingCommand.cs" />
+    <Compile Include="../../IO/LsOutputParser.cs" Link="IO/LsOutputParser.cs" />
+    <Compile Include="../../LocalRepo/OpenWrtDetector.cs" Link="LocalRepo/OpenWrtDetector.cs" />
+    <Compile Include="../../LocalRepo/LocalRepoPackageManager.cs" Link="LocalRepo/LocalRepoPackageManager.cs" />
+    <Compile Include="../../Transport/RemoteBackup.cs" Link="Transport/RemoteBackup.cs" />
+    <Compile Include="../../Transport/MtdFlash.cs" Link="Transport/MtdFlash.cs" />
+    <Compile Include="../../Transport/DevMem.cs" Link="Transport/DevMem.cs" />
+    <Compile Include="../../Utilities/PosixShell.cs" Link="Utilities/PosixShell.cs" />
     <Compile Include="../../Terminal/TerminalDirectoryWatcher.cs" Link="Terminal/TerminalDirectoryWatcher.cs" />
     <Compile Include="../../Terminal/TerminalDirectorySync.cs" Link="Terminal/TerminalDirectorySync.cs" />
     <Compile Include="../../Terminal/ByteColumns.cs" Link="Terminal/ByteColumns.cs" />

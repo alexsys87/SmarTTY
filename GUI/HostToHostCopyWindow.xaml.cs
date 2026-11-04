@@ -119,6 +119,11 @@ public partial class HostToHostCopyWindow : Window
             MessageBoxes.Error("Choose the host to copy from and the host to copy to.");
             return;
         }
+        if (source.IsWindowsHost || destination.IsWindowsHost)
+        {
+            MessageBoxes.Error("The folder is copied with tar on both hosts, which a Windows host does not have. Download it to this computer and upload it again, from the file list.");
+            return;
+        }
         if (source == destination)
         {
             MessageBoxes.Error("The source and the target are the same host. Use \"Copy a directory\" for a local copy.");

@@ -50,6 +50,7 @@ internal static class Program
             WindowsTransferTests.Run(environment);
             WindowsEditingTests.Run(environment);
             SftpFolderTests.Run(environment);
+            SftpListingTests.Run(environment);
             HostToHostCopyTests.Run(environment);
             X11ForwardingTests.RunLive(environment);
         }

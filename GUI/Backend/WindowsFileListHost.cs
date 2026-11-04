@@ -43,16 +43,23 @@ public sealed class WindowsFileListHost : IFileListHost
     {
         new Thread(() =>
         {
-            string directory = "/";
+            // A thread that ends with an exception ends the program: whatever goes wrong here, the list just starts at the root.
             try
             {
-                using SftpChannel sftp = SftpChannel.Open(Session);
-                directory = WindowsSftpPath.Normalize(new SftpFileSystem(sftp).HomeDirectory());
+                string directory = "/";
+                try
+                {
+                    using SftpChannel sftp = SftpChannel.Open(Session);
+                    directory = WindowsSftpPath.Normalize(new SftpFileSystem(sftp).HomeDirectory());
+                }
+                catch
+                {
+                }
+                SetCurrentDirectory(directory);
             }
             catch
             {
             }
-            SetCurrentDirectory(directory);
         })
         {
             IsBackground = true
@@ -80,7 +87,15 @@ public sealed class WindowsFileListHost : IFileListHost
             }
         }
         SetCurrentDirectory(target);
-        Navigated?.Invoke(target);
+        try
+        {
+            Navigated?.Invoke(target);
+        }
+        catch
+        {
+            // Entering the folder in the shell as well is a courtesy; a shell that cannot be written to (the tab is closing) must
+            // not make the move in the list fail.
+        }
     }
 
     /// <summary>

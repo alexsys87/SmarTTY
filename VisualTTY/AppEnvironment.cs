@@ -74,6 +74,13 @@ public static class AppEnvironment
         }
         try
         {
+            if (sshSession.RemoteOs == RemoteOsKind.Windows)
+            {
+                // No pwd there; the profile is where the SFTP server starts.
+                using SftpChannel sftp = SftpChannel.Open(sshSession);
+                cachedHomeDirectory = WindowsSftpPath.Normalize(sftp.RealPath("."));
+                return;
+            }
             using SshShellChannel sshShellChannel = sshSession.OpenShellChannel("pwd");
             using StreamReader streamReader = new StreamReader(sshShellChannel.Output);
             cachedHomeDirectory = streamReader.ReadLine();

@@ -37,7 +37,13 @@ public enum SessionTool
     MtdFlash,
 
     /// <summary>Tools > Memory (devmem): reads and writes physical memory with devmem or devmem2.</summary>
-    MemoryEditor
+    MemoryEditor,
+
+    /// <summary>
+    /// SCP > Download a directory, Upload a directory, Copy a directory between hosts and Synchronize folders: they pack with tar and
+    /// compare with find and stat on the host. A Windows host gets its folders through the file list instead (SFTP, file by file).
+    /// </summary>
+    DirectoryTransfer
 }
 
 /// <summary>What is known about the host of a session when the Tools menu is shown.</summary>
@@ -116,6 +122,8 @@ public static class ToolAvailability
             case SessionTool.RunScript:
             case SessionTool.X11Check:
                 // sh, chmod, /tmp and xauth are tools of a Unix host.
+                return host.Os != RemoteOsKind.Windows;
+            case SessionTool.DirectoryTransfer:
                 return host.Os != RemoteOsKind.Windows;
             case SessionTool.Backup:
                 // /bin/sh and tar: offered once the probe has found tar, so a host without it (or a Windows one) never sees the item.

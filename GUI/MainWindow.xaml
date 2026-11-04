@@ -203,22 +203,22 @@
             <Image Source="../icons/MainWindow/upload.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Download a directory" Click="DownloadDir_Click">
+        <MenuItem Header="Download a directory" Click="DownloadDir_Click" Visibility="{Binding Path=ActiveSession.DirectoryTransferMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/getdir.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Upload a directory" Click="UploadDir_Click">
+        <MenuItem Header="Upload a directory" Click="UploadDir_Click" Visibility="{Binding Path=ActiveSession.DirectoryTransferMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/updir.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Copy a directory between hosts..." Click="CopyDirBetweenHosts_Click">
+        <MenuItem Header="Copy a directory between hosts..." Click="CopyDirBetweenHosts_Click" Visibility="{Binding Path=ActiveSession.DirectoryTransferMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/dialog-scp-download.png" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="Synchronize folders..." Click="Synchronize_Click">
+        <MenuItem Header="Synchronize folders..." Click="Synchronize_Click" Visibility="{Binding Path=ActiveSession.DirectoryTransferMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/refresh16.png" />
           </MenuItem.Icon>
