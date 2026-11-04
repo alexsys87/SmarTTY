@@ -29,6 +29,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Nginx:
                 case SyntaxHighlighting.Language.SshConfig:
                 case SyntaxHighlighting.Language.Script:
+                case SyntaxHighlighting.Language.Awk:
                 case SyntaxHighlighting.Language.Tcl:
                 case SyntaxHighlighting.Language.Ruby:
                 case SyntaxHighlighting.Language.Perl:

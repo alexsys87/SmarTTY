@@ -266,6 +266,8 @@ public static class EditorSignatureSource
             case SyntaxHighlighting.Language.CMake:
                 skipFirstName = TryCMakeDefinition(text, i, out name, out openParen);
                 return skipFirstName;
+            case SyntaxHighlighting.Language.Awk:
+                return TryKeywordDefinition(text, i, out name, out openParen, "function", "func");
             case SyntaxHighlighting.Language.Script:
                 return TryKeywordDefinition(text, i, out name, out openParen, "function", "fn")
                     || TryBareDefinition(text, i, out name, out openParen);
@@ -655,6 +657,7 @@ public static class EditorSignatureSource
             case SyntaxHighlighting.Language.Python:
             case SyntaxHighlighting.Language.Bash:
             case SyntaxHighlighting.Language.Script:
+            case SyntaxHighlighting.Language.Awk:
             case SyntaxHighlighting.Language.Tcl:
             case SyntaxHighlighting.Language.Ruby:
             case SyntaxHighlighting.Language.Perl:

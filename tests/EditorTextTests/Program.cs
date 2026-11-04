@@ -200,8 +200,17 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/CMakeLists.txt"), L.CMake, "CMakeLists.txt is CMake");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/tools.cmake"), L.CMake, ".cmake is CMake");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/job.r"), L.Script, "R stays in the generic script profile");
-        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/run.awk"), L.Script, "AWK stays in the generic script profile");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/run.awk"), L.Awk, ".awk is AWK");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/default.nix"), L.Script, "Nix stays in the generic script profile");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Awk), "AWK", "AWK has its own display name");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Awk), "AWK is in the syntax menu");
+        Check(SyntaxHighlighting.GetKeywords(L.Awk).Contains("BEGIN"), "AWK keywords contain 'BEGIN'");
+        Check(SyntaxHighlighting.GetKeywords(L.Awk).Contains("print"), "AWK keywords contain 'print'");
+        Check(SyntaxHighlighting.GetKeywords(L.Awk).Contains("getline"), "AWK keywords contain 'getline'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Awk).Contains("sizeof"), "AWK keywords do not include the C 'sizeof'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("BEGIN"), "the generic Script profile no longer carries the AWK 'BEGIN'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("getline"), "the generic Script profile no longer carries the AWK 'getline'");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Script), "Script (R, Nix)", "the generic Script profile now covers only R and Nix");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/deploy.tcl"), L.Tcl, ".tcl is Tcl");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/panel.tk"), L.Tcl, ".tk is Tcl");
         Equal(SyntaxHighlighting.GetDisplayName(L.Tcl), "Tcl", "Tcl has its own display name");
@@ -256,6 +265,11 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/tclsh"), L.Tcl, "tclsh is Tcl");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env wish8.6"), L.Tcl, "wish is Tcl");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/expect -f"), L.Tcl, "an Expect script is Tcl");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/awk -f"), L.Awk, "awk is AWK");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env gawk"), L.Awk, "gawk is AWK");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/mawk -f"), L.Awk, "mawk is AWK");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/nawk -f"), L.Awk, "nawk is AWK");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/bin/busybox awk"), L.Awk, "busybox awk is AWK");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/Rscript"), L.Script, "Rscript stays in the generic script profile");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "hello"), L.Plain, "no shebang: plain");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/x.sh", "#!/usr/bin/python"), L.Bash, "the extension wins over the shebang");
@@ -486,6 +500,22 @@ internal static class Program
         Equal(Join(tcl.Tokens(3, SyntaxHighlighting.TypeKeyword)), "if|eq|return", "Tcl control words and operators");
         Equal(Join(tcl.Tokens(3, SyntaxHighlighting.TypeString)), "\"\"", "an empty Tcl string");
         Equal(Join(tcl.Tokens(5, SyntaxHighlighting.TypeString)), "", "Tcl single quotes are not strings");
+        Highlighted awk = new Highlighted(L.Awk,
+            "# note\nBEGIN { FS = \",\" }\nfunction add(a, b) {\n    return a + b\n}\n" +
+            "{ print $1 } # note2\nEND { printf \"%d\\n\", NR }\nset x 'literal'");
+        Equal(Join(awk.Tokens(0, SyntaxHighlighting.TypeComment)), "# note", "an AWK line comment");
+        Equal(Join(awk.Tokens(1, SyntaxHighlighting.TypeKeyword)), "BEGIN|FS", "AWK pattern and variable keywords");
+        Equal(Join(awk.Tokens(1, SyntaxHighlighting.TypeString)), "\",\"", "an AWK quoted string");
+        Equal(Join(awk.Tokens(2, SyntaxHighlighting.TypeKeyword)), "function", "an AWK function keyword");
+        Equal(Join(awk.Tokens(3, SyntaxHighlighting.TypeKeyword)), "return", "an AWK return keyword");
+        Equal(Join(awk.Tokens(5, SyntaxHighlighting.TypeKeyword)), "print", "an AWK print keyword");
+        Equal(Join(awk.Tokens(5, SyntaxHighlighting.TypeComment)), "# note2", "an AWK comment after code");
+        Equal(Join(awk.Tokens(6, SyntaxHighlighting.TypeKeyword)), "END|printf|NR", "AWK END and printf keywords");
+        Equal(Join(awk.Tokens(6, SyntaxHighlighting.TypeString)), "\"%d\\n\"", "an AWK printf format string");
+        Equal(Join(awk.Tokens(7, SyntaxHighlighting.TypeString)), "", "AWK single quotes are not strings");
+        TokenCache.Token awkBrace = awk.At(1, 6);
+        Check(awkBrace != null && awkBrace.Partner != null, "AWK braces are paired");
+        Check(awkBrace.Style != null, "AWK braces are foldable");
         Highlighted html2 = new Highlighted(L.Markup, "<p>He said \"hi</p>\n<a href=\"u\"\n   title=\"t\">x</a>\n<!DOCTYPE html>");
         Equal(Join(html2.Tokens(0, SyntaxHighlighting.TypeString)), "", "a quote in the text between tags is not a string");
         Equal(Join(html2.Tokens(1, SyntaxHighlighting.TypeString)), "\"u\"", "an attribute value is");
@@ -1098,6 +1128,7 @@ internal static class Program
         Equal(Join(markup.Toggle(new[] { "<!-- <a/> -->" })), "<a/>", "markup comment is removed");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CLike).Toggle(new[] { "int a;" })), "// int a;", "C-like comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Cpp).Toggle(new[] { "int a;" })), "// int a;", "C++ comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Awk).Toggle(new[] { "print $1" })), "# print $1", "AWK comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Tcl).Toggle(new[] { "set x 1" })), "# set x 1", "Tcl comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Ruby).Toggle(new[] { "puts 1" })), "# puts 1", "Ruby comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Perl).Toggle(new[] { "print 1" })), "# print 1", "Perl comment");
