@@ -1,3 +1,4 @@
+using SmarTTY.IO;
 using System;
 using System.IO;
 using System.Linq;
@@ -14,6 +15,8 @@ public enum DeviceFileDropProtocol
     YModem,
     ZModem,
     Kermit,
+    /// <summary>Through the shell of a Linux device: packed with gzip, typed as base64, unpacked there (one file).</summary>
+    GzipBase64,
     /// <summary>The bytes of the file are written to the line as they are, with no protocol.</summary>
     RawSend,
 }
@@ -35,12 +38,18 @@ public partial class DeviceTerminalControl
     }
 
     /// <summary>
+    /// Asks for the gzip + base64 transfer of the dropped file (its full path): the window also needs the path on the device.
+    /// Returns the request, or null when the user cancelled. Injected by <c>App</c>, like <see cref="FileDropProtocolPrompt"/>.
+    /// </summary>
+    public static Func<string, GzipBase64Transfer.Request> GzipBase64DropPrompt;
+
+    /// <summary>
     /// Every child control has to accept the drop itself: a WinForms control that does not allow drops hides the
     /// ones below it. Text boxes and combo boxes are left alone, so that they keep their own text drop behavior.
     /// </summary>
     private void HookFileDrop(Control control)
     {
-        if (control is TextBoxBase || control is ComboBox || control is ToolStrip)
+        if (control is TextBoxBase || control is ComboBox)
         {
             return;
         }
@@ -145,6 +154,14 @@ public partial class DeviceTerminalControl
                 break;
             case DeviceFileDropProtocol.Kermit:
                 StartKermitSend(files);
+                break;
+            case DeviceFileDropProtocol.GzipBase64:
+                if (files.Length != 1)
+                {
+                    ThemedMessageBox.Show("The gzip + base64 transfer sends one file at a time. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "gzip + base64 Send", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                StartGzipBase64Transfer(sending: true, droppedFile: files[0]);
                 break;
             case DeviceFileDropProtocol.RawSend:
                 if (files.Length != 1)
