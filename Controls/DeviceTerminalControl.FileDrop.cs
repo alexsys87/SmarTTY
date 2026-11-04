@@ -19,6 +19,8 @@ public enum DeviceFileDropProtocol
     GzipBase64,
     /// <summary>The bytes of the file are written to the line as they are, with no protocol.</summary>
     RawSend,
+    /// <summary>Through the shell of a Linux device: packed with gzip and sent as it is, with no text form, read there in raw mode (one file).</summary>
+    GzipCat,
 }
 
 // Files dropped on the terminal: a window asks which protocol to send them with, then the same code runs as for the
@@ -42,6 +44,9 @@ public partial class DeviceTerminalControl
     /// Returns the request, or null when the user cancelled. Injected by <c>App</c>, like <see cref="FileDropProtocolPrompt"/>.
     /// </summary>
     public static Func<string, GzipBase64Transfer.Request> GzipBase64DropPrompt;
+
+    /// <summary>The same for the raw form, gzip + cat (the request then has <see cref="GzipBase64Transfer.EncodingKind.Raw"/>).</summary>
+    public static Func<string, GzipBase64Transfer.Request> GzipCatDropPrompt;
 
     /// <summary>
     /// Every child control has to accept the drop itself: a WinForms control that does not allow drops hides the
@@ -162,6 +167,14 @@ public partial class DeviceTerminalControl
                     return;
                 }
                 StartGzipBase64Transfer(sending: true, droppedFile: files[0]);
+                break;
+            case DeviceFileDropProtocol.GzipCat:
+                if (files.Length != 1)
+                {
+                    ThemedMessageBox.Show("The gzip + cat transfer sends one file at a time. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "gzip + cat Send", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                StartGzipBase64Transfer(sending: true, droppedFile: files[0], raw: true);
                 break;
             case DeviceFileDropProtocol.RawSend:
                 if (files.Length != 1)

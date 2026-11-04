@@ -221,7 +221,7 @@ jobs:
         run: dotnet run --project tests/LocalFolderTreeTests -c Release
 
   interop:
-    name: File transfer interoperability (lrzsz, C-Kermit, G-Kermit, gzip + base64 through BusyBox ash and bash)
+    name: File transfer interoperability (lrzsz, C-Kermit, G-Kermit, gzip + base64 and gzip + cat through BusyBox ash and bash)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -246,7 +246,7 @@ jobs:
       - name: Kermit against C-Kermit and G-Kermit (sliding windows, clean and noisy lines)
         run: python3 tests/KermitInterop/run_interop.py
 
-      - name: gzip + base64 transfer through a real shell on a pseudo terminal (BusyBox ash as on OpenWrt, bash; damaged data, cancel, no echo)
+      - name: gzip + base64 and gzip + cat (raw) transfer through a real shell on a pseudo terminal (BusyBox ash as on OpenWrt, bash; damaged data, cancel, no echo)
         run: dotnet run --project tests/GzipBase64TransferTests -c Release
 
       - name: Backup to and restore from tar.gz (mount table, folder tree, tar streamed to stdout and stdin, md5sum check; /bin/sh with GNU tar, BusyBox ash with BusyBox tar as on OpenWrt)

@@ -9,7 +9,9 @@ namespace SmarTTY.GUI;
 
 /// <summary>
 /// Asks what to send to the device (or fetch from it) with the gzip + base64 transfer: the file, the path on the device and
-/// the options of <see cref="GzipBase64Transfer.Options"/>. What was chosen last time is offered again.
+/// the options of <see cref="GzipBase64Transfer.Options"/>. What was chosen last time is offered again. The same window asks for
+/// the raw form, gzip + cat (<see cref="GzipBase64Transfer.EncodingKind.Raw"/>): there is no text form to choose and no line
+/// length, and the speed limit is the speed of the whole stream.
 /// </summary>
 public partial class GzipBase64TransferWindow : Window
 {
@@ -22,23 +24,39 @@ public partial class GzipBase64TransferWindow : Window
     private static string _lastAttempts = "2";
     private static string _lastRate = "6000";
     private static string _lastBlock = "1024";
+    private static string _lastRawRate = "6000";
 
     private readonly bool _sending;
+    private readonly bool _raw;
 
     internal GzipBase64Transfer.Request Request { get; private set; }
 
-    private GzipBase64TransferWindow(bool sending, string localPath = null)
+    private GzipBase64TransferWindow(bool sending, string localPath, bool raw)
     {
         InitializeComponent();
         _sending = sending;
+        _raw = raw;
         EncodingBox.SelectedIndex = _lastEncoding;
         ChecksumBox.SelectedIndex = _lastChecksum;
         AttemptsBox.Text = _lastAttempts;
-        RateBox.Text = _lastRate;
+        RateBox.Text = raw ? _lastRawRate : _lastRate;
         BlockBox.Text = _lastBlock;
+        if (raw)
+        {
+            // gzip + cat: the archive goes as it is, so there is no text form and no line to check against an echo.
+            EncodingLabel.Visibility = Visibility.Collapsed;
+            EncodingBox.Visibility = Visibility.Collapsed;
+            BlockLabel.Visibility = Visibility.Collapsed;
+            BlockPanel.Visibility = Visibility.Collapsed;
+            RateLabel.Text = "Speed:";
+            RateBox.ToolTip = "Bytes per second that the archive is sent at. There is no echo in raw mode to tell that the device has kept up, so keep it under what the device and its line can take: 11520 is the top of a 115200 baud line, 6000 is safe for most routers.";
+            NoteText.Text = sending
+                ? "Start this at an idle shell prompt of the device (not inside another program). The device needs gunzip, stty and cat (head -c or dd to count the bytes; without them the end of the data is found by 8 seconds of silence on the line) and sha256sum (or md5sum); OpenWrt has them in busybox. Nothing is installed on the device. The file is packed with gzip and sent as it is, without base64, unpacked there, then the checksums are compared. Nothing can be checked on the way, so a check that fails repeats the whole transfer. The file gets its name only when the checksums match."
+                : "Start this at an idle shell prompt of the device (not inside another program). The device needs gzip, stty, wc and cat, and sha256sum (or md5sum); OpenWrt has them in busybox. Nothing is installed on the device. The file is packed with gzip there and sent as it is, without base64, then unpacked here and the checksums are compared. Nothing can be checked on the way, so a check that fails repeats the whole transfer.";
+        }
         if (sending)
         {
-            Title = "Send file via gzip + base64";
+            Title = raw ? "Send file via gzip + cat" : "Send file via gzip + base64";
             IntroText.Text = "Sends a file to the device through its shell, with no file transfer program on the device.";
             LocalLabel.Text = "File to send:";
             RemoteLabel.Text = "Save on the device as:";
@@ -53,7 +71,7 @@ public partial class GzipBase64TransferWindow : Window
         }
         else
         {
-            Title = "Receive file via gzip + base64";
+            Title = raw ? "Receive file via gzip + cat" : "Receive file via gzip + base64";
             IntroText.Text = "Fetches a file from the device through its shell, with no file transfer program on the device.";
             LocalLabel.Text = "Save as:";
             RemoteLabel.Text = "File on the device:";
@@ -64,21 +82,21 @@ public partial class GzipBase64TransferWindow : Window
         }
     }
 
-    /// <summary>Returns the request, or null when the user cancelled.</summary>
-    internal static GzipBase64Transfer.Request ShowSend(Window owner, string localPath = null)
+    /// <summary>Returns the request, or null when the user cancelled. With <paramref name="raw"/> it is a request for gzip + cat.</summary>
+    internal static GzipBase64Transfer.Request ShowSend(Window owner, string localPath = null, bool raw = false)
     {
-        return Show(owner, sending: true, localPath);
+        return Show(owner, sending: true, localPath, raw);
     }
 
-    /// <summary>Returns the request, or null when the user cancelled.</summary>
-    internal static GzipBase64Transfer.Request ShowReceive(Window owner)
+    /// <summary>Returns the request, or null when the user cancelled. With <paramref name="raw"/> it is a request for gzip + cat.</summary>
+    internal static GzipBase64Transfer.Request ShowReceive(Window owner, bool raw = false)
     {
-        return Show(owner, sending: false);
+        return Show(owner, sending: false, localPath: null, raw);
     }
 
-    private static GzipBase64Transfer.Request Show(Window owner, bool sending, string localPath = null)
+    private static GzipBase64Transfer.Request Show(Window owner, bool sending, string localPath, bool raw)
     {
-        GzipBase64TransferWindow window = new GzipBase64TransferWindow(sending, localPath);
+        GzipBase64TransferWindow window = new GzipBase64TransferWindow(sending, localPath, raw);
         WindowOwnership.Attach(window, owner ?? WindowOwnership.ActiveWindow());
         return window.ShowDialog() == true ? window.Request : null;
     }
@@ -183,7 +201,7 @@ public partial class GzipBase64TransferWindow : Window
 
         GzipBase64Transfer.Options options = new GzipBase64Transfer.Options
         {
-            Encoding = (GzipBase64Transfer.EncodingKind)EncodingBox.SelectedIndex,
+            Encoding = _raw ? GzipBase64Transfer.EncodingKind.Raw : (GzipBase64Transfer.EncodingKind)EncodingBox.SelectedIndex,
             Checksum = (GzipBase64Transfer.ChecksumKind)ChecksumBox.SelectedIndex,
             Attempts = attempts,
             Overwrite = OverwriteBox.IsChecked == true,
@@ -192,11 +210,18 @@ public partial class GzipBase64TransferWindow : Window
         };
         Request = new GzipBase64Transfer.Request { LocalPath = local, RemotePath = remote, Options = options };
 
-        _lastEncoding = EncodingBox.SelectedIndex;
         _lastChecksum = ChecksumBox.SelectedIndex;
         _lastAttempts = attempts.ToString(CultureInfo.InvariantCulture);
-        _lastRate = rate.ToString(CultureInfo.InvariantCulture);
-        _lastBlock = block.ToString(CultureInfo.InvariantCulture);
+        if (_raw)
+        {
+            _lastRawRate = rate.ToString(CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            _lastEncoding = EncodingBox.SelectedIndex;
+            _lastRate = rate.ToString(CultureInfo.InvariantCulture);
+            _lastBlock = block.ToString(CultureInfo.InvariantCulture);
+        }
         _lastLocalFolder = Path.GetDirectoryName(Path.GetFullPath(local)) ?? string.Empty;
         if (_sending)
         {

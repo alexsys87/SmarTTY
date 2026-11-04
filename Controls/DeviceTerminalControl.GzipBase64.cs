@@ -9,7 +9,8 @@ using VisualTTY.DeviceTerminal;
 namespace SmarTTY.Controls;
 
 // File transfer through the device's shell: the file is packed with gzip and typed into the shell as base64 (or uuencode)
-// text, the device decodes and unpacks it and the checksums are compared (IO/GzipBase64Transfer.cs holds the protocol). It
+// text, the device decodes and unpacks it and the checksums are compared (IO/GzipBase64Transfer.cs holds the protocol). The raw form,
+// gzip + cat, sends the archive as it is, without a text form (the device reads it from its terminal in raw mode). It
 // needs nothing on the device but busybox tools, so it works on any Linux (OpenWrt included) that has a shell on this COM/TCP
 // connection. A transfer owns the line exactly like an XMODEM or Kermit one (StartLineTransfer is shared, with the WPF
 // progress window of the other protocols). The window that asks what to transfer is WPF (GUI/GzipBase64TransferWindow.xaml);
@@ -22,6 +23,9 @@ public partial class DeviceTerminalControl
     /// cancelled. Injected by <c>App</c> (the window is WPF).
     /// </summary>
     public static Func<bool, GzipBase64Transfer.Request> GzipBase64RequestPrompt;
+
+    /// <summary>The same for the raw form, gzip + cat (the request then has <see cref="GzipBase64Transfer.EncodingKind.Raw"/>). Injected by <c>App</c>.</summary>
+    public static Func<bool, GzipBase64Transfer.Request> GzipCatRequestPrompt;
 
     // A transfer that had to stop after its connection was gone (a reconnect, a cable pulled) leaves the device's console in the
     // middle of it: the shell script there waits for the rest of the data and eats whatever is typed next. What ends that is kept
@@ -46,29 +50,45 @@ public partial class DeviceTerminalControl
         receive.Click += (sender, e) => StartGzipBase64Transfer(sending: false);
         toolStripButton3.DropDownItems.Add(send);
         toolStripButton3.DropDownItems.Add(receive);
+
+        ToolStripMenuItem sendRaw = new ToolStripMenuItem("Send file via gzip + cat (raw, shell)...")
+        {
+            ToolTipText = "Sends a file through the shell of a Linux device (OpenWrt too): packed with gzip and sent as it is, without base64 (a quarter less on the line), read there from the terminal in raw mode, unpacked and checked with a checksum at the end. Nothing can be checked on the way, so keep the speed under what the device can take."
+        };
+        ToolStripMenuItem receiveRaw = new ToolStripMenuItem("Receive file via gzip + cat (raw, shell)...")
+        {
+            ToolTipText = "Fetches a file through the shell of a Linux device (OpenWrt too): packed there with gzip and sent as it is, without base64, unpacked here and checked with a checksum at the end."
+        };
+        Icons.Apply(sendRaw, "upload");
+        Icons.Apply(receiveRaw, "download");
+        sendRaw.Click += (sender, e) => StartGzipBase64Transfer(sending: true, raw: true);
+        receiveRaw.Click += (sender, e) => StartGzipBase64Transfer(sending: false, raw: true);
+        toolStripButton3.DropDownItems.Add(sendRaw);
+        toolStripButton3.DropDownItems.Add(receiveRaw);
     }
 
     /// <summary>Asks what to transfer and runs the transfer over the shared line runner. Must be called on the UI thread.</summary>
-    private void StartGzipBase64Transfer(bool sending, string droppedFile = null)
+    private void StartGzipBase64Transfer(bool sending, string droppedFile = null, bool raw = false)
     {
-        string caption = sending ? "gzip + base64 Send" : "gzip + base64 Receive";
+        string form = raw ? "gzip + cat" : "gzip + base64";
+        string caption = form + (sending ? " Send" : " Receive");
         if (IsLineBusy())
         {
             return;
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before using gzip + base64 transfer.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("Please connect first before using " + form + " transfer.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         // A dropped file is already chosen: the window asks only for the rest (the path on the device and the options).
-        Func<string, GzipBase64Transfer.Request> dropPrompt = GzipBase64DropPrompt;
+        Func<string, GzipBase64Transfer.Request> dropPrompt = raw ? GzipCatDropPrompt : GzipBase64DropPrompt;
         Func<bool, GzipBase64Transfer.Request> prompt = droppedFile != null && dropPrompt != null
             ? (Func<bool, GzipBase64Transfer.Request>)(s => dropPrompt(droppedFile))
-            : GzipBase64RequestPrompt;
+            : raw ? GzipCatRequestPrompt : GzipBase64RequestPrompt;
         if (prompt == null)
         {
-            ThemedMessageBox.Show("The gzip + base64 transfer window is not available.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ThemedMessageBox.Show("The " + form + " transfer window is not available.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         GzipBase64Transfer.Request request = prompt(sending);
@@ -82,7 +102,7 @@ public partial class DeviceTerminalControl
 
         if (sending)
         {
-            StartLineTransfer("Send via gzip + base64 - " + Path.GetFileName(request.LocalPath), "gzip + base64", "send",
+            StartLineTransfer("Send via " + form + " - " + Path.GetFileName(request.LocalPath), form, "send",
                 (sendData, progress, token) =>
                     GzipBase64Transfer.SendFile(request.LocalPath, request.RemotePath, request.Options, sendData, ReadXModemByte, token, progress),
                 () => "The file arrived on the device and its checksum matches the original:\r\n" + request.RemotePath,
@@ -90,7 +110,7 @@ public partial class DeviceTerminalControl
         }
         else
         {
-            StartLineTransfer("Receive via gzip + base64 - " + Path.GetFileName(request.RemotePath), "gzip + base64", "receive",
+            StartLineTransfer("Receive via " + form + " - " + Path.GetFileName(request.RemotePath), form, "receive",
                 (sendData, progress, token) =>
                     GzipBase64Transfer.ReceiveFile(request.RemotePath, request.LocalPath, request.Options, sendData, ReadXModemByte, token, progress),
                 () => "The file was saved and its checksum matches the original on the device:\r\n" + request.LocalPath,

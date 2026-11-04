@@ -19,6 +19,7 @@
       <RadioButton x:Name="ZModemButton" GroupName="Protocol" Margin="0 3 0 3" Content="ZMODEM (one or more files)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
       <RadioButton x:Name="KermitButton" GroupName="Protocol" Margin="0 3 0 3" Content="Kermit (one or more files)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
       <RadioButton x:Name="GzipButton" GroupName="Protocol" Margin="0 3 0 3" Content="gzip + base64 through the shell (one file)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
+      <RadioButton x:Name="GzipCatButton" GroupName="Protocol" Margin="0 3 0 3" Content="gzip + cat through the shell (raw bytes, no base64; one file, checksum checked)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
       <RadioButton x:Name="RawButton" GroupName="Protocol" Margin="0 3 0 3" Content="Raw data (one file, no protocol)" Checked="Protocol_Checked" MouseDoubleClick="Protocol_DoubleClick" />
     </StackPanel>
     <TextBlock x:Name="HintText" Grid.Row="4" TextWrapping="Wrap" Margin="0 10 0 0" Opacity="0.7" />

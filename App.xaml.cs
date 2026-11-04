@@ -71,6 +71,10 @@ public partial class App : Application
             : GzipBase64TransferWindow.ShowReceive(WindowOwnership.ActiveWindow());
         DeviceTerminalControl.FileDropProtocolPrompt = files => FileTransferProtocolWindow.Ask(WindowOwnership.ActiveWindow(), files);
         DeviceTerminalControl.GzipBase64DropPrompt = file => GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow(), file);
+        DeviceTerminalControl.GzipCatRequestPrompt = sending => sending
+            ? GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow(), raw: true)
+            : GzipBase64TransferWindow.ShowReceive(WindowOwnership.ActiveWindow(), raw: true);
+        DeviceTerminalControl.GzipCatDropPrompt = file => GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow(), file, raw: true);
         DeviceTerminalControl.CommandListEditor = (title, description, commands) =>
             DeviceCommandListWindow.Edit(WindowOwnership.ActiveWindow(), title, description, commands);
         DeviceTerminalControl.TftpFirmwareWindowFactory = (terminal, title) => new TftpFirmwareWindow(terminal, title);
