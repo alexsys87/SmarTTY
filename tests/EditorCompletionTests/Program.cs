@@ -76,7 +76,7 @@ internal static class Program
             (L.JavaScript, "function", "fun"), (L.TypeScript, "interface", "fun"), (L.Php, "echo", "fun"),
             (L.Css, "display", "message"), (L.Protobuf, "message", "impl"), (L.DeviceTree, "compatible", "message"),
             (L.Awk, "BEGIN", "sizeof"), (L.Tcl, "proc", "sizeof"),
-            (L.Assembly, "mov", "def")
+            (L.Assembly, "mov", "def"), (L.PowerShell, "function", "sizeof")
         };
         foreach ((L language, string keyword, string foreign) in profiles)
         {

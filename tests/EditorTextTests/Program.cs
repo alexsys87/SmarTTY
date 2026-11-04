@@ -231,6 +231,22 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Assembly).Contains("rax"), "Assembly keywords contain the register 'rax'");
         Check(!SyntaxHighlighting.GetKeywords(L.Assembly).Contains("sizeof"), "Assembly keywords do not include the C 'sizeof'");
         Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("mov"), "the generic Script profile does not carry Assembly instructions");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/deploy.ps1"), L.PowerShell, ".ps1 is PowerShell");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/module.psm1"), L.PowerShell, ".psm1 is PowerShell");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/data.psd1"), L.PowerShell, ".psd1 is PowerShell");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/format.ps1xml"), L.PowerShell, ".ps1xml is PowerShell");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/session.pssc"), L.PowerShell, ".pssc is PowerShell");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/profile.psrc"), L.PowerShell, ".psrc is PowerShell");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/DEPLOY.PS1"), L.PowerShell, ".PS1 is PowerShell too");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/env pwsh"), L.PowerShell, "a pwsh shebang is PowerShell");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/powershell -NoProfile"), L.PowerShell, "a powershell shebang is PowerShell");
+        Equal(SyntaxHighlighting.GetDisplayName(L.PowerShell), "PowerShell", "PowerShell has its own display name");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.PowerShell), "PowerShell is in the syntax menu");
+        Check(SyntaxHighlighting.GetKeywords(L.PowerShell).Contains("function"), "PowerShell keywords contain 'function'");
+        Check(SyntaxHighlighting.GetKeywords(L.PowerShell).Contains("param"), "PowerShell keywords contain 'param'");
+        Check(SyntaxHighlighting.GetKeywords(L.PowerShell).Contains("foreach"), "PowerShell keywords contain 'foreach'");
+        Check(!SyntaxHighlighting.GetKeywords(L.PowerShell).Contains("sizeof"), "PowerShell keywords do not include the C 'sizeof'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("param"), "the generic Script profile does not carry PowerShell keywords");
         Equal(SyntaxHighlighting.GetDisplayName(L.Ruby), "Ruby", "Ruby has its own display name");
         Equal(SyntaxHighlighting.GetDisplayName(L.Perl), "Perl", "Perl has its own display name");
         Equal(SyntaxHighlighting.GetDisplayName(L.CMake), "CMake", "CMake has its own display name");
@@ -551,6 +567,43 @@ internal static class Program
         Equal(Join(assembly.Tokens(11, SyntaxHighlighting.TypeKeyword)), "db", "a data directive");
         Equal(Join(assembly.Tokens(11, SyntaxHighlighting.TypeString)), "\"hi\"", "an Assembly string");
         Equal(Join(assembly.Tokens(11, SyntaxHighlighting.TypeComment)), "/* note */", "an Assembly block comment");
+        Highlighted powershell = new Highlighted(L.PowerShell,
+            "# comment\n" +
+            "Write-Host \"hi\" # note\n" +
+            "$name = 'value'\n" +
+            "Get-ChildItem -Path . | Where-Object { $_ -eq 1 }\n" +
+            "<# block\n" +
+            "   still #>\n" +
+            "$text = @\"\n" +
+            "hello $Name\n" +
+            "\"@\n" +
+            "@args\n" +
+            "function Get-Thing {\n" +
+            "    param($Name)\n" +
+            "}\n" +
+            "$s = \"a # b\"");
+        Equal(Join(powershell.Tokens(0, SyntaxHighlighting.TypeComment)), "# comment", "a PowerShell '#' comment");
+        Equal(Join(powershell.Tokens(1, SyntaxHighlighting.TypeKeyword)), "Write-Host", "a PowerShell cmdlet");
+        Equal(Join(powershell.Tokens(1, SyntaxHighlighting.TypeString)), "\"hi\"", "a PowerShell string");
+        Equal(Join(powershell.Tokens(1, SyntaxHighlighting.TypeComment)), "# note", "a PowerShell comment after code");
+        Equal(Join(powershell.Tokens(2, SyntaxHighlighting.TypeVariable)), "$name", "a PowerShell variable");
+        Equal(Join(powershell.Tokens(2, SyntaxHighlighting.TypeString)), "'value'", "a PowerShell single-quoted string");
+        Equal(Join(powershell.Tokens(3, SyntaxHighlighting.TypeKeyword)), "Get-ChildItem|Where-Object|-eq",
+            "PowerShell commands and a comparison operator");
+        Equal(Join(powershell.Tokens(3, SyntaxHighlighting.TypeVariable)), "$_", "the PowerShell current-item variable");
+        Equal(Join(powershell.Tokens(3, SyntaxHighlighting.TypeNumber)), "1", "a PowerShell number");
+        Equal(Join(powershell.Tokens(4, SyntaxHighlighting.TypeComment)), "<# block", "a PowerShell block comment");
+        Equal(Join(powershell.Tokens(5, SyntaxHighlighting.TypeComment)), "   still #>", "the rest of a PowerShell block comment");
+        Equal(Join(powershell.Tokens(6, SyntaxHighlighting.TypeVariable)), "$text", "a variable before a here-string");
+        Equal(Join(powershell.Tokens(6, SyntaxHighlighting.TypeString)), "@\"", "the start of a double-quoted here-string");
+        Equal(Join(powershell.Tokens(7, SyntaxHighlighting.TypeString)), "hello $Name", "a here-string body");
+        Equal(Join(powershell.Tokens(8, SyntaxHighlighting.TypeString)), "\"@", "the end of a double-quoted here-string");
+        Equal(Join(powershell.Tokens(9, SyntaxHighlighting.TypeVariable)), "@args", "a splatted variable");
+        Equal(Join(powershell.Tokens(10, SyntaxHighlighting.TypeKeyword)), "function|Get-Thing", "a PowerShell function");
+        Equal(Join(powershell.Tokens(11, SyntaxHighlighting.TypeKeyword)), "param", "a PowerShell param block");
+        Equal(Join(powershell.Tokens(11, SyntaxHighlighting.TypeVariable)), "$Name", "a PowerShell parameter variable");
+        Equal(Join(powershell.Tokens(13, SyntaxHighlighting.TypeComment)), "", "a '#' inside a string is not a comment");
+        Equal(Join(powershell.Tokens(13, SyntaxHighlighting.TypeString)), "\"a # b\"", "a PowerShell string with '#'");
         Highlighted html2 = new Highlighted(L.Markup, "<p>He said \"hi</p>\n<a href=\"u\"\n   title=\"t\">x</a>\n<!DOCTYPE html>");
         Equal(Join(html2.Tokens(0, SyntaxHighlighting.TypeString)), "", "a quote in the text between tags is not a string");
         Equal(Join(html2.Tokens(1, SyntaxHighlighting.TypeString)), "\"u\"", "an attribute value is");
@@ -705,7 +758,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -1166,6 +1219,7 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Awk).Toggle(new[] { "print $1" })), "# print $1", "AWK comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Tcl).Toggle(new[] { "set x 1" })), "# set x 1", "Tcl comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Assembly).Toggle(new[] { "mov eax, 1" })), "; mov eax, 1", "Assembly comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.PowerShell).Toggle(new[] { "Get-ChildItem" })), "# Get-ChildItem", "PowerShell comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Ruby).Toggle(new[] { "puts 1" })), "# puts 1", "Ruby comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Perl).Toggle(new[] { "print 1" })), "# print 1", "Perl comment");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.CMake).Toggle(new[] { "set(X 1)" })), "# set(X 1)", "CMake comment");

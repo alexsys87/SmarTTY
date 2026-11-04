@@ -31,6 +31,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Script:
                 case SyntaxHighlighting.Language.Awk:
                 case SyntaxHighlighting.Language.Tcl:
+                case SyntaxHighlighting.Language.PowerShell:
                 case SyntaxHighlighting.Language.Ruby:
                 case SyntaxHighlighting.Language.Perl:
                 case SyntaxHighlighting.Language.CMake:
