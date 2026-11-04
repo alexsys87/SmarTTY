@@ -108,6 +108,30 @@ internal static class Program
         Equal(QuickCommandRules.BuildInvocation("setup.sh", "/root"), "/root/setup.sh", "invocation: the full path when the script is in another folder");
         Equal(QuickCommandRules.BuildInvocation("setup.sh", "/"), "/setup.sh", "invocation: the root folder");
         Equal(QuickCommandRules.RemotePath("/home/u/", "a.sh"), "/home/u/a.sh", "remote path");
+        Equal(QuickCommandRules.RemotePath(null, "a.sh"), "./a.sh", "remote path: the current folder when no folder is given");
+
+        SerialRuleTests();
+    }
+
+    // A script typed into a device (COM port, Telnet) goes through the terminal line of the device: what that line takes for a key
+    // must not be in the text (all of this was tried on a pty with dash, bash and BusyBox ash).
+    private static void SerialRuleTests()
+    {
+        Check(QuickCommandRules.ValidateForSerial(Command("cat /proc/mtd")) == null, "serial: a command has no limits of the line of the device");
+        Check(QuickCommandRules.ValidateForSerial(Script("a.sh", "#!/bin/sh\r\n\tif true; then\r\n\t\techo \"привет, мир — ✓\"\r\n\tfi\r\n")) == null, "serial: tabs, UTF-8 and CR LF pass");
+        Check(QuickCommandRules.ValidateForSerial(Script("a.sh", "  \n")) is string empty && empty.Contains("empty"), "serial: an empty script is refused as before");
+        Check(QuickCommandRules.ValidateForSerial(Script("", "echo")) != null, "serial: a script needs a file name as before");
+        foreach (int key in new[] { 0x01, 0x03, 0x04, 0x08, 0x11, 0x13, 0x15, 0x16, 0x17, 0x1A, 0x1B, 0x1C, 0x7F })
+        {
+            string problem = QuickCommandRules.ValidateForSerial(Script("a.sh", "#!/bin/sh\necho a" + (char)key + "b\n"));
+            Check(problem != null && problem.StartsWith("Line 2 ", StringComparison.Ordinal) && problem.Contains("0x" + key.ToString("X2")), "serial: the control character 0x" + key.ToString("X2") + " is refused with its line (" + problem + ")");
+        }
+        Check(QuickCommandRules.ValidateForSerial(Script("a.sh", "#!/bin/sh\n\n\necho a\u0003\n")) is string third && third.StartsWith("Line 4 ", StringComparison.Ordinal), "serial: the line number counts the empty lines");
+        Check(QuickCommandRules.ValidateForSerial(Script("a.sh", "#!/bin/sh\n" + new string('a', QuickCommandRules.MaxSerialLineLength) + "\n")) == null, "serial: a line of the longest size passes");
+        Check(QuickCommandRules.ValidateForSerial(Script("a.sh", "#!/bin/sh\n" + new string('a', QuickCommandRules.MaxSerialLineLength + 1) + "\n")) is string tooLong && tooLong.StartsWith("Line 2 ", StringComparison.Ordinal) && tooLong.Contains("longer than"), "serial: a longer line is refused");
+        Check(QuickCommandRules.ValidateForSerial(Script("a.sh", new string('я', QuickCommandRules.MaxSerialLineLength / 2) + "\n")) == null, "serial: the line is measured in bytes, not characters (the longest line of UTF-8 passes)");
+        Check(QuickCommandRules.ValidateForSerial(Script("a.sh", new string('я', QuickCommandRules.MaxSerialLineLength / 2 + 1) + "\n")) != null, "serial: the line is measured in bytes, not characters (one more is refused)");
+        Check(QuickCommandRules.ValidateForSerial(Script("a.sh", "echo a\n" + new string('b', 3000) + "\n" + new string('c', 3000) + "\n")) == null, "serial: the limit is for a line, not for the whole script");
     }
 
     private static void MenuTests()
@@ -233,6 +257,113 @@ internal static class Program
         // A folder that does not exist: the upload fails and leaves nothing.
         string missing = QuickCommandRules.RemotePath(Path.Combine(folder, "missing"), "a.sh");
         Check(Run(busybox, QuickCommandRules.BuildUploadCommand(missing), second, out _, out string missingError) != 0 && missingError.Length > 0, label + ": the upload into a missing folder fails with a message");
+
+        SerialShellTests(busybox, label, folder);
+    }
+
+    // The command that is typed into the shell of a device (BuildSerialUploadCommand) stores its standard input the same way: the
+    // lines that follow it on the terminal line are read by cat until Ctrl-D (the end of the input), which a pipe shows as its end.
+    private static void SerialShellTests(string busybox, string label, string folder)
+    {
+        foreach (string fileName in new[] { "setup.sh", "my script.sh", "it's.sh", "-dash.sh" })
+        {
+            string remotePath = QuickCommandRules.RemotePath(folder, fileName);
+            byte[] data = QuickCommandRules.ScriptBytes("#!/bin/sh\r\necho \"ran $0 in $(pwd)\"\r\n\techo \"tab\tinside\" привет\r\necho arg=$1");
+            string command = QuickCommandRules.BuildSerialUploadCommand(remotePath);
+            Check(command.StartsWith("/bin/sh -c ", StringComparison.Ordinal) && command.Contains("trap "), label + " " + fileName + ": serial command: one /bin/sh -c word with a trap");
+            int exit = Run(busybox, command, data, out _, out string error);
+            Check(exit == 0 && File.ReadAllBytes(remotePath).SequenceEqual(data), label + " " + fileName + ": serial upload stores the script (" + error.Trim() + ")");
+            Check((File.GetUnixFileMode(remotePath) & UnixFileMode.UserExecute) != 0 && (File.GetUnixFileMode(remotePath) & UnixFileMode.OtherExecute) != 0, label + " " + fileName + ": serial upload: the script is executable");
+            Check(!File.Exists(remotePath + ".smartty-part"), label + " " + fileName + ": serial upload: no temporary file is left");
+            exit = Run(busybox, "cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(folder) + " && " + QuickCommandRules.BuildInvocation(fileName) + " 7", null, out string output, out error);
+            Check(exit == 0 && output.Contains("arg=7") && output.Contains("tab\tinside привет"), label + " " + fileName + ": the stored script runs (" + output.Trim().Replace('\n', ' ') + error.Trim() + ")");
+        }
+
+        // The path is relative to the current folder of the shell, as the terminal types it ("./name").
+        if (busybox == null)
+        {
+            string relative = "relative.sh";
+            byte[] relativeData = QuickCommandRules.ScriptBytes("#!/bin/sh\necho relative");
+            int relativeExit = Run(null, "cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(folder) + " && " + QuickCommandRules.BuildSerialUploadCommand(QuickCommandRules.RemotePath(null, relative)), relativeData, out _, out string relativeError);
+            Check(relativeExit == 0 && File.ReadAllBytes(Path.Combine(folder, relative)).SequenceEqual(relativeData), "sh: serial upload into the current folder by ./name (" + relativeError.Trim() + ")");
+        }
+
+        // A file with this name is replaced.
+        string replaced = QuickCommandRules.RemotePath(folder, "setup.sh");
+        byte[] second = QuickCommandRules.ScriptBytes("#!/bin/sh\necho second");
+        Check(Run(busybox, QuickCommandRules.BuildSerialUploadCommand(replaced), second, out _, out _) == 0 && File.ReadAllBytes(replaced).SequenceEqual(second), label + ": serial upload replaces a script");
+
+        // A folder that does not exist: the upload fails with a message and leaves nothing.
+        string missing = QuickCommandRules.RemotePath(Path.Combine(folder, "missing-serial"), "a.sh");
+        Check(Run(busybox, QuickCommandRules.BuildSerialUploadCommand(missing), second, out _, out string missingError) != 0 && missingError.Length > 0, label + ": serial upload into a missing folder fails with a message");
+
+        SerialCancelTest(busybox, label, folder);
+    }
+
+    // Esc in the terminal ends the upload with Ctrl-C: the tty sends SIGINT to the whole foreground job (the shell of the command and
+    // cat). The command has to leave neither half a script under the name nor its temporary file. setsid gives the process a group
+    // of its own (its pid), which is what the foreground job is.
+    private static void SerialCancelTest(string busybox, string label, string folder)
+    {
+        string setsid = new[] { "/usr/bin/setsid", "/bin/setsid" }.FirstOrDefault(File.Exists);
+        if (setsid == null)
+        {
+            Console.WriteLine("SKIP: setsid is not installed, the cancelled upload is not tried");
+            return;
+        }
+        string remotePath = QuickCommandRules.RemotePath(folder, "cancel.sh");
+        string temporary = remotePath + ".smartty-part";
+        string command = QuickCommandRules.BuildSerialUploadCommand(remotePath);
+        ProcessStartInfo start = new ProcessStartInfo(setsid)
+        {
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        start.ArgumentList.Add("/bin/sh");
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add(busybox != null ? busybox + " sh -c " + command.Substring("/bin/sh -c ".Length) : command);
+        if (busybox != null)
+        {
+            start.Environment["PATH"] = Applets(busybox) + ":" + Environment.GetEnvironmentVariable("PATH");
+        }
+        using Process process = Process.Start(start);
+        System.Threading.Tasks.Task<string> output = process.StandardOutput.ReadToEndAsync();
+        System.Threading.Tasks.Task<string> error = process.StandardError.ReadToEndAsync();
+        byte[] half = Encoding.UTF8.GetBytes("#!/bin/sh\necho half\n");
+        process.StandardInput.BaseStream.Write(half, 0, half.Length);
+        process.StandardInput.BaseStream.Flush();
+        Check(WaitFor(() => File.Exists(temporary) && new FileInfo(temporary).Length >= half.Length, 5000), label + ": while the upload runs the text is in the temporary file");
+        // The kill program, not the built-in of a shell (dash does not take "--" to tell a group from an option).
+        ProcessStartInfo kill = new ProcessStartInfo("/usr/bin/env") { RedirectStandardError = true, UseShellExecute = false };
+        foreach (string argument in new[] { "kill", "-INT", "--", "-" + process.Id })
+        {
+            kill.ArgumentList.Add(argument);
+        }
+        using (Process killer = Process.Start(kill))
+        {
+            string killError = killer.StandardError.ReadToEnd();
+            killer.WaitForExit();
+            Equal(killer.ExitCode, 0, label + ": SIGINT goes to the group of the upload (" + killError.Trim() + ")");
+        }
+        Check(process.WaitForExit(5000), label + ": the cancelled upload ends");
+        Check(WaitFor(() => !File.Exists(temporary), 5000), label + ": a cancelled upload removes its temporary file");
+        Check(!File.Exists(remotePath), label + ": a cancelled upload leaves no script under the name");
+    }
+
+    private static bool WaitFor(Func<bool> condition, int milliseconds)
+    {
+        DateTime end = DateTime.UtcNow.AddMilliseconds(milliseconds);
+        while (DateTime.UtcNow < end)
+        {
+            if (condition())
+            {
+                return true;
+            }
+            System.Threading.Thread.Sleep(20);
+        }
+        return condition();
     }
 
     private static string _applets;

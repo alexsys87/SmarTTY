@@ -772,6 +772,24 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// <summary>True when "Send terminal size now" can run: the input line is shown and nothing is typed in it.</summary>
     public bool CanSendRemoteSize => _inputLine != null && _inputLine.Text.Length == 0 && LineInputText.BuildRemoteSizeCommand(TerminalSize.Width, TerminalSize.Height) != null;
 
+    /// <summary>True when <see cref="SubmitCommandNow"/> can run: the input line is shown (the device is at its prompt) and nothing is typed in it.</summary>
+    public bool CanSubmitCommandNow => _inputLine != null && _inputLine.Text.Length == 0;
+
+    /// <summary>
+    /// Sends <paramref name="command"/> to the device as a command of its own, ended with <paramref name="lineEnding"/> instead of
+    /// the Enter of the connection (it is not put in the history). What the command starts then reads the keys from the device
+    /// line: the text sent after it with SendToDevice goes there. False, and nothing is sent, when <see cref="CanSubmitCommandNow"/> is false.
+    /// </summary>
+    public bool SubmitCommandNow(string command, string lineEnding)
+    {
+        if (!CanSubmitCommandNow || string.IsNullOrWhiteSpace(command))
+        {
+            return false;
+        }
+        SubmitCommand(command, lineEnding);
+        return true;
+    }
+
     /// <summary>Sends the command that sets the terminal size as a command of its own (it is not put in the history).</summary>
     public bool SendRemoteSizeNow()
     {
@@ -1588,7 +1606,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     // commandOverride: a command made by the terminal itself (the terminal size), sent instead of the text of the
     // input line; it is not recorded in the history and not reported as typed by the user.
-    private void SubmitCommand(string commandOverride)
+    // lineEndingOverride: what ends the command instead of the Enter of the connection (EnterSequence).
+    private void SubmitCommand(string commandOverride, string lineEndingOverride = null)
     {
         if (_inputLine == null) return;
 
@@ -1634,7 +1653,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
 
         // Send command to device
-        string lineEnding = EnterSequence ?? "\r";
+        string lineEnding = lineEndingOverride ?? EnterSequence ?? "\r";
         string sizePrefix = typedByUser ? TakeRemoteSizePrefix(command, _inputLine.Prompt) : string.Empty;
         SendText(sizePrefix + command + lineEnding, InputKind.Typed);
 
