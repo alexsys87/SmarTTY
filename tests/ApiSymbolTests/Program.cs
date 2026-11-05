@@ -68,7 +68,7 @@ internal static class Program
         }
 
         // The set covers the languages the editor highlights with a code tokenizer.
-        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Ruby, L.Perl, L.CMake, L.Go })
+        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Ruby, L.Perl, L.CMake, L.Go, L.Rust })
         {
             Check(database.ForLanguage(language).Count > 0, "the set has symbols for " + language);
         }
@@ -263,7 +263,7 @@ internal static class Program
         // The split C-like profiles start without an API set; the C library is not inherited by them.
         foreach (L language in new[]
                  {
-                     L.CSharp, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Rust, L.Swift, L.Dart,
+                     L.CSharp, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Swift, L.Dart,
                      L.JavaScript, L.TypeScript, L.Php, L.Css, L.Protobuf, L.DeviceTree, L.Awk, L.Tcl,
                      L.Assembly, L.PowerShell
                  })
@@ -534,6 +534,63 @@ internal static class Program
             "the Go http.HandleFunc signature has two parameters");
         Equal(database.FindSignature(L.Go, "Atoi").ToString(), "strconv.Atoi(s string)",
             "a bare Go call resolves to the package-qualified signature");
+
+        // Rust has its own profile with the standard library: the prelude types, the collections,
+        // the filesystem, the threads and the common modules.
+        List<ApiSymbolDatabase.Symbol> rust = database.ForLanguage(L.Rust).ToList();
+        Check(rust.Count > 850, "the Rust set is broad (" + rust.Count + " symbols)");
+        Equal(rust.Count, rust.Select(s => s.Name).Distinct().Count(), "Rust names are unique");
+        Equal(rust.Count, rust.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every Rust symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "std::option::Option", "std::option::Option::unwrap", "std::result::Result",
+                     "std::result::Result::map_err", "std::iter::Iterator", "std::iter::Iterator::map",
+                     "std::iter::Iterator::collect", "std::vec::Vec", "std::vec::Vec::push",
+                     "std::string::String", "std::string::String::push_str", "std::str::split",
+                     "std::collections::HashMap", "std::collections::HashMap::insert",
+                     "std::collections::HashSet", "std::collections::BTreeMap",
+                     "std::collections::VecDeque", "std::boxed::Box", "std::rc::Rc", "std::sync::Arc",
+                     "std::cell::RefCell", "std::sync::Mutex", "std::sync::mpsc::channel",
+                     "std::sync::atomic::AtomicUsize", "std::fs::read_to_string", "std::fs::write",
+                     "std::fs::File", "std::path::Path", "std::path::Path::join",
+                     "std::io::Read::read_to_string", "std::io::BufReader", "std::env::var",
+                     "std::process::Command", "std::process::Command::output",
+                     "std::thread::spawn", "std::thread::JoinHandle::join",
+                     "std::time::Duration", "std::time::Instant::now",
+                     "std::cmp::Ordering", "std::fmt::Display", "std::error::Error",
+                     "std::net::TcpStream", "std::net::TcpListener::bind",
+                     "std::hint::black_box"
+                 })
+        {
+            Check(database.Find(L.Rust, name) != null, "the Rust set includes '" + name + "'");
+        }
+        Check(database.Find(L.Rust, "std::fs::read_to_string").Description.Contains("Rust std::fs module"),
+            "the description of 'std::fs::read_to_string' names a std::fs module");
+        Check(database.Find(L.Rust, "std::vec::Vec::push").Description.Contains("Rust Vec method"),
+            "the description of 'std::vec::Vec::push' names a Vec method");
+        Check(database.Find(L.Rust, "std::option::Option").Description.Contains("Rust std::option type"),
+            "the description of 'std::option::Option' names a std::option type");
+        Check(database.Find(L.Rust, "std::iter::Iterator::map").Description.Contains("Rust Iterator method"),
+            "the description of 'std::iter::Iterator::map' names an Iterator method");
+        Check(database.Find(L.Rust, "printf") == null, "Rust does not inherit the C library");
+        Check(database.Find(L.Go, "std::fs::read_to_string") == null,
+            "the Rust symbols stay in the Rust profile");
+        Equal(database.FindSignature(L.Rust, "std::fs::read_to_string").ToString(),
+            "std::fs::read_to_string(path: impl AsRef<Path>)", "the Rust signature keeps its module");
+        Equal(database.FindSignature(L.Rust, "std::fs::write").ParameterCount, 2,
+            "the Rust std::fs::write signature has two parameters");
+        Equal(database.FindSignature(L.Rust, "std::fs::write").GetParameter(1).Text,
+            "contents: impl AsRef<[u8]>", "the nested Rust array parameter stays one parameter");
+        Equal(database.FindSignature(L.Rust, "read_to_string").ToString(),
+            "std::fs::read_to_string(path: impl AsRef<Path>)",
+            "a bare Rust call resolves to the module-qualified signature");
+        Equal(database.FindSignature(L.Rust, "unwrap").Name, "std::option::Option::unwrap",
+            "the first Rust definition wins the bare 'unwrap' hint");
+        Equal(database.FindSignature(L.Rust, "map").Name, "std::iter::Iterator::map",
+            "the Iterator method wins the bare 'map' hint");
+        Equal(database.FindSignature(L.Rust, "take").ParameterCount, 1,
+            "the bare 'take' hint is the Iterator method");
     }
 
     private static List<ISuggestion> Build(L language, string text, string prefix, ApiSymbolDatabase database)
@@ -745,6 +802,22 @@ internal static class Program
         Check(!Build(L.Go, "", "print", database).Any(s => s.DisplayName == "printf"),
             "the Go completion list does not offer the C library");
 
+        // The Rust standard library feeds the completion list under its short names.
+        ISuggestion rustRead = Build(L.Rust, "", "read_to", database)
+            .FirstOrDefault(s => s.DisplayName == "read_to_string");
+        Check(rustRead != null, "the completion list offers 'read_to_string' from 'std::fs::read_to_string'");
+        Equal(rustRead.DetailText, "Read a file into a string", "the Rust summary is the detail text");
+        Equal(rustRead.HintText, "std::fs::read_to_string(path: impl AsRef<Path>)",
+            "the qualified Rust signature is the hint text");
+        Check(Build(L.Rust, "", "unwr", database).Any(s => s.DisplayName == "unwrap"),
+            "the completion list offers 'std::option::Option::unwrap' as 'unwrap'");
+        Check(Build(L.Rust, "", "pus", database).Any(s => s.DisplayName == "push"),
+            "the completion list offers 'std::vec::Vec::push' as 'push'");
+        Equal(Build(L.Rust, "", "map", database).Count(s => s.DisplayName == "map"), 1,
+            "the Rust 'map' method is offered once");
+        Check(!Build(L.Rust, "", "prin", database).Any(s => s.DisplayName == "printf"),
+            "the Rust completion list does not offer the C library");
+
         // Without a database the list is what it always was: keywords and document words only.
         List<ISuggestion> plain = Build(L.Python, "", "pri", null);
         Check(!plain.Any(s => s.DisplayName == "print"), "without a database no API symbol is offered");
@@ -791,6 +864,22 @@ internal static class Program
         Check(goAtoi != null, "a bare 'Atoi(' call finds the Go 'strconv.Atoi' symbol");
         Equal(goAtoi.Name, "strconv.Atoi", "the Go strconv hint keeps the qualified name");
         Equal(goAtoi.ParameterCount, 1, "the Go strconv hint has its parameter");
+
+        // A bare Rust call finds the module-qualified symbol.
+        ParameterSignature rustReadHint = EditorSignatureSource.FindSignature(
+            L.Rust, "read_to_string(\n", 0, 15, database, out int rustReadActive);
+        Check(rustReadHint != null,
+            "a bare 'read_to_string(' call finds the Rust 'std::fs::read_to_string' symbol");
+        Equal(rustReadHint.Name, "std::fs::read_to_string", "the Rust hint keeps the qualified name");
+        Equal(rustReadHint.ParameterCount, 1, "the Rust hint has its parameter");
+        Equal(rustReadActive, 0, "the first Rust parameter is active");
+
+        ParameterSignature rustPushHint = EditorSignatureSource.FindSignature(
+            L.Rust, "push(\n", 0, 5, database, out int rustPushActive);
+        Check(rustPushHint != null, "a bare 'push(' call finds the Rust 'std::vec::Vec::push' symbol");
+        Equal(rustPushHint.Name, "std::vec::Vec::push", "the Rust method hint keeps the qualified name");
+        Equal(rustPushHint.ParameterCount, 1, "the Rust method hint has its parameter");
+        Equal(rustPushActive, 0, "the first Rust method parameter is active");
 
         ParameterSignature sql = EditorSignatureSource.FindSignature(
             L.Sql, "CONCAT(\n", 0, 7, database, out int sqlActive);
