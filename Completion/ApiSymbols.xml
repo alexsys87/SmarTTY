@@ -24629,5 +24629,1537 @@
       <Summary>Fixed-length character data type</Summary>
       <Description>Fixed-length character data type. SQL data type. A fixed-length character string.</Description>
     </Symbol>
+    <Symbol language="Go" name="append" signature="append(slice []T, elems ...T)">
+      <Summary>Append values to a slice</Summary>
+      <Description>Append values to a slice. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="cap" signature="cap(v []T)">
+      <Summary>Capacity of a slice</Summary>
+      <Description>Capacity of a slice. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="clear" signature="clear(v T)">
+      <Summary>Clear a map or slice</Summary>
+      <Description>Clear a map or slice. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="close" signature="close(c chan&lt;- T)">
+      <Summary>Close a channel</Summary>
+      <Description>Close a channel. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="complex" signature="complex(real, imag float64)">
+      <Summary>Complex number from real and imaginary parts</Summary>
+      <Description>Complex number from real and imaginary parts. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="copy" signature="copy(dst, src []T)">
+      <Summary>Copy elements between slices</Summary>
+      <Description>Copy elements between slices. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="delete" signature="delete(m map[K]V, key K)">
+      <Summary>Delete an entry from a map</Summary>
+      <Description>Delete an entry from a map. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="imag" signature="imag(c complex128)">
+      <Summary>Imaginary part of a complex number</Summary>
+      <Description>Imaginary part of a complex number. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="len" signature="len(v T)">
+      <Summary>Length of a value</Summary>
+      <Description>Length of a value. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="make" signature="make(t T, size ...int)">
+      <Summary>Allocate a slice, map or channel</Summary>
+      <Description>Allocate a slice, map or channel. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="max" signature="max(x T, y ...T)">
+      <Summary>Larger of the values</Summary>
+      <Description>Larger of the values. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="min" signature="min(x T, y ...T)">
+      <Summary>Smaller of the values</Summary>
+      <Description>Smaller of the values. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="new" signature="new(T)">
+      <Summary>Allocate a value</Summary>
+      <Description>Allocate a value. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="panic" signature="panic(v any)">
+      <Summary>Stop the program with a panic</Summary>
+      <Description>Stop the program with a panic. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="real" signature="real(c complex128)">
+      <Summary>Real part of a complex number</Summary>
+      <Description>Real part of a complex number. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="recover" signature="recover()">
+      <Summary>Recover from a panic</Summary>
+      <Description>Recover from a panic. Go builtin.</Description>
+    </Symbol>
+    <Symbol language="Go" name="any" signature="any">
+      <Summary>Any type</Summary>
+      <Description>Any type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bool" signature="bool">
+      <Summary>Boolean type</Summary>
+      <Description>Boolean type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="byte" signature="byte">
+      <Summary>Byte type</Summary>
+      <Description>Byte type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="comparable" signature="comparable">
+      <Summary>Comparable type constraint</Summary>
+      <Description>Comparable type constraint. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="complex64" signature="complex64">
+      <Summary>Complex64 type</Summary>
+      <Description>Complex64 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="complex128" signature="complex128">
+      <Summary>Complex128 type</Summary>
+      <Description>Complex128 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="error" signature="error">
+      <Summary>Error interface</Summary>
+      <Description>Error interface. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="float32" signature="float32">
+      <Summary>Float32 type</Summary>
+      <Description>Float32 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="float64" signature="float64">
+      <Summary>Float64 type</Summary>
+      <Description>Float64 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="int" signature="int">
+      <Summary>Int type</Summary>
+      <Description>Int type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="int8" signature="int8">
+      <Summary>Int8 type</Summary>
+      <Description>Int8 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="int16" signature="int16">
+      <Summary>Int16 type</Summary>
+      <Description>Int16 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="int32" signature="int32">
+      <Summary>Int32 type</Summary>
+      <Description>Int32 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="int64" signature="int64">
+      <Summary>Int64 type</Summary>
+      <Description>Int64 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="rune" signature="rune">
+      <Summary>Rune type</Summary>
+      <Description>Rune type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="string" signature="string">
+      <Summary>String type</Summary>
+      <Description>String type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="uint" signature="uint">
+      <Summary>Uint type</Summary>
+      <Description>Uint type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="uint8" signature="uint8">
+      <Summary>Uint8 type</Summary>
+      <Description>Uint8 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="uint16" signature="uint16">
+      <Summary>Uint16 type</Summary>
+      <Description>Uint16 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="uint32" signature="uint32">
+      <Summary>Uint32 type</Summary>
+      <Description>Uint32 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="uint64" signature="uint64">
+      <Summary>Uint64 type</Summary>
+      <Description>Uint64 type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="uintptr" signature="uintptr">
+      <Summary>Uintptr type</Summary>
+      <Description>Uintptr type. Go builtin package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Print" signature="fmt.Print(a ...any)">
+      <Summary>Print values to standard output</Summary>
+      <Description>Print values to standard output. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Printf" signature="fmt.Printf(format string, a ...any)">
+      <Summary>Print formatted values to standard output</Summary>
+      <Description>Print formatted values to standard output. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Println" signature="fmt.Println(a ...any)">
+      <Summary>Print values with a newline</Summary>
+      <Description>Print values with a newline. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Sprint" signature="fmt.Sprint(a ...any)">
+      <Summary>Format values as a string</Summary>
+      <Description>Format values as a string. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Sprintf" signature="fmt.Sprintf(format string, a ...any)">
+      <Summary>Format values as a string with a format</Summary>
+      <Description>Format values as a string with a format. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Sprintln" signature="fmt.Sprintln(a ...any)">
+      <Summary>Format values as a string with spaces and a newline</Summary>
+      <Description>Format values as a string with spaces and a newline. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Errorf" signature="fmt.Errorf(format string, a ...any)">
+      <Summary>Create an error with a formatted message</Summary>
+      <Description>Create an error with a formatted message. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Fprint" signature="fmt.Fprint(w io.Writer, a ...any)">
+      <Summary>Print values to a writer</Summary>
+      <Description>Print values to a writer. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Fprintf" signature="fmt.Fprintf(w io.Writer, format string, a ...any)">
+      <Summary>Print formatted values to a writer</Summary>
+      <Description>Print formatted values to a writer. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Fprintln" signature="fmt.Fprintln(w io.Writer, a ...any)">
+      <Summary>Print values to a writer with a newline</Summary>
+      <Description>Print values to a writer with a newline. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Scan" signature="fmt.Scan(a ...any)">
+      <Summary>Read space-separated values from standard input</Summary>
+      <Description>Read space-separated values from standard input. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Scanf" signature="fmt.Scanf(format string, a ...any)">
+      <Summary>Read formatted values from standard input</Summary>
+      <Description>Read formatted values from standard input. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Scanln" signature="fmt.Scanln(a ...any)">
+      <Summary>Read values from standard input up to a newline</Summary>
+      <Description>Read values from standard input up to a newline. Go fmt package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="fmt.Stringer" signature="fmt.Stringer">
+      <Summary>Stringer interface</Summary>
+      <Description>Stringer interface. Go fmt package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Contains" signature="strings.Contains(s, substr string)">
+      <Summary>Report whether a string contains a substring</Summary>
+      <Description>Report whether a string contains a substring. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.ContainsAny" signature="strings.ContainsAny(s, chars string)">
+      <Summary>Report whether a string contains any of the characters</Summary>
+      <Description>Report whether a string contains any of the characters. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.ContainsRune" signature="strings.ContainsRune(s string, r rune)">
+      <Summary>Report whether a string contains a rune</Summary>
+      <Description>Report whether a string contains a rune. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Count" signature="strings.Count(s, substr string)">
+      <Summary>Count non-overlapping occurrences of a substring</Summary>
+      <Description>Count non-overlapping occurrences of a substring. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Cut" signature="strings.Cut(s, sep string)">
+      <Summary>Cut a string around the first separator</Summary>
+      <Description>Cut a string around the first separator. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.EqualFold" signature="strings.EqualFold(s, t string)">
+      <Summary>Compare strings ignoring case</Summary>
+      <Description>Compare strings ignoring case. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Fields" signature="strings.Fields(s string)">
+      <Summary>Split a string around whitespace</Summary>
+      <Description>Split a string around whitespace. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.FieldsFunc" signature="strings.FieldsFunc(s string, f func(rune) bool)">
+      <Summary>Split a string around characters accepted by a function</Summary>
+      <Description>Split a string around characters accepted by a function. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.HasPrefix" signature="strings.HasPrefix(s, prefix string)">
+      <Summary>Report whether a string starts with a prefix</Summary>
+      <Description>Report whether a string starts with a prefix. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.HasSuffix" signature="strings.HasSuffix(s, suffix string)">
+      <Summary>Report whether a string ends with a suffix</Summary>
+      <Description>Report whether a string ends with a suffix. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Index" signature="strings.Index(s, substr string)">
+      <Summary>Index of the first occurrence of a substring</Summary>
+      <Description>Index of the first occurrence of a substring. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.IndexAny" signature="strings.IndexAny(s, chars string)">
+      <Summary>Index of the first character from a set</Summary>
+      <Description>Index of the first character from a set. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.IndexByte" signature="strings.IndexByte(s string, c byte)">
+      <Summary>Index of a byte in a string</Summary>
+      <Description>Index of a byte in a string. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.IndexRune" signature="strings.IndexRune(s string, r rune)">
+      <Summary>Index of a rune in a string</Summary>
+      <Description>Index of a rune in a string. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Join" signature="strings.Join(elems []string, sep string)">
+      <Summary>Join strings with a separator</Summary>
+      <Description>Join strings with a separator. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.LastIndex" signature="strings.LastIndex(s, substr string)">
+      <Summary>Index of the last occurrence of a substring</Summary>
+      <Description>Index of the last occurrence of a substring. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Map" signature="strings.Map(f func(rune) rune, s string)">
+      <Summary>Apply a function to every character</Summary>
+      <Description>Apply a function to every character. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.NewReader" signature="strings.NewReader(s string)">
+      <Summary>Create a reader over a string</Summary>
+      <Description>Create a reader over a string. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.NewReplacer" signature="strings.NewReplacer(oldnew ...string)">
+      <Summary>Create a string replacer</Summary>
+      <Description>Create a string replacer. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Repeat" signature="strings.Repeat(s string, count int)">
+      <Summary>Repeat a string</Summary>
+      <Description>Repeat a string. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Replace" signature="strings.Replace(s, old, new string, n int)">
+      <Summary>Replace occurrences of a substring</Summary>
+      <Description>Replace occurrences of a substring. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.ReplaceAll" signature="strings.ReplaceAll(s, old, new string)">
+      <Summary>Replace all occurrences of a substring</Summary>
+      <Description>Replace all occurrences of a substring. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Split" signature="strings.Split(s, sep string)">
+      <Summary>Split a string around a separator</Summary>
+      <Description>Split a string around a separator. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.SplitAfter" signature="strings.SplitAfter(s, sep string)">
+      <Summary>Split a string after each separator</Summary>
+      <Description>Split a string after each separator. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.SplitN" signature="strings.SplitN(s, sep string, n int)">
+      <Summary>Split a string into at most n parts</Summary>
+      <Description>Split a string into at most n parts. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.ToLower" signature="strings.ToLower(s string)">
+      <Summary>Convert a string to lower case</Summary>
+      <Description>Convert a string to lower case. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.ToUpper" signature="strings.ToUpper(s string)">
+      <Summary>Convert a string to upper case</Summary>
+      <Description>Convert a string to upper case. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Trim" signature="strings.Trim(s, cutset string)">
+      <Summary>Trim characters from both ends</Summary>
+      <Description>Trim characters from both ends. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.TrimPrefix" signature="strings.TrimPrefix(s, prefix string)">
+      <Summary>Remove a prefix from a string</Summary>
+      <Description>Remove a prefix from a string. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.TrimSpace" signature="strings.TrimSpace(s string)">
+      <Summary>Trim whitespace from both ends</Summary>
+      <Description>Trim whitespace from both ends. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.TrimSuffix" signature="strings.TrimSuffix(s, suffix string)">
+      <Summary>Remove a suffix from a string</Summary>
+      <Description>Remove a suffix from a string. Go strings package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Builder" signature="strings.Builder">
+      <Summary>String builder type</Summary>
+      <Description>String builder type. Go strings package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strings.Reader" signature="strings.Reader">
+      <Summary>String reader type</Summary>
+      <Description>String reader type. Go strings package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.Atoi" signature="strconv.Atoi(s string)">
+      <Summary>Convert a string to an int</Summary>
+      <Description>Convert a string to an int. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.Itoa" signature="strconv.Itoa(i int)">
+      <Summary>Convert an int to a string</Summary>
+      <Description>Convert an int to a string. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.ParseBool" signature="strconv.ParseBool(s string)">
+      <Summary>Parse a boolean from a string</Summary>
+      <Description>Parse a boolean from a string. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.ParseFloat" signature="strconv.ParseFloat(s string, bitSize int)">
+      <Summary>Parse a floating-point number from a string</Summary>
+      <Description>Parse a floating-point number from a string. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.ParseInt" signature="strconv.ParseInt(s string, base int, bitSize int)">
+      <Summary>Parse a signed integer from a string</Summary>
+      <Description>Parse a signed integer from a string. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.ParseUint" signature="strconv.ParseUint(s string, base int, bitSize int)">
+      <Summary>Parse an unsigned integer from a string</Summary>
+      <Description>Parse an unsigned integer from a string. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.FormatBool" signature="strconv.FormatBool(b bool)">
+      <Summary>Format a boolean as a string</Summary>
+      <Description>Format a boolean as a string. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.FormatFloat" signature="strconv.FormatFloat(f float64, fmt byte, prec, bitSize int)">
+      <Summary>Format a floating-point number as a string</Summary>
+      <Description>Format a floating-point number as a string. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.FormatInt" signature="strconv.FormatInt(i int64, base int)">
+      <Summary>Format a signed integer as a string</Summary>
+      <Description>Format a signed integer as a string. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="strconv.Quote" signature="strconv.Quote(s string)">
+      <Summary>Quote a string as a Go string literal</Summary>
+      <Description>Quote a string as a Go string literal. Go strconv package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Getenv" signature="os.Getenv(key string)">
+      <Summary>Read an environment variable</Summary>
+      <Description>Read an environment variable. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.LookupEnv" signature="os.LookupEnv(key string)">
+      <Summary>Look up an environment variable</Summary>
+      <Description>Look up an environment variable. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Setenv" signature="os.Setenv(key, value string)">
+      <Summary>Set an environment variable</Summary>
+      <Description>Set an environment variable. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Unsetenv" signature="os.Unsetenv(key string)">
+      <Summary>Remove an environment variable</Summary>
+      <Description>Remove an environment variable. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Environ" signature="os.Environ()">
+      <Summary>Environment variables of the process</Summary>
+      <Description>Environment variables of the process. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.ReadFile" signature="os.ReadFile(name string)">
+      <Summary>Read a file into memory</Summary>
+      <Description>Read a file into memory. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.WriteFile" signature="os.WriteFile(name string, data []byte, perm int)">
+      <Summary>Write data to a file</Summary>
+      <Description>Write data to a file. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Create" signature="os.Create(name string)">
+      <Summary>Create or truncate a file</Summary>
+      <Description>Create or truncate a file. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Open" signature="os.Open(name string)">
+      <Summary>Open a file for reading</Summary>
+      <Description>Open a file for reading. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.OpenFile" signature="os.OpenFile(name string, flag int, perm int)">
+      <Summary>Open a file with flags</Summary>
+      <Description>Open a file with flags. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Remove" signature="os.Remove(name string)">
+      <Summary>Remove a file or empty directory</Summary>
+      <Description>Remove a file or empty directory. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.RemoveAll" signature="os.RemoveAll(path string)">
+      <Summary>Remove a path and its children</Summary>
+      <Description>Remove a path and its children. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Rename" signature="os.Rename(oldpath, newpath string)">
+      <Summary>Rename a file or directory</Summary>
+      <Description>Rename a file or directory. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Mkdir" signature="os.Mkdir(name string, perm int)">
+      <Summary>Create a directory</Summary>
+      <Description>Create a directory. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.MkdirAll" signature="os.MkdirAll(path string, perm int)">
+      <Summary>Create a directory tree</Summary>
+      <Description>Create a directory tree. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Stat" signature="os.Stat(name string)">
+      <Summary>Get file information</Summary>
+      <Description>Get file information. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Lstat" signature="os.Lstat(name string)">
+      <Summary>Get file information without following links</Summary>
+      <Description>Get file information without following links. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Getwd" signature="os.Getwd()">
+      <Summary>Current working directory</Summary>
+      <Description>Current working directory. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Chdir" signature="os.Chdir(dir string)">
+      <Summary>Change the working directory</Summary>
+      <Description>Change the working directory. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Executable" signature="os.Executable()">
+      <Summary>Path of the running executable</Summary>
+      <Description>Path of the running executable. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.UserHomeDir" signature="os.UserHomeDir()">
+      <Summary>Home directory of the current user</Summary>
+      <Description>Home directory of the current user. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.ReadDir" signature="os.ReadDir(name string)">
+      <Summary>Read the entries of a directory</Summary>
+      <Description>Read the entries of a directory. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Getpid" signature="os.Getpid()">
+      <Summary>Process identifier</Summary>
+      <Description>Process identifier. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Hostname" signature="os.Hostname()">
+      <Summary>Host name of the machine</Summary>
+      <Description>Host name of the machine. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.TempDir" signature="os.TempDir()">
+      <Summary>Default directory for temporary files</Summary>
+      <Description>Default directory for temporary files. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.CreateTemp" signature="os.CreateTemp(dir, pattern string)">
+      <Summary>Create a temporary file</Summary>
+      <Description>Create a temporary file. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.MkdirTemp" signature="os.MkdirTemp(dir, pattern string)">
+      <Summary>Create a temporary directory</Summary>
+      <Description>Create a temporary directory. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.IsNotExist" signature="os.IsNotExist(err error)">
+      <Summary>Report whether an error means a missing file</Summary>
+      <Description>Report whether an error means a missing file. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.IsPermission" signature="os.IsPermission(err error)">
+      <Summary>Report whether an error means a permission problem</Summary>
+      <Description>Report whether an error means a permission problem. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Exit" signature="os.Exit(code int)">
+      <Summary>Exit the program</Summary>
+      <Description>Exit the program. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Args" signature="os.Args">
+      <Summary>Command-line arguments</Summary>
+      <Description>Command-line arguments. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Stdin" signature="os.Stdin">
+      <Summary>Standard input</Summary>
+      <Description>Standard input. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Stdout" signature="os.Stdout">
+      <Summary>Standard output</Summary>
+      <Description>Standard output. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.Stderr" signature="os.Stderr">
+      <Summary>Standard error</Summary>
+      <Description>Standard error. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.ErrNotExist" signature="os.ErrNotExist">
+      <Summary>Missing file error</Summary>
+      <Description>Missing file error. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.O_RDONLY" signature="os.O_RDONLY">
+      <Summary>Read-only open flag</Summary>
+      <Description>Read-only open flag. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.O_WRONLY" signature="os.O_WRONLY">
+      <Summary>Write-only open flag</Summary>
+      <Description>Write-only open flag. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.O_RDWR" signature="os.O_RDWR">
+      <Summary>Read-write open flag</Summary>
+      <Description>Read-write open flag. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.O_CREATE" signature="os.O_CREATE">
+      <Summary>Create open flag</Summary>
+      <Description>Create open flag. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.O_TRUNC" signature="os.O_TRUNC">
+      <Summary>Truncate open flag</Summary>
+      <Description>Truncate open flag. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="os.O_APPEND" signature="os.O_APPEND">
+      <Summary>Append open flag</Summary>
+      <Description>Append open flag. Go os package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="errors.New" signature="errors.New(text string)">
+      <Summary>Create a new error</Summary>
+      <Description>Create a new error. Go errors package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="errors.Is" signature="errors.Is(err, target error)">
+      <Summary>Report whether an error matches a target</Summary>
+      <Description>Report whether an error matches a target. Go errors package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="errors.As" signature="errors.As(err error, target any)">
+      <Summary>Find an error of a given type</Summary>
+      <Description>Find an error of a given type. Go errors package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="errors.Unwrap" signature="errors.Unwrap(err error)">
+      <Summary>Unwrap an error</Summary>
+      <Description>Unwrap an error. Go errors package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="errors.Join" signature="errors.Join(errs ...error)">
+      <Summary>Combine errors into one</Summary>
+      <Description>Combine errors into one. Go errors package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Now" signature="time.Now()">
+      <Summary>Current local time</Summary>
+      <Description>Current local time. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Sleep" signature="time.Sleep(d Duration)">
+      <Summary>Pause the current goroutine</Summary>
+      <Description>Pause the current goroutine. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Since" signature="time.Since(t Time)">
+      <Summary>Time elapsed since t</Summary>
+      <Description>Time elapsed since t. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Until" signature="time.Until(t Time)">
+      <Summary>Time remaining until t</Summary>
+      <Description>Time remaining until t. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.After" signature="time.After(d Duration)">
+      <Summary>Channel that receives after a delay</Summary>
+      <Description>Channel that receives after a delay. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Tick" signature="time.Tick(d Duration)">
+      <Summary>Channel that ticks periodically</Summary>
+      <Description>Channel that ticks periodically. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.NewTimer" signature="time.NewTimer(d Duration)">
+      <Summary>Create a timer</Summary>
+      <Description>Create a timer. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.NewTicker" signature="time.NewTicker(d Duration)">
+      <Summary>Create a ticker</Summary>
+      <Description>Create a ticker. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Parse" signature="time.Parse(layout, value string)">
+      <Summary>Parse a time from text</Summary>
+      <Description>Parse a time from text. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.ParseDuration" signature="time.ParseDuration(s string)">
+      <Summary>Parse a duration from text</Summary>
+      <Description>Parse a duration from text. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Date" signature="time.Date(year int, month Month, day, hour, min, sec, nsec int, loc *Location)">
+      <Summary>Build a time value</Summary>
+      <Description>Build a time value. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Unix" signature="time.Unix(sec, nsec int64)">
+      <Summary>Time from Unix seconds and nanoseconds</Summary>
+      <Description>Time from Unix seconds and nanoseconds. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Time" signature="time.Time">
+      <Summary>Time value type</Summary>
+      <Description>Time value type. Go time package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Duration" signature="time.Duration">
+      <Summary>Duration type</Summary>
+      <Description>Duration type. Go time package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Timer" signature="time.Timer">
+      <Summary>Timer type</Summary>
+      <Description>Timer type. Go time package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Ticker" signature="time.Ticker">
+      <Summary>Ticker type</Summary>
+      <Description>Ticker type. Go time package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Location" signature="time.Location">
+      <Summary>Time zone type</Summary>
+      <Description>Time zone type. Go time package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Nanosecond" signature="time.Nanosecond">
+      <Summary>One nanosecond</Summary>
+      <Description>One nanosecond. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Second" signature="time.Second">
+      <Summary>One second</Summary>
+      <Description>One second. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Minute" signature="time.Minute">
+      <Summary>One minute</Summary>
+      <Description>One minute. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Hour" signature="time.Hour">
+      <Summary>One hour</Summary>
+      <Description>One hour. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.RFC3339" signature="time.RFC3339">
+      <Summary>RFC 3339 time layout</Summary>
+      <Description>RFC 3339 time layout. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Time.Format" signature="time.Time.Format(layout string)">
+      <Summary>Format a time as text</Summary>
+      <Description>Format a time as text. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Time.Add" signature="time.Time.Add(d Duration)">
+      <Summary>Add a duration to a time</Summary>
+      <Description>Add a duration to a time. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Time.Sub" signature="time.Time.Sub(u Time)">
+      <Summary>Difference between two times</Summary>
+      <Description>Difference between two times. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Time.Unix" signature="time.Time.Unix()">
+      <Summary>Unix seconds of a time</Summary>
+      <Description>Unix seconds of a time. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="time.Duration.Seconds" signature="time.Duration.Seconds()">
+      <Summary>Duration in seconds</Summary>
+      <Description>Duration in seconds. Go time package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Abs" signature="math.Abs(x float64)">
+      <Summary>Absolute value</Summary>
+      <Description>Absolute value. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Ceil" signature="math.Ceil(x float64)">
+      <Summary>Smallest integer not less than x</Summary>
+      <Description>Smallest integer not less than x. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Floor" signature="math.Floor(x float64)">
+      <Summary>Largest integer not greater than x</Summary>
+      <Description>Largest integer not greater than x. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Round" signature="math.Round(x float64)">
+      <Summary>Nearest integer</Summary>
+      <Description>Nearest integer. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Trunc" signature="math.Trunc(x float64)">
+      <Summary>Integer part</Summary>
+      <Description>Integer part. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Max" signature="math.Max(x, y float64)">
+      <Summary>Larger of two numbers</Summary>
+      <Description>Larger of two numbers. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Min" signature="math.Min(x, y float64)">
+      <Summary>Smaller of two numbers</Summary>
+      <Description>Smaller of two numbers. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Pow" signature="math.Pow(x, y float64)">
+      <Summary>x raised to the power y</Summary>
+      <Description>x raised to the power y. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Sqrt" signature="math.Sqrt(x float64)">
+      <Summary>Square root</Summary>
+      <Description>Square root. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Cbrt" signature="math.Cbrt(x float64)">
+      <Summary>Cube root</Summary>
+      <Description>Cube root. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Exp" signature="math.Exp(x float64)">
+      <Summary>e raised to the power x</Summary>
+      <Description>e raised to the power x. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Log" signature="math.Log(x float64)">
+      <Summary>Natural logarithm</Summary>
+      <Description>Natural logarithm. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Log2" signature="math.Log2(x float64)">
+      <Summary>Binary logarithm</Summary>
+      <Description>Binary logarithm. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Log10" signature="math.Log10(x float64)">
+      <Summary>Decimal logarithm</Summary>
+      <Description>Decimal logarithm. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Sin" signature="math.Sin(x float64)">
+      <Summary>Sine</Summary>
+      <Description>Sine. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Cos" signature="math.Cos(x float64)">
+      <Summary>Cosine</Summary>
+      <Description>Cosine. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Tan" signature="math.Tan(x float64)">
+      <Summary>Tangent</Summary>
+      <Description>Tangent. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Atan2" signature="math.Atan2(y, x float64)">
+      <Summary>Angle of a point</Summary>
+      <Description>Angle of a point. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Hypot" signature="math.Hypot(p, q float64)">
+      <Summary>Hypotenuse</Summary>
+      <Description>Hypotenuse. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Mod" signature="math.Mod(x, y float64)">
+      <Summary>Floating-point remainder</Summary>
+      <Description>Floating-point remainder. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Inf" signature="math.Inf(sign int)">
+      <Summary>Infinity</Summary>
+      <Description>Infinity. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.NaN" signature="math.NaN()">
+      <Summary>Not-a-number value</Summary>
+      <Description>Not-a-number value. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.IsInf" signature="math.IsInf(f float64, sign int)">
+      <Summary>Report whether a number is infinite</Summary>
+      <Description>Report whether a number is infinite. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.IsNaN" signature="math.IsNaN(f float64)">
+      <Summary>Report whether a number is NaN</Summary>
+      <Description>Report whether a number is NaN. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.Pi" signature="math.Pi">
+      <Summary>Pi constant</Summary>
+      <Description>Pi constant. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="math.E" signature="math.E">
+      <Summary>Euler constant</Summary>
+      <Description>Euler constant. Go math package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sort.Ints" signature="sort.Ints(x []int)">
+      <Summary>Sort a slice of ints</Summary>
+      <Description>Sort a slice of ints. Go sort package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sort.Strings" signature="sort.Strings(x []string)">
+      <Summary>Sort a slice of strings</Summary>
+      <Description>Sort a slice of strings. Go sort package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sort.Float64s" signature="sort.Float64s(x []float64)">
+      <Summary>Sort a slice of float64 values</Summary>
+      <Description>Sort a slice of float64 values. Go sort package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sort.Slice" signature="sort.Slice(x any, less func(i, j int) bool)">
+      <Summary>Sort a slice with a comparison function</Summary>
+      <Description>Sort a slice with a comparison function. Go sort package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sort.SliceStable" signature="sort.SliceStable(x any, less func(i, j int) bool)">
+      <Summary>Stable sort of a slice</Summary>
+      <Description>Stable sort of a slice. Go sort package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sort.Search" signature="sort.Search(n int, f func(int) bool)">
+      <Summary>Binary search for a condition</Summary>
+      <Description>Binary search for a condition. Go sort package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sort.SearchInts" signature="sort.SearchInts(a []int, x int)">
+      <Summary>Binary search in sorted ints</Summary>
+      <Description>Binary search in sorted ints. Go sort package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sort.SearchStrings" signature="sort.SearchStrings(a []string, x string)">
+      <Summary>Binary search in sorted strings</Summary>
+      <Description>Binary search in sorted strings. Go sort package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.Mutex" signature="sync.Mutex">
+      <Summary>Mutual exclusion lock type</Summary>
+      <Description>Mutual exclusion lock type. Go sync package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.RWMutex" signature="sync.RWMutex">
+      <Summary>Reader-writer lock type</Summary>
+      <Description>Reader-writer lock type. Go sync package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.WaitGroup" signature="sync.WaitGroup">
+      <Summary>Wait group type</Summary>
+      <Description>Wait group type. Go sync package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.Once" signature="sync.Once">
+      <Summary>Run-once type</Summary>
+      <Description>Run-once type. Go sync package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.Map" signature="sync.Map">
+      <Summary>Concurrent map type</Summary>
+      <Description>Concurrent map type. Go sync package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.Pool" signature="sync.Pool">
+      <Summary>Reusable object pool type</Summary>
+      <Description>Reusable object pool type. Go sync package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.Mutex.Lock" signature="sync.Mutex.Lock()">
+      <Summary>Lock a mutex</Summary>
+      <Description>Lock a mutex. Go sync package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.Mutex.Unlock" signature="sync.Mutex.Unlock()">
+      <Summary>Unlock a mutex</Summary>
+      <Description>Unlock a mutex. Go sync package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.RWMutex.RLock" signature="sync.RWMutex.RLock()">
+      <Summary>Take a read lock</Summary>
+      <Description>Take a read lock. Go sync package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.RWMutex.RUnlock" signature="sync.RWMutex.RUnlock()">
+      <Summary>Release a read lock</Summary>
+      <Description>Release a read lock. Go sync package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.WaitGroup.Add" signature="sync.WaitGroup.Add(delta int)">
+      <Summary>Add to a wait group</Summary>
+      <Description>Add to a wait group. Go sync package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.WaitGroup.Done" signature="sync.WaitGroup.Done()">
+      <Summary>Mark one wait group task done</Summary>
+      <Description>Mark one wait group task done. Go sync package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.WaitGroup.Wait" signature="sync.WaitGroup.Wait()">
+      <Summary>Wait for a wait group</Summary>
+      <Description>Wait for a wait group. Go sync package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sync.Once.Do" signature="sync.Once.Do(f func())">
+      <Summary>Run a function once</Summary>
+      <Description>Run a function once. Go sync package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.Copy" signature="io.Copy(dst Writer, src Reader)">
+      <Summary>Copy from a reader to a writer</Summary>
+      <Description>Copy from a reader to a writer. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.CopyN" signature="io.CopyN(dst Writer, src Reader, n int64)">
+      <Summary>Copy at most n bytes</Summary>
+      <Description>Copy at most n bytes. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.ReadAll" signature="io.ReadAll(r Reader)">
+      <Summary>Read a reader to the end</Summary>
+      <Description>Read a reader to the end. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.ReadFull" signature="io.ReadFull(r Reader, buf []byte)">
+      <Summary>Read exactly len(buf) bytes</Summary>
+      <Description>Read exactly len(buf) bytes. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.WriteString" signature="io.WriteString(w Writer, s string)">
+      <Summary>Write a string to a writer</Summary>
+      <Description>Write a string to a writer. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.LimitReader" signature="io.LimitReader(r Reader, n int64)">
+      <Summary>Limit a reader to n bytes</Summary>
+      <Description>Limit a reader to n bytes. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.TeeReader" signature="io.TeeReader(r Reader, w Writer)">
+      <Summary>Copy what is read to a writer</Summary>
+      <Description>Copy what is read to a writer. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.MultiReader" signature="io.MultiReader(readers ...Reader)">
+      <Summary>Read several readers in order</Summary>
+      <Description>Read several readers in order. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.MultiWriter" signature="io.MultiWriter(writers ...Writer)">
+      <Summary>Write to several writers at once</Summary>
+      <Description>Write to several writers at once. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.Pipe" signature="io.Pipe()">
+      <Summary>Create a connected reader and writer</Summary>
+      <Description>Create a connected reader and writer. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.EOF" signature="io.EOF">
+      <Summary>End-of-file error</Summary>
+      <Description>End-of-file error. Go io package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.Reader" signature="io.Reader">
+      <Summary>Reader interface</Summary>
+      <Description>Reader interface. Go io package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.Writer" signature="io.Writer">
+      <Summary>Writer interface</Summary>
+      <Description>Writer interface. Go io package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="io.Closer" signature="io.Closer">
+      <Summary>Closer interface</Summary>
+      <Description>Closer interface. Go io package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bufio.NewReader" signature="bufio.NewReader(rd io.Reader)">
+      <Summary>Create a buffered reader</Summary>
+      <Description>Create a buffered reader. Go bufio package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bufio.NewWriter" signature="bufio.NewWriter(w io.Writer)">
+      <Summary>Create a buffered writer</Summary>
+      <Description>Create a buffered writer. Go bufio package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bufio.NewScanner" signature="bufio.NewScanner(r io.Reader)">
+      <Summary>Create a line scanner</Summary>
+      <Description>Create a line scanner. Go bufio package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bufio.Reader" signature="bufio.Reader">
+      <Summary>Buffered reader type</Summary>
+      <Description>Buffered reader type. Go bufio package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bufio.Writer" signature="bufio.Writer">
+      <Summary>Buffered writer type</Summary>
+      <Description>Buffered writer type. Go bufio package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bufio.Scanner" signature="bufio.Scanner">
+      <Summary>Scanner type</Summary>
+      <Description>Scanner type. Go bufio package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bufio.Reader.ReadString" signature="bufio.Reader.ReadString(delim byte)">
+      <Summary>Read up to a delimiter</Summary>
+      <Description>Read up to a delimiter. Go bufio package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bufio.Writer.Flush" signature="bufio.Writer.Flush()">
+      <Summary>Flush buffered data</Summary>
+      <Description>Flush buffered data. Go bufio package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.Contains" signature="bytes.Contains(b, sub []byte)">
+      <Summary>Report whether bytes contain a subsequence</Summary>
+      <Description>Report whether bytes contain a subsequence. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.ContainsAny" signature="bytes.ContainsAny(b []byte, chars string)">
+      <Summary>Report whether bytes contain any character</Summary>
+      <Description>Report whether bytes contain any character. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.Equal" signature="bytes.Equal(a, b []byte)">
+      <Summary>Compare byte slices</Summary>
+      <Description>Compare byte slices. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.EqualFold" signature="bytes.EqualFold(a, b []byte)">
+      <Summary>Compare byte slices ignoring case</Summary>
+      <Description>Compare byte slices ignoring case. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.HasPrefix" signature="bytes.HasPrefix(s, prefix []byte)">
+      <Summary>Report whether bytes start with a prefix</Summary>
+      <Description>Report whether bytes start with a prefix. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.HasSuffix" signature="bytes.HasSuffix(s, suffix []byte)">
+      <Summary>Report whether bytes end with a suffix</Summary>
+      <Description>Report whether bytes end with a suffix. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.Index" signature="bytes.Index(s, sep []byte)">
+      <Summary>Index of a subsequence</Summary>
+      <Description>Index of a subsequence. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.IndexByte" signature="bytes.IndexByte(s []byte, c byte)">
+      <Summary>Index of a byte</Summary>
+      <Description>Index of a byte. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.Join" signature="bytes.Join(s [][]byte, sep []byte)">
+      <Summary>Join byte slices</Summary>
+      <Description>Join byte slices. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.Split" signature="bytes.Split(s, sep []byte)">
+      <Summary>Split bytes around a separator</Summary>
+      <Description>Split bytes around a separator. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.TrimSpace" signature="bytes.TrimSpace(s []byte)">
+      <Summary>Trim whitespace from bytes</Summary>
+      <Description>Trim whitespace from bytes. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.ToLower" signature="bytes.ToLower(s []byte)">
+      <Summary>Convert bytes to lower case</Summary>
+      <Description>Convert bytes to lower case. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.ToUpper" signature="bytes.ToUpper(s []byte)">
+      <Summary>Convert bytes to upper case</Summary>
+      <Description>Convert bytes to upper case. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.NewReader" signature="bytes.NewReader(b []byte)">
+      <Summary>Create a reader over bytes</Summary>
+      <Description>Create a reader over bytes. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.NewBuffer" signature="bytes.NewBuffer(buf []byte)">
+      <Summary>Create a byte buffer</Summary>
+      <Description>Create a byte buffer. Go bytes package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="bytes.Buffer" signature="bytes.Buffer">
+      <Summary>Byte buffer type</Summary>
+      <Description>Byte buffer type. Go bytes package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="context.Background" signature="context.Background()">
+      <Summary>Root background context</Summary>
+      <Description>Root background context. Go context package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="context.TODO" signature="context.TODO()">
+      <Summary>Placeholder context</Summary>
+      <Description>Placeholder context. Go context package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="context.WithCancel" signature="context.WithCancel(parent Context)">
+      <Summary>Context with a cancel function</Summary>
+      <Description>Context with a cancel function. Go context package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="context.WithTimeout" signature="context.WithTimeout(parent Context, timeout Duration)">
+      <Summary>Context with a deadline and cancellation</Summary>
+      <Description>Context with a deadline and cancellation. Go context package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="context.WithDeadline" signature="context.WithDeadline(parent Context, d Time)">
+      <Summary>Context with a fixed deadline</Summary>
+      <Description>Context with a fixed deadline. Go context package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="context.WithValue" signature="context.WithValue(parent Context, key, val any)">
+      <Summary>Context with a value</Summary>
+      <Description>Context with a value. Go context package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="context.Canceled" signature="context.Canceled">
+      <Summary>Cancellation error</Summary>
+      <Description>Cancellation error. Go context package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="context.DeadlineExceeded" signature="context.DeadlineExceeded">
+      <Summary>Deadline error</Summary>
+      <Description>Deadline error. Go context package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="context.Context" signature="context.Context">
+      <Summary>Context interface</Summary>
+      <Description>Context interface. Go context package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="json.Marshal" signature="json.Marshal(v any)">
+      <Summary>Encode a value as JSON</Summary>
+      <Description>Encode a value as JSON. Go json package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="json.MarshalIndent" signature="json.MarshalIndent(v any, prefix, indent string)">
+      <Summary>Encode a value as indented JSON</Summary>
+      <Description>Encode a value as indented JSON. Go json package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="json.Unmarshal" signature="json.Unmarshal(data []byte, v any)">
+      <Summary>Decode JSON into a value</Summary>
+      <Description>Decode JSON into a value. Go json package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="json.NewDecoder" signature="json.NewDecoder(r io.Reader)">
+      <Summary>Create a JSON decoder</Summary>
+      <Description>Create a JSON decoder. Go json package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="json.NewEncoder" signature="json.NewEncoder(w io.Writer)">
+      <Summary>Create a JSON encoder</Summary>
+      <Description>Create a JSON encoder. Go json package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="json.Valid" signature="json.Valid(data []byte)">
+      <Summary>Report whether data is valid JSON</Summary>
+      <Description>Report whether data is valid JSON. Go json package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="json.Decoder" signature="json.Decoder">
+      <Summary>JSON decoder type</Summary>
+      <Description>JSON decoder type. Go json package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="json.Encoder" signature="json.Encoder">
+      <Summary>JSON encoder type</Summary>
+      <Description>JSON encoder type. Go json package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Join" signature="filepath.Join(elem ...string)">
+      <Summary>Join path elements</Summary>
+      <Description>Join path elements. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Abs" signature="filepath.Abs(path string)">
+      <Summary>Absolute path</Summary>
+      <Description>Absolute path. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Base" signature="filepath.Base(path string)">
+      <Summary>Last element of a path</Summary>
+      <Description>Last element of a path. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Dir" signature="filepath.Dir(path string)">
+      <Summary>Directory part of a path</Summary>
+      <Description>Directory part of a path. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Ext" signature="filepath.Ext(path string)">
+      <Summary>File extension</Summary>
+      <Description>File extension. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Clean" signature="filepath.Clean(path string)">
+      <Summary>Clean a path</Summary>
+      <Description>Clean a path. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Rel" signature="filepath.Rel(basepath, targpath string)">
+      <Summary>Relative path</Summary>
+      <Description>Relative path. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Walk" signature="filepath.Walk(root string, fn WalkFunc)">
+      <Summary>Walk a file tree</Summary>
+      <Description>Walk a file tree. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.WalkDir" signature="filepath.WalkDir(root string, fn WalkDirFunc)">
+      <Summary>Walk a file tree with directory entries</Summary>
+      <Description>Walk a file tree with directory entries. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Glob" signature="filepath.Glob(pattern string)">
+      <Summary>Find paths matching a pattern</Summary>
+      <Description>Find paths matching a pattern. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Match" signature="filepath.Match(pattern, name string)">
+      <Summary>Match a name against a pattern</Summary>
+      <Description>Match a name against a pattern. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.IsAbs" signature="filepath.IsAbs(path string)">
+      <Summary>Report whether a path is absolute</Summary>
+      <Description>Report whether a path is absolute. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="filepath.Separator" signature="filepath.Separator">
+      <Summary>Path separator character</Summary>
+      <Description>Path separator character. Go filepath package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.Compile" signature="regexp.Compile(expr string)">
+      <Summary>Compile a regular expression</Summary>
+      <Description>Compile a regular expression. Go regexp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.MustCompile" signature="regexp.MustCompile(expr string)">
+      <Summary>Compile a regular expression and panic on error</Summary>
+      <Description>Compile a regular expression and panic on error. Go regexp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.Match" signature="regexp.Match(pattern string, b []byte)">
+      <Summary>Report whether bytes match a pattern</Summary>
+      <Description>Report whether bytes match a pattern. Go regexp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.MatchString" signature="regexp.MatchString(pattern, s string)">
+      <Summary>Report whether a string matches a pattern</Summary>
+      <Description>Report whether a string matches a pattern. Go regexp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.QuoteMeta" signature="regexp.QuoteMeta(s string)">
+      <Summary>Escape regular expression metacharacters</Summary>
+      <Description>Escape regular expression metacharacters. Go regexp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.Regexp" signature="regexp.Regexp">
+      <Summary>Compiled regular expression type</Summary>
+      <Description>Compiled regular expression type. Go regexp package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.Regexp.FindString" signature="regexp.Regexp.FindString(s string)">
+      <Summary>First match in a string</Summary>
+      <Description>First match in a string. Go regexp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.Regexp.FindAllString" signature="regexp.Regexp.FindAllString(s string, n int)">
+      <Summary>All matches in a string</Summary>
+      <Description>All matches in a string. Go regexp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.Regexp.ReplaceAllString" signature="regexp.Regexp.ReplaceAllString(src, repl string)">
+      <Summary>Replace all matches in a string</Summary>
+      <Description>Replace all matches in a string. Go regexp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="regexp.Regexp.Split" signature="regexp.Regexp.Split(s string, n int)">
+      <Summary>Split a string around matches</Summary>
+      <Description>Split a string around matches. Go regexp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.Print" signature="log.Print(v ...any)">
+      <Summary>Write a log message</Summary>
+      <Description>Write a log message. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.Printf" signature="log.Printf(format string, v ...any)">
+      <Summary>Write a formatted log message</Summary>
+      <Description>Write a formatted log message. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.Println" signature="log.Println(v ...any)">
+      <Summary>Write a log message with a newline</Summary>
+      <Description>Write a log message with a newline. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.Fatal" signature="log.Fatal(v ...any)">
+      <Summary>Log a message and exit</Summary>
+      <Description>Log a message and exit. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.Fatalf" signature="log.Fatalf(format string, v ...any)">
+      <Summary>Log a formatted message and exit</Summary>
+      <Description>Log a formatted message and exit. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.Fatalln" signature="log.Fatalln(v ...any)">
+      <Summary>Log a message with a newline and exit</Summary>
+      <Description>Log a message with a newline and exit. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.Panic" signature="log.Panic(v ...any)">
+      <Summary>Log a message and panic</Summary>
+      <Description>Log a message and panic. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.Panicf" signature="log.Panicf(format string, v ...any)">
+      <Summary>Log a formatted message and panic</Summary>
+      <Description>Log a formatted message and panic. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.Panicln" signature="log.Panicln(v ...any)">
+      <Summary>Log a message with a newline and panic</Summary>
+      <Description>Log a message with a newline and panic. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.New" signature="log.New(out io.Writer, prefix string, flag int)">
+      <Summary>Create a logger</Summary>
+      <Description>Create a logger. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.SetFlags" signature="log.SetFlags(flag int)">
+      <Summary>Set logger flags</Summary>
+      <Description>Set logger flags. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="log.SetPrefix" signature="log.SetPrefix(prefix string)">
+      <Summary>Set the logger prefix</Summary>
+      <Description>Set the logger prefix. Go log package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="flag.String" signature="flag.String(name, value, usage string)">
+      <Summary>Define a string flag</Summary>
+      <Description>Define a string flag. Go flag package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="flag.Int" signature="flag.Int(name string, value int, usage string)">
+      <Summary>Define an int flag</Summary>
+      <Description>Define an int flag. Go flag package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="flag.Bool" signature="flag.Bool(name string, value bool, usage string)">
+      <Summary>Define a boolean flag</Summary>
+      <Description>Define a boolean flag. Go flag package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="flag.Duration" signature="flag.Duration(name string, value time.Duration, usage string)">
+      <Summary>Define a duration flag</Summary>
+      <Description>Define a duration flag. Go flag package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="flag.Float64" signature="flag.Float64(name string, value float64, usage string)">
+      <Summary>Define a float64 flag</Summary>
+      <Description>Define a float64 flag. Go flag package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="flag.Parse" signature="flag.Parse()">
+      <Summary>Parse the command-line flags</Summary>
+      <Description>Parse the command-line flags. Go flag package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="flag.Args" signature="flag.Args()">
+      <Summary>Non-flag arguments</Summary>
+      <Description>Non-flag arguments. Go flag package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="flag.NArg" signature="flag.NArg()">
+      <Summary>Number of non-flag arguments</Summary>
+      <Description>Number of non-flag arguments. Go flag package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="unicode.IsLetter" signature="unicode.IsLetter(r rune)">
+      <Summary>Report whether a rune is a letter</Summary>
+      <Description>Report whether a rune is a letter. Go unicode package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="unicode.IsDigit" signature="unicode.IsDigit(r rune)">
+      <Summary>Report whether a rune is a digit</Summary>
+      <Description>Report whether a rune is a digit. Go unicode package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="unicode.IsSpace" signature="unicode.IsSpace(r rune)">
+      <Summary>Report whether a rune is whitespace</Summary>
+      <Description>Report whether a rune is whitespace. Go unicode package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="unicode.IsUpper" signature="unicode.IsUpper(r rune)">
+      <Summary>Report whether a rune is upper case</Summary>
+      <Description>Report whether a rune is upper case. Go unicode package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="unicode.IsLower" signature="unicode.IsLower(r rune)">
+      <Summary>Report whether a rune is lower case</Summary>
+      <Description>Report whether a rune is lower case. Go unicode package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="unicode.ToUpper" signature="unicode.ToUpper(r rune)">
+      <Summary>Convert a rune to upper case</Summary>
+      <Description>Convert a rune to upper case. Go unicode package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="unicode.ToLower" signature="unicode.ToLower(r rune)">
+      <Summary>Convert a rune to lower case</Summary>
+      <Description>Convert a rune to lower case. Go unicode package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="unicode.IsPunct" signature="unicode.IsPunct(r rune)">
+      <Summary>Report whether a rune is punctuation</Summary>
+      <Description>Report whether a rune is punctuation. Go unicode package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="runtime.GOOS" signature="runtime.GOOS">
+      <Summary>Operating system name</Summary>
+      <Description>Operating system name. Go runtime package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="runtime.GOARCH" signature="runtime.GOARCH">
+      <Summary>Processor architecture name</Summary>
+      <Description>Processor architecture name. Go runtime package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="runtime.NumCPU" signature="runtime.NumCPU()">
+      <Summary>Number of logical CPUs</Summary>
+      <Description>Number of logical CPUs. Go runtime package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="runtime.GOMAXPROCS" signature="runtime.GOMAXPROCS(n int)">
+      <Summary>Limit the number of running goroutines</Summary>
+      <Description>Limit the number of running goroutines. Go runtime package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="runtime.Gosched" signature="runtime.Gosched()">
+      <Summary>Yield the processor to other goroutines</Summary>
+      <Description>Yield the processor to other goroutines. Go runtime package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="runtime.Version" signature="runtime.Version()">
+      <Summary>Go version of the program</Summary>
+      <Description>Go version of the program. Go runtime package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="reflect.TypeOf" signature="reflect.TypeOf(i any)">
+      <Summary>Type of a value</Summary>
+      <Description>Type of a value. Go reflect package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="reflect.ValueOf" signature="reflect.ValueOf(i any)">
+      <Summary>Reflect value of a value</Summary>
+      <Description>Reflect value of a value. Go reflect package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="reflect.DeepEqual" signature="reflect.DeepEqual(x, y any)">
+      <Summary>Deep equality of two values</Summary>
+      <Description>Deep equality of two values. Go reflect package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sha256.Sum256" signature="sha256.Sum256(data []byte)">
+      <Summary>SHA-256 checksum of bytes</Summary>
+      <Description>SHA-256 checksum of bytes. Go sha256 package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sha256.New" signature="sha256.New()">
+      <Summary>Create a SHA-256 hash</Summary>
+      <Description>Create a SHA-256 hash. Go sha256 package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="base64.StdEncoding" signature="base64.StdEncoding">
+      <Summary>Standard base64 encoding</Summary>
+      <Description>Standard base64 encoding. Go base64 package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="base64.URLEncoding" signature="base64.URLEncoding">
+      <Summary>URL-safe base64 encoding</Summary>
+      <Description>URL-safe base64 encoding. Go base64 package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="base64.NewEncoder" signature="base64.NewEncoder(enc *Encoding, w io.Writer)">
+      <Summary>Create a base64 encoder</Summary>
+      <Description>Create a base64 encoder. Go base64 package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="base64.NewDecoder" signature="base64.NewDecoder(enc *Encoding, r io.Reader)">
+      <Summary>Create a base64 decoder</Summary>
+      <Description>Create a base64 decoder. Go base64 package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.Get" signature="http.Get(url string)">
+      <Summary>Send an HTTP GET request</Summary>
+      <Description>Send an HTTP GET request. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.Post" signature="http.Post(url, contentType string, body io.Reader)">
+      <Summary>Send an HTTP POST request</Summary>
+      <Description>Send an HTTP POST request. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.PostForm" signature="http.PostForm(url string, data url.Values)">
+      <Summary>Send an HTTP POST form</Summary>
+      <Description>Send an HTTP POST form. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.Head" signature="http.Head(url string)">
+      <Summary>Send an HTTP HEAD request</Summary>
+      <Description>Send an HTTP HEAD request. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.NewRequest" signature="http.NewRequest(method, url string, body io.Reader)">
+      <Summary>Create an HTTP request</Summary>
+      <Description>Create an HTTP request. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.ListenAndServe" signature="http.ListenAndServe(addr string, handler Handler)">
+      <Summary>Start an HTTP server</Summary>
+      <Description>Start an HTTP server. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.HandleFunc" signature="http.HandleFunc(pattern string, handler func(ResponseWriter, *Request))">
+      <Summary>Register an HTTP handler function</Summary>
+      <Description>Register an HTTP handler function. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.Redirect" signature="http.Redirect(w ResponseWriter, r *Request, url string, code int)">
+      <Summary>Send an HTTP redirect</Summary>
+      <Description>Send an HTTP redirect. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.Error" signature="http.Error(w ResponseWriter, error string, code int)">
+      <Summary>Send an HTTP error</Summary>
+      <Description>Send an HTTP error. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.NotFound" signature="http.NotFound(w ResponseWriter, r *Request)">
+      <Summary>Send an HTTP 404 response</Summary>
+      <Description>Send an HTTP 404 response. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.StatusOK" signature="http.StatusOK">
+      <Summary>HTTP 200 status code</Summary>
+      <Description>HTTP 200 status code. Go http package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.Client" signature="http.Client">
+      <Summary>HTTP client type</Summary>
+      <Description>HTTP client type. Go http package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.Server" signature="http.Server">
+      <Summary>HTTP server type</Summary>
+      <Description>HTTP server type. Go http package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.Request" signature="http.Request">
+      <Summary>HTTP request type</Summary>
+      <Description>HTTP request type. Go http package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.Response" signature="http.Response">
+      <Summary>HTTP response type</Summary>
+      <Description>HTTP response type. Go http package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="http.HandlerFunc" signature="http.HandlerFunc">
+      <Summary>HTTP handler function type</Summary>
+      <Description>HTTP handler function type. Go http package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="net.Dial" signature="net.Dial(network, address string)">
+      <Summary>Connect to a network address</Summary>
+      <Description>Connect to a network address. Go net package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="net.DialTimeout" signature="net.DialTimeout(network, address string, timeout time.Duration)">
+      <Summary>Connect with a timeout</Summary>
+      <Description>Connect with a timeout. Go net package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="net.Listen" signature="net.Listen(network, address string)">
+      <Summary>Listen for incoming connections</Summary>
+      <Description>Listen for incoming connections. Go net package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="net.LookupHost" signature="net.LookupHost(host string)">
+      <Summary>Resolve a host name</Summary>
+      <Description>Resolve a host name. Go net package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="net.JoinHostPort" signature="net.JoinHostPort(host, port string)">
+      <Summary>Join a host and port</Summary>
+      <Description>Join a host and port. Go net package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="net.SplitHostPort" signature="net.SplitHostPort(hostport string)">
+      <Summary>Split a host and port</Summary>
+      <Description>Split a host and port. Go net package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="net.ParseIP" signature="net.ParseIP(s string)">
+      <Summary>Parse an IP address</Summary>
+      <Description>Parse an IP address. Go net package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="exec.Command" signature="exec.Command(name string, arg ...string)">
+      <Summary>Prepare an external command</Summary>
+      <Description>Prepare an external command. Go exec package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="exec.CommandContext" signature="exec.CommandContext(ctx context.Context, name string, arg ...string)">
+      <Summary>Prepare a command with a context</Summary>
+      <Description>Prepare a command with a context. Go exec package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="exec.LookPath" signature="exec.LookPath(file string)">
+      <Summary>Find an executable in PATH</Summary>
+      <Description>Find an executable in PATH. Go exec package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sql.Open" signature="sql.Open(driverName, dataSourceName string)">
+      <Summary>Open a database handle</Summary>
+      <Description>Open a database handle. Go sql package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sql.DB" signature="sql.DB">
+      <Summary>Database handle type</Summary>
+      <Description>Database handle type. Go sql package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sql.Rows" signature="sql.Rows">
+      <Summary>Query result rows type</Summary>
+      <Description>Query result rows type. Go sql package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="sql.Row" signature="sql.Row">
+      <Summary>Single result row type</Summary>
+      <Description>Single result row type. Go sql package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="slices.Sort" signature="slices.Sort(x []T)">
+      <Summary>Sort a slice</Summary>
+      <Description>Sort a slice. Go slices package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="slices.SortFunc" signature="slices.SortFunc(x []T, cmp func(a, b T) int)">
+      <Summary>Sort a slice with a comparison function</Summary>
+      <Description>Sort a slice with a comparison function. Go slices package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="slices.Contains" signature="slices.Contains(s []T, v T)">
+      <Summary>Report whether a slice contains a value</Summary>
+      <Description>Report whether a slice contains a value. Go slices package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="slices.Index" signature="slices.Index(s []T, v T)">
+      <Summary>Index of a value in a slice</Summary>
+      <Description>Index of a value in a slice. Go slices package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="slices.Clone" signature="slices.Clone(s []T)">
+      <Summary>Copy a slice</Summary>
+      <Description>Copy a slice. Go slices package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="slices.Equal" signature="slices.Equal(s1, s2 []T)">
+      <Summary>Compare two slices</Summary>
+      <Description>Compare two slices. Go slices package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="maps.Keys" signature="maps.Keys(m map[K]V)">
+      <Summary>Keys of a map</Summary>
+      <Description>Keys of a map. Go maps package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="maps.Values" signature="maps.Values(m map[K]V)">
+      <Summary>Values of a map</Summary>
+      <Description>Values of a map. Go maps package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="maps.Clone" signature="maps.Clone(m map[K]V)">
+      <Summary>Copy a map</Summary>
+      <Description>Copy a map. Go maps package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="maps.Copy" signature="maps.Copy(dst, src map[K]V)">
+      <Summary>Copy entries into a map</Summary>
+      <Description>Copy entries into a map. Go maps package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="maps.Equal" signature="maps.Equal(m1, m2 map[K]V)">
+      <Summary>Compare two maps</Summary>
+      <Description>Compare two maps. Go maps package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="cmp.Compare" signature="cmp.Compare(x, y T)">
+      <Summary>Compare two ordered values</Summary>
+      <Description>Compare two ordered values. Go cmp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="cmp.Less" signature="cmp.Less(x, y T)">
+      <Summary>Report whether x is less than y</Summary>
+      <Description>Report whether x is less than y. Go cmp package.</Description>
+    </Symbol>
+    <Symbol language="Go" name="testing.T" signature="testing.T">
+      <Summary>Test state type</Summary>
+      <Description>Test state type. Go testing package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="testing.B" signature="testing.B">
+      <Summary>Benchmark state type</Summary>
+      <Description>Benchmark state type. Go testing package type.</Description>
+    </Symbol>
+    <Symbol language="Go" name="testing.Short" signature="testing.Short()">
+      <Summary>Report whether short tests are requested</Summary>
+      <Description>Report whether short tests are requested. Go testing package.</Description>
+    </Symbol>
   </Symbols>
 </ApiSymbols>
