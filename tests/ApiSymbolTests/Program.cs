@@ -68,7 +68,7 @@ internal static class Program
         }
 
         // The set covers the languages the editor highlights with a code tokenizer.
-        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Ruby, L.Perl, L.CMake })
+        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Ruby, L.Perl, L.CMake, L.Go })
         {
             Check(database.ForLanguage(language).Count > 0, "the set has symbols for " + language);
         }
@@ -263,7 +263,7 @@ internal static class Program
         // The split C-like profiles start without an API set; the C library is not inherited by them.
         foreach (L language in new[]
                  {
-                     L.CSharp, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
+                     L.CSharp, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Rust, L.Swift, L.Dart,
                      L.JavaScript, L.TypeScript, L.Php, L.Css, L.Protobuf, L.DeviceTree, L.Awk, L.Tcl,
                      L.Assembly, L.PowerShell
                  })
@@ -487,6 +487,53 @@ internal static class Program
             "the description of 'shopt' names a Bash builtin");
         Check(database.Find(L.Bash, "BASH_VERSION").Description.Contains("Bash variable"),
             "the description of 'BASH_VERSION' names a Bash variable");
+
+        // Go has its own profile with the standard library: the builtins, the common packages and their types.
+        List<ApiSymbolDatabase.Symbol> go = database.ForLanguage(L.Go).ToList();
+        Check(go.Count > 350, "the Go set is broad (" + go.Count + " symbols)");
+        Equal(go.Count, go.Select(s => s.Name).Distinct().Count(), "Go names are unique");
+        Equal(go.Count, go.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every Go symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "append", "len", "make", "panic", "recover", "error", "string", "int",
+                     "fmt.Println", "fmt.Printf", "fmt.Sprintf", "fmt.Errorf",
+                     "strings.Split", "strings.Join", "strings.TrimSpace", "strings.Builder",
+                     "strconv.Atoi", "strconv.Itoa", "strconv.ParseInt",
+                     "os.ReadFile", "os.WriteFile", "os.Getenv", "os.Exit", "os.Args",
+                     "errors.New", "errors.Is", "errors.As",
+                     "time.Now", "time.Sleep", "time.Duration", "time.Time.Format",
+                     "math.Sqrt", "math.Pi", "sort.Slice", "sort.Strings",
+                     "sync.Mutex", "sync.WaitGroup", "sync.Once.Do",
+                     "context.Background", "context.WithTimeout",
+                     "json.Marshal", "json.Unmarshal", "filepath.Join", "filepath.Abs",
+                     "regexp.MustCompile", "regexp.Regexp.FindAllString",
+                     "io.ReadAll", "io.Copy", "bufio.NewScanner",
+                     "flag.String", "flag.Parse", "runtime.GOOS", "slices.Sort", "maps.Keys"
+                 })
+        {
+            Check(database.Find(L.Go, name) != null, "the Go set includes '" + name + "'");
+        }
+        Check(database.Find(L.Go, "append").Description.Contains("Go builtin"),
+            "the description of 'append' names a Go builtin");
+        Check(database.Find(L.Go, "fmt.Println").Description.Contains("Go fmt package"),
+            "the description of 'fmt.Println' names the fmt package");
+        Check(database.Find(L.Go, "sync.Mutex").Description.Contains("Go sync package type"),
+            "the description of 'sync.Mutex' names a sync package type");
+        Check(database.Find(L.Go, "printf") == null, "Go does not inherit the C library");
+        Check(database.Find(L.Python, "fmt.Println") == null, "the Go symbols stay in the Go profile");
+        Equal(database.FindSignature(L.Go, "fmt.Println").ToString(), "fmt.Println(a ...any)",
+            "the Go signature keeps its package");
+        Equal(database.FindSignature(L.Go, "sort.Slice").ParameterCount, 2,
+            "the Go sort.Slice signature has two parameters");
+        Equal(database.FindSignature(L.Go, "sort.Slice").GetParameter(1).Text, "less func(i, j int) bool",
+            "the nested Go function parameter stays one parameter");
+        Equal(database.FindSignature(L.Go, "time.Date").ParameterCount, 8,
+            "the Go time.Date signature has eight parameters");
+        Equal(database.FindSignature(L.Go, "http.HandleFunc").ParameterCount, 2,
+            "the Go http.HandleFunc signature has two parameters");
+        Equal(database.FindSignature(L.Go, "Atoi").ToString(), "strconv.Atoi(s string)",
+            "a bare Go call resolves to the package-qualified signature");
     }
 
     private static List<ISuggestion> Build(L language, string text, string prefix, ApiSymbolDatabase database)
@@ -684,6 +731,20 @@ internal static class Program
         ISuggestion path = variables.FirstOrDefault(s => s.DisplayName == "PATH");
         Check(path != null && path.IsBold, "the completion list offers the Bash variable 'PATH'");
 
+        // The Go standard library feeds the completion list under its short names.
+        ISuggestion println = Build(L.Go, "", "Printl", database).FirstOrDefault(s => s.DisplayName == "Println");
+        Check(println != null, "the completion list offers 'Println' from 'fmt.Println'");
+        Equal(println.DetailText, "Print values with a newline", "the Go summary is the detail text");
+        Equal(println.HintText, "fmt.Println(a ...any)", "the qualified Go signature is the hint text");
+        Check(Build(L.Go, "", "Sprin", database).Any(s => s.DisplayName == "Sprintf"),
+            "the completion list offers 'fmt.Sprintf' as 'Sprintf'");
+        Check(Build(L.Go, "", "Atoi", database).Any(s => s.DisplayName == "Atoi"),
+            "the completion list offers 'strconv.Atoi' as 'Atoi'");
+        Check(Build(L.Go, "", "GOO", database).Any(s => s.DisplayName == "GOOS"),
+            "the completion list offers the Go 'runtime.GOOS' constant");
+        Check(!Build(L.Go, "", "print", database).Any(s => s.DisplayName == "printf"),
+            "the Go completion list does not offer the C library");
+
         // Without a database the list is what it always was: keywords and document words only.
         List<ISuggestion> plain = Build(L.Python, "", "pri", null);
         Check(!plain.Any(s => s.DisplayName == "print"), "without a database no API symbol is offered");
@@ -716,6 +777,20 @@ internal static class Program
         Check(luaGsubHint != null, "a bare 'gsub(' call finds the 'string.gsub' symbol");
         Check(luaGsubHint.Name == "string.gsub", "the Lua string hint keeps the qualified name");
         Equal(luaGsubHint.ParameterCount, 3, "the Lua string hint has its parameters");
+
+        // A bare Go call finds the package-qualified symbol.
+        ParameterSignature goPrintln = EditorSignatureSource.FindSignature(
+            L.Go, "Println(\n", 0, 8, database, out int goActive);
+        Check(goPrintln != null, "a bare 'Println(' call finds the Go 'fmt.Println' symbol");
+        Equal(goPrintln.Name, "fmt.Println", "the Go hint keeps the qualified name");
+        Equal(goPrintln.ParameterCount, 1, "the Go hint has its parameters");
+        Equal(goActive, 0, "the first Go parameter is active");
+
+        ParameterSignature goAtoi = EditorSignatureSource.FindSignature(
+            L.Go, "Atoi(\n", 0, 5, database, out int goAtoiActive);
+        Check(goAtoi != null, "a bare 'Atoi(' call finds the Go 'strconv.Atoi' symbol");
+        Equal(goAtoi.Name, "strconv.Atoi", "the Go strconv hint keeps the qualified name");
+        Equal(goAtoi.ParameterCount, 1, "the Go strconv hint has its parameter");
 
         ParameterSignature sql = EditorSignatureSource.FindSignature(
             L.Sql, "CONCAT(\n", 0, 7, database, out int sqlActive);
