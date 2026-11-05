@@ -512,7 +512,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             object hiddenSourceElement = ((sender is FrameworkElement) ? sender : null);
             (((hiddenSourceElement != null) ? ((FrameworkElement)hiddenSourceElement).DataContext : null) as TextSearcher)?.Hide();
         }
-        else if ((int)e.Key == 114)
+        else if (e.Key == Key.F3)
         {
             // F3 searches down (forward), Shift+F3 searches up (backward), exactly like the two arrow buttons.
             ModifierKeys f3Modifiers = (e.KeyboardDevice != null) ? e.KeyboardDevice.Modifiers : ModifierKeys.None;
@@ -1209,7 +1209,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     {
         // Ctrl+F opens the shared search bar for any active tab. It is intercepted here, before the terminal sees
         // the key, so Ctrl+F is never sent to the remote side (SSH shell, COM port or raw TCP connection).
-        if ((int)e.Key == 70)
+        if (e.Key == Key.F)
         {
             ModifierKeys modifiers = (e.KeyboardDevice != null) ? e.KeyboardDevice.Modifiers : ModifierKeys.None;
             if ((modifiers & ModifierKeys.Control) != 0 && (modifiers & ModifierKeys.Alt) == 0)
