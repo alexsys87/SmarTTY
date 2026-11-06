@@ -85,13 +85,14 @@ namespace SmarTTY.CodeEditing
             PowerShell, // PowerShell: # and <# #> comments, $variables, Verb-Noun commands, here-strings, no API set
             Verilog, // Verilog/SystemVerilog: // and /* */ comments, `directives, $system tasks
             Vhdl,    // VHDL: -- comments, case-insensitive keywords
-            Kconfig  // Kconfig and .config: the colors of Config, the Kconfig directives are keywords
+            Kconfig,  // Kconfig and .config: the colors of Config, the Kconfig directives are keywords
+            UBoot    // U-Boot env files and scripts: shell-like words and $variables
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
-            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.Lua, Language.Makefile, Language.Json, Language.Config,
+            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Lua, Language.Makefile, Language.Json, Language.Config,
             Language.Systemd, Language.Nginx, Language.SshConfig, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
@@ -111,6 +112,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Bash: return "Shell (sh, bash)";
                 case Language.Uci: return "UCI (OpenWrt config)";
                 case Language.Kconfig: return "Kconfig (kernel, OpenWrt)";
+                case Language.UBoot: return "U-Boot (env, scripts)";
                 case Language.Lua: return "Lua";
                 case Language.Makefile: return "Makefile";
                 case Language.Json: return "JSON";
@@ -359,6 +361,17 @@ namespace SmarTTY.CodeEditing
                 case "defconfig":
                     return Language.Kconfig;
 
+                case "uenv.txt":
+                case "uboot.env":
+                case "uboot-env.txt":
+                case "u-boot.env":
+                case "u-boot-env.txt":
+                case "boot.cmd":
+                case "boot.scr":
+                case "u-boot.cmd":
+                case "u-boot.scr":
+                    return Language.UBoot;
+
                 case "ssh_config":
                 case "sshd_config":
                     return Language.SshConfig;
@@ -378,6 +391,15 @@ namespace SmarTTY.CodeEditing
                 name.StartsWith("kconfig.", StringComparison.Ordinal))
             {
                 return Language.Kconfig;
+            }
+            if ((name.StartsWith("uboot-env", StringComparison.Ordinal) ||
+                 name.StartsWith("u-boot-env", StringComparison.Ordinal) ||
+                 name.StartsWith("uboot.", StringComparison.Ordinal) ||
+                 name.StartsWith("u-boot.", StringComparison.Ordinal)) &&
+                (name.EndsWith(".env", StringComparison.Ordinal) || name.EndsWith(".txt", StringComparison.Ordinal) ||
+                 name.EndsWith(".cmd", StringComparison.Ordinal) || name.EndsWith(".scr", StringComparison.Ordinal)))
+            {
+                return Language.UBoot;
             }
             if (name.StartsWith("dockerfile.", StringComparison.Ordinal) || name.StartsWith("containerfile.", StringComparison.Ordinal))
             {
@@ -565,6 +587,9 @@ namespace SmarTTY.CodeEditing
                 case "r":
                 case "nix":
                     return Language.Script;
+
+                case "uboot":
+                    return Language.UBoot;
 
                 case "awk":
                     return Language.Awk;
@@ -799,6 +824,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Makefile: return TokenizeMakefile;
                 case Language.Uci: return TokenizeUci;
                 case Language.Kconfig: return KconfigTokenizer;
+                case Language.UBoot: return UBootTokenizer;
                 case Language.Yaml: return TokenizeYaml;
                 case Language.Systemd: return SystemdTokenizer;
                 case Language.Nginx: return NginxTokenizer;
@@ -904,6 +930,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(UciKeywords);
                 case Language.Kconfig:
                     return Combine(KconfigKeywords, KconfigValues);
+                case Language.UBoot:
+                    return Combine(UBootKeywords);
                 case Language.Systemd:
                     return Combine(SystemdDirectives, SystemdSectionNames, SystemdValues, ConfigConstants);
                 case Language.Nginx:
@@ -2596,6 +2624,7 @@ namespace SmarTTY.CodeEditing
             public bool Preprocessor;          // #include-style directives at the start of a line
             public bool BacktickDirectives;    // `define-style directives (Verilog)
             public bool DollarIdentifiers;     // $display-style system tasks (Verilog)
+            public bool ShellVariables;        // $name and ${name} shell-style variables (U-Boot)
             public bool SingleQuoteStrings = true;
             public bool MarkupTags;            // <tag> and </tag> names are colored as keywords
             public bool Brackets;              // emit paired bracket tokens
@@ -3249,6 +3278,30 @@ namespace SmarTTY.CodeEditing
                             last = i;
                             continue;
                         }
+                    }
+
+                    // Shell-style variables of U-Boot scripts and environment variables: $name, ${name}.
+                    if (ShellVariables && c == '$' && i + 1 < len && (text[i + 1] == '{' || IsIdStart(text[i + 1])))
+                    {
+                        int variableEnd;
+                        if (text[i + 1] == '{')
+                        {
+                            int close = text.IndexOf('}', i + 2);
+                            variableEnd = (close < 0) ? len : close + 1;
+                        }
+                        else
+                        {
+                            variableEnd = i + 1;
+                            while (variableEnd < len && IsIdChar(text[variableEnd]))
+                            {
+                                variableEnd++;
+                            }
+                        }
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(TypeVariable, i, variableEnd);
+                        i = variableEnd;
+                        last = i;
+                        continue;
                     }
 
                     // PowerShell comparison, logical and formatting operators: -eq, -not, -replace.

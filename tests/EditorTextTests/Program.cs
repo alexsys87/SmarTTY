@@ -1029,6 +1029,30 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Kconfig).Toggle(new[] { "config NET" })), "# config NET", "Kconfig comment");
     }
 
+    private static void UBootChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/boot/uEnv.txt"), L.UBoot, "a U-Boot environment text file");
+        Equal(SyntaxHighlighting.DetectLanguage("/boot/uboot.env"), L.UBoot, "a saved U-Boot environment");
+        Equal(SyntaxHighlighting.DetectLanguage("/boot/boot.cmd"), L.UBoot, "a U-Boot boot script");
+        Equal(SyntaxHighlighting.DetectLanguage("/boot/boot.scr"), L.UBoot, "a compiled U-Boot boot script");
+        Equal(SyntaxHighlighting.DetectLanguage("/firmware/u-boot-env.txt"), L.UBoot, "a named U-Boot environment");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/.env"), L.Config, ".env stays a config");
+
+        Highlighted uboot = new Highlighted(L.UBoot,
+            "setenv bootargs console=${console} root=/dev/mmcblk0p2\nif test ${bootcount} -gt 3; then\n\trun bootcmd\nfi\n# comment\nmy_unknown_command arg");
+        Equal(Join(uboot.Tokens(0, SyntaxHighlighting.TypeKeyword)), "setenv|bootargs", "U-Boot: commands and common variables");
+        Equal(Join(uboot.Tokens(0, SyntaxHighlighting.TypeVariable)), "${console}", "U-Boot: a braced variable");
+        Equal(Join(uboot.Tokens(1, SyntaxHighlighting.TypeKeyword)), "if|test|then", "U-Boot: the shell words");
+        Equal(Join(uboot.Tokens(1, SyntaxHighlighting.TypeVariable)), "${bootcount}", "U-Boot: a variable in a test");
+        Equal(Join(uboot.Tokens(1, SyntaxHighlighting.TypeNumber)), "3", "U-Boot: a number");
+        Equal(Join(uboot.Tokens(2, SyntaxHighlighting.TypeKeyword)), "run|bootcmd", "U-Boot: run and a boot variable");
+        Equal(Join(uboot.Tokens(4, SyntaxHighlighting.TypeComment)), "# comment", "U-Boot: a comment");
+        Equal(Join(uboot.Tokens(5, SyntaxHighlighting.TypeKeyword)), "", "U-Boot: an unknown command is not a keyword");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("bootm"), "U-Boot keywords contain 'bootm'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("setenv"), "U-Boot keywords contain 'setenv'");
+        Equal(Join(CommentStyle.ForLanguage(L.UBoot).Toggle(new[] { "setenv x 1" })), "# setenv x 1", "U-Boot comment");
+    }
+
     private static void FoldChecks()
     {
         // Bash: then...fi, do...done, case...esac, function bodies.
@@ -1401,6 +1425,7 @@ internal static class Program
             AdminFormatDetectionChecks();
         AdminFormatTokenChecks();
         KconfigChecks();
+        UBootChecks();
         FoldChecks();
             PythonChecks();
             CppChecks();
