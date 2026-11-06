@@ -412,6 +412,60 @@ public static partial class SyntaxHighlighting
         }
     }
 
+    // ---------------------------------------------------------------- sudoers
+
+    private static readonly HashSet<string> SudoersDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        @"Defaults User_Alias Runas_Alias Host_Alias Cmnd_Alias");
+
+    private static readonly HashSet<string> SudoersValues = Words(StringComparer.OrdinalIgnoreCase,
+        // tags of a command
+        @"ALL NOPASSWD PASSWD NOEXEC EXEC SETENV NOSETENV LOG_INPUT NOLOG_INPUT LOG_OUTPUT NOLOG_OUTPUT
+          MAIL NOMAIL FOLLOW NOFOLLOW",
+        // Defaults flags
+        @"env_reset env_keep env_check env_file secure_path timestamp_timeout timestamp_type passwd_tries passwd_timeout
+          umask insults requiretty mail_badpass mail_no_user mail_no_perms mail_always mail_no_host use_pty
+          logfile log_input log_output syslog syslog_goodpri syslog_badpri lecture lecture_file always_set_home set_home
+          preserve_groups targetpw rootpw runaspw visiblepw noexec fqdn hostname command_timeout maxseq fast_glob glob
+          shell_noargs setenv noenv editor env_editor verifypw listpw pwfeedback stay_setuid closefrom
+          restrict_inherit nohost authenticate intercept log_subcmds log_servers log_server_timeout iolog_dir iolog_file
+          utmp_runas case_insensitive");
+
+    /// <summary>
+    /// sudoers: the colours of Config with the directives (Defaults, the *_Alias definitions), the tags (NOPASSWD,
+    /// PASSWD, SETENV) and the Defaults flags known. "#include" and "@include" are directives of the file, not comments.
+    /// </summary>
+    private static bool TokenizeSudoers(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        endState = 0;
+        int first = SkipBlanks(text, 0);
+        if (first < text.Length && (text[first] == '#' || text[first] == '@'))
+        {
+            int wordEnd = first + 1;
+            while (wordEnd < text.Length && IsIdChar(text[wordEnd]))
+            {
+                wordEnd++;
+            }
+            string word = text.Substring(first + 1, wordEnd - first - 1);
+            if (word == "include" || word == "includedir")
+            {
+                sink.AddToken(TypeKeyword, first, wordEnd);
+                int pathStart = SkipBlanks(text, wordEnd);
+                int pathEnd = pathStart;
+                while (pathEnd < text.Length && !IsBlank(text[pathEnd]))
+                {
+                    pathEnd++;
+                }
+                if (pathEnd > pathStart)
+                {
+                    sink.AddToken(TypeString, pathStart, pathEnd);
+                }
+                ScanCronRest(text, pathEnd, sink);
+                return true;
+            }
+        }
+        return TokenizeConfigCore(SudoersDirectives, startState, text, sink, out endState, valueKeywords: SudoersValues);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)
