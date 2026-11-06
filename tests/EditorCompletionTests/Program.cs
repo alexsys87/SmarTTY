@@ -100,6 +100,8 @@ internal static class Program
         Check(Names(L.Kconfig, "", "").Contains("depends"), "the Kconfig directive 'depends' is offered");
         Check(Names(L.UBoot, "", "").Contains("bootm"), "the U-Boot command 'bootm' is offered");
         Check(Names(L.UBoot, "", "").Contains("setenv"), "the U-Boot command 'setenv' is offered");
+        Check(Names(L.Yocto, "", "").Contains("SRC_URI"), "the BitBake variable 'SRC_URI' is offered");
+        Check(Names(L.Yocto, "", "").Contains("do_install"), "the BitBake task 'do_install' is offered");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");

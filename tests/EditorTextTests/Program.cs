@@ -1053,6 +1053,31 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.UBoot).Toggle(new[] { "setenv x 1" })), "# setenv x 1", "U-Boot comment");
     }
 
+    private static void YoctoChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/src/poky/meta/recipes-core/busybox/busybox_1.36.bb"), L.Yocto, "a BitBake recipe");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/meta-foo/recipes-app/app/app_1.0.bbappend"), L.Yocto, "a .bbappend");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/poky/meta/classes/base.bbclass"), L.Yocto, "a .bbclass");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/meta-foo/recipes-app/app/files/defconfig.inc"), L.Yocto, "an .inc of a layer");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/meta-foo/conf/layer.conf"), L.Yocto, "a configuration of a layer");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/php.inc"), L.Plain, ".inc outside a layer stays plain");
+
+        Highlighted recipe = new Highlighted(L.Yocto,
+            "SUMMARY = \"A test\"\nDEPENDS ?= \"zlib\"\nSRC_URI += \"file://defconfig\"\ninherit autotools systemd\ndo_install() {\n    install -d ${D}${bindir}\n}\nSRCREV = \"${AUTOREV}\"\n# comment");
+        Equal(Join(recipe.Tokens(0, SyntaxHighlighting.TypeKeyword)), "SUMMARY", "Yocto: SUMMARY");
+        Equal(Join(recipe.Tokens(1, SyntaxHighlighting.TypeKeyword)), "DEPENDS", "Yocto: a conditional assignment");
+        Equal(Join(recipe.Tokens(2, SyntaxHighlighting.TypeKeyword)), "SRC_URI", "Yocto: an appended variable");
+        Equal(Join(recipe.Tokens(3, SyntaxHighlighting.TypeKeyword)), "inherit", "Yocto: inherit");
+        Equal(Join(recipe.Tokens(4, SyntaxHighlighting.TypeKeyword)), "do_install", "Yocto: a task definition");
+        Equal(Join(recipe.Tokens(5, SyntaxHighlighting.TypeVariable)), "install|${D}|${bindir}", "Yocto: the task body and its variables");
+        Equal(Join(recipe.Tokens(7, SyntaxHighlighting.TypeKeyword)), "SRCREV", "Yocto: SRCREV");
+        Equal(Join(recipe.Tokens(7, SyntaxHighlighting.TypeString)), "\"${AUTOREV}\"", "Yocto: a quoted value");
+        Equal(Join(recipe.Tokens(8, SyntaxHighlighting.TypeComment)), "# comment", "Yocto: a comment");
+        Check(SyntaxHighlighting.GetKeywords(L.Yocto).Contains("SRC_URI"), "Yocto keywords contain 'SRC_URI'");
+        Check(SyntaxHighlighting.GetKeywords(L.Yocto).Contains("do_install"), "Yocto keywords contain 'do_install'");
+        Equal(Join(CommentStyle.ForLanguage(L.Yocto).Toggle(new[] { "SUMMARY = \"x\"" })), "# SUMMARY = \"x\"", "Yocto comment");
+    }
+
     private static void FoldChecks()
     {
         // Bash: then...fi, do...done, case...esac, function bodies.
@@ -1426,6 +1451,7 @@ internal static class Program
         AdminFormatTokenChecks();
         KconfigChecks();
         UBootChecks();
+        YoctoChecks();
         FoldChecks();
             PythonChecks();
             CppChecks();
