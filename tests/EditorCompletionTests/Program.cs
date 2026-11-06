@@ -106,6 +106,8 @@ internal static class Program
         Check(Names(L.LinkerScript, "", "").Contains("SIZEOF"), "the linker command 'SIZEOF' is offered");
         Check(Names(L.Crontab, "", "").Contains("jan"), "the crontab month 'jan' is offered");
         Check(Names(L.Crontab, "", "").Contains("MAILTO"), "the crontab variable 'MAILTO' is offered");
+        Check(Names(L.Fstab, "", "").Contains("ext4"), "the fstab filesystem 'ext4' is offered");
+        Check(Names(L.Fstab, "", "").Contains("noatime"), "the fstab option 'noatime' is offered");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");

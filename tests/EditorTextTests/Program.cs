@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -927,6 +927,7 @@ internal static class Program
         }
         Check(CommentStyle.ForLanguage(L.Systemd) != null && CommentStyle.ForLanguage(L.Nginx) != null && CommentStyle.ForLanguage(L.SshConfig) != null, "# comments in systemd, nginx and ssh files");
         Check(CommentStyle.ForLanguage(L.Crontab) != null, "# comments in crontab files");
+        Check(CommentStyle.ForLanguage(L.Fstab) != null, "# comments in fstab");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1025,6 +1026,30 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("jan"), "crontab keywords contain 'jan'");
         Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("@reboot"), "crontab keywords contain '@reboot'");
         Equal(Join(CommentStyle.ForLanguage(L.Crontab).Toggle(new[] { "0 5 * * * /usr/bin/backup" })), "# 0 5 * * * /usr/bin/backup", "crontab comment");
+    }
+
+    private static void FstabChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/fstab"), L.Fstab, "/etc/fstab");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/fstab.d/home.conf"), L.Fstab, "a drop-in of /etc/fstab.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/fstab"), L.Fstab, "a file named fstab");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/fstab.conf"), L.Config, "a .conf named after fstab stays a config");
+
+        Highlighted fstab = new Highlighted(L.Fstab,
+            "# /etc/fstab\nUUID=1234-ABCD / ext4 defaults,noatime 0 1\n/dev/sdb1 /home xfs rw,noexec,nosuid 0 2\n//server/share /mnt/share cifs credentials=/root/.smb,uid=1000 0 0\ntmpfs /tmp tmpfs nosuid,nodev,size=256M 0 0\nserver:/export /mnt/nfs nfs4 soft,timeo=100 0 0\n/dev/sdc1 /mnt/bad myfs defaults,foo=bar 0 0\n/dev/sdd1 /mnt/data ext4 defaults 0 0 # backup");
+        Equal(Join(fstab.Tokens(0, SyntaxHighlighting.TypeComment)), "# /etc/fstab", "fstab: a comment");
+        Equal(Join(fstab.Tokens(1, SyntaxHighlighting.TypeString)), "UUID=1234-ABCD|/", "fstab: the device and the mount point");
+        Equal(Join(fstab.Tokens(1, SyntaxHighlighting.TypeKeyword)), "ext4|defaults|noatime", "fstab: the filesystem and the options");
+        Equal(Join(fstab.Tokens(1, SyntaxHighlighting.TypeNumber)), "0|1", "fstab: dump and pass");
+        Equal(Join(fstab.Tokens(2, SyntaxHighlighting.TypeKeyword)), "xfs|rw|noexec|nosuid", "fstab: more options");
+        Equal(Join(fstab.Tokens(3, SyntaxHighlighting.TypeKeyword)), "cifs|credentials=/root/.smb|uid=1000", "fstab: a network share");
+        Equal(Join(fstab.Tokens(4, SyntaxHighlighting.TypeKeyword)), "tmpfs|nosuid|nodev|size=256M", "fstab: tmpfs");
+        Equal(Join(fstab.Tokens(5, SyntaxHighlighting.TypeKeyword)), "nfs4|soft|timeo=100", "fstab: NFS options");
+        Equal(Join(fstab.Tokens(6, SyntaxHighlighting.TypeVariable)), "myfs|foo=bar", "fstab: an unknown filesystem and option");
+        Equal(Join(fstab.Tokens(7, SyntaxHighlighting.TypeComment)), "# backup", "fstab: a trailing comment");
+        Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("ext4"), "fstab keywords contain 'ext4'");
+        Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("noatime"), "fstab keywords contain 'noatime'");
+        Equal(Join(CommentStyle.ForLanguage(L.Fstab).Toggle(new[] { "UUID=1 / ext4 defaults 0 1" })), "# UUID=1 / ext4 defaults 0 1", "fstab comment");
     }
 
     private static void KconfigChecks()
@@ -1499,6 +1524,7 @@ internal static class Program
             AdminFormatDetectionChecks();
         AdminFormatTokenChecks();
         CrontabChecks();
+        FstabChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();
