@@ -98,6 +98,8 @@ internal static class Program
         Check(Names(L.Css, "", "").Contains("font-size"), "a hyphenated CSS property is offered");
         Check(Names(L.Kconfig, "", "").Contains("menuconfig"), "the Kconfig directive 'menuconfig' is offered");
         Check(Names(L.Kconfig, "", "").Contains("depends"), "the Kconfig directive 'depends' is offered");
+        Check(Names(L.UBoot, "", "").Contains("bootm"), "the U-Boot command 'bootm' is offered");
+        Check(Names(L.UBoot, "", "").Contains("setenv"), "the U-Boot command 'setenv' is offered");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");

@@ -60,4 +60,32 @@ public static partial class SyntaxHighlighting
         }
         return TokenizeConfigCore(KconfigKeywords, startState, text, sink, out endState, dollarParentheses: true, valueKeywords: KconfigValues);
     }
+
+    // ---------------------------------------------------------------- U-Boot
+
+    private static readonly HashSet<string> UBootKeywords = Words(StringComparer.Ordinal,
+        // commands of the U-Boot shell
+        @"setenv saveenv run bootm bootz booti bootd bootelf bootvx boot go reset
+          tftpboot tftp fatload fatwrite fatls fatmkdir fatrm ext4load ext4write ext4ls ext4size
+          ext2load ext2write ext2ls ext2size mmc nand nor sf usb scsi sata dhcp
+          load loadb loads loadx loady printenv env import export source
+          if then else elif fi for while do done until case esac in
+          test echo sleep mw md mm nm cp cmp mv
+          setexpr protect erase
+          ubi ubifs mtd ubifsmount ubifsumount ubifswrite ubifsload
+          i2c gpio adc fuse dm part disk ls size
+          fdt addr resize move mknode setprop print rm
+          fastboot dfu acpi button
+          bootargs bootcmd bootdelay baudrate ethaddr eth1addr ipaddr serverip gatewayip netmask
+          fileaddr filesize loadaddr fdtaddr fdtcontroladdr kernel_addr_r fdt_addr_r ramdisk_addr_r
+          scriptaddr pxefile_addr_r fdtoverlay_addr_r stdin stdout stderr
+          boot_targets distro_bootcmd boot_scripts prefix fdtfile board board_name soc vendor ver
+          serial# ethact netretry tftpblocksize");
+
+    private static readonly TokenCache.LineTokenizer UBootTokenizer = new GenericSyntax
+    {
+        HashComments = true,
+        ShellVariables = true,
+        Keywords = UBootKeywords
+    }.Tokenize;
 }
