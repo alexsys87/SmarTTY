@@ -68,7 +68,11 @@ internal static class Program
         }
 
         // The set covers the languages the editor highlights with a code tokenizer.
-        foreach (L language in new[] { L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Ruby, L.Perl, L.CMake, L.Go, L.Rust })
+        foreach (L language in new[]
+                 {
+                     L.Python, L.CLike, L.Cpp, L.Bash, L.Lua, L.Sql, L.Ruby, L.Perl, L.CMake, L.Go, L.Rust,
+                     L.Verilog, L.Vhdl
+                 })
         {
             Check(database.ForLanguage(language).Count > 0, "the set has symbols for " + language);
         }
@@ -591,6 +595,72 @@ internal static class Program
             "the Iterator method wins the bare 'map' hint");
         Equal(database.FindSignature(L.Rust, "take").ParameterCount, 1,
             "the bare 'take' hint is the Iterator method");
+
+        // Verilog and SystemVerilog system tasks have their own profile. The names are stored without the
+        // '$' so the completion list can offer them, while the signatures keep the prefix of the language.
+        List<ApiSymbolDatabase.Symbol> verilog = database.ForLanguage(L.Verilog).ToList();
+        Check(verilog.Count >= 85, "the Verilog set is complete (" + verilog.Count + " symbols)");
+        Equal(verilog.Count, verilog.Select(s => s.Name).Distinct().Count(), "Verilog names are unique");
+        Equal(verilog.Count, verilog.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every Verilog symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "display", "write", "finish", "time", "fopen", "fdisplay", "sformatf", "random",
+                     "urandom_range", "countones", "clog2", "bits", "signed", "itor", "dumpvars", "error", "fatal"
+                 })
+        {
+            Check(database.Find(L.Verilog, name) != null, "the Verilog set includes '" + name + "'");
+        }
+        Check(database.Find(L.Verilog, "display").Description.Contains("Verilog system task"),
+            "the description of 'display' names a Verilog system task");
+        Check(database.Find(L.Verilog, "clog2").Description.Contains("Verilog system function"),
+            "the description of 'clog2' names a Verilog system function");
+        Check(database.Find(L.Verilog, "printf") == null, "Verilog does not inherit the C library");
+        Check(database.Find(L.Verilog, "rising_edge") == null, "Verilog does not see the VHDL functions");
+        Check(database.Find(L.Verilog, "DISPLAY") == null, "Verilog names are case sensitive");
+        Equal(database.FindSignature(L.Verilog, "display").ToString(), "$display(format, args...)",
+            "the Verilog signature keeps the '$' prefix");
+        Equal(database.FindSignature(L.Verilog, "fopen").ParameterCount, 2,
+            "the Verilog $fopen signature has two parameters");
+        Equal(database.FindSignature(L.Verilog, "time").ParameterCount, 0,
+            "the Verilog $time signature has no parameters");
+
+        // VHDL has its own profile: the IEEE packages, the standard types and the common functions.
+        List<ApiSymbolDatabase.Symbol> vhdl = database.ForLanguage(L.Vhdl).ToList();
+        Check(vhdl.Count >= 140, "the VHDL set is complete (" + vhdl.Count + " symbols)");
+        Equal(vhdl.Count, vhdl.Select(s => s.Name).Distinct().Count(), "VHDL names are unique");
+        Equal(vhdl.Count, vhdl.Count(s => !string.IsNullOrEmpty(s.Summary) && !string.IsNullOrEmpty(s.Description)),
+            "every VHDL symbol has a summary and a description");
+        foreach (string name in new[]
+                 {
+                     "ieee.std_logic_1164", "ieee.numeric_std", "std_logic", "std_logic_vector", "signed",
+                     "unsigned", "rising_edge", "falling_edge", "to_integer", "to_unsigned", "to_signed",
+                     "resize", "shift_left", "std_match", "conv_integer", "and_reduce", "sin", "sqrt",
+                     "readline", "writeline", "file_open", "stop", "finish", "to_string", "to_hstring",
+                     "to_sfixed", "to_float", "now", "true", "false", "note", "warning", "error", "failure"
+                 })
+        {
+            Check(database.Find(L.Vhdl, name) != null, "the VHDL set includes '" + name + "'");
+        }
+        Check(database.Find(L.Vhdl, "rising_edge").Description.Contains("VHDL std_logic_1164 function"),
+            "the description of 'rising_edge' names a std_logic_1164 function");
+        Check(database.Find(L.Vhdl, "to_unsigned").Description.Contains("VHDL numeric_std function"),
+            "the description of 'to_unsigned' names a numeric_std function");
+        Check(database.Find(L.Vhdl, "ieee.numeric_std").Description.Contains("VHDL package"),
+            "the description of 'ieee.numeric_std' names a VHDL package");
+        Check(database.Find(L.Vhdl, "std_logic").Description.Contains("VHDL type"),
+            "the description of 'std_logic' names a VHDL type");
+        Check(database.Find(L.Vhdl, "printf") == null, "VHDL does not inherit the C library");
+        Check(database.Find(L.Vhdl, "display") == null, "VHDL does not see the Verilog system tasks");
+        Check(database.Find(L.Vhdl, "STD_LOGIC") != null, "the VHDL lookup ignores the case");
+        Check(database.Find(L.Vhdl, "IEEE.NUMERIC_STD") != null,
+            "a case-insensitive qualified VHDL name is found");
+        Equal(database.FindSignature(L.Vhdl, "rising_edge").ToString(), "rising_edge(signal s : std_logic)",
+            "the VHDL signature keeps its parameter");
+        Equal(database.FindSignature(L.Vhdl, "to_unsigned").ParameterCount, 2,
+            "the VHDL to_unsigned signature has two parameters");
+        Equal(database.FindSignature(L.Vhdl, "TO_UNSIGNED").Name, "to_unsigned",
+            "the VHDL hint lookup ignores the case");
     }
 
     private static List<ISuggestion> Build(L language, string text, string prefix, ApiSymbolDatabase database)
@@ -818,6 +888,32 @@ internal static class Program
         Check(!Build(L.Rust, "", "prin", database).Any(s => s.DisplayName == "printf"),
             "the Rust completion list does not offer the C library");
 
+        // The Verilog system tasks are offered without the '$', so the editor's word reader can match them.
+        ISuggestion verilogDisplay = Build(L.Verilog, "", "displ", database)
+            .FirstOrDefault(s => s.DisplayName == "display");
+        Check(verilogDisplay != null, "the completion list offers 'display' from '$display'");
+        Equal(verilogDisplay.DetailText, "Write formatted output", "the Verilog summary is the detail text");
+        Equal(verilogDisplay.HintText, "$display(format, args...)", "the Verilog signature keeps the '$' prefix");
+        Check(Build(L.Verilog, "", "fini", database).Any(s => s.DisplayName == "finish"),
+            "the completion list offers 'finish' from '$finish'");
+        Check(Build(L.Verilog, "", "dumpv", database).Any(s => s.DisplayName == "dumpvars"),
+            "the completion list offers 'dumpvars' from '$dumpvars'");
+        Check(!Build(L.Verilog, "", "print", database).Any(s => s.DisplayName == "printf"),
+            "the Verilog completion list does not offer the C library");
+
+        // The VHDL API names are case insensitive in the source; the list offers the canonical spelling.
+        ISuggestion vhdlEdge = Build(L.Vhdl, "", "rising", database)
+            .FirstOrDefault(s => s.DisplayName == "rising_edge");
+        Check(vhdlEdge != null, "the completion list offers the VHDL function 'rising_edge'");
+        Equal(vhdlEdge.DetailText, "Detect a rising edge", "the VHDL summary is the detail text");
+        Equal(vhdlEdge.HintText, "rising_edge(signal s : std_logic)", "the VHDL signature is the hint text");
+        Check(Build(L.Vhdl, "", "RISING", database).Any(s => s.DisplayName == "rising_edge"),
+            "the VHDL API prefix is case insensitive");
+        Check(Build(L.Vhdl, "", "to_uns", database).Any(s => s.DisplayName == "to_unsigned"),
+            "the completion list offers 'to_unsigned'");
+        Check(!Build(L.Vhdl, "", "display", database).Any(s => s.DisplayName == "display"),
+            "the VHDL completion list does not offer the Verilog system tasks");
+
         // Without a database the list is what it always was: keywords and document words only.
         List<ISuggestion> plain = Build(L.Python, "", "pri", null);
         Check(!plain.Any(s => s.DisplayName == "print"), "without a database no API symbol is offered");
@@ -987,6 +1083,28 @@ internal static class Program
         Check(cmakeAdd != null, "an 'ADD_EXECUTABLE(' call finds the CMake command");
         Equal(cmakeAdd.Name, "add_executable", "the CMake hint shows the canonical command name");
         Equal(cmakeAdd.ParameterCount, 1, "the CMake command hint has its arguments");
+
+        // A Verilog system task resolves from its '$' call; a based literal before it is not a string.
+        ParameterSignature verilogDisplayHint = EditorSignatureSource.FindSignature(
+            L.Verilog, "x = 4'b1010;\n$display(\n", 1, 9, database, out int verilogActive);
+        Check(verilogDisplayHint != null, "a '$display(' call finds the Verilog system task");
+        Equal(verilogDisplayHint.Name, "$display", "the Verilog hint keeps the '$' prefix");
+        Equal(verilogDisplayHint.ParameterCount, 2, "the Verilog hint has its parameters");
+        Equal(verilogActive, 0, "the first Verilog parameter is active");
+
+        // VHDL names are found without regard to case; clk'event and '1' are not strings.
+        ParameterSignature vhdlEdgeHint = EditorSignatureSource.FindSignature(
+            L.Vhdl, "if clk'event and clk = '1' then -- note\n    RISING_EDGE(\n", 1, 16, database, out int vhdlActive);
+        Check(vhdlEdgeHint != null, "a 'RISING_EDGE(' call finds the VHDL function");
+        Equal(vhdlEdgeHint.Name, "rising_edge", "the VHDL hint shows the canonical name");
+        Equal(vhdlEdgeHint.ParameterCount, 1, "the VHDL hint has its parameter");
+        Equal(vhdlActive, 0, "the first VHDL parameter is active");
+
+        ParameterSignature vhdlUnsignedHint = EditorSignatureSource.FindSignature(
+            L.Vhdl, "TO_UNSIGNED(\n", 0, 12, database, out int vhdlUnsignedActive);
+        Check(vhdlUnsignedHint != null, "a 'TO_UNSIGNED(' call finds the VHDL function");
+        Equal(vhdlUnsignedHint.Name, "to_unsigned", "the VHDL conversion hint keeps its name");
+        Equal(vhdlUnsignedHint.ParameterCount, 2, "the VHDL conversion hint has two parameters");
 
         // Without a database the unknown call shows nothing.
         Check(EditorSignatureSource.FindSignature(L.Python, "print(\n", 0, 6, null, out _) == null,

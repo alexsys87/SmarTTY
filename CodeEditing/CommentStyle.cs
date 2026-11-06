@@ -46,6 +46,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Groovy:
                 case SyntaxHighlighting.Language.Go:
                 case SyntaxHighlighting.Language.Rust:
+                case SyntaxHighlighting.Language.Verilog:
                 case SyntaxHighlighting.Language.Swift:
                 case SyntaxHighlighting.Language.Dart:
                 case SyntaxHighlighting.Language.JavaScript:
@@ -57,6 +58,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Css:
                     return new CommentStyle("/* ", " */");
                 case SyntaxHighlighting.Language.Sql:
+                case SyntaxHighlighting.Language.Vhdl:
                     return new CommentStyle("-- ");
                 case SyntaxHighlighting.Language.Assembly:
                     return new CommentStyle("; ");

@@ -29782,5 +29782,1160 @@
       <Summary>Hint that the thread is spinning</Summary>
       <Description>Hint that the thread is spinning. Rust std::hint module.</Description>
     </Symbol>
+
+    <Symbol language="Verilog" name="display" signature="$display(format, args...)">
+      <Summary>Write formatted output</Summary>
+      <Description>Write formatted output to the standard output. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="displayb" signature="$displayb(format, args...)">
+      <Summary>Write binary formatted output</Summary>
+      <Description>Write formatted output with a binary radix. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="displayh" signature="$displayh(format, args...)">
+      <Summary>Write hexadecimal formatted output</Summary>
+      <Description>Write formatted output with a hexadecimal radix. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="displayo" signature="$displayo(format, args...)">
+      <Summary>Write octal formatted output</Summary>
+      <Description>Write formatted output with an octal radix. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="write" signature="$write(format, args...)">
+      <Summary>Write output without a newline</Summary>
+      <Description>Write formatted output without a trailing newline. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="writeb" signature="$writeb(format, args...)">
+      <Summary>Write binary output without a newline</Summary>
+      <Description>Write binary formatted output without a trailing newline. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="writeh" signature="$writeh(format, args...)">
+      <Summary>Write hexadecimal output without a newline</Summary>
+      <Description>Write hexadecimal formatted output without a trailing newline. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="writeo" signature="$writeo(format, args...)">
+      <Summary>Write octal output without a newline</Summary>
+      <Description>Write octal formatted output without a trailing newline. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="strobe" signature="$strobe(format, args...)">
+      <Summary>Write output at the end of a time step</Summary>
+      <Description>Write formatted output at the end of the current simulation time step. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="monitor" signature="$monitor(format, args...)">
+      <Summary>Write output when a value changes</Summary>
+      <Description>Write formatted output whenever a monitored value changes. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="monitoron" signature="$monitoron">
+      <Summary>Enable the monitor</Summary>
+      <Description>Enable the monitor task. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="monitoroff" signature="$monitoroff">
+      <Summary>Disable the monitor</Summary>
+      <Description>Disable the monitor task. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="finish" signature="$finish(status)">
+      <Summary>Finish the simulation</Summary>
+      <Description>Finish the simulation and return control to the simulator. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="stop" signature="$stop(status)">
+      <Summary>Stop the simulation</Summary>
+      <Description>Suspend the simulation and enter the interactive debugger. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="time" signature="$time">
+      <Summary>Current simulation time</Summary>
+      <Description>Return the current simulation time as a 64-bit integer. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="stime" signature="$stime">
+      <Summary>Current simulation time as 32 bits</Summary>
+      <Description>Return the current simulation time as a 32-bit integer. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="realtime" signature="$realtime">
+      <Summary>Current simulation time as a real</Summary>
+      <Description>Return the current simulation time as a real number. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="timeformat" signature="$timeformat(unit, precision, suffix, width)">
+      <Summary>Set the time format of the display tasks</Summary>
+      <Description>Set the unit, precision, suffix and width of the time values shown by the display tasks. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="printtimescale" signature="$printtimescale(module)">
+      <Summary>Print the time scale of a module</Summary>
+      <Description>Print the time unit and precision of a module. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="fopen" signature="$fopen(filename, mode)">
+      <Summary>Open a file and return a descriptor</Summary>
+      <Description>Open a file and return a multi-channel descriptor. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="fclose" signature="$fclose(fd)">
+      <Summary>Close a file descriptor</Summary>
+      <Description>Close a file opened with $fopen. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="fdisplay" signature="$fdisplay(fd, format, args...)">
+      <Summary>Write formatted output to a file</Summary>
+      <Description>Write formatted output to a file descriptor. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="fwrite" signature="$fwrite(fd, format, args...)">
+      <Summary>Write output to a file without a newline</Summary>
+      <Description>Write formatted output to a file descriptor without a trailing newline. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="fscanf" signature="$fscanf(fd, format, args...)">
+      <Summary>Read formatted input from a file</Summary>
+      <Description>Read formatted input from a file descriptor. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="fgets" signature="$fgets(str, fd)">
+      <Summary>Read a line from a file</Summary>
+      <Description>Read a line from a file descriptor into a string. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="fgetc" signature="$fgetc(fd)">
+      <Summary>Read a character from a file</Summary>
+      <Description>Read one character from a file descriptor. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="ungetc" signature="$ungetc(c, fd)">
+      <Summary>Push a character back to a file</Summary>
+      <Description>Push a character back to a file descriptor. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="feof" signature="$feof(fd)">
+      <Summary>Test for the end of a file</Summary>
+      <Description>Return true when the end of a file has been reached. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="ferror" signature="$ferror(fd, str)">
+      <Summary>Get the file error status</Summary>
+      <Description>Return the error status of a file descriptor and its message. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="rewind" signature="$rewind(fd)">
+      <Summary>Rewind a file</Summary>
+      <Description>Set the file position to the beginning of a file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="fflush" signature="$fflush(fd)">
+      <Summary>Flush a file</Summary>
+      <Description>Write the buffered output of a file descriptor. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="readmemh" signature="$readmemh(filename, memory, start, end)">
+      <Summary>Read a hexadecimal memory image</Summary>
+      <Description>Read a hexadecimal memory image into a memory array. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="readmemb" signature="$readmemb(filename, memory, start, end)">
+      <Summary>Read a binary memory image</Summary>
+      <Description>Read a binary memory image into a memory array. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="sformat" signature="$sformat(output, format, args...)">
+      <Summary>Format a string</Summary>
+      <Description>Write formatted output into a string variable. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="sformatf" signature="$sformatf(format, args...)">
+      <Summary>Return a formatted string</Summary>
+      <Description>Return a formatted string. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="sscanf" signature="$sscanf(str, format, args...)">
+      <Summary>Read formatted input from a string</Summary>
+      <Description>Read formatted input from a string. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="swrite" signature="$swrite(output, format, args...)">
+      <Summary>Write formatted output to a string</Summary>
+      <Description>Write formatted output into a string variable. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="swriteb" signature="$swriteb(output, format, args...)">
+      <Summary>Write binary output to a string</Summary>
+      <Description>Write binary formatted output into a string. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="swriteh" signature="$swriteh(output, format, args...)">
+      <Summary>Write hexadecimal output to a string</Summary>
+      <Description>Write hexadecimal formatted output into a string. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="swriteo" signature="$swriteo(output, format, args...)">
+      <Summary>Write octal output to a string</Summary>
+      <Description>Write octal formatted output into a string. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="random" signature="$random(seed)">
+      <Summary>Random integer</Summary>
+      <Description>Return a random 32-bit integer, optionally updating the seed. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="urandom" signature="$urandom(seed)">
+      <Summary>Unsigned random integer</Summary>
+      <Description>Return a random unsigned 32-bit integer. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="urandom_range" signature="$urandom_range(max, min)">
+      <Summary>Random integer in a range</Summary>
+      <Description>Return a random integer between min and max. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dist_uniform" signature="$dist_uniform(seed, start, end)">
+      <Summary>Uniform distribution</Summary>
+      <Description>Return a random integer from a uniform distribution. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dist_normal" signature="$dist_normal(seed, mean, standard_deviation)">
+      <Summary>Normal distribution</Summary>
+      <Description>Return a random integer from a normal distribution. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dist_exponential" signature="$dist_exponential(seed, mean)">
+      <Summary>Exponential distribution</Summary>
+      <Description>Return a random integer from an exponential distribution. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dist_poisson" signature="$dist_poisson(seed, mean)">
+      <Summary>Poisson distribution</Summary>
+      <Description>Return a random integer from a Poisson distribution. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dist_chi_square" signature="$dist_chi_square(seed, degrees)">
+      <Summary>Chi-square distribution</Summary>
+      <Description>Return a random integer from a chi-square distribution. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dist_t" signature="$dist_t(seed, degrees)">
+      <Summary>Student t distribution</Summary>
+      <Description>Return a random integer from a Student t distribution. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dist_erlang" signature="$dist_erlang(seed, k, mean)">
+      <Summary>Erlang distribution</Summary>
+      <Description>Return a random integer from an Erlang distribution. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="countones" signature="$countones(expression)">
+      <Summary>Number of set bits</Summary>
+      <Description>Count the bits set to one in a vector. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="onehot" signature="$onehot(expression)">
+      <Summary>Exactly one bit is set</Summary>
+      <Description>Return true when exactly one bit of a vector is set. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="onehot0" signature="$onehot0(expression)">
+      <Summary>At most one bit is set</Summary>
+      <Description>Return true when at most one bit of a vector is set. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="isunknown" signature="$isunknown(expression)">
+      <Summary>Any unknown bit</Summary>
+      <Description>Return true when any bit of an expression is unknown. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="clog2" signature="$clog2(value)">
+      <Summary>Ceiling of the base-2 logarithm</Summary>
+      <Description>Return the ceiling of the base-2 logarithm of a value. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="bits" signature="$bits(expression)">
+      <Summary>Number of bits in an expression</Summary>
+      <Description>Return the number of bits of a data type or expression. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="size" signature="$size(array, dimension)">
+      <Summary>Size of an array dimension</Summary>
+      <Description>Return the number of elements in an array dimension. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="high" signature="$high(array, dimension)">
+      <Summary>Upper bound of an array</Summary>
+      <Description>Return the upper bound of an array dimension. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="low" signature="$low(array, dimension)">
+      <Summary>Lower bound of an array</Summary>
+      <Description>Return the lower bound of an array dimension. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="left" signature="$left(array, dimension)">
+      <Summary>Left bound of an array</Summary>
+      <Description>Return the left bound of an array dimension. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="right" signature="$right(array, dimension)">
+      <Summary>Right bound of an array</Summary>
+      <Description>Return the right bound of an array dimension. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="increment" signature="$increment(array)">
+      <Summary>Increment an array</Summary>
+      <Description>Increment an array as if it were a number. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="cast" signature="$cast(dest, source)">
+      <Summary>Assign with a type check</Summary>
+      <Description>Assign a value to a variable with a runtime type check. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="signed" signature="$signed(value)">
+      <Summary>Interpret a value as signed</Summary>
+      <Description>Return the value interpreted as a signed number. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="unsigned" signature="$unsigned(value)">
+      <Summary>Interpret a value as unsigned</Summary>
+      <Description>Return the value interpreted as an unsigned number. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="itor" signature="$itor(value)">
+      <Summary>Integer to real</Summary>
+      <Description>Convert an integer to a real number. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="rtoi" signature="$rtoi(value)">
+      <Summary>Real to integer</Summary>
+      <Description>Convert a real number to an integer by truncation. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="bitstoreal" signature="$bitstoreal(value)">
+      <Summary>Bits to real</Summary>
+      <Description>Convert a bit pattern to a real number. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="realtobits" signature="$realtobits(value)">
+      <Summary>Real to bits</Summary>
+      <Description>Convert a real number to its bit pattern. Verilog system function.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="error" signature="$error(message, args...)">
+      <Summary>Report an error</Summary>
+      <Description>Report an error message when the simulation runs. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="warning" signature="$warning(message, args...)">
+      <Summary>Report a warning</Summary>
+      <Description>Report a warning message when the simulation runs. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="info" signature="$info(message, args...)">
+      <Summary>Report an informational message</Summary>
+      <Description>Report an informational message when the simulation runs. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="fatal" signature="$fatal(code, message, args...)">
+      <Summary>Report a fatal error and finish</Summary>
+      <Description>Report a fatal error and finish the simulation. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="assertoff" signature="$assertoff(levels, list)">
+      <Summary>Disable assertions</Summary>
+      <Description>Temporarily disable the assertions of the listed modules. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="asserton" signature="$asserton(levels, list)">
+      <Summary>Enable assertions</Summary>
+      <Description>Re-enable the assertions of the listed modules. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="assertkill" signature="$assertkill(levels, list)">
+      <Summary>Kill assertions</Summary>
+      <Description>Kill the running assertions of the listed modules. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="assertcontrol" signature="$assertcontrol(control, levels, list)">
+      <Summary>Control assertions</Summary>
+      <Description>Control the assertion actions of the listed modules. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpfile" signature="$dumpfile(filename)">
+      <Summary>Set the waveform file</Summary>
+      <Description>Set the name of the VCD file written by the dump tasks. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpvars" signature="$dumpvars(levels, module)">
+      <Summary>Dump variables</Summary>
+      <Description>Dump the variables of a module to the VCD file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpoff" signature="$dumpoff">
+      <Summary>Pause the dump</Summary>
+      <Description>Pause the writing of the VCD file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpon" signature="$dumpon">
+      <Summary>Resume the dump</Summary>
+      <Description>Resume the writing of the VCD file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumplimit" signature="$dumplimit(filesize)">
+      <Summary>Limit the dump file size</Summary>
+      <Description>Limit the size of the VCD file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpflush" signature="$dumpflush">
+      <Summary>Flush the dump file</Summary>
+      <Description>Flush the VCD file to disk. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpports" signature="$dumpports(levels, module)">
+      <Summary>Dump port values</Summary>
+      <Description>Dump the port values of a module to a VCD file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpportsoff" signature="$dumpportsoff">
+      <Summary>Pause the port dump</Summary>
+      <Description>Pause the writing of the port VCD file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpportson" signature="$dumpportson">
+      <Summary>Resume the port dump</Summary>
+      <Description>Resume the writing of the port VCD file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpportsall" signature="$dumpportsall">
+      <Summary>Dump all ports</Summary>
+      <Description>Dump all port values to the port VCD file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpportslimit" signature="$dumpportslimit(filesize)">
+      <Summary>Limit the port dump size</Summary>
+      <Description>Limit the size of the port VCD file. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Verilog" name="dumpportsflush" signature="$dumpportsflush">
+      <Summary>Flush the port dump file</Summary>
+      <Description>Flush the port VCD file to disk. Verilog system task.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.std_logic_1164">
+      <Summary>IEEE std_logic_1164 package</Summary>
+      <Description>The IEEE standard logic package with the std_logic types and conversion functions. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.numeric_std">
+      <Summary>IEEE numeric_std package</Summary>
+      <Description>The IEEE package for arithmetic on signed and unsigned vectors. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.numeric_bit">
+      <Summary>IEEE numeric_bit package</Summary>
+      <Description>The IEEE package for arithmetic on bit vectors. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.std_logic_arith">
+      <Summary>IEEE std_logic_arith package</Summary>
+      <Description>The legacy IEEE package for arithmetic on std_logic vectors. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.std_logic_unsigned">
+      <Summary>IEEE std_logic_unsigned package</Summary>
+      <Description>The legacy IEEE package with unsigned arithmetic for std_logic vectors. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.std_logic_signed">
+      <Summary>IEEE std_logic_signed package</Summary>
+      <Description>The legacy IEEE package with signed arithmetic for std_logic vectors. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.std_logic_misc">
+      <Summary>IEEE std_logic_misc package</Summary>
+      <Description>The IEEE package with reduction functions for std_logic vectors. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.math_real">
+      <Summary>IEEE math_real package</Summary>
+      <Description>The IEEE package with real-valued mathematical functions. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.math_complex">
+      <Summary>IEEE math_complex package</Summary>
+      <Description>The IEEE package with complex-valued mathematical functions. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.fixed_pkg">
+      <Summary>IEEE fixed_pkg package</Summary>
+      <Description>The IEEE package with fixed-point types and functions. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ieee.float_pkg">
+      <Summary>IEEE float_pkg package</Summary>
+      <Description>The IEEE package with floating-point types and functions. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="std.standard">
+      <Summary>VHDL standard package</Summary>
+      <Description>The predefined VHDL types, operators and functions. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="std.textio">
+      <Summary>VHDL textio package</Summary>
+      <Description>The standard package for reading and writing text files. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="std.env">
+      <Summary>VHDL env package</Summary>
+      <Description>The standard package with simulation control and environment functions. VHDL package.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="std_logic">
+      <Summary>Standard logic type</Summary>
+      <Description>The nine-valued std_logic type of IEEE std_logic_1164. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="std_ulogic">
+      <Summary>Unresolved standard logic type</Summary>
+      <Description>The unresolved nine-valued std_ulogic type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="std_logic_vector">
+      <Summary>Vector of std_logic</Summary>
+      <Description>An array of std_logic values. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="std_ulogic_vector">
+      <Summary>Vector of std_ulogic</Summary>
+      <Description>An array of std_ulogic values. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="signed">
+      <Summary>Signed vector type</Summary>
+      <Description>A signed numeric vector from IEEE numeric_std. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="unsigned">
+      <Summary>Unsigned vector type</Summary>
+      <Description>An unsigned numeric vector from IEEE numeric_std. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="integer">
+      <Summary>Integer type</Summary>
+      <Description>The predefined signed integer type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="natural">
+      <Summary>Natural number subtype</Summary>
+      <Description>The predefined non-negative integer subtype. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="positive">
+      <Summary>Positive number subtype</Summary>
+      <Description>The predefined positive integer subtype. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="boolean">
+      <Summary>Boolean type</Summary>
+      <Description>The predefined true and false type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="bit">
+      <Summary>Bit type</Summary>
+      <Description>The predefined two-valued bit type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="bit_vector">
+      <Summary>Vector of bits</Summary>
+      <Description>An array of bit values. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="character">
+      <Summary>Character type</Summary>
+      <Description>The predefined character type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="string">
+      <Summary>String type</Summary>
+      <Description>An array of characters. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="real">
+      <Summary>Real type</Summary>
+      <Description>The predefined floating-point type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="time">
+      <Summary>Time type</Summary>
+      <Description>The predefined simulation time type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="delay_length">
+      <Summary>Delay length subtype</Summary>
+      <Description>The predefined non-negative time subtype. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="severity_level">
+      <Summary>Severity level type</Summary>
+      <Description>The predefined note, warning, error and failure type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="file_open_kind">
+      <Summary>File open kind type</Summary>
+      <Description>The predefined file open mode type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="file_open_status">
+      <Summary>File open status type</Summary>
+      <Description>The predefined file open status type. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="line">
+      <Summary>Text line access type</Summary>
+      <Description>An access type to a text line in std.textio. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="text">
+      <Summary>Text file type</Summary>
+      <Description>The type of a text file in std.textio. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="side">
+      <Summary>Justification side type</Summary>
+      <Description>The left and right justification type of std.textio. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="width">
+      <Summary>Field width subtype</Summary>
+      <Description>The field width subtype of std.textio. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="justified">
+      <Summary>Justification type</Summary>
+      <Description>The left, right and center justification type of std.textio. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="field">
+      <Summary>Field type</Summary>
+      <Description>The field type of std.textio. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="number_base">
+      <Summary>Number base type</Summary>
+      <Description>The number base type of std.textio. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="sfixed">
+      <Summary>Signed fixed-point type</Summary>
+      <Description>A signed fixed-point type from IEEE fixed_pkg. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ufixed">
+      <Summary>Unsigned fixed-point type</Summary>
+      <Description>An unsigned fixed-point type from IEEE fixed_pkg. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="float32">
+      <Summary>32-bit floating-point type</Summary>
+      <Description>A 32-bit floating-point type from IEEE float_pkg. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="float64">
+      <Summary>64-bit floating-point type</Summary>
+      <Description>A 64-bit floating-point type from IEEE float_pkg. VHDL type.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="true">
+      <Summary>Boolean true</Summary>
+      <Description>The true value of the boolean type. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="false">
+      <Summary>Boolean false</Summary>
+      <Description>The false value of the boolean type. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="note">
+      <Summary>Note severity</Summary>
+      <Description>The note severity level. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="warning">
+      <Summary>Warning severity</Summary>
+      <Description>The warning severity level. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="error">
+      <Summary>Error severity</Summary>
+      <Description>The error severity level. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="failure">
+      <Summary>Failure severity</Summary>
+      <Description>The failure severity level. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="read_mode">
+      <Summary>Read file mode</Summary>
+      <Description>Open a file for reading. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="write_mode">
+      <Summary>Write file mode</Summary>
+      <Description>Open a file for writing. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="append_mode">
+      <Summary>Append file mode</Summary>
+      <Description>Open a file for appending. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="open_ok">
+      <Summary>File opened successfully</Summary>
+      <Description>The file open status of a successful open. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="status_error">
+      <Summary>File status error</Summary>
+      <Description>The file open status of an operation error. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="name_error">
+      <Summary>File name error</Summary>
+      <Description>The file open status of an invalid file name. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="mode_error">
+      <Summary>File mode error</Summary>
+      <Description>The file open status of an invalid open mode. VHDL literal.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="rising_edge" signature="rising_edge(signal s : std_logic)">
+      <Summary>Detect a rising edge</Summary>
+      <Description>Return true when the signal changes from 0 or L to 1 or H. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="falling_edge" signature="falling_edge(signal s : std_logic)">
+      <Summary>Detect a falling edge</Summary>
+      <Description>Return true when the signal changes from 1 or H to 0 or L. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_stdlogicvector" signature="to_stdlogicvector(value : bit_vector)">
+      <Summary>Convert to std_logic_vector</Summary>
+      <Description>Convert a bit vector to a std_logic_vector. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_stdulogic" signature="to_stdulogic(value : bit)">
+      <Summary>Convert to std_ulogic</Summary>
+      <Description>Convert a bit to a std_ulogic value. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_stdulogicvector" signature="to_stdulogicvector(value : bit_vector)">
+      <Summary>Convert to std_ulogic_vector</Summary>
+      <Description>Convert a bit vector to a std_ulogic_vector. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_bit" signature="to_bit(value : std_logic)">
+      <Summary>Convert to bit</Summary>
+      <Description>Convert a std_logic value to a bit. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_bitvector" signature="to_bitvector(value : std_logic_vector)">
+      <Summary>Convert to bit_vector</Summary>
+      <Description>Convert a std_logic_vector to a bit_vector. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_x01" signature="to_x01(value : std_logic)">
+      <Summary>Convert to X, 0 or 1</Summary>
+      <Description>Convert a std_logic value to X, 0 or 1. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_x01z" signature="to_x01z(value : std_logic)">
+      <Summary>Convert to X, 0, 1 or Z</Summary>
+      <Description>Convert a std_logic value to X, 0, 1 or Z. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_ux01" signature="to_ux01(value : std_logic)">
+      <Summary>Convert to U, X, 0 or 1</Summary>
+      <Description>Convert a std_logic value to U, X, 0 or 1. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="is_x" signature="is_x(value : std_logic)">
+      <Summary>Test for an unknown value</Summary>
+      <Description>Return true when the value is U, X, W or Z. VHDL std_logic_1164 function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_integer" signature="to_integer(arg : unsigned)">
+      <Summary>Convert to integer</Summary>
+      <Description>Convert a signed or unsigned vector to an integer. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_unsigned" signature="to_unsigned(arg : natural, size : natural)">
+      <Summary>Convert to unsigned</Summary>
+      <Description>Convert a natural number to an unsigned vector of the given size. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_signed" signature="to_signed(arg : integer, size : natural)">
+      <Summary>Convert to signed</Summary>
+      <Description>Convert an integer to a signed vector of the given size. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="resize" signature="resize(arg : unsigned, new_size : natural)">
+      <Summary>Resize a vector</Summary>
+      <Description>Resize a signed or unsigned vector to a new width. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="shift_left" signature="shift_left(arg : unsigned, count : natural)">
+      <Summary>Shift a vector left</Summary>
+      <Description>Shift a signed or unsigned vector left by a number of positions. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="shift_right" signature="shift_right(arg : unsigned, count : natural)">
+      <Summary>Shift a vector right</Summary>
+      <Description>Shift a signed or unsigned vector right by a number of positions. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="rotate_left" signature="rotate_left(arg : unsigned, count : natural)">
+      <Summary>Rotate a vector left</Summary>
+      <Description>Rotate a signed or unsigned vector left by a number of positions. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="rotate_right" signature="rotate_right(arg : unsigned, count : natural)">
+      <Summary>Rotate a vector right</Summary>
+      <Description>Rotate a signed or unsigned vector right by a number of positions. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="std_match" signature="std_match(a : std_logic_vector, b : std_logic_vector)">
+      <Summary>Match with wildcards</Summary>
+      <Description>Compare two std_logic vectors, treating the dash as a wildcard. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="minimum" signature="minimum(a : integer, b : integer)">
+      <Summary>Smaller of two values</Summary>
+      <Description>Return the smaller of two values. VHDL standard function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="maximum" signature="maximum(a : integer, b : integer)">
+      <Summary>Larger of two values</Summary>
+      <Description>Return the larger of two values. VHDL standard function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_01" signature="to_01(value : std_logic_vector)">
+      <Summary>Map to 0 and 1</Summary>
+      <Description>Map H to 1 and L to 0 in a std_logic vector. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="add_carry" signature="add_carry(a : unsigned, b : unsigned, c_in : std_logic)">
+      <Summary>Add with carry</Summary>
+      <Description>Add two unsigned vectors and a carry input. VHDL numeric_std function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="conv_integer" signature="conv_integer(value : std_logic_vector)">
+      <Summary>Legacy integer conversion</Summary>
+      <Description>Convert a std_logic_vector to an integer. VHDL std_logic_arith function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="conv_unsigned" signature="conv_unsigned(value : integer, size : natural)">
+      <Summary>Legacy unsigned conversion</Summary>
+      <Description>Convert an integer to an unsigned vector. VHDL std_logic_arith function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="conv_signed" signature="conv_signed(value : integer, size : natural)">
+      <Summary>Legacy signed conversion</Summary>
+      <Description>Convert an integer to a signed vector. VHDL std_logic_arith function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="conv_std_logic_vector" signature="conv_std_logic_vector(value : integer, size : natural)">
+      <Summary>Legacy std_logic_vector conversion</Summary>
+      <Description>Convert an integer to a std_logic_vector. VHDL std_logic_arith function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="and_reduce" signature="and_reduce(arg : std_logic_vector)">
+      <Summary>AND reduction</Summary>
+      <Description>Return the AND reduction of a std_logic vector. VHDL std_logic_misc function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="or_reduce" signature="or_reduce(arg : std_logic_vector)">
+      <Summary>OR reduction</Summary>
+      <Description>Return the OR reduction of a std_logic vector. VHDL std_logic_misc function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="xor_reduce" signature="xor_reduce(arg : std_logic_vector)">
+      <Summary>XOR reduction</Summary>
+      <Description>Return the XOR reduction of a std_logic vector. VHDL std_logic_misc function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="nand_reduce" signature="nand_reduce(arg : std_logic_vector)">
+      <Summary>NAND reduction</Summary>
+      <Description>Return the NAND reduction of a std_logic vector. VHDL std_logic_misc function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="nor_reduce" signature="nor_reduce(arg : std_logic_vector)">
+      <Summary>NOR reduction</Summary>
+      <Description>Return the NOR reduction of a std_logic vector. VHDL std_logic_misc function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="xnor_reduce" signature="xnor_reduce(arg : std_logic_vector)">
+      <Summary>XNOR reduction</Summary>
+      <Description>Return the XNOR reduction of a std_logic vector. VHDL std_logic_misc function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="sin" signature="sin(x : real)">
+      <Summary>Sine</Summary>
+      <Description>Return the sine of an angle in radians. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="cos" signature="cos(x : real)">
+      <Summary>Cosine</Summary>
+      <Description>Return the cosine of an angle in radians. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="tan" signature="tan(x : real)">
+      <Summary>Tangent</Summary>
+      <Description>Return the tangent of an angle in radians. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="arcsin" signature="arcsin(x : real)">
+      <Summary>Arc sine</Summary>
+      <Description>Return the arc sine of a value in radians. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="arccos" signature="arccos(x : real)">
+      <Summary>Arc cosine</Summary>
+      <Description>Return the arc cosine of a value in radians. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="arctan" signature="arctan(x : real)">
+      <Summary>Arc tangent</Summary>
+      <Description>Return the arc tangent of a value in radians. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="sinh" signature="sinh(x : real)">
+      <Summary>Hyperbolic sine</Summary>
+      <Description>Return the hyperbolic sine of a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="cosh" signature="cosh(x : real)">
+      <Summary>Hyperbolic cosine</Summary>
+      <Description>Return the hyperbolic cosine of a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="tanh" signature="tanh(x : real)">
+      <Summary>Hyperbolic tangent</Summary>
+      <Description>Return the hyperbolic tangent of a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="exp" signature="exp(x : real)">
+      <Summary>Exponential</Summary>
+      <Description>Return e raised to a power. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="log" signature="log(x : real)">
+      <Summary>Natural logarithm</Summary>
+      <Description>Return the natural logarithm of a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="log2" signature="log2(x : real)">
+      <Summary>Base-2 logarithm</Summary>
+      <Description>Return the base-2 logarithm of a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="log10" signature="log10(x : real)">
+      <Summary>Base-10 logarithm</Summary>
+      <Description>Return the base-10 logarithm of a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="sqrt" signature="sqrt(x : real)">
+      <Summary>Square root</Summary>
+      <Description>Return the square root of a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="ceil" signature="ceil(x : real)">
+      <Summary>Ceiling</Summary>
+      <Description>Return the smallest integer not less than a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="floor" signature="floor(x : real)">
+      <Summary>Floor</Summary>
+      <Description>Return the largest integer not greater than a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="round" signature="round(x : real)">
+      <Summary>Round to the nearest integer</Summary>
+      <Description>Return the nearest integer to a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="trunc" signature="trunc(x : real)">
+      <Summary>Truncate to an integer</Summary>
+      <Description>Return the integer part of a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="sign" signature="sign(x : real)">
+      <Summary>Sign of a value</Summary>
+      <Description>Return -1, 0 or 1 for the sign of a value. VHDL math_real function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="realmax">
+      <Summary>Largest real value</Summary>
+      <Description>The largest representable real value. VHDL math_real constant.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="realmin">
+      <Summary>Smallest positive real value</Summary>
+      <Description>The smallest positive representable real value. VHDL math_real constant.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="readline" signature="readline(file : text, line : out line)">
+      <Summary>Read a line from a text file</Summary>
+      <Description>Read a line from a text file into a line variable. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="writeline" signature="writeline(file : text, line : in line)">
+      <Summary>Write a line to a text file</Summary>
+      <Description>Write a line variable to a text file. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="read" signature="read(line : inout line, value : out integer)">
+      <Summary>Read a value from a line</Summary>
+      <Description>Read a value of a supported type from a line. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="write" signature="write(line : inout line, value : in integer)">
+      <Summary>Write a value to a line</Summary>
+      <Description>Write a value of a supported type to a line. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="hread" signature="hread(line : inout line, value : out std_logic_vector)">
+      <Summary>Read a hexadecimal value</Summary>
+      <Description>Read a hexadecimal value from a line. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="hwrite" signature="hwrite(line : inout line, value : in std_logic_vector)">
+      <Summary>Write a hexadecimal value</Summary>
+      <Description>Write a hexadecimal value to a line. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="endline" signature="endline(line : inout line)">
+      <Summary>Test for the end of a line</Summary>
+      <Description>Return true when a line has no more characters. VHDL textio function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="endfile" signature="endfile(file : text)">
+      <Summary>Test for the end of a file</Summary>
+      <Description>Return true when a text file has no more lines. VHDL textio function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="file_open" signature="file_open(file : text, name : string, mode : file_open_kind)">
+      <Summary>Open a text file</Summary>
+      <Description>Open a text file with the given name and mode. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="file_close" signature="file_close(file : text)">
+      <Summary>Close a text file</Summary>
+      <Description>Close a text file. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="flush" signature="flush(file : text)">
+      <Summary>Flush a text file</Summary>
+      <Description>Write the buffered output of a text file. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="tee" signature="tee(file : text, line : out line)">
+      <Summary>Copy the output to a file</Summary>
+      <Description>Copy the output written to the standard output into a file. VHDL textio procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="stop" signature="stop(status : integer)">
+      <Summary>Stop the simulation</Summary>
+      <Description>Stop the simulation with a status code. VHDL std.env procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="finish" signature="finish(status : integer)">
+      <Summary>Finish the simulation</Summary>
+      <Description>Finish the simulation with a status code. VHDL std.env procedure.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="resolution_limit">
+      <Summary>Simulation resolution limit</Summary>
+      <Description>The resolution limit of the current simulation. VHDL std.env constant.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_string" signature="to_string(value : integer)">
+      <Summary>Convert to string</Summary>
+      <Description>Convert a value of a supported type to a string. VHDL standard function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_hstring" signature="to_hstring(value : std_logic_vector)">
+      <Summary>Convert to hexadecimal string</Summary>
+      <Description>Convert a vector to a hexadecimal string. VHDL standard function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_ostring" signature="to_ostring(value : std_logic_vector)">
+      <Summary>Convert to octal string</Summary>
+      <Description>Convert a vector to an octal string. VHDL standard function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="from_string" signature="from_string(value : string)">
+      <Summary>Convert from string</Summary>
+      <Description>Convert a string to a value of a supported type. VHDL standard function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="from_hstring" signature="from_hstring(value : string)">
+      <Summary>Convert from hexadecimal string</Summary>
+      <Description>Convert a hexadecimal string to a vector. VHDL standard function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="from_ostring" signature="from_ostring(value : string)">
+      <Summary>Convert from octal string</Summary>
+      <Description>Convert an octal string to a vector. VHDL standard function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_sfixed" signature="to_sfixed(arg : real, left_index : integer, right_index : integer)">
+      <Summary>Convert to sfixed</Summary>
+      <Description>Convert a real value to a signed fixed-point value. VHDL fixed_pkg function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_ufixed" signature="to_ufixed(arg : real, left_index : integer, right_index : integer)">
+      <Summary>Convert to ufixed</Summary>
+      <Description>Convert a real value to an unsigned fixed-point value. VHDL fixed_pkg function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_real" signature="to_real(arg : sfixed)">
+      <Summary>Convert to real</Summary>
+      <Description>Convert a fixed-point value to a real number. VHDL fixed_pkg function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_slv" signature="to_slv(arg : sfixed)">
+      <Summary>Convert to std_logic_vector</Summary>
+      <Description>Convert a fixed-point value to a std_logic_vector. VHDL fixed_pkg function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="from_slv" signature="from_slv(arg : std_logic_vector)">
+      <Summary>Convert from std_logic_vector</Summary>
+      <Description>Convert a std_logic_vector to a fixed-point value. VHDL fixed_pkg function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="to_float" signature="to_float(arg : real)">
+      <Summary>Convert to float</Summary>
+      <Description>Convert a real value to a floating-point value. VHDL float_pkg function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="from_float" signature="from_float(arg : float32)">
+      <Summary>Convert from float</Summary>
+      <Description>Convert a floating-point value to a real number. VHDL float_pkg function.</Description>
+    </Symbol>
+
+    <Symbol language="Vhdl" name="now">
+      <Summary>Current simulation time</Summary>
+      <Description>Return the current simulation time. VHDL predefined function.</Description>
+    </Symbol>
   </Symbols>
 </ApiSymbols>
