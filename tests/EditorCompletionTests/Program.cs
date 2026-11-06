@@ -76,7 +76,8 @@ internal static class Program
             (L.JavaScript, "function", "fun"), (L.TypeScript, "interface", "fun"), (L.Php, "echo", "fun"),
             (L.Css, "display", "message"), (L.Protobuf, "message", "impl"), (L.DeviceTree, "compatible", "message"),
             (L.Awk, "BEGIN", "sizeof"), (L.Tcl, "proc", "sizeof"),
-            (L.Assembly, "mov", "def"), (L.PowerShell, "function", "sizeof")
+            (L.Assembly, "mov", "def"), (L.PowerShell, "function", "sizeof"),
+            (L.Verilog, "module", "entity"), (L.Vhdl, "entity", "module")
         };
         foreach ((L language, string keyword, string foreign) in profiles)
         {
@@ -86,6 +87,12 @@ internal static class Program
         }
         Check(SyntaxHighlighting.GetKeywords(L.CSharp).Contains("region"), "C# keywords contain the 'region' directive");
         Check(!SyntaxHighlighting.GetKeywords(L.CSharp).Contains("include"), "C# keywords do not contain the C 'include' directive");
+        Check(SyntaxHighlighting.GetKeywords(L.Verilog).Contains("timescale"),
+            "Verilog keywords contain the `timescale directive");
+        Check(!SyntaxHighlighting.GetKeywords(L.Verilog).Contains("MODULE"),
+            "Verilog keywords are case sensitive");
+        Check(((HashSet<string>)SyntaxHighlighting.GetKeywords(L.Vhdl)).Contains("ARCHITECTURE"),
+            "VHDL keywords are case insensitive");
         Check(Names(L.DeviceTree, "", "").Contains("interrupt-parent"), "a hyphenated Device Tree property is offered");
         Check(Names(L.DeviceTree, "", "").Contains("gpio-controller"), "another hyphenated Device Tree property is offered");
         Check(Names(L.Css, "", "").Contains("font-size"), "a hyphenated CSS property is offered");
@@ -158,6 +165,21 @@ internal static class Program
         List<string> sqlWords = Names(sql, "", "");
         Check(sqlWords.Contains("select"), "a .sql file is offered the SQL keyword 'select'");
         Check(!sqlWords.Contains("def"), "a .sql file is not offered the Python keyword 'def'");
+
+        L verilog = SyntaxHighlighting.DetectLanguage("/srv/counter.sv");
+        Equal(verilog, L.Verilog, "counter.sv is detected as Verilog");
+        List<string> verilogWords = Names(verilog, "", "");
+        Check(verilogWords.Contains("always_ff"), "a .sv file is offered the Verilog keyword 'always_ff'");
+        Check(!verilogWords.Contains("entity"), "a .sv file is not offered the VHDL keyword 'entity'");
+        Check(Names(L.Verilog, "", "alw").Contains("always"), "the Verilog completion prefix finds 'always'");
+
+        L vhdl = SyntaxHighlighting.DetectLanguage("/srv/counter.vhdl");
+        Equal(vhdl, L.Vhdl, "counter.vhdl is detected as VHDL");
+        List<string> vhdlWords = Names(vhdl, "", "");
+        Check(vhdlWords.Contains("architecture"), "a .vhdl file is offered the VHDL keyword 'architecture'");
+        Check(!vhdlWords.Contains("always_ff"), "a .vhdl file is not offered the Verilog keyword 'always_ff'");
+        Check(Names(L.Vhdl, "", "ENT").Contains("entity"),
+            "the VHDL completion prefix is case insensitive");
 
         L shell = SyntaxHighlighting.DetectLanguage("/usr/local/bin/backup", "#!/bin/bash");
         Equal(shell, L.Bash, "a #!/bin/bash script without an extension is detected as Bash");

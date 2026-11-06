@@ -122,7 +122,7 @@ public static class EditorSignatureSource
         while (i < offset)
         {
             char c = text[i];
-            if (c == '\'' || c == '"')
+            if (IsStringQuote(language, c))
             {
                 i = SkipString(text, i, offset);
                 continue;
@@ -191,7 +191,7 @@ public static class EditorSignatureSource
         while (i < to)
         {
             char c = text[i];
-            if (c == '\'' || c == '"')
+            if (IsStringQuote(language, c))
             {
                 i = SkipString(text, i, to);
                 continue;
@@ -614,7 +614,7 @@ public static class EditorSignatureSource
     {
         for (int i = 0; i < line.Length; i++)
         {
-            if (line[i] == '\'' || line[i] == '"')
+            if (IsStringQuote(language, line[i]))
             {
                 i = SkipString(line, i, line.Length) - 1;
                 continue;
@@ -625,6 +625,20 @@ public static class EditorSignatureSource
             }
         }
         return line;
+    }
+
+    /// <summary>
+    /// True for a character that opens a string. Verilog uses the apostrophe in based literals (4'b1010)
+    /// and VHDL in attributes (clk'event) and character literals, so there it is an ordinary character.
+    /// </summary>
+    private static bool IsStringQuote(SyntaxHighlighting.Language language, char c)
+    {
+        if (c == '"')
+        {
+            return true;
+        }
+        return c == '\'' && language != SyntaxHighlighting.Language.Verilog &&
+            language != SyntaxHighlighting.Language.Vhdl;
     }
 
     private static bool IsLineCommentStart(SyntaxHighlighting.Language language, string text, int i)
@@ -642,6 +656,7 @@ public static class EditorSignatureSource
             case SyntaxHighlighting.Language.Groovy:
             case SyntaxHighlighting.Language.Go:
             case SyntaxHighlighting.Language.Rust:
+            case SyntaxHighlighting.Language.Verilog:
             case SyntaxHighlighting.Language.Swift:
             case SyntaxHighlighting.Language.Dart:
             case SyntaxHighlighting.Language.JavaScript:
@@ -653,6 +668,7 @@ public static class EditorSignatureSource
                 return (c == '/' && next == '/') || c == '#';
             case SyntaxHighlighting.Language.Sql:
             case SyntaxHighlighting.Language.Lua:
+            case SyntaxHighlighting.Language.Vhdl:
                 return c == '-' && next == '-';
             case SyntaxHighlighting.Language.Python:
             case SyntaxHighlighting.Language.Bash:
@@ -693,6 +709,8 @@ public static class EditorSignatureSource
             case SyntaxHighlighting.Language.Groovy:
             case SyntaxHighlighting.Language.Go:
             case SyntaxHighlighting.Language.Rust:
+            case SyntaxHighlighting.Language.Verilog:
+            case SyntaxHighlighting.Language.Vhdl:
             case SyntaxHighlighting.Language.Swift:
             case SyntaxHighlighting.Language.Dart:
             case SyntaxHighlighting.Language.JavaScript:

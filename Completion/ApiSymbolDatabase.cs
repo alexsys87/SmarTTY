@@ -258,7 +258,36 @@ public class ApiSymbolDatabase
         {
             return null;
         }
-        return symbols.TryGetValue(name, out Symbol symbol) ? symbol : null;
+        return TryFind(symbols, language, name, out Symbol symbol) ? symbol : null;
+    }
+
+    /// <summary>True for languages whose identifiers are case-insensitive (VHDL).</summary>
+    private static bool IsCaseInsensitive(SyntaxHighlighting.Language language)
+    {
+        return language == SyntaxHighlighting.Language.Vhdl;
+    }
+
+    /// <summary>Looks a name up exactly, then without regard to the case for VHDL.</summary>
+    private static bool TryFind(Dictionary<string, Symbol> symbols, SyntaxHighlighting.Language language,
+        string name, out Symbol symbol)
+    {
+        if (symbols.TryGetValue(name, out symbol))
+        {
+            return true;
+        }
+        if (IsCaseInsensitive(language))
+        {
+            foreach (KeyValuePair<string, Symbol> pair in symbols)
+            {
+                if (string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    symbol = pair.Value;
+                    return true;
+                }
+            }
+        }
+        symbol = null;
+        return false;
     }
 
     /// <summary>
@@ -275,7 +304,7 @@ public class ApiSymbolDatabase
         Symbol symbol = Find(language, name);
         if (symbol == null && _byShortName.TryGetValue(LanguageName(language), out Dictionary<string, Symbol> shortNames))
         {
-            shortNames.TryGetValue(name, out symbol);
+            TryFind(shortNames, language, name, out symbol);
         }
         if (symbol == null && language == SyntaxHighlighting.Language.CMake &&
             _byLanguage.TryGetValue(LanguageName(language), out Dictionary<string, Symbol> cmake))

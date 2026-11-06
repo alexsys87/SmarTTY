@@ -82,7 +82,9 @@ namespace SmarTTY.CodeEditing
             Tcl,     // Tcl: # comments, command words, foldable { } bodies, no API set
             Awk,     // AWK: # comments, BEGIN/END blocks, foldable { } bodies, no API set
             Assembly, // Assembly: ;, # and @ comments, labels, directives, instructions and registers, no API set
-            PowerShell // PowerShell: # and <# #> comments, $variables, Verb-Noun commands, here-strings, no API set
+            PowerShell, // PowerShell: # and <# #> comments, $variables, Verb-Noun commands, here-strings, no API set
+            Verilog, // Verilog/SystemVerilog: // and /* */ comments, `directives, $system tasks
+            Vhdl     // VHDL: -- comments, case-insensitive keywords
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -91,7 +93,8 @@ namespace SmarTTY.CodeEditing
             Language.Plain, Language.Bash, Language.Uci, Language.Lua, Language.Makefile, Language.Json, Language.Config,
             Language.Systemd, Language.Nginx, Language.SshConfig, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
-            Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust, Language.Swift,
+            Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
+            Language.Verilog, Language.Vhdl, Language.Swift,
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
             Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Assembly,
             Language.PowerShell, Language.Ruby, Language.Perl, Language.CMake, Language.Dockerfile,
@@ -125,6 +128,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Groovy: return "Groovy";
                 case Language.Go: return "Go";
                 case Language.Rust: return "Rust";
+                case Language.Verilog: return "Verilog";
+                case Language.Vhdl: return "VHDL";
                 case Language.Swift: return "Swift";
                 case Language.Dart: return "Dart";
                 case Language.JavaScript: return "JavaScript";
@@ -459,6 +464,16 @@ namespace SmarTTY.CodeEditing
                 case "rs":
                     return Language.Rust;
 
+                case "v":
+                case "vh":
+                case "sv":
+                case "svh":
+                    return Language.Verilog;
+
+                case "vhd":
+                case "vhdl":
+                    return Language.Vhdl;
+
                 case "swift":
                     return Language.Swift;
 
@@ -739,6 +754,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Groovy: return GroovyTokenizer;
                 case Language.Go: return GoTokenizer;
                 case Language.Rust: return RustTokenizer;
+                case Language.Verilog: return VerilogTokenizer;
+                case Language.Vhdl: return VhdlTokenizer;
                 case Language.Swift: return SwiftTokenizer;
                 case Language.Dart: return DartTokenizer;
                 case Language.JavaScript: return JavaScriptTokenizer;
@@ -816,6 +833,10 @@ namespace SmarTTY.CodeEditing
                     return Combine(GoKeywords);
                 case Language.Rust:
                     return Combine(RustKeywords);
+                case Language.Verilog:
+                    return Combine(VerilogKeywords, VerilogDirectives);
+                case Language.Vhdl:
+                    return VhdlKeywords;
                 case Language.Swift:
                     return Combine(SwiftKeywords);
                 case Language.Dart:
@@ -2005,6 +2026,69 @@ namespace SmarTTY.CodeEditing
             "unsafe", "unsized", "use", "virtual", "where", "while", "yield"
         };
 
+        /// <summary>The reserved words of Verilog-2005 and SystemVerilog (IEEE 1800-2017).</summary>
+        private static readonly HashSet<string> VerilogKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "accept_on", "alias", "always", "always_comb", "always_ff", "always_latch", "and", "assert",
+            "assign", "assume", "automatic", "before", "begin", "bind", "bins", "binsof", "bit", "break",
+            "buf", "bufif0", "bufif1", "byte", "case", "casex", "casez", "cell", "chandle", "checker",
+            "class", "clocking", "cmos", "config", "const", "constraint", "context", "continue", "cover",
+            "covergroup", "coverpoint", "cross", "deassign", "default", "defparam", "design", "disable",
+            "dist", "do", "edge", "else", "end", "endcase", "endchecker", "endclass", "endclocking",
+            "endconfig", "endfunction", "endgenerate", "endgroup", "endinterface", "endmodule", "endpackage",
+            "endprimitive", "endprogram", "endproperty", "endsequence", "endspecify", "endtable", "endtask",
+            "enum", "event", "expect", "export", "extends", "extern", "final", "first_match", "for", "force",
+            "foreach", "forever", "fork", "forkjoin", "function", "generate", "genvar", "global", "highz0",
+            "highz1", "if", "iff", "ifnone", "ignore_bins", "illegal_bins", "implements", "implies", "import",
+            "incdir", "include", "initial", "inout", "input", "inside", "instance", "int", "integer",
+            "interconnect", "interface", "intersect", "join", "join_any", "join_none", "large", "let",
+            "liblist", "library", "local", "localparam", "logic", "longint", "macromodule", "matches",
+            "medium", "modport", "module", "nand", "negedge", "nettype", "new", "nexttime", "nmos", "nor",
+            "noshowcancelled", "not", "notif0", "notif1", "null", "or", "output", "package", "packed",
+            "parameter", "pmos", "posedge", "primitive", "priority", "program", "property", "protected",
+            "pull0", "pull1", "pulldown", "pullup", "pulsestyle_ondetect", "pulsestyle_onevent", "pure",
+            "rand", "randc", "randcase", "randsequence", "rcmos", "real", "realtime", "ref", "reg",
+            "reject_on", "release", "repeat", "restrict", "return", "rnmos", "rpmos", "rtran", "rtranif0",
+            "rtranif1", "s_always", "s_eventually", "s_nexttime", "s_until", "s_until_with", "scalared",
+            "sequence", "shortint", "shortreal", "showcancelled", "signed", "small", "solve", "specify",
+            "specparam", "static", "string", "strong", "strong0", "strong1", "struct", "super", "supply0",
+            "supply1", "sync_accept_on", "sync_reject_on", "table", "tagged", "task", "this", "throughout",
+            "time", "timeprecision", "timeunit", "tran", "tranif0", "tranif1", "tri", "tri0", "tri1",
+            "triand", "trior", "trireg", "type", "typedef", "union", "unique", "unique0", "unsigned",
+            "until", "until_with", "untyped", "use", "uwire", "var", "vectored", "virtual", "void", "wait",
+            "wait_order", "wand", "weak", "weak0", "weak1", "while", "wildcard", "wire", "with", "within",
+            "wor", "xnor", "xor"
+        };
+
+        /// <summary>The compiler directives of Verilog and SystemVerilog (they start with a backtick).</summary>
+        private static readonly HashSet<string> VerilogDirectives = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "accelerate", "autoexpand_vectornets", "begin_keywords", "celldefine", "default_decay_time",
+            "default_nettype", "default_trireg_strength", "define", "delay_mode_distributed", "delay_mode_path",
+            "delay_mode_unit", "delay_mode_zero", "else", "elsif", "end_keywords", "endcelldefine",
+            "endprotect", "endprotected", "endif", "expand_vectornets", "ifdef", "ifndef", "include", "line",
+            "noaccelerate", "noexpand_vectornets", "noremove_gatenames", "noremove_netnames",
+            "nosuppress_faults", "nounconnected_drive", "pragma", "protect", "protected", "remove_gatename",
+            "remove_netname", "resetall", "suppress_faults", "timescale", "unconnected_drive", "undef", "uselib"
+        };
+
+        /// <summary>The reserved words of VHDL-2008 (the language is case-insensitive).</summary>
+        private static readonly HashSet<string> VhdlKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "abs", "access", "after", "alias", "all", "and", "architecture", "array", "assert", "assume",
+            "attribute", "begin", "block", "body", "buffer", "bus", "case", "component", "configuration",
+            "constant", "context", "cover", "default", "disconnect", "downto", "else", "elsif", "end",
+            "entity", "exit", "fairness", "file", "for", "force", "function", "generate", "generic", "group",
+            "guarded", "if", "impure", "in", "inertial", "inout", "is", "label", "library", "linkage",
+            "literal", "loop", "map", "mod", "nand", "new", "next", "nor", "not", "null", "of", "on",
+            "open", "or", "others", "out", "package", "parameter", "port", "postponed", "procedure",
+            "process", "property", "protected", "pure", "range", "record", "register", "reject", "release",
+            "rem", "report", "restrict", "return", "rol", "ror", "select", "sequence", "severity", "shared",
+            "signal", "sla", "sll", "sra", "srl", "strong", "subtype", "then", "to", "transport", "type",
+            "unaffected", "units", "until", "use", "variable", "view", "vmode", "vprop", "vunit", "wait",
+            "when", "while", "with", "xnor", "xor"
+        };
+
         private static readonly HashSet<string> SwiftKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
             "actor", "any", "Any", "as", "associatedtype", "async", "await", "borrowing", "break", "case",
@@ -2474,6 +2558,8 @@ namespace SmarTTY.CodeEditing
             public bool SemicolonComments;     // ";" comments (Assembly)
             public bool AtComments;            // "@" comments at the start of a line or after whitespace (Assembly)
             public bool Preprocessor;          // #include-style directives at the start of a line
+            public bool BacktickDirectives;    // `define-style directives (Verilog)
+            public bool DollarIdentifiers;     // $display-style system tasks (Verilog)
             public bool SingleQuoteStrings = true;
             public bool MarkupTags;            // <tag> and </tag> names are colored as keywords
             public bool Brackets;              // emit paired bracket tokens
@@ -2906,6 +2992,40 @@ namespace SmarTTY.CodeEditing
                         return true;
                     }
 
+                    // Verilog compiler directives: `timescale, `define, `include, `ifdef, ...
+                    if (BacktickDirectives && c == '`' && i + 1 < len && IsIdStart(text[i + 1]))
+                    {
+                        int wordEnd = i + 2;
+                        while (wordEnd < len && IsIdChar(text[wordEnd]))
+                        {
+                            wordEnd++;
+                        }
+                        string word = text.Substring(i + 1, wordEnd - i - 1);
+                        if (PreprocessorWords != null && PreprocessorWords.Contains(word))
+                        {
+                            Normal(ref last, last, i, sink);
+                            sink.AddToken(TypePreprocessor, i, wordEnd);
+                            i = wordEnd;
+                            last = i;
+                            continue;
+                        }
+                    }
+
+                    // Verilog system tasks and functions: $display, $finish, $random, ...
+                    if (DollarIdentifiers && c == '$' && i + 1 < len && IsIdStart(text[i + 1]))
+                    {
+                        int wordEnd = i + 2;
+                        while (wordEnd < len && IsIdChar(text[wordEnd]))
+                        {
+                            wordEnd++;
+                        }
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(TypeKeyword, i, wordEnd);
+                        i = wordEnd;
+                        last = i;
+                        continue;
+                    }
+
                     // PowerShell here-strings: @" ... "@ and @' ... '@, opened at the end of a line.
                     if (PowerShellSyntax && c == '@' && i + 1 < len &&
                         (text[i + 1] == '"' || text[i + 1] == '\'') && SkipBlanks(text, i + 2) == len)
@@ -3306,6 +3426,29 @@ namespace SmarTTY.CodeEditing
 
         private static readonly TokenCache.LineTokenizer RustTokenizer =
             CreateCLikeTokenizer(RustKeywords, rustLiterals: true);
+
+        private static readonly TokenCache.LineTokenizer VerilogTokenizer = new GenericSyntax
+        {
+            SlashComments = true,
+            BlockCommentStart = "/*",
+            BlockCommentEnd = "*/",
+            // Verilog uses the apostrophe in based literals (4'b1010), not as a string delimiter.
+            SingleQuoteStrings = false,
+            BacktickDirectives = true,
+            PreprocessorWords = VerilogDirectives,
+            DollarIdentifiers = true,
+            Brackets = true,
+            Keywords = VerilogKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer VhdlTokenizer = new GenericSyntax
+        {
+            DashDashComments = true,
+            // VHDL attributes use the apostrophe (clk'event), so only "..." is a string.
+            SingleQuoteStrings = false,
+            Brackets = true,
+            Keywords = VhdlKeywords
+        }.Tokenize;
 
         private static readonly TokenCache.LineTokenizer SwiftTokenizer =
             CreateCLikeTokenizer(SwiftKeywords, tripleQuotes: true);

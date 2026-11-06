@@ -247,6 +247,31 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.PowerShell).Contains("foreach"), "PowerShell keywords contain 'foreach'");
         Check(!SyntaxHighlighting.GetKeywords(L.PowerShell).Contains("sizeof"), "PowerShell keywords do not include the C 'sizeof'");
         Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("param"), "the generic Script profile does not carry PowerShell keywords");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/cpu.v"), L.Verilog, ".v is Verilog");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/cpu.vh"), L.Verilog, ".vh is a Verilog header");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/cpu.sv"), L.Verilog, ".sv is SystemVerilog");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/cpu.svh"), L.Verilog, ".svh is a SystemVerilog header");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/CPU.SV"), L.Verilog, ".SV is Verilog too");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/cpu.vhd"), L.Vhdl, ".vhd is VHDL");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/cpu.vhdl"), L.Vhdl, ".vhdl is VHDL");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/CPU.VHDL"), L.Vhdl, ".VHDL is VHDL too");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Verilog), "Verilog", "Verilog has its own display name");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Vhdl), "VHDL", "VHDL has its own display name");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Verilog), "Verilog is in the syntax menu");
+        Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Vhdl), "VHDL is in the syntax menu");
+        Check(SyntaxHighlighting.GetKeywords(L.Verilog).Contains("module"), "Verilog keywords contain 'module'");
+        Check(SyntaxHighlighting.GetKeywords(L.Verilog).Contains("always_ff"), "Verilog keywords contain 'always_ff'");
+        Check(SyntaxHighlighting.GetKeywords(L.Verilog).Contains("timescale"), "Verilog keywords contain the `timescale directive");
+        Check(SyntaxHighlighting.GetKeywords(L.Verilog).Contains("include"), "Verilog keywords contain the `include directive");
+        Check(!SyntaxHighlighting.GetKeywords(L.Verilog).Contains("MODULE"), "Verilog keywords are case sensitive");
+        Check(!SyntaxHighlighting.GetKeywords(L.Verilog).Contains("entity"), "Verilog keywords do not include the VHDL 'entity'");
+        Check(SyntaxHighlighting.GetKeywords(L.Vhdl).Contains("entity"), "VHDL keywords contain 'entity'");
+        Check(SyntaxHighlighting.GetKeywords(L.Vhdl).Contains("downto"), "VHDL keywords contain 'downto'");
+        Check(SyntaxHighlighting.GetKeywords(L.Vhdl).Contains("process"), "VHDL keywords contain 'process'");
+        Check(((HashSet<string>)SyntaxHighlighting.GetKeywords(L.Vhdl)).Contains("ENTITY"),
+            "VHDL keywords are matched without regard to case");
+        Check(!SyntaxHighlighting.GetKeywords(L.Vhdl).Contains("module"), "VHDL keywords do not include the Verilog 'module'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Vhdl).Contains("sizeof"), "VHDL keywords do not include the C 'sizeof'");
         Equal(SyntaxHighlighting.GetDisplayName(L.Ruby), "Ruby", "Ruby has its own display name");
         Equal(SyntaxHighlighting.GetDisplayName(L.Perl), "Perl", "Perl has its own display name");
         Equal(SyntaxHighlighting.GetDisplayName(L.CMake), "CMake", "CMake has its own display name");
@@ -646,6 +671,90 @@ internal static class Program
         Equal(diff.TypeAt(0, 0), SyntaxHighlighting.TypeKeyword, "file header");
     }
 
+    private static void HdlChecks()
+    {
+        Highlighted verilog = new Highlighted(L.Verilog,
+            "`timescale 1ns / 1ps\n" +
+            "`define WIDTH 8\n" +
+            "/* block\n" +
+            "   comment */\n" +
+            "module counter #(parameter WIDTH = 8) (\n" +
+            "    input wire clk,\n" +
+            "    output reg [WIDTH-1:0] q\n" +
+            ");\n" +
+            "always @(posedge clk) begin\n" +
+            "    if (rst) q <= 0; // note\n" +
+            "    else q <= q + 1'b1;\n" +
+            "end\n" +
+            "initial $display(\"q=%0d\", q); $finish;\n" +
+            "endmodule");
+        Equal(Join(verilog.Tokens(0, SyntaxHighlighting.TypePreprocessor)), "`timescale",
+            "a Verilog `timescale directive");
+        Equal(Join(verilog.Tokens(0, SyntaxHighlighting.TypeNumber)), "1ns|1ps", "Verilog time values");
+        Equal(Join(verilog.Tokens(1, SyntaxHighlighting.TypePreprocessor)), "`define",
+            "a Verilog `define directive");
+        Equal(Join(verilog.Tokens(2, SyntaxHighlighting.TypeComment)), "/* block", "a Verilog block comment starts");
+        Equal(Join(verilog.Tokens(3, SyntaxHighlighting.TypeComment)), "   comment */",
+            "...and continues on the next line");
+        Equal(Join(verilog.Tokens(4, SyntaxHighlighting.TypeKeyword)), "module|parameter", "Verilog module keywords");
+        Equal(Join(verilog.Tokens(5, SyntaxHighlighting.TypeKeyword)), "input|wire", "Verilog port keywords");
+        Equal(Join(verilog.Tokens(6, SyntaxHighlighting.TypeKeyword)), "output|reg", "more Verilog port keywords");
+        Equal(Join(verilog.Tokens(8, SyntaxHighlighting.TypeKeyword)), "always|posedge|begin",
+            "Verilog always and begin keywords");
+        Equal(Join(verilog.Tokens(9, SyntaxHighlighting.TypeKeyword)), "if", "a Verilog if keyword");
+        Equal(Join(verilog.Tokens(9, SyntaxHighlighting.TypeComment)), "// note", "a Verilog line comment");
+        Equal(Join(verilog.Tokens(10, SyntaxHighlighting.TypeKeyword)), "else", "a Verilog else keyword");
+        Equal(Join(verilog.Tokens(10, SyntaxHighlighting.TypeString)), "",
+            "the apostrophe of a based literal is not a string");
+        Equal(Join(verilog.Tokens(12, SyntaxHighlighting.TypeKeyword)), "initial|$display|$finish",
+            "the $display and $finish system tasks are keywords");
+        Equal(Join(verilog.Tokens(12, SyntaxHighlighting.TypeString)), "\"q=%0d\"", "a Verilog format string");
+        Equal(Join(verilog.Tokens(13, SyntaxHighlighting.TypeKeyword)), "endmodule", "the endmodule keyword");
+
+        Highlighted vhdl = new Highlighted(L.Vhdl,
+            "-- note\n" +
+            "library ieee;\n" +
+            "use ieee.std_logic_1164.all;\n" +
+            "entity counter is\n" +
+            "    Port (clk : in  STD_LOGIC;\n" +
+            "          q   : out STD_LOGIC_VECTOR(7 downto 0));\n" +
+            "end entity;\n" +
+            "architecture rtl of counter is\n" +
+            "    signal count : unsigned(7 downto 0) := (others => '0');\n" +
+            "begin\n" +
+            "    process (clk) begin\n" +
+            "        if rising_edge(clk) then\n" +
+            "            count <= count + 1;\n" +
+            "        end if;\n" +
+            "    end process;\n" +
+            "end architecture;\n" +
+            "ARCHITECTURE RTL OF Counter IS\n" +
+            "            if clk'event and clk = '1' then");
+        Equal(Join(vhdl.Tokens(0, SyntaxHighlighting.TypeComment)), "-- note", "a VHDL line comment");
+        Equal(Join(vhdl.Tokens(1, SyntaxHighlighting.TypeKeyword)), "library", "a VHDL library keyword");
+        Equal(Join(vhdl.Tokens(2, SyntaxHighlighting.TypeKeyword)), "use|all", "VHDL use and all keywords");
+        Equal(Join(vhdl.Tokens(3, SyntaxHighlighting.TypeKeyword)), "entity|is", "VHDL entity declaration");
+        Equal(Join(vhdl.Tokens(4, SyntaxHighlighting.TypeKeyword)), "Port|in",
+            "VHDL keywords are case insensitive ('Port')");
+        Equal(Join(vhdl.Tokens(5, SyntaxHighlighting.TypeKeyword)), "out|downto", "a VHDL port direction and range");
+        Equal(Join(vhdl.Tokens(6, SyntaxHighlighting.TypeKeyword)), "end|entity", "the end of a VHDL entity");
+        Equal(Join(vhdl.Tokens(7, SyntaxHighlighting.TypeKeyword)), "architecture|of|is", "a VHDL architecture");
+        Equal(Join(vhdl.Tokens(8, SyntaxHighlighting.TypeKeyword)), "signal|downto|others",
+            "VHDL signal, range and others keywords");
+        Equal(Join(vhdl.Tokens(8, SyntaxHighlighting.TypeString)), "",
+            "VHDL character literals and attributes are not strings");
+        Equal(Join(vhdl.Tokens(10, SyntaxHighlighting.TypeKeyword)), "process|begin", "a VHDL process");
+        Equal(Join(vhdl.Tokens(11, SyntaxHighlighting.TypeKeyword)), "if|then", "a VHDL if statement");
+        Equal(Join(vhdl.Tokens(13, SyntaxHighlighting.TypeKeyword)), "end|if", "the end of a VHDL if");
+        Equal(Join(vhdl.Tokens(14, SyntaxHighlighting.TypeKeyword)), "end|process", "the end of a VHDL process");
+        Equal(Join(vhdl.Tokens(15, SyntaxHighlighting.TypeKeyword)), "end|architecture", "the end of a VHDL architecture");
+        Equal(Join(vhdl.Tokens(16, SyntaxHighlighting.TypeKeyword)), "ARCHITECTURE|OF|IS",
+            "uppercase VHDL keywords are highlighted too");
+        Equal(Join(vhdl.Tokens(17, SyntaxHighlighting.TypeKeyword)), "if|and|then",
+            "the apostrophe of clk'event does not swallow the rest of the line");
+        Equal(Join(vhdl.Tokens(17, SyntaxHighlighting.TypeString)), "", "clk'event and '1' are not strings");
+    }
+
     private static void TokenOrderChecks()
     {
         // Every tokenizer must emit sorted, non-overlapping tokens inside the line, whatever the input.
@@ -757,7 +866,7 @@ internal static class Program
         L[] selfNamed =
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
-            L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
+            L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
             L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell
         };
         foreach (L language in Enum.GetValues(typeof(L)))
@@ -1226,7 +1335,7 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Dockerfile).Toggle(new[] { "FROM alpine" })), "# FROM alpine", "Dockerfile comment");
         foreach (L language in new[]
                  {
-                     L.CSharp, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Swift, L.Dart,
+                     L.CSharp, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
                      L.JavaScript, L.TypeScript, L.Php, L.Protobuf, L.DeviceTree
                  })
         {
@@ -1235,6 +1344,8 @@ internal static class Program
         }
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Css).Toggle(new[] { "a" })), "/* a */", "CSS uses block comments");
         Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Sql).Toggle(new[] { "select 1" })), "-- select 1", "SQL comment");
+        Equal(Join(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Vhdl).Toggle(new[] { "signal x : bit" })),
+            "-- signal x : bit", "VHDL comment");
         Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Plain) == null, "plain text has no comments");
         Check(CommentStyle.ForLanguage(SyntaxHighlighting.Language.Diff) == null, "a diff has no comments");
     }
@@ -1264,6 +1375,7 @@ internal static class Program
             PythonChecks();
             CppChecks();
             GenericChecks();
+            HdlChecks();
             TokenOrderChecks();
             PairEditingChecks();
             CommentChecks();
