@@ -90,14 +90,15 @@ namespace SmarTTY.CodeEditing
             Yocto,   // Yocto/BitBake recipes: the colors of Config, the BitBake variables and tasks are keywords
             LinkerScript, // GNU ld scripts: C-like comments, the commands of the linker are keywords
             Crontab, // cron/crontab: schedule fields, @reboot, environment assignments and comments
-            Fstab    // /etc/fstab: device, mount point, filesystem, options, dump and pass
+            Fstab,   // /etc/fstab: device, mount point, filesystem, options, dump and pass
+            Sudoers  // sudoers: aliases, Defaults, tags (NOPASSWD), users, hosts and commands
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -128,6 +129,7 @@ namespace SmarTTY.CodeEditing
                 case Language.SshConfig: return "SSH config (ssh_config, sshd_config)";
                 case Language.Crontab: return "crontab";
                 case Language.Fstab: return "fstab (/etc/fstab)";
+                case Language.Sudoers: return "sudoers";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
@@ -266,6 +268,10 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.Fstab;
             }
+            if (lowerCasePath.Contains("/sudoers.d/"))
+            {
+                return Language.Sudoers;
+            }
             if ((lowerCasePath.Contains("/ssh_config.d/") || lowerCasePath.Contains("/sshd_config.d/")) && name.EndsWith(".conf", StringComparison.Ordinal))
             {
                 return Language.SshConfig;
@@ -386,6 +392,9 @@ namespace SmarTTY.CodeEditing
 
                 case "fstab":
                     return Language.Fstab;
+
+                case "sudoers":
+                    return Language.Sudoers;
 
                 case ".config":
                 case "kconfig":
@@ -881,6 +890,7 @@ namespace SmarTTY.CodeEditing
                 case Language.SshConfig: return SshConfigTokenizer;
                 case Language.Crontab: return TokenizeCrontab;
                 case Language.Fstab: return TokenizeFstab;
+                case Language.Sudoers: return TokenizeSudoers;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -998,6 +1008,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(CrontabKeywords);
                 case Language.Fstab:
                     return Combine(FstabTypes, FstabOptions);
+                case Language.Sudoers:
+                    return Combine(SudoersDirectives, SudoersValues);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:

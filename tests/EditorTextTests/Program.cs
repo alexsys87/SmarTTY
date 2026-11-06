@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -928,6 +928,7 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.Systemd) != null && CommentStyle.ForLanguage(L.Nginx) != null && CommentStyle.ForLanguage(L.SshConfig) != null, "# comments in systemd, nginx and ssh files");
         Check(CommentStyle.ForLanguage(L.Crontab) != null, "# comments in crontab files");
         Check(CommentStyle.ForLanguage(L.Fstab) != null, "# comments in fstab");
+        Check(CommentStyle.ForLanguage(L.Sudoers) != null, "# comments in sudoers");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1050,6 +1051,34 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("ext4"), "fstab keywords contain 'ext4'");
         Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("noatime"), "fstab keywords contain 'noatime'");
         Equal(Join(CommentStyle.ForLanguage(L.Fstab).Toggle(new[] { "UUID=1 / ext4 defaults 0 1" })), "# UUID=1 / ext4 defaults 0 1", "fstab comment");
+    }
+
+    private static void SudoersChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sudoers"), L.Sudoers, "/etc/sudoers");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sudoers.d/90-admins"), L.Sudoers, "a drop-in of sudoers.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/sudoers"), L.Sudoers, "a file named sudoers");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/sudoers.conf"), L.Config, "a .conf named after sudoers stays a config");
+
+        Highlighted sudoers = new Highlighted(L.Sudoers,
+            "Defaults env_reset,secure_path=\"/usr/local/sbin:/usr/bin:/bin\"\nDefaults:root !requiretty\nUser_Alias ADMINS = alice, bob\nCmnd_Alias SERVICES = /bin/systemctl restart nginx, /bin/systemctl status nginx\nroot ALL=(ALL:ALL) ALL\n%sudo ALL=(ALL:ALL) NOPASSWD: /usr/bin/systemctl restart app\ndeploy ALL=(root) PASSWD: /usr/bin/apt update\n#includedir /etc/sudoers.d\n@includedir /etc/sudoers.d\n# a comment");
+        Equal(Join(sudoers.Tokens(0, SyntaxHighlighting.TypeKeyword)), "Defaults|env_reset|secure_path", "sudoers: Defaults and its flags");
+        Equal(Join(sudoers.Tokens(0, SyntaxHighlighting.TypeString)), "\"/usr/local/sbin:/usr/bin:/bin\"", "sudoers: a quoted path list");
+        Equal(Join(sudoers.Tokens(1, SyntaxHighlighting.TypeKeyword)), "Defaults|requiretty", "sudoers: a Defaults line for root");
+        Equal(Join(sudoers.Tokens(2, SyntaxHighlighting.TypeKeyword)), "User_Alias", "sudoers: User_Alias");
+        Equal(Join(sudoers.Tokens(3, SyntaxHighlighting.TypeKeyword)), "Cmnd_Alias", "sudoers: Cmnd_Alias");
+        Equal(Join(sudoers.Tokens(4, SyntaxHighlighting.TypeVariable)), "root", "sudoers: the user of a rule");
+        Equal(Join(sudoers.Tokens(4, SyntaxHighlighting.TypeKeyword)), "ALL|ALL|ALL|ALL", "sudoers: the ALL keywords");
+        Equal(Join(sudoers.Tokens(5, SyntaxHighlighting.TypeKeyword)), "ALL|ALL|ALL|NOPASSWD", "sudoers: a NOPASSWD rule");
+        Equal(Join(sudoers.Tokens(6, SyntaxHighlighting.TypeVariable)), "deploy", "sudoers: the user of a tagged rule");
+        Equal(Join(sudoers.Tokens(6, SyntaxHighlighting.TypeKeyword)), "ALL|PASSWD", "sudoers: PASSWD");
+        Equal(Join(sudoers.Tokens(7, SyntaxHighlighting.TypeKeyword)), "#includedir", "sudoers: #includedir is a directive");
+        Equal(Join(sudoers.Tokens(7, SyntaxHighlighting.TypeString)), "/etc/sudoers.d", "sudoers: the include path");
+        Equal(Join(sudoers.Tokens(8, SyntaxHighlighting.TypeKeyword)), "@includedir", "sudoers: @includedir is a directive");
+        Equal(Join(sudoers.Tokens(9, SyntaxHighlighting.TypeComment)), "# a comment", "sudoers: a comment");
+        Check(SyntaxHighlighting.GetKeywords(L.Sudoers).Contains("NOPASSWD"), "sudoers keywords contain 'NOPASSWD'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sudoers).Contains("secure_path"), "sudoers keywords contain 'secure_path'");
+        Equal(Join(CommentStyle.ForLanguage(L.Sudoers).Toggle(new[] { "root ALL=(ALL:ALL) ALL" })), "# root ALL=(ALL:ALL) ALL", "sudoers comment");
     }
 
     private static void KconfigChecks()
@@ -1525,6 +1554,7 @@ internal static class Program
         AdminFormatTokenChecks();
         CrontabChecks();
         FstabChecks();
+        SudoersChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();
