@@ -89,14 +89,15 @@ namespace SmarTTY.CodeEditing
             UBoot,   // U-Boot env files and scripts: shell-like words and $variables
             Yocto,   // Yocto/BitBake recipes: the colors of Config, the BitBake variables and tasks are keywords
             LinkerScript, // GNU ld scripts: C-like comments, the commands of the linker are keywords
-            Crontab  // cron/crontab: schedule fields, @reboot, environment assignments and comments
+            Crontab, // cron/crontab: schedule fields, @reboot, environment assignments and comments
+            Fstab    // /etc/fstab: device, mount point, filesystem, options, dump and pass
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -126,6 +127,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Nginx: return "nginx config";
                 case Language.SshConfig: return "SSH config (ssh_config, sshd_config)";
                 case Language.Crontab: return "crontab";
+                case Language.Fstab: return "fstab (/etc/fstab)";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
@@ -260,6 +262,10 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.Crontab;
             }
+            if (lowerCasePath.Contains("/etc/fstab.d/"))
+            {
+                return Language.Fstab;
+            }
             if ((lowerCasePath.Contains("/ssh_config.d/") || lowerCasePath.Contains("/sshd_config.d/")) && name.EndsWith(".conf", StringComparison.Ordinal))
             {
                 return Language.SshConfig;
@@ -369,7 +375,6 @@ namespace SmarTTY.CodeEditing
                 case ".npmrc":
                 case ".inputrc":
                 case ".env":
-                case "fstab":
                 case "hosts":
                 case "passwd":
                 case "group":
@@ -378,6 +383,9 @@ namespace SmarTTY.CodeEditing
 
                 case "crontab":
                     return Language.Crontab;
+
+                case "fstab":
+                    return Language.Fstab;
 
                 case ".config":
                 case "kconfig":
@@ -872,6 +880,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Nginx: return NginxTokenizer;
                 case Language.SshConfig: return SshConfigTokenizer;
                 case Language.Crontab: return TokenizeCrontab;
+                case Language.Fstab: return TokenizeFstab;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -987,6 +996,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(SshDirectives, SshValues);
                 case Language.Crontab:
                     return Combine(CrontabKeywords);
+                case Language.Fstab:
+                    return Combine(FstabTypes, FstabOptions);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:

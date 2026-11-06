@@ -309,6 +309,109 @@ public static partial class SyntaxHighlighting
         }
     }
 
+    // ------------------------------------------------------------------ fstab
+
+    private static readonly HashSet<string> FstabTypes = Words(StringComparer.Ordinal,
+        @"ext2 ext3 ext4 xfs btrfs zfs vfat fat msdos exfat ntfs ntfs3 iso9660 udf f2fs reiserfs jfs nilfs2
+          bcachefs squashfs erofs overlay tmpfs devtmpfs ramfs proc sysfs devpts cgroup cgroup2
+          securityfs debugfs tracefs pstore bpf configfs fusectl mqueue hugetlbfs autofs
+          nfs nfs4 cifs smb3 fuse fuse.sshfs sshfs glusterfs ceph lustre gpfs 9p virtiofs
+          swap none auto");
+
+    private static readonly HashSet<string> FstabOptions = Words(StringComparer.Ordinal,
+        @"defaults rw ro suid nosuid dev nodev exec noexec auto noauto user nouser users owner group
+          sync async atime noatime relatime norelatime strictatime lazytime nodiratime diratime
+          discard nodiscard fail nofail _netdev
+          umask dmask fmask uid gid mode acl noacl
+          errors x-systemd.automount x-systemd.device-timeout x-systemd.idle-timeout
+          x-systemd.required-by x-systemd.wanted-by x-systemd.before x-systemd.after
+          soft hard intr nointr timeo retrans rsize wsize nolock lock
+          vers proto tcp udp port mountproto mountport
+          credentials guest sec iocharset codepage
+          size nr_inodes bind rbind move remount compress compress-force subvol subvolid");
+
+    /// <summary>
+    /// /etc/fstab: the device, the mount point, the filesystem, the options, the dump and the pass fields. A known
+    /// filesystem and option are keywords, an unknown one is a plain variable (so a typo stands out), the dump and pass
+    /// columns are numbers, and a trailing # starts a comment.
+    /// </summary>
+    private static bool TokenizeFstab(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        endState = 0;
+        int len = text.Length;
+        int i = SkipBlanks(text, 0);
+        if (i >= len)
+        {
+            return true;
+        }
+        if (text[i] == '#')
+        {
+            sink.AddToken(TypeComment, i, len);
+            return true;
+        }
+
+        for (int field = 0; field < 6 && i < len; field++)
+        {
+            if (text[i] == '#')
+            {
+                sink.AddToken(TypeComment, i, len);
+                return true;
+            }
+            int s = i;
+            while (i < len && !IsBlank(text[i]))
+            {
+                i++;
+            }
+            if (i == s)
+            {
+                break;
+            }
+            if (field == 0 || field == 1)
+            {
+                sink.AddToken(TypeString, s, i);
+            }
+            else if (field == 2)
+            {
+                sink.AddToken(FstabTypes.Contains(text.Substring(s, i - s)) ? TypeKeyword : TypeVariable, s, i);
+            }
+            else if (field == 3)
+            {
+                ScanFstabOptions(text, s, i, sink);
+            }
+            else
+            {
+                sink.AddToken(TypeNumber, s, i);
+            }
+            i = SkipBlanks(text, i);
+        }
+        if (i < len && text[i] == '#')
+        {
+            sink.AddToken(TypeComment, i, len);
+        }
+        return true;
+    }
+
+    /// <summary>The mount options of a fstab line: known options are keywords, unknown ones are variables.</summary>
+    private static void ScanFstabOptions(string text, int start, int end, TokenCache.ITokenSink sink)
+    {
+        int s = start;
+        for (int i = start; i <= end; i++)
+        {
+            if (i < end && text[i] != ',')
+            {
+                continue;
+            }
+            if (i > s)
+            {
+                string option = text.Substring(s, i - s);
+                int equals = option.IndexOf('=');
+                string name = (equals > 0) ? option.Substring(0, equals) : option;
+                sink.AddToken(FstabOptions.Contains(name) ? TypeKeyword : TypeVariable, s, i);
+            }
+            s = i + 1;
+        }
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)
