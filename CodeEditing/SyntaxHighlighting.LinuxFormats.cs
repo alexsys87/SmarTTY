@@ -148,4 +148,23 @@ public static partial class SyntaxHighlighting
         }
         return TokenizeConfigCore(YoctoDirectives, startState, text, sink, out endState);
     }
+
+    // ---------------------------------------------------------- linker scripts
+
+    private static readonly HashSet<string> LinkerKeywords = Words(StringComparer.Ordinal,
+        @"SECTIONS MEMORY PHDRS OVERLAY INSERT AFTER INTO OUTPUT_FORMAT OUTPUT_ARCH OUTPUT ENTRY STARTUP
+          SEARCH_DIR GROUP INPUT AS_NEEDED PROVIDE PROVIDE_HIDDEN HIDDEN ASSERT EXTERN FORCE_COMMON_ALLOCATION
+          INCLUDE DEFINED SIZEOF ADDR LOADADDR ALIGN DATA_SEGMENT_ALIGN DATA_SEGMENT_RELRO_END DATA_SEGMENT_END
+          SEGMENT_START ABSOLUTE ORIGIN LENGTH REGION_ALIAS NOLOAD DSECT COPY INFO AT SUBALIGN ONLY_IF_RO
+          ONLY_IF_RW KEEP SORT COMMON EXCLUDE_FILE BYTE SHORT LONG QUAD SQUAD FILL ORG");
+
+    private static readonly TokenCache.LineTokenizer LinkerScriptTokenizer = new GenericSyntax
+    {
+        SlashComments = true,
+        BlockCommentStart = "/*",
+        BlockCommentEnd = "*/",
+        // Linker scripts use the apostrophe in expressions, not as a string delimiter.
+        SingleQuoteStrings = false,
+        Keywords = LinkerKeywords
+    }.Tokenize;
 }
