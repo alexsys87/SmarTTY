@@ -205,6 +205,110 @@ public static partial class SyntaxHighlighting
         "password", "hostbased", "always", "never", "dynamic"
     };
 
+    // ---------------------------------------------------------------- crontab
+
+    private static readonly HashSet<string> CrontabKeywords = Words(StringComparer.Ordinal,
+        // shortcuts in place of the five fields
+        @"@reboot @yearly @annually @monthly @weekly @daily @midnight @hourly",
+        // names of months and days of the week
+        @"jan feb mar apr may jun jul aug sep oct nov dec
+          sun mon tue wed thu fri sat",
+        // the environment names a crontab may set
+        @"SHELL PATH MAILTO HOME LOGNAME CRON_TZ");
+
+    /// <summary>
+    /// cron/crontab: a comment, an environment assignment (SHELL, PATH, MAILTO), a @reboot-style shortcut or the five
+    /// schedule fields followed by the command. The schedule fields are numbers (or keywords for *, ranges and names);
+    /// the command is left as it is except for its quoted strings and its trailing comment.
+    /// </summary>
+    private static bool TokenizeCrontab(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        endState = 0;
+        int len = text.Length;
+        int first = SkipBlanks(text, 0);
+        if (first >= len)
+        {
+            return true;
+        }
+        if (text[first] == '#')
+        {
+            sink.AddToken(TypeComment, first, len);
+            return true;
+        }
+
+        // An environment assignment: NAME=value, NAME = value.
+        int wordEnd = first;
+        while (wordEnd < len && (IsIdChar(text[wordEnd]) || text[wordEnd] == '@'))
+        {
+            wordEnd++;
+        }
+        if (wordEnd > first && IsIdStart(text[first]))
+        {
+            int equals = SkipBlanks(text, wordEnd);
+            if (equals < len && text[equals] == '=')
+            {
+                sink.AddToken(TypeVariable, first, wordEnd);
+                ScanCronRest(text, SkipBlanks(text, equals + 1), sink);
+                return true;
+            }
+        }
+
+        // @reboot, @daily and the other shortcuts.
+        if (text[first] == '@')
+        {
+            string shortcut = text.Substring(first, wordEnd - first);
+            if (CrontabKeywords.Contains(shortcut))
+            {
+                sink.AddToken(TypeKeyword, first, wordEnd);
+                ScanCronRest(text, SkipBlanks(text, wordEnd), sink);
+                return true;
+            }
+        }
+
+        // The five fields: minute, hour, day of month, month, day of the week.
+        int i = first;
+        for (int field = 0; field < 5 && i < len; field++)
+        {
+            int s = i;
+            while (i < len && !IsBlank(text[i]))
+            {
+                i++;
+            }
+            if (i == s)
+            {
+                break;
+            }
+            sink.AddToken(IsDigit(text[s]) ? TypeNumber : TypeKeyword, s, i);
+            i = SkipBlanks(text, i);
+        }
+        ScanCronRest(text, i, sink);
+        return true;
+    }
+
+    /// <summary>The command of a cron line: quoted strings and a trailing comment.</summary>
+    private static void ScanCronRest(string text, int start, TokenCache.ITokenSink sink)
+    {
+        int len = text.Length;
+        int i = start;
+        while (i < len)
+        {
+            char c = text[i];
+            if (c == '#' && i > 0 && IsBlank(text[i - 1]))
+            {
+                sink.AddToken(TypeComment, i, len);
+                return;
+            }
+            if (c == '"' || c == '\'')
+            {
+                int end = FindQuoteEnd(text, i, c);
+                sink.AddToken(TypeString, i, (end < 0) ? len : end);
+                i = (end < 0) ? len : end;
+                continue;
+            }
+            i++;
+        }
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)

@@ -900,7 +900,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/journald.conf"), L.Systemd, "journald.conf is systemd's");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/foo.conf"), L.Config, "an ordinary .conf stays a config");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.network"), L.Config, "networkd files are not units");
-        Equal(SyntaxHighlighting.DetectLanguage("/etc/crontab"), L.Config, "crontab stays a config");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/crontab"), L.Crontab, "/etc/crontab is a crontab");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/.env"), L.Config, ".env stays a config");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pyproject.toml"), L.Config, "toml stays a config");
 
@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -926,6 +926,7 @@ internal static class Program
             Check(ReferenceEquals(SyntaxHighlighting.GetTokenizer(language), SyntaxHighlighting.GetTokenizer(language)), language + ": the tokenizer is the same object every time");
         }
         Check(CommentStyle.ForLanguage(L.Systemd) != null && CommentStyle.ForLanguage(L.Nginx) != null && CommentStyle.ForLanguage(L.SshConfig) != null, "# comments in systemd, nginx and ssh files");
+        Check(CommentStyle.ForLanguage(L.Crontab) != null, "# comments in crontab files");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -998,6 +999,32 @@ internal static class Program
         Equal(Join(log.Tokens(8, SyntaxHighlighting.TypeString)) + Join(log.Tokens(8, SyntaxHighlighting.TypeNumber)), "", "log: the words in a sentence are left alone");
         Equal(Join(log.Tokens(9, SyntaxHighlighting.TypeSection)), "07:00:09", "log: a time of the day alone");
         Equal(Join(log.Tokens(9, SyntaxHighlighting.TypeString)), "FATAL", "log: FATAL");
+    }
+
+    private static void CrontabChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/cron.d/app"), L.Crontab, "a file of /etc/cron.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/spool/cron/crontabs/root"), L.Crontab, "a user crontab");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/crontab"), L.Crontab, "a file named crontab");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/cron.daily/backup"), L.Plain, "a script of /etc/cron.daily is not a crontab");
+
+        Highlighted cron = new Highlighted(L.Crontab,
+            "# m h dom mon dow command\nSHELL=/bin/bash\nMAILTO = root # where mail goes\n0 5 * * * /usr/bin/backup --quiet # nightly\n@reboot /usr/local/bin/start.sh\n*/15 9-17 * * mon-fri /usr/bin/report \"daily\"\n0 5 * * * /bin/echo a#b");
+        Equal(Join(cron.Tokens(0, SyntaxHighlighting.TypeComment)), "# m h dom mon dow command", "crontab: a comment");
+        Equal(Join(cron.Tokens(1, SyntaxHighlighting.TypeVariable)), "SHELL", "crontab: an environment assignment");
+        Equal(Join(cron.Tokens(2, SyntaxHighlighting.TypeVariable)), "MAILTO", "crontab: an environment assignment with spaces");
+        Equal(Join(cron.Tokens(2, SyntaxHighlighting.TypeComment)), "# where mail goes", "crontab: a comment after an assignment");
+        Equal(Join(cron.Tokens(3, SyntaxHighlighting.TypeNumber)), "0|5", "crontab: the minutes and hours");
+        Equal(Join(cron.Tokens(3, SyntaxHighlighting.TypeKeyword)), "*|*|*", "crontab: the * fields");
+        Equal(Join(cron.Tokens(3, SyntaxHighlighting.TypeComment)), "# nightly", "crontab: a comment after the command");
+        Equal(Join(cron.Tokens(4, SyntaxHighlighting.TypeKeyword)), "@reboot", "crontab: @reboot");
+        Equal(Join(cron.Tokens(5, SyntaxHighlighting.TypeKeyword)), "*/15|*|*|mon-fri", "crontab: steps, ranges and names");
+        Equal(Join(cron.Tokens(5, SyntaxHighlighting.TypeNumber)), "9-17", "crontab: a range of hours");
+        Equal(Join(cron.Tokens(5, SyntaxHighlighting.TypeString)), "\"daily\"", "crontab: a quoted argument");
+        Equal(Join(cron.Tokens(6, SyntaxHighlighting.TypeComment)), "", "crontab: # without a space is not a comment");
+        Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("jan"), "crontab keywords contain 'jan'");
+        Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("@reboot"), "crontab keywords contain '@reboot'");
+        Equal(Join(CommentStyle.ForLanguage(L.Crontab).Toggle(new[] { "0 5 * * * /usr/bin/backup" })), "# 0 5 * * * /usr/bin/backup", "crontab comment");
     }
 
     private static void KconfigChecks()
@@ -1471,6 +1498,7 @@ internal static class Program
             OpenWrtDetectionChecks();
             AdminFormatDetectionChecks();
         AdminFormatTokenChecks();
+        CrontabChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();
