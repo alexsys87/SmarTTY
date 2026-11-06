@@ -84,13 +84,14 @@ namespace SmarTTY.CodeEditing
             Assembly, // Assembly: ;, # and @ comments, labels, directives, instructions and registers, no API set
             PowerShell, // PowerShell: # and <# #> comments, $variables, Verb-Noun commands, here-strings, no API set
             Verilog, // Verilog/SystemVerilog: // and /* */ comments, `directives, $system tasks
-            Vhdl     // VHDL: -- comments, case-insensitive keywords
+            Vhdl,    // VHDL: -- comments, case-insensitive keywords
+            Kconfig  // Kconfig and .config: the colors of Config, the Kconfig directives are keywords
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
-            Language.Plain, Language.Bash, Language.Uci, Language.Lua, Language.Makefile, Language.Json, Language.Config,
+            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.Lua, Language.Makefile, Language.Json, Language.Config,
             Language.Systemd, Language.Nginx, Language.SshConfig, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
@@ -109,6 +110,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Plain: return "Plain text";
                 case Language.Bash: return "Shell (sh, bash)";
                 case Language.Uci: return "UCI (OpenWrt config)";
+                case Language.Kconfig: return "Kconfig (kernel, OpenWrt)";
                 case Language.Lua: return "Lua";
                 case Language.Makefile: return "Makefile";
                 case Language.Json: return "JSON";
@@ -220,6 +222,11 @@ namespace SmarTTY.CodeEditing
         /// </summary>
         private static Language DetectLanguageFromPath(string lowerCasePath, string name)
         {
+            // The kernel and OpenWrt keep the result of "make config" in /boot/config-<release>.
+            if (lowerCasePath.Contains("/boot/") && (name == "config" || name.StartsWith("config-", StringComparison.Ordinal)))
+            {
+                return Language.Kconfig;
+            }
             bool nginxDirectory = lowerCasePath.Contains("/etc/nginx/") || lowerCasePath.Contains("/nginx/sites-") || lowerCasePath.Contains("/nginx/conf");
             if (nginxDirectory && (name.EndsWith(".conf", StringComparison.Ordinal) || name.IndexOf('.') < 0))
             {
@@ -346,6 +353,12 @@ namespace SmarTTY.CodeEditing
                 case "config":
                     return Language.Config;
 
+                case ".config":
+                case "kconfig":
+                case "config.in":
+                case "defconfig":
+                    return Language.Kconfig;
+
                 case "ssh_config":
                 case "sshd_config":
                     return Language.SshConfig;
@@ -361,6 +374,11 @@ namespace SmarTTY.CodeEditing
             }
 
             // Variants of well-known names: Dockerfile.dev, Makefile.am.
+            if (name.EndsWith("_defconfig", StringComparison.Ordinal) ||
+                name.StartsWith("kconfig.", StringComparison.Ordinal))
+            {
+                return Language.Kconfig;
+            }
             if (name.StartsWith("dockerfile.", StringComparison.Ordinal) || name.StartsWith("containerfile.", StringComparison.Ordinal))
             {
                 return Language.Dockerfile;
@@ -780,6 +798,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Json: return TokenizeJson;
                 case Language.Makefile: return TokenizeMakefile;
                 case Language.Uci: return TokenizeUci;
+                case Language.Kconfig: return KconfigTokenizer;
                 case Language.Yaml: return TokenizeYaml;
                 case Language.Systemd: return SystemdTokenizer;
                 case Language.Nginx: return NginxTokenizer;
@@ -883,6 +902,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(ConfigConstants);
                 case Language.Uci:
                     return Combine(UciKeywords);
+                case Language.Kconfig:
+                    return Combine(KconfigKeywords, KconfigValues);
                 case Language.Systemd:
                     return Combine(SystemdDirectives, SystemdSectionNames, SystemdValues, ConfigConstants);
                 case Language.Nginx:
@@ -1699,9 +1720,11 @@ namespace SmarTTY.CodeEditing
         /// <summary>
         /// The tokenizer of Config. With <paramref name="directives"/> (systemd, nginx, ssh) the key at the start of a line is a
         /// keyword when it is one of them, and stays a plain key otherwise. With <paramref name="foldBraces"/> (nginx) the { } of the
-        /// blocks are paired brackets that fold: "server {...}".
+        /// blocks are paired brackets that fold: "server {...}". With <paramref name="dollarParentheses"/> (Kconfig) a reference
+        /// written as "$(NAME)" is a variable too, and <paramref name="valueKeywords"/> (Kconfig's y, m, n) are the words that are
+        /// coloured wherever they stand.
         /// </summary>
-        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false)
+        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false, bool dollarParentheses = false, HashSet<string> valueKeywords = null)
         {
             int len = text.Length;
             int last = 0;
@@ -1796,6 +1819,18 @@ namespace SmarTTY.CodeEditing
                     continue;
                 }
 
+                // Variable references: ${NAME}, $NAME, and $(NAME) where the language writes them so (Kconfig).
+                if (dollarParentheses && c == '$' && i + 1 < len && text[i + 1] == '(')
+                {
+                    int close = text.IndexOf(')', i + 2);
+                    int e = (close < 0) ? len : (close + 1);
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeVariable, i, e);
+                    i = e;
+                    last = i;
+                    continue;
+                }
+
                 // Variable references: ${NAME}, $NAME.
                 if (c == '$' && i + 1 < len && (text[i + 1] == '{' || IsIdStart(text[i + 1])))
                 {
@@ -1851,7 +1886,8 @@ namespace SmarTTY.CodeEditing
                     {
                         i++;
                     }
-                    if (ConfigConstants.Contains(text.Substring(s, i - s)))
+                    string word = text.Substring(s, i - s);
+                    if (ConfigConstants.Contains(word) || (valueKeywords != null && valueKeywords.Contains(word)))
                     {
                         Normal(ref last, last, s, sink);
                         sink.AddToken(TypeKeyword, s, i);

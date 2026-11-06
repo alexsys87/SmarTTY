@@ -25,6 +25,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Python:
                 case SyntaxHighlighting.Language.Bash:
                 case SyntaxHighlighting.Language.Config:
+                case SyntaxHighlighting.Language.Kconfig:
                 case SyntaxHighlighting.Language.Systemd:
                 case SyntaxHighlighting.Language.Nginx:
                 case SyntaxHighlighting.Language.SshConfig:

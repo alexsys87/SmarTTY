@@ -1000,6 +1000,35 @@ internal static class Program
         Equal(Join(log.Tokens(9, SyntaxHighlighting.TypeString)), "FATAL", "log: FATAL");
     }
 
+    private static void KconfigChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/build/.config"), L.Kconfig, "the .config of a kernel or OpenWrt build");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/linux/Kconfig"), L.Kconfig, "Kconfig");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/linux/init/Kconfig.debug"), L.Kconfig, "Kconfig.debug");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/linux/arch/x86/configs/x86_64_defconfig"), L.Kconfig, "a defconfig");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/linux/config.in"), L.Kconfig, "config.in");
+        Equal(SyntaxHighlighting.DetectLanguage("/boot/config-6.1.0"), L.Kconfig, "the config of the running kernel");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/config"), L.Config, "a file called config elsewhere stays a config");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/foo.config"), L.Config, "a .config extension elsewhere stays a config");
+
+        Highlighted kconfig = new Highlighted(L.Kconfig,
+            "config NET\n\tbool \"Networking\"\n\tdefault y\n\tdepends on NET\nmenu \"Drivers\"\nendmenu\nhelp\n\tSay Y here.\n# CONFIG_X is not set\nsource $(ARCH)/Kconfig");
+        Equal(Join(kconfig.Tokens(0, SyntaxHighlighting.TypeKeyword)), "config", "Kconfig: config");
+        Equal(Join(kconfig.Tokens(1, SyntaxHighlighting.TypeKeyword)), "bool", "Kconfig: a type");
+        Equal(Join(kconfig.Tokens(2, SyntaxHighlighting.TypeKeyword)), "default|y", "Kconfig: default and its value");
+        Equal(Join(kconfig.Tokens(3, SyntaxHighlighting.TypeKeyword)), "depends|on", "Kconfig: depends on");
+        Equal(Join(kconfig.Tokens(4, SyntaxHighlighting.TypeKeyword)), "menu", "Kconfig: menu");
+        Equal(Join(kconfig.Tokens(5, SyntaxHighlighting.TypeKeyword)), "endmenu", "Kconfig: a directive that stands alone");
+        Equal(Join(kconfig.Tokens(6, SyntaxHighlighting.TypeKeyword)), "help", "Kconfig: help");
+        Equal(Join(kconfig.Tokens(7, SyntaxHighlighting.TypeVariable)), "", "Kconfig: the help text is prose");
+        Equal(Join(kconfig.Tokens(8, SyntaxHighlighting.TypeComment)), "# CONFIG_X is not set", "Kconfig: comment");
+        Equal(Join(kconfig.Tokens(9, SyntaxHighlighting.TypeKeyword)), "source", "Kconfig: source");
+        Equal(Join(kconfig.Tokens(9, SyntaxHighlighting.TypeVariable)), "$(ARCH)", "Kconfig: a $(NAME) reference");
+        Check(SyntaxHighlighting.GetKeywords(L.Kconfig).Contains("menuconfig"), "Kconfig keywords contain 'menuconfig'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kconfig).Contains("depends"), "Kconfig keywords contain 'depends'");
+        Equal(Join(CommentStyle.ForLanguage(L.Kconfig).Toggle(new[] { "config NET" })), "# config NET", "Kconfig comment");
+    }
+
     private static void FoldChecks()
     {
         // Bash: then...fi, do...done, case...esac, function bodies.
@@ -1371,6 +1400,7 @@ internal static class Program
             OpenWrtDetectionChecks();
             AdminFormatDetectionChecks();
         AdminFormatTokenChecks();
+        KconfigChecks();
         FoldChecks();
             PythonChecks();
             CppChecks();
