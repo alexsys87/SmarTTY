@@ -87,13 +87,14 @@ namespace SmarTTY.CodeEditing
             Vhdl,    // VHDL: -- comments, case-insensitive keywords
             Kconfig,  // Kconfig and .config: the colors of Config, the Kconfig directives are keywords
             UBoot,   // U-Boot env files and scripts: shell-like words and $variables
-            Yocto    // Yocto/BitBake recipes: the colors of Config, the BitBake variables and tasks are keywords
+            Yocto,   // Yocto/BitBake recipes: the colors of Config, the BitBake variables and tasks are keywords
+            LinkerScript // GNU ld scripts: C-like comments, the commands of the linker are keywords
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
-            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.Lua, Language.Makefile, Language.Json, Language.Config,
+            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
             Language.Systemd, Language.Nginx, Language.SshConfig, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
@@ -115,6 +116,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Kconfig: return "Kconfig (kernel, OpenWrt)";
                 case Language.UBoot: return "U-Boot (env, scripts)";
                 case Language.Yocto: return "Yocto (BitBake recipe)";
+                case Language.LinkerScript: return "Linker script (ld)";
                 case Language.Lua: return "Lua";
                 case Language.Makefile: return "Makefile";
                 case Language.Json: return "JSON";
@@ -436,6 +438,13 @@ namespace SmarTTY.CodeEditing
                 return Language.Plain;
             }
 
+            // The linker scripts that the kernel and U-Boot preprocess: vmlinux.lds.S, u-boot.lds.S, foo.ld.in.
+            if (name.EndsWith(".lds.s", StringComparison.Ordinal) || name.EndsWith(".lds.in", StringComparison.Ordinal) ||
+                name.EndsWith(".ld.in", StringComparison.Ordinal))
+            {
+                return Language.LinkerScript;
+            }
+
             switch (name.Substring(dot + 1))
             {
                 case "py":
@@ -479,6 +488,10 @@ namespace SmarTTY.CodeEditing
                 case "bbappend":
                 case "bbclass":
                     return Language.Yocto;
+
+                case "ld":
+                case "lds":
+                    return Language.LinkerScript;
 
                 case "service":
                 case "socket":
@@ -845,6 +858,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Kconfig: return KconfigTokenizer;
                 case Language.UBoot: return UBootTokenizer;
                 case Language.Yocto: return YoctoTokenizer;
+                case Language.LinkerScript: return LinkerScriptTokenizer;
                 case Language.Yaml: return TokenizeYaml;
                 case Language.Systemd: return SystemdTokenizer;
                 case Language.Nginx: return NginxTokenizer;
@@ -954,6 +968,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(UBootKeywords);
                 case Language.Yocto:
                     return Combine(YoctoDirectives);
+                case Language.LinkerScript:
+                    return Combine(LinkerKeywords);
                 case Language.Systemd:
                     return Combine(SystemdDirectives, SystemdSectionNames, SystemdValues, ConfigConstants);
                 case Language.Nginx:

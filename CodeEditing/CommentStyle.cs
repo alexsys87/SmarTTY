@@ -59,6 +59,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.DeviceTree:
                     return new CommentStyle("// ");
                 case SyntaxHighlighting.Language.Css:
+                case SyntaxHighlighting.Language.LinkerScript:
                     return new CommentStyle("/* ", " */");
                 case SyntaxHighlighting.Language.Sql:
                 case SyntaxHighlighting.Language.Vhdl:

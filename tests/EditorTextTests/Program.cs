@@ -1078,6 +1078,28 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Yocto).Toggle(new[] { "SUMMARY = \"x\"" })), "# SUMMARY = \"x\"", "Yocto comment");
     }
 
+    private static void LinkerScriptChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/src/boot/linker.ld"), L.LinkerScript, "a linker script");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/u-boot/u-boot.lds"), L.LinkerScript, "a .lds script");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/linux/arch/riscv/kernel/vmlinux.lds.S"), L.LinkerScript, "a preprocessed .lds.S script");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/board/board.ld.in"), L.LinkerScript, "a .ld.in template");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/main.s"), L.Assembly, ".s stays assembly");
+
+        Highlighted linker = new Highlighted(L.LinkerScript,
+            "OUTPUT_FORMAT(\"elf64-littleriscv\")\nENTRY(_start)\nSECTIONS\n{\n  . = 0x80000000;\n  .text : { *(.text*) }\n  /* comment */\n  .data : AT(ADDR(.text) + SIZEOF(.text)) { *(.data*) }\n}");
+        Equal(Join(linker.Tokens(0, SyntaxHighlighting.TypeKeyword)), "OUTPUT_FORMAT", "linker: OUTPUT_FORMAT");
+        Equal(Join(linker.Tokens(0, SyntaxHighlighting.TypeString)), "\"elf64-littleriscv\"", "linker: a quoted format");
+        Equal(Join(linker.Tokens(1, SyntaxHighlighting.TypeKeyword)), "ENTRY", "linker: ENTRY");
+        Equal(Join(linker.Tokens(2, SyntaxHighlighting.TypeKeyword)), "SECTIONS", "linker: SECTIONS");
+        Equal(Join(linker.Tokens(4, SyntaxHighlighting.TypeNumber)), "0x80000000", "linker: an address");
+        Equal(Join(linker.Tokens(6, SyntaxHighlighting.TypeComment)), "/* comment */", "linker: a block comment");
+        Equal(Join(linker.Tokens(7, SyntaxHighlighting.TypeKeyword)), "AT|ADDR|SIZEOF", "linker: commands in an expression");
+        Check(SyntaxHighlighting.GetKeywords(L.LinkerScript).Contains("SECTIONS"), "linker keywords contain 'SECTIONS'");
+        Check(SyntaxHighlighting.GetKeywords(L.LinkerScript).Contains("SIZEOF"), "linker keywords contain 'SIZEOF'");
+        Equal(Join(CommentStyle.ForLanguage(L.LinkerScript).Toggle(new[] { "ENTRY(_start)" })), "/* ENTRY(_start) */", "linker comment");
+    }
+
     private static void FoldChecks()
     {
         // Bash: then...fi, do...done, case...esac, function bodies.
@@ -1452,6 +1474,7 @@ internal static class Program
         KconfigChecks();
         UBootChecks();
         YoctoChecks();
+        LinkerScriptChecks();
         FoldChecks();
             PythonChecks();
             CppChecks();
