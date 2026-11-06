@@ -14,6 +14,7 @@
     <Compile Include="../../CodeEditing/TokenCache.cs" Link="TokenCache.cs" />
     <Compile Include="../../CodeEditing/SyntaxHighlighting.cs" Link="SyntaxHighlighting.cs" />
     <Compile Include="../../CodeEditing/SyntaxHighlighting.AdminFormats.cs" Link="SyntaxHighlighting.AdminFormats.cs" />
+    <Compile Include="../../CodeEditing/SyntaxHighlighting.LinuxFormats.cs" Link="SyntaxHighlighting.LinuxFormats.cs" />
     <Compile Include="../../Completion/ISuggestion.cs" Link="ISuggestion.cs" />
     <Compile Include="../../Completion/SuggestionFilter.cs" Link="SuggestionFilter.cs" />
     <Compile Include="../../Completion/EditorCompletionSource.cs" Link="EditorCompletionSource.cs" />
