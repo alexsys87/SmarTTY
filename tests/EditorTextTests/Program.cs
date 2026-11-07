@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.SystemdNetworkd, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.SystemdNetworkd, L.Kubernetes, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -934,6 +934,7 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.HAProxy) != null, "# comments in HAProxy files");
         Check(CommentStyle.ForLanguage(L.ApacheHttpd) != null, "# comments in Apache files");
         Check(CommentStyle.ForLanguage(L.SystemdNetworkd) != null, "# comments in systemd-networkd files");
+        Check(CommentStyle.ForLanguage(L.Kubernetes) != null, "# comments in Kubernetes YAML");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1251,6 +1252,47 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("DHCP"), "networkd keywords contain 'DHCP'");
         Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("PreferredLifetime"), "networkd keywords contain 'PreferredLifetime'");
         Equal(Join(CommentStyle.ForLanguage(L.SystemdNetworkd).Toggle(new[] { "DHCP=ipv4" })), "# DHCP=ipv4", "networkd comment");
+    }
+
+    private static void KubernetesChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/kubernetes/service.yml"), L.Kubernetes, "a manifest under /kubernetes/");
+        Equal(SyntaxHighlighting.DetectLanguage("/opt/app/manifests/configmap.yaml"), L.Kubernetes, "a manifest under /manifests/");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/charts/web/templates/deployment.yaml"), L.Kubernetes, "a Helm template");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/charts/web/Chart.yaml"), L.Kubernetes, "the metadata of a Helm chart");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/charts/web/values.yaml"), L.Kubernetes, "the values of a Helm chart");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/kustomization.yaml"), L.Kubernetes, "a kustomization");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/deployment.yaml"), L.Kubernetes, "a deployment by its name");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/notes.yaml"), L.Yaml, "an ordinary .yaml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/site.yml"), L.Yaml, "an ordinary .yml stays YAML");
+
+        Highlighted manifest = new Highlighted(L.Kubernetes,
+            "# web\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  labels:\n    app: web\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - name: web\n        image: nginx:1.25\n        ports:\n        - containerPort: 80\n        env:\n        - name: MODE\n          value: \"prod\"\n{{- include \"web.labels\" . | nindent 4 }}");
+        Equal(Join(manifest.Tokens(0, SyntaxHighlighting.TypeComment)), "# web", "Kubernetes: a comment");
+        Equal(Join(manifest.Tokens(1, SyntaxHighlighting.TypeKeyword)), "apiVersion|v1", "Kubernetes: apiVersion and the version");
+        Equal(Join(manifest.Tokens(2, SyntaxHighlighting.TypeKeyword)), "kind|Deployment", "Kubernetes: the kind");
+        Equal(Join(manifest.Tokens(3, SyntaxHighlighting.TypeKeyword)), "metadata", "Kubernetes: metadata");
+        Equal(Join(manifest.Tokens(4, SyntaxHighlighting.TypeKeyword)), "name", "Kubernetes: a name");
+        Equal(Join(manifest.Tokens(6, SyntaxHighlighting.TypeVariable)), "app", "Kubernetes: an unknown key stays an ordinary key");
+        Equal(Join(manifest.Tokens(7, SyntaxHighlighting.TypeKeyword)), "spec", "Kubernetes: spec");
+        Equal(Join(manifest.Tokens(8, SyntaxHighlighting.TypeKeyword)), "replicas", "Kubernetes: replicas");
+        Equal(Join(manifest.Tokens(8, SyntaxHighlighting.TypeNumber)), "3", "Kubernetes: the number of replicas");
+        Equal(Join(manifest.Tokens(10, SyntaxHighlighting.TypeKeyword)), "matchLabels", "Kubernetes: matchLabels");
+        Equal(Join(manifest.Tokens(17, SyntaxHighlighting.TypeKeyword)), "containers", "Kubernetes: containers");
+        Equal(Join(manifest.Tokens(18, SyntaxHighlighting.TypeKeyword)), "name", "Kubernetes: a container name");
+        Equal(Join(manifest.Tokens(19, SyntaxHighlighting.TypeKeyword)), "image", "Kubernetes: image");
+        Equal(Join(manifest.Tokens(19, SyntaxHighlighting.TypeNumber)), "1.25", "Kubernetes: the tag of the image");
+        Equal(Join(manifest.Tokens(21, SyntaxHighlighting.TypeKeyword)), "containerPort", "Kubernetes: containerPort");
+        Equal(Join(manifest.Tokens(21, SyntaxHighlighting.TypeNumber)), "80", "Kubernetes: the port");
+        Equal(Join(manifest.Tokens(24, SyntaxHighlighting.TypeKeyword)), "value", "Kubernetes: value");
+        Equal(Join(manifest.Tokens(24, SyntaxHighlighting.TypeString)), "\"prod\"", "Kubernetes: a quoted value");
+        Equal(Join(manifest.Tokens(25, SyntaxHighlighting.TypeKeyword)), "include|nindent", "Kubernetes: the Helm template functions");
+        Equal(Join(manifest.Tokens(25, SyntaxHighlighting.TypeString)), "\"web.labels\"", "Kubernetes: the name of the template");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("apiVersion"), "Kubernetes keywords contain 'apiVersion'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("containers"), "Kubernetes keywords contain 'containers'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("Deployment"), "Kubernetes keywords contain 'Deployment'");
+        Equal(Join(CommentStyle.ForLanguage(L.Kubernetes).Toggle(new[] { "kind: Deployment" })), "# kind: Deployment", "Kubernetes comment");
     }
 
     private static void KconfigChecks()
@@ -1732,6 +1774,7 @@ internal static class Program
         HAProxyChecks();
         ApacheChecks();
         SystemdNetworkdChecks();
+        KubernetesChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();
