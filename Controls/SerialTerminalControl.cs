@@ -251,9 +251,11 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 }
                 else if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
                 {
-                    // Local filesystem paths
-                    _itemsDirectory = GetPathListingDirectory(filterText);
-                    itemsList.AddRange(GetLocalPaths(filterText, _target == CompletionTarget.Directory));
+                    // The files are on the device: its shell lists them (the folder of this program used to be offered).
+                    _itemsDirectory = GetDeviceDirectoryPrefix(tokenText);
+                    _items = itemsList;
+                    RequestDeviceListing(_itemsDirectory);
+                    return;
                 }
 
                 _items = itemsList;
@@ -308,17 +310,10 @@ public class SerialTerminalControl : TerminalEmulatorControl
             // token points into; when it changed we must re-enumerate.
             if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
             {
-                string directory = GetPathListingDirectory(extracted.Trim('\'', '"'));
-                if (!string.Equals(directory, _itemsDirectory, StringComparison.OrdinalIgnoreCase))
+                string directory = GetDeviceDirectoryPrefix(extracted);
+                if (!string.Equals(directory, _itemsDirectory, StringComparison.Ordinal))
                 {
-                    if (directory.Length == 0)
-                    {
-                        _items = new List<CompletionItem>();
-                    }
-                    else
-                    {
-                        LoadItems();
-                    }
+                    LoadItems();
                 }
             }
 
@@ -328,40 +323,88 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         private static readonly char[] CompletionMetaChars = { '`', '$', '<', '>', '|', '&', ';' };
 
-        // Resolves the directory (with trailing separator) whose children would
-        // be listed for the given path filter - mirrors GetLocalPaths so the
-        // live-sync can detect when the listing context changed.
-        private static string GetPathListingDirectory(string filter)
+        // The directory part of a path word as the shell reads it ("/etc/", "my dir/", "~/"), up to and with its last
+        // slash; empty when the word names something in the shell's own directory.
+        private static string GetDeviceDirectoryPrefix(string word)
         {
-            string path = filter;
-            if (path.StartsWith("~"))
-            {
-                path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + path.Substring(1);
-            }
+            string path = ShellCommandLine.Unquote(word ?? "");
+            int lastSlash = path.LastIndexOf('/');
+            return lastSlash >= 0 ? path.Substring(0, lastSlash + 1) : "";
+        }
 
-            int lastSlash = Math.Max(path.LastIndexOf('/'), path.LastIndexOf('\\'));
-            string directory = lastSlash >= 0
-                ? path.Substring(0, lastSlash + 1)
-                : Environment.CurrentDirectory + Path.DirectorySeparatorChar;
-
-            if (!Directory.Exists(directory))
+        // The prefix of the names that matches the word: what follows its last slash.
+        private string GetItemFilter()
+        {
+            string tokenText = GetTokenText();
+            if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
             {
-                // Try to find parent directory
-                DirectoryInfo di = new DirectoryInfo(directory);
-                while (di != null && !di.Exists)
-                {
-                    di = di.Parent;
-                }
-                if (di != null)
-                {
-                    directory = di.FullName + Path.DirectorySeparatorChar;
-                }
-                else
-                {
-                    return "";
-                }
+                string path = ShellCommandLine.Unquote(tokenText);
+                return path.Substring(path.LastIndexOf('/') + 1);
             }
-            return directory;
+            return tokenText.Trim('\'', '"');
+        }
+
+        // Each listing request gets a number: the answer to an older one (the word moved to another directory
+        // meanwhile) is dropped.
+        private int _listingGeneration;
+        private bool _disposed;
+
+        private void RequestDeviceListing(string directory)
+        {
+            int generation = ++_listingGeneration;
+            bool directoriesOnly = _target == CompletionTarget.Directory;
+            DeviceDirectoryListerHandler lister = _terminal.DeviceDirectoryLister;
+            bool started = lister != null && _terminal.CanListDeviceDirectory && lister(directory, entries =>
+            {
+                if (_disposed || generation != _listingGeneration)
+                {
+                    return;
+                }
+                _items = BuildPathItems(directory, entries, directoriesOnly);
+                OnItemsLoaded();
+            });
+            if (!started)
+            {
+                // No shell to ask (a bootloader, a password prompt, characters echoed to the device as they are typed):
+                // nothing is offered rather than files of this computer.
+                _items = new List<CompletionItem>();
+                _terminal.BeginInvoke((Action)(() =>
+                {
+                    if (!_disposed && generation == _listingGeneration)
+                    {
+                        UpdatePopup();
+                    }
+                }));
+            }
+        }
+
+        private static List<CompletionItem> BuildPathItems(string directory, IReadOnlyList<DeviceDirectoryEntry> entries, bool directoriesOnly)
+        {
+            List<CompletionItem> items = new List<CompletionItem>();
+            if (entries == null)
+            {
+                return items;
+            }
+            // Directories first, then files, each sorted by name.
+            foreach (DeviceDirectoryEntry entry in entries
+                .Where(e => e.IsDirectory || !directoriesOnly)
+                .OrderBy(e => e.IsDirectory ? 0 : 1)
+                .ThenBy(e => e.Name, StringComparer.Ordinal))
+            {
+                string fullPath = directory + entry.Name;
+                items.Add(new CompletionItem
+                {
+                    Icon = entry.IsDirectory ? VirtualTerminalPopupItemIcon.Directory : VirtualTerminalPopupItemIcon.File,
+                    Text = entry.Name,
+                    InsertText = ShellCommandLine.EscapeWord(fullPath) + (entry.IsDirectory ? "/" : ""),
+                    Summary = new VirtualTerminalPopupSummary.FileOrDirectoryInfo
+                    {
+                        FullPath = fullPath,
+                        IsDirectory = entry.IsDirectory
+                    }
+                });
+            }
+            return items;
         }
 
         private static bool ContainsUnescapedSpace(string text)
@@ -478,129 +521,11 @@ public class SerialTerminalControl : TerminalEmulatorControl
             }
         }
 
-        private IEnumerable<CompletionItem> GetLocalPaths(string filter, bool directoriesOnly)
-        {
-            string path = filter;
-            string directory;
-            string prefix;
-
-            // Handle relative paths
-            if (path.StartsWith("~"))
-            {
-                path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + path.Substring(1);
-            }
-
-            int lastSlash = Math.Max(path.LastIndexOf('/'), path.LastIndexOf('\\'));
-            if (lastSlash >= 0)
-            {
-                directory = path.Substring(0, lastSlash + 1);
-                prefix = path.Substring(lastSlash + 1);
-            }
-            else
-            {
-                directory = Environment.CurrentDirectory + Path.DirectorySeparatorChar;
-                prefix = path;
-            }
-
-            if (!Directory.Exists(directory))
-            {
-                // Try to find parent directory
-                DirectoryInfo di = new DirectoryInfo(directory);
-                while (di != null && !di.Exists)
-                {
-                    di = di.Parent;
-                }
-                if (di != null)
-                {
-                    directory = di.FullName + Path.DirectorySeparatorChar;
-                }
-                else
-                {
-                    yield break;
-                }
-            }
-
-            if (directoriesOnly)
-            {
-                foreach (string dir in EnumerateDirectoriesSafe(directory))
-                {
-                    string name = Path.GetFileName(dir);
-                    if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        yield return new CompletionItem
-                        {
-                            Icon = VirtualTerminalPopupItemIcon.Directory,
-                            Text = name,
-                            InsertText = name + Path.DirectorySeparatorChar,
-                            Summary = new VirtualTerminalPopupSummary.FileOrDirectoryInfo
-                            {
-                                FullPath = dir,
-                                IsDirectory = true
-                            }
-                        };
-                    }
-                }
-            }
-            else
-            {
-                // Directories first
-                foreach (string dir in EnumerateDirectoriesSafe(directory))
-                {
-                    string name = Path.GetFileName(dir);
-                    if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        yield return new CompletionItem
-                        {
-                            Icon = VirtualTerminalPopupItemIcon.Directory,
-                            Text = name,
-                            InsertText = name + Path.DirectorySeparatorChar,
-                            Summary = new VirtualTerminalPopupSummary.FileOrDirectoryInfo
-                            {
-                                FullPath = dir,
-                                IsDirectory = true
-                            }
-                        };
-                    }
-                }
-                // Then files
-                foreach (string file in EnumerateFilesSafe(directory))
-                {
-                    string name = Path.GetFileName(file);
-                    if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        yield return new CompletionItem
-                        {
-                            Icon = VirtualTerminalPopupItemIcon.File,
-                            Text = name,
-                            InsertText = name,
-                            Summary = new VirtualTerminalPopupSummary.FileOrDirectoryInfo
-                            {
-                                FullPath = file,
-                                IsDirectory = false
-                            }
-                        };
-                    }
-                }
-            }
-        }
-
         private static IEnumerable<string> EnumerateFilesSafe(string directory)
         {
             try
             {
                 return Directory.GetFiles(directory);
-            }
-            catch
-            {
-                return new string[0];
-            }
-        }
-
-        private static IEnumerable<string> EnumerateDirectoriesSafe(string directory)
-        {
-            try
-            {
-                return Directory.GetDirectories(directory);
             }
             catch
             {
@@ -619,10 +544,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         private void UpdatePopup()
         {
-            if (_items == null) return;
+            if (_items == null || _disposed) return;
 
-            string tokenText = GetTokenText();
-            string filter = tokenText.Trim('\'', '"');
+            string filter = GetItemFilter();
 
             var filtered = _items.Where(item => item.Text.StartsWith(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
             _popup.SetItemList(filtered);
@@ -631,8 +555,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         private void ApplyBestMatch()
         {
-            string tokenText = GetTokenText();
-            string filter = tokenText.Trim('\'', '"');
+            if (_items == null) return;
+            string filter = GetItemFilter();
 
             var matches = _items.Where(item => item.Text.StartsWith(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
             if (matches.Length == 1)
@@ -648,7 +572,11 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 }
                 if (common.Length > 0 && common != filter)
                 {
-                    ApplyItem(new CompletionItem { Text = common, InsertText = common }, commit: false);
+                    // A path keeps the directory part of the word in front of the common start of the names.
+                    string insertText = (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
+                        ? ShellCommandLine.EscapeWord(_itemsDirectory + common)
+                        : common;
+                    ApplyItem(new CompletionItem { Text = common, InsertText = insertText }, commit: false);
                 }
             }
         }
@@ -676,12 +604,13 @@ public class SerialTerminalControl : TerminalEmulatorControl
             if (item.InsertText == null) return;
 
             string insertText = item.InsertText;
-            bool isDir = insertText.EndsWith(Path.DirectorySeparatorChar.ToString());
+            // Paths are the device's: its separator is "/" (the one of Windows used to be put in).
+            bool isDir = insertText.EndsWith("/", StringComparison.Ordinal);
 
             if (isDir)
             {
-                if (suffix == Path.DirectorySeparatorChar.ToString()) suffix = "";
-                else if (commit) insertText = insertText.TrimEnd(Path.DirectorySeparatorChar);
+                if (suffix == "/") suffix = "";
+                else if (commit) insertText = insertText.TrimEnd('/');
             }
 
             string newText = _commandText.Substring(0, _tokenStart) + insertText + _commandText.Substring(_tokenEnd) + suffix;
@@ -700,9 +629,27 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         public void Dispose()
         {
+            _disposed = true;
             _popup?.Close();
         }
     }
+
+    /// <summary>
+    /// Lists <c>directory</c> (the directory part of the word, as typed; empty for the shell's own directory) on the device and calls
+    /// <c>done</c> on the UI thread with the names, or with null when the device did not answer. False when no listing could be started.
+    /// </summary>
+    public delegate bool DeviceDirectoryListerHandler(string directory, Action<IReadOnlyList<DeviceDirectoryEntry>> done);
+
+    /// <summary>Set by the device terminal: asks the shell of the device for the names that the path completion offers.</summary>
+    public DeviceDirectoryListerHandler DeviceDirectoryLister { get; set; }
+
+    /// <summary>
+    /// True when the shell of the device can be asked for a listing now: a Linux shell prompt is shown with the input
+    /// line, and nothing typed has gone to the device yet (with "Echo typed characters" the device holds a part of the
+    /// line, which the listing command would be appended to).
+    /// </summary>
+    internal bool CanListDeviceDirectory => _inputLine != null && _shellPromptSeen && !_localEcho
+        && !LineInputText.LooksLikeSecretPrompt(_inputLine.Prompt);
 
     private LocalCompletionSession _completionSession;
     private ICompletionPopup _completionPopup;
@@ -1166,6 +1113,29 @@ public class SerialTerminalControl : TerminalEmulatorControl
         SetCaret(GetCaretPositionFromInputIndex(_inputLine.CaretIndex));
     }
 
+    /// <summary>
+    /// Takes the caret of the screen into the input line. The arrow keys, Home/End and a mouse click move only the caret
+    /// of the screen, so a paste, a quick command or the completion used the place of the last typed character instead
+    /// of the one the caret shows (the smart terminal reads its caret from the screen as well).
+    /// </summary>
+    private void SyncInputCaretFromScreen()
+    {
+        if (_inputLine == null || _visibleColumns <= 0) return;
+
+        TextDocument.TextPosition caret = CaretPosition;
+        string fullText = _inputLine.Prompt + _inputLine.Text;
+        int line = caret.Line - _inputLine.StartLine;
+        int lines = Math.Max(1, (fullText.Length + _visibleColumns - 1) / _visibleColumns);
+        if (line < 0 || line > lines)
+        {
+            // The caret is not in the input block (the text above was being selected): the input line keeps its own.
+            return;
+        }
+        int fullIndex = line * _visibleColumns + Math.Max(0, caret.Column);
+        int inputIndex = fullIndex - _inputLine.Prompt.Length;
+        _inputLine.SetCaretIndex(Math.Min(Math.Max(inputIndex, 0), _inputLine.Text.Length));
+    }
+
     // ----------------------------------------------------------------------
     // §3.3 ReplaceText routing. Every edit that lands inside the input area is
     // routed through ReplaceInputLineText so an open completion (session +
@@ -1371,6 +1341,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
             CloseCompletion();
         }
 
+        SyncInputCaretFromScreen();
         string text = _inputLine.Text;
         int caretIndex = _inputLine.CaretIndex;
 
@@ -1516,6 +1487,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
             }
             return;
         }
+
+        // Typing goes where the caret is shown, after the arrows or a click moved it.
+        SyncInputCaretFromScreen();
 
         // Handle printable characters
         if (!char.IsControl(e.KeyChar))
@@ -1913,6 +1887,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
         // The command continues from the text that a history search shows now.
         _historySearch = null;
+        SyncInputCaretFromScreen();
         ReplaceInputLineText(_inputLine.CaretIndex, 0, text);
         UpdateCaretFromInputLine();
         // Like a pasted text: with "Echo typed characters" the device gets the characters as they are put in.
@@ -1943,6 +1918,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
             text = text != null ? PasteGuard.FitToEncoding(text, InputEncoding, AppSettings, this) : null;
             if (_inputLine != null && !string.IsNullOrEmpty(text))
             {
+                SyncInputCaretFromScreen();
                 int offset = _inputLine.CaretIndex;
                 var run = new System.Text.StringBuilder();
                 foreach (char ch in text)

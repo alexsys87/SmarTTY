@@ -866,6 +866,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.KeyDown += OnTerminalKeyDown;
         _serialTerminalControl.CompletionPopupRequested += OnSerialCompletionPopupRequested;
         _serialTerminalControl.OpenFileRequested += OnSerialOpenFileRequested;
+        InitializeDeviceListing();
         // The status line shows what the terminal is doing (at its prompt, a full-screen program), so it has to be
         // told when that changes.
         _serialTerminalControl.InputLineStateChanged += (sender, args) => RefreshStatusIfChanged();
@@ -1510,6 +1511,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
         {
             text = text.Replace("\n", "\r\n");
         }
+        // The answer to a directory listing of the path completion is not shown.
+        text = FilterDeviceListing(text);
+        if (text.Length == 0)
+        {
+            return;
+        }
         _serialTerminalControl.OnDataReceived(text);
     }
 
@@ -1827,6 +1834,10 @@ public partial class DeviceTerminalControl : DpiAwareControl
         if (RedirectToNetconsoleLine(buffer, inputKind))
         {
             return; // line mode: the text goes into the input box below the terminal
+        }
+        if (HoldInputDuringListing(buffer))
+        {
+            return; // the shell is answering a listing of the path completion; sent when it is done
         }
         if (_asyncTransportConnection != null)
         {

@@ -29,6 +29,9 @@ jobs:
       - name: Run COM/TCP command history checks
         run: dotnet run --project tests/DeviceLineInputTests -c Release
 
+      - name: Run COM/TCP path completion listing checks
+        run: dotnet run --project tests/DeviceDirectoryListingTests -c Release
+
       - name: Run automatic reconnect delay checks
         run: dotnet run --project tests/AutoReconnectPolicyTests -c Release
 
