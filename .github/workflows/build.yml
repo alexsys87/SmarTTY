@@ -103,6 +103,9 @@ jobs:
       - name: Run COM/TCP terminal state checks (prompt and full-screen program in the status bar)
         run: dotnet run --project tests/DeviceTerminalStateTests -c Release
 
+      - name: Run device terminal link checks (network paths are no links, painting never waits for the disk)
+        run: dotnet run --project tests/LocalLinkTests -c Release
+
       - name: Run transport write failure checks
         run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
 
