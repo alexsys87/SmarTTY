@@ -91,14 +91,15 @@ namespace SmarTTY.CodeEditing
             LinkerScript, // GNU ld scripts: C-like comments, the commands of the linker are keywords
             Crontab, // cron/crontab: schedule fields, @reboot, environment assignments and comments
             Fstab,   // /etc/fstab: device, mount point, filesystem, options, dump and pass
-            Sudoers  // sudoers: aliases, Defaults, tags (NOPASSWD), users, hosts and commands
+            Sudoers, // sudoers: aliases, Defaults, tags (NOPASSWD), users, hosts and commands
+            PostgreSql // postgresql.conf, pg_hba.conf: the colors of Config with the PostgreSQL settings and keywords
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -130,6 +131,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Crontab: return "crontab";
                 case Language.Fstab: return "fstab (/etc/fstab)";
                 case Language.Sudoers: return "sudoers";
+                case Language.PostgreSql: return "PostgreSQL config";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
@@ -395,6 +397,12 @@ namespace SmarTTY.CodeEditing
 
                 case "sudoers":
                     return Language.Sudoers;
+
+                case "postgresql.conf":
+                case "postgresql.auto.conf":
+                case "pg_hba.conf":
+                case "pg_ident.conf":
+                    return Language.PostgreSql;
 
                 case ".config":
                 case "kconfig":
@@ -891,6 +899,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Crontab: return TokenizeCrontab;
                 case Language.Fstab: return TokenizeFstab;
                 case Language.Sudoers: return TokenizeSudoers;
+                case Language.PostgreSql: return TokenizePostgreSql;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -1010,6 +1019,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(FstabTypes, FstabOptions);
                 case Language.Sudoers:
                     return Combine(SudoersDirectives, SudoersValues);
+                case Language.PostgreSql:
+                    return Combine(PostgreSqlDirectives, PostgreSqlValues);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:

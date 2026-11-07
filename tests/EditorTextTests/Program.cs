@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.PostgreSql, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -929,6 +929,7 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.Crontab) != null, "# comments in crontab files");
         Check(CommentStyle.ForLanguage(L.Fstab) != null, "# comments in fstab");
         Check(CommentStyle.ForLanguage(L.Sudoers) != null, "# comments in sudoers");
+        Check(CommentStyle.ForLanguage(L.PostgreSql) != null, "# comments in PostgreSQL files");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1079,6 +1080,37 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Sudoers).Contains("NOPASSWD"), "sudoers keywords contain 'NOPASSWD'");
         Check(SyntaxHighlighting.GetKeywords(L.Sudoers).Contains("secure_path"), "sudoers keywords contain 'secure_path'");
         Equal(Join(CommentStyle.ForLanguage(L.Sudoers).Toggle(new[] { "root ALL=(ALL:ALL) ALL" })), "# root ALL=(ALL:ALL) ALL", "sudoers comment");
+    }
+
+    private static void PostgreSqlChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postgresql/16/main/postgresql.conf"), L.PostgreSql, "postgresql.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/lib/pgsql/data/pg_hba.conf"), L.PostgreSql, "pg_hba.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postgresql/16/main/pg_ident.conf"), L.PostgreSql, "pg_ident.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pg_hba.conf"), L.PostgreSql, "pg_hba.conf anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/database.conf"), L.Config, "an ordinary .conf stays a config");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/schema.sql"), L.Sql, "SQL stays SQL");
+
+        Highlighted postgres = new Highlighted(L.PostgreSql,
+            "# PostgreSQL\nlisten_addresses = '*'\nmax_connections = 100\nshared_buffers = '128MB'\nwal_level = replica\nhba_file = '/etc/postgresql/pg_hba.conf' # path\nlocal all postgres peer\nhost all all 127.0.0.1/32 scram-sha-256\nhostssl appdb app 0.0.0.0/0 md5\ninclude 'extra.conf'");
+        Equal(Join(postgres.Tokens(0, SyntaxHighlighting.TypeComment)), "# PostgreSQL", "PostgreSQL: a comment");
+        Equal(Join(postgres.Tokens(1, SyntaxHighlighting.TypeKeyword)), "listen_addresses", "PostgreSQL: listen_addresses");
+        Equal(Join(postgres.Tokens(1, SyntaxHighlighting.TypeString)), "'*'", "PostgreSQL: a quoted address");
+        Equal(Join(postgres.Tokens(2, SyntaxHighlighting.TypeKeyword)), "max_connections", "PostgreSQL: max_connections");
+        Equal(Join(postgres.Tokens(2, SyntaxHighlighting.TypeNumber)), "100", "PostgreSQL: a number");
+        Equal(Join(postgres.Tokens(3, SyntaxHighlighting.TypeKeyword)), "shared_buffers", "PostgreSQL: shared_buffers");
+        Equal(Join(postgres.Tokens(3, SyntaxHighlighting.TypeString)), "'128MB'", "PostgreSQL: a quoted size");
+        Equal(Join(postgres.Tokens(5, SyntaxHighlighting.TypeString)), "'/etc/postgresql/pg_hba.conf'", "PostgreSQL: a quoted path");
+        Equal(Join(postgres.Tokens(5, SyntaxHighlighting.TypeComment)), "# path", "PostgreSQL: a trailing comment");
+        Equal(Join(postgres.Tokens(6, SyntaxHighlighting.TypeKeyword)), "local|all|peer", "PostgreSQL: a local hba line");
+        Equal(Join(postgres.Tokens(7, SyntaxHighlighting.TypeKeyword)), "host|all|all|scram-sha-256", "PostgreSQL: a host hba line");
+        Equal(Join(postgres.Tokens(7, SyntaxHighlighting.TypeNumber)), "127.0.0.1|32", "PostgreSQL: the address and the mask");
+        Equal(Join(postgres.Tokens(8, SyntaxHighlighting.TypeKeyword)), "hostssl|md5", "PostgreSQL: hostssl with md5");
+        Equal(Join(postgres.Tokens(9, SyntaxHighlighting.TypeKeyword)), "include", "PostgreSQL: include");
+        Equal(Join(postgres.Tokens(9, SyntaxHighlighting.TypeString)), "'extra.conf'", "PostgreSQL: the included file");
+        Check(SyntaxHighlighting.GetKeywords(L.PostgreSql).Contains("listen_addresses"), "PostgreSQL keywords contain 'listen_addresses'");
+        Check(SyntaxHighlighting.GetKeywords(L.PostgreSql).Contains("scram-sha-256"), "PostgreSQL keywords contain 'scram-sha-256'");
+        Equal(Join(CommentStyle.ForLanguage(L.PostgreSql).Toggle(new[] { "max_connections = 100" })), "# max_connections = 100", "PostgreSQL comment");
     }
 
     private static void KconfigChecks()
@@ -1555,6 +1587,7 @@ internal static class Program
         CrontabChecks();
         FstabChecks();
         SudoersChecks();
+        PostgreSqlChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();

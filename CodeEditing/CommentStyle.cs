@@ -34,6 +34,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Crontab:
                 case SyntaxHighlighting.Language.Fstab:
                 case SyntaxHighlighting.Language.Sudoers:
+                case SyntaxHighlighting.Language.PostgreSql:
                 case SyntaxHighlighting.Language.Script:
                 case SyntaxHighlighting.Language.Awk:
                 case SyntaxHighlighting.Language.Tcl:
