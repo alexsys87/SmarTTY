@@ -109,6 +109,60 @@ public class SerialTerminalControl : TerminalEmulatorControl
         });
     }
 
+    private SmarTTY.Utilities.PathExistenceCache _pathExistence;
+
+    private int _pathRedrawQueued;
+
+    /// <summary>
+    /// Whether the paths in the text exist, for painting and hovering: it answers at once and checks in the background
+    /// (File.Exists on a network drive that does not answer, or on a sleeping disk, would freeze the window). The check has
+    /// a thread of its own, so a drive that hangs does not hold a thread of the pool.
+    /// </summary>
+    private SmarTTY.Utilities.PathExistenceCache PathExistence
+    {
+        get
+        {
+            if (_pathExistence == null)
+            {
+                _pathExistence = new SmarTTY.Utilities.PathExistenceCache(
+                    path => File.Exists(path) || Directory.Exists(path),
+                    work => new System.Threading.Thread(() => work()) { IsBackground = true, Name = "Local link path check" }.Start(),
+                    OnPathExistenceChanged);
+            }
+            return _pathExistence;
+        }
+    }
+
+    // Called on the thread of the check when a path turned out to exist or not (the underline of a link depends on it).
+    private void OnPathExistenceChanged()
+    {
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return;
+        }
+        // One request is enough for a burst of results.
+        if (System.Threading.Interlocked.Exchange(ref _pathRedrawQueued, 1) != 0)
+        {
+            return;
+        }
+        try
+        {
+            BeginInvoke((Action)(() =>
+            {
+                System.Threading.Interlocked.Exchange(ref _pathRedrawQueued, 0);
+                if (!IsDisposed)
+                {
+                    Redraw();
+                }
+            }));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException || ex is ObjectDisposedException)
+        {
+            // The window went away in the meantime.
+            System.Threading.Interlocked.Exchange(ref _pathRedrawQueued, 0);
+        }
+    }
+
     private bool IsLinkExtension(string extension)
     {
         string autoLinkExtensions = AppSettings?.VirtualTerminal?.AutoLinkExtensions;
@@ -2128,7 +2182,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 {
                     return false;
                 }
-                string path = ComputeTargetPath();
+                string path = TargetPath;
                 if (path == null)
                 {
                     return false;
@@ -2137,20 +2191,16 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 {
                     return true;
                 }
-                try
-                {
-                    return File.Exists(path) || Directory.Exists(path);
-                }
-                catch
-                {
-                    return false;
-                }
+                // This is asked for every piece of the line each time it is painted, and when the mouse moves over it: it must
+                // not wait for the disk. The answer is the last one that is known, the check runs in the background and the
+                // terminal is painted again when it finds a different one.
+                return _terminal.PathExistence.Exists(path);
             }
         }
 
         public void Activate()
         {
-            string path = ComputeTargetPath();
+            string path = TargetPath;
             if (path != null)
             {
                 _terminal.RequestOpenFile(path);
@@ -2164,6 +2214,29 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 path.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase);
         }
 
+        private string _targetPath;
+
+        private bool _hasTargetPath;
+
+        // The path does not change once the candidate is complete, so it is worked out once, not at every paint.
+        private string TargetPath
+        {
+            get
+            {
+                if (_hasTargetPath)
+                {
+                    return _targetPath;
+                }
+                string path = ComputeTargetPath();
+                if (State == LinkCandidateState.Position)
+                {
+                    _targetPath = path;
+                    _hasTargetPath = true;
+                }
+                return path;
+            }
+        }
+
         private string ComputeTargetPath()
         {
             try
@@ -2173,12 +2246,25 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 {
                     return path;
                 }
+                // The text comes from the device. Windows connects to the host of a network path (\\host\share, //host/share)
+                // as soon as it is asked whether the path exists, and offers the credentials of the user to that host: such a
+                // name is no link, and nothing is asked about it.
+                if (SmarTTY.Utilities.LocalLinkRules.IsNetworkOrDevicePath(path))
+                {
+                    return null;
+                }
                 bool isDosDrive = path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':';
+                string fullPath;
                 if (State == LinkCandidateState.AbsolutePath || isDosDrive)
                 {
-                    return Path.GetFullPath(path);
+                    fullPath = Path.GetFullPath(path);
                 }
-                return Path.GetFullPath(Path.Combine(_baseDirectory, path));
+                else
+                {
+                    fullPath = Path.GetFullPath(Path.Combine(_baseDirectory, path));
+                }
+                // A name that is resolved against a working directory on a network share ends up on that share as well.
+                return SmarTTY.Utilities.LocalLinkRules.IsNetworkOrDevicePath(fullPath) ? null : fullPath;
             }
             catch
             {
