@@ -466,6 +466,429 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(SudoersDirectives, startState, text, sink, out endState, valueKeywords: SudoersValues);
     }
 
+    // ----------------------------------------------------------- MySQL/MariaDB
+
+    private static readonly HashSet<string> MySqlDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // server, client and replication settings of my.cnf / my.ini
+        @"user port socket bind-address admin-address datadir basedir tmpdir pid-file plugin-dir
+          log-error log-error-verbosity log-warnings general-log general_log general-log-file general_log_file
+          slow-query-log slow_query_log slow-query-log-file slow_query_log_file long-query-time long_query_time
+          log-queries-not-using-indexes log-slow-admin-statements log-slow-replica-statements
+          max-connections max_connections max-user-connections max_user_connections max-allowed-packet max_allowed_packet
+          max-connect-errors max_connect_errors connect-timeout connect_timeout wait-timeout wait_timeout
+          interactive-timeout interactive_timeout net-read-timeout net_read_timeout net-write-timeout net_write_timeout
+          net-buffer-length net_buffer_length thread-cache-size thread_cache_size thread-stack thread_stack
+          table-open-cache table_open_cache table-definition-cache table_definition_cache open-files-limit open_files_limit
+          key-buffer-size key_buffer_size sort-buffer-size sort_buffer_size join-buffer-size join_buffer_size
+          read-buffer-size read_buffer_size read-rnd-buffer-size read_rnd_buffer_size
+          tmp-table-size tmp_table_size max-heap-table-size max_heap_table_size
+          bulk-insert-buffer-size bulk_insert_buffer_size myisam-recover-options myisam_sort_buffer_size
+          innodb-buffer-pool-size innodb_buffer_pool_size innodb-buffer-pool-instances innodb_buffer_pool_instances
+          innodb-buffer-pool-chunk-size innodb_buffer_pool_chunk_size innodb-log-buffer-size innodb_log_buffer_size
+          innodb-log-file-size innodb_log_file_size innodb-redo-log-capacity innodb_redo_log_capacity
+          innodb-flush-log-at-trx-commit innodb_flush_log_at_trx_commit innodb-flush-method innodb_flush_method
+          innodb-file-per-table innodb_file_per_table innodb-io-capacity innodb_io_capacity
+          innodb-io-capacity-max innodb_io_capacity_max innodb-read-io-threads innodb_read_io_threads
+          innodb-write-io-threads innodb_write_io_threads innodb-thread-concurrency innodb_thread_concurrency
+          innodb-lock-wait-timeout innodb_lock_wait_timeout innodb-buffer-pool-dump-at-shutdown innodb_buffer_pool_dump_at_shutdown
+          innodb-buffer-pool-load-at-startup innodb_buffer_pool_load_at_startup innodb-strict-mode innodb_strict_mode
+          innodb-autoinc-lock-mode innodb_autoinc_lock_mode innodb-page-size innodb_page_size
+          innodb-rollback-on-timeout innodb_rollback_on_timeout
+          character-set-server character_set_server collation-server collation_server
+          character-set-client character_set_client character-set-results character_set_results
+          default-storage-engine default_storage_engine default-authentication-plugin default_authentication_plugin
+          authentication-policy authentication_policy
+          skip-name-resolve skip-networking skip-grant-tables skip-external-locking skip-symbolic-links
+          bind-address secure-file-priv secure_file_priv local-infile local_infile protocol
+          server-id server_id server-id-bits server_id_bits
+          log-bin log_bin log-bin-index log_bin_index log-bin-trust-function-creators log_bin_trust_function_creators
+          binlog-format binlog_format binlog-expire-logs-seconds binlog_expire_logs_seconds expire-logs-days expire_logs_days
+          sync-binlog sync_binlog max-binlog-size max_binlog_size max-binlog-cache-size max_binlog_cache_size
+          relay-log relay_log relay-log-index relay_log_index relay-log-info-file relay_log_info_file
+          log-replica-updates log_replica_updates log-slave-updates log_slave_updates
+          replicate-do-db replicate_do_db replicate-ignore-db replicate_ignore_db
+          replicate-do-table replicate_do_table replicate-ignore-table replicate_ignore_table
+          replicate-wild-do-table replicate_wild_do_table replicate-wild-ignore-table replicate_wild_ignore_table
+          read-only read_only super-read-only super_read_only
+          auto-increment-increment auto_increment_increment auto-increment-offset auto_increment_offset
+          sql-mode sql_mode optimizer-switch optimizer_switch transaction-isolation transaction_isolation
+          lock-wait-timeout lock_wait_timeout
+          lower-case-table-names lower_case_table_names lc-messages-dir lc_messages_dir
+          event-scheduler event_scheduler performance-schema performance_schema
+          ssl-ca ssl_cert ssl_key ssl-cipher ssl_crl ssl_crlpath tls-version tls_version
+          require-secure-transport require_secure_transport
+          wsrep-on wsrep_on wsrep-provider wsrep_provider wsrep-cluster-name wsrep_cluster_name
+          wsrep-cluster-address wsrep_cluster_address wsrep-node-address wsrep_node_address wsrep-node-name wsrep_node_name
+          galera-provider-options galera_provider_options
+          super-user super_user max-seeks-for-key max_seeks_for_key
+          delayed-insert-timeout delayed_insert_timeout low-priority-updates low_priority_updates
+          concurrent-insert concurrent_insert div-precision-increment div_precision_increment
+          group-concat-max-len group_concat_max_len",
+        // the [groups] of the file
+        @"mysqld mysqld_safe mysqldump mysql client server mariadb mariadbd mariadb-client mariadb-server
+          embedded client-server client-mariadb galera mariadb-galera");
+
+    private static readonly HashSet<string> MySqlValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"innodb myisam csv memory archive blackhole ndb aria tokudb rocksdb mysql mariadb
+          row statement mixed
+          read-uncommitted read-committed repeatable-read serializable
+          latin1 utf8 utf8mb3 utf8mb4 utf16 utf16le utf32 ucs2 binary ascii
+          general_log slow_query_log
+          mysql_native_password caching_sha2_password ed25519 unix_socket
+          strict_trans_tables strict_all_tables no_zero_date no_zero_in_date
+          on off true false yes no none");
+
+    /// <summary>
+    /// MySQL/MariaDB: the colours of Config with the options of my.cnf / my.ini known, and "!include"/"!includedir"
+    /// recognised as directives of the file rather than as ordinary values.
+    /// </summary>
+    private static bool TokenizeMySql(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        endState = 0;
+        int first = SkipBlanks(text, 0);
+        if (first < text.Length && text[first] == '!')
+        {
+            int wordEnd = first + 1;
+            while (wordEnd < text.Length && IsIdChar(text[wordEnd]))
+            {
+                wordEnd++;
+            }
+            string word = text.Substring(first + 1, wordEnd - first - 1);
+            if (word == "include" || word == "includedir")
+            {
+                sink.AddToken(TypeKeyword, first, wordEnd);
+                int pathStart = SkipBlanks(text, wordEnd);
+                int pathEnd = pathStart;
+                while (pathEnd < text.Length && !IsBlank(text[pathEnd]))
+                {
+                    pathEnd++;
+                }
+                if (pathEnd > pathStart)
+                {
+                    sink.AddToken(TypeString, pathStart, pathEnd);
+                }
+                ScanCronRest(text, pathEnd, sink);
+                return true;
+            }
+        }
+        return TokenizeConfigCore(MySqlDirectives, startState, text, sink, out endState, valueKeywords: MySqlValues);
+    }
+
+    // ------------------------------------------------------------------ Redis
+
+    private static readonly HashSet<string> RedisDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        @"include loadmodule bind protected-mode port tcp-backlog unixsocket unixsocketperm timeout tcp-keepalive
+          daemonize supervised pidfile loglevel logfile syslog-enabled syslog-ident syslog-facility crash-log-enabled
+          databases always-show-logo set-proc-title proc-title-template locale-collate
+          save stop-writes-on-bgsave-error rdbcompression rdbchecksum dbfilename rdb-del-sync-files dir
+          replicaof slaveof masterauth masteruser replica-serve-stale-data replica-read-only
+          repl-diskless-sync repl-diskless-sync-delay repl-diskless-load repl-disable-tcp-nodelay replica-priority
+          min-replicas-to-write min-replicas-max-lag min-slaves-to-write min-slaves-max-lag
+          aclfile requirepass user rename-command
+          maxclients maxmemory maxmemory-policy maxmemory-samples maxmemory-clients
+          lazyfree-lazy-eviction lazyfree-lazy-expire lazyfree-lazy-server-del replica-lazy-flush lazyfree-lazy-user-del
+          lazyfree-lazy-user-flush
+          appendonly appendfilename appenddirname appendfsync no-appendfsync-on-rewrite auto-aof-rewrite-percentage
+          auto-aof-rewrite-min-size aof-load-truncated aof-use-rdb-preamble aof-timestamp-enabled
+          slowlog-log-slower-than slowlog-max-len latency-monitor-threshold latency-tracking
+          latency-tracking-info-percentiles
+          notify-keyspace-events hash-max-listpack-entries hash-max-ziplist-entries hash-max-listpack-value
+          hash-max-ziplist-value list-max-listpack-size list-max-ziplist-size list-compress-depth
+          set-max-intset-entries set-max-listpack-entries set-max-listpack-value
+          zset-max-listpack-entries zset-max-ziplist-entries zset-max-listpack-value zset-max-ziplist-value
+          hll-sparse-max-bytes stream-node-max-bytes stream-node-max-entries
+          activerehashing client-output-buffer-limit hz dynamic-hz aof-rewrite-incremental-fsync
+          rdb-save-incremental-fsync jemalloc-bg-thread activedefrag");
+
+    private static readonly HashSet<string> RedisValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"yes no always everysec debug verbose notice warning
+          noeviction allkeys-lru allkeys-lfu allkeys-random volatile-lru volatile-lfu volatile-random volatile-ttl
+          on off nopass resetpass allkeys allchannels all
+          normal slave replica master");
+
+    /// <summary>
+    /// Redis: the colours of Config with the directives of redis.conf and sentinel.conf known, and the values of the
+    /// eviction policies, appendfsync and loglevel modes coloured as keywords.
+    /// </summary>
+    private static bool TokenizeRedis(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(RedisDirectives, startState, text, sink, out endState, valueKeywords: RedisValues);
+    }
+
+    // ---------------------------------------------------------------- HAProxy
+
+    private static readonly HashSet<string> HAProxyDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // sections
+        @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward mailers",
+        // global and defaults
+        @"log log-format log-format-sd log-tag maxconn daemon user group uid gid chroot pidfile
+          stats nbproc nbthread cpu-map master-worker mworker-max-reloads expose-fd
+          mode balance hash-type server default-server default_backend bind server-template
+          timeout retries option acl use_backend
+          http-request http-response http-after-response http-check redirect
+          tcp-request tcp-response tcp-check capture cookie stick-table stick store-request store-response
+          compression filter errorfile errorloc errorloc302 errorloc303 unique-id-header unique-id-format
+          dispatch source monitor-uri external-check
+          peers peer nameserver parse-resolv-conf resolve_retries
+          userlist program command ring size format log-forward");
+
+    private static readonly HashSet<string> HAProxyValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the words a section may stand alone with, and the choices of the directives
+        @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward mailers
+          daemon master-worker
+          http tcp health
+          roundrobin static-rr leastconn first source uri url_param rdp-cookie random
+          inter fastinter downinter rise fall observe
+          connect client server queue tunnel http-request http-keep-alive
+          check ssl verify none required prefer
+          enabled disabled normal admin drain enable disable
+          on off yes no
+          local0 local1 local2 local3 local4 local5 local6 local7
+          GET POST HEAD PUT DELETE OPTIONS");
+
+    /// <summary>
+    /// HAProxy: the colours of Config with the sections (global, defaults, frontend, backend, listen, ...), the
+    /// directives and their common values known. A section name that stands alone is a keyword too.
+    /// </summary>
+    private static bool TokenizeHAProxy(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(HAProxyDirectives, startState, text, sink, out endState, valueKeywords: HAProxyValues);
+    }
+
+    // ------------------------------------------------------------ Apache httpd
+
+    private static readonly HashSet<string> ApacheDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        @"ServerRoot ServerName ServerAdmin ServerAlias ServerPath UseCanonicalName
+          Listen PidFile Mutex ScoreBoardFile Timeout KeepAlive MaxKeepAliveRequests KeepAliveTimeout
+          User Group LoadModule LoadFile
+          DocumentRoot DirectoryIndex Options AllowOverride Require Order Allow Deny
+          ErrorLog CustomLog LogLevel LogFormat TransferLog ScriptLog
+          Include IncludeOptional
+          TypesConfig AddType AddEncoding AddLanguage AddHandler AddCharset AddDefaultCharset DefaultType
+          AccessFileName SetHandler
+          Directory Files FileMatch Location LocationMatch VirtualHost IfModule IfDefine IfVersion ElseIf Else
+          Limit LimitExcept Proxy
+          ProxyRequests ProxyPass ProxyPassReverse ProxyPreserveHost ProxyTimeout ProxyBadHeader ProxyVia
+          RewriteEngine RewriteBase RewriteCond RewriteRule RewriteMap RewriteOptions
+          Header RequestHeader SetEnvIf SetEnvIfNoCase BrowserMatch
+          SSLEngine SSLProtocol SSLCipherSuite SSLCertificateFile SSLCertificateKeyFile SSLCertificateChainFile
+          SSLVerifyClient SSLVerifyDepth
+          AuthType AuthName AuthUserFile AuthGroupFile AuthBasicProvider
+          AddDefaultCharset ErrorDocument Alias ScriptAlias
+          ExtendedStatus AllowEncodedSlashes AcceptPathInfo EnableMMAP EnableSendfile
+          FileETag HostnameLookups NameVirtualHost
+          MaxRequestWorkers MaxConnectionsPerChild StartServers MinSpareThreads MaxSpareThreads ThreadsPerChild
+          ServerLimit ThreadLimit StartThreads MinSpareServers MaxSpareServers MaxClients MaxRequestsPerChild");
+
+    private static readonly HashSet<string> ApacheValues = Words(StringComparer.OrdinalIgnoreCase,
+        // choices of the directives
+        @"on off all none granted denied valid-user
+          Indexes FollowSymLinks SymLinksIfOwnerMatch ExecCGI Includes IncludesNOEXEC MultiViews
+          All None
+          emerg alert crit error warn notice info debug trace1 trace2 trace3 trace4 trace5 trace6 trace7 trace8
+          Directory Files FileMatch Location LocationMatch VirtualHost IfModule IfDefine IfVersion ElseIf Else
+          Limit LimitExcept Proxy
+          GET POST HEAD PUT DELETE OPTIONS");
+
+    /// <summary>
+    /// Apache httpd: the colours of Config with the directives of httpd.conf, apache2.conf and .htaccess known, and
+    /// the section names of &lt;Directory&gt;, &lt;VirtualHost&gt; and the other containers highlighted as words too.
+    /// </summary>
+    private static bool TokenizeApache(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(ApacheDirectives, startState, text, sink, out endState, valueKeywords: ApacheValues);
+    }
+
+    // -------------------------------------------------------- systemd-networkd
+
+    private static readonly HashSet<string> SystemdNetworkdDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        @"Name MACAddress Driver Type Kind Path Property Host Virtual
+          MACAddressPolicy NamePolicy AddressPolicy Address AlternativeName AlternativeNames
+          DHCP DHCPv4 DHCPv6 DHCPServer DHCPServerStaticLease Address Gateway DNS Domains NTP
+          LinkLocalAddressing IPv4LLRoute IPv6AcceptRA IPv6DuplicateAddressDetection IPv6PrivacyExtensions
+          IPv6SendRA IPv6Token IPv6MTUBytes IPv6StableSecretAddress IPv6LinkLocalAddressGenerationMode
+          ConfigureWithoutCarrier IgnoreCarrierLoss KeepConfiguration RequiredForOnline RequiredFamilyForOnline
+          BindCarrier VLAN Bridge Bond Tunnel VXLAN MACsec IPoIB CAN MultiqueueSRv6
+          Peer Broadcast Label PreferredLifetime ValidLifetime Scope
+          Destination Source Metric Table Protocol Type
+          ClientIdentifier VendorClassIdentifier UseDNS UseNTP UseDomains UseHostname UseRoutes RouteMetric
+          UseMTU UseGateway Token PoolOffset PoolSize EmitDNS EmitNTP EmitRouter Router EmitTimezone Timezone
+          PrefixDelegationHint
+          STP Priority ForwardDelay HelloTime MaxAge AgeingTime VLANFiltering
+          Id Mode MIIMonitorSec LACPTransmitRate UpDelaySec DownDelaySec
+          Local Remote TTL
+          RouterLifetime");
+
+    private static readonly HashSet<string> SystemdNetworkdValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"yes no on off true false ipv4 ipv6 both none static dhcp routable carrier up down any
+          promiscuous auto forever link-local global host site universe nowhere success degraded
+          stable-privacy mac random persistent onlink mtu unspecified unicast blackhole unreachable
+          prohibit throw local main default");
+
+    /// <summary>
+    /// systemd-networkd: the colours of Config with the keys of .network, .netdev and .link files known. The sections
+    /// ([Match], [Network], [Address], [Route], ...) are coloured by the Config tokenizer.
+    /// </summary>
+    private static bool TokenizeSystemdNetworkd(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(SystemdNetworkdDirectives, startState, text, sink, out endState, valueKeywords: SystemdNetworkdValues);
+    }
+
+    // -------------------------------------------------------------- Kubernetes
+
+    private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope and the metadata
+        @"apiVersion kind metadata spec status name generateName namespace labels annotations ownerReferences finalizers
+          uid resourceVersion generation creationTimestamp deletionTimestamp deletionGracePeriodSeconds managedFields
+          // the pods and their containers
+          containers initContainers ephemeralContainers image imagePullPolicy command args workingDir ports containerPort
+          hostPort hostIP protocol env envFrom prefix configMapRef secretRef value valueFrom fieldRef resourceFieldRef
+          configMapKeyRef secretKeyRef resources requests limits cpu memory hugepages volumeMounts mountPath
+          mountPropagation subPath subPathExpr readOnly volumeDevices devicePath
+          livenessProbe readinessProbe startupProbe httpGet tcpSocket grpc exec scheme host httpHeaders initialDelaySeconds
+          periodSeconds timeoutSeconds successThreshold failureThreshold terminationGracePeriodSeconds lifecycle postStart
+          preStop securityContext runAsUser runAsGroup runAsNonRoot allowPrivilegeEscalation readOnlyRootFilesystem
+          privileged capabilities add drop seccompProfile appArmorProfile fsGroup fsGroupChangePolicy supplementalGroups
+          sysctls serviceAccountName serviceAccount automountServiceAccountToken dnsPolicy dnsConfig nameservers searches
+          options nodeName nodeSelector restartPolicy terminationMessagePath terminationMessagePolicy hostNetwork hostPID
+          hostIPC shareProcessNamespace schedulerName priorityClassName priority preemptionPolicy
+          // scheduling
+          tolerations affinity nodeAffinity podAffinity podAntiAffinity requiredDuringSchedulingIgnoredDuringExecution
+          preferredDuringSchedulingIgnoredDuringExecution matchExpressions matchFields matchLabels operator values weight topologyKey
+          topologySpreadConstraints maxSkew whenUnsatisfiable labelSelector nodeSelectorTerms
+          // the volumes
+          volumes configMap secret emptyDir hostPath persistentVolumeClaim claimName storageClassName accessModes nfs server
+          iscsi targetPortal iqn lun rbd cephfs glusterfs awsElasticBlockStore gcePersistentDisk azureDisk azureFile csi
+          driver volumeAttributes projected downwardAPI serviceAccountToken expirationSeconds audience path medium sizeLimit
+          defaultMode optional items key mode
+          // the services and the ingress
+          service type clusterIP clusterIPs externalIPs loadBalancerIP loadBalancerSourceRanges externalName
+          externalTrafficPolicy internalTrafficPolicy sessionAffinity sessionAffinityConfig selector port targetPort nodePort
+          appProtocol publishNotReadyAddresses healthCheckNodePort ipFamilyPolicy ipFamilies allocateLoadBalancerNodePorts
+          ingressClassName tls hosts secretName rules http paths pathType backend serviceName servicePort resource
+          defaultBackend
+          // the workloads
+          replicas revisionHistoryLimit paused strategy rollingUpdate maxSurge maxUnavailable minReadySeconds
+          progressDeadlineSeconds template updateStrategy podManagementPolicy volumeClaimTemplates
+          persistentVolumeReclaimPolicy allowedTopologies schedule concurrencyPolicy suspend successfulJobsHistoryLimit
+          failedJobsHistoryLimit startingDeadlineSeconds completions parallelism backoffLimit activeDeadlineSeconds
+          ttlSecondsAfterFinished
+          // RBAC, autoscaling and the policies
+          apiGroups resources resourceNames verbs nonResourceURLs subjects roleRef apiGroup aggregationRule
+          clusterRoleSelectors minReplicas maxReplicas metrics scaleTargetRef behavior scaleUp scaleDown
+          stabilizationWindowSeconds policies policy podSelector policyTypes from to namespaceSelector ipBlock cidr except
+          hard minAvailable disruptionBudget
+          // custom resources
+          group scope names plural singular shortNames categories versions served storage schema openAPIV3Schema
+          properties required additionalProperties description format enum conversion webhook admissionReviewVersions
+          clientConfig caBundle
+          // Helm
+          chart apiVersion appVersion kubeVersion keywords home sources dependencies maintainers icon condition tags
+          repository alias deprecated");
+
+    private static readonly HashSet<string> KubernetesValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the kinds
+        @"Pod Deployment Service StatefulSet DaemonSet ReplicaSet Job CronJob ConfigMap Secret Ingress Namespace
+          PersistentVolume PersistentVolumeClaim ServiceAccount Role RoleBinding ClusterRole ClusterRoleBinding NetworkPolicy
+          PodDisruptionBudget HorizontalPodAutoscaler StorageClass CustomResourceDefinition ResourceQuota LimitRange
+          Endpoints EndpointSlice PriorityClass RuntimeClass CSIDriver CSINode VolumeAttachment APIService
+          // the api versions
+          v1 v1beta1 v1beta2 v2 v2beta1 v2beta2
+          // the choices of the fields
+          Always IfNotPresent Never OnFailure TCP UDP SCTP ClusterIP NodePort LoadBalancer ExternalName RollingUpdate Recreate
+          ReadWriteOnce ReadOnlyMany ReadWriteMany ReadWriteOncePod NoSchedule PreferNoSchedule NoExecute In NotIn Exists
+          DoesNotExist Gt Lt DoNotSchedule ScheduleAnyway Allow Forbid Replace ClusterFirst Default ClusterFirstWithHostNet
+          application library Delete Retain Recycle RuntimeDefault Unconfined Localhost
+          // Helm template functions
+          include template tpl required default quote squote toYaml fromYaml toJson fromJson nindent indent trim upper lower
+          title trunc replace printf range with if else end define block fail lookup semverCompare");
+
+    /// <summary>
+    /// Kubernetes and Helm: the colours and the folds of YAML with the keys of the manifests and the chart metadata
+    /// known, and the kinds, api versions and Helm template functions coloured as values.
+    /// </summary>
+    private static bool TokenizeKubernetes(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(KubernetesKeywords, KubernetesValues, startState, text, sink, out endState);
+    }
+
+    // ----------------------------------------------------------- Docker Compose
+
+    private static readonly HashSet<string> DockerComposeKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope
+        @"version name services networks volumes secrets configs
+          // the services
+          image build context dockerfile dockerfile_inline additional_contexts args target cache_from cache_to labels
+          pull network container_name command entrypoint environment env_file expose ports tmpfs network_mode hostname
+          domainname mac_address depends_on restart deploy profiles scale
+          healthcheck test interval timeout retries start_period start_interval disable
+          privileged user working_dir stdin_open tty stop_grace_period stop_signal sysctls ulimits cap_add cap_drop
+          devices dns dns_search extra_hosts group_add init isolation links logging driver options pid platform
+          read_only security_opt shm_size userns_mode extends file service
+          annotations blkio_config cgroup cgroup_parent cpu_count cpu_percent cpu_shares cpu_quota cpu_period cpuset
+          credential_spec device_cgroup_rules oom_kill_disable oom_score_adj uts
+          // the networks, the volumes and the deploy settings
+          external external_links ipam subnet gateway ip_range aux_addresses enable_ipv4 enable_ipv6 internal attachable
+          resources reservations limits cpus memory pids restart_policy condition delay max_attempts window
+          update_config parallelism failure_action monitor order rollback_config placement constraints preferences
+          endpoint_mode mode replicas node role");
+
+    private static readonly HashSet<string> DockerComposeValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"bridge host none service always unless-stopped on-failure local global replicated dnsrr vip
+          tcp udp sctp json-file syslog journald gelf fluentd awslogs splunk
+          asc desc spread stop-first start-first pause continue manager worker ingress latest");
+
+    /// <summary>
+    /// Docker Compose: the colours and the folds of YAML with the keys of the services, networks, volumes and deploy
+    /// settings known, and the choices of the drivers, policies and modes coloured as values.
+    /// </summary>
+    private static bool TokenizeDockerCompose(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(DockerComposeKeywords, DockerComposeValues, startState, text, sink, out endState);
+    }
+
+    // ------------------------------------------------------------------ Ansible
+
+    private static readonly HashSet<string> AnsibleKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the play
+        @"name hosts remote_user port connection become become_user become_method become_exe become_flags become_pass
+          gather_facts gather_subset gather_timeout fact_path vars vars_files vars_prompt roles tasks handlers pre_tasks
+          post_tasks force_handlers any_errors_fatal max_fail_percentage serial strategy order throttle run_once
+          delegate_to delegate_facts module_defaults environment collections check_mode diff no_log ignore_errors
+          ignore_unreachable tags
+          // the task
+          when loop loop_control with_items with_dict with_list with_fileglob with_together with_nested with_sequence
+          with_indexed_items with_first_found with_random_choice with_cartesian with_flattened with_subelements with_ini
+          with_inventory_hostnames with_password with_lines until retries delay register failed_when changed_when notify
+          listen block rescue always async poll
+          include_tasks import_tasks include_role import_role include_vars include import_playbook
+          // the modules
+          apt apt_key apt_repository yum yum_repository dnf rpm_key package copy template file lineinfile blockinfile
+          replace assemble fetch synchronize unarchive archive command shell script raw expect service systemd sysvinit
+          runit supervisorctl user group authorized_key git subversion hg get_url uri slurp cron at timezone mount parted
+          lvg lvol filesystem stat debug assert fail pause wait_for wait_for_connection meta set_fact local_action
+          state src dest path owner group mode content backup validate force recurse follow create regexp line
+          insertafter insertbefore marker remote_src attributes seuser serole setype selevel unsafe_writes enabled
+          docker_container docker_image docker_network docker_volume docker_compose_v2 k8s helm
+          mysql_db mysql_user mysql_query postgresql_db postgresql_user postgresql_query redis redis_info
+          pip composer npm yarn gem");
+
+    private static readonly HashSet<string> AnsibleValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the states and the choices of the play
+        @"present absent started stopped restarted reloaded latest enabled disabled mounted unmounted link file directory
+          touch yes no true false always never any all first last on_success on_failure
+          ssh local docker paramiko_ssh winrm sudo su doas pbrun pfexec runas
+          linear free host_pinned debug");
+
+    /// <summary>
+    /// Ansible: the colours and the folds of YAML with the keys of the plays, the tasks and the roles known, and the
+    /// modules (apt, copy, service, command, ...) and the common states (present, started, enabled) coloured too.
+    /// </summary>
+    private static bool TokenizeAnsible(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(AnsibleKeywords, AnsibleValues, startState, text, sink, out endState);
+    }
+
     // ------------------------------------------------------------- PostgreSQL
 
     private static readonly HashSet<string> PostgreSqlDirectives = Words(StringComparer.OrdinalIgnoreCase,

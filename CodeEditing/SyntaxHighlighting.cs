@@ -92,6 +92,14 @@ namespace SmarTTY.CodeEditing
             Crontab, // cron/crontab: schedule fields, @reboot, environment assignments and comments
             Fstab,   // /etc/fstab: device, mount point, filesystem, options, dump and pass
             Sudoers, // sudoers: aliases, Defaults, tags (NOPASSWD), users, hosts and commands
+            MySql,   // my.cnf, my.ini: the colors of Config with the MySQL/MariaDB options known
+            Redis,   // redis.conf, sentinel.conf: the colors of Config with the Redis directives known
+            HAProxy, // haproxy.cfg: the colors of Config with the sections, directives and values of HAProxy known
+            ApacheHttpd, // httpd.conf, apache2.conf, .htaccess: the colors of Config with the Apache directives known
+            SystemdNetworkd, // .network, .netdev, .link: the colors of Config with the systemd-networkd keys known
+            Kubernetes, // Kubernetes and Helm YAML: the colors of YAML with the keys of the manifests known
+            DockerCompose, // docker-compose.yml, compose.yaml: the colors of YAML with the keys of Compose known
+            Ansible, // playbooks, roles and tasks: the colors of YAML with the keys and modules of Ansible known
             PostgreSql // postgresql.conf, pg_hba.conf: the colors of Config with the PostgreSQL settings and keywords
         }
 
@@ -99,7 +107,7 @@ namespace SmarTTY.CodeEditing
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.PostgreSql, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -131,6 +139,14 @@ namespace SmarTTY.CodeEditing
                 case Language.Crontab: return "crontab";
                 case Language.Fstab: return "fstab (/etc/fstab)";
                 case Language.Sudoers: return "sudoers";
+                case Language.MySql: return "MySQL/MariaDB config";
+                case Language.Redis: return "Redis config";
+                case Language.HAProxy: return "HAProxy config";
+                case Language.ApacheHttpd: return "Apache httpd config";
+                case Language.SystemdNetworkd: return "systemd-networkd";
+                case Language.Kubernetes: return "Kubernetes/Helm YAML";
+                case Language.DockerCompose: return "Docker Compose";
+                case Language.Ansible: return "Ansible playbook";
                 case Language.PostgreSql: return "PostgreSQL config";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
@@ -274,6 +290,61 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.Sudoers;
             }
+            if (lowerCasePath.Contains("/etc/mysql/") || lowerCasePath.Contains("/my.cnf.d/") ||
+                lowerCasePath.Contains("/mysql/conf.d/") || lowerCasePath.Contains("/mariadb.conf.d/"))
+            {
+                return Language.MySql;
+            }
+            if (lowerCasePath.Contains("/etc/redis/") || lowerCasePath.Contains("/redis/conf/"))
+            {
+                return Language.Redis;
+            }
+            if (lowerCasePath.Contains("/etc/haproxy/") &&
+                (name.EndsWith(".cfg", StringComparison.Ordinal) || name.EndsWith(".conf", StringComparison.Ordinal) || name.IndexOf('.') < 0))
+            {
+                return Language.HAProxy;
+            }
+            if ((lowerCasePath.Contains("/etc/httpd/") || lowerCasePath.Contains("/etc/apache2/") ||
+                 lowerCasePath.Contains("/etc/apache/")) &&
+                (name.EndsWith(".conf", StringComparison.Ordinal) || name == ".htaccess" || name.IndexOf('.') < 0))
+            {
+                return Language.ApacheHttpd;
+            }
+            if (lowerCasePath.Contains("/systemd/network/"))
+            {
+                return Language.SystemdNetworkd;
+            }
+            // Docker Compose: the conventional names, including the override and the per-file variants.
+            bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
+            if (yamlFile && (name.StartsWith("docker-compose.", StringComparison.Ordinal) ||
+                name.StartsWith("compose.", StringComparison.Ordinal)))
+            {
+                return Language.DockerCompose;
+            }
+            // Kubernetes manifests, Kustomize overlays and Helm charts: YAML told by the place or the conventional name.
+            if (yamlFile && (lowerCasePath.Contains("/kubernetes/") || lowerCasePath.Contains("/k8s/") ||
+                lowerCasePath.Contains("/kube/") || lowerCasePath.Contains("/manifests/") ||
+                lowerCasePath.Contains("/helm/") || lowerCasePath.Contains("/charts/") ||
+                name == "kustomization.yml" || name == "kustomization.yaml" ||
+                name == "chart.yml" || name == "chart.yaml" ||
+                name == "deployment.yml" || name == "deployment.yaml" ||
+                name == "statefulset.yml" || name == "statefulset.yaml" ||
+                name == "daemonset.yml" || name == "daemonset.yaml" ||
+                name == "configmap.yml" || name == "configmap.yaml" ||
+                name == "cronjob.yml" || name == "cronjob.yaml" ||
+                name == "ingress.yml" || name == "ingress.yaml"))
+            {
+                return Language.Kubernetes;
+            }
+            // Ansible: playbooks, the roles and the inventories are YAML told by their place or their name.
+            if (yamlFile && (name.Contains("playbook") ||
+                lowerCasePath.Contains("/ansible/") || lowerCasePath.Contains("/playbooks/") ||
+                lowerCasePath.Contains("/roles/") || lowerCasePath.Contains("/group_vars/") ||
+                lowerCasePath.Contains("/host_vars/") || lowerCasePath.Contains("/tasks/") ||
+                lowerCasePath.Contains("/handlers/")))
+            {
+                return Language.Ansible;
+            }
             if ((lowerCasePath.Contains("/ssh_config.d/") || lowerCasePath.Contains("/sshd_config.d/")) && name.EndsWith(".conf", StringComparison.Ordinal))
             {
                 return Language.SshConfig;
@@ -398,6 +469,32 @@ namespace SmarTTY.CodeEditing
                 case "sudoers":
                     return Language.Sudoers;
 
+                case "my.cnf":
+                case ".my.cnf":
+                case "my.ini":
+                case "mysql.cnf":
+                case "mariadb.cnf":
+                case "mysql.conf":
+                case "mariadb.conf":
+                    return Language.MySql;
+
+                case "redis.conf":
+                case "sentinel.conf":
+                case "redis-sentinel.conf":
+                    return Language.Redis;
+
+                case "haproxy.cfg":
+                case "haproxy.conf":
+                    return Language.HAProxy;
+
+                case "httpd.conf":
+                case "apache2.conf":
+                case "httpd-vhosts.conf":
+                case "httpd-ssl.conf":
+                case "ports.conf":
+                case ".htaccess":
+                    return Language.ApacheHttpd;
+
                 case "postgresql.conf":
                 case "postgresql.auto.conf":
                 case "pg_hba.conf":
@@ -510,12 +607,14 @@ namespace SmarTTY.CodeEditing
                 case "editorconfig":
                 case "toml":
                 case "env":
-                case "network":
-                case "netdev":
-                case "link":
                 case "desktop":
                 case "rules":
                     return Language.Config;
+
+                case "network":
+                case "netdev":
+                case "link":
+                    return Language.SystemdNetworkd;
 
                 case "bb":
                 case "bbappend":
@@ -899,6 +998,14 @@ namespace SmarTTY.CodeEditing
                 case Language.Crontab: return TokenizeCrontab;
                 case Language.Fstab: return TokenizeFstab;
                 case Language.Sudoers: return TokenizeSudoers;
+                case Language.MySql: return TokenizeMySql;
+                case Language.Redis: return TokenizeRedis;
+                case Language.HAProxy: return TokenizeHAProxy;
+                case Language.ApacheHttpd: return TokenizeApache;
+                case Language.SystemdNetworkd: return TokenizeSystemdNetworkd;
+                case Language.Kubernetes: return TokenizeKubernetes;
+                case Language.DockerCompose: return TokenizeDockerCompose;
+                case Language.Ansible: return TokenizeAnsible;
                 case Language.PostgreSql: return TokenizePostgreSql;
                 case Language.Log: return TokenizeLog;
                 default: return null;
@@ -1019,6 +1126,22 @@ namespace SmarTTY.CodeEditing
                     return Combine(FstabTypes, FstabOptions);
                 case Language.Sudoers:
                     return Combine(SudoersDirectives, SudoersValues);
+                case Language.MySql:
+                    return Combine(MySqlDirectives, MySqlValues);
+                case Language.Redis:
+                    return Combine(RedisDirectives, RedisValues);
+                case Language.HAProxy:
+                    return Combine(HAProxyDirectives, HAProxyValues);
+                case Language.ApacheHttpd:
+                    return Combine(ApacheDirectives, ApacheValues);
+                case Language.SystemdNetworkd:
+                    return Combine(SystemdNetworkdDirectives, SystemdNetworkdValues);
+                case Language.Kubernetes:
+                    return Combine(KubernetesKeywords, KubernetesValues);
+                case Language.DockerCompose:
+                    return Combine(DockerComposeKeywords, DockerComposeValues);
+                case Language.Ansible:
+                    return Combine(AnsibleKeywords, AnsibleValues);
                 case Language.PostgreSql:
                     return Combine(PostgreSqlDirectives, PostgreSqlValues);
                 case Language.Log:
@@ -4635,6 +4758,16 @@ namespace SmarTTY.CodeEditing
         /// <summary>YAML: the colors of the config tokenizer, and a fold for every "key:", "- key: value" and block scalar.</summary>
         private static bool TokenizeYaml(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
+            return TokenizeYamlCore(null, null, startState, text, sink, out endState);
+        }
+
+        /// <summary>
+        /// YAML with the keys of a format known (Kubernetes, Docker Compose, Ansible): a key of <paramref name="keywords"/>
+        /// is a keyword, an unknown key stays an ordinary key, and the words of <paramref name="values"/> are coloured
+        /// wherever they stand. With null sets this is plain YAML.
+        /// </summary>
+        private static bool TokenizeYamlCore(HashSet<string> keywords, HashSet<string> values, int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
             int len = text.Length;
             int depth = startState & 7;
             int levels = (startState >> YamlLevelShift) & 0xFFFFFF;
@@ -4690,7 +4823,7 @@ namespace SmarTTY.CodeEditing
 
             if (!scalarText)
             {
-                TokenizeConfig(0, text, buffer, out int ignored);
+                TokenizeConfigCore(keywords, 0, text, buffer, out int ignored, valueKeywords: values);
             }
 
             if (code)

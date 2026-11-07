@@ -899,7 +899,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service.d/override.conf"), L.Systemd, "a drop-in of a unit");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/journald.conf"), L.Systemd, "journald.conf is systemd's");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/foo.conf"), L.Config, "an ordinary .conf stays a config");
-        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.network"), L.Config, "networkd files are not units");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.network"), L.SystemdNetworkd, "networkd files are not units");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/crontab"), L.Crontab, "/etc/crontab is a crontab");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/.env"), L.Config, ".env stays a config");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pyproject.toml"), L.Config, "toml stays a config");
@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.PostgreSql, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.SystemdNetworkd, L.Kubernetes, L.DockerCompose, L.Ansible, L.PostgreSql, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -929,6 +929,14 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.Crontab) != null, "# comments in crontab files");
         Check(CommentStyle.ForLanguage(L.Fstab) != null, "# comments in fstab");
         Check(CommentStyle.ForLanguage(L.Sudoers) != null, "# comments in sudoers");
+        Check(CommentStyle.ForLanguage(L.MySql) != null, "# comments in MySQL files");
+        Check(CommentStyle.ForLanguage(L.Redis) != null, "# comments in Redis files");
+        Check(CommentStyle.ForLanguage(L.HAProxy) != null, "# comments in HAProxy files");
+        Check(CommentStyle.ForLanguage(L.ApacheHttpd) != null, "# comments in Apache files");
+        Check(CommentStyle.ForLanguage(L.SystemdNetworkd) != null, "# comments in systemd-networkd files");
+        Check(CommentStyle.ForLanguage(L.Kubernetes) != null, "# comments in Kubernetes YAML");
+        Check(CommentStyle.ForLanguage(L.DockerCompose) != null, "# comments in Docker Compose files");
+        Check(CommentStyle.ForLanguage(L.Ansible) != null, "# comments in Ansible files");
         Check(CommentStyle.ForLanguage(L.PostgreSql) != null, "# comments in PostgreSQL files");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
@@ -1080,6 +1088,300 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Sudoers).Contains("NOPASSWD"), "sudoers keywords contain 'NOPASSWD'");
         Check(SyntaxHighlighting.GetKeywords(L.Sudoers).Contains("secure_path"), "sudoers keywords contain 'secure_path'");
         Equal(Join(CommentStyle.ForLanguage(L.Sudoers).Toggle(new[] { "root ALL=(ALL:ALL) ALL" })), "# root ALL=(ALL:ALL) ALL", "sudoers comment");
+    }
+
+    private static void MySqlChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mysql/my.cnf"), L.MySql, "my.cnf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mysql/mariadb.conf.d/50-server.cnf"), L.MySql, "a drop-in of MariaDB");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mysql/conf.d/foo.cnf"), L.MySql, "a drop-in of MySQL");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/my.cnf"), L.MySql, "the old /etc/my.cnf");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/.my.cnf"), L.MySql, "a user's .my.cnf");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/my.ini"), L.MySql, "my.ini");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/database.conf"), L.Config, "an ordinary .conf stays a config");
+
+        Highlighted mysql = new Highlighted(L.MySql,
+            "[client]\nport = 3306\nsocket = /run/mysqld/mysqld.sock\n[mysqld]\nuser = mysql\nbind-address = 127.0.0.1\ndatadir = /var/lib/mysql\ninnodb_buffer_pool_size = 1G\nmax_connections = 200\nlog_error = /var/log/mysql/error.log # note\n!includedir /etc/mysql/conf.d/\n!include /etc/mysql/extra.cnf\n# comment\n; semicolon comment");
+        Equal(Join(mysql.Tokens(0, SyntaxHighlighting.TypeSection)), "[client]", "MySQL: the client group");
+        Equal(Join(mysql.Tokens(1, SyntaxHighlighting.TypeKeyword)), "port", "MySQL: port");
+        Equal(Join(mysql.Tokens(1, SyntaxHighlighting.TypeNumber)), "3306", "MySQL: the port number");
+        Equal(Join(mysql.Tokens(2, SyntaxHighlighting.TypeKeyword)), "socket", "MySQL: socket");
+        Equal(Join(mysql.Tokens(3, SyntaxHighlighting.TypeSection)), "[mysqld]", "MySQL: the mysqld group");
+        Equal(Join(mysql.Tokens(4, SyntaxHighlighting.TypeKeyword)), "user|mysql", "MySQL: user and its value");
+        Equal(Join(mysql.Tokens(5, SyntaxHighlighting.TypeKeyword)), "bind-address", "MySQL: a hyphenated option");
+        Equal(Join(mysql.Tokens(7, SyntaxHighlighting.TypeKeyword)), "innodb_buffer_pool_size", "MySQL: an InnoDB option");
+        Equal(Join(mysql.Tokens(8, SyntaxHighlighting.TypeKeyword)), "max_connections", "MySQL: max_connections");
+        Equal(Join(mysql.Tokens(9, SyntaxHighlighting.TypeComment)), "# note", "MySQL: a trailing comment");
+        Equal(Join(mysql.Tokens(10, SyntaxHighlighting.TypeKeyword)), "!includedir", "MySQL: !includedir is a directive");
+        Equal(Join(mysql.Tokens(10, SyntaxHighlighting.TypeString)), "/etc/mysql/conf.d/", "MySQL: the directory of !includedir");
+        Equal(Join(mysql.Tokens(11, SyntaxHighlighting.TypeKeyword)), "!include", "MySQL: !include is a directive");
+        Equal(Join(mysql.Tokens(11, SyntaxHighlighting.TypeString)), "/etc/mysql/extra.cnf", "MySQL: the file of !include");
+        Equal(Join(mysql.Tokens(12, SyntaxHighlighting.TypeComment)), "# comment", "MySQL: a # comment");
+        Equal(Join(mysql.Tokens(13, SyntaxHighlighting.TypeComment)), "; semicolon comment", "MySQL: a ; comment");
+        Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("innodb_buffer_pool_size"), "MySQL keywords contain 'innodb_buffer_pool_size'");
+        Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("skip-name-resolve"), "MySQL keywords contain 'skip-name-resolve'");
+        Equal(Join(CommentStyle.ForLanguage(L.MySql).Toggle(new[] { "max_connections = 200" })), "# max_connections = 200", "MySQL comment");
+    }
+
+    private static void RedisChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/redis/redis.conf"), L.Redis, "redis.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/redis/6379.conf"), L.Redis, "a Redis instance file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/redis.conf"), L.Redis, "redis.conf anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/sentinel.conf"), L.Redis, "sentinel.conf anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.conf"), L.Config, "an ordinary .conf stays a config");
+
+        Highlighted redis = new Highlighted(L.Redis,
+            "# Redis\nbind 127.0.0.1 ::1\nport 6379\ndaemonize yes\nloglevel notice\nsave 900 1\nsave 300 10\ndir /var/lib/redis\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nappendonly yes\nappendfsync everysec\ninclude /etc/redis/local.conf\nuser default on nopass ~* &* +@all");
+        Equal(Join(redis.Tokens(0, SyntaxHighlighting.TypeComment)), "# Redis", "Redis: a comment");
+        Equal(Join(redis.Tokens(1, SyntaxHighlighting.TypeKeyword)), "bind", "Redis: bind");
+        Equal(Join(redis.Tokens(1, SyntaxHighlighting.TypeNumber)), "127.0.0.1|1", "Redis: the addresses");
+        Equal(Join(redis.Tokens(2, SyntaxHighlighting.TypeKeyword)), "port", "Redis: port");
+        Equal(Join(redis.Tokens(3, SyntaxHighlighting.TypeKeyword)), "daemonize|yes", "Redis: daemonize");
+        Equal(Join(redis.Tokens(4, SyntaxHighlighting.TypeKeyword)), "loglevel|notice", "Redis: the log level");
+        Equal(Join(redis.Tokens(5, SyntaxHighlighting.TypeKeyword)), "save", "Redis: save");
+        Equal(Join(redis.Tokens(5, SyntaxHighlighting.TypeNumber)), "900|1", "Redis: the save interval");
+        Equal(Join(redis.Tokens(8, SyntaxHighlighting.TypeKeyword)), "maxmemory", "Redis: maxmemory");
+        Equal(Join(redis.Tokens(9, SyntaxHighlighting.TypeKeyword)), "maxmemory-policy|allkeys-lru", "Redis: the eviction policy");
+        Equal(Join(redis.Tokens(11, SyntaxHighlighting.TypeKeyword)), "appendfsync|everysec", "Redis: appendfsync");
+        Equal(Join(redis.Tokens(12, SyntaxHighlighting.TypeKeyword)), "include", "Redis: include");
+        Equal(Join(redis.Tokens(13, SyntaxHighlighting.TypeKeyword)), "user|on|nopass|all", "Redis: an ACL user");
+        Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("maxmemory-policy"), "Redis keywords contain 'maxmemory-policy'");
+        Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("appendfsync"), "Redis keywords contain 'appendfsync'");
+        Equal(Join(CommentStyle.ForLanguage(L.Redis).Toggle(new[] { "port 6379" })), "# port 6379", "Redis comment");
+    }
+
+    private static void HAProxyChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/haproxy/haproxy.cfg"), L.HAProxy, "haproxy.cfg");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/haproxy/conf.d/10-global.cfg"), L.HAProxy, "a drop-in of /etc/haproxy");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/haproxy.cfg"), L.HAProxy, "haproxy.cfg anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.cfg"), L.Config, "an ordinary .cfg stays a config");
+
+        Highlighted haproxy = new Highlighted(L.HAProxy,
+            "# HAProxy\nglobal\n    log /dev/log local0\n    maxconn 4096\n    daemon\ndefaults\n    mode http\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n    retries 3\nfrontend http-in\n    bind *:80\n    default_backend servers\nbackend servers\n    balance roundrobin\n    server web1 10.0.0.1:8080 check\nlisten stats\n    bind *:8404\n    stats enable\n    stats uri /stats");
+        Equal(Join(haproxy.Tokens(0, SyntaxHighlighting.TypeComment)), "# HAProxy", "HAProxy: a comment");
+        Equal(Join(haproxy.Tokens(1, SyntaxHighlighting.TypeKeyword)), "global", "HAProxy: the global section");
+        Equal(Join(haproxy.Tokens(2, SyntaxHighlighting.TypeKeyword)), "log|local0", "HAProxy: log and its facility");
+        Equal(Join(haproxy.Tokens(3, SyntaxHighlighting.TypeKeyword)), "maxconn", "HAProxy: maxconn");
+        Equal(Join(haproxy.Tokens(3, SyntaxHighlighting.TypeNumber)), "4096", "HAProxy: the connection limit");
+        Equal(Join(haproxy.Tokens(4, SyntaxHighlighting.TypeKeyword)), "daemon", "HAProxy: a directive that stands alone");
+        Equal(Join(haproxy.Tokens(5, SyntaxHighlighting.TypeKeyword)), "defaults", "HAProxy: the defaults section");
+        Equal(Join(haproxy.Tokens(6, SyntaxHighlighting.TypeKeyword)), "mode|http", "HAProxy: the mode");
+        Equal(Join(haproxy.Tokens(7, SyntaxHighlighting.TypeKeyword)), "timeout|connect", "HAProxy: a timeout");
+        Equal(Join(haproxy.Tokens(11, SyntaxHighlighting.TypeKeyword)), "frontend", "HAProxy: frontend");
+        Equal(Join(haproxy.Tokens(12, SyntaxHighlighting.TypeKeyword)), "bind", "HAProxy: bind");
+        Equal(Join(haproxy.Tokens(14, SyntaxHighlighting.TypeKeyword)), "backend", "HAProxy: backend");
+        Equal(Join(haproxy.Tokens(15, SyntaxHighlighting.TypeKeyword)), "balance|roundrobin", "HAProxy: the balance algorithm");
+        Equal(Join(haproxy.Tokens(16, SyntaxHighlighting.TypeKeyword)), "server|check", "HAProxy: a server with its check");
+        Equal(Join(haproxy.Tokens(16, SyntaxHighlighting.TypeNumber)), "10.0.0.1|8080", "HAProxy: the server address");
+        Equal(Join(haproxy.Tokens(17, SyntaxHighlighting.TypeKeyword)), "listen", "HAProxy: listen");
+        Equal(Join(haproxy.Tokens(19, SyntaxHighlighting.TypeKeyword)), "stats|enable", "HAProxy: the stats page");
+        Equal(Join(haproxy.Tokens(20, SyntaxHighlighting.TypeKeyword)), "stats|uri", "HAProxy: the stats uri");
+        Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("default_backend"), "HAProxy keywords contain 'default_backend'");
+        Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("roundrobin"), "HAProxy keywords contain 'roundrobin'");
+        Equal(Join(CommentStyle.ForLanguage(L.HAProxy).Toggle(new[] { "    balance roundrobin" })), "    # balance roundrobin", "HAProxy comment");
+    }
+
+    private static void ApacheChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/httpd/conf/httpd.conf"), L.ApacheHttpd, "httpd.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/apache2/apache2.conf"), L.ApacheHttpd, "apache2.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/apache2/sites-available/000-default.conf"), L.ApacheHttpd, "a site of apache2");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/apache2/ports.conf"), L.ApacheHttpd, "ports.conf of apache2");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/www/html/.htaccess"), L.ApacheHttpd, ".htaccess");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/.htaccess"), L.ApacheHttpd, ".htaccess anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/site.conf"), L.Config, "an ordinary .conf stays a config");
+
+        Highlighted apache = new Highlighted(L.ApacheHttpd,
+            "# Apache\nServerRoot \"/etc/httpd\"\nListen 80\nLoadModule mpm_event_module modules/mod_mpm_event.so\nUser apache\nGroup apache\nServerName example.com:80\nDocumentRoot \"/var/www/html\"\nErrorLog \"logs/error_log\"\nLogLevel warn\n<Directory \"/var/www/html\">\n    Options Indexes FollowSymLinks\n    AllowOverride All\n    Require all granted\n</Directory>\n<VirtualHost *:80>\n    ServerName example.com\n    ProxyPass /api/ http://127.0.0.1:8080/\n    RewriteEngine On\n    RewriteRule ^/old /new [R=301,L]\n</VirtualHost>\nIncludeOptional conf.d/*.conf");
+        Equal(Join(apache.Tokens(0, SyntaxHighlighting.TypeComment)), "# Apache", "Apache: a comment");
+        Equal(Join(apache.Tokens(1, SyntaxHighlighting.TypeKeyword)), "ServerRoot", "Apache: ServerRoot");
+        Equal(Join(apache.Tokens(1, SyntaxHighlighting.TypeString)), "\"/etc/httpd\"", "Apache: a quoted path");
+        Equal(Join(apache.Tokens(2, SyntaxHighlighting.TypeKeyword)), "Listen", "Apache: Listen");
+        Equal(Join(apache.Tokens(2, SyntaxHighlighting.TypeNumber)), "80", "Apache: the port");
+        Equal(Join(apache.Tokens(3, SyntaxHighlighting.TypeKeyword)), "LoadModule", "Apache: LoadModule");
+        Equal(Join(apache.Tokens(6, SyntaxHighlighting.TypeKeyword)), "ServerName", "Apache: ServerName");
+        Equal(Join(apache.Tokens(7, SyntaxHighlighting.TypeKeyword)), "DocumentRoot", "Apache: DocumentRoot");
+        Equal(Join(apache.Tokens(9, SyntaxHighlighting.TypeKeyword)), "LogLevel|warn", "Apache: the log level");
+        Equal(Join(apache.Tokens(10, SyntaxHighlighting.TypeKeyword)), "Directory", "Apache: a Directory section");
+        Equal(Join(apache.Tokens(10, SyntaxHighlighting.TypeString)), "\"/var/www/html\"", "Apache: the directory path");
+        Equal(Join(apache.Tokens(11, SyntaxHighlighting.TypeKeyword)), "Options|Indexes|FollowSymLinks", "Apache: the options");
+        Equal(Join(apache.Tokens(12, SyntaxHighlighting.TypeKeyword)), "AllowOverride|All", "Apache: AllowOverride");
+        Equal(Join(apache.Tokens(13, SyntaxHighlighting.TypeKeyword)), "Require|all|granted", "Apache: Require");
+        Equal(Join(apache.Tokens(14, SyntaxHighlighting.TypeKeyword)), "Directory", "Apache: the closing section");
+        Equal(Join(apache.Tokens(15, SyntaxHighlighting.TypeKeyword)), "VirtualHost", "Apache: a VirtualHost section");
+        Equal(Join(apache.Tokens(17, SyntaxHighlighting.TypeKeyword)), "ProxyPass", "Apache: ProxyPass");
+        Equal(Join(apache.Tokens(18, SyntaxHighlighting.TypeKeyword)), "RewriteEngine|On", "Apache: RewriteEngine");
+        Equal(Join(apache.Tokens(19, SyntaxHighlighting.TypeKeyword)), "RewriteRule", "Apache: RewriteRule");
+        Equal(Join(apache.Tokens(21, SyntaxHighlighting.TypeKeyword)), "IncludeOptional", "Apache: IncludeOptional");
+        Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("DocumentRoot"), "Apache keywords contain 'DocumentRoot'");
+        Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("FollowSymLinks"), "Apache keywords contain 'FollowSymLinks'");
+        Equal(Join(CommentStyle.ForLanguage(L.ApacheHttpd).Toggle(new[] { "Listen 80" })), "# Listen 80", "Apache comment");
+    }
+
+    private static void SystemdNetworkdChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.network"), L.SystemdNetworkd, "a .network of networkd");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.netdev"), L.SystemdNetworkd, "a .netdev of networkd");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.link"), L.SystemdNetworkd, "a .link of networkd");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/systemd/network/99-default.link"), L.SystemdNetworkd, "the defaults of the distribution");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/systemd/network/10-dhcp.network"), L.SystemdNetworkd, "a generated file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg0.netdev"), L.SystemdNetworkd, "a .netdev anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/10-eth.link"), L.SystemdNetworkd, "a .link anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service"), L.Systemd, "units stay systemd");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/foo.conf"), L.Config, "an ordinary .conf stays a config");
+
+        Highlighted network = new Highlighted(L.SystemdNetworkd,
+            "# Network\n[Match]\nName=eth0\n\n[Network]\nDHCP=ipv4\nAddress=192.168.1.10/24\nGateway=192.168.1.1\nDNS=1.1.1.1 8.8.8.8\nLinkLocalAddressing=ipv6\nIPv6PrivacyExtensions=yes\n\n[DHCPv4]\nUseDNS=no\nRouteMetric=100\n\n[Address]\nAddress=192.168.1.20/24\nPreferredLifetime=forever");
+        Equal(Join(network.Tokens(0, SyntaxHighlighting.TypeComment)), "# Network", "networkd: a comment");
+        Equal(Join(network.Tokens(1, SyntaxHighlighting.TypeSection)), "[Match]", "networkd: the Match section");
+        Equal(Join(network.Tokens(2, SyntaxHighlighting.TypeKeyword)), "Name", "networkd: Name");
+        Equal(Join(network.Tokens(4, SyntaxHighlighting.TypeSection)), "[Network]", "networkd: the Network section");
+        Equal(Join(network.Tokens(5, SyntaxHighlighting.TypeKeyword)), "DHCP|ipv4", "networkd: DHCP");
+        Equal(Join(network.Tokens(6, SyntaxHighlighting.TypeKeyword)), "Address", "networkd: Address");
+        Equal(Join(network.Tokens(6, SyntaxHighlighting.TypeNumber)), "192.168.1.10|24", "networkd: an address and its prefix");
+        Equal(Join(network.Tokens(7, SyntaxHighlighting.TypeNumber)), "192.168.1.1", "networkd: a gateway");
+        Equal(Join(network.Tokens(8, SyntaxHighlighting.TypeKeyword)), "DNS", "networkd: DNS");
+        Equal(Join(network.Tokens(8, SyntaxHighlighting.TypeNumber)), "1.1.1.1|8.8.8.8", "networkd: the name servers");
+        Equal(Join(network.Tokens(9, SyntaxHighlighting.TypeKeyword)), "LinkLocalAddressing|ipv6", "networkd: LinkLocalAddressing");
+        Equal(Join(network.Tokens(10, SyntaxHighlighting.TypeKeyword)), "IPv6PrivacyExtensions|yes", "networkd: IPv6PrivacyExtensions");
+        Equal(Join(network.Tokens(12, SyntaxHighlighting.TypeSection)), "[DHCPv4]", "networkd: the DHCPv4 section");
+        Equal(Join(network.Tokens(13, SyntaxHighlighting.TypeKeyword)), "UseDNS|no", "networkd: UseDNS");
+        Equal(Join(network.Tokens(14, SyntaxHighlighting.TypeKeyword)), "RouteMetric", "networkd: RouteMetric");
+        Equal(Join(network.Tokens(14, SyntaxHighlighting.TypeNumber)), "100", "networkd: the metric");
+        Equal(Join(network.Tokens(16, SyntaxHighlighting.TypeSection)), "[Address]", "networkd: the Address section");
+        Equal(Join(network.Tokens(18, SyntaxHighlighting.TypeKeyword)), "PreferredLifetime|forever", "networkd: PreferredLifetime");
+        Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("DHCP"), "networkd keywords contain 'DHCP'");
+        Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("PreferredLifetime"), "networkd keywords contain 'PreferredLifetime'");
+        Equal(Join(CommentStyle.ForLanguage(L.SystemdNetworkd).Toggle(new[] { "DHCP=ipv4" })), "# DHCP=ipv4", "networkd comment");
+    }
+
+    private static void KubernetesChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/kubernetes/service.yml"), L.Kubernetes, "a manifest under /kubernetes/");
+        Equal(SyntaxHighlighting.DetectLanguage("/opt/app/manifests/configmap.yaml"), L.Kubernetes, "a manifest under /manifests/");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/charts/web/templates/deployment.yaml"), L.Kubernetes, "a Helm template");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/charts/web/Chart.yaml"), L.Kubernetes, "the metadata of a Helm chart");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/charts/web/values.yaml"), L.Kubernetes, "the values of a Helm chart");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/kustomization.yaml"), L.Kubernetes, "a kustomization");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/deployment.yaml"), L.Kubernetes, "a deployment by its name");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/notes.yaml"), L.Yaml, "an ordinary .yaml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/site.yml"), L.Yaml, "an ordinary .yml stays YAML");
+
+        Highlighted manifest = new Highlighted(L.Kubernetes,
+            "# web\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  labels:\n    app: web\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - name: web\n        image: nginx:1.25\n        ports:\n        - containerPort: 80\n        env:\n        - name: MODE\n          value: \"prod\"\n{{- include \"web.labels\" . | nindent 4 }}");
+        Equal(Join(manifest.Tokens(0, SyntaxHighlighting.TypeComment)), "# web", "Kubernetes: a comment");
+        Equal(Join(manifest.Tokens(1, SyntaxHighlighting.TypeKeyword)), "apiVersion|v1", "Kubernetes: apiVersion and the version");
+        Equal(Join(manifest.Tokens(2, SyntaxHighlighting.TypeKeyword)), "kind|Deployment", "Kubernetes: the kind");
+        Equal(Join(manifest.Tokens(3, SyntaxHighlighting.TypeKeyword)), "metadata", "Kubernetes: metadata");
+        Equal(Join(manifest.Tokens(4, SyntaxHighlighting.TypeKeyword)), "name", "Kubernetes: a name");
+        Equal(Join(manifest.Tokens(6, SyntaxHighlighting.TypeVariable)), "app", "Kubernetes: an unknown key stays an ordinary key");
+        Equal(Join(manifest.Tokens(7, SyntaxHighlighting.TypeKeyword)), "spec", "Kubernetes: spec");
+        Equal(Join(manifest.Tokens(8, SyntaxHighlighting.TypeKeyword)), "replicas", "Kubernetes: replicas");
+        Equal(Join(manifest.Tokens(8, SyntaxHighlighting.TypeNumber)), "3", "Kubernetes: the number of replicas");
+        Equal(Join(manifest.Tokens(10, SyntaxHighlighting.TypeKeyword)), "matchLabels", "Kubernetes: matchLabels");
+        Equal(Join(manifest.Tokens(17, SyntaxHighlighting.TypeKeyword)), "containers", "Kubernetes: containers");
+        Equal(Join(manifest.Tokens(18, SyntaxHighlighting.TypeKeyword)), "name", "Kubernetes: a container name");
+        Equal(Join(manifest.Tokens(19, SyntaxHighlighting.TypeKeyword)), "image", "Kubernetes: image");
+        Equal(Join(manifest.Tokens(19, SyntaxHighlighting.TypeNumber)), "1.25", "Kubernetes: the tag of the image");
+        Equal(Join(manifest.Tokens(21, SyntaxHighlighting.TypeKeyword)), "containerPort", "Kubernetes: containerPort");
+        Equal(Join(manifest.Tokens(21, SyntaxHighlighting.TypeNumber)), "80", "Kubernetes: the port");
+        Equal(Join(manifest.Tokens(24, SyntaxHighlighting.TypeKeyword)), "value", "Kubernetes: value");
+        Equal(Join(manifest.Tokens(24, SyntaxHighlighting.TypeString)), "\"prod\"", "Kubernetes: a quoted value");
+        Equal(Join(manifest.Tokens(25, SyntaxHighlighting.TypeKeyword)), "include|nindent", "Kubernetes: the Helm template functions");
+        Equal(Join(manifest.Tokens(25, SyntaxHighlighting.TypeString)), "\"web.labels\"", "Kubernetes: the name of the template");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("apiVersion"), "Kubernetes keywords contain 'apiVersion'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("containers"), "Kubernetes keywords contain 'containers'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("Deployment"), "Kubernetes keywords contain 'Deployment'");
+        Equal(Join(CommentStyle.ForLanguage(L.Kubernetes).Toggle(new[] { "kind: Deployment" })), "# kind: Deployment", "Kubernetes comment");
+    }
+
+    private static void DockerComposeChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yml"), L.DockerCompose, "docker-compose.yml");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yaml"), L.DockerCompose, "docker-compose.yaml");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/compose.yml"), L.DockerCompose, "compose.yml");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/compose.yaml"), L.DockerCompose, "compose.yaml");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.override.yml"), L.DockerCompose, "an override file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/compose.prod.yaml"), L.DockerCompose, "a per-environment file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app.yml"), L.Yaml, "an ordinary .yml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/charts/web/values.yaml"), L.Kubernetes, "Helm values stay Kubernetes");
+
+        Highlighted compose = new Highlighted(L.DockerCompose,
+            "# compose\nversion: \"3.9\"\nservices:\n  web:\n    image: nginx:1.25\n    build:\n      context: .\n      dockerfile: Dockerfile\n    ports:\n      - \"80:80\"\n    environment:\n      MY_SETTING: prod\n    depends_on:\n      - db\n    restart: unless-stopped\n    healthcheck:\n      test: [\"CMD\", \"curl\", \"-f\", \"http://localhost\"]\n      interval: 30s\n      retries: 3\n    deploy:\n      replicas: 2\n      resources:\n        limits:\n          cpus: \"0.5\"\n          memory: 256M\n  db:\n    image: postgres:16\n    volumes:\n      - data:/var/lib/postgresql/data\nvolumes:\n  data: {}\nnetworks:\n  default:\n    driver: bridge");
+        Equal(Join(compose.Tokens(0, SyntaxHighlighting.TypeComment)), "# compose", "Compose: a comment");
+        Equal(Join(compose.Tokens(1, SyntaxHighlighting.TypeKeyword)), "version", "Compose: the version");
+        Equal(Join(compose.Tokens(1, SyntaxHighlighting.TypeString)), "\"3.9\"", "Compose: the version number");
+        Equal(Join(compose.Tokens(2, SyntaxHighlighting.TypeKeyword)), "services", "Compose: services");
+        Equal(Join(compose.Tokens(3, SyntaxHighlighting.TypeVariable)), "web", "Compose: a service name stays an ordinary key");
+        Equal(Join(compose.Tokens(4, SyntaxHighlighting.TypeKeyword)), "image", "Compose: image");
+        Equal(Join(compose.Tokens(4, SyntaxHighlighting.TypeNumber)), "1.25", "Compose: the tag of the image");
+        Equal(Join(compose.Tokens(5, SyntaxHighlighting.TypeKeyword)), "build", "Compose: build");
+        Equal(Join(compose.Tokens(9, SyntaxHighlighting.TypeString)), "\"80:80\"", "Compose: a published port");
+        Equal(Join(compose.Tokens(10, SyntaxHighlighting.TypeKeyword)), "environment", "Compose: environment");
+        Equal(Join(compose.Tokens(11, SyntaxHighlighting.TypeVariable)), "MY_SETTING", "Compose: an environment variable stays an ordinary key");
+        Equal(Join(compose.Tokens(12, SyntaxHighlighting.TypeKeyword)), "depends_on", "Compose: depends_on");
+        Equal(Join(compose.Tokens(14, SyntaxHighlighting.TypeKeyword)), "restart|unless-stopped", "Compose: the restart policy");
+        Equal(Join(compose.Tokens(15, SyntaxHighlighting.TypeKeyword)), "healthcheck", "Compose: healthcheck");
+        Equal(Join(compose.Tokens(16, SyntaxHighlighting.TypeKeyword)), "test", "Compose: the health test");
+        Equal(Join(compose.Tokens(17, SyntaxHighlighting.TypeKeyword)), "interval", "Compose: the health interval");
+        Equal(Join(compose.Tokens(18, SyntaxHighlighting.TypeKeyword)), "retries", "Compose: the health retries");
+        Equal(Join(compose.Tokens(18, SyntaxHighlighting.TypeNumber)), "3", "Compose: the number of retries");
+        Equal(Join(compose.Tokens(19, SyntaxHighlighting.TypeKeyword)), "deploy", "Compose: deploy");
+        Equal(Join(compose.Tokens(20, SyntaxHighlighting.TypeKeyword)), "replicas", "Compose: replicas");
+        Equal(Join(compose.Tokens(20, SyntaxHighlighting.TypeNumber)), "2", "Compose: the number of replicas");
+        Equal(Join(compose.Tokens(23, SyntaxHighlighting.TypeKeyword)), "cpus", "Compose: a cpu limit");
+        Equal(Join(compose.Tokens(23, SyntaxHighlighting.TypeString)), "\"0.5\"", "Compose: the cpu value");
+        Equal(Join(compose.Tokens(27, SyntaxHighlighting.TypeKeyword)), "volumes", "Compose: the volumes of a service");
+        Equal(Join(compose.Tokens(28, SyntaxHighlighting.TypeVariable)), "data", "Compose: a named volume");
+        Equal(Join(compose.Tokens(33, SyntaxHighlighting.TypeKeyword)), "driver|bridge", "Compose: the network driver");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("services"), "Compose keywords contain 'services'");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("depends_on"), "Compose keywords contain 'depends_on'");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("unless-stopped"), "Compose keywords contain 'unless-stopped'");
+        Equal(Join(CommentStyle.ForLanguage(L.DockerCompose).Toggle(new[] { "    image: nginx" })), "    # image: nginx", "Compose comment");
+    }
+
+    private static void AnsibleChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/ansible/site.yml"), L.Ansible, "a playbook under /ansible/");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/playbooks/deploy.yaml"), L.Ansible, "a playbook under /playbooks/");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/roles/nginx/tasks/main.yml"), L.Ansible, "a task file of a role");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/inventory/group_vars/all.yml"), L.Ansible, "the variables of a group");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/ansible/deploy-playbook.yml"), L.Ansible, "a name with 'playbook'");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/handlers/main.yaml"), L.Ansible, "a handler file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/site.yml"), L.Yaml, "an ordinary site.yml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/tasks.yaml"), L.Yaml, "an ordinary tasks.yaml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/k8s/deployment.yaml"), L.Kubernetes, "Kubernetes wins under /k8s/");
+
+        Highlighted playbook = new Highlighted(L.Ansible,
+            "# deploy\n- name: Configure web\n  hosts: web\n  become: yes\n  vars:\n    http_port: 80\n  tasks:\n    - name: Install nginx\n      apt:\n        name: nginx\n        state: present\n      notify: restart nginx\n    - name: Start the service\n      service:\n        name: nginx\n        state: started\n        enabled: yes\n    - name: Run the command\n      command: /bin/echo hello\n      when: ansible_os_family == \"Debian\"\n      register: result\n      changed_when: false\n  handlers:\n    - name: restart nginx\n      service:\n        name: nginx\n        state: restarted");
+        Equal(Join(playbook.Tokens(0, SyntaxHighlighting.TypeComment)), "# deploy", "Ansible: a comment");
+        Equal(Join(playbook.Tokens(1, SyntaxHighlighting.TypeKeyword)), "name", "Ansible: the name of a play");
+        Equal(Join(playbook.Tokens(2, SyntaxHighlighting.TypeKeyword)), "hosts", "Ansible: hosts");
+        Equal(Join(playbook.Tokens(3, SyntaxHighlighting.TypeKeyword)), "become|yes", "Ansible: become");
+        Equal(Join(playbook.Tokens(4, SyntaxHighlighting.TypeKeyword)), "vars", "Ansible: vars");
+        Equal(Join(playbook.Tokens(5, SyntaxHighlighting.TypeVariable)), "http_port", "Ansible: a variable stays an ordinary key");
+        Equal(Join(playbook.Tokens(5, SyntaxHighlighting.TypeNumber)), "80", "Ansible: the port of the variable");
+        Equal(Join(playbook.Tokens(6, SyntaxHighlighting.TypeKeyword)), "tasks", "Ansible: tasks");
+        Equal(Join(playbook.Tokens(8, SyntaxHighlighting.TypeKeyword)), "apt", "Ansible: the apt module");
+        Equal(Join(playbook.Tokens(10, SyntaxHighlighting.TypeKeyword)), "state|present", "Ansible: state and present");
+        Equal(Join(playbook.Tokens(11, SyntaxHighlighting.TypeKeyword)), "notify", "Ansible: notify");
+        Equal(Join(playbook.Tokens(13, SyntaxHighlighting.TypeKeyword)), "service", "Ansible: the service module");
+        Equal(Join(playbook.Tokens(15, SyntaxHighlighting.TypeKeyword)), "state|started", "Ansible: state and started");
+        Equal(Join(playbook.Tokens(16, SyntaxHighlighting.TypeKeyword)), "enabled|yes", "Ansible: enabled");
+        Equal(Join(playbook.Tokens(18, SyntaxHighlighting.TypeKeyword)), "command", "Ansible: the command module");
+        Equal(Join(playbook.Tokens(19, SyntaxHighlighting.TypeKeyword)), "when", "Ansible: when");
+        Equal(Join(playbook.Tokens(20, SyntaxHighlighting.TypeKeyword)), "register", "Ansible: register");
+        Equal(Join(playbook.Tokens(21, SyntaxHighlighting.TypeKeyword)), "changed_when|false", "Ansible: changed_when");
+        Equal(Join(playbook.Tokens(22, SyntaxHighlighting.TypeKeyword)), "handlers", "Ansible: handlers");
+        Equal(Join(playbook.Tokens(23, SyntaxHighlighting.TypeKeyword)), "name", "Ansible: the name of a handler");
+        Equal(Join(playbook.Tokens(26, SyntaxHighlighting.TypeKeyword)), "state|restarted", "Ansible: a handler that restarts");
+        Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("hosts"), "Ansible keywords contain 'hosts'");
+        Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("apt"), "Ansible keywords contain 'apt'");
+        Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("become"), "Ansible keywords contain 'become'");
+        Equal(Join(CommentStyle.ForLanguage(L.Ansible).Toggle(new[] { "  become: yes" })), "  # become: yes", "Ansible comment");
     }
 
     private static void PostgreSqlChecks()
@@ -1319,7 +1621,7 @@ internal static class Program
         Equal(Folds(yaml), "2:6,3:5,6:14,7:14,9:12,12:14", "YAML mappings, lists at the indentation of their key and block scalars fold");
         Equal(Join(yaml.Tokens(1, SyntaxHighlighting.TypeVariable)), "name", "YAML keys keep the config colors");
         Equal(Join(yaml.Tokens(1, SyntaxHighlighting.TypeComment)), "# note", "YAML comments keep the config colors");
-        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yml"), L.Yaml, ".yml is YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yml"), L.DockerCompose, "docker-compose.yml is Compose");
 
         // The text of a block scalar is not YAML.
         Highlighted scalar = new Highlighted(L.Yaml, "run: |\n  echo \"don't # stop\"\n  x: y\n\n  more\nnext: 'v'\n");
@@ -1587,6 +1889,14 @@ internal static class Program
         CrontabChecks();
         FstabChecks();
         SudoersChecks();
+        MySqlChecks();
+        RedisChecks();
+        HAProxyChecks();
+        ApacheChecks();
+        SystemdNetworkdChecks();
+        KubernetesChecks();
+        DockerComposeChecks();
+        AnsibleChecks();
         PostgreSqlChecks();
         KconfigChecks();
         UBootChecks();
