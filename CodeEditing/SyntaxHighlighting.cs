@@ -98,14 +98,15 @@ namespace SmarTTY.CodeEditing
             ApacheHttpd, // httpd.conf, apache2.conf, .htaccess: the colors of Config with the Apache directives known
             SystemdNetworkd, // .network, .netdev, .link: the colors of Config with the systemd-networkd keys known
             Kubernetes, // Kubernetes and Helm YAML: the colors of YAML with the keys of the manifests known
-            DockerCompose // docker-compose.yml, compose.yaml: the colors of YAML with the keys of Compose known
+            DockerCompose, // docker-compose.yml, compose.yaml: the colors of YAML with the keys of Compose known
+            Ansible  // playbooks, roles and tasks: the colors of YAML with the keys and modules of Ansible known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -144,6 +145,7 @@ namespace SmarTTY.CodeEditing
                 case Language.SystemdNetworkd: return "systemd-networkd";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
+                case Language.Ansible: return "Ansible playbook";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
@@ -331,6 +333,15 @@ namespace SmarTTY.CodeEditing
                 name == "ingress.yml" || name == "ingress.yaml"))
             {
                 return Language.Kubernetes;
+            }
+            // Ansible: playbooks, the roles and the inventories are YAML told by their place or their name.
+            if (yamlFile && (name.Contains("playbook") ||
+                lowerCasePath.Contains("/ansible/") || lowerCasePath.Contains("/playbooks/") ||
+                lowerCasePath.Contains("/roles/") || lowerCasePath.Contains("/group_vars/") ||
+                lowerCasePath.Contains("/host_vars/") || lowerCasePath.Contains("/tasks/") ||
+                lowerCasePath.Contains("/handlers/")))
+            {
+                return Language.Ansible;
             }
             if ((lowerCasePath.Contains("/ssh_config.d/") || lowerCasePath.Contains("/sshd_config.d/")) && name.EndsWith(".conf", StringComparison.Ordinal))
             {
@@ -986,6 +997,7 @@ namespace SmarTTY.CodeEditing
                 case Language.SystemdNetworkd: return TokenizeSystemdNetworkd;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
+                case Language.Ansible: return TokenizeAnsible;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -1119,6 +1131,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
                     return Combine(DockerComposeKeywords, DockerComposeValues);
+                case Language.Ansible:
+                    return Combine(AnsibleKeywords, AnsibleValues);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:

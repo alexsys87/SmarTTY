@@ -124,6 +124,8 @@ internal static class Program
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("depends_on"), "the Compose key 'depends_on' is offered");
+        Check(Names(L.Ansible, "", "").Contains("hosts"), "the Ansible key 'hosts' is offered");
+        Check(Names(L.Ansible, "", "").Contains("apt"), "the Ansible module 'apt' is offered");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");
