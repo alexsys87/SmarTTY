@@ -18,7 +18,11 @@ public enum TarEntryType
 
     HardLink,
 
-    /// <summary>A device node, a FIFO or another kind that carries no data.</summary>
+    /// <summary>
+    /// A device node or a FIFO (no data), or a kind this reader does not use: a GNU sparse file ('S'), a dump directory ('D') or a
+    /// vendor type. Such a member is listed and passed on as it is, and the data that follows its header (the size of the header says
+    /// how much) is passed with it.
+    /// </summary>
     Other,
 
     /// <summary>A pax global header ('g'): it applies to the whole archive, so a filtered archive keeps it.</summary>
@@ -33,7 +37,10 @@ public sealed class TarEntry
 
     public TarEntryType Type { get; set; }
 
-    /// <summary>The size of the data of the member (0 for anything but a regular file).</summary>
+    /// <summary>
+    /// The size of the data after the header of the member: the length of a regular file, or of what a type of another kind keeps
+    /// (the stored part of a sparse file); 0 for a link, a folder, a device and a FIFO.
+    /// </summary>
     public long Size { get; set; }
 
     public string LinkName { get; set; }
@@ -119,6 +126,12 @@ public sealed class TarArchiveReader
                 return null;
             }
             char type = (char)header[156];
+            string mapProblem = TarArchiveChecker.ReadSparseExtensions(_stream, header, _headerBlocks);
+            if (mapProblem != null)
+            {
+                Problem = mapProblem;
+                return null;
+            }
             if (type == 'L' || type == 'K' || type == 'x')
             {
                 // An extension header: its data belongs to the header blocks of the member that follows.
@@ -198,7 +211,10 @@ public sealed class TarArchiveReader
                 // Old tar programs mark folders by the trailing slash only.
                 entry.Type = TarEntryType.Directory;
             }
-            bool hasData = entry.Type == TarEntryType.File || entry.Type == TarEntryType.GlobalHeader;
+            // A type that is none of the above still has its data after the header (a sparse file, a dump directory): skipping it
+            // by the size is what tells where the next header is. Devices and FIFOs have none, whatever the size field says.
+            bool hasData = entry.Type == TarEntryType.File || entry.Type == TarEntryType.GlobalHeader
+                || (entry.Type == TarEntryType.Other && !TarArchiveChecker.CarriesNoData(type));
             entry.Size = hasData ? size : 0;
             entry.Name = NormalizeName(name);
             entry.LinkName = link;

@@ -48,6 +48,7 @@ internal static partial class Program
             SelectionTests();
             ArchiveCheckerTests();
             ReaderTests();
+            DataTypeTests();
             if (OperatingSystem.IsWindows())
             {
                 Console.WriteLine("SKIP: the shell commands are not run on Windows");
@@ -57,6 +58,7 @@ internal static partial class Program
                 ListingTests("/bin/sh", null);
                 ArchiveTests("/bin/sh", null);
                 RestoreTests("/bin/sh", null);
+                SparseArchiveTests();
                 string busybox = new[] { "/usr/bin/busybox", "/bin/busybox" }.FirstOrDefault(File.Exists);
                 if (busybox == null)
                 {
