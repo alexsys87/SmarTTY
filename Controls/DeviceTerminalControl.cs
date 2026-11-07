@@ -2268,6 +2268,15 @@ public partial class DeviceTerminalControl : DpiAwareControl
                 }
                 return;
             }
+            bool slowPaste = _pasteMode == PasteMode.Slow || options.SlowPasteAlways;
+            if (!HexMode && !slowPaste && _serialTerminalControl.HasInputLine)
+            {
+                // At the prompt the text goes into the input line at the caret, as in the smart terminal: what was typed
+                // stays, and nothing runs before Enter. Sent to the device straight away, it used to be echoed from the
+                // start of the line, over the typed text.
+                _serialTerminalControl.PasteIntoInputLine(text, _pasteMode);
+                return;
+            }
             // A command wrapped by its source must not go out in pieces; every line break sends the line at once.
             text = PasteGuard.ApplyMode(text, _pasteMode);
             text = ShellCommandLine.JoinWrappedLines(text, indentContinues: false);

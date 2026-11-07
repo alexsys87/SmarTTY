@@ -1107,6 +1107,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
         return new TextDocument.TextPosition(column, line);
     }
 
+    private bool _caretClampedFromOutput;
+
     private void UpdateCaretFromInputLine()
     {
         if (_inputLine == null) return;
@@ -1120,7 +1122,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// </summary>
     private void SyncInputCaretFromScreen()
     {
-        if (_inputLine == null || _visibleColumns <= 0) return;
+        if (_inputLine == null || _visibleColumns <= 0 || _caretClampedFromOutput) return;
 
         TextDocument.TextPosition caret = CaretPosition;
         string fullText = _inputLine.Prompt + _inputLine.Text;
@@ -1387,21 +1389,28 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 }
             }
         }
-        else if (tokens.Length > 0)
+        else
         {
-            // Caret is after the last token
-            var lastToken = tokens[tokens.Length - 1];
-            tokenStart = lastToken.End;
-            tokenEnd = lastToken.End;
-
-            string prevText = lastToken.Extract(text);
-            if (prevText == "cd" || prevText == "ls" || prevText == "dir")
+            // The caret is between words or after the last one ("rm |"): an empty word at the caret is completed. The
+            // word used to start at the end of the previous one, so the chosen path replaced the blank after it.
+            tokenStart = caretIndex;
+            tokenEnd = caretIndex;
+            CompletionSession.Token? previous = null;
+            foreach (var token in tokens)
             {
-                target = CompletionTarget.Directory;
+                if (token.End < caretIndex)
+                {
+                    previous = token;
+                }
+            }
+            if (previous.HasValue)
+            {
+                string prevText = previous.Value.Extract(text);
+                target = (prevText == "cd" || prevText == "ls" || prevText == "dir") ? CompletionTarget.Directory : CompletionTarget.Path;
             }
             else
             {
-                target = CompletionTarget.Path;
+                target = CompletionTarget.Command;
             }
         }
 
@@ -1767,12 +1776,16 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     protected override void SetCaretCore(TextDocument.TextPosition textPosition, SelectionChangeSource selectionChangeSource, CaretDirection caretDirection = CaretDirection.Unspecified)
     {
+        // A caret held at the start of the input line only because the mouse selected text above it (to copy it)
+        // does not say where to type or paste.
+        _caretClampedFromOutput = false;
         if (_inputLine != null)
         {
             // Constrain caret to input area
             if (textPosition < _inputLine.StartPosition)
             {
                 textPosition = _inputLine.StartPosition;
+                _caretClampedFromOutput = true;
             }
         }
         base.SetCaretCore(textPosition, selectionChangeSource, caretDirection);
@@ -1904,63 +1917,66 @@ public class SerialTerminalControl : TerminalEmulatorControl
             base.PasteText(clipboardText);
             return;
         }
+        PasteIntoInputLine(clipboardText, PasteModeInUse);
+    }
+
+    /// <summary>
+    /// Pastes into the input line the way the smart terminal does: the text goes where the caret is (a selection inside
+    /// the line is replaced), several lines become one command line as a shell would run them ("; " between commands,
+    /// a wrapped command joined with a space), and nothing is sent before Enter. False when no input line is shown.
+    /// </summary>
+    public bool PasteIntoInputLine(string clipboardText, PasteMode mode)
+    {
+        if (_inputLine == null)
+        {
+            return false;
+        }
         try
         {
-            string text = PasteGuard.ApplyMode(clipboardText, PasteModeInUse);
-            if (!string.IsNullOrEmpty(text))
-            {
-                // Each line is sent as a command: a command wrapped by its source must not go out in pieces.
-                text = ShellCommandLine.JoinWrappedLines(text, indentContinues: false);
-            }
-            // Every line break submits the line to the device at once.
-            text = _inputLine != null ? PasteGuard.Prepare(text, AppSettings, linesRunAtOnce: true, owner: this) : null;
+            string text = PasteGuard.Prepare(PasteGuard.ApplyMode(clipboardText, mode), AppSettings, linesRunAtOnce: false, owner: this);
+            text = ShellCommandLine.JoinPastedLines(text);
             // The device may use an encoding without some of the characters of the text.
-            text = text != null ? PasteGuard.FitToEncoding(text, InputEncoding, AppSettings, this) : null;
-            if (_inputLine != null && !string.IsNullOrEmpty(text))
+            text = !string.IsNullOrEmpty(text) ? PasteGuard.FitToEncoding(text, InputEncoding, AppSettings, this) : null;
+            if (_inputLine == null || string.IsNullOrEmpty(text))
+            {
+                return true;
+            }
+            // The command continues from the text that a history search shows now.
+            _historySearch = null;
+
+            int start;
+            int length = 0;
+            int selectionStart = HasSelection ? GetInputIndexFromDocumentPosition(SelectionStart) : -1;
+            int selectionEnd = HasSelection ? GetInputIndexFromDocumentPosition(CaretPosition) : -1;
+            if (selectionStart >= 0 && selectionEnd >= 0 && !_caretClampedFromOutput)
+            {
+                // A selection inside the input line is replaced, as in any editor.
+                start = Math.Min(selectionStart, selectionEnd);
+                length = Math.Abs(selectionEnd - selectionStart);
+            }
+            else
             {
                 SyncInputCaretFromScreen();
-                int offset = _inputLine.CaretIndex;
-                var run = new System.Text.StringBuilder();
-                foreach (char ch in text)
-                {
-                    if (ch == '\n')
-                    {
-                        if (run.Length > 0)
-                        {
-                            ReplaceInputLineText(offset, 0, run.ToString());
-                            offset += run.Length;
-                            run.Clear();
-                        }
-                        SubmitCommand();
-                        if (_inputLine == null)
-                        {
-                            // Text after a final newline falls on a fresh prompt that
-                            // has not been drawn yet; stop inserting (same as before).
-                            break;
-                        }
-                        offset = 0;
-                    }
-                    else
-                    {
-                        run.Append(ch);
-                    }
-                }
-                if (run.Length > 0)
-                {
-                    ReplaceInputLineText(offset, 0, run.ToString());
-                }
-                UpdateCaretFromInputLine();
-                // Send pasted text to device
-                if (_localEcho)
-                {
-                    SendText(text, InputKind.Paste);
-                }
+                start = _inputLine.CaretIndex;
+            }
+            if (HasSelection)
+            {
+                SetSelection(select: false, CaretPosition);
+                Invalidate();
+            }
+            ReplaceInputLineText(start, length, text);
+            UpdateCaretFromInputLine();
+            // With "Echo typed characters" the device gets the characters as they are put in.
+            if (_localEcho)
+            {
+                SendText(text, InputKind.Paste);
             }
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
+        return true;
     }
 
     public void OnDataReceived(string text)
