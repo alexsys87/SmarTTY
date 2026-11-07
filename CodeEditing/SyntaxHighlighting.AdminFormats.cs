@@ -699,6 +699,119 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(ApacheDirectives, startState, text, sink, out endState, valueKeywords: ApacheValues);
     }
 
+    // -------------------------------------------------------- systemd-networkd
+
+    private static readonly HashSet<string> SystemdNetworkdDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        @"Name MACAddress Driver Type Kind Path Property Host Virtual
+          MACAddressPolicy NamePolicy AddressPolicy Address AlternativeName AlternativeNames
+          DHCP DHCPv4 DHCPv6 DHCPServer DHCPServerStaticLease Address Gateway DNS Domains NTP
+          LinkLocalAddressing IPv4LLRoute IPv6AcceptRA IPv6DuplicateAddressDetection IPv6PrivacyExtensions
+          IPv6SendRA IPv6Token IPv6MTUBytes IPv6StableSecretAddress IPv6LinkLocalAddressGenerationMode
+          ConfigureWithoutCarrier IgnoreCarrierLoss KeepConfiguration RequiredForOnline RequiredFamilyForOnline
+          BindCarrier VLAN Bridge Bond Tunnel VXLAN MACsec IPoIB CAN MultiqueueSRv6
+          Peer Broadcast Label PreferredLifetime ValidLifetime Scope
+          Destination Source Metric Table Protocol Type
+          ClientIdentifier VendorClassIdentifier UseDNS UseNTP UseDomains UseHostname UseRoutes RouteMetric
+          UseMTU UseGateway Token PoolOffset PoolSize EmitDNS EmitNTP EmitRouter Router EmitTimezone Timezone
+          PrefixDelegationHint
+          STP Priority ForwardDelay HelloTime MaxAge AgeingTime VLANFiltering
+          Id Mode MIIMonitorSec LACPTransmitRate UpDelaySec DownDelaySec
+          Local Remote TTL
+          RouterLifetime");
+
+    private static readonly HashSet<string> SystemdNetworkdValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"yes no on off true false ipv4 ipv6 both none static dhcp routable carrier up down any
+          promiscuous auto forever link-local global host site universe nowhere success degraded
+          stable-privacy mac random persistent onlink mtu unspecified unicast blackhole unreachable
+          prohibit throw local main default");
+
+    /// <summary>
+    /// systemd-networkd: the colours of Config with the keys of .network, .netdev and .link files known. The sections
+    /// ([Match], [Network], [Address], [Route], ...) are coloured by the Config tokenizer.
+    /// </summary>
+    private static bool TokenizeSystemdNetworkd(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(SystemdNetworkdDirectives, startState, text, sink, out endState, valueKeywords: SystemdNetworkdValues);
+    }
+
+    // -------------------------------------------------------------- Kubernetes
+
+    private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope and the metadata
+        @"apiVersion kind metadata spec status name generateName namespace labels annotations ownerReferences finalizers
+          uid resourceVersion generation creationTimestamp deletionTimestamp deletionGracePeriodSeconds managedFields
+          // the pods and their containers
+          containers initContainers ephemeralContainers image imagePullPolicy command args workingDir ports containerPort
+          hostPort hostIP protocol env envFrom prefix configMapRef secretRef value valueFrom fieldRef resourceFieldRef
+          configMapKeyRef secretKeyRef resources requests limits cpu memory hugepages volumeMounts mountPath
+          mountPropagation subPath subPathExpr readOnly volumeDevices devicePath
+          livenessProbe readinessProbe startupProbe httpGet tcpSocket grpc exec scheme host httpHeaders initialDelaySeconds
+          periodSeconds timeoutSeconds successThreshold failureThreshold terminationGracePeriodSeconds lifecycle postStart
+          preStop securityContext runAsUser runAsGroup runAsNonRoot allowPrivilegeEscalation readOnlyRootFilesystem
+          privileged capabilities add drop seccompProfile appArmorProfile fsGroup fsGroupChangePolicy supplementalGroups
+          sysctls serviceAccountName serviceAccount automountServiceAccountToken dnsPolicy dnsConfig nameservers searches
+          options nodeName nodeSelector restartPolicy terminationMessagePath terminationMessagePolicy hostNetwork hostPID
+          hostIPC shareProcessNamespace schedulerName priorityClassName priority preemptionPolicy
+          // scheduling
+          tolerations affinity nodeAffinity podAffinity podAntiAffinity requiredDuringSchedulingIgnoredDuringExecution
+          preferredDuringSchedulingIgnoredDuringExecution matchExpressions matchFields matchLabels operator values weight topologyKey
+          topologySpreadConstraints maxSkew whenUnsatisfiable labelSelector nodeSelectorTerms
+          // the volumes
+          volumes configMap secret emptyDir hostPath persistentVolumeClaim claimName storageClassName accessModes nfs server
+          iscsi targetPortal iqn lun rbd cephfs glusterfs awsElasticBlockStore gcePersistentDisk azureDisk azureFile csi
+          driver volumeAttributes projected downwardAPI serviceAccountToken expirationSeconds audience path medium sizeLimit
+          defaultMode optional items key mode
+          // the services and the ingress
+          service type clusterIP clusterIPs externalIPs loadBalancerIP loadBalancerSourceRanges externalName
+          externalTrafficPolicy internalTrafficPolicy sessionAffinity sessionAffinityConfig selector port targetPort nodePort
+          appProtocol publishNotReadyAddresses healthCheckNodePort ipFamilyPolicy ipFamilies allocateLoadBalancerNodePorts
+          ingressClassName tls hosts secretName rules http paths pathType backend serviceName servicePort resource
+          defaultBackend
+          // the workloads
+          replicas revisionHistoryLimit paused strategy rollingUpdate maxSurge maxUnavailable minReadySeconds
+          progressDeadlineSeconds template updateStrategy podManagementPolicy volumeClaimTemplates
+          persistentVolumeReclaimPolicy allowedTopologies schedule concurrencyPolicy suspend successfulJobsHistoryLimit
+          failedJobsHistoryLimit startingDeadlineSeconds completions parallelism backoffLimit activeDeadlineSeconds
+          ttlSecondsAfterFinished
+          // RBAC, autoscaling and the policies
+          apiGroups resources resourceNames verbs nonResourceURLs subjects roleRef apiGroup aggregationRule
+          clusterRoleSelectors minReplicas maxReplicas metrics scaleTargetRef behavior scaleUp scaleDown
+          stabilizationWindowSeconds policies policy podSelector policyTypes from to namespaceSelector ipBlock cidr except
+          hard minAvailable disruptionBudget
+          // custom resources
+          group scope names plural singular shortNames categories versions served storage schema openAPIV3Schema
+          properties required additionalProperties description format enum conversion webhook admissionReviewVersions
+          clientConfig caBundle
+          // Helm
+          chart apiVersion appVersion kubeVersion keywords home sources dependencies maintainers icon condition tags
+          repository alias deprecated");
+
+    private static readonly HashSet<string> KubernetesValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the kinds
+        @"Pod Deployment Service StatefulSet DaemonSet ReplicaSet Job CronJob ConfigMap Secret Ingress Namespace
+          PersistentVolume PersistentVolumeClaim ServiceAccount Role RoleBinding ClusterRole ClusterRoleBinding NetworkPolicy
+          PodDisruptionBudget HorizontalPodAutoscaler StorageClass CustomResourceDefinition ResourceQuota LimitRange
+          Endpoints EndpointSlice PriorityClass RuntimeClass CSIDriver CSINode VolumeAttachment APIService
+          // the api versions
+          v1 v1beta1 v1beta2 v2 v2beta1 v2beta2
+          // the choices of the fields
+          Always IfNotPresent Never OnFailure TCP UDP SCTP ClusterIP NodePort LoadBalancer ExternalName RollingUpdate Recreate
+          ReadWriteOnce ReadOnlyMany ReadWriteMany ReadWriteOncePod NoSchedule PreferNoSchedule NoExecute In NotIn Exists
+          DoesNotExist Gt Lt DoNotSchedule ScheduleAnyway Allow Forbid Replace ClusterFirst Default ClusterFirstWithHostNet
+          application library Delete Retain Recycle RuntimeDefault Unconfined Localhost
+          // Helm template functions
+          include template tpl required default quote squote toYaml fromYaml toJson fromJson nindent indent trim upper lower
+          title trunc replace printf range with if else end define block fail lookup semverCompare");
+
+    /// <summary>
+    /// Kubernetes and Helm: the colours and the folds of YAML with the keys of the manifests and the chart metadata
+    /// known, and the kinds, api versions and Helm template functions coloured as values.
+    /// </summary>
+    private static bool TokenizeKubernetes(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(KubernetesKeywords, KubernetesValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)

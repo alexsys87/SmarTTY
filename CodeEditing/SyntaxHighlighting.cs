@@ -95,14 +95,16 @@ namespace SmarTTY.CodeEditing
             MySql,   // my.cnf, my.ini: the colors of Config with the MySQL/MariaDB options known
             Redis,   // redis.conf, sentinel.conf: the colors of Config with the Redis directives known
             HAProxy, // haproxy.cfg: the colors of Config with the sections, directives and values of HAProxy known
-            ApacheHttpd // httpd.conf, apache2.conf, .htaccess: the colors of Config with the Apache directives known
+            ApacheHttpd, // httpd.conf, apache2.conf, .htaccess: the colors of Config with the Apache directives known
+            SystemdNetworkd, // .network, .netdev, .link: the colors of Config with the systemd-networkd keys known
+            Kubernetes // Kubernetes and Helm YAML: the colors of YAML with the keys of the manifests known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -138,6 +140,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Redis: return "Redis config";
                 case Language.HAProxy: return "HAProxy config";
                 case Language.ApacheHttpd: return "Apache httpd config";
+                case Language.SystemdNetworkd: return "systemd-networkd";
+                case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
@@ -299,6 +303,26 @@ namespace SmarTTY.CodeEditing
                 (name.EndsWith(".conf", StringComparison.Ordinal) || name == ".htaccess" || name.IndexOf('.') < 0))
             {
                 return Language.ApacheHttpd;
+            }
+            if (lowerCasePath.Contains("/systemd/network/"))
+            {
+                return Language.SystemdNetworkd;
+            }
+            // Kubernetes manifests, Kustomize overlays and Helm charts: YAML told by the place or the conventional name.
+            bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
+            if (yamlFile && (lowerCasePath.Contains("/kubernetes/") || lowerCasePath.Contains("/k8s/") ||
+                lowerCasePath.Contains("/kube/") || lowerCasePath.Contains("/manifests/") ||
+                lowerCasePath.Contains("/helm/") || lowerCasePath.Contains("/charts/") ||
+                name == "kustomization.yml" || name == "kustomization.yaml" ||
+                name == "chart.yml" || name == "chart.yaml" ||
+                name == "deployment.yml" || name == "deployment.yaml" ||
+                name == "statefulset.yml" || name == "statefulset.yaml" ||
+                name == "daemonset.yml" || name == "daemonset.yaml" ||
+                name == "configmap.yml" || name == "configmap.yaml" ||
+                name == "cronjob.yml" || name == "cronjob.yaml" ||
+                name == "ingress.yml" || name == "ingress.yaml"))
+            {
+                return Language.Kubernetes;
             }
             if ((lowerCasePath.Contains("/ssh_config.d/") || lowerCasePath.Contains("/sshd_config.d/")) && name.EndsWith(".conf", StringComparison.Ordinal))
             {
@@ -556,12 +580,14 @@ namespace SmarTTY.CodeEditing
                 case "editorconfig":
                 case "toml":
                 case "env":
-                case "network":
-                case "netdev":
-                case "link":
                 case "desktop":
                 case "rules":
                     return Language.Config;
+
+                case "network":
+                case "netdev":
+                case "link":
+                    return Language.SystemdNetworkd;
 
                 case "bb":
                 case "bbappend":
@@ -949,6 +975,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Redis: return TokenizeRedis;
                 case Language.HAProxy: return TokenizeHAProxy;
                 case Language.ApacheHttpd: return TokenizeApache;
+                case Language.SystemdNetworkd: return TokenizeSystemdNetworkd;
+                case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -1076,6 +1104,10 @@ namespace SmarTTY.CodeEditing
                     return Combine(HAProxyDirectives, HAProxyValues);
                 case Language.ApacheHttpd:
                     return Combine(ApacheDirectives, ApacheValues);
+                case Language.SystemdNetworkd:
+                    return Combine(SystemdNetworkdDirectives, SystemdNetworkdValues);
+                case Language.Kubernetes:
+                    return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:
@@ -4690,6 +4722,16 @@ namespace SmarTTY.CodeEditing
         /// <summary>YAML: the colors of the config tokenizer, and a fold for every "key:", "- key: value" and block scalar.</summary>
         private static bool TokenizeYaml(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
+            return TokenizeYamlCore(null, null, startState, text, sink, out endState);
+        }
+
+        /// <summary>
+        /// YAML with the keys of a format known (Kubernetes, Docker Compose, Ansible): a key of <paramref name="keywords"/>
+        /// is a keyword, an unknown key stays an ordinary key, and the words of <paramref name="values"/> are coloured
+        /// wherever they stand. With null sets this is plain YAML.
+        /// </summary>
+        private static bool TokenizeYamlCore(HashSet<string> keywords, HashSet<string> values, int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
             int len = text.Length;
             int depth = startState & 7;
             int levels = (startState >> YamlLevelShift) & 0xFFFFFF;
@@ -4745,7 +4787,7 @@ namespace SmarTTY.CodeEditing
 
             if (!scalarText)
             {
-                TokenizeConfig(0, text, buffer, out int ignored);
+                TokenizeConfigCore(keywords, 0, text, buffer, out int ignored, valueKeywords: values);
             }
 
             if (code)
