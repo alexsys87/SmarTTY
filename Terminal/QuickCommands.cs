@@ -129,6 +129,18 @@ public sealed class QuickCommandList
 /// The rules of quick commands and the shell commands that put a script on the server. Pure logic without WPF or SSH, tested by
 /// tests/QuickCommandsTests.
 /// </summary>
+public enum RemoteNameState
+{
+    /// <summary>Nothing of that name is there: the check ran to its end and printed nothing.</summary>
+    Free,
+
+    /// <summary>A file, a folder or a link (a dangling one too) of that name is there.</summary>
+    Exists,
+
+    /// <summary>The check did not run to its end (it timed out, the connection or the channel failed): nothing can be said.</summary>
+    Unknown
+}
+
 public static class QuickCommandRules
 {
     public const int MaxCommandLength = 4096;
@@ -223,6 +235,21 @@ public static class QuickCommandRules
     public static string BuildExistsCommand(string remotePath)
     {
         return SmarTTY.Utilities.PosixShell.Wrap("if [ -e " + RemotePathUtils.ShellQuote(remotePath) + " ] || [ -L " + RemotePathUtils.ShellQuote(remotePath) + " ]; then echo exists; fi");
+    }
+
+    /// <summary>
+    /// What the answer to <see cref="BuildExistsCommand"/> says. <paramref name="lines"/> is null when the command could not be run
+    /// or was abandoned. The command ends with status 0 whether the name is there or not, so "free" needs the output of a command that
+    /// ran to its end: no output from a command that timed out, lost its channel, was closed without a status or failed to start (127)
+    /// does not mean that the name is free. The upload replaces a file of that name without a word, so only "free" lets it go on unasked.
+    /// </summary>
+    public static RemoteNameState ReadExistsAnswer(IEnumerable<string> lines, int? exitStatus)
+    {
+        if (lines != null && lines.Any(line => line != null && line.Trim() == "exists"))
+        {
+            return RemoteNameState.Exists;
+        }
+        return lines != null && exitStatus == 0 ? RemoteNameState.Free : RemoteNameState.Unknown;
     }
 
     /// <summary>

@@ -33,6 +33,29 @@ internal static class Program
         Check(equal, name + (equal ? "" : $" (expected '{expected}', got '{actual}')"));
     }
 
+    /// <summary>
+    /// The upload replaces a file of the same name without a word, so only a check that ran to its end and printed nothing may let
+    /// it go on unasked: a check that timed out (no lines), lost its channel, was closed without a status or failed is "unknown".
+    /// </summary>
+    private static void ExistsAnswerTests()
+    {
+        Equal(QuickCommandRules.ReadExistsAnswer(new string[0], 0), RemoteNameState.Free, "exists answer: no output from a check that ended with 0 is 'free'");
+        Equal(QuickCommandRules.ReadExistsAnswer(new[] { "exists" }, 0), RemoteNameState.Exists, "exists answer: 'exists' is 'exists'");
+        Equal(QuickCommandRules.ReadExistsAnswer(new[] { "exists\r" }, 0), RemoteNameState.Exists, "exists answer: a carriage return after it does not matter");
+        Equal(QuickCommandRules.ReadExistsAnswer(new[] { " exists " }, 0), RemoteNameState.Exists, "exists answer: nor do blanks");
+        Equal(QuickCommandRules.ReadExistsAnswer(new[] { "exists" }, null), RemoteNameState.Exists, "exists answer: 'exists' counts without an exit status (the file is there)");
+        Equal(QuickCommandRules.ReadExistsAnswer(new[] { "exists" }, 1), RemoteNameState.Exists, "exists answer: 'exists' counts after another status as well");
+        Equal(QuickCommandRules.ReadExistsAnswer(null, null), RemoteNameState.Unknown, "exists answer: a check that could not be run or was abandoned (null) is 'unknown'");
+        Equal(QuickCommandRules.ReadExistsAnswer(null, 0), RemoteNameState.Unknown, "exists answer: no lines at all are 'unknown', whatever the status");
+        Equal(QuickCommandRules.ReadExistsAnswer(new string[0], null), RemoteNameState.Unknown, "exists answer: no output and no exit status (the channel was closed) is 'unknown'");
+        Equal(QuickCommandRules.ReadExistsAnswer(new string[0], 1), RemoteNameState.Unknown, "exists answer: no output and a failure is 'unknown'");
+        Equal(QuickCommandRules.ReadExistsAnswer(new string[0], -1), RemoteNameState.Unknown, "exists answer: no output and a signal is 'unknown'");
+        Equal(QuickCommandRules.ReadExistsAnswer(new[] { "sh: 1: not found" }, 127), RemoteNameState.Unknown, "exists answer: a shell that did not start is 'unknown'");
+        Equal(QuickCommandRules.ReadExistsAnswer(new[] { "Last login: today" }, 0), RemoteNameState.Free, "exists answer: other lines of a check that ended with 0 do not make the name taken");
+        Equal(QuickCommandRules.ReadExistsAnswer(new[] { "not exists" }, 0), RemoteNameState.Free, "exists answer: only the whole line 'exists' counts");
+        Equal(QuickCommandRules.ReadExistsAnswer(new string[] { null }, 0), RemoteNameState.Free, "exists answer: an empty entry is no answer");
+    }
+
     private static int Main()
     {
         _work = Path.Combine(Path.GetTempPath(), "smartty-quick-" + Guid.NewGuid().ToString("N"));
@@ -40,6 +63,7 @@ internal static class Program
         try
         {
             RuleTests();
+            ExistsAnswerTests();
             MenuTests();
             XmlTests();
             if (OperatingSystem.IsWindows())
@@ -227,12 +251,14 @@ internal static class Program
             byte[] data = QuickCommandRules.ScriptBytes("#!/bin/sh\r\necho \"ran $0 in $(pwd)\"\r\necho arg=$1");
             Equal(Run(busybox, QuickCommandRules.BuildExistsCommand(remotePath), null, out string existsBefore, out _), 0, label + " " + fileName + ": the check of the name runs");
             Check(existsBefore.Trim() == "", label + " " + fileName + ": a missing file is not reported");
+            Equal(QuickCommandRules.ReadExistsAnswer(existsBefore.Split('\n'), 0), RemoteNameState.Free, label + " " + fileName + ": the answer of the check is read as 'free'");
             int exit = Run(busybox, QuickCommandRules.BuildUploadCommand(remotePath), data, out _, out string error);
             Check(exit == 0 && File.ReadAllBytes(remotePath).SequenceEqual(data), label + " " + fileName + ": the upload stores the script (" + error.Trim() + ")");
             Check((File.GetUnixFileMode(remotePath) & UnixFileMode.UserExecute) != 0 && (File.GetUnixFileMode(remotePath) & UnixFileMode.OtherExecute) != 0, label + " " + fileName + ": the script is executable (755)");
             Check(!File.Exists(remotePath + ".smartty-part"), label + " " + fileName + ": no temporary file is left");
-            Run(busybox, QuickCommandRules.BuildExistsCommand(remotePath), null, out string existsAfter, out _);
+            Equal(Run(busybox, QuickCommandRules.BuildExistsCommand(remotePath), null, out string existsAfter, out _), 0, label + " " + fileName + ": the check ends with status 0 when the file is there, as when it is not");
             Equal(existsAfter.Trim(), "exists", label + " " + fileName + ": an existing file is reported");
+            Equal(QuickCommandRules.ReadExistsAnswer(existsAfter.Split('\n'), 0), RemoteNameState.Exists, label + " " + fileName + ": the answer of the check is read as 'exists'");
 
             // What the menu types into the command line, run in the current folder of the terminal.
             string invocation = QuickCommandRules.BuildInvocation(fileName);

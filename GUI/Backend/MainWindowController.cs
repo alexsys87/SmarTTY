@@ -2482,13 +2482,17 @@ public class MainWindowController : INotifyPropertyChanged
     public void Dispose()
     {
         SessionWrapper[] items = AllSessions.ToArray();
+        List<System.Threading.Tasks.Task> cleanups = new List<System.Threading.Tasks.Task>();
         foreach (SessionWrapper sessionWrapper in items)
         {
             if (!sessionWrapper.IsPlaceholder)
             {
-                sessionWrapper.Dispose();
+                cleanups.Add(sessionWrapper.Shutdown());
             }
         }
+        // The sessions clean their devices up side by side, and the window waits for them together: a connection that went away without
+        // a word costs the wait of one session, not of each one in turn. A device that answers is cleaned up in moments.
+        BoundedWork.WaitAll(cleanups, SessionWrapper.CleanupLimit + TimeSpan.FromSeconds(2));
         _Worker.Dispose();
         NewConnectionController?.Dispose();
         ToolStrip?.Dispose();
