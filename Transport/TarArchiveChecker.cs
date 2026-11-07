@@ -163,19 +163,43 @@ public static class TarArchiveChecker
         return stored == unsignedSum || stored == signedSum;
     }
 
-    /// <summary>An octal number field, or the base-256 form that GNU and BusyBox tar use for sizes of 8 GiB and more; -1 when invalid.</summary>
+    /// <summary>An octal number field, or the base-256 form that GNU and BusyBox tar use for sizes of 8 GiB and more; -1 when invalid or negative.</summary>
     internal static long ParseNumber(byte[] header, int offset, int length)
     {
+        return TryParseNumber(header, offset, length, out long value) && value >= 0 ? value : -1;
+    }
+
+    /// <summary>
+    /// A number field of a header: octal (an empty field is 0), or base-256 that GNU and BusyBox tar use for what octal cannot hold,
+    /// sizes of 8 GiB and more and times before 1970 or after 2242. A base-256 field is a big-endian two's complement number: bit 7
+    /// of its first byte only marks the form, bit 6 is the sign. False when the field is no number or does not fit into a long.
+    /// </summary>
+    internal static bool TryParseNumber(byte[] header, int offset, int length, out long value)
+    {
+        value = 0;
         if ((header[offset] & 0x80) != 0)
         {
-            long big = header[offset] & 0x7F;
-            for (int i = 1; i < length; i++)
+            bool negative = (header[offset] & 0x40) != 0;
+            long big = negative ? -1 : 0;
+            for (int i = 0; i < length; i++)
             {
-                big = (big << 8) | header[offset + i];
+                int current = header[offset + i];
+                if (i == 0)
+                {
+                    // Bit 7 is the marker, not data: put the sign extension in its place.
+                    current = negative ? (current | 0x80) : (current & 0x7F);
+                }
+                // The next byte shifts the number by 8 bits: it must not lose any bit that matters.
+                if (big > (long.MaxValue >> 8) || big < (long.MinValue >> 8))
+                {
+                    return false;
+                }
+                big = (big << 8) | (long)current;
             }
-            return big;
+            value = big;
+            return true;
         }
-        long value = 0;
+        long number = 0;
         bool any = false;
         for (int i = offset; i < offset + length; i++)
         {
@@ -190,11 +214,12 @@ public static class TarArchiveChecker
             }
             if (c < '0' || c > '7')
             {
-                return -1;
+                return false;
             }
-            value = value * 8 + (c - '0');
+            number = number * 8 + (c - '0');
             any = true;
         }
-        return value;
+        value = number;
+        return true;
     }
 }

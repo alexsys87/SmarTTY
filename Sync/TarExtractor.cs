@@ -1,6 +1,8 @@
 using SmarTTY.Native;
+using SmarTTY.Transport;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -75,6 +77,14 @@ public class TarExtractor
 
     private static DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0);
 
+    // The times that a file can have on Windows (a FILETIME starts in 1601) and in a DateTime; a time outside is clamped.
+    private static readonly long MinUnixSeconds = (long)(new DateTime(1601, 1, 2) - UnixEpoch).TotalSeconds;
+
+    private static readonly long MaxUnixSeconds = (long)(DateTime.MaxValue - UnixEpoch).TotalSeconds;
+
+    /// <summary>The data of a GNU 'L', 'K' or a pax 'x', 'g' record is a few names; a bigger one is a broken or malicious archive.</summary>
+    private const int MaxExtensionHeaderSize = 16 * 1024 * 1024;
+
     private DirectoryStatistics _statistics = new DirectoryStatistics();
 
     private List<PendingSymlink> _symlinks = new List<PendingSymlink>();
@@ -125,9 +135,70 @@ public class TarExtractor
         {
             throw new Exception("Invalid file name in a TAR record");
         }
-        size = Convert.ToUInt64(utf8.GetString(buffer, 124, 12).TrimEnd('\0', ' '), 8);
+        // Octal, or base-256 for 8 GiB and more (GNU tar, BusyBox tar): the same reader as the archive checker has.
+        long parsedSize = TarArchiveChecker.ParseNumber(buffer, 124, 12);
+        if (parsedSize < 0)
+        {
+            throw new InvalidDataException("Invalid size in a TAR record");
+        }
+        size = (ulong)parsedSize;
         typeFlag = buffer[156];
         return buffer;
+    }
+
+    private void ReadExactly(byte[] buffer, int count, string errorMessage)
+    {
+        int done = 0;
+        while (done < count)
+        {
+            int read = _stream.Read(buffer, done, count - done);
+            if (read <= 0)
+            {
+                throw new IOException(errorMessage);
+            }
+            done += read;
+        }
+    }
+
+    /// <summary>The data of an extension record ('L', 'K', 'x', 'g') without the padding to whole blocks.</summary>
+    private byte[] ReadExtensionData(ulong size)
+    {
+        if (size > MaxExtensionHeaderSize)
+        {
+            throw new InvalidDataException("An extension header of the TAR archive is too big");
+        }
+        byte[] data = new byte[(int)size];
+        ReadExactly(data, data.Length, "Incomplete TAR extension header");
+        int padLen = (512 - (int)(size % 512)) % 512;
+        if (padLen != 0)
+        {
+            ReadExactly(new byte[padLen], padLen, "Incomplete TAR extension header");
+        }
+        return data;
+    }
+
+    /// <summary>The text of a GNU long name or link target record: up to its NUL.</summary>
+    private static string ExtensionText(byte[] data)
+    {
+        int end = Array.IndexOf(data, (byte)0);
+        return Encoding.UTF8.GetString(data, 0, end < 0 ? data.Length : end);
+    }
+
+    /// <summary>The whole seconds of a pax time, "1700000000.123456789" or "-86400.5"; the fraction is dropped.</summary>
+    internal static bool TryParsePaxTime(string value, out long seconds)
+    {
+        seconds = 0L;
+        if (string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+        int dot = value.IndexOf('.');
+        return long.TryParse(dot < 0 ? value : value.Substring(0, dot), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out seconds);
+    }
+
+    private static DateTime UnixTimeToUtc(long seconds)
+    {
+        return UnixEpoch.AddSeconds(Math.Max(MinUnixSeconds, Math.Min(MaxUnixSeconds, seconds)));
     }
 
     /// <summary>
@@ -191,37 +262,93 @@ public class TarExtractor
 
     private bool ExtractNextEntry(bool ignoreErrors, bool stripFirstDirectory)
     {
-        byte[] headerBuffer = ReadHeader(out var entryName, out var entrySize, out var typeFlag);
-        if (headerBuffer == null)
+        string longName = null;
+        string longLink = null;
+        Dictionary<string, string> pax = null;
+        byte[] headerBuffer;
+        string entryName;
+        ulong entrySize;
+        byte typeFlag;
+        while (true)
         {
-            return false;
-        }
-        Encoding utf8 = Encoding.UTF8;
-        if (typeFlag == 76 && entryName == "././@LongLink")
-        {
-            int padLen = 512 - (int)(entrySize % 512);
-            byte[] nameBuffer = new byte[entrySize];
-            if (_stream.Read(nameBuffer, 0, (int)entrySize) != (int)entrySize)
-            {
-                throw new IOException("Incomplete long TAR name");
-            }
-            if (padLen != 512)
-            {
-                _stream.Read(headerBuffer, 0, padLen);
-            }
             headerBuffer = ReadHeader(out entryName, out entrySize, out typeFlag);
             if (headerBuffer == null)
             {
                 return false;
             }
-            entryName = utf8.GetString(nameBuffer, 0, nameBuffer.Length).TrimEnd(default(char));
+            if (typeFlag != 'L' && typeFlag != 'K' && typeFlag != 'x' && typeFlag != 'g')
+            {
+                break;
+            }
+            // Not an entry but a record about the next one: a GNU long name ('L') or long link target ('K'), pax attributes ('x').
+            // A pax global header ('g', git archive writes the commit id into it) is about the whole archive: nothing to extract.
+            byte[] data = ReadExtensionData(entrySize);
+            if (typeFlag == 'L')
+            {
+                longName = ExtensionText(data);
+            }
+            else if (typeFlag == 'K')
+            {
+                longLink = ExtensionText(data);
+            }
+            else if (typeFlag == 'x')
+            {
+                if (pax == null)
+                {
+                    pax = new Dictionary<string, string>(StringComparer.Ordinal);
+                }
+                foreach (KeyValuePair<string, string> record in TarArchiveReader.ParsePax(data, data.Length))
+                {
+                    pax[record.Key] = record.Value;
+                }
+            }
         }
-        ulong mtimeSec = Convert.ToUInt64(utf8.GetString(headerBuffer, 136, 12).TrimEnd('\0', ' '), 8);
-        DateTime lastWriteTimeUtc = UnixEpoch.AddSeconds(mtimeSec);
+        Encoding utf8 = Encoding.UTF8;
+        string paxPath = null;
+        string paxLinkPath = null;
+        if (pax != null)
+        {
+            pax.TryGetValue("path", out paxPath);
+            pax.TryGetValue("linkpath", out paxLinkPath);
+            if (pax.TryGetValue("size", out string paxSize))
+            {
+                // The size field of the header cannot say more than 8 GiB, or has been cut to what it can say.
+                if (!ulong.TryParse(paxSize, NumberStyles.None, CultureInfo.InvariantCulture, out ulong parsedPaxSize) || parsedPaxSize > long.MaxValue)
+                {
+                    throw new InvalidDataException("Invalid size in a TAR extended header");
+                }
+                entrySize = parsedPaxSize;
+            }
+        }
+        // The name of the header is a truncated copy when a long name or a pax path follows it.
+        if (longName != null)
+        {
+            entryName = longName;
+        }
+        if (paxPath != null)
+        {
+            entryName = paxPath;
+        }
+        if (entryName.Length == 0)
+        {
+            throw new Exception("Invalid file name in a TAR record");
+        }
+        long mtimeSeconds = 0L;
+        bool hasPaxTime = false;
+        if (pax != null && pax.TryGetValue("mtime", out string paxTime))
+        {
+            hasPaxTime = TryParsePaxTime(paxTime, out mtimeSeconds);
+        }
+        if (!hasPaxTime && !TarArchiveChecker.TryParseNumber(headerBuffer, 136, 12, out mtimeSeconds))
+        {
+            // A time field that is no number costs the time stamp of the file, not the download of the folder.
+            mtimeSeconds = 0L;
+        }
+        DateTime lastWriteTimeUtc = UnixTimeToUtc(mtimeSeconds);
         char lastChar = entryName[entryName.Length - 1];
         bool isDirectory = lastChar == '/' || lastChar == '\\' || typeFlag == 53;
         bool isLink = typeFlag == 49 || typeFlag == 50;
-        if (headerBuffer[257] == 117 && headerBuffer[258] == 115 && headerBuffer[259] == 116 && headerBuffer[260] == 97 && headerBuffer[261] == 114 && headerBuffer[262] == 0 && headerBuffer[345] != 0)
+        if (longName == null && paxPath == null && headerBuffer[257] == 117 && headerBuffer[258] == 115 && headerBuffer[259] == 116 && headerBuffer[260] == 97 && headerBuffer[261] == 114 && headerBuffer[262] == 0 && headerBuffer[345] != 0)
         {
             string prefix = utf8.GetString(headerBuffer, 345, 155).TrimEnd(default(char));
             if (!prefix.EndsWith("/"))
@@ -328,7 +455,7 @@ public class TarExtractor
             if (fullPath != null)
             {
                 _statistics.TotalSymlinks++;
-                string targetName = utf8.GetString(headerBuffer, 157, 100).TrimEnd(default(char));
+                string targetName = paxLinkPath ?? longLink ?? utf8.GetString(headerBuffer, 157, 100).TrimEnd(default(char));
                 _symlinks.Add(new PendingSymlink
                 {
                     Path = fullPath,
@@ -477,7 +604,8 @@ public class TarExtractor
         string[] segments = path.Split('/', '\\');
         foreach (string segment in segments)
         {
-            if (!(segment == ""))
+            // An empty segment (a doubled slash) and "." stay where they are; only a name goes down and ".." goes up.
+            if (!(segment == "") && segment != ".")
             {
                 currentDepth = ((!(segment == "..")) ? (currentDepth - 1) : (currentDepth + 1));
                 maxParentCount = ((!isForward) ? Math.Max(maxParentCount, -currentDepth) : Math.Max(maxParentCount, currentDepth));
@@ -506,6 +634,12 @@ public class TarExtractor
         {
             return null;
         }
+        // Only the start of the target was compared with the root. What follows is a path of its own and may climb out of the
+        // root with ".." (/srv/proj/../../x) or be rooted on Windows (a drive letter): it gets the checks of a relative target.
+        if (CountParentReferences(rest, isForward: true) > 0 || !IsPlainRelativeTarget(rest))
+        {
+            return null;
+        }
         string result = "";
         if (!isHardLink)
         {
@@ -520,6 +654,74 @@ public class TarExtractor
         return result.Length == 0 ? "." : result.Replace('/', '\\');
     }
 
+    /// <summary>
+    /// True for a link target that stays a plain relative path on Windows: it is not rooted (a leading slash or backslash, a drive
+    /// letter or a UNC path would replace the folder it is combined with) and its segments are ordinary names, "." and "..".
+    /// </summary>
+    internal static bool IsPlainRelativeTarget(string target)
+    {
+        if (target.Length != 0 && (target[0] == '/' || target[0] == '\\'))
+        {
+            return false;
+        }
+        foreach (string segment in target.Split('/', '\\'))
+        {
+            if (segment == "" || segment == "." || segment == "..")
+            {
+                continue;
+            }
+            // A ':' is a drive or a data stream, a name of dots and blanks is normalized away: the rules of the names of entries.
+            if (HasInvalidLocalNameCharacters(segment))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// True when a link target, relative to the link (a symlink) or to the extraction root (a hard link), cannot lead out of the
+    /// extraction root. A link outside would let a later download write through it into a foreign place.
+    /// </summary>
+    internal static bool IsTargetInsideRoot(string relativeLinkPath, string target, bool isHardLink)
+    {
+        if (!IsPlainRelativeTarget(target))
+        {
+            return false;
+        }
+        int targetParents = CountParentReferences(target, isForward: true);
+        int pathParents = CountParentReferences(relativeLinkPath, isForward: false) - 1;
+        // A hard link target is relative to the archive root, so it has no business going up.
+        return isHardLink ? targetParents == 0 : targetParents <= pathParents;
+    }
+
+    /// <summary>
+    /// The target of a link as a path relative to the link (a symlink) or to the extraction root (a hard link), or null when the
+    /// link cannot be created: its target is outside of the download folder (remoteRoot is the folder on the server, it is needed
+    /// to make sense of an absolute target) or is no plain relative path. Absolute and relative targets get the same check.
+    /// </summary>
+    internal static string ResolveRelativeTarget(string relativeLinkPath, string target, bool isHardLink, string remoteRoot)
+    {
+        if (string.IsNullOrEmpty(target))
+        {
+            return null;
+        }
+        string relativeTarget;
+        if (target[0] == '/')
+        {
+            if (remoteRoot == null)
+            {
+                return null;
+            }
+            relativeTarget = MakeRelativeToRoot(relativeLinkPath, target, remoteRoot, isHardLink);
+        }
+        else
+        {
+            relativeTarget = target.Replace('/', '\\');
+        }
+        return relativeTarget != null && IsTargetInsideRoot(relativeLinkPath, relativeTarget, isHardLink) ? relativeTarget : null;
+    }
+
     public void CreateSymlinks(out List<string> unresolvedLinks, string remoteRoot = null)
     {
         unresolvedLinks = new List<string>();
@@ -530,24 +732,7 @@ public class TarExtractor
             {
                 continue;
             }
-            string relativeTarget = null;
-            if (item.Target[0] == '/')
-            {
-                if (remoteRoot != null)
-                {
-                    relativeTarget = MakeRelativeToRoot(item.RelativePath, item.Target, remoteRoot, item.IsHardLink);
-                }
-            }
-            else
-            {
-                int targetParents = CountParentReferences(item.Target, isForward: true);
-                int pathParents = CountParentReferences(item.RelativePath, isForward: false) - 1;
-                // A hard link target is relative to the archive root, so it has no business going up.
-                if (item.IsHardLink ? targetParents == 0 : targetParents <= pathParents)
-                {
-                    relativeTarget = item.Target.Replace('/', '\\');
-                }
-            }
+            string relativeTarget = ResolveRelativeTarget(item.RelativePath, item.Target, item.IsHardLink, remoteRoot);
             if (relativeTarget != null)
             {
                 string baseDir = null;

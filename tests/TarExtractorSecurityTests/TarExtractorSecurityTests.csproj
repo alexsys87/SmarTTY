@@ -8,6 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Sync/TarExtractor.cs" Link="TarExtractor.cs" />
+    <Compile Include="../../Transport/TarArchiveChecker.cs" Link="TarArchiveChecker.cs" />
+    <Compile Include="../../Transport/TarArchiveReader.cs" Link="TarArchiveReader.cs" />
     <Compile Include="../../Sync/DirectoryStatistics.cs" Link="DirectoryStatistics.cs" />
     <Compile Include="../../Sync/IExtractionTarget.cs" Link="IExtractionTarget.cs" />
     <Compile Include="../../Sync/LocalFileSystem.cs" Link="LocalFileSystem.cs" />
