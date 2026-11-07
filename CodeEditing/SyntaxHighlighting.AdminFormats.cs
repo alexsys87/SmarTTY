@@ -574,6 +574,47 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(MySqlDirectives, startState, text, sink, out endState, valueKeywords: MySqlValues);
     }
 
+    // ------------------------------------------------------------------ Redis
+
+    private static readonly HashSet<string> RedisDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        @"include loadmodule bind protected-mode port tcp-backlog unixsocket unixsocketperm timeout tcp-keepalive
+          daemonize supervised pidfile loglevel logfile syslog-enabled syslog-ident syslog-facility crash-log-enabled
+          databases always-show-logo set-proc-title proc-title-template locale-collate
+          save stop-writes-on-bgsave-error rdbcompression rdbchecksum dbfilename rdb-del-sync-files dir
+          replicaof slaveof masterauth masteruser replica-serve-stale-data replica-read-only
+          repl-diskless-sync repl-diskless-sync-delay repl-diskless-load repl-disable-tcp-nodelay replica-priority
+          min-replicas-to-write min-replicas-max-lag min-slaves-to-write min-slaves-max-lag
+          aclfile requirepass user rename-command
+          maxclients maxmemory maxmemory-policy maxmemory-samples maxmemory-clients
+          lazyfree-lazy-eviction lazyfree-lazy-expire lazyfree-lazy-server-del replica-lazy-flush lazyfree-lazy-user-del
+          lazyfree-lazy-user-flush
+          appendonly appendfilename appenddirname appendfsync no-appendfsync-on-rewrite auto-aof-rewrite-percentage
+          auto-aof-rewrite-min-size aof-load-truncated aof-use-rdb-preamble aof-timestamp-enabled
+          slowlog-log-slower-than slowlog-max-len latency-monitor-threshold latency-tracking
+          latency-tracking-info-percentiles
+          notify-keyspace-events hash-max-listpack-entries hash-max-ziplist-entries hash-max-listpack-value
+          hash-max-ziplist-value list-max-listpack-size list-max-ziplist-size list-compress-depth
+          set-max-intset-entries set-max-listpack-entries set-max-listpack-value
+          zset-max-listpack-entries zset-max-ziplist-entries zset-max-listpack-value zset-max-ziplist-value
+          hll-sparse-max-bytes stream-node-max-bytes stream-node-max-entries
+          activerehashing client-output-buffer-limit hz dynamic-hz aof-rewrite-incremental-fsync
+          rdb-save-incremental-fsync jemalloc-bg-thread activedefrag");
+
+    private static readonly HashSet<string> RedisValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"yes no always everysec debug verbose notice warning
+          noeviction allkeys-lru allkeys-lfu allkeys-random volatile-lru volatile-lfu volatile-random volatile-ttl
+          on off nopass resetpass allkeys allchannels all
+          normal slave replica master");
+
+    /// <summary>
+    /// Redis: the colours of Config with the directives of redis.conf and sentinel.conf known, and the values of the
+    /// eviction policies, appendfsync and loglevel modes coloured as keywords.
+    /// </summary>
+    private static bool TokenizeRedis(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(RedisDirectives, startState, text, sink, out endState, valueKeywords: RedisValues);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)

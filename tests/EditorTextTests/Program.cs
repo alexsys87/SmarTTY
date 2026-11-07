@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -930,6 +930,7 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.Fstab) != null, "# comments in fstab");
         Check(CommentStyle.ForLanguage(L.Sudoers) != null, "# comments in sudoers");
         Check(CommentStyle.ForLanguage(L.MySql) != null, "# comments in MySQL files");
+        Check(CommentStyle.ForLanguage(L.Redis) != null, "# comments in Redis files");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1113,6 +1114,34 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("innodb_buffer_pool_size"), "MySQL keywords contain 'innodb_buffer_pool_size'");
         Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("skip-name-resolve"), "MySQL keywords contain 'skip-name-resolve'");
         Equal(Join(CommentStyle.ForLanguage(L.MySql).Toggle(new[] { "max_connections = 200" })), "# max_connections = 200", "MySQL comment");
+    }
+
+    private static void RedisChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/redis/redis.conf"), L.Redis, "redis.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/redis/6379.conf"), L.Redis, "a Redis instance file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/redis.conf"), L.Redis, "redis.conf anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/sentinel.conf"), L.Redis, "sentinel.conf anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.conf"), L.Config, "an ordinary .conf stays a config");
+
+        Highlighted redis = new Highlighted(L.Redis,
+            "# Redis\nbind 127.0.0.1 ::1\nport 6379\ndaemonize yes\nloglevel notice\nsave 900 1\nsave 300 10\ndir /var/lib/redis\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nappendonly yes\nappendfsync everysec\ninclude /etc/redis/local.conf\nuser default on nopass ~* &* +@all");
+        Equal(Join(redis.Tokens(0, SyntaxHighlighting.TypeComment)), "# Redis", "Redis: a comment");
+        Equal(Join(redis.Tokens(1, SyntaxHighlighting.TypeKeyword)), "bind", "Redis: bind");
+        Equal(Join(redis.Tokens(1, SyntaxHighlighting.TypeNumber)), "127.0.0.1|1", "Redis: the addresses");
+        Equal(Join(redis.Tokens(2, SyntaxHighlighting.TypeKeyword)), "port", "Redis: port");
+        Equal(Join(redis.Tokens(3, SyntaxHighlighting.TypeKeyword)), "daemonize|yes", "Redis: daemonize");
+        Equal(Join(redis.Tokens(4, SyntaxHighlighting.TypeKeyword)), "loglevel|notice", "Redis: the log level");
+        Equal(Join(redis.Tokens(5, SyntaxHighlighting.TypeKeyword)), "save", "Redis: save");
+        Equal(Join(redis.Tokens(5, SyntaxHighlighting.TypeNumber)), "900|1", "Redis: the save interval");
+        Equal(Join(redis.Tokens(8, SyntaxHighlighting.TypeKeyword)), "maxmemory", "Redis: maxmemory");
+        Equal(Join(redis.Tokens(9, SyntaxHighlighting.TypeKeyword)), "maxmemory-policy|allkeys-lru", "Redis: the eviction policy");
+        Equal(Join(redis.Tokens(11, SyntaxHighlighting.TypeKeyword)), "appendfsync|everysec", "Redis: appendfsync");
+        Equal(Join(redis.Tokens(12, SyntaxHighlighting.TypeKeyword)), "include", "Redis: include");
+        Equal(Join(redis.Tokens(13, SyntaxHighlighting.TypeKeyword)), "user|on|nopass|all", "Redis: an ACL user");
+        Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("maxmemory-policy"), "Redis keywords contain 'maxmemory-policy'");
+        Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("appendfsync"), "Redis keywords contain 'appendfsync'");
+        Equal(Join(CommentStyle.ForLanguage(L.Redis).Toggle(new[] { "port 6379" })), "# port 6379", "Redis comment");
     }
 
     private static void KconfigChecks()
@@ -1590,6 +1619,7 @@ internal static class Program
         FstabChecks();
         SudoersChecks();
         MySqlChecks();
+        RedisChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();
