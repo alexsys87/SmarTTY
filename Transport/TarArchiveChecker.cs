@@ -82,11 +82,16 @@ public static class TarArchiveChecker
                     return result;
                 }
                 char type = (char)header[156];
-                bool hasData = type == '0' || type == '\0' || type == '7' || type == 'L' || type == 'K' || type == 'x' || type == 'g';
-                if (!hasData)
+                if (CarriesNoData(type))
                 {
                     // Links, folders, devices and FIFOs carry no data, whatever the size field says (a hard link may repeat it).
                     size = 0;
+                }
+                string mapProblem = ReadSparseExtensions(tar, header, null);
+                if (mapProblem != null)
+                {
+                    result.Problem = mapProblem;
+                    return result;
                 }
                 if (type != 'L' && type != 'K' && type != 'x' && type != 'g')
                 {
@@ -119,6 +124,48 @@ public static class TarArchiveChecker
             result.Problem = "the gzip data ends too early: the archive was cut off";
             return result;
         }
+    }
+
+    /// <summary>
+    /// True for the types whose size field is not the length of data after the header: links, folders, devices and FIFOs ('1' to
+    /// '6'). Every other type has its data after the header, by the size field: the regular files and the extension headers, and
+    /// also a GNU sparse file ('S'), a dump directory ('D'), a multi-volume continuation ('M') and the vendor types ('A' to 'Z'),
+    /// because POSIX has a reader treat a type it does not know like a regular file.
+    /// </summary>
+    internal static bool CarriesNoData(char type)
+    {
+        return type >= '1' && type <= '6';
+    }
+
+    /// <summary>The most extension blocks of the map of holes of one sparse file that are read (16 MiB), as a header cut by the same rule.</summary>
+    internal const int MaxSparseExtensionBlocks = 32768;
+
+    /// <summary>
+    /// The old GNU format of a sparse file ('S') keeps the first four pieces of its map of holes in the header; when the flag at
+    /// offset 482 is set, the blocks of further pieces follow the header (21 in each, with a flag of their own at offset 504 that says
+    /// whether another block follows), and the data comes after them. Reads those blocks (and writes them to <paramref name="copy"/>
+    /// when it is given). Returns null when there are none or they are read, otherwise the reason that the archive cannot be read on.
+    /// </summary>
+    internal static string ReadSparseExtensions(Stream tar, byte[] header, Stream copy)
+    {
+        if (header[156] != (byte)'S' || header[482] == 0)
+        {
+            return null;
+        }
+        byte[] block = new byte[BlockSize];
+        for (int count = 0; count < MaxSparseExtensionBlocks; count++)
+        {
+            if (ReadBlock(tar, block) < BlockSize)
+            {
+                return "the archive ends in the middle of a header: it was cut off";
+            }
+            copy?.Write(block, 0, BlockSize);
+            if (block[504] == 0)
+            {
+                return null;
+            }
+        }
+        return "the map of holes of a sparse file in the archive is too big";
     }
 
     private static int ReadBlock(Stream stream, byte[] block)
