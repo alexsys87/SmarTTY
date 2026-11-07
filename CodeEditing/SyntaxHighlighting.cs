@@ -99,14 +99,15 @@ namespace SmarTTY.CodeEditing
             SystemdNetworkd, // .network, .netdev, .link: the colors of Config with the systemd-networkd keys known
             Kubernetes, // Kubernetes and Helm YAML: the colors of YAML with the keys of the manifests known
             DockerCompose, // docker-compose.yml, compose.yaml: the colors of YAML with the keys of Compose known
-            Ansible  // playbooks, roles and tasks: the colors of YAML with the keys and modules of Ansible known
+            Ansible, // playbooks, roles and tasks: the colors of YAML with the keys and modules of Ansible known
+            PostgreSql // postgresql.conf, pg_hba.conf: the colors of Config with the PostgreSQL settings and keywords
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.PostgreSql, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -146,6 +147,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
+                case Language.PostgreSql: return "PostgreSQL config";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
@@ -492,6 +494,12 @@ namespace SmarTTY.CodeEditing
                 case "ports.conf":
                 case ".htaccess":
                     return Language.ApacheHttpd;
+
+                case "postgresql.conf":
+                case "postgresql.auto.conf":
+                case "pg_hba.conf":
+                case "pg_ident.conf":
+                    return Language.PostgreSql;
 
                 case ".config":
                 case "kconfig":
@@ -998,6 +1006,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
+                case Language.PostgreSql: return TokenizePostgreSql;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -1133,6 +1142,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(DockerComposeKeywords, DockerComposeValues);
                 case Language.Ansible:
                     return Combine(AnsibleKeywords, AnsibleValues);
+                case Language.PostgreSql:
+                    return Combine(PostgreSqlDirectives, PostgreSqlValues);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:

@@ -889,6 +889,78 @@ public static partial class SyntaxHighlighting
         return TokenizeYamlCore(AnsibleKeywords, AnsibleValues, startState, text, sink, out endState);
     }
 
+    // ------------------------------------------------------------- PostgreSQL
+
+    private static readonly HashSet<string> PostgreSqlDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // postgresql.conf: the settings a server is tuned with
+        @"listen_addresses port max_connections superuser_reserved_connections reserved_connections
+          shared_buffers work_mem maintenance_work_mem effective_cache_size huge_pages huge_page_size
+          temp_buffers max_prepared_transactions wal_level wal_buffers wal_keep_size max_wal_size min_wal_size
+          wal_compression wal_log_hints full_page_writes fsync synchronous_commit checkpoint_timeout
+          checkpoint_completion_target max_wal_senders max_replication_slots hot_standby
+          primary_conninfo primary_slot_name restore_command archive_mode archive_command archive_timeout
+          recovery_target recovery_target_action recovery_target_time recovery_target_name
+          password_encryption scram_iterations authentication_timeout ssl ssl_cert_file ssl_key_file ssl_ca_file
+          ssl_ciphers ssl_min_protocol_version ssl_max_protocol_version ssl_prefer_server_ciphers
+          unix_socket_directories unix_socket_permissions listen_addresses hba_file ident_file config_file
+          data_directory external_pid_file timezone log_timezone log_destination logging_collector
+          log_directory log_filename log_rotation_age log_rotation_size log_truncate_on_rotation log_line_prefix
+          log_min_messages log_min_duration_statement log_statement log_checkpoints log_connections
+          log_disconnections log_duration log_lock_waits log_temp_files log_autovacuum_min_duration
+          logging_collector syslog_facility syslog_ident syslog_sequence_numbers syslog_split_messages
+          autovacuum autovacuum_max_workers autovacuum_naptime autovacuum_vacuum_threshold
+          autovacuum_vacuum_scale_factor autovacuum_analyze_threshold autovacuum_analyze_scale_factor
+          autovacuum_freeze_max_age autovacuum_multixact_freeze_max_age autovacuum_vacuum_cost_delay
+          autovacuum_vacuum_cost_limit vacuum_cost_delay vacuum_cost_limit vacuum_cost_page_hit
+          vacuum_cost_page_miss vacuum_cost_page_dirty vacuum_freeze_min_age vacuum_freeze_table_age
+          bgwriter_delay bgwriter_lru_maxpages bgwriter_lru_multiplier bgwriter_flush_after
+          backend_flush_after effective_io_concurrency maintenance_io_concurrency random_page_cost
+          seq_page_cost cpu_tuple_cost cpu_index_tuple_cost cpu_operator_cost parallel_setup_cost
+          parallel_tuple_cost min_parallel_table_scan_size min_parallel_index_scan_size
+          max_parallel_workers max_parallel_workers_per_gather max_worker_processes
+          max_parallel_maintenance_workers default_statistics_target default_tablespace
+          default_transaction_isolation default_transaction_read_only statement_timeout lock_timeout
+          idle_in_transaction_session_timeout idle_session_timeout client_encoding client_min_messages
+          search_path datestyle intervalstyle extra_float_digits standard_conforming_strings
+          bytea_output xmlbinary xmloption escape_string_warning backslash_quote standard_conforming_strings
+          lc_messages lc_monetary lc_numeric lc_time default_text_search_config
+          shared_preload_libraries session_preload_libraries local_preload_libraries
+          dynamic_library_path jit jit_provider jit_above_cost jit_inline_above_cost jit_optimize_above_cost
+          max_files_per_process max_locks_per_transaction max_pred_locks_per_transaction
+          max_function_args max_identifier_length max_index_keys max_stack_depth
+          track_activities track_counts track_io_timing track_functions track_commit_timestamp
+          update_process_title cluster_name application_name bonjour bonjour_name
+          allow_system_table_mods data_checksums ignore_checksum_failure zero_damaged_pages
+          row_security constraint_exclusion from_collapse_limit join_collapse_limit
+          enable_seqscan enable_indexscan enable_indexonlyscan enable_bitmapscan enable_sort
+          enable_hashagg enable_hashjoin enable_mergejoin enable_nestloop enable_material
+          enable_partitionwise_join enable_partitionwise_aggregate enable_parallel_append
+          enable_parallel_hash enable_incremental_sort enable_memoize enable_presorted_aggregate
+          enable_partition_pruning enable_async_append enable_gathermerge
+          quote_all_identifiers transform_null_equals array_nulls remove_temp_files_after_crash",
+        // pg_hba.conf: the connection types
+        @"local host hostssl hostnossl include include_if_exists include_dir");
+
+    private static readonly HashSet<string> PostgreSqlValues = Words(StringComparer.OrdinalIgnoreCase,
+        // pg_hba.conf: databases, users and authentication methods
+        @"all sameuser samerole replication
+          trust reject md5 scram-sha-256 password gss sspi krb5 ident peer pam ldap radius cert
+          map clientcert clientname ldapserver ldapport ldapprefix ldapsuffix ldapbasedn ldapbinddn
+          ldapbindpasswd ldapsearchattribute ldapsearchfilter ldaptls
+          on off true false yes no minimal replica logical archive
+          read committed repeatable serializable
+          local0 local1 local2 local3 local4 local5 local6 local7
+          stderr csvlog jsonlog syslog eventlog");
+
+    /// <summary>
+    /// PostgreSQL: the colours of Config with the settings of postgresql.conf known, and the connection types,
+    /// authentication methods and option names of pg_hba.conf. Keys stay case insensitive like the server's.
+    /// </summary>
+    private static bool TokenizePostgreSql(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(PostgreSqlDirectives, startState, text, sink, out endState, valueKeywords: PostgreSqlValues);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)
