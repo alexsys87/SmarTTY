@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -929,6 +929,7 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.Crontab) != null, "# comments in crontab files");
         Check(CommentStyle.ForLanguage(L.Fstab) != null, "# comments in fstab");
         Check(CommentStyle.ForLanguage(L.Sudoers) != null, "# comments in sudoers");
+        Check(CommentStyle.ForLanguage(L.MySql) != null, "# comments in MySQL files");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1079,6 +1080,39 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Sudoers).Contains("NOPASSWD"), "sudoers keywords contain 'NOPASSWD'");
         Check(SyntaxHighlighting.GetKeywords(L.Sudoers).Contains("secure_path"), "sudoers keywords contain 'secure_path'");
         Equal(Join(CommentStyle.ForLanguage(L.Sudoers).Toggle(new[] { "root ALL=(ALL:ALL) ALL" })), "# root ALL=(ALL:ALL) ALL", "sudoers comment");
+    }
+
+    private static void MySqlChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mysql/my.cnf"), L.MySql, "my.cnf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mysql/mariadb.conf.d/50-server.cnf"), L.MySql, "a drop-in of MariaDB");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mysql/conf.d/foo.cnf"), L.MySql, "a drop-in of MySQL");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/my.cnf"), L.MySql, "the old /etc/my.cnf");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/.my.cnf"), L.MySql, "a user's .my.cnf");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/my.ini"), L.MySql, "my.ini");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/database.conf"), L.Config, "an ordinary .conf stays a config");
+
+        Highlighted mysql = new Highlighted(L.MySql,
+            "[client]\nport = 3306\nsocket = /run/mysqld/mysqld.sock\n[mysqld]\nuser = mysql\nbind-address = 127.0.0.1\ndatadir = /var/lib/mysql\ninnodb_buffer_pool_size = 1G\nmax_connections = 200\nlog_error = /var/log/mysql/error.log # note\n!includedir /etc/mysql/conf.d/\n!include /etc/mysql/extra.cnf\n# comment\n; semicolon comment");
+        Equal(Join(mysql.Tokens(0, SyntaxHighlighting.TypeSection)), "[client]", "MySQL: the client group");
+        Equal(Join(mysql.Tokens(1, SyntaxHighlighting.TypeKeyword)), "port", "MySQL: port");
+        Equal(Join(mysql.Tokens(1, SyntaxHighlighting.TypeNumber)), "3306", "MySQL: the port number");
+        Equal(Join(mysql.Tokens(2, SyntaxHighlighting.TypeKeyword)), "socket", "MySQL: socket");
+        Equal(Join(mysql.Tokens(3, SyntaxHighlighting.TypeSection)), "[mysqld]", "MySQL: the mysqld group");
+        Equal(Join(mysql.Tokens(4, SyntaxHighlighting.TypeKeyword)), "user|mysql", "MySQL: user and its value");
+        Equal(Join(mysql.Tokens(5, SyntaxHighlighting.TypeKeyword)), "bind-address", "MySQL: a hyphenated option");
+        Equal(Join(mysql.Tokens(7, SyntaxHighlighting.TypeKeyword)), "innodb_buffer_pool_size", "MySQL: an InnoDB option");
+        Equal(Join(mysql.Tokens(8, SyntaxHighlighting.TypeKeyword)), "max_connections", "MySQL: max_connections");
+        Equal(Join(mysql.Tokens(9, SyntaxHighlighting.TypeComment)), "# note", "MySQL: a trailing comment");
+        Equal(Join(mysql.Tokens(10, SyntaxHighlighting.TypeKeyword)), "!includedir", "MySQL: !includedir is a directive");
+        Equal(Join(mysql.Tokens(10, SyntaxHighlighting.TypeString)), "/etc/mysql/conf.d/", "MySQL: the directory of !includedir");
+        Equal(Join(mysql.Tokens(11, SyntaxHighlighting.TypeKeyword)), "!include", "MySQL: !include is a directive");
+        Equal(Join(mysql.Tokens(11, SyntaxHighlighting.TypeString)), "/etc/mysql/extra.cnf", "MySQL: the file of !include");
+        Equal(Join(mysql.Tokens(12, SyntaxHighlighting.TypeComment)), "# comment", "MySQL: a # comment");
+        Equal(Join(mysql.Tokens(13, SyntaxHighlighting.TypeComment)), "; semicolon comment", "MySQL: a ; comment");
+        Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("innodb_buffer_pool_size"), "MySQL keywords contain 'innodb_buffer_pool_size'");
+        Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("skip-name-resolve"), "MySQL keywords contain 'skip-name-resolve'");
+        Equal(Join(CommentStyle.ForLanguage(L.MySql).Toggle(new[] { "max_connections = 200" })), "# max_connections = 200", "MySQL comment");
     }
 
     private static void KconfigChecks()
@@ -1555,6 +1589,7 @@ internal static class Program
         CrontabChecks();
         FstabChecks();
         SudoersChecks();
+        MySqlChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();

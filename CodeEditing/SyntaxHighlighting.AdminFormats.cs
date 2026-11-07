@@ -466,6 +466,114 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(SudoersDirectives, startState, text, sink, out endState, valueKeywords: SudoersValues);
     }
 
+    // ----------------------------------------------------------- MySQL/MariaDB
+
+    private static readonly HashSet<string> MySqlDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // server, client and replication settings of my.cnf / my.ini
+        @"user port socket bind-address admin-address datadir basedir tmpdir pid-file plugin-dir
+          log-error log-error-verbosity log-warnings general-log general_log general-log-file general_log_file
+          slow-query-log slow_query_log slow-query-log-file slow_query_log_file long-query-time long_query_time
+          log-queries-not-using-indexes log-slow-admin-statements log-slow-replica-statements
+          max-connections max_connections max-user-connections max_user_connections max-allowed-packet max_allowed_packet
+          max-connect-errors max_connect_errors connect-timeout connect_timeout wait-timeout wait_timeout
+          interactive-timeout interactive_timeout net-read-timeout net_read_timeout net-write-timeout net_write_timeout
+          net-buffer-length net_buffer_length thread-cache-size thread_cache_size thread-stack thread_stack
+          table-open-cache table_open_cache table-definition-cache table_definition_cache open-files-limit open_files_limit
+          key-buffer-size key_buffer_size sort-buffer-size sort_buffer_size join-buffer-size join_buffer_size
+          read-buffer-size read_buffer_size read-rnd-buffer-size read_rnd_buffer_size
+          tmp-table-size tmp_table_size max-heap-table-size max_heap_table_size
+          bulk-insert-buffer-size bulk_insert_buffer_size myisam-recover-options myisam_sort_buffer_size
+          innodb-buffer-pool-size innodb_buffer_pool_size innodb-buffer-pool-instances innodb_buffer_pool_instances
+          innodb-buffer-pool-chunk-size innodb_buffer_pool_chunk_size innodb-log-buffer-size innodb_log_buffer_size
+          innodb-log-file-size innodb_log_file_size innodb-redo-log-capacity innodb_redo_log_capacity
+          innodb-flush-log-at-trx-commit innodb_flush_log_at_trx_commit innodb-flush-method innodb_flush_method
+          innodb-file-per-table innodb_file_per_table innodb-io-capacity innodb_io_capacity
+          innodb-io-capacity-max innodb_io_capacity_max innodb-read-io-threads innodb_read_io_threads
+          innodb-write-io-threads innodb_write_io_threads innodb-thread-concurrency innodb_thread_concurrency
+          innodb-lock-wait-timeout innodb_lock_wait_timeout innodb-buffer-pool-dump-at-shutdown innodb_buffer_pool_dump_at_shutdown
+          innodb-buffer-pool-load-at-startup innodb_buffer_pool_load_at_startup innodb-strict-mode innodb_strict_mode
+          innodb-autoinc-lock-mode innodb_autoinc_lock_mode innodb-page-size innodb_page_size
+          innodb-rollback-on-timeout innodb_rollback_on_timeout
+          character-set-server character_set_server collation-server collation_server
+          character-set-client character_set_client character-set-results character_set_results
+          default-storage-engine default_storage_engine default-authentication-plugin default_authentication_plugin
+          authentication-policy authentication_policy
+          skip-name-resolve skip-networking skip-grant-tables skip-external-locking skip-symbolic-links
+          bind-address secure-file-priv secure_file_priv local-infile local_infile protocol
+          server-id server_id server-id-bits server_id_bits
+          log-bin log_bin log-bin-index log_bin_index log-bin-trust-function-creators log_bin_trust_function_creators
+          binlog-format binlog_format binlog-expire-logs-seconds binlog_expire_logs_seconds expire-logs-days expire_logs_days
+          sync-binlog sync_binlog max-binlog-size max_binlog_size max-binlog-cache-size max_binlog_cache_size
+          relay-log relay_log relay-log-index relay_log_index relay-log-info-file relay_log_info_file
+          log-replica-updates log_replica_updates log-slave-updates log_slave_updates
+          replicate-do-db replicate_do_db replicate-ignore-db replicate_ignore_db
+          replicate-do-table replicate_do_table replicate-ignore-table replicate_ignore_table
+          replicate-wild-do-table replicate_wild_do_table replicate-wild-ignore-table replicate_wild_ignore_table
+          read-only read_only super-read-only super_read_only
+          auto-increment-increment auto_increment_increment auto-increment-offset auto_increment_offset
+          sql-mode sql_mode optimizer-switch optimizer_switch transaction-isolation transaction_isolation
+          lock-wait-timeout lock_wait_timeout
+          lower-case-table-names lower_case_table_names lc-messages-dir lc_messages_dir
+          event-scheduler event_scheduler performance-schema performance_schema
+          ssl-ca ssl_cert ssl_key ssl-cipher ssl_crl ssl_crlpath tls-version tls_version
+          require-secure-transport require_secure_transport
+          wsrep-on wsrep_on wsrep-provider wsrep_provider wsrep-cluster-name wsrep_cluster_name
+          wsrep-cluster-address wsrep_cluster_address wsrep-node-address wsrep_node_address wsrep-node-name wsrep_node_name
+          galera-provider-options galera_provider_options
+          super-user super_user max-seeks-for-key max_seeks_for_key
+          delayed-insert-timeout delayed_insert_timeout low-priority-updates low_priority_updates
+          concurrent-insert concurrent_insert div-precision-increment div_precision_increment
+          group-concat-max-len group_concat_max_len",
+        // the [groups] of the file
+        @"mysqld mysqld_safe mysqldump mysql client server mariadb mariadbd mariadb-client mariadb-server
+          embedded client-server client-mariadb galera mariadb-galera");
+
+    private static readonly HashSet<string> MySqlValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"innodb myisam csv memory archive blackhole ndb aria tokudb rocksdb mysql mariadb
+          row statement mixed
+          read-uncommitted read-committed repeatable-read serializable
+          latin1 utf8 utf8mb3 utf8mb4 utf16 utf16le utf32 ucs2 binary ascii
+          general_log slow_query_log
+          mysql_native_password caching_sha2_password ed25519 unix_socket
+          strict_trans_tables strict_all_tables no_zero_date no_zero_in_date
+          on off true false yes no none");
+
+    /// <summary>
+    /// MySQL/MariaDB: the colours of Config with the options of my.cnf / my.ini known, and "!include"/"!includedir"
+    /// recognised as directives of the file rather than as ordinary values.
+    /// </summary>
+    private static bool TokenizeMySql(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        endState = 0;
+        int first = SkipBlanks(text, 0);
+        if (first < text.Length && text[first] == '!')
+        {
+            int wordEnd = first + 1;
+            while (wordEnd < text.Length && IsIdChar(text[wordEnd]))
+            {
+                wordEnd++;
+            }
+            string word = text.Substring(first + 1, wordEnd - first - 1);
+            if (word == "include" || word == "includedir")
+            {
+                sink.AddToken(TypeKeyword, first, wordEnd);
+                int pathStart = SkipBlanks(text, wordEnd);
+                int pathEnd = pathStart;
+                while (pathEnd < text.Length && !IsBlank(text[pathEnd]))
+                {
+                    pathEnd++;
+                }
+                if (pathEnd > pathStart)
+                {
+                    sink.AddToken(TypeString, pathStart, pathEnd);
+                }
+                ScanCronRest(text, pathEnd, sink);
+                return true;
+            }
+        }
+        return TokenizeConfigCore(MySqlDirectives, startState, text, sink, out endState, valueKeywords: MySqlValues);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)
