@@ -93,14 +93,16 @@ namespace SmarTTY.CodeEditing
             Fstab,   // /etc/fstab: device, mount point, filesystem, options, dump and pass
             Sudoers, // sudoers: aliases, Defaults, tags (NOPASSWD), users, hosts and commands
             MySql,   // my.cnf, my.ini: the colors of Config with the MySQL/MariaDB options known
-            Redis    // redis.conf, sentinel.conf: the colors of Config with the Redis directives known
+            Redis,   // redis.conf, sentinel.conf: the colors of Config with the Redis directives known
+            HAProxy, // haproxy.cfg: the colors of Config with the sections, directives and values of HAProxy known
+            ApacheHttpd // httpd.conf, apache2.conf, .htaccess: the colors of Config with the Apache directives known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -134,6 +136,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Sudoers: return "sudoers";
                 case Language.MySql: return "MySQL/MariaDB config";
                 case Language.Redis: return "Redis config";
+                case Language.HAProxy: return "HAProxy config";
+                case Language.ApacheHttpd: return "Apache httpd config";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
@@ -285,6 +289,17 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.Redis;
             }
+            if (lowerCasePath.Contains("/etc/haproxy/") &&
+                (name.EndsWith(".cfg", StringComparison.Ordinal) || name.EndsWith(".conf", StringComparison.Ordinal) || name.IndexOf('.') < 0))
+            {
+                return Language.HAProxy;
+            }
+            if ((lowerCasePath.Contains("/etc/httpd/") || lowerCasePath.Contains("/etc/apache2/") ||
+                 lowerCasePath.Contains("/etc/apache/")) &&
+                (name.EndsWith(".conf", StringComparison.Ordinal) || name == ".htaccess" || name.IndexOf('.') < 0))
+            {
+                return Language.ApacheHttpd;
+            }
             if ((lowerCasePath.Contains("/ssh_config.d/") || lowerCasePath.Contains("/sshd_config.d/")) && name.EndsWith(".conf", StringComparison.Ordinal))
             {
                 return Language.SshConfig;
@@ -422,6 +437,18 @@ namespace SmarTTY.CodeEditing
                 case "sentinel.conf":
                 case "redis-sentinel.conf":
                     return Language.Redis;
+
+                case "haproxy.cfg":
+                case "haproxy.conf":
+                    return Language.HAProxy;
+
+                case "httpd.conf":
+                case "apache2.conf":
+                case "httpd-vhosts.conf":
+                case "httpd-ssl.conf":
+                case "ports.conf":
+                case ".htaccess":
+                    return Language.ApacheHttpd;
 
                 case ".config":
                 case "kconfig":
@@ -920,6 +947,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Sudoers: return TokenizeSudoers;
                 case Language.MySql: return TokenizeMySql;
                 case Language.Redis: return TokenizeRedis;
+                case Language.HAProxy: return TokenizeHAProxy;
+                case Language.ApacheHttpd: return TokenizeApache;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -1043,6 +1072,10 @@ namespace SmarTTY.CodeEditing
                     return Combine(MySqlDirectives, MySqlValues);
                 case Language.Redis:
                     return Combine(RedisDirectives, RedisValues);
+                case Language.HAProxy:
+                    return Combine(HAProxyDirectives, HAProxyValues);
+                case Language.ApacheHttpd:
+                    return Combine(ApacheDirectives, ApacheValues);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:

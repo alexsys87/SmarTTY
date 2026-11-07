@@ -615,6 +615,90 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(RedisDirectives, startState, text, sink, out endState, valueKeywords: RedisValues);
     }
 
+    // ---------------------------------------------------------------- HAProxy
+
+    private static readonly HashSet<string> HAProxyDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // sections
+        @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward mailers",
+        // global and defaults
+        @"log log-format log-format-sd log-tag maxconn daemon user group uid gid chroot pidfile
+          stats nbproc nbthread cpu-map master-worker mworker-max-reloads expose-fd
+          mode balance hash-type server default-server default_backend bind server-template
+          timeout retries option acl use_backend
+          http-request http-response http-after-response http-check redirect
+          tcp-request tcp-response tcp-check capture cookie stick-table stick store-request store-response
+          compression filter errorfile errorloc errorloc302 errorloc303 unique-id-header unique-id-format
+          dispatch source monitor-uri external-check
+          peers peer nameserver parse-resolv-conf resolve_retries
+          userlist program command ring size format log-forward");
+
+    private static readonly HashSet<string> HAProxyValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the words a section may stand alone with, and the choices of the directives
+        @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward mailers
+          daemon master-worker
+          http tcp health
+          roundrobin static-rr leastconn first source uri url_param rdp-cookie random
+          inter fastinter downinter rise fall observe
+          connect client server queue tunnel http-request http-keep-alive
+          check ssl verify none required prefer
+          enabled disabled normal admin drain enable disable
+          on off yes no
+          local0 local1 local2 local3 local4 local5 local6 local7
+          GET POST HEAD PUT DELETE OPTIONS");
+
+    /// <summary>
+    /// HAProxy: the colours of Config with the sections (global, defaults, frontend, backend, listen, ...), the
+    /// directives and their common values known. A section name that stands alone is a keyword too.
+    /// </summary>
+    private static bool TokenizeHAProxy(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(HAProxyDirectives, startState, text, sink, out endState, valueKeywords: HAProxyValues);
+    }
+
+    // ------------------------------------------------------------ Apache httpd
+
+    private static readonly HashSet<string> ApacheDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        @"ServerRoot ServerName ServerAdmin ServerAlias ServerPath UseCanonicalName
+          Listen PidFile Mutex ScoreBoardFile Timeout KeepAlive MaxKeepAliveRequests KeepAliveTimeout
+          User Group LoadModule LoadFile
+          DocumentRoot DirectoryIndex Options AllowOverride Require Order Allow Deny
+          ErrorLog CustomLog LogLevel LogFormat TransferLog ScriptLog
+          Include IncludeOptional
+          TypesConfig AddType AddEncoding AddLanguage AddHandler AddCharset AddDefaultCharset DefaultType
+          AccessFileName SetHandler
+          Directory Files FileMatch Location LocationMatch VirtualHost IfModule IfDefine IfVersion ElseIf Else
+          Limit LimitExcept Proxy
+          ProxyRequests ProxyPass ProxyPassReverse ProxyPreserveHost ProxyTimeout ProxyBadHeader ProxyVia
+          RewriteEngine RewriteBase RewriteCond RewriteRule RewriteMap RewriteOptions
+          Header RequestHeader SetEnvIf SetEnvIfNoCase BrowserMatch
+          SSLEngine SSLProtocol SSLCipherSuite SSLCertificateFile SSLCertificateKeyFile SSLCertificateChainFile
+          SSLVerifyClient SSLVerifyDepth
+          AuthType AuthName AuthUserFile AuthGroupFile AuthBasicProvider
+          AddDefaultCharset ErrorDocument Alias ScriptAlias
+          ExtendedStatus AllowEncodedSlashes AcceptPathInfo EnableMMAP EnableSendfile
+          FileETag HostnameLookups NameVirtualHost
+          MaxRequestWorkers MaxConnectionsPerChild StartServers MinSpareThreads MaxSpareThreads ThreadsPerChild
+          ServerLimit ThreadLimit StartThreads MinSpareServers MaxSpareServers MaxClients MaxRequestsPerChild");
+
+    private static readonly HashSet<string> ApacheValues = Words(StringComparer.OrdinalIgnoreCase,
+        // choices of the directives
+        @"on off all none granted denied valid-user
+          Indexes FollowSymLinks SymLinksIfOwnerMatch ExecCGI Includes IncludesNOEXEC MultiViews
+          All None
+          emerg alert crit error warn notice info debug trace1 trace2 trace3 trace4 trace5 trace6 trace7 trace8
+          Directory Files FileMatch Location LocationMatch VirtualHost IfModule IfDefine IfVersion ElseIf Else
+          Limit LimitExcept Proxy
+          GET POST HEAD PUT DELETE OPTIONS");
+
+    /// <summary>
+    /// Apache httpd: the colours of Config with the directives of httpd.conf, apache2.conf and .htaccess known, and
+    /// the section names of &lt;Directory&gt;, &lt;VirtualHost&gt; and the other containers highlighted as words too.
+    /// </summary>
+    private static bool TokenizeApache(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(ApacheDirectives, startState, text, sink, out endState, valueKeywords: ApacheValues);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)

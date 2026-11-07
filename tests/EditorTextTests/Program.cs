@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -931,6 +931,8 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.Sudoers) != null, "# comments in sudoers");
         Check(CommentStyle.ForLanguage(L.MySql) != null, "# comments in MySQL files");
         Check(CommentStyle.ForLanguage(L.Redis) != null, "# comments in Redis files");
+        Check(CommentStyle.ForLanguage(L.HAProxy) != null, "# comments in HAProxy files");
+        Check(CommentStyle.ForLanguage(L.ApacheHttpd) != null, "# comments in Apache files");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1142,6 +1144,75 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("maxmemory-policy"), "Redis keywords contain 'maxmemory-policy'");
         Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("appendfsync"), "Redis keywords contain 'appendfsync'");
         Equal(Join(CommentStyle.ForLanguage(L.Redis).Toggle(new[] { "port 6379" })), "# port 6379", "Redis comment");
+    }
+
+    private static void HAProxyChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/haproxy/haproxy.cfg"), L.HAProxy, "haproxy.cfg");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/haproxy/conf.d/10-global.cfg"), L.HAProxy, "a drop-in of /etc/haproxy");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/haproxy.cfg"), L.HAProxy, "haproxy.cfg anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.cfg"), L.Config, "an ordinary .cfg stays a config");
+
+        Highlighted haproxy = new Highlighted(L.HAProxy,
+            "# HAProxy\nglobal\n    log /dev/log local0\n    maxconn 4096\n    daemon\ndefaults\n    mode http\n    timeout connect 5s\n    timeout client 30s\n    timeout server 30s\n    retries 3\nfrontend http-in\n    bind *:80\n    default_backend servers\nbackend servers\n    balance roundrobin\n    server web1 10.0.0.1:8080 check\nlisten stats\n    bind *:8404\n    stats enable\n    stats uri /stats");
+        Equal(Join(haproxy.Tokens(0, SyntaxHighlighting.TypeComment)), "# HAProxy", "HAProxy: a comment");
+        Equal(Join(haproxy.Tokens(1, SyntaxHighlighting.TypeKeyword)), "global", "HAProxy: the global section");
+        Equal(Join(haproxy.Tokens(2, SyntaxHighlighting.TypeKeyword)), "log|local0", "HAProxy: log and its facility");
+        Equal(Join(haproxy.Tokens(3, SyntaxHighlighting.TypeKeyword)), "maxconn", "HAProxy: maxconn");
+        Equal(Join(haproxy.Tokens(3, SyntaxHighlighting.TypeNumber)), "4096", "HAProxy: the connection limit");
+        Equal(Join(haproxy.Tokens(4, SyntaxHighlighting.TypeKeyword)), "daemon", "HAProxy: a directive that stands alone");
+        Equal(Join(haproxy.Tokens(5, SyntaxHighlighting.TypeKeyword)), "defaults", "HAProxy: the defaults section");
+        Equal(Join(haproxy.Tokens(6, SyntaxHighlighting.TypeKeyword)), "mode|http", "HAProxy: the mode");
+        Equal(Join(haproxy.Tokens(7, SyntaxHighlighting.TypeKeyword)), "timeout|connect", "HAProxy: a timeout");
+        Equal(Join(haproxy.Tokens(11, SyntaxHighlighting.TypeKeyword)), "frontend", "HAProxy: frontend");
+        Equal(Join(haproxy.Tokens(12, SyntaxHighlighting.TypeKeyword)), "bind", "HAProxy: bind");
+        Equal(Join(haproxy.Tokens(14, SyntaxHighlighting.TypeKeyword)), "backend", "HAProxy: backend");
+        Equal(Join(haproxy.Tokens(15, SyntaxHighlighting.TypeKeyword)), "balance|roundrobin", "HAProxy: the balance algorithm");
+        Equal(Join(haproxy.Tokens(16, SyntaxHighlighting.TypeKeyword)), "server|check", "HAProxy: a server with its check");
+        Equal(Join(haproxy.Tokens(16, SyntaxHighlighting.TypeNumber)), "10.0.0.1|8080", "HAProxy: the server address");
+        Equal(Join(haproxy.Tokens(17, SyntaxHighlighting.TypeKeyword)), "listen", "HAProxy: listen");
+        Equal(Join(haproxy.Tokens(19, SyntaxHighlighting.TypeKeyword)), "stats|enable", "HAProxy: the stats page");
+        Equal(Join(haproxy.Tokens(20, SyntaxHighlighting.TypeKeyword)), "stats|uri", "HAProxy: the stats uri");
+        Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("default_backend"), "HAProxy keywords contain 'default_backend'");
+        Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("roundrobin"), "HAProxy keywords contain 'roundrobin'");
+        Equal(Join(CommentStyle.ForLanguage(L.HAProxy).Toggle(new[] { "    balance roundrobin" })), "    # balance roundrobin", "HAProxy comment");
+    }
+
+    private static void ApacheChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/httpd/conf/httpd.conf"), L.ApacheHttpd, "httpd.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/apache2/apache2.conf"), L.ApacheHttpd, "apache2.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/apache2/sites-available/000-default.conf"), L.ApacheHttpd, "a site of apache2");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/apache2/ports.conf"), L.ApacheHttpd, "ports.conf of apache2");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/www/html/.htaccess"), L.ApacheHttpd, ".htaccess");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/.htaccess"), L.ApacheHttpd, ".htaccess anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/site.conf"), L.Config, "an ordinary .conf stays a config");
+
+        Highlighted apache = new Highlighted(L.ApacheHttpd,
+            "# Apache\nServerRoot \"/etc/httpd\"\nListen 80\nLoadModule mpm_event_module modules/mod_mpm_event.so\nUser apache\nGroup apache\nServerName example.com:80\nDocumentRoot \"/var/www/html\"\nErrorLog \"logs/error_log\"\nLogLevel warn\n<Directory \"/var/www/html\">\n    Options Indexes FollowSymLinks\n    AllowOverride All\n    Require all granted\n</Directory>\n<VirtualHost *:80>\n    ServerName example.com\n    ProxyPass /api/ http://127.0.0.1:8080/\n    RewriteEngine On\n    RewriteRule ^/old /new [R=301,L]\n</VirtualHost>\nIncludeOptional conf.d/*.conf");
+        Equal(Join(apache.Tokens(0, SyntaxHighlighting.TypeComment)), "# Apache", "Apache: a comment");
+        Equal(Join(apache.Tokens(1, SyntaxHighlighting.TypeKeyword)), "ServerRoot", "Apache: ServerRoot");
+        Equal(Join(apache.Tokens(1, SyntaxHighlighting.TypeString)), "\"/etc/httpd\"", "Apache: a quoted path");
+        Equal(Join(apache.Tokens(2, SyntaxHighlighting.TypeKeyword)), "Listen", "Apache: Listen");
+        Equal(Join(apache.Tokens(2, SyntaxHighlighting.TypeNumber)), "80", "Apache: the port");
+        Equal(Join(apache.Tokens(3, SyntaxHighlighting.TypeKeyword)), "LoadModule", "Apache: LoadModule");
+        Equal(Join(apache.Tokens(6, SyntaxHighlighting.TypeKeyword)), "ServerName", "Apache: ServerName");
+        Equal(Join(apache.Tokens(7, SyntaxHighlighting.TypeKeyword)), "DocumentRoot", "Apache: DocumentRoot");
+        Equal(Join(apache.Tokens(9, SyntaxHighlighting.TypeKeyword)), "LogLevel|warn", "Apache: the log level");
+        Equal(Join(apache.Tokens(10, SyntaxHighlighting.TypeKeyword)), "Directory", "Apache: a Directory section");
+        Equal(Join(apache.Tokens(10, SyntaxHighlighting.TypeString)), "\"/var/www/html\"", "Apache: the directory path");
+        Equal(Join(apache.Tokens(11, SyntaxHighlighting.TypeKeyword)), "Options|Indexes|FollowSymLinks", "Apache: the options");
+        Equal(Join(apache.Tokens(12, SyntaxHighlighting.TypeKeyword)), "AllowOverride|All", "Apache: AllowOverride");
+        Equal(Join(apache.Tokens(13, SyntaxHighlighting.TypeKeyword)), "Require|all|granted", "Apache: Require");
+        Equal(Join(apache.Tokens(14, SyntaxHighlighting.TypeKeyword)), "Directory", "Apache: the closing section");
+        Equal(Join(apache.Tokens(15, SyntaxHighlighting.TypeKeyword)), "VirtualHost", "Apache: a VirtualHost section");
+        Equal(Join(apache.Tokens(17, SyntaxHighlighting.TypeKeyword)), "ProxyPass", "Apache: ProxyPass");
+        Equal(Join(apache.Tokens(18, SyntaxHighlighting.TypeKeyword)), "RewriteEngine|On", "Apache: RewriteEngine");
+        Equal(Join(apache.Tokens(19, SyntaxHighlighting.TypeKeyword)), "RewriteRule", "Apache: RewriteRule");
+        Equal(Join(apache.Tokens(21, SyntaxHighlighting.TypeKeyword)), "IncludeOptional", "Apache: IncludeOptional");
+        Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("DocumentRoot"), "Apache keywords contain 'DocumentRoot'");
+        Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("FollowSymLinks"), "Apache keywords contain 'FollowSymLinks'");
+        Equal(Join(CommentStyle.ForLanguage(L.ApacheHttpd).Toggle(new[] { "Listen 80" })), "# Listen 80", "Apache comment");
     }
 
     private static void KconfigChecks()
@@ -1620,6 +1691,8 @@ internal static class Program
         SudoersChecks();
         MySqlChecks();
         RedisChecks();
+        HAProxyChecks();
+        ApacheChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();
