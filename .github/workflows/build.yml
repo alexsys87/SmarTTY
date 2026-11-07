@@ -85,6 +85,9 @@ jobs:
       - name: Run ls output parser checks
         run: dotnet run --project tests/LsOutputParserTests -c Release
 
+      - name: Run bounded work checks (closing a session)
+        run: dotnet run --project tests/BoundedWorkTests -c Release
+
       - name: Run remote directory listing checks (file-by-file download; /bin/sh)
         run: dotnet run --project tests/RemoteDirectoryListingTests -c Release
 

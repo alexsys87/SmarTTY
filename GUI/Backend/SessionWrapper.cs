@@ -2755,10 +2755,16 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     }
                 }
                 string remotePath = QuickCommandRules.RemotePath(directory, fileName);
-                List<string> exists = session.RunCommand(QuickCommandRules.BuildExistsCommand(remotePath), out _, timeout: TimeSpan.FromSeconds(20));
-                if (exists != null && exists.Any(line => line.Trim() == "exists"))
+                List<string> exists = session.RunCommand(QuickCommandRules.BuildExistsCommand(remotePath), out int? existsStatus, timeout: TimeSpan.FromSeconds(20));
+                RemoteNameState nameState = QuickCommandRules.ReadExistsAnswer(exists, existsStatus);
+                if (nameState != RemoteNameState.Free)
                 {
-                    bool replace = _Controller.Dispatcher.Invoke(() => MessageBoxes.Ask(remotePath + " exists already. Replace it with the script \"" + item.MenuText + "\"?"));
+                    // The upload replaces a file of that name without a word, so a check that did not finish (a slow link, a busy
+                    // channel) must not read as "there is no such file": the user decides.
+                    string question = nameState == RemoteNameState.Exists
+                        ? remotePath + " exists already. Replace it with the script \"" + item.MenuText + "\"?"
+                        : "The server did not tell in time whether " + remotePath + " exists already. Upload the script \"" + item.MenuText + "\" anyway? A file of that name would be replaced.";
+                    bool replace = _Controller.Dispatcher.Invoke(() => MessageBoxes.Ask(question));
                     if (!replace)
                     {
                         return;
@@ -2829,27 +2835,56 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    /// <summary>
+    /// How long closing a session waits for the feeds of the local repository server to be taken out of the device (a few commands, which
+    /// take moments on a device that answers). A device that does not answer is given up after that and the connection is closed anyway.
+    /// </summary>
+    internal static readonly TimeSpan CleanupLimit = TimeSpan.FromSeconds(10);
+
     public void Dispose()
+    {
+        Shutdown();
+    }
+
+    /// <summary>
+    /// Closes the session. What talks to the server (taking the feeds of the local repository out of the device, stopping the proxy and the
+    /// forwardings, closing the connection) runs on a pool thread: on the UI thread a connection that went away without a word (the device
+    /// was switched off, the TCP connection was not closed) froze the window until the network gave up, and for every such session in turn.
+    /// The returned task is done when the device is cleaned up or that was given up after <see cref="CleanupLimit"/>; the connection is
+    /// closed after that. The window that is closed for good waits for the tasks of all its sessions together, so that the feeds do not
+    /// stay in the configuration of a device that answers.
+    /// </summary>
+    public Task Shutdown()
     {
         // Saved before the queue is stopped, so that the transfers still waiting come back as waiting, not as failed.
         SaveTransferQueue();
         TransferManager?.Dispose();
-        try
-        {
-            // Takes the feeds out of the opkg configuration of the device while the connection is still open.
-            LocalRepo.Stop(Session);
-        }
-        catch
-        {
-        }
         SshSession sessionToClose = Session;
         DiskSpace.Dispose();
-        if (SocksProxy.IsRunning || PortForwards.HasActive)
+        TaskCompletionSource<bool> deviceCleaned = new TaskCompletionSource<bool>();
+        bool stopRepository = LocalRepo.IsRunning;
+        if (stopRepository || SocksProxy.IsRunning || PortForwards.HasActive)
         {
             // Stopping the proxy and the forwardings waits (up to 30 s) for the programs that still use them to close their
             // connections: not on the UI thread.
             ThreadPool.QueueUserWorkItem(delegate
             {
+                try
+                {
+                    if (stopRepository)
+                    {
+                        // Takes the feeds out of the opkg configuration of the device while the connection is still open. If the device
+                        // does not answer, the connection is closed below, which ends what is stuck.
+                        BoundedWork.Run(() => LocalRepo.Stop(sessionToClose), CleanupLimit);
+                    }
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    deviceCleaned.TrySetResult(true);
+                }
                 try
                 {
                     SocksProxy.Stop();
@@ -2876,11 +2911,13 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         else
         {
             sessionToClose?.Dispose();
+            deviceCleaned.TrySetResult(true);
         }
         foreach (DeviceTabContext deviceTab in Tabs.OfType<DeviceTabContext>().ToList())
         {
             deviceTab.Dispose();
         }
+        return deviceCleaned.Task;
     }
 
     internal void OnCtrlTabPressed(bool bShift)
