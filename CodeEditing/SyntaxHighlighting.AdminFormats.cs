@@ -615,6 +615,46 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(RedisDirectives, startState, text, sink, out endState, valueKeywords: RedisValues);
     }
 
+    // ---------------------------------------------------------------- HAProxy
+
+    private static readonly HashSet<string> HAProxyDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // sections
+        @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward mailers",
+        // global and defaults
+        @"log log-format log-format-sd log-tag maxconn daemon user group uid gid chroot pidfile
+          stats nbproc nbthread cpu-map master-worker mworker-max-reloads expose-fd
+          mode balance hash-type server default-server default_backend bind server-template
+          timeout retries option acl use_backend
+          http-request http-response http-after-response http-check redirect
+          tcp-request tcp-response tcp-check capture cookie stick-table stick store-request store-response
+          compression filter errorfile errorloc errorloc302 errorloc303 unique-id-header unique-id-format
+          dispatch source monitor-uri external-check
+          peers peer nameserver parse-resolv-conf resolve_retries
+          userlist program command ring size format log-forward");
+
+    private static readonly HashSet<string> HAProxyValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the words a section may stand alone with, and the choices of the directives
+        @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward mailers
+          daemon master-worker
+          http tcp health
+          roundrobin static-rr leastconn first source uri url_param rdp-cookie random
+          inter fastinter downinter rise fall observe
+          connect client server queue tunnel http-request http-keep-alive
+          check ssl verify none required prefer
+          enabled disabled normal admin drain enable disable
+          on off yes no
+          local0 local1 local2 local3 local4 local5 local6 local7
+          GET POST HEAD PUT DELETE OPTIONS");
+
+    /// <summary>
+    /// HAProxy: the colours of Config with the sections (global, defaults, frontend, backend, listen, ...), the
+    /// directives and their common values known. A section name that stands alone is a keyword too.
+    /// </summary>
+    private static bool TokenizeHAProxy(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(HAProxyDirectives, startState, text, sink, out endState, valueKeywords: HAProxyValues);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)
