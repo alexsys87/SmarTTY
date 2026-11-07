@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using SmarTTY.Terminal;
@@ -76,6 +77,65 @@ internal static class Program
         Equal(XtermProtocol.PreparePaste("a\r\nb", "\n", bracketed: false), "a\nb", "LF line breaks on request");
         Equal(XtermProtocol.PreparePaste("ls\n", "\r", bracketed: true), Esc + "[200~ls\r" + Esc + "[201~", "bracketed paste wraps the text");
         Equal(XtermProtocol.PreparePaste("x" + Esc + "[201~rm -rf ~\n", "\r", bracketed: true), Esc + "[200~xrm -rf ~\r" + Esc + "[201~", "an end marker inside the text cannot end the paste early");
+        // A marker whose removal joins the pieces around it into another marker: ESC [ + ESC[201~ + 201~ is ESC[201~ again.
+        // Removing the markers in two passes left that one in the text, ended the paste early and typed the rest.
+        string nestedEnd = Esc + "[" + Esc + "[201~" + "201~";
+        Equal(XtermProtocol.PreparePaste("a" + nestedEnd + "rm -rf ~\n", "\r", bracketed: true), Esc + "[200~arm -rf ~\r" + Esc + "[201~", "an end marker that the removal of another one assembles cannot end the paste early");
+        Equal(XtermProtocol.PreparePaste(Esc + "[2" + Esc + "[200~" + "00~x", "\r", bracketed: true), Esc + "[200~x" + Esc + "[201~", "a start marker assembled by the removal of another one is removed too");
+        Equal(XtermProtocol.PreparePaste(Esc + "[20" + Esc + "[201~" + "0~x", "\r", bracketed: true), Esc + "[200~x" + Esc + "[201~", "an end marker inside a start marker leaves no start marker behind");
+        Equal(XtermProtocol.PreparePaste(Esc + "[" + Esc + "[" + Esc + "[201~" + "201~" + "201~" + "ls", "\r", bracketed: true), Esc + "[200~ls" + Esc + "[201~", "markers nested several levels deep are all removed");
+        Equal(XtermProtocol.PreparePaste("ESC[201~ and [200~ and " + Esc + "[20 and " + Esc + "[2011~ stay as they are", "\r", bracketed: true),
+            Esc + "[200~ESC[201~ and [200~ and " + Esc + "[20 and " + Esc + "[2011~ stay as they are" + Esc + "[201~", "text that only looks like a marker is not touched");
+        Equal(XtermProtocol.PreparePaste(nestedEnd + "x", "\r", bracketed: false), nestedEnd + "x", "without bracketed paste the text is not searched for markers");
+        {
+            // Many levels of nesting must neither hang the paste nor leave a marker: the removal is one pass over the text.
+            int levels = 50000;
+            string deep = string.Concat(Enumerable.Repeat(Esc + "[", levels)) + Esc + "[201~" + string.Concat(Enumerable.Repeat("201~", levels));
+            Stopwatch watch = Stopwatch.StartNew();
+            string prepared = XtermProtocol.PreparePaste(deep, "\r", bracketed: true);
+            watch.Stop();
+            Equal(prepared, XtermProtocol.BracketedPasteStart + XtermProtocol.BracketedPasteEnd, "a text nested " + levels + " levels deep is cleaned completely");
+            Check(watch.ElapsedMilliseconds < 2000, "a text nested " + levels + " levels deep is cleaned in linear time (" + watch.ElapsedMilliseconds + " ms)");
+        }
+        {
+            // Random texts made of the pieces of the markers: whatever the order, one start marker opens the paste, one end
+            // marker closes it, none is inside, and nothing but the markers is taken out of the text.
+            string[] pieces = { Esc, "[", "2", "0", "1", "~", "x", "\n", "[20", "01~", Esc + "[201~", Esc + "[200~" };
+            Random random = new Random(20240607);
+            bool allClean = true;
+            string firstBad = null;
+            for (int round = 0; round < 20000; round++)
+            {
+                StringBuilder source = new StringBuilder();
+                int length = random.Next(1, 40);
+                for (int index = 0; index < length; index++)
+                {
+                    source.Append(pieces[random.Next(pieces.Length)]);
+                }
+                string prepared = XtermProtocol.PreparePaste(source.ToString(), "\n", bracketed: true);
+                string inner = prepared.Substring(XtermProtocol.BracketedPasteStart.Length, prepared.Length - XtermProtocol.BracketedPasteStart.Length - XtermProtocol.BracketedPasteEnd.Length);
+                string reference = source.ToString();
+                string before;
+                do
+                {
+                    before = reference;
+                    reference = reference.Replace(XtermProtocol.BracketedPasteStart, "").Replace(XtermProtocol.BracketedPasteEnd, "");
+                }
+                while (reference != before);
+                bool clean = prepared.StartsWith(XtermProtocol.BracketedPasteStart, StringComparison.Ordinal)
+                    && prepared.EndsWith(XtermProtocol.BracketedPasteEnd, StringComparison.Ordinal)
+                    && inner.IndexOf(XtermProtocol.BracketedPasteStart, StringComparison.Ordinal) == -1
+                    && inner.IndexOf(XtermProtocol.BracketedPasteEnd, StringComparison.Ordinal) == -1
+                    && prepared.IndexOf(XtermProtocol.BracketedPasteEnd, StringComparison.Ordinal) == prepared.Length - XtermProtocol.BracketedPasteEnd.Length
+                    && inner == reference;
+                if (!clean)
+                {
+                    allClean = false;
+                    firstBad = firstBad ?? Show(source.ToString());
+                }
+            }
+            Check(allClean, "20000 random texts of marker pieces: the paste is closed once, at the end, and only markers are removed" + (firstBad == null ? "" : " (first bad: '" + firstBad + "')"));
+        }
         Check(XtermProtocol.PreparePaste(null, "\r", bracketed: true) == null, "null clipboard text stays null");
         Equal(XtermProtocol.PreparePaste("", "\r", bracketed: true), "", "empty clipboard text sends nothing");
     }
