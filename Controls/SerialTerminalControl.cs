@@ -96,7 +96,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
     private bool _localEcho = true;
 
     /// <summary>Raised when the user clicks a path or an URL shown in the terminal text. Device terminals run on this
-    /// machine, so the path is a local file; the controller opens it with the default associated application.</summary>
+    /// machine, so the path is a local file; the controller opens an address, a folder or a document with the program it belongs to
+    /// and anything else as text (see LocalLinkPolicy): the path is what the device printed, and a file must not be run for it.</summary>
     public event EventHandler<OpenFileEventArgs> OpenFileRequested;
 
     public void RequestOpenFile(string path, int? line = null, int? column = null)
