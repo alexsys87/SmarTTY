@@ -221,6 +221,24 @@ internal static class Program
         Check(error == null && File.Exists(Path.Combine(root, "pre\\posix.txt")), "posix format: the prefix field is still honoured");
         Directory.Delete(root, true);
 
+        // --- GNU long names: the size comes from the remote side ---
+        string sizedLongName = new string('a', 150) + ".txt";
+        root = Extract(Archive((Header("././@LongLink", sizedLongName.Length + 1, (byte)'L', false), sizedLongName + "\0"), (Header("short", 2, (byte)'0', false), "ok")), out error);
+        Check(error == null && File.Exists(Path.Combine(root, sizedLongName)), "long name: a record of a sensible size still names the next entry");
+        Directory.Delete(root, true);
+
+        root = Extract(Archive((Header("././@LongLink", 0x1FFFFFFFFL, (byte)'L', false), null)), out error);
+        Check(error is IOException && error.Message.Contains("Invalid size of a long TAR name"), "long name: a size of gigabytes is refused, not allocated");
+        Directory.Delete(root, true);
+
+        root = Extract(Archive((Header("././@LongLink", TarExtractor.MaxLongNameBytes + 1, (byte)'L', false), null)), out error);
+        Check(error is IOException, "long name: one byte over the limit is refused");
+        Directory.Delete(root, true);
+
+        root = Extract(Archive((Header("././@LongLink", 0, (byte)'L', false), null), (Header("short", 2, (byte)'0', false), "ok")), out error);
+        Check(error is IOException, "long name: an empty name record is refused");
+        Directory.Delete(root, true);
+
         // --- levels up ---
         Check(TarExtractor.CountParentReferences("..\\..\\x", isForward: true) == 2, "levels: backslashes count as separators");
         Check(TarExtractor.CountParentReferences("a/../..", isForward: true) == 1, "levels: net levels above the start");

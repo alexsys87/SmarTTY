@@ -99,8 +99,9 @@ public partial class DeviceTerminalControl
                 slots.Release();
                 break;
             }
-            byte[] chunk = new byte[FileSendChunkBytes];
-            int count = stream.Read(chunk, 0, chunk.Length);
+            // One byte more than the chunk size: a CR LF pair is never cut between two writes (see FileSendChunks.Read).
+            byte[] chunk = new byte[FileSendChunkBytes + 1];
+            int count = FileSendChunks.Read(stream, chunk, FileSendChunkBytes);
             if (count <= 0)
             {
                 slots.Release();

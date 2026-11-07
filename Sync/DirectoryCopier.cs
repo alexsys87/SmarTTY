@@ -223,7 +223,7 @@ public class DirectoryCopier
             sshShellChannel.Output.ReadFully = true;
             TarExtractor tarExtractor = new TarExtractor(sshShellChannel.Output, localPath)
             {
-                PreserveTimestamps = true
+                PreserveTimestamps = preserveTimestamps
             };
             if (TarOverwrite != null)
             {
@@ -286,9 +286,7 @@ public class DirectoryCopier
 
     private void DownloadFileByFile(string remoteDir, string localDir, ref int filesDone, ref long bytesDone, Regex[] excludeRegexes)
     {
-        List<string> fileList = new List<string>();
-        List<string> dirList = new List<string>();
-        List<string> rawLines = this._session.RunCommandChecked("ls -1ALF " + SmarTTY.IO.RemotePathUtils.ShellQuote(remoteDir), requireSuccess: true);
+        List<string> rawLines = this._session.RunCommandChecked(SmarTTY.IO.RemoteDirectoryListing.BuildCommand(remoteDir), requireSuccess: true);
         if (rawLines == null)
         {
             if (Log != null)
@@ -297,23 +295,12 @@ public class DirectoryCopier
             }
             return;
         }
-        foreach (string line in rawLines)
+        SmarTTY.IO.RemoteDirectoryListing listing = SmarTTY.IO.RemoteDirectoryListing.Parse(rawLines);
+        List<string> fileList = listing.Files;
+        List<string> dirList = listing.Directories;
+        if (listing.NamesWithLineBreak != 0 && Log != null)
         {
-            if (!string.IsNullOrEmpty(line))
-            {
-                if (line[line.Length - 1] == '/')
-                {
-                    dirList.Add(line.Substring(0, line.Length - 1));
-                }
-                else if (line[line.Length - 1] == '*')
-                {
-                    fileList.Add(line.Substring(0, line.Length - 1));
-                }
-                else if ("@/=>|".IndexOf(line[line.Length - 1]) == -1)
-                {
-                    fileList.Add(line);
-                }
-            }
+            Log(this, "Skipped " + listing.NamesWithLineBreak + " item(s) in " + remoteDir + " whose names contain a line break");
         }
         Directory.CreateDirectory(localDir);
         foreach (string fileName in fileList)

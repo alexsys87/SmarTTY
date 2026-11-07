@@ -34,6 +34,9 @@
     <Compile Include="../../Ssh/*.cs" LinkBase="Ssh" />
     <Compile Include="../../IO/DfOutputParser.cs" Link="IO/DfOutputParser.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="IO/RemotePathUtils.cs" />
+    <!-- Sync/DirectoryCopier.cs uses this listing for the file-by-file download; the Sync/*.cs glob below pulls
+         the copier in, so the listing it now calls has to be linked here as well. -->
+    <Compile Include="../../IO/RemoteDirectoryListing.cs" Link="IO/RemoteDirectoryListing.cs" />
     <Compile Include="../../IO/PathUtils.cs" Link="IO/PathUtils.cs" />
     <Compile Include="../../IO/RemoteFileOperations.cs" Link="IO/RemoteFileOperations.cs" />
     <Compile Include="../../IO/RemoteScript.cs" Link="IO/RemoteScript.cs" />

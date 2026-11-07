@@ -75,6 +75,10 @@ public class TarExtractor
 
     private byte[] _buffer = new byte[1048576];
 
+    // The most a GNU long name record may carry. The size comes from the remote side, and a path is far shorter than this
+    // (PATH_MAX is 4096 on Linux, a Windows path is at most 32767 characters).
+    internal const int MaxLongNameBytes = 65536;
+
     private static DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, 0);
 
     // The times that a file can have on Windows (a FILETIME starts in 1601) and in a DateTime; a time outside is clamped.
@@ -279,6 +283,11 @@ public class TarExtractor
             if (typeFlag != 'L' && typeFlag != 'K' && typeFlag != 'x' && typeFlag != 'g')
             {
                 break;
+            }
+            // A GNU long name record carries a path, not data: a size of gigabytes is a broken or malicious archive.
+            if (typeFlag == 'L' && (entrySize == 0 || entrySize > MaxLongNameBytes))
+            {
+                throw new IOException("Invalid size of a long TAR name: " + entrySize);
             }
             // Not an entry but a record about the next one: a GNU long name ('L') or long link target ('K'), pax attributes ('x').
             // A pax global header ('g', git archive writes the commit id into it) is about the whole archive: nothing to extract.
@@ -780,70 +789,6 @@ public class TarExtractor
             {
                 unresolvedLinks.Add(link.OriginalName);
             }
-        }
-    }
-
-    private static void RetryFor(ThreadStart callback, int timeoutMs = 5000)
-    {
-        try
-        {
-            callback();
-        }
-        catch
-        {
-            DateTime now = DateTime.Now;
-            while (true)
-            {
-                try
-                {
-                    Thread.Sleep(100);
-                    callback();
-                    break;
-                }
-                catch
-                {
-                    if ((DateTime.Now - now).TotalMilliseconds > (double)timeoutMs)
-                    {
-                        throw;
-                    }
-                }
-            }
-        }
-    }
-
-    public static void DeleteDirectoryRecursive(string dirPath)
-    {
-        string[] directories;
-        try
-        {
-            directories = Directory.GetDirectories(dirPath);
-        }
-        catch
-        {
-            Directory.Delete(dirPath);
-            return;
-        }
-        foreach (string subDir in directories)
-        {
-            DeleteDirectoryRecursive(subDir);
-        }
-        string[] files = Directory.GetFiles(dirPath);
-        foreach (string file in files)
-        {
-            if (File.Exists(file))
-            {
-                RetryFor(() =>
-                {
-                    File.Delete(file);
-                });
-            }
-        }
-        if (Directory.Exists(dirPath))
-        {
-            RetryFor(() =>
-            {
-                Directory.Delete(dirPath, recursive: true);
-            });
         }
     }
 
