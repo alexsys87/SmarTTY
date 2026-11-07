@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.SystemdNetworkd, L.Kubernetes, L.DockerCompose, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.SystemdNetworkd, L.Kubernetes, L.DockerCompose, L.Ansible, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -936,6 +936,7 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.SystemdNetworkd) != null, "# comments in systemd-networkd files");
         Check(CommentStyle.ForLanguage(L.Kubernetes) != null, "# comments in Kubernetes YAML");
         Check(CommentStyle.ForLanguage(L.DockerCompose) != null, "# comments in Docker Compose files");
+        Check(CommentStyle.ForLanguage(L.Ansible) != null, "# comments in Ansible files");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1339,6 +1340,47 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("depends_on"), "Compose keywords contain 'depends_on'");
         Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("unless-stopped"), "Compose keywords contain 'unless-stopped'");
         Equal(Join(CommentStyle.ForLanguage(L.DockerCompose).Toggle(new[] { "    image: nginx" })), "    # image: nginx", "Compose comment");
+    }
+
+    private static void AnsibleChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/ansible/site.yml"), L.Ansible, "a playbook under /ansible/");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/playbooks/deploy.yaml"), L.Ansible, "a playbook under /playbooks/");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/roles/nginx/tasks/main.yml"), L.Ansible, "a task file of a role");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/inventory/group_vars/all.yml"), L.Ansible, "the variables of a group");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/ansible/deploy-playbook.yml"), L.Ansible, "a name with 'playbook'");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/handlers/main.yaml"), L.Ansible, "a handler file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/site.yml"), L.Yaml, "an ordinary site.yml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/tasks.yaml"), L.Yaml, "an ordinary tasks.yaml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/k8s/deployment.yaml"), L.Kubernetes, "Kubernetes wins under /k8s/");
+
+        Highlighted playbook = new Highlighted(L.Ansible,
+            "# deploy\n- name: Configure web\n  hosts: web\n  become: yes\n  vars:\n    http_port: 80\n  tasks:\n    - name: Install nginx\n      apt:\n        name: nginx\n        state: present\n      notify: restart nginx\n    - name: Start the service\n      service:\n        name: nginx\n        state: started\n        enabled: yes\n    - name: Run the command\n      command: /bin/echo hello\n      when: ansible_os_family == \"Debian\"\n      register: result\n      changed_when: false\n  handlers:\n    - name: restart nginx\n      service:\n        name: nginx\n        state: restarted");
+        Equal(Join(playbook.Tokens(0, SyntaxHighlighting.TypeComment)), "# deploy", "Ansible: a comment");
+        Equal(Join(playbook.Tokens(1, SyntaxHighlighting.TypeKeyword)), "name", "Ansible: the name of a play");
+        Equal(Join(playbook.Tokens(2, SyntaxHighlighting.TypeKeyword)), "hosts", "Ansible: hosts");
+        Equal(Join(playbook.Tokens(3, SyntaxHighlighting.TypeKeyword)), "become|yes", "Ansible: become");
+        Equal(Join(playbook.Tokens(4, SyntaxHighlighting.TypeKeyword)), "vars", "Ansible: vars");
+        Equal(Join(playbook.Tokens(5, SyntaxHighlighting.TypeVariable)), "http_port", "Ansible: a variable stays an ordinary key");
+        Equal(Join(playbook.Tokens(5, SyntaxHighlighting.TypeNumber)), "80", "Ansible: the port of the variable");
+        Equal(Join(playbook.Tokens(6, SyntaxHighlighting.TypeKeyword)), "tasks", "Ansible: tasks");
+        Equal(Join(playbook.Tokens(8, SyntaxHighlighting.TypeKeyword)), "apt", "Ansible: the apt module");
+        Equal(Join(playbook.Tokens(10, SyntaxHighlighting.TypeKeyword)), "state|present", "Ansible: state and present");
+        Equal(Join(playbook.Tokens(11, SyntaxHighlighting.TypeKeyword)), "notify", "Ansible: notify");
+        Equal(Join(playbook.Tokens(13, SyntaxHighlighting.TypeKeyword)), "service", "Ansible: the service module");
+        Equal(Join(playbook.Tokens(15, SyntaxHighlighting.TypeKeyword)), "state|started", "Ansible: state and started");
+        Equal(Join(playbook.Tokens(16, SyntaxHighlighting.TypeKeyword)), "enabled|yes", "Ansible: enabled");
+        Equal(Join(playbook.Tokens(18, SyntaxHighlighting.TypeKeyword)), "command", "Ansible: the command module");
+        Equal(Join(playbook.Tokens(19, SyntaxHighlighting.TypeKeyword)), "when", "Ansible: when");
+        Equal(Join(playbook.Tokens(20, SyntaxHighlighting.TypeKeyword)), "register", "Ansible: register");
+        Equal(Join(playbook.Tokens(21, SyntaxHighlighting.TypeKeyword)), "changed_when|false", "Ansible: changed_when");
+        Equal(Join(playbook.Tokens(22, SyntaxHighlighting.TypeKeyword)), "handlers", "Ansible: handlers");
+        Equal(Join(playbook.Tokens(23, SyntaxHighlighting.TypeKeyword)), "name", "Ansible: the name of a handler");
+        Equal(Join(playbook.Tokens(26, SyntaxHighlighting.TypeKeyword)), "state|restarted", "Ansible: a handler that restarts");
+        Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("hosts"), "Ansible keywords contain 'hosts'");
+        Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("apt"), "Ansible keywords contain 'apt'");
+        Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("become"), "Ansible keywords contain 'become'");
+        Equal(Join(CommentStyle.ForLanguage(L.Ansible).Toggle(new[] { "  become: yes" })), "  # become: yes", "Ansible comment");
     }
 
     private static void KconfigChecks()
@@ -1822,6 +1864,7 @@ internal static class Program
         SystemdNetworkdChecks();
         KubernetesChecks();
         DockerComposeChecks();
+        AnsibleChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();

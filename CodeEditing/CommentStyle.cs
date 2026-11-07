@@ -41,6 +41,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.SystemdNetworkd:
                 case SyntaxHighlighting.Language.Kubernetes:
                 case SyntaxHighlighting.Language.DockerCompose:
+                case SyntaxHighlighting.Language.Ansible:
                 case SyntaxHighlighting.Language.Script:
                 case SyntaxHighlighting.Language.Awk:
                 case SyntaxHighlighting.Language.Tcl:

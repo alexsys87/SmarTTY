@@ -847,6 +847,48 @@ public static partial class SyntaxHighlighting
         return TokenizeYamlCore(DockerComposeKeywords, DockerComposeValues, startState, text, sink, out endState);
     }
 
+    // ------------------------------------------------------------------ Ansible
+
+    private static readonly HashSet<string> AnsibleKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the play
+        @"name hosts remote_user port connection become become_user become_method become_exe become_flags become_pass
+          gather_facts gather_subset gather_timeout fact_path vars vars_files vars_prompt roles tasks handlers pre_tasks
+          post_tasks force_handlers any_errors_fatal max_fail_percentage serial strategy order throttle run_once
+          delegate_to delegate_facts module_defaults environment collections check_mode diff no_log ignore_errors
+          ignore_unreachable tags
+          // the task
+          when loop loop_control with_items with_dict with_list with_fileglob with_together with_nested with_sequence
+          with_indexed_items with_first_found with_random_choice with_cartesian with_flattened with_subelements with_ini
+          with_inventory_hostnames with_password with_lines until retries delay register failed_when changed_when notify
+          listen block rescue always async poll
+          include_tasks import_tasks include_role import_role include_vars include import_playbook
+          // the modules
+          apt apt_key apt_repository yum yum_repository dnf rpm_key package copy template file lineinfile blockinfile
+          replace assemble fetch synchronize unarchive archive command shell script raw expect service systemd sysvinit
+          runit supervisorctl user group authorized_key git subversion hg get_url uri slurp cron at timezone mount parted
+          lvg lvol filesystem stat debug assert fail pause wait_for wait_for_connection meta set_fact local_action
+          state src dest path owner group mode content backup validate force recurse follow create regexp line
+          insertafter insertbefore marker remote_src attributes seuser serole setype selevel unsafe_writes enabled
+          docker_container docker_image docker_network docker_volume docker_compose_v2 k8s helm
+          mysql_db mysql_user mysql_query postgresql_db postgresql_user postgresql_query redis redis_info
+          pip composer npm yarn gem");
+
+    private static readonly HashSet<string> AnsibleValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the states and the choices of the play
+        @"present absent started stopped restarted reloaded latest enabled disabled mounted unmounted link file directory
+          touch yes no true false always never any all first last on_success on_failure
+          ssh local docker paramiko_ssh winrm sudo su doas pbrun pfexec runas
+          linear free host_pinned debug");
+
+    /// <summary>
+    /// Ansible: the colours and the folds of YAML with the keys of the plays, the tasks and the roles known, and the
+    /// modules (apt, copy, service, command, ...) and the common states (present, started, enabled) coloured too.
+    /// </summary>
+    private static bool TokenizeAnsible(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(AnsibleKeywords, AnsibleValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)
