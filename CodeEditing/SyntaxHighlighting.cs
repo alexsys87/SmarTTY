@@ -97,14 +97,15 @@ namespace SmarTTY.CodeEditing
             HAProxy, // haproxy.cfg: the colors of Config with the sections, directives and values of HAProxy known
             ApacheHttpd, // httpd.conf, apache2.conf, .htaccess: the colors of Config with the Apache directives known
             SystemdNetworkd, // .network, .netdev, .link: the colors of Config with the systemd-networkd keys known
-            Kubernetes // Kubernetes and Helm YAML: the colors of YAML with the keys of the manifests known
+            Kubernetes, // Kubernetes and Helm YAML: the colors of YAML with the keys of the manifests known
+            DockerCompose // docker-compose.yml, compose.yaml: the colors of YAML with the keys of Compose known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -142,6 +143,7 @@ namespace SmarTTY.CodeEditing
                 case Language.ApacheHttpd: return "Apache httpd config";
                 case Language.SystemdNetworkd: return "systemd-networkd";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
+                case Language.DockerCompose: return "Docker Compose";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
@@ -308,8 +310,14 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.SystemdNetworkd;
             }
-            // Kubernetes manifests, Kustomize overlays and Helm charts: YAML told by the place or the conventional name.
+            // Docker Compose: the conventional names, including the override and the per-file variants.
             bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
+            if (yamlFile && (name.StartsWith("docker-compose.", StringComparison.Ordinal) ||
+                name.StartsWith("compose.", StringComparison.Ordinal)))
+            {
+                return Language.DockerCompose;
+            }
+            // Kubernetes manifests, Kustomize overlays and Helm charts: YAML told by the place or the conventional name.
             if (yamlFile && (lowerCasePath.Contains("/kubernetes/") || lowerCasePath.Contains("/k8s/") ||
                 lowerCasePath.Contains("/kube/") || lowerCasePath.Contains("/manifests/") ||
                 lowerCasePath.Contains("/helm/") || lowerCasePath.Contains("/charts/") ||
@@ -977,6 +985,7 @@ namespace SmarTTY.CodeEditing
                 case Language.ApacheHttpd: return TokenizeApache;
                 case Language.SystemdNetworkd: return TokenizeSystemdNetworkd;
                 case Language.Kubernetes: return TokenizeKubernetes;
+                case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -1108,6 +1117,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(SystemdNetworkdDirectives, SystemdNetworkdValues);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
+                case Language.DockerCompose:
+                    return Combine(DockerComposeKeywords, DockerComposeValues);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:

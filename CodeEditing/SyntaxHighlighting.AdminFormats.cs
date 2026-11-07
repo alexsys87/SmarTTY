@@ -812,6 +812,41 @@ public static partial class SyntaxHighlighting
         return TokenizeYamlCore(KubernetesKeywords, KubernetesValues, startState, text, sink, out endState);
     }
 
+    // ----------------------------------------------------------- Docker Compose
+
+    private static readonly HashSet<string> DockerComposeKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope
+        @"version name services networks volumes secrets configs
+          // the services
+          image build context dockerfile dockerfile_inline additional_contexts args target cache_from cache_to labels
+          pull network container_name command entrypoint environment env_file expose ports tmpfs network_mode hostname
+          domainname mac_address depends_on restart deploy profiles scale
+          healthcheck test interval timeout retries start_period start_interval disable
+          privileged user working_dir stdin_open tty stop_grace_period stop_signal sysctls ulimits cap_add cap_drop
+          devices dns dns_search extra_hosts group_add init isolation links logging driver options pid platform
+          read_only security_opt shm_size userns_mode extends file service
+          annotations blkio_config cgroup cgroup_parent cpu_count cpu_percent cpu_shares cpu_quota cpu_period cpuset
+          credential_spec device_cgroup_rules oom_kill_disable oom_score_adj uts
+          // the networks, the volumes and the deploy settings
+          external external_links ipam subnet gateway ip_range aux_addresses enable_ipv4 enable_ipv6 internal attachable
+          resources reservations limits cpus memory pids restart_policy condition delay max_attempts window
+          update_config parallelism failure_action monitor order rollback_config placement constraints preferences
+          endpoint_mode mode replicas node role");
+
+    private static readonly HashSet<string> DockerComposeValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"bridge host none service always unless-stopped on-failure local global replicated dnsrr vip
+          tcp udp sctp json-file syslog journald gelf fluentd awslogs splunk
+          asc desc spread stop-first start-first pause continue manager worker ingress latest");
+
+    /// <summary>
+    /// Docker Compose: the colours and the folds of YAML with the keys of the services, networks, volumes and deploy
+    /// settings known, and the choices of the drivers, policies and modes coloured as values.
+    /// </summary>
+    private static bool TokenizeDockerCompose(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(DockerComposeKeywords, DockerComposeValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)

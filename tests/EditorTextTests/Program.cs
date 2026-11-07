@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.SystemdNetworkd, L.Kubernetes, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.SystemdNetworkd, L.Kubernetes, L.DockerCompose, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -935,6 +935,7 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.ApacheHttpd) != null, "# comments in Apache files");
         Check(CommentStyle.ForLanguage(L.SystemdNetworkd) != null, "# comments in systemd-networkd files");
         Check(CommentStyle.ForLanguage(L.Kubernetes) != null, "# comments in Kubernetes YAML");
+        Check(CommentStyle.ForLanguage(L.DockerCompose) != null, "# comments in Docker Compose files");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1295,6 +1296,51 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Kubernetes).Toggle(new[] { "kind: Deployment" })), "# kind: Deployment", "Kubernetes comment");
     }
 
+    private static void DockerComposeChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yml"), L.DockerCompose, "docker-compose.yml");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yaml"), L.DockerCompose, "docker-compose.yaml");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/compose.yml"), L.DockerCompose, "compose.yml");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/compose.yaml"), L.DockerCompose, "compose.yaml");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.override.yml"), L.DockerCompose, "an override file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/compose.prod.yaml"), L.DockerCompose, "a per-environment file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app.yml"), L.Yaml, "an ordinary .yml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/charts/web/values.yaml"), L.Kubernetes, "Helm values stay Kubernetes");
+
+        Highlighted compose = new Highlighted(L.DockerCompose,
+            "# compose\nversion: \"3.9\"\nservices:\n  web:\n    image: nginx:1.25\n    build:\n      context: .\n      dockerfile: Dockerfile\n    ports:\n      - \"80:80\"\n    environment:\n      MY_SETTING: prod\n    depends_on:\n      - db\n    restart: unless-stopped\n    healthcheck:\n      test: [\"CMD\", \"curl\", \"-f\", \"http://localhost\"]\n      interval: 30s\n      retries: 3\n    deploy:\n      replicas: 2\n      resources:\n        limits:\n          cpus: \"0.5\"\n          memory: 256M\n  db:\n    image: postgres:16\n    volumes:\n      - data:/var/lib/postgresql/data\nvolumes:\n  data: {}\nnetworks:\n  default:\n    driver: bridge");
+        Equal(Join(compose.Tokens(0, SyntaxHighlighting.TypeComment)), "# compose", "Compose: a comment");
+        Equal(Join(compose.Tokens(1, SyntaxHighlighting.TypeKeyword)), "version", "Compose: the version");
+        Equal(Join(compose.Tokens(1, SyntaxHighlighting.TypeString)), "\"3.9\"", "Compose: the version number");
+        Equal(Join(compose.Tokens(2, SyntaxHighlighting.TypeKeyword)), "services", "Compose: services");
+        Equal(Join(compose.Tokens(3, SyntaxHighlighting.TypeVariable)), "web", "Compose: a service name stays an ordinary key");
+        Equal(Join(compose.Tokens(4, SyntaxHighlighting.TypeKeyword)), "image", "Compose: image");
+        Equal(Join(compose.Tokens(4, SyntaxHighlighting.TypeNumber)), "1.25", "Compose: the tag of the image");
+        Equal(Join(compose.Tokens(5, SyntaxHighlighting.TypeKeyword)), "build", "Compose: build");
+        Equal(Join(compose.Tokens(9, SyntaxHighlighting.TypeString)), "\"80:80\"", "Compose: a published port");
+        Equal(Join(compose.Tokens(10, SyntaxHighlighting.TypeKeyword)), "environment", "Compose: environment");
+        Equal(Join(compose.Tokens(11, SyntaxHighlighting.TypeVariable)), "MY_SETTING", "Compose: an environment variable stays an ordinary key");
+        Equal(Join(compose.Tokens(12, SyntaxHighlighting.TypeKeyword)), "depends_on", "Compose: depends_on");
+        Equal(Join(compose.Tokens(14, SyntaxHighlighting.TypeKeyword)), "restart|unless-stopped", "Compose: the restart policy");
+        Equal(Join(compose.Tokens(15, SyntaxHighlighting.TypeKeyword)), "healthcheck", "Compose: healthcheck");
+        Equal(Join(compose.Tokens(16, SyntaxHighlighting.TypeKeyword)), "test", "Compose: the health test");
+        Equal(Join(compose.Tokens(17, SyntaxHighlighting.TypeKeyword)), "interval", "Compose: the health interval");
+        Equal(Join(compose.Tokens(18, SyntaxHighlighting.TypeKeyword)), "retries", "Compose: the health retries");
+        Equal(Join(compose.Tokens(18, SyntaxHighlighting.TypeNumber)), "3", "Compose: the number of retries");
+        Equal(Join(compose.Tokens(19, SyntaxHighlighting.TypeKeyword)), "deploy", "Compose: deploy");
+        Equal(Join(compose.Tokens(20, SyntaxHighlighting.TypeKeyword)), "replicas", "Compose: replicas");
+        Equal(Join(compose.Tokens(20, SyntaxHighlighting.TypeNumber)), "2", "Compose: the number of replicas");
+        Equal(Join(compose.Tokens(23, SyntaxHighlighting.TypeKeyword)), "cpus", "Compose: a cpu limit");
+        Equal(Join(compose.Tokens(23, SyntaxHighlighting.TypeString)), "\"0.5\"", "Compose: the cpu value");
+        Equal(Join(compose.Tokens(27, SyntaxHighlighting.TypeKeyword)), "volumes", "Compose: the volumes of a service");
+        Equal(Join(compose.Tokens(28, SyntaxHighlighting.TypeVariable)), "data", "Compose: a named volume");
+        Equal(Join(compose.Tokens(33, SyntaxHighlighting.TypeKeyword)), "driver|bridge", "Compose: the network driver");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("services"), "Compose keywords contain 'services'");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("depends_on"), "Compose keywords contain 'depends_on'");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("unless-stopped"), "Compose keywords contain 'unless-stopped'");
+        Equal(Join(CommentStyle.ForLanguage(L.DockerCompose).Toggle(new[] { "    image: nginx" })), "    # image: nginx", "Compose comment");
+    }
+
     private static void KconfigChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/build/.config"), L.Kconfig, "the .config of a kernel or OpenWrt build");
@@ -1501,7 +1547,7 @@ internal static class Program
         Equal(Folds(yaml), "2:6,3:5,6:14,7:14,9:12,12:14", "YAML mappings, lists at the indentation of their key and block scalars fold");
         Equal(Join(yaml.Tokens(1, SyntaxHighlighting.TypeVariable)), "name", "YAML keys keep the config colors");
         Equal(Join(yaml.Tokens(1, SyntaxHighlighting.TypeComment)), "# note", "YAML comments keep the config colors");
-        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yml"), L.Yaml, ".yml is YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/docker-compose.yml"), L.DockerCompose, "docker-compose.yml is Compose");
 
         // The text of a block scalar is not YAML.
         Highlighted scalar = new Highlighted(L.Yaml, "run: |\n  echo \"don't # stop\"\n  x: y\n\n  more\nnext: 'v'\n");
@@ -1775,6 +1821,7 @@ internal static class Program
         ApacheChecks();
         SystemdNetworkdChecks();
         KubernetesChecks();
+        DockerComposeChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();
