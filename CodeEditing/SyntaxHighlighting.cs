@@ -95,14 +95,15 @@ namespace SmarTTY.CodeEditing
             MySql,   // my.cnf, my.ini: the colors of Config with the MySQL/MariaDB options known
             Redis,   // redis.conf, sentinel.conf: the colors of Config with the Redis directives known
             HAProxy, // haproxy.cfg: the colors of Config with the sections, directives and values of HAProxy known
-            ApacheHttpd // httpd.conf, apache2.conf, .htaccess: the colors of Config with the Apache directives known
+            ApacheHttpd, // httpd.conf, apache2.conf, .htaccess: the colors of Config with the Apache directives known
+            SystemdNetworkd // .network, .netdev, .link: the colors of Config with the systemd-networkd keys known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -138,6 +139,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Redis: return "Redis config";
                 case Language.HAProxy: return "HAProxy config";
                 case Language.ApacheHttpd: return "Apache httpd config";
+                case Language.SystemdNetworkd: return "systemd-networkd";
                 case Language.Log: return "Log (syslog, application logs)";
                 case Language.Yaml: return "YAML";
                 case Language.Python: return "Python";
@@ -299,6 +301,10 @@ namespace SmarTTY.CodeEditing
                 (name.EndsWith(".conf", StringComparison.Ordinal) || name == ".htaccess" || name.IndexOf('.') < 0))
             {
                 return Language.ApacheHttpd;
+            }
+            if (lowerCasePath.Contains("/systemd/network/"))
+            {
+                return Language.SystemdNetworkd;
             }
             if ((lowerCasePath.Contains("/ssh_config.d/") || lowerCasePath.Contains("/sshd_config.d/")) && name.EndsWith(".conf", StringComparison.Ordinal))
             {
@@ -556,12 +562,14 @@ namespace SmarTTY.CodeEditing
                 case "editorconfig":
                 case "toml":
                 case "env":
-                case "network":
-                case "netdev":
-                case "link":
                 case "desktop":
                 case "rules":
                     return Language.Config;
+
+                case "network":
+                case "netdev":
+                case "link":
+                    return Language.SystemdNetworkd;
 
                 case "bb":
                 case "bbappend":
@@ -949,6 +957,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Redis: return TokenizeRedis;
                 case Language.HAProxy: return TokenizeHAProxy;
                 case Language.ApacheHttpd: return TokenizeApache;
+                case Language.SystemdNetworkd: return TokenizeSystemdNetworkd;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -1076,6 +1085,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(HAProxyDirectives, HAProxyValues);
                 case Language.ApacheHttpd:
                     return Combine(ApacheDirectives, ApacheValues);
+                case Language.SystemdNetworkd:
+                    return Combine(SystemdNetworkdDirectives, SystemdNetworkdValues);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:

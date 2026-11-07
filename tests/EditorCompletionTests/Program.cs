@@ -118,6 +118,8 @@ internal static class Program
         Check(Names(L.HAProxy, "", "").Contains("roundrobin"), "the HAProxy balance 'roundrobin' is offered");
         Check(Names(L.ApacheHttpd, "", "").Contains("DocumentRoot"), "the Apache directive 'DocumentRoot' is offered");
         Check(Names(L.ApacheHttpd, "", "").Contains("FollowSymLinks"), "the Apache option 'FollowSymLinks' is offered");
+        Check(Names(L.SystemdNetworkd, "", "").Contains("DHCP"), "the systemd-networkd key 'DHCP' is offered");
+        Check(Names(L.SystemdNetworkd, "", "").Contains("LinkLocalAddressing"), "the systemd-networkd key 'LinkLocalAddressing' is offered");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");

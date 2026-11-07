@@ -899,7 +899,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service.d/override.conf"), L.Systemd, "a drop-in of a unit");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/journald.conf"), L.Systemd, "journald.conf is systemd's");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/foo.conf"), L.Config, "an ordinary .conf stays a config");
-        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.network"), L.Config, "networkd files are not units");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.network"), L.SystemdNetworkd, "networkd files are not units");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/crontab"), L.Crontab, "/etc/crontab is a crontab");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/.env"), L.Config, ".env stays a config");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pyproject.toml"), L.Config, "toml stays a config");
@@ -918,7 +918,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
         // The status bar and the syntax menu offer them, with names of their own.
-        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.Log })
+        foreach (L language in new[] { L.Systemd, L.Nginx, L.SshConfig, L.Crontab, L.Fstab, L.Sudoers, L.MySql, L.Redis, L.HAProxy, L.ApacheHttpd, L.SystemdNetworkd, L.Log })
         {
             Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, language) >= 0, language + " is in the syntax menu");
             Check(SyntaxHighlighting.GetDisplayName(language) != language.ToString(), language + " has a name for people");
@@ -933,6 +933,7 @@ internal static class Program
         Check(CommentStyle.ForLanguage(L.Redis) != null, "# comments in Redis files");
         Check(CommentStyle.ForLanguage(L.HAProxy) != null, "# comments in HAProxy files");
         Check(CommentStyle.ForLanguage(L.ApacheHttpd) != null, "# comments in Apache files");
+        Check(CommentStyle.ForLanguage(L.SystemdNetworkd) != null, "# comments in systemd-networkd files");
         Check(CommentStyle.ForLanguage(L.Log) == null, "a log has no comments");
     }
 
@@ -1213,6 +1214,43 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("DocumentRoot"), "Apache keywords contain 'DocumentRoot'");
         Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("FollowSymLinks"), "Apache keywords contain 'FollowSymLinks'");
         Equal(Join(CommentStyle.ForLanguage(L.ApacheHttpd).Toggle(new[] { "Listen 80" })), "# Listen 80", "Apache comment");
+    }
+
+    private static void SystemdNetworkdChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.network"), L.SystemdNetworkd, "a .network of networkd");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.netdev"), L.SystemdNetworkd, "a .netdev of networkd");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.link"), L.SystemdNetworkd, "a .link of networkd");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/systemd/network/99-default.link"), L.SystemdNetworkd, "the defaults of the distribution");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/systemd/network/10-dhcp.network"), L.SystemdNetworkd, "a generated file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg0.netdev"), L.SystemdNetworkd, "a .netdev anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/10-eth.link"), L.SystemdNetworkd, "a .link anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/system/app.service"), L.Systemd, "units stay systemd");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/foo.conf"), L.Config, "an ordinary .conf stays a config");
+
+        Highlighted network = new Highlighted(L.SystemdNetworkd,
+            "# Network\n[Match]\nName=eth0\n\n[Network]\nDHCP=ipv4\nAddress=192.168.1.10/24\nGateway=192.168.1.1\nDNS=1.1.1.1 8.8.8.8\nLinkLocalAddressing=ipv6\nIPv6PrivacyExtensions=yes\n\n[DHCPv4]\nUseDNS=no\nRouteMetric=100\n\n[Address]\nAddress=192.168.1.20/24\nPreferredLifetime=forever");
+        Equal(Join(network.Tokens(0, SyntaxHighlighting.TypeComment)), "# Network", "networkd: a comment");
+        Equal(Join(network.Tokens(1, SyntaxHighlighting.TypeSection)), "[Match]", "networkd: the Match section");
+        Equal(Join(network.Tokens(2, SyntaxHighlighting.TypeKeyword)), "Name", "networkd: Name");
+        Equal(Join(network.Tokens(4, SyntaxHighlighting.TypeSection)), "[Network]", "networkd: the Network section");
+        Equal(Join(network.Tokens(5, SyntaxHighlighting.TypeKeyword)), "DHCP|ipv4", "networkd: DHCP");
+        Equal(Join(network.Tokens(6, SyntaxHighlighting.TypeKeyword)), "Address", "networkd: Address");
+        Equal(Join(network.Tokens(6, SyntaxHighlighting.TypeNumber)), "192.168.1.10|24", "networkd: an address and its prefix");
+        Equal(Join(network.Tokens(7, SyntaxHighlighting.TypeNumber)), "192.168.1.1", "networkd: a gateway");
+        Equal(Join(network.Tokens(8, SyntaxHighlighting.TypeKeyword)), "DNS", "networkd: DNS");
+        Equal(Join(network.Tokens(8, SyntaxHighlighting.TypeNumber)), "1.1.1.1|8.8.8.8", "networkd: the name servers");
+        Equal(Join(network.Tokens(9, SyntaxHighlighting.TypeKeyword)), "LinkLocalAddressing|ipv6", "networkd: LinkLocalAddressing");
+        Equal(Join(network.Tokens(10, SyntaxHighlighting.TypeKeyword)), "IPv6PrivacyExtensions|yes", "networkd: IPv6PrivacyExtensions");
+        Equal(Join(network.Tokens(12, SyntaxHighlighting.TypeSection)), "[DHCPv4]", "networkd: the DHCPv4 section");
+        Equal(Join(network.Tokens(13, SyntaxHighlighting.TypeKeyword)), "UseDNS|no", "networkd: UseDNS");
+        Equal(Join(network.Tokens(14, SyntaxHighlighting.TypeKeyword)), "RouteMetric", "networkd: RouteMetric");
+        Equal(Join(network.Tokens(14, SyntaxHighlighting.TypeNumber)), "100", "networkd: the metric");
+        Equal(Join(network.Tokens(16, SyntaxHighlighting.TypeSection)), "[Address]", "networkd: the Address section");
+        Equal(Join(network.Tokens(18, SyntaxHighlighting.TypeKeyword)), "PreferredLifetime|forever", "networkd: PreferredLifetime");
+        Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("DHCP"), "networkd keywords contain 'DHCP'");
+        Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("PreferredLifetime"), "networkd keywords contain 'PreferredLifetime'");
+        Equal(Join(CommentStyle.ForLanguage(L.SystemdNetworkd).Toggle(new[] { "DHCP=ipv4" })), "# DHCP=ipv4", "networkd comment");
     }
 
     private static void KconfigChecks()
@@ -1693,6 +1731,7 @@ internal static class Program
         RedisChecks();
         HAProxyChecks();
         ApacheChecks();
+        SystemdNetworkdChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();

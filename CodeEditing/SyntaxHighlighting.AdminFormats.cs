@@ -699,6 +699,41 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(ApacheDirectives, startState, text, sink, out endState, valueKeywords: ApacheValues);
     }
 
+    // -------------------------------------------------------- systemd-networkd
+
+    private static readonly HashSet<string> SystemdNetworkdDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        @"Name MACAddress Driver Type Kind Path Property Host Virtual
+          MACAddressPolicy NamePolicy AddressPolicy Address AlternativeName AlternativeNames
+          DHCP DHCPv4 DHCPv6 DHCPServer DHCPServerStaticLease Address Gateway DNS Domains NTP
+          LinkLocalAddressing IPv4LLRoute IPv6AcceptRA IPv6DuplicateAddressDetection IPv6PrivacyExtensions
+          IPv6SendRA IPv6Token IPv6MTUBytes IPv6StableSecretAddress IPv6LinkLocalAddressGenerationMode
+          ConfigureWithoutCarrier IgnoreCarrierLoss KeepConfiguration RequiredForOnline RequiredFamilyForOnline
+          BindCarrier VLAN Bridge Bond Tunnel VXLAN MACsec IPoIB CAN MultiqueueSRv6
+          Peer Broadcast Label PreferredLifetime ValidLifetime Scope
+          Destination Source Metric Table Protocol Type
+          ClientIdentifier VendorClassIdentifier UseDNS UseNTP UseDomains UseHostname UseRoutes RouteMetric
+          UseMTU UseGateway Token PoolOffset PoolSize EmitDNS EmitNTP EmitRouter Router EmitTimezone Timezone
+          PrefixDelegationHint
+          STP Priority ForwardDelay HelloTime MaxAge AgeingTime VLANFiltering
+          Id Mode MIIMonitorSec LACPTransmitRate UpDelaySec DownDelaySec
+          Local Remote TTL
+          RouterLifetime");
+
+    private static readonly HashSet<string> SystemdNetworkdValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"yes no on off true false ipv4 ipv6 both none static dhcp routable carrier up down any
+          promiscuous auto forever link-local global host site universe nowhere success degraded
+          stable-privacy mac random persistent onlink mtu unspecified unicast blackhole unreachable
+          prohibit throw local main default");
+
+    /// <summary>
+    /// systemd-networkd: the colours of Config with the keys of .network, .netdev and .link files known. The sections
+    /// ([Match], [Network], [Address], [Route], ...) are coloured by the Config tokenizer.
+    /// </summary>
+    private static bool TokenizeSystemdNetworkd(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(SystemdNetworkdDirectives, startState, text, sink, out endState, valueKeywords: SystemdNetworkdValues);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)
