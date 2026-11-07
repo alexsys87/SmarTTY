@@ -295,7 +295,7 @@ public sealed class TarArchiveReader
     }
 
     /// <summary>The records "length key=value\n" of a pax extended header.</summary>
-    private static Dictionary<string, string> ParsePax(byte[] data, long size)
+    internal static Dictionary<string, string> ParsePax(byte[] data, long size)
     {
         Dictionary<string, string> records = new Dictionary<string, string>(StringComparer.Ordinal);
         int position = 0;

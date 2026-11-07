@@ -52,6 +52,9 @@
     <Compile Include="../../LocalRepo/OpenWrtDetector.cs" Link="LocalRepo/OpenWrtDetector.cs" />
     <Compile Include="../../LocalRepo/LocalRepoPackageManager.cs" Link="LocalRepo/LocalRepoPackageManager.cs" />
     <Compile Include="../../Transport/RemoteBackup.cs" Link="Transport/RemoteBackup.cs" />
+    <!-- Sync/TarExtractor.cs reads its TAR headers through these two, as tests/TarExtractorSecurityTests links them too. -->
+    <Compile Include="../../Transport/TarArchiveChecker.cs" Link="Transport/TarArchiveChecker.cs" />
+    <Compile Include="../../Transport/TarArchiveReader.cs" Link="Transport/TarArchiveReader.cs" />
     <Compile Include="../../Transport/MtdFlash.cs" Link="Transport/MtdFlash.cs" />
     <Compile Include="../../Transport/DevMem.cs" Link="Transport/DevMem.cs" />
     <Compile Include="../../Utilities/PosixShell.cs" Link="Utilities/PosixShell.cs" />
