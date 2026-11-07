@@ -112,6 +112,8 @@ internal static class Program
         Check(Names(L.Sudoers, "", "").Contains("secure_path"), "the sudoers flag 'secure_path' is offered");
         Check(Names(L.MySql, "", "").Contains("innodb_buffer_pool_size"), "the MySQL option 'innodb_buffer_pool_size' is offered");
         Check(Names(L.MySql, "", "").Contains("skip-name-resolve"), "the MySQL option 'skip-name-resolve' is offered");
+        Check(Names(L.Redis, "", "").Contains("maxmemory-policy"), "the Redis directive 'maxmemory-policy' is offered");
+        Check(Names(L.Redis, "", "").Contains("appendfsync"), "the Redis directive 'appendfsync' is offered");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");
