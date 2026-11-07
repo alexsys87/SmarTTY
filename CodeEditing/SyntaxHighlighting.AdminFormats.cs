@@ -655,6 +655,50 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(HAProxyDirectives, startState, text, sink, out endState, valueKeywords: HAProxyValues);
     }
 
+    // ------------------------------------------------------------ Apache httpd
+
+    private static readonly HashSet<string> ApacheDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        @"ServerRoot ServerName ServerAdmin ServerAlias ServerPath UseCanonicalName
+          Listen PidFile Mutex ScoreBoardFile Timeout KeepAlive MaxKeepAliveRequests KeepAliveTimeout
+          User Group LoadModule LoadFile
+          DocumentRoot DirectoryIndex Options AllowOverride Require Order Allow Deny
+          ErrorLog CustomLog LogLevel LogFormat TransferLog ScriptLog
+          Include IncludeOptional
+          TypesConfig AddType AddEncoding AddLanguage AddHandler AddCharset AddDefaultCharset DefaultType
+          AccessFileName SetHandler
+          Directory Files FileMatch Location LocationMatch VirtualHost IfModule IfDefine IfVersion ElseIf Else
+          Limit LimitExcept Proxy
+          ProxyRequests ProxyPass ProxyPassReverse ProxyPreserveHost ProxyTimeout ProxyBadHeader ProxyVia
+          RewriteEngine RewriteBase RewriteCond RewriteRule RewriteMap RewriteOptions
+          Header RequestHeader SetEnvIf SetEnvIfNoCase BrowserMatch
+          SSLEngine SSLProtocol SSLCipherSuite SSLCertificateFile SSLCertificateKeyFile SSLCertificateChainFile
+          SSLVerifyClient SSLVerifyDepth
+          AuthType AuthName AuthUserFile AuthGroupFile AuthBasicProvider
+          AddDefaultCharset ErrorDocument Alias ScriptAlias
+          ExtendedStatus AllowEncodedSlashes AcceptPathInfo EnableMMAP EnableSendfile
+          FileETag HostnameLookups NameVirtualHost
+          MaxRequestWorkers MaxConnectionsPerChild StartServers MinSpareThreads MaxSpareThreads ThreadsPerChild
+          ServerLimit ThreadLimit StartThreads MinSpareServers MaxSpareServers MaxClients MaxRequestsPerChild");
+
+    private static readonly HashSet<string> ApacheValues = Words(StringComparer.OrdinalIgnoreCase,
+        // choices of the directives
+        @"on off all none granted denied valid-user
+          Indexes FollowSymLinks SymLinksIfOwnerMatch ExecCGI Includes IncludesNOEXEC MultiViews
+          All None
+          emerg alert crit error warn notice info debug trace1 trace2 trace3 trace4 trace5 trace6 trace7 trace8
+          Directory Files FileMatch Location LocationMatch VirtualHost IfModule IfDefine IfVersion ElseIf Else
+          Limit LimitExcept Proxy
+          GET POST HEAD PUT DELETE OPTIONS");
+
+    /// <summary>
+    /// Apache httpd: the colours of Config with the directives of httpd.conf, apache2.conf and .htaccess known, and
+    /// the section names of &lt;Directory&gt;, &lt;VirtualHost&gt; and the other containers highlighted as words too.
+    /// </summary>
+    private static bool TokenizeApache(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(ApacheDirectives, startState, text, sink, out endState, valueKeywords: ApacheValues);
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)

@@ -37,6 +37,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.MySql:
                 case SyntaxHighlighting.Language.Redis:
                 case SyntaxHighlighting.Language.HAProxy:
+                case SyntaxHighlighting.Language.ApacheHttpd:
                 case SyntaxHighlighting.Language.Script:
                 case SyntaxHighlighting.Language.Awk:
                 case SyntaxHighlighting.Language.Tcl:
