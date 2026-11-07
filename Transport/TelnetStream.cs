@@ -828,6 +828,8 @@ internal sealed class TelnetStream : Stream
     /// <summary>
     /// Turns the user's bytes into what is sent over the wire: IAC is doubled and a CR that is not followed by LF
     /// (or NUL) gets a NUL, because a bare CR is not a line end for the Network Virtual Terminal.
+    /// Every write is encoded on its own, so a CR that ends a write is sent as CR NUL even when the next write starts
+    /// with LF: a caller that sends a text in pieces must not cut a CR LF pair apart (see FileSendChunks and PasteModes).
     /// </summary>
     internal static byte[] EncodeOutgoing(byte[] buffer, int offset, int count)
     {

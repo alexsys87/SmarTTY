@@ -325,6 +325,58 @@ internal static class Program
             CheckBytes(connection.TakeWritten(), Text("234"), "the offset and count of a write are honored");
         }
 
+        // --- "Send file" writes a file in pieces: a CR LF pair must not be cut between two writes ---
+        {
+            byte[] file = Text("one\r\ntwo\r\n\r\nlone\rcr\r\nend\r");
+            byte[] expected = TelnetStream.EncodeOutgoing(file, 0, file.Length);
+            CheckBytes(expected, Text("one\r\ntwo\r\n\r\nlone\r\0cr\r\nend\r\0"), "send file: the whole text is encoded with CR LF kept and a bare CR as CR NUL");
+            bool cutBeforeLf = false;
+            bool plainCutDiffers = false;
+            for (int size = 1; size <= 12; size++)
+            {
+                // The pieces as a plain Read of that size would give them: some of them end with the CR of a CR LF.
+                FakeConnection plain = new FakeConnection();
+                TelnetStream plainStream = new TelnetStream(plain);
+                for (int at = 0; at < file.Length; at += size)
+                {
+                    plainStream.Write(file, at, Math.Min(size, file.Length - at));
+                }
+                plainCutDiffers |= !plain.Written.ToArray().SequenceEqual(expected);
+
+                FakeConnection connection = new FakeConnection();
+                TelnetStream stream = new TelnetStream(connection);
+                MemoryStream source = new MemoryStream(file);
+                byte[] piece = new byte[size + 1];
+                int count;
+                int pieces = 0;
+                while ((count = FileSendChunks.Read(source, piece, size)) > 0)
+                {
+                    cutBeforeLf |= count > size + 1 || (piece[count - 1] == 13 && source.Position < file.Length && file[source.Position] == 10);
+                    stream.Write(piece, 0, count);
+                    pieces++;
+                }
+                if (!connection.Written.ToArray().SequenceEqual(expected) || cutBeforeLf)
+                {
+                    throw new Exception("FAIL: send file: pieces of " + size + " bytes give another stream than the whole text");
+                }
+                if (size >= file.Length && pieces != 1)
+                {
+                    throw new Exception("FAIL: send file: a piece as large as the file is one write");
+                }
+            }
+            Check(true, "send file: pieces of 1 to 12 bytes give the same bytes on the wire as the whole text");
+            Check(plainCutDiffers, "send file: cutting a CR LF pair apart does change what a Telnet server receives (the defect this prevents)");
+        }
+        {
+            // a file that ends with a CR, a file of one CR, and one that cannot be moved back
+            byte[] piece = new byte[4];
+            MemoryStream endsWithCr = new MemoryStream(Text("abc\r"));
+            Check(FileSendChunks.Read(endsWithCr, piece, 3) == 3 && FileSendChunks.Read(endsWithCr, piece, 3) == 1 && FileSendChunks.Read(endsWithCr, piece, 3) == 0, "send file: a CR at the end of the file is a piece of its own");
+            MemoryStream crThenText = new MemoryStream(Text("ab\rxyz"));
+            Check(FileSendChunks.Read(crThenText, piece, 3) == 3 && FileSendChunks.Read(crThenText, piece, 3) == 3 && Text("xyz").SequenceEqual(piece.Take(3)), "send file: the byte after a CR that is not an LF is not lost");
+            Check(FileSendChunks.Read(new MemoryStream(new byte[0]), piece, 3) == 0, "send file: an empty file has no pieces");
+        }
+
         // --- answers and user data do not get mixed up on the wire (every message is written whole) ---
         {
             FakeConnection connection = new FakeConnection(B(IAC, DO, TelnetStream.OptTerminalType));
