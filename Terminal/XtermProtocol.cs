@@ -131,8 +131,51 @@ public static class XtermProtocol
         {
             return text;
         }
-        text = text.Replace(BracketedPasteStart, "").Replace(BracketedPasteEnd, "");
-        return BracketedPasteStart + text + BracketedPasteEnd;
+        return BracketedPasteStart + RemovePasteMarkers(text) + BracketedPasteEnd;
+    }
+
+    /// <summary>
+    /// Removes every bracketed paste marker from the text, also the ones that only appear once another marker is taken
+    /// out: ESC [ + ESC [ 2 0 1 ~ + 2 0 1 ~ becomes ESC [ 2 0 1 ~ when the inner marker goes, and that one has to go too,
+    /// or it would end the paste early and the rest would reach the program as typed input. A new marker can only end at
+    /// the character just added, so the text is built character by character and a marker at its end is dropped at
+    /// once: one pass, however deep the markers are nested (removing them with Replace until nothing changes takes
+    /// a pass per level, which a text made for it turns into a hang).
+    /// </summary>
+    private static string RemovePasteMarkers(string text)
+    {
+        if (text.IndexOf(Escape) == -1)
+        {
+            return text;
+        }
+        StringBuilder kept = new StringBuilder(text.Length);
+        foreach (char character in text)
+        {
+            kept.Append(character);
+            if (character == '~' && (EndsWithMarker(kept, BracketedPasteStart) || EndsWithMarker(kept, BracketedPasteEnd)))
+            {
+                // Both markers have the same length.
+                kept.Length -= BracketedPasteStart.Length;
+            }
+        }
+        return kept.ToString();
+    }
+
+    private static bool EndsWithMarker(StringBuilder text, string marker)
+    {
+        int start = text.Length - marker.Length;
+        if (start < 0)
+        {
+            return false;
+        }
+        for (int index = 0; index < marker.Length; index++)
+        {
+            if (text[start + index] != marker[index])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>
