@@ -232,14 +232,16 @@ internal static class Program
         {
             string target = Path.Combine(w.Root, "new-in-a-folder-of-root.conf");
             Options options = new Options { AsNobody = true };
-            if (CanDropPrivileges(options))
+            // This one needs a process that owns the folder and can become somebody who does not: root with setpriv. A process that
+            // is not root owns its own temporary folder and can create the file in it, so there is nothing to check.
+            if (CanDropPrivileges(options) && IsRoot())
             {
                 Result r = Run(shell, w.Script(target, w.Upload(newText)), options);
                 Check(r.Exit != 0 && r.Exit < RemoteSaveCommand.ExitNoSpace && !File.Exists(target) && RemoteSaveCommand.Describe(r.Exit, r.Output, target, "x") == null, label + "no permission to create a new file: the status of cat, and sudo may be offered");
             }
             else
             {
-                Skip(label + "no permission to create a new file: the process is root and there is no setpriv");
+                Skip(label + "no permission to create a new file: this needs root with setpriv (the folder of a process that is not root is its own)");
             }
         }
 
