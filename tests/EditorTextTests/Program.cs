@@ -902,7 +902,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/etc/systemd/network/10-eth.network"), L.SystemdNetworkd, "networkd files are not units");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/crontab"), L.Crontab, "/etc/crontab is a crontab");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/.env"), L.Config, ".env stays a config");
-        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pyproject.toml"), L.Config, "toml stays a config");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pyproject.toml"), L.Toml, "pyproject.toml is TOML");
 
         Equal(SyntaxHighlighting.DetectLanguage("/var/log/syslog"), L.Log, "syslog");
         Equal(SyntaxHighlighting.DetectLanguage("/var/log/messages"), L.Log, "messages");
@@ -1415,6 +1415,69 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.PostgreSql).Toggle(new[] { "max_connections = 100" })), "# max_connections = 100", "PostgreSQL comment");
     }
 
+    private static void TomlChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Cargo.toml"), L.Toml, ".toml is TOML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pyproject.toml"), L.Toml, "pyproject.toml is TOML");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/containers/storage.conf"), L.Toml, "the containers configuration is TOML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Pipfile"), L.Toml, "Pipfile is TOML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/Cargo.lock"), L.Toml, "Cargo.lock is TOML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/poetry.lock"), L.Toml, "poetry.lock is TOML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/notes.txt"), L.Plain, "prose stays plain");
+        Check(Array.IndexOf(SyntaxHighlighting.SelectableLanguages, L.Toml) >= 0, "TOML is in the syntax menu");
+        Check(SyntaxHighlighting.GetTokenizer(L.Toml) != null, "TOML has a tokenizer");
+
+        Highlighted toml = new Highlighted(L.Toml,
+            "# Cargo manifest\n[package]\nname = \"app\"\nversion = \"0.1.0\"\nedition = 2021\n[dependencies]\nserde = { version = \"1\", features = [\"derive\"] }\n[profile.release]\nlto = true\n[workspace]\nmembers = [\n  \"crates/a\", # first\n  \"crates/b\",\n]\n[[bin]]\nname = \"tool\"\npath = 'src/main.rs'\ncreated = 1979-05-27T07:32:00Z\nhex = 0xDEAD_BEEF\nratio = 1.5e-3\nnotes = \"\"\"\nline one\nline two\n\"\"\"\nphysical.color = \"orange\"\nsite.\"google.com\" = false");
+        Equal(Join(toml.Tokens(0, SyntaxHighlighting.TypeComment)), "# Cargo manifest", "TOML: a comment");
+        Equal(Join(toml.Tokens(1, SyntaxHighlighting.TypeSection)), "[package]", "TOML: a table");
+        Equal(Join(toml.Tokens(2, SyntaxHighlighting.TypeVariable)), "name", "TOML: a bare key");
+        Equal(Join(toml.Tokens(2, SyntaxHighlighting.TypeString)), "\"app\"", "TOML: a basic string");
+        Equal(Join(toml.Tokens(4, SyntaxHighlighting.TypeNumber)), "2021", "TOML: an integer");
+        Equal(Join(toml.Tokens(6, SyntaxHighlighting.TypeVariable)), "serde|version|features", "TOML: an inline table and its keys");
+        Equal(Join(toml.Tokens(6, SyntaxHighlighting.TypeString)), "\"1\"|\"derive\"", "TOML: strings in an inline table");
+        Equal(Join(toml.Tokens(8, SyntaxHighlighting.TypeKeyword)), "true", "TOML: true");
+        Equal(Join(toml.Tokens(10, SyntaxHighlighting.TypeVariable)), "members", "TOML: the key of an array");
+        Equal(Join(toml.Tokens(11, SyntaxHighlighting.TypeString)), "\"crates/a\"", "TOML: a string in a multi-line array");
+        Equal(Join(toml.Tokens(11, SyntaxHighlighting.TypeComment)), "# first", "TOML: a comment inside an array");
+        Equal(Join(toml.Tokens(14, SyntaxHighlighting.TypeSection)), "[[bin]]", "TOML: an array of tables");
+        Equal(Join(toml.Tokens(16, SyntaxHighlighting.TypeString)), "'src/main.rs'", "TOML: a literal string");
+        Equal(Join(toml.Tokens(17, SyntaxHighlighting.TypeNumber)), "1979-05-27T07:32:00Z", "TOML: an offset date-time");
+        Equal(Join(toml.Tokens(18, SyntaxHighlighting.TypeNumber)), "0xDEAD_BEEF", "TOML: a hexadecimal integer");
+        Equal(Join(toml.Tokens(19, SyntaxHighlighting.TypeNumber)), "1.5e-3", "TOML: a float");
+        Equal(Join(toml.Tokens(20, SyntaxHighlighting.TypeVariable)), "notes", "TOML: the key of a multi-line string");
+        Equal(Join(toml.Tokens(20, SyntaxHighlighting.TypeString)), "\"\"\"", "TOML: a multi-line string opens");
+        Equal(toml.TypeAt(21, 0), SyntaxHighlighting.TypeString, "TOML: ...its text continues");
+        Equal(toml.TypeAt(22, 0), SyntaxHighlighting.TypeString, "TOML: ...on every line");
+        Equal(Join(toml.Tokens(23, SyntaxHighlighting.TypeString)), "\"\"\"", "TOML: ...and closes");
+        Equal(Join(toml.Tokens(24, SyntaxHighlighting.TypeVariable)), "physical|color", "TOML: a dotted key");
+        Equal(Join(toml.Tokens(25, SyntaxHighlighting.TypeVariable)), "site|\"google.com\"", "TOML: a quoted key of a dotted key");
+        Equal(Join(toml.Tokens(25, SyntaxHighlighting.TypeKeyword)), "false", "TOML: false");
+
+        // A literal multi-line string is raw: backslashes and quotes inside are text.
+        Highlighted raw = new Highlighted(L.Toml, "pattern = '''\nC:\\new\\text\n'''\nafter = 1");
+        Equal(raw.TypeAt(1, 0), SyntaxHighlighting.TypeString, "TOML: a literal multi-line string continues");
+        Equal(Join(raw.Tokens(2, SyntaxHighlighting.TypeString)), "'''", "TOML: ...and closes");
+        Equal(Join(raw.Tokens(3, SyntaxHighlighting.TypeVariable)), "after", "TOML: code after a multi-line string");
+        Equal(Join(raw.Tokens(3, SyntaxHighlighting.TypeNumber)), "1", "TOML: the value after a multi-line string");
+
+        // A "#" inside a string is text; outside it starts a comment.
+        Highlighted hash = new Highlighted(L.Toml, "url = \"http://x/#frag\" # note\nx = 1#tight");
+        Equal(Join(hash.Tokens(0, SyntaxHighlighting.TypeString)), "\"http://x/#frag\"", "TOML: # inside a string");
+        Equal(Join(hash.Tokens(0, SyntaxHighlighting.TypeComment)), "# note", "TOML: a trailing comment");
+        Equal(Join(hash.Tokens(1, SyntaxHighlighting.TypeComment)), "#tight", "TOML: a comment need not be preceded by a space");
+
+        // The [ ] of an array fold; the [table] after the array is a table again.
+        Highlighted folding = new Highlighted(L.Toml, "arr = [\n  1,\n  2,\n]\n[after]\nk = 1");
+        Equal(Folds(folding), "0:3", "TOML: a multi-line array folds");
+        Equal(Join(folding.Tokens(4, SyntaxHighlighting.TypeSection)), "[after]", "TOML: a table after an array");
+        Equal(Join(folding.Tokens(5, SyntaxHighlighting.TypeVariable)), "k", "TOML: a key after an array");
+
+        Check(SyntaxHighlighting.GetKeywords(L.Toml).Contains("true"), "TOML keywords contain 'true'");
+        Check(!SyntaxHighlighting.GetKeywords(L.Toml).Contains("select"), "TOML keywords do not include the SQL 'select'");
+        Equal(Join(CommentStyle.ForLanguage(L.Toml).Toggle(new[] { "name = \"app\"" })), "# name = \"app\"", "TOML comment");
+    }
+
     private static void KconfigChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/build/.config"), L.Kconfig, "the .config of a kernel or OpenWrt build");
@@ -1898,6 +1961,7 @@ internal static class Program
         DockerComposeChecks();
         AnsibleChecks();
         PostgreSqlChecks();
+        TomlChecks();
         KconfigChecks();
         UBootChecks();
         YoctoChecks();

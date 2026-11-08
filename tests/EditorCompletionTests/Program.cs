@@ -128,6 +128,8 @@ internal static class Program
         Check(Names(L.Ansible, "", "").Contains("apt"), "the Ansible module 'apt' is offered");
         Check(Names(L.PostgreSql, "", "").Contains("listen_addresses"), "the PostgreSQL setting 'listen_addresses' is offered");
         Check(Names(L.PostgreSql, "", "").Contains("scram-sha-256"), "the PostgreSQL auth method 'scram-sha-256' is offered");
+        Check(Names(L.Toml, "", "").Contains("true"), "the TOML literal 'true' is offered");
+        Check(Names(L.Toml, "title = \"x\"", "").Contains("title"), "a TOML key from the document is offered");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");
