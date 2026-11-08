@@ -961,6 +961,313 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(PostgreSqlDirectives, startState, text, sink, out endState, valueKeywords: PostgreSqlValues);
     }
 
+    // -------------------------------------------------------------------- TOML
+
+    private static readonly HashSet<string> TomlKeywords = Words(StringComparer.Ordinal,
+        @"true false");
+
+    // Line state: a multi-line basic ("") or literal ('') string continues on the next line; the rest of
+    // the state is the depth of the [ ] arrays, so a "[" at the start of a line is a table only at depth 0.
+    private const int StTomlBasicString = 0x01;
+    private const int StTomlLiteralString = 0x02;
+    private const int TomlDepthShift = 2;
+    private const int TomlDepthMax = 31;
+
+    private static bool IsTomlBareKeyChar(char c)
+    {
+        return char.IsLetterOrDigit(c) || c == '_' || c == '-';
+    }
+
+    /// <summary>Index after the closing "]" of a [table] or [[array of tables]] header, or -1.</summary>
+    private static int TomlSectionEnd(string text, int start)
+    {
+        bool array = start + 1 < text.Length && text[start + 1] == '[';
+        int i = start + (array ? 2 : 1);
+        char quote = '\0';
+        while (i < text.Length)
+        {
+            char c = text[i];
+            if (quote != '\0')
+            {
+                if (c == '\\' && quote == '"')
+                {
+                    i += 2;
+                    continue;
+                }
+                if (c == quote)
+                {
+                    quote = '\0';
+                }
+                i++;
+                continue;
+            }
+            if (c == '"' || c == '\'')
+            {
+                quote = c;
+                i++;
+                continue;
+            }
+            if (c == ']')
+            {
+                if (!array)
+                {
+                    return i + 1;
+                }
+                if (i + 1 < text.Length && text[i + 1] == ']')
+                {
+                    return i + 2;
+                }
+            }
+            i++;
+        }
+        return -1;
+    }
+
+    /// <summary>Index after the closing ' of a literal string that starts at start, or -1.</summary>
+    private static int FindTomlLiteralEnd(string text, int start)
+    {
+        int close = text.IndexOf('\'', start + 1);
+        return (close < 0) ? -1 : (close + 1);
+    }
+
+    /// <summary>
+    /// Index after the closing delimiter of a multi-line string that starts at <paramref name="start"/>, or -1
+    /// when the string continues on the next line. In a basic string a backslash escapes the next character;
+    /// up to two quotes before the delimiter belong to the text.
+    /// </summary>
+    private static int TomlMultilineEnd(string text, int start, bool basic)
+    {
+        char quote = basic ? '"' : '\'';
+        int i = start;
+        while (i < text.Length)
+        {
+            if (basic && text[i] == '\\')
+            {
+                i += 2;
+                continue;
+            }
+            if (i + 2 < text.Length && text[i] == quote && text[i + 1] == quote && text[i + 2] == quote)
+            {
+                int end = i + 3;
+                for (int extra = 0; extra < 2 && end < text.Length && text[end] == quote; extra++)
+                {
+                    end++;
+                }
+                return end;
+            }
+            i++;
+        }
+        return -1;
+    }
+
+    /// <summary>Index after a number or a date/time that starts at <paramref name="start"/>.</summary>
+    private static int TomlNumberEnd(string text, int start)
+    {
+        int len = text.Length;
+        int i = start;
+        if (i < len && (text[i] == '+' || text[i] == '-'))
+        {
+            i++;
+        }
+        // A signed inf or nan.
+        if (i + 2 < len && (string.Compare(text, i, "inf", 0, 3, StringComparison.OrdinalIgnoreCase) == 0 ||
+            string.Compare(text, i, "nan", 0, 3, StringComparison.OrdinalIgnoreCase) == 0))
+        {
+            return i + 3;
+        }
+        bool date = i + 9 < len && IsDigit(text[i]) && IsDigit(text[i + 1]) && IsDigit(text[i + 2]) &&
+            IsDigit(text[i + 3]) && text[i + 4] == '-' && IsDigit(text[i + 5]) && IsDigit(text[i + 6]) &&
+            text[i + 7] == '-' && IsDigit(text[i + 8]) && IsDigit(text[i + 9]);
+        while (i < len)
+        {
+            char c = text[i];
+            if (char.IsLetterOrDigit(c) || c == '_' || c == '.' || c == ':' || c == '+' || c == '-')
+            {
+                i++;
+                continue;
+            }
+            // The space in "1979-05-27 07:32:00".
+            if (c == ' ' && date && i + 3 < len && IsDigit(text[i + 1]) && IsDigit(text[i + 2]) && text[i + 3] == ':')
+            {
+                i++;
+                continue;
+            }
+            break;
+        }
+        return i;
+    }
+
+    /// <summary>
+    /// TOML: # comments, [tables] and [[arrays of tables]], bare, quoted and dotted keys, basic and literal
+    /// strings (single-line and multi-line), numbers, dates, true/false, and the foldable [ ] and { } of arrays
+    /// and inline tables.
+    /// </summary>
+    private static bool TokenizeToml(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        int len = text.Length;
+        int last = 0;
+        int i = 0;
+        int depth = (startState >> TomlDepthShift) & TomlDepthMax;
+        int strings = startState & (StTomlBasicString | StTomlLiteralString);
+        endState = 0;
+
+        if (strings != 0)
+        {
+            bool basic = (strings & StTomlBasicString) != 0;
+            int end = TomlMultilineEnd(text, 0, basic);
+            if (end < 0)
+            {
+                if (len > 0)
+                {
+                    sink.AddToken(TypeString, 0, len);
+                }
+                endState = strings | (depth << TomlDepthShift);
+                return true;
+            }
+            sink.AddToken(TypeString, 0, end);
+            i = end;
+            last = end;
+        }
+
+        i = SkipBlanks(text, i);
+        if (i < len && text[i] == '#')
+        {
+            Normal(ref last, last, i, sink);
+            sink.AddToken(TypeComment, i, len);
+            endState = depth << TomlDepthShift;
+            return true;
+        }
+        if (i < len && text[i] == '[' && depth == 0)
+        {
+            int end = TomlSectionEnd(text, i);
+            Normal(ref last, last, i, sink);
+            sink.AddToken(TypeSection, i, (end < 0) ? len : end);
+            if (end < 0)
+            {
+                endState = 0;
+                return true;
+            }
+            i = end;
+            last = end;
+        }
+
+        while (i < len)
+        {
+            char c = text[i];
+
+            if (c == '#')
+            {
+                Normal(ref last, last, i, sink);
+                sink.AddToken(TypeComment, i, len);
+                endState = depth << TomlDepthShift;
+                return true;
+            }
+
+            if (c == '"' || c == '\'')
+            {
+                bool basic = c == '"';
+                if (i + 2 < len && text[i + 1] == c && text[i + 2] == c)
+                {
+                    Normal(ref last, last, i, sink);
+                    int end = TomlMultilineEnd(text, i + 3, basic);
+                    if (end < 0)
+                    {
+                        sink.AddToken(TypeString, i, len);
+                        endState = (basic ? StTomlBasicString : StTomlLiteralString) | (depth << TomlDepthShift);
+                        return true;
+                    }
+                    sink.AddToken(TypeString, i, end);
+                    i = end;
+                    last = end;
+                    continue;
+                }
+                int close = basic ? FindQuoteEnd(text, i, c) : FindTomlLiteralEnd(text, i);
+                int stop = (close < 0) ? len : close;
+                int probe = SkipBlanks(text, stop);
+                bool isKey = probe < len && (text[probe] == '=' || text[probe] == '.');
+                Normal(ref last, last, i, sink);
+                sink.AddToken(isKey ? TypeVariable : TypeString, i, stop);
+                i = stop;
+                last = i;
+                continue;
+            }
+
+            if (c == '[')
+            {
+                TryAddBracket(text, i, ref last, sink, foldSquareBrackets: true);
+                depth = Math.Min(depth + 1, TomlDepthMax);
+                i++;
+                continue;
+            }
+            if (c == ']')
+            {
+                TryAddBracket(text, i, ref last, sink, foldSquareBrackets: true);
+                if (depth > 0)
+                {
+                    depth--;
+                }
+                i++;
+                continue;
+            }
+            if (c == '{' || c == '}')
+            {
+                TryAddBracket(text, i, ref last, sink, foldCurlyBraces: true);
+                i++;
+                continue;
+            }
+
+            if (IsDigit(c) || ((c == '+' || c == '-') && i + 1 < len &&
+                (IsDigit(text[i + 1]) || text[i + 1] == 'i' || text[i + 1] == 'n')))
+            {
+                int end = TomlNumberEnd(text, i);
+                int probe = SkipBlanks(text, end);
+                // A bare key may start with a digit: 1234 = "x", 1979.05 = 1.
+                bool isKey = probe < len && text[probe] == '=';
+                Normal(ref last, last, i, sink);
+                sink.AddToken(isKey ? TypeVariable : TypeNumber, i, end);
+                i = end;
+                last = i;
+                continue;
+            }
+
+            if (IsTomlBareKeyChar(c))
+            {
+                int s = i;
+                while (i < len && IsTomlBareKeyChar(text[i]))
+                {
+                    i++;
+                }
+                string word = text.Substring(s, i - s);
+                int probe = SkipBlanks(text, i);
+                bool isKey = probe < len && (text[probe] == '=' || text[probe] == '.');
+                Normal(ref last, last, s, sink);
+                if (isKey)
+                {
+                    sink.AddToken(TypeVariable, s, i);
+                    last = i;
+                }
+                else if (TomlKeywords.Contains(word))
+                {
+                    sink.AddToken(TypeKeyword, s, i);
+                    last = i;
+                }
+                else if (string.Equals(word, "inf", StringComparison.Ordinal) ||
+                    string.Equals(word, "nan", StringComparison.Ordinal))
+                {
+                    sink.AddToken(TypeNumber, s, i);
+                    last = i;
+                }
+                continue;
+            }
+
+            i++;
+        }
+
+        Normal(ref last, last, len, sink);
+        endState = depth << TomlDepthShift;
+        return true;
+    }
+
     // -------------------------------------------------------------------- logs
 
     private static readonly HashSet<string> LogLevelWords = new HashSet<string>(StringComparer.Ordinal)

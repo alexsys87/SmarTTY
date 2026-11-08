@@ -44,7 +44,7 @@ namespace SmarTTY.CodeEditing
             Plain,   // no highlighting
             Python,
             Bash,
-            Config,  // INI / .conf / .properties / TOML / systemd units
+            Config,  // INI / .conf / .properties / systemd units
             CLike,   // C: // and /* */ comments, # preprocessor directives
             Script,  // R, Nix: the generic # comment profile
             Sql,     // SQL: -- comments
@@ -100,13 +100,14 @@ namespace SmarTTY.CodeEditing
             Kubernetes, // Kubernetes and Helm YAML: the colors of YAML with the keys of the manifests known
             DockerCompose, // docker-compose.yml, compose.yaml: the colors of YAML with the keys of Compose known
             Ansible, // playbooks, roles and tasks: the colors of YAML with the keys and modules of Ansible known
-            PostgreSql // postgresql.conf, pg_hba.conf: the colors of Config with the PostgreSQL settings and keywords
+            PostgreSql, // postgresql.conf, pg_hba.conf: the colors of Config with the PostgreSQL settings and keywords
+            Toml // TOML: tables, arrays, inline tables, dates and multi-line strings, foldable [ ] and { } blocks
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
-            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
+            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
             Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
@@ -132,7 +133,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Lua: return "Lua";
                 case Language.Makefile: return "Makefile";
                 case Language.Json: return "JSON";
-                case Language.Config: return "Config (INI, TOML, .env, properties)";
+                case Language.Config: return "Config (INI, .env, properties)";
+                case Language.Toml: return "TOML";
                 case Language.Systemd: return "systemd unit";
                 case Language.Nginx: return "nginx config";
                 case Language.SshConfig: return "SSH config (ssh_config, sshd_config)";
@@ -268,6 +270,12 @@ namespace SmarTTY.CodeEditing
                 name.EndsWith(".conf", StringComparison.Ordinal)))
             {
                 return Language.Yocto;
+            }
+            // storage.conf, containers.conf and the other files of the containers projects are TOML.
+            if ((lowerCasePath.Contains("/etc/containers/") || lowerCasePath.Contains("/usr/share/containers/")) &&
+                name.EndsWith(".conf", StringComparison.Ordinal))
+            {
+                return Language.Toml;
             }
             bool nginxDirectory = lowerCasePath.Contains("/etc/nginx/") || lowerCasePath.Contains("/nginx/sites-") || lowerCasePath.Contains("/nginx/conf");
             if (nginxDirectory && (name.EndsWith(".conf", StringComparison.Ordinal) || name.IndexOf('.') < 0))
@@ -460,6 +468,14 @@ namespace SmarTTY.CodeEditing
                 case "config":
                     return Language.Config;
 
+                // TOML files whose names carry another extension (or none).
+                case "pipfile":
+                case "cargo.lock":
+                case "poetry.lock":
+                case "uv.lock":
+                case "pdm.lock":
+                    return Language.Toml;
+
                 case "crontab":
                     return Language.Crontab;
 
@@ -605,11 +621,13 @@ namespace SmarTTY.CodeEditing
                 case "properties":
                 case "inf":
                 case "editorconfig":
-                case "toml":
                 case "env":
                 case "desktop":
                 case "rules":
                     return Language.Config;
+
+                case "toml":
+                    return Language.Toml;
 
                 case "network":
                 case "netdev":
@@ -1007,6 +1025,7 @@ namespace SmarTTY.CodeEditing
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
                 case Language.PostgreSql: return TokenizePostgreSql;
+                case Language.Toml: return TokenizeToml;
                 case Language.Log: return TokenizeLog;
                 default: return null;
             }
@@ -1144,6 +1163,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(AnsibleKeywords, AnsibleValues);
                 case Language.PostgreSql:
                     return Combine(PostgreSqlDirectives, PostgreSqlValues);
+                case Language.Toml:
+                    return Combine(TomlKeywords);
                 case Language.Log:
                     return Combine(LogLevelWords);
                 default:
@@ -1933,7 +1954,7 @@ namespace SmarTTY.CodeEditing
         }
 
         // ==================================================================
-        // Config (INI / .conf / .properties / YAML / TOML / systemd units)
+        // Config (INI / .conf / .properties / YAML / systemd units)
         // ==================================================================
 
         private static readonly HashSet<string> ConfigConstants = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
