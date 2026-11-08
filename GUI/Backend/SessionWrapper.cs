@@ -1812,30 +1812,65 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// </summary>
     public void UploadPastedText(string text, TerminalEmulatorControl terminal)
     {
+        string copyDirectory = null;
         try
         {
             NormalTabContext tab = Tabs.OfType<NormalTabContext>().FirstOrDefault((NormalTabContext candidate) => candidate.Terminal == terminal);
-            string directory = Path.Combine(Path.GetTempPath(), "SmarTTY-paste");
-            Directory.CreateDirectory(directory);
-            foreach (string old in Directory.GetFiles(directory, "paste-*.txt"))
+            string root = Path.Combine(Path.GetTempPath(), "SmarTTY-paste");
+            Directory.CreateDirectory(root);
+            // What an earlier run left behind (the copy is removed when its upload ends, but not when the program was closed first).
+            foreach (string old in Directory.GetFileSystemEntries(root))
             {
                 try
                 {
                     if (File.GetLastWriteTime(old) < DateTime.Now.AddDays(-1))
                     {
-                        File.Delete(old);
+                        if (Directory.Exists(old))
+                        {
+                            Directory.Delete(old, recursive: true);
+                        }
+                        else
+                        {
+                            File.Delete(old);
+                        }
                     }
                 }
                 catch
                 {
                 }
             }
-            string file = Path.Combine(directory, "paste-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt");
+            // A folder of its own for the copy: it is removed as soon as the upload is over (the text may be a password or a key),
+            // and the name of the file is one that no other paste has, on this machine and on the server.
+            copyDirectory = Path.Combine(root, Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(copyDirectory);
+            string file = Path.Combine(copyDirectory, PastedTextFile.NewName(DateTime.Now));
             File.WriteAllText(file, text, new System.Text.UTF8Encoding(false));
             UploadFiles(new[] { file }, tab);
+            string fullPath = Path.GetFullPath(file);
+            bool queued = false;
+            foreach (FileTransferManager.TransferJob job in SCPController.Jobs)
+            {
+                if (!job.IsDownload && string.Equals(Path.GetFullPath(job.LocalPath), fullPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Once it has arrived the file is for its owner alone (a Unix host; Windows has no such mode).
+                    _ScriptUploads[job.Id] = new ScriptUpload
+                    {
+                        TempDirectory = copyDirectory,
+                        ChmodMode = Session?.RemoteOs == RemoteOsKind.Windows ? null : "600",
+                        IsPastedText = true
+                    };
+                    queued = true;
+                }
+            }
+            if (!queued)
+            {
+                // Not queued (the upload was cancelled, or it is over already): nothing will read the copy.
+                DeleteTempDirectory(copyDirectory);
+            }
         }
         catch (Exception exception)
         {
+            DeleteTempDirectory(copyDirectory);
             MessageBoxes.Exception(exception);
         }
     }
@@ -1862,6 +1897,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     {
         // The folder with the copy that has Unix line endings (null when the file needed no change); removed when the upload ends.
         public string TempDirectory;
+
+        // What chmod does to the file once it has arrived: "+x" for a script, "600" for pasted text, null for nothing.
+        public string ChmodMode = "+x";
+
+        // The upload is that of a pasted text, not of a dropped script (the wording of a failure).
+        public bool IsPastedText;
     }
 
     private readonly Dictionary<Guid, ScriptUpload> _ScriptUploads = new Dictionary<Guid, ScriptUpload>();
@@ -1966,18 +2007,20 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
         _ScriptUploads.Remove(job.Id);
         DeleteTempDirectory(upload.TempDirectory);
-        if (job.State != FileTransferManager.TransferState.Completed)
+        if (job.State != FileTransferManager.TransferState.Completed || upload.ChmodMode == null)
         {
             return;
         }
         string remotePath = job.RemotePath;
+        string mode = upload.ChmodMode;
+        bool pastedText = upload.IsPastedText;
         SshSession session = Session;
         ThreadPool.QueueUserWorkItem((object state) =>
         {
             string error = null;
             try
             {
-                string command = RemoteFileOperations.ChmodCommands(new[] { remotePath }, "+x", ChmodScope.Selected)[0];
+                string command = RemoteFileOperations.ChmodCommands(new[] { remotePath }, mode, ChmodScope.Selected)[0];
                 if (session.RunCommandChecked(command, requireSuccess: true) == null)
                 {
                     session.ThrowIfConnectionLost();
@@ -1992,7 +2035,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             {
                 if (error != null)
                 {
-                    MessageBoxes.Warning("The script " + remotePath + " was uploaded, but it could not be made executable: " + error + ".");
+                    MessageBoxes.Warning(pastedText
+                        ? "The pasted text " + remotePath + " was uploaded, but it could not be made readable for you alone (chmod 600): " + error + "."
+                        : "The script " + remotePath + " was uploaded, but it could not be made executable: " + error + ".");
                 }
                 RefreshFileExplorers(RemotePathUtils.GetDirectoryName(remotePath));
             });

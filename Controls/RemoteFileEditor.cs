@@ -1175,14 +1175,7 @@ public partial class RemoteFileEditor : CodeEditorPP
             {
                 return SmarTTY.Transport.WindowsRemoteFileEditing.Signature(_context.Session, RemotePath);
             }
-            string path = RemotePathUtils.ShellQuote(RemotePath);
-            System.Collections.Generic.List<string> output = _context.Session.RunCommandChecked("stat -c '%Y %s' " + path + " 2>/dev/null || md5sum " + path, requireSuccess: true);
-            if (output == null || output.Count == 0)
-            {
-                return null;
-            }
-            string signature = string.Join("\n", output).Trim();
-            return (signature.Length == 0) ? null : signature;
+            return RemoteFileSignature.Parse(_context.Session.RunCommandChecked(RemoteFileSignature.BuildCommand(RemotePath), requireSuccess: true));
         }
         catch
         {
@@ -1379,6 +1372,13 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// <summary>Raised on the UI thread when <see cref="IsSaving"/> changes.</summary>
     public event EventHandler SavingChanged;
 
+    /// <summary>
+    /// How long a save that is asked for when a tab or the window closes waits for the background save that is still running. That
+    /// one is over in moments on a connection that works; on one that went away without a word it never ends, and the window waited
+    /// with it for ever.
+    /// </summary>
+    private static readonly TimeSpan BackgroundSaveWait = TimeSpan.FromSeconds(30);
+
     /// <summary>Saves the file and returns when it is written (used when a tab or the window closes).</summary>
     public void Save()
     {
@@ -1386,8 +1386,15 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             return;
         }
-        // A background save of an older version must not overwrite this one afterwards.
-        _backgroundUploadDone?.WaitOne();
+        // A background save of an older version must not overwrite this one afterwards. If it does not end, the save of the closing
+        // tab is not started over it: the error is shown, the tab stays open, and closing it again either finds the file saved by then
+        // or lets the user give the changes up.
+        ManualResetEvent backgroundSave = _backgroundUploadDone;
+        if (backgroundSave != null && !backgroundSave.WaitOne(BackgroundSaveWait))
+        {
+            throw new IOException("The save of " + RemotePath + " that was started earlier has not ended after " + (int)BackgroundSaveWait.TotalSeconds
+                + " seconds: the connection may not answer. Close the tab again when it has (the changes are kept in the editor until then), or choose No to give them up.");
+        }
         SaveJob job = PrepareSave();
         // Saving on close does not run the check: the user is leaving and cannot act on what it finds.
         job.Validator = null;

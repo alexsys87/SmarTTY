@@ -97,6 +97,12 @@ jobs:
       - name: Run local link policy checks (clicks on paths in device terminals)
         run: dotnet run --project tests/LocalLinkPolicyTests -c Release
 
+      - name: Run remote file signature checks (editor conflict detection; stat, md5sum)
+        run: dotnet run --project tests/RemoteFileSignatureTests -c Release
+
+      - name: Run pasted text file name checks
+        run: dotnet run --project tests/PastedTextFileTests -c Release
+
       - name: Run df output parser checks (free disk space bar; GNU and BusyBox)
         run: dotnet run --project tests/DfOutputParserTests -c Release
 
