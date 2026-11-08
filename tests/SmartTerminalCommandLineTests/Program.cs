@@ -352,6 +352,12 @@ internal static class Program
             "",
             "#1700000002",
         }) + "\n";
+        if (OperatingSystem.IsWindows())
+        {
+            // The rest runs real Unix shells on files with Unix permissions.
+            Console.WriteLine("SKIP: removing history lines needs a Unix shell");
+            return;
+        }
         string[] remove = { "mysql -pSecret", "echo 'it''s' \"$HOME\" \\n", "not in the file" };
         string work = Path.Combine(Path.GetTempPath(), "smartty-history-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
