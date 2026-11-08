@@ -146,6 +146,11 @@ internal static class WindowsAuthorizedKeys
     public static string RestrictAccessCommand(string sftpPath)
     {
         string windowsPath = WindowsSftpPath.ToWindows(sftpPath) ?? throw new ArgumentException("Not a path with a drive: " + sftpPath, nameof(sftpPath));
+        if (windowsPath.IndexOfAny(new[] { '$', '`', '%', '"' }) >= 0 || windowsPath.Any(char.IsControl))
+        {
+            // PowerShell would expand $name and $(...) inside the double quotes, cmd.exe %NAME%: the path comes from the server's configuration.
+            throw new ArgumentException("The path has a character that cannot be put into a command safely ($ ` % \"): " + sftpPath, nameof(sftpPath));
+        }
         return "icacls \"" + windowsPath + "\" /inheritance:r /grant *" + AdministratorsSid + ":F /grant *" + SystemSid + ":F";
     }
 

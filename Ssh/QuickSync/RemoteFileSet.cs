@@ -50,6 +50,13 @@ public class RemoteFileSet
 
         public List<RemoteSymlink> Symlinks = new List<RemoteSymlink>();
 
+        /// <summary>
+        /// True when the listing of this folder failed or was not made (the folder could not be entered, or it is on another file
+        /// system and the scan stays on one). The lists above are then not the whole content, and a synchronization that deletes
+        /// what the other side does not have must not delete anything in the matching folder: the "missing" files are just not known.
+        /// </summary>
+        public bool ListingIncomplete;
+
         public string FullPath
         {
             get

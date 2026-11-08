@@ -265,7 +265,29 @@ public static class LocalFileSystem
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    private static extern bool MoveFileEx(string existingFileName, string newFileName, int flags);
+
+    /// <summary>
+    /// Puts <paramref name="source"/> in the place of <paramref name="target"/> in one step (MoveFileEx with MOVEFILE_REPLACE_EXISTING and
+    /// MOVEFILE_COPY_ALLOWED): the old file is there until the new one has taken its place.
+    /// </summary>
+    public static void ReplaceFile(LocalPath source, LocalPath target)
+    {
+        if (!MoveFileEx(source.FullPath, target.FullPath, 3))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     public static extern bool CopyFile(string existingFileName, string newFileName, [MarshalAs(UnmanagedType.I1)] bool failIfExists);
+
+    /// <summary>True when the path is a folder that exists (a mistyped path, a disk that is gone and a network folder that is offline are not).</summary>
+    public static bool DirectoryExists(LocalPath localPath)
+    {
+        int attributes = GetFileAttributes(localPath.FullPath);
+        return attributes != -1 && (attributes & (int)FileAttributes.Directory) != 0;
+    }
 
     public static IEnumerable<FindData> EnumerateDirectory(LocalPath localPath, bool ignoreMissing)
     {
@@ -370,7 +392,8 @@ public static class LocalFileSystem
         if (fileAttributes != -1 && (fileAttributes & 0x400) != 0 && (fileAttributes & 0x10) == 0)
         {
             KeyValuePair<string, bool> linkInfo = ReparsePoints.ReadReparsePoint(localPath.FullPath);
-            if (StringComparer.InvariantCulture.Compare(linkInfo.Key, relativeTarget) == 0)
+            // The link on this side keeps backslashes, the target from the server has slashes.
+            if (StringComparer.InvariantCulture.Compare(linkInfo.Key, relativeTarget.Replace('/', '\\')) == 0)
             {
                 return;
             }
@@ -440,7 +463,8 @@ public static class LocalFileSystem
         }
         try
         {
-            if (!CopyFile(localPath.FullPath, targetLocalPath.FullPath, failIfExists: false))
+            // CopyFile(existing, new): the real file is the source, the place of the link is the copy (the arguments were the other way round).
+            if (!CopyFile(targetLocalPath.FullPath, localPath.FullPath, failIfExists: false))
             {
                 throw new Win32Exception($"Failed to copy {targetLocalPath} to {localPath}");
             }
@@ -573,7 +597,7 @@ public static class LocalFileSystem
         if (fileAttributes != -1 && (fileAttributes & 0x400) != 0 && (fileAttributes & 0x10) != 0)
         {
             KeyValuePair<string, bool> linkInfo = ReparsePoints.ReadReparsePoint(localPath.FullPath);
-            if (StringComparer.InvariantCulture.Compare(linkInfo.Key, targetPath) == 0)
+            if (StringComparer.InvariantCulture.Compare(linkInfo.Key, targetPath) == 0 || StringComparer.InvariantCulture.Compare(linkInfo.Key, targetPath.Replace('/', '\\')) == 0)
             {
                 return;
             }

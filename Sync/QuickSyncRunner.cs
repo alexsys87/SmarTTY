@@ -1,4 +1,4 @@
-﻿using SmarTTY.Ssh;
+using SmarTTY.Ssh;
 using SmarTTY.Ssh.QuickSync;
 using SmarTTY.IO;
 using SmarTTY.Native;
@@ -263,6 +263,11 @@ public class QuickSyncRunner
         {
             syncSettings.LocalPath = ((syncSettings.LocalPath == null) ? null : PathUtils.GetFullPathChecked(syncSettings.LocalPath));
             syncSettings.RemotePath = RemotePathUtils.NormalizeUnix(syncSettings.RemotePath);
+            if (syncSettings.Direction == SyncDirection.Upload && syncSettings.LocalPath != null && !LocalFileSystem.DirectoryExists(LocalPath.FromUserPath(syncSettings.LocalPath)))
+            {
+                // The folder would be read as an empty one, and "Delete files that are not in the source" would empty the folder on the device.
+                throw new IOException("The local folder " + syncSettings.LocalPath + " does not exist or cannot be reached. Nothing was changed.");
+            }
             using ISyncEngine syncEngine = this.CreateEngine(sshSession, syncSettings, syncEvents, localFileCache, syncCustomization);
             syncEvents?.OnProgress(new SyncProgress
             {
@@ -309,7 +314,7 @@ public class QuickSyncRunner
                     // with the deletions and the replaced files only.
                     throw new IOException("The connection to the server was lost before the files were copied. Nothing was changed.");
                 }
-                this.ExecuteLocalActions(LocalPath.FromUserPath(syncSettings.LocalPath), syncPlan, remoteFileSource, syncEvents, ref statistics);
+                this.ExecuteLocalActions(LocalPath.FromUserPath(syncSettings.LocalPath), syncPlan, remoteFileSource, syncEvents, ref statistics, () => sshSession.IsConnectionClosed);
                 CreateLinks(syncPlan, linkOptions, syncEvents);
             }
             else
@@ -594,7 +599,10 @@ public class QuickSyncRunner
         return targetPath.FullPath;
     }
 
-    private void ExecuteLocalActions(LocalPath localPath, SyncPlan syncPlan, IRemoteFileSource remoteFileSource, ISyncEvents syncEvents, ref TransferStatistics transferStatistics)
+    /// <summary>The end of the name of a file that is being received; it replaces the real one when it is whole.</summary>
+    private const string PartialFileSuffix = ".smartty-part";
+
+    private void ExecuteLocalActions(LocalPath localPath, SyncPlan syncPlan, IRemoteFileSource remoteFileSource, ISyncEvents syncEvents, ref TransferStatistics transferStatistics, Func<bool> isConnectionClosed = null)
     {
         Stack<LocalDirectoryContext> stack = new Stack<LocalDirectoryContext>();
         LocalDirectoryContext item = new LocalDirectoryContext(localPath);
@@ -638,31 +646,24 @@ public class QuickSyncRunner
                     break;
                 case SyncPlan.ActionType.TransferFile:
                     {
-                        LocalFileSystem.NativeFile nativeFile = null;
-                        string text = GetRelativePath(localPath, item.Path.Combine(action.Path));
-                        if (!item.Failed)
+                        if (isConnectionClosed != null && isConnectionClosed())
                         {
-                            try
-                            {
-                                nativeFile = LocalFileSystem.OpenFile(item.Path.Combine(action.Path), LocalFileSystem.FileOpenMode.Create);
-                            }
-                            catch (Exception exception)
-                            {
-                                syncEvents?.OnWarning(new SyncWarning
-                                {
-                                    Exception = exception,
-                                    Warning = new QuickSyncWarning
-                                    {
-                                        Type = QuickSyncWarningType.CannotCreateTargetFile,
-                                        Path = text
-                                    }
-                                });
-                            }
+                            // Every file that is left would find the server gone; stop here instead of going through the whole plan.
+                            throw new IOException("The connection to the server was lost during the download. The files that were not copied yet are left as they were.");
                         }
+                        LocalPath targetPath = item.Path.Combine(action.Path);
+                        string text = GetRelativePath(localPath, targetPath);
+                        // The file of the server is opened first, and the data goes to a file next to the target that replaces it only
+                        // when everything has arrived: the target used to be truncated before the server was asked, so a file that the
+                        // server did not give (no permission, a lost connection, a cancelled run) left an empty file for a good one.
+                        LocalPath partPath = item.Path.Combine(action.Path + PartialFileSuffix);
+                        LocalFileSystem.NativeFile nativeFile = null;
+                        bool partCreated = false;
+                        bool committed = false;
                         bool transferFailed = false;
                         using (IRemoteFileStream remoteFileStream = remoteFileSource.OpenFile(action.Argument))
                         {
-                            using (nativeFile)
+                            try
                             {
                                 if (remoteFileStream.ErrorCode != 0)
                                 {
@@ -675,6 +676,26 @@ public class QuickSyncRunner
                                             ErrorCode = remoteFileStream.ErrorCode
                                         }
                                     });
+                                }
+                                else if (!item.Failed)
+                                {
+                                    try
+                                    {
+                                        nativeFile = LocalFileSystem.OpenFile(partPath, LocalFileSystem.FileOpenMode.Create);
+                                        partCreated = true;
+                                    }
+                                    catch (Exception exception)
+                                    {
+                                        syncEvents?.OnWarning(new SyncWarning
+                                        {
+                                            Exception = exception,
+                                            Warning = new QuickSyncWarning
+                                            {
+                                                Type = QuickSyncWarningType.CannotCreateTargetFile,
+                                                Path = text
+                                            }
+                                        });
+                                    }
                                 }
                                 while (true)
                                 {
@@ -711,15 +732,64 @@ public class QuickSyncRunner
                                             Warning = new QuickSyncWarning
                                             {
                                                 Type = QuickSyncWarningType.CannotUpdateLocalFile,
-                                                Path = item.Path.Combine(action.Path).FullPath
+                                                Path = targetPath.FullPath
                                             }
                                         });
                                     }
                                 }
-                                if (remoteFileStream.ErrorCode == 0 && !transferFailed && nativeFile != null)
+                                if (nativeFile != null && !transferFailed)
                                 {
-                                    nativeFile.SetLastWriteTime(remoteFileStream.ModifiedTime);
-                                    transferStatistics.CopiedFiles++;
+                                    if (remoteFileStream.ErrorCode != 0)
+                                    {
+                                        syncEvents?.OnWarning(new SyncWarning
+                                        {
+                                            Warning = new QuickSyncWarning
+                                            {
+                                                Type = QuickSyncWarningType.CannotReadRemoteFile,
+                                                Path = text,
+                                                ErrorCode = remoteFileStream.ErrorCode
+                                            }
+                                        });
+                                    }
+                                    else
+                                    {
+                                        try
+                                        {
+                                            nativeFile.SetLastWriteTime(remoteFileStream.ModifiedTime);
+                                            nativeFile.Dispose();
+                                            nativeFile = null;
+                                            LocalFileSystem.ReplaceFile(partPath, targetPath);
+                                            committed = true;
+                                            transferStatistics.CopiedFiles++;
+                                        }
+                                        catch (Exception exception)
+                                        {
+                                            syncEvents?.OnWarning(new SyncWarning
+                                            {
+                                                Exception = exception,
+                                                Warning = new QuickSyncWarning
+                                                {
+                                                    Type = QuickSyncWarningType.CannotUpdateLocalFile,
+                                                    Path = targetPath.FullPath
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                nativeFile?.Dispose();
+                                if (partCreated && !committed)
+                                {
+                                    // Whatever ended the file (an error, the Cancel button): the old file stays, the unfinished one goes.
+                                    try
+                                    {
+                                        LocalFileSystem.DeleteFile(partPath, resetReadOnly: true, ignoreMissing: true);
+                                    }
+                                    catch (Exception)
+                                    {
+                                    }
                                 }
                             }
                         }

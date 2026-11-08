@@ -151,6 +151,11 @@ internal class FileByFileSyncEngine : CommandSyncEngine
             {
                 throw;
             }
+            catch (Exception) when (_session.IsConnectionClosed)
+            {
+                // Not "cannot read the local file" for this file and for every one that follows: the connection is gone, and so is the run.
+                throw new IOException("The connection to the server was lost during the upload.");
+            }
             catch (Exception exception)
             {
                 base._events.OnWarning(new SyncWarning
@@ -161,6 +166,21 @@ internal class FileByFileSyncEngine : CommandSyncEngine
             }
         }
         ApplyAttributes(actions, uploadedFiles, localPaths);
+    }
+
+    /// <summary>Put in front of a command that works on a name relative to the current folder: it is skipped inside a folder that could not be entered.</summary>
+    private const string SkipWhenLost = "[ \"$f\" -gt 0 ] ||";
+
+    /// <summary>"cd" into a folder (by its full path), counting the folders entered after a failure; reports the failure of the action.</summary>
+    internal static string EnterScript(string fullPath, int actionIndex)
+    {
+        return "if [ \"$f\" -gt 0 ]; then f=$((f+1)); elif cd " + RemotePathUtils.ShellQuote(fullPath) + "; then :; else echo \"cmdfail:" + actionIndex + "\"; f=1; fi";
+    }
+
+    /// <summary>The way back out of a folder: the count goes down, and the script changes to the parent only when it is not inside a lost folder.</summary>
+    internal static string LeaveScript(string parentFullPath)
+    {
+        return "if [ \"$f\" -gt 0 ]; then f=$((f-1)); fi; [ \"$f\" -gt 0 ] || cd " + RemotePathUtils.ShellQuote(parentFullPath);
     }
 
     private void CreateDirectories(List<SyncPlan.SyncAction> actions, UploadedFile[] uploadedFiles)
@@ -178,35 +198,39 @@ internal class FileByFileSyncEngine : CommandSyncEngine
         streamWriter.WriteLine("test -d " + RemotePathUtils.ShellQuote(_settings.RemotePath) + " || exit 1");
         streamWriter.WriteLine("cd " + RemotePathUtils.ShellQuote(_settings.RemotePath) + " || exit 1");
         streamWriter.WriteLine("echo " + mainDirMsg);
+        // The commands below use names relative to the folder that the script is in. When a "cd" fails, the script stays in the folder
+        // above, and the same names there (an "rm -rf" of a folder with the same name) would be hit. $f is the number of folders entered
+        // since a "cd" failed: while it is not 0 the commands of the plan are skipped.
+        streamWriter.WriteLine("f=0");
         for (int i = 0; i < actions.Count; i++)
         {
             SyncPlan.SyncAction action = actions[i];
             switch (action.Type)
             {
                 case SyncPlan.ActionType.CreateAndEnterDirectory:
-                    streamWriter.WriteLine($"mkdir -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine($"{SkipWhenLost} mkdir -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
                     goto case SyncPlan.ActionType.EnterDirectory;
                 case SyncPlan.ActionType.EnterDirectory:
                     currentRemoteDir = RemotePathUtils.Combine(currentRemoteDir, action.Path);
-                    streamWriter.WriteLine($"cd {RemotePathUtils.ShellQuote(currentRemoteDir)} || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine(EnterScript(currentRemoteDir, i));
                     break;
                 case SyncPlan.ActionType.GoToParentDirectory:
                     currentRemoteDir = RemotePathUtils.GetDirectoryName(currentRemoteDir);
-                    streamWriter.WriteLine("cd " + RemotePathUtils.ShellQuote(currentRemoteDir));
+                    streamWriter.WriteLine(LeaveScript(currentRemoteDir));
                     break;
                 case SyncPlan.ActionType.TransferFile:
                     uploadedFiles[action.Argument].Path = RemotePathUtils.Combine(currentRemoteDir, action.Path);
                     break;
                 case SyncPlan.ActionType.DeleteTargetFile:
-                    streamWriter.WriteLine($"rm -f -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine($"{SkipWhenLost} rm -f -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.DeleteEmptyTargetDirectory:
                     // "rm -f" does not remove directories ("Is a directory"), so the warning was always reported and the
                     // directory stayed.
-                    streamWriter.WriteLine($"rmdir -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine($"{SkipWhenLost} rmdir -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.DeleteTargetDirectoryRecursively:
-                    streamWriter.WriteLine($"rm -rf -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine($"{SkipWhenLost} rm -rf -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
                     break;
                 case SyncPlan.ActionType.PrintStderrMessage:
                     streamWriter.WriteLine($"echo \"cmdfail:{i}\"");
@@ -258,6 +282,7 @@ internal class FileByFileSyncEngine : CommandSyncEngine
         };
         streamWriter.WriteLine("echo " + marker);
         streamWriter.WriteLine("cd " + RemotePathUtils.ShellQuote(_settings.RemotePath) + " || exit 1");
+        streamWriter.WriteLine("f=0");
         for (int i = 0; i < actions.Count; i++)
         {
             SyncPlan.SyncAction action = actions[i];
@@ -266,18 +291,19 @@ internal class FileByFileSyncEngine : CommandSyncEngine
                 case SyncPlan.ActionType.CreateAndEnterDirectory:
                 case SyncPlan.ActionType.EnterDirectory:
                     currentRemoteDir = RemotePathUtils.Combine(currentRemoteDir, action.Path);
-                    streamWriter.WriteLine($"cd {RemotePathUtils.ShellQuote(currentRemoteDir)} || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine(EnterScript(currentRemoteDir, i));
                     break;
                 case SyncPlan.ActionType.GoToParentDirectory:
                     currentRemoteDir = RemotePathUtils.GetDirectoryName(currentRemoteDir);
-                    streamWriter.WriteLine("cd " + RemotePathUtils.ShellQuote(currentRemoteDir));
+                    streamWriter.WriteLine(LeaveScript(currentRemoteDir));
                     break;
                 case SyncPlan.ActionType.TransferFile:
                     {
                         uploadedFiles[action.Argument].Path = RemotePathUtils.Combine(currentRemoteDir, action.Path);
                         int permissions = permissionProvider?.GetFilePermissions(localPaths[action.Argument]) ?? defaultPermissions;
-                        streamWriter.WriteLine("chmod " + Convert.ToString(permissions, 8) + " -- " + RemotePathUtils.ShellQuote(action.Path));
-                        streamWriter.WriteLine($"touch -d @{new LocalFileSystem.FileStamp(0L, uploadedFiles[action.Argument].Size + _settings.ClockOffset.Seconds).UnixSeconds} -- {RemotePathUtils.ShellQuote(action.Path)}");
+                        // Not in a folder that could not be entered: touch would create an empty file of this name in the folder above.
+                        streamWriter.WriteLine(SkipWhenLost + " chmod " + Convert.ToString(permissions, 8) + " -- " + RemotePathUtils.ShellQuote(action.Path));
+                        streamWriter.WriteLine($"{SkipWhenLost} touch -d @{new LocalFileSystem.FileStamp(0L, uploadedFiles[action.Argument].Size + _settings.ClockOffset.Seconds).UnixSeconds} -- {RemotePathUtils.ShellQuote(action.Path)}");
                         break;
                     }
                 case SyncPlan.ActionType.CreateRemoteSymlink:
@@ -288,8 +314,8 @@ internal class FileByFileSyncEngine : CommandSyncEngine
                         {
                             throw new Exception("Invalid queued symlink: " + action.Path);
                         }
-                        streamWriter.WriteLine("rm -f -- " + RemotePathUtils.ShellQuote(linkFileName));
-                        streamWriter.WriteLine($"ln -s -- {RemotePathUtils.ShellQuote(symlinkPair.Value)} {RemotePathUtils.ShellQuote(linkFileName)} || echo \"cmdfail:{i}\"");
+                        streamWriter.WriteLine(SkipWhenLost + " rm -f -- " + RemotePathUtils.ShellQuote(linkFileName));
+                        streamWriter.WriteLine($"{SkipWhenLost} ln -s -- {RemotePathUtils.ShellQuote(symlinkPair.Value)} {RemotePathUtils.ShellQuote(linkFileName)} || echo \"cmdfail:{i}\"");
                         break;
                     }
             }

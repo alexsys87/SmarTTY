@@ -350,6 +350,11 @@ internal static class WindowsHostTests
         Test.Check(Transport.WindowsRemoteFileTools.ParseChecksum(new[] { hash.Substring(1) }) == null && Transport.WindowsRemoteFileTools.ParseChecksum(new[] { hash + "00" }) == null, "a hash of the wrong length is not one");
         Test.Equal("certutil -hashfile \"C:\\Users\\me\\a b.txt\" SHA256", Transport.WindowsRemoteFileTools.ChecksumCommand("/C:/Users/me/a b.txt"), "the certutil command, the path in double quotes");
         Test.Check(Transport.WindowsRemoteFileTools.ChecksumCommand("/home/user/x") == null, "no command for a path without a drive");
+        foreach (string unsafePath in new[] { "/C:/data/a$(calc).txt", "/C:/data/$HOME.txt", "/C:/data/a`b.txt", "/C:/data/%TEMP%.txt" })
+        {
+            Test.Check(Transport.WindowsRemoteFileTools.ChecksumCommand(unsafePath) == null, "no certutil command for a path that PowerShell or cmd.exe would expand: " + unsafePath);
+            Test.Throws<ArgumentException>(() => WindowsAuthorizedKeys.RestrictAccessCommand(unsafePath), "no icacls command for " + unsafePath);
+        }
     }
 
     private static string Format(Transport.FileChecksum checksum)

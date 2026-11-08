@@ -65,6 +65,9 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
             }
         }
 
+        // Printed after the listing of a folder that failed (the exit status of the listing command), see ScanDirectories.
+        private const string ListFailedMarker = "--listfailed";
+
         private SshSession _session;
 
         private readonly CommandSyncEngine _engine;
@@ -101,6 +104,13 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
             Files.Add(default);
             if (RunCommand("test -d " + RemotePathUtils.ShellQuote(this._rootPath)) == null)
             {
+                if (!_engine.IsUpload)
+                {
+                    // An empty file set would pass for an empty folder, and "Delete files that are not in the source" would then empty the
+                    // local folder: a mistyped path, a folder that was removed, a disk that is not mounted, a command that could not run.
+                    throw new IOException("The folder " + _rootPath + " was not found on the server (or it is not a folder, or the check could not be run). Nothing was changed.");
+                }
+                // An upload to a folder that is not there yet is fine: everything is new.
                 return;
             }
             if (_flavor == StatCommandBuilder.StatFlavor.Unknown)
@@ -299,7 +309,8 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                 string dirPath = dir.FullPath;
                 _visited[dirPath] = dir;
                 streamWriter.WriteLine("echo --dir:" + dirPath);
-                streamWriter.WriteLine(statCommandBuilder.GetListCommand(dirPath));
+                // A folder that cannot be listed says so, instead of being taken for an empty one.
+                streamWriter.WriteLine(statCommandBuilder.GetListCommand(dirPath) + " || echo " + ListFailedMarker);
             }
             // The last line of the output: without it the list may be cut short (the script was stopped, the output was
             // lost), and a cut list must not pass for the whole one.
@@ -322,6 +333,17 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                 else if (line == endMarker)
                 {
                     endSeen = true;
+                }
+                else if (line == ListFailedMarker)
+                {
+                    if (currentDir != null)
+                    {
+                        currentDir.RemoteDirectory.ListingIncomplete = true;
+                        this._engine._events?.OnWarning(new SyncWarning
+                        {
+                            Warning = new QuickSyncWarning(QuickSyncWarningType.UnreadableRemoteDirectory, currentDir.FullPath, 0)
+                        });
+                    }
                 }
                 else if (line.StartsWith("--dir:"))
                 {
@@ -395,6 +417,11 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                                     if ((_settings.Options & SyncOptions.OneFileSystem) != SyncOptions.OneFileSystem || currentDir.DeviceId == 0 || statEntry.DeviceId == currentDir.DeviceId)
                                     {
                                         nextDirsToScan.Add(childDir);
+                                    }
+                                    else
+                                    {
+                                        // Not listed on purpose: its local copy is not "extraneous".
+                                        childDir.RemoteDirectory.ListingIncomplete = true;
                                     }
                                 }
                                 break;

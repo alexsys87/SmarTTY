@@ -1,6 +1,7 @@
 using SmarTTY.Ssh;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace SmarTTY.Transport;
@@ -95,13 +96,24 @@ internal static class WindowsRemoteFileTools
     }
 
     /// <summary>
-    /// The command that prints the SHA-256 of a file on Windows; null for a path without a drive. certutil is part of Windows
-    /// and a program, so cmd.exe and PowerShell run it alike; the path is in double quotes.
+    /// The command that prints the SHA-256 of a file on Windows; null for a path without a drive, or with a character that the shell
+    /// of the server would read inside the double quotes. certutil is part of Windows and a program, so cmd.exe and PowerShell run it
+    /// alike, but the quotes are not read alike: PowerShell expands $name and $(...) and takes the backtick for an escape, and cmd.exe
+    /// expands %NAME%. All of them are valid in a file name, and the name may come from an archive that is not trusted.
     /// </summary>
     public static string ChecksumCommand(string sftpPath)
     {
         string windowsPath = WindowsSftpPath.ToWindows(sftpPath);
-        return windowsPath == null ? null : "certutil -hashfile \"" + windowsPath + "\" SHA256";
+        return windowsPath == null || !IsSafeInDoubleQuotes(windowsPath) ? null : "certutil -hashfile \"" + windowsPath + "\" SHA256";
+    }
+
+    /// <summary>
+    /// True for a path that cmd.exe and PowerShell both read as it is inside double quotes: none of $ ` % and " (the last one cannot be in a
+    /// Windows file name anyway), and no control character.
+    /// </summary>
+    public static bool IsSafeInDoubleQuotes(string windowsPath)
+    {
+        return windowsPath != null && windowsPath.IndexOfAny(new[] { '$', '`', '%', '"' }) < 0 && !windowsPath.Any(char.IsControl);
     }
 
     /// <summary>
