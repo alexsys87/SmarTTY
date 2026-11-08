@@ -38,7 +38,7 @@ internal static class Program
         public bool IsLinkExtension(string extension)
         {
             // The default list of the terminal, shortened to what the checks use.
-            return new[] { ".c", ".h", ".cpp", ".hpp", ".cc", ".py", ".sh", ".rs", ".go", ".txt", ".mk", ".cxx", ".s" }.Contains(extension, StringComparer.OrdinalIgnoreCase);
+            return new[] { ".c", ".h", ".cpp", ".hpp", ".cc", ".py", ".sh", ".rs", ".go", ".txt", ".mk", ".cxx", ".s", ".html", ".json" }.Contains(extension, StringComparer.OrdinalIgnoreCase);
         }
 
         public void RequestOpenFile(string path, int? line, int? column, ColumnUnit unit)
@@ -541,8 +541,74 @@ internal static class Program
         Equal(longLine.Line("error: z")[2], "error:", "...and the next line is analysed again");
     }
 
+    // An address in the output is no file name: "https://example.com/a.html" has the extension of a file that the terminal knows, and
+    // opened "<directory>/example.com/a.html" in the editor on the remote machine (an empty new file, or an error).
+    private static void UrlChecks()
+    {
+        foreach (string url in new[]
+        {
+            "https://example.com/a.html", "http://example.com/dir/index.html", "HTTPS://EXAMPLE.COM/A.HTML", "ftp://host/pub/readme.txt", "s3://bucket/key.json",
+            "git+ssh://git@host/repo/main.c", "http://user:pass@host:8080/a.c", "https://example.com/a.html?file=b.c&x=1#top", "http://127.0.0.1:8000/static/app.json",
+            "https://example.com/path/to/file.tar.gz"
+        })
+        {
+            Equal(new Output("/w", "curl", "see " + url + " now\n").Covered.Count, 0, "an address is no file: " + url);
+        }
+
+        // What follows an address, or comes before it, is looked at as it was.
+        Output after = new Output("/w", "make", "fetched https://example.com/a.html then main.c:12:3: error: x\n");
+        Equal(after.Covered.Count, 1, "a file name after an address is a link");
+        Equal(after.Click(0), "/w/main.c|11|2", "and it opens at its position");
+        Output before = new Output("/w", "make", "main.c:7:1: note: see https://example.com/a.html\n");
+        Equal(before.Covered.Count, 1, "a file name before an address is a link, the address is not");
+        Equal(before.Click(0), "/w/main.c|6|0", "and it opens at its position");
+
+        // Where an address ends.
+        foreach (string text in new[] { "\"https://example.com/a.html\" b.c:2:1", "<https://example.com/a.html> b.c:2:1", "'https://example.com/a.html' b.c:2:1", "(https://example.com/a.html) b.c:2:1", "https://example.com/a.html, b.c:2:1" })
+        {
+            Output ended = new Output("/w", "x", text + "\n");
+            Check(ended.Covered.Count == 1 && ended.Click(0) == "/w/b.c|1|0", "an address ends at a quote, a bracket or a blank, the name after it is a link: " + text);
+        }
+        Output lines = new Output("/w", "x", "https://example.com/a.html\n", "b.c:3:1\n");
+        Check(lines.Covered.Count == 1 && lines.Click(0) == "/w/b.c|2|0", "an address ends at the end of the line");
+        Output tabbed = new Output("/w", "x", "https://example.com/a.html\tb.c:4:1\n");
+        Check(tabbed.Covered.Count == 1 && tabbed.Click(0) == "/w/b.c|3|0", "an address ends at a tab");
+
+        // The output comes in pieces, cut anywhere.
+        string full = "see https://example.com/dir/a.html and b.c:2:1\n";
+        for (int cut = 1; cut < full.Length; cut++)
+        {
+            Output pieces = new Output("/w", "x", full.Substring(0, cut), full.Substring(cut));
+            if (pieces.Covered.Count != 1 || pieces.Click(0) != "/w/b.c|1|0")
+            {
+                throw new Exception("FAIL: the output cut after " + cut + " characters gave links " + string.Join(" | ", pieces.Covered));
+            }
+        }
+        Check(true, "an address in the output cut into two pieces at any place is no file, and the name after it is a link");
+        Output many = new Output("/w", "x", "see ", "h", "ttps", ":", "/", "/exa", "mple.com", "/a.", "html and ", "b.c:2:1\n");
+        Check(many.Covered.Count == 1 && many.Click(0) == "/w/b.c|1|0", "an address that arrives in tiny pieces is no file either");
+
+        // A new line (column 0) starts without the address of the line before it, though that had no line break.
+        Host host = new Host();
+        OutputLinkScanner scanner = new OutputLinkScanner(host, "/w", "x");
+        TerminalEmulatorBase.LinkCell[] first = scanner.Scan("https://example.com/a", 0);
+        TerminalEmulatorBase.LinkCell[] second = scanner.Scan("b.c:5:1", 0);
+        Check(first.All(cell => cell.Target == null) && second.Count(cell => cell.Target != null) == 7, "a piece that starts a new line is looked at as a name, not as the rest of an address");
+
+        // The classic terminal (absolute names are strict) is no different.
+        Output classic = new Output("/w", "x", true, "https://example.com/a.html /etc/hosts:3\n");
+        Check(classic.Covered.Count == 1 && classic.Click(0) == "/etc/hosts|2|-", "a classic terminal: the address is no file, /etc/hosts:3 after it is");
+
+        // What looks like an address but is not: a drive, a time, a plain name.
+        Equal(new Output("/w", "x", "a.c:3:1: error\n").Covered.Count, 1, "a name with a position is still a link");
+        Equal(new Output("/w", "x", "x://dir/sub/file.c\n").Covered.Count, 1, "one letter before :// is no scheme: what follows is looked at as before");
+        Equal(new Output("/w", "x", "time 10:30//a.c:1:1\n").Covered.Count, 1, "a time with a slash after it is no address: the name after it is still a link");
+        Equal(new Output("/w", "x", "ERROR: //x.c:3:1\n").Covered.Count, 1, "a word and a colon with a blank before the slashes is no address");
+    }
+
     private static void Main()
     {
+        UrlChecks();
         DiagnosticSpanChecks();
         LogLevelChecks();
         LogLevelCellChecks();

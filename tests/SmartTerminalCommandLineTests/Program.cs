@@ -316,6 +316,103 @@ internal static class Program
         Check(HistorySuggestion.MatchesPrefix("ls -l", "ls") && !HistorySuggestion.MatchesPrefix("ls", "ls") && HistorySuggestion.MatchesPrefix("", ""), "a match is longer than the typed text; an empty one matches all");
     }
 
+    private static void CommandHistoryChecks()
+    {
+        Equal(string.Join("|", CommandHistoryEditing.Distinct(new[] { "ls", "make", "", "  ", "ls", null, "git status" })), "ls|make|git status", "the window lists every command once, newest first");
+        List<string> commands = new List<string> { "git push origin main", "echo PUSH to git", "make test", "git status" };
+        Equal(string.Join("|", CommandHistoryEditing.Filter(commands, "")), string.Join("|", commands), "an empty search shows everything");
+        Equal(string.Join("|", CommandHistoryEditing.Filter(commands, "git push")), "git push origin main|echo PUSH to git", "every word, in any order and case");
+        Equal(string.Join("|", CommandHistoryEditing.Filter(commands, "  test  ")), "make test", "blanks around the search are ignored");
+        Equal(CommandHistoryEditing.Filter(commands, "nothing").Count, 0, "no match");
+        Equal(CommandHistoryEditing.QuoteHistoryFile("~/.bash_history"), "\"$HOME\"/'.bash_history'", "the history file under the home directory");
+        Equal(CommandHistoryEditing.QuoteHistoryFile("/var/my history"), "'/var/my history'", "a history file with a blank is quoted");
+        Equal(CommandHistoryEditing.BuildRemoveCommand("~/.bash_history", new string[0]), null, "nothing to remove: no command");
+        Equal(CommandHistoryEditing.BuildRemoveCommand("~/.bash_history", new[] { "a\nb" }), null, "a command of several lines is not a line of the file");
+        Equal(CommandHistoryEditing.BuildRemoveCommand(null, new[] { "ls" }), null, "no history file");
+
+        // The removal in real shells, on a file with bash time stamps, zsh extended lines and quotes.
+        string original = string.Join("\n", new[]
+        {
+            "ls -la",
+            "#1699999999",
+            "mysql -pSecret",
+            "#1700000000",
+            "make test",
+            ": 1700000001:0;mysql -pSecret",
+            "echo 'it''s' \"$HOME\" \\n",
+            "mysql -pSecret",
+            "",
+            "#1700000002",
+        }) + "\n";
+        string expected = string.Join("\n", new[]
+        {
+            "ls -la",
+            "#1700000000",
+            "make test",
+            "",
+            "#1700000002",
+        }) + "\n";
+        string[] remove = { "mysql -pSecret", "echo 'it''s' \"$HOME\" \\n", "not in the file" };
+        string work = Path.Combine(Path.GetTempPath(), "smartty-history-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            List<KeyValuePair<string, string>> shells = new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>("sh", "sh") };
+            if (FindProgram("bash") != null)
+            {
+                shells.Add(new KeyValuePair<string, string>("bash", "bash"));
+            }
+            string busybox = FindProgram("busybox");
+            if (busybox != null)
+            {
+                // An OpenWrt-like system: only BusyBox applets.
+                string bin = Path.Combine(work, "owrt-bin");
+                Directory.CreateDirectory(bin);
+                foreach (string applet in new[] { "ash", "sh", "awk", "cat", "rm", "mktemp", "printf", "[" })
+                {
+                    File.CreateSymbolicLink(Path.Combine(bin, applet), busybox);
+                }
+                shells.Add(new KeyValuePair<string, string>("BusyBox ash", bin));
+            }
+            else
+            {
+                Console.WriteLine("SKIP: removing history lines under BusyBox (busybox is not installed)");
+            }
+            string script = CommandHistoryEditing.BuildRemoveCommand("~/.bash_history", remove);
+            foreach (KeyValuePair<string, string> shell in shells)
+            {
+                string home = Path.Combine(work, "home-" + shell.Key.Replace(' ', '-'));
+                Directory.CreateDirectory(home);
+                string file = Path.Combine(home, ".bash_history");
+                File.WriteAllText(file, original);
+                File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                Dictionary<string, string> environment = new Dictionary<string, string> { ["HOME"] = home };
+                string command = script;
+                if (shell.Value.Contains("/"))
+                {
+                    environment["PATH"] = shell.Value;
+                    command = Path.Combine(shell.Value, "ash") + " -c " + Quote(script);
+                }
+                else if (shell.Value != "sh")
+                {
+                    command = shell.Value + " -c " + Quote(script);
+                }
+                RunScript(command, environment, out string error, out int exit);
+                string result = File.ReadAllText(file);
+                Check(exit == 0 && result == expected, shell.Key + ": the commands, their time stamps and their zsh lines are removed" + (exit == 0 && result == expected ? "" : " (exit " + exit + ", " + error + "): " + result.Replace("\n", "\\n")));
+                Equal(File.GetUnixFileMode(file), UnixFileMode.UserRead | UnixFileMode.UserWrite, shell.Key + ": the file keeps its permissions");
+                Equal(Directory.GetFiles(home).Length, 1, shell.Key + ": no temporary file is left next to it");
+                File.Delete(file);
+                RunScript(command, environment, out _, out exit);
+                Check(exit == 0 && !File.Exists(file), shell.Key + ": a missing history file is left alone");
+            }
+        }
+        finally
+        {
+            Directory.Delete(work, recursive: true);
+        }
+    }
+
     private static void CompletionSourceChecks()
     {
         CompletionSources.ShellDefinitions definitions = CompletionSources.ParseShellDefinitions(new[]
@@ -542,6 +639,7 @@ internal static class Program
             VariableAndHostChecks();
             HistorySearchChecks();
             HistorySuggestionChecks();
+            CommandHistoryChecks();
             CompletionSourceChecks();
             TokenizeChecks();
             AnalyzeChecks();

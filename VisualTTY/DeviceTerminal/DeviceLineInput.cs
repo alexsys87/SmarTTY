@@ -58,6 +58,13 @@ public class CommandHistory
         _items.Clear();
     }
 
+    /// <summary>Removes every one of <paramref name="lines"/>. Returns true when the history changed.</summary>
+    public bool Remove(IEnumerable<string> lines)
+    {
+        HashSet<string> set = new HashSet<string>(lines ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
+        return set.Count > 0 && _items.RemoveAll(set.Contains) > 0;
+    }
+
     public static CommandHistory Parse(string text, int capacity = DefaultCapacity)
     {
         CommandHistory history = new CommandHistory(capacity);

@@ -1,3 +1,4 @@
+using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
@@ -36,13 +37,60 @@ public partial class DeviceTerminalControl
         editCommon.Click += (sender, e) => EditCommandList(forThisDevice: false);
         ToolStripMenuItem clearHistory = new ToolStripMenuItem("Clear saved command history");
         clearHistory.Click += (sender, e) => ClearSavedHistory();
+        ToolStripMenuItem showHistory = new ToolStripMenuItem("Command history...");
+        showHistory.ToolTipText = "Search the commands sent to this device, put one into the input line or delete some";
+        showHistory.Click += (sender, e) => ShowCommandHistory();
         Icons.Apply(_editDeviceCommandsMenuItem, "edit");
         Icons.Apply(editCommon, "edit");
         Icons.Apply(clearHistory, "delete");
+        Icons.Apply(showHistory, "find");
         toolStripDropDownButton1.DropDownItems.Add(new ToolStripSeparator());
+        toolStripDropDownButton1.DropDownItems.Add(showHistory);
         toolStripDropDownButton1.DropDownItems.Add(_editDeviceCommandsMenuItem);
         toolStripDropDownButton1.DropDownItems.Add(editCommon);
         toolStripDropDownButton1.DropDownItems.Add(clearHistory);
+        // Also in the menu of the terminal (right button), as in SSH tabs.
+        ToolStripMenuItem contextHistory = new ToolStripMenuItem("Command history...", null, (sender, e) => ShowCommandHistory())
+        {
+            ToolTipText = showHistory.ToolTipText
+        };
+        Icons.Apply(contextHistory, "find");
+        contextMenuStrip1.Items.Add(contextHistory);
+    }
+
+    /// <summary>
+    /// The source of the "Command history" window: the commands sent to this device, newest first. Deleting removes them
+    /// from the input line (Up/Down, Ctrl+R, the grey suggestion), from the saved history of the device and from what Tab offers.
+    /// </summary>
+    internal CommandHistorySource CreateCommandHistorySource()
+    {
+        List<string> commands = _serialTerminalControl.GetCommandHistory();
+        return new CommandHistorySource
+        {
+            Title = ConnectionTitle,
+            Load = () => commands,
+            Delete = DeleteFromCommandHistory,
+            Insert = (string command) =>
+            {
+                _serialTerminalControl.PutCommand(command);
+                _serialTerminalControl.Focus();
+            }
+        };
+    }
+
+    private void ShowCommandHistory()
+    {
+        CreateCommandHistorySource().Show();
+    }
+
+    internal void DeleteFromCommandHistory(IReadOnlyList<string> commands)
+    {
+        _serialTerminalControl.RemoveFromHistory(commands);
+        if (_savedHistory.Remove(commands) && _commandKey != null)
+        {
+            _commandStorage.SaveHistory(_commandKey, _savedHistory);
+        }
+        RefreshCommandSuggestions();
     }
 
     /// <summary>Loads the history and the command lists of this device. Called from ApplySettings before connecting.</summary>

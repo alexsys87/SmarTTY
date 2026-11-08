@@ -80,6 +80,8 @@ public partial class App : Application
         DeviceTerminalControl.GzipCatDropPrompt = file => GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow(), file, raw: true);
         DeviceTerminalControl.CommandListEditor = (title, description, commands) =>
             DeviceCommandListWindow.Edit(WindowOwnership.ActiveWindow(), title, description, commands);
+        // "Command history..." of the terminal menus (SSH tabs and COM/TCP terminals).
+        SmarTTY.Terminal.CommandHistorySource.ShowWindow = source => CommandHistoryWindow.Open(WindowOwnership.ActiveWindow(), source);
         DeviceTerminalControl.TftpFirmwareWindowFactory = (terminal, title) => new TftpFirmwareWindow(terminal, title);
         RemoteFileEditor.SudoConfirmationPrompt = (channel, promptText) =>
             SudoConfirmationWindow.Show(WindowOwnership.ActiveWindow(), channel, promptText);
