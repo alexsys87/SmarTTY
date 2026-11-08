@@ -330,6 +330,12 @@ jobs:
       - name: Run the netconsole terminal checks (the real COM/TCP control as a UDP receiver, under Mono)
         run: xvfb-run -a mono tests/NetconsoleTerminalTests/bin/Release/net48/NetconsoleTerminalTests.exe
 
+      - name: Build the COM/TCP input line checks
+        run: dotnet build tests/DeviceLineEditorTests -c Release
+
+      - name: Run the COM/TCP input line checks (history suggestions and Up/Down by prefix, the real control over TCP, under Mono)
+        run: xvfb-run -a mono tests/DeviceLineEditorTests/bin/Release/net48/DeviceLineEditorTests.exe
+
   build:
     name: Build SmarTTY (Release)
     runs-on: windows-latest
