@@ -285,6 +285,21 @@ internal static class Program
         Equal(HistorySuggestion.FitToWidth("abc", 10, 80), "abc", "a suggestion that fits is drawn in full");
         Equal(HistorySuggestion.FitToWidth("abc", 80, 80), "", "no room when the text ends at the edge");
         Equal(HistorySuggestion.FitToWidth("abc", -3, 80), "", "nothing when the end of the text is scrolled out of view");
+        // Up/Down by the beginning of the line: [0] is the typed line, the rest the history, newest first.
+        List<string> entries = new List<string> { "git", "git status", "ls", "git", "git push", "make" };
+        Equal(HistorySuggestion.StepByPrefix(entries, 0, true, "git"), 1, "Up: the newest command that starts with the typed text");
+        Equal(HistorySuggestion.StepByPrefix(entries, 1, true, "git"), 4, "Up again skips other commands and the bare typed text");
+        Equal(HistorySuggestion.StepByPrefix(entries, 4, true, "git"), -1, "Up stops at the oldest match");
+        Equal(HistorySuggestion.StepByPrefix(entries, 4, false, "git"), 1, "Down: the next newer match");
+        Equal(HistorySuggestion.StepByPrefix(entries, 1, false, "git"), 0, "Down past the newest match brings the typed line back");
+        Equal(HistorySuggestion.StepByPrefix(entries, 0, false, "git"), -1, "Down on the typed line goes nowhere");
+        Equal(HistorySuggestion.StepByPrefix(entries, 0, true, ""), 1, "an empty line: Up goes through every command");
+        Equal(HistorySuggestion.StepByPrefix(entries, 2, true, ""), 3, "an empty line: one command at a time");
+        Equal(HistorySuggestion.StepByPrefix(entries, 5, true, ""), -1, "an empty line: Up stops at the oldest command");
+        Equal(HistorySuggestion.StepByPrefix(entries, 0, true, "zz"), -1, "Up without a match keeps the line");
+        Equal(HistorySuggestion.StepByPrefix(entries, 0, true, "Git"), -1, "the beginning is case-sensitive");
+        Equal(HistorySuggestion.StepByPrefix(new List<string>(), 0, true, ""), -1, "no history");
+        Check(HistorySuggestion.MatchesPrefix("ls -l", "ls") && !HistorySuggestion.MatchesPrefix("ls", "ls") && HistorySuggestion.MatchesPrefix("", ""), "a match is longer than the typed text; an empty one matches all");
     }
 
     private static void CompletionSourceChecks()

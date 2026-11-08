@@ -659,7 +659,8 @@
               <CheckBox Content="Each time '/' is typed" IsChecked="{Binding Slash}" />
               <CheckBox Content="Each time a space is typed" IsChecked="{Binding Space}" />
               <CheckBox Content="When a first character in a word is typed" IsChecked="{Binding FirstCharacterInWord}" />
-              <CheckBox Margin="5 8 2 0" Content="Suggest previously typed commands in grey while typing" IsChecked="{Binding HistorySuggestions}" ToolTip="Smart Terminal: the rest of the newest command in the history that starts with the typed text is shown in grey after the caret. Right arrow or End at the end of the line takes it, Ctrl+Right takes its next word, Esc hides it. Tab still opens the completion list." />
+              <CheckBox Margin="5 8 2 0" Content="Suggest previously typed commands in grey while typing" IsChecked="{Binding HistorySuggestions}" ToolTip="Smart Terminal and COM/TCP terminals: the rest of the newest command in the history that starts with the typed text is shown in grey after the caret. Right arrow or End at the end of the line takes it, Ctrl+Right takes its next word, Esc hides it. Tab still opens the completion list. Nothing is suggested at a password prompt of a device." />
+              <CheckBox Content="Up/Down show only commands that start with the typed text" IsChecked="{Binding HistoryPrefixSearch}" ToolTip="Smart Terminal and COM/TCP terminals: with text on the line, Up and Down go through the commands of the history that start with it (as history-search-backward in bash). On an empty line they go through every command." />
             </StackPanel>
           </GroupBox>
         </StackPanel>

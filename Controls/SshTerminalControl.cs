@@ -155,7 +155,11 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             Region.CaretIndex = -1;
         }
 
-        public void NavigateHistory(bool older)
+        /// <summary>
+        /// Up (<paramref name="older"/>) or Down. With <paramref name="byPrefix"/> only the commands that start with the line
+        /// as it was typed are shown (as history-search-backward in bash); on an empty line that is every command.
+        /// </summary>
+        public void NavigateHistory(bool older, bool byPrefix)
         {
             string text = this.Text ?? "";
             if (_history == null)
@@ -172,8 +176,8 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             }
             // Like bash, Up stops at the oldest command and Down at the line being typed: wrapping around used to
             // replace the typed line with the oldest command when Down was pressed at the prompt.
-            int newIndex = _historyIndex + (older ? 1 : -1);
-            if (newIndex < 0 || newIndex >= _history.Count)
+            int newIndex = HistorySuggestion.StepByPrefix(_history, _historyIndex, older, byPrefix ? _history[0] : "");
+            if (newIndex < 0)
             {
                 return;
             }
@@ -364,12 +368,6 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
     private string _suggestionResult;
 
     private List<string> _suggestionQueryHistory;
-
-    private SolidBrush _suggestionBrush;
-
-    private Color _suggestionBrushFore;
-
-    private Color _suggestionBrushBack;
 
     private List<string> _typedCommands = new List<string>();
 
@@ -1106,37 +1104,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             column += (ch == '\t') ? (TabSize - column % TabSize) : 1;
         }
-        column -= firstColumn;
-        string visible = HistorySuggestion.FitToWidth(suggestion, column, _visibleColumns);
-        if (visible.Length == 0)
-        {
-            return;
-        }
-        Brush brush = GetSuggestionBrush();
-        float charWidth = CharSize.Width;
-        // One character per cell, as PaintLine places the typed text, so the suggestion stays on the same grid.
-        for (int i = 0; i < visible.Length; i++)
-        {
-            if (visible[i] != ' ')
-            {
-                graphics.DrawString(visible.Substring(i, 1), Font, brush, left + (column + i) * charWidth, top, _stringFormat);
-            }
-        }
-    }
-
-    // Halfway between the text and the background, so it reads as a hint in light and dark colour schemes alike.
-    private Brush GetSuggestionBrush()
-    {
-        Color fore = (_defaultColors[0].Foreground as SolidBrush)?.Color ?? ForeColor;
-        Color back = BackColor;
-        if (_suggestionBrush == null || fore != _suggestionBrushFore || back != _suggestionBrushBack)
-        {
-            _suggestionBrush?.Dispose();
-            _suggestionBrush = new SolidBrush(Color.FromArgb((fore.R + back.R) / 2, (fore.G + back.G) / 2, (fore.B + back.B) / 2));
-            _suggestionBrushFore = fore;
-            _suggestionBrushBack = back;
-        }
-        return _suggestionBrush;
+        PaintHistorySuggestion(graphics, suggestion, column - firstColumn, left, top);
     }
 
     protected override void SelectAll()
@@ -1478,7 +1446,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             }
             else if (!e.Alt && !e.Shift && (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down))
             {
-                _inputLine.NavigateHistory(e.KeyCode == Keys.Up);
+                _inputLine.NavigateHistory(e.KeyCode == Keys.Up, CompletionTriggers().HistoryPrefixSearch);
                 SuppressKey(e);
                 return;
             }
@@ -2240,8 +2208,6 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             catch
             {
             }
-            _suggestionBrush?.Dispose();
-            _suggestionBrush = null;
         }
         base.Dispose(disposing);
     }

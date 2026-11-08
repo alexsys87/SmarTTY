@@ -736,6 +736,54 @@ internal static class Program
             Done = () => Suggestion(terminal) == null && InputText(terminal) == "echo hello-sm",
             TimeoutMs = 3000
         };
+        // Up/Down on a line with text: only the commands that start with it (history-search-backward in bash).
+        yield return Retype(terminal, "cd", "a line to walk the history from", () => InputText(terminal) == "cd");
+        yield return new Step
+        {
+            Name = "Up shows the newest command that starts with the typed text",
+            Act = () => Key(terminal, Keys.Up),
+            Done = () => InputText(terminal) == "cd -",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Up again skips the commands that start otherwise",
+            Act = () => Key(terminal, Keys.Up),
+            Done = () => InputText(terminal) == "cd /tmp",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Down goes back to the newer match",
+            Act = () => Key(terminal, Keys.Down),
+            Done = () => InputText(terminal) == "cd -",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Down past the newest match brings the typed text back",
+            Act = () => Key(terminal, Keys.Down),
+            Done = () => InputText(terminal) == "cd",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "with the option off Up shows the newest command whatever was typed",
+            Act = () =>
+            {
+                context.VTSettings.CompletionTriggers.HistoryPrefixSearch = false;
+                Key(terminal, Keys.Control | Keys.C);
+                Type(terminal, "cd");
+                Key(terminal, Keys.Up);
+            },
+            Done = () => InputText(terminal) == "sh -c 'exit 4'; echo exit-code-off",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the prefix search is turned on again",
+            Act = () => context.VTSettings.CompletionTriggers.HistoryPrefixSearch = true
+        };
         yield return new Step
         {
             Name = "the line is cleared and the suggestions are turned on again",

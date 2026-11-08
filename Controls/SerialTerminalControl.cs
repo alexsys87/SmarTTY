@@ -88,7 +88,21 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     private bool _reportedFullScreenProgramActive;
     private List<string> _commandHistory = new List<string>();
-    private int _historyIndex = -1;
+    // Up/Down: the line as it was typed followed by the history, newest first, built at the first Up (null until then:
+    // a new line, a command added), and the entry shown.
+    private List<string>? _navigationEntries;
+    private int _navigationIndex;
+
+    // Changes with every change of the history, so the newest-first copy for the grey suggestion is built again.
+    private int _historyVersion;
+    private List<string>? _suggestionHistory;
+    private int _suggestionHistoryVersion = -1;
+
+    // The grey rest of a previously typed command drawn after the caret (see HistorySuggestion); null when none is shown.
+    private string? _historySuggestion;
+
+    // Esc hides the suggestion until the line changes: the text it was hidden for.
+    private string? _suggestionDismissedFor;
     private const int MaxHistorySize = 1000;
     private HistorySearchSession? _historySearch;
     private string _currentPrompt = "> ";
@@ -930,7 +944,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
     public void ClearHistory()
     {
         _commandHistory.Clear();
-        _historyIndex = -1;
+        _navigationEntries = null;
+        _historyVersion++;
     }
 
     public void AddToHistory(string command)
@@ -947,7 +962,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             _commandHistory.RemoveAt(0);
         }
-        _historyIndex = _commandHistory.Count;
+        _navigationEntries = null;
+        _historyVersion++;
     }
 
     /// <summary>
@@ -990,12 +1006,14 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             document.RemoveLines(cursor.Line + 1, document.LineCount - cursor.Line - 1);
         }
+        _historySuggestion = null;
+        _suggestionDismissedFor = null;
         _inputLine = new InputLine(cursor.Line, prompt.Length, prompt);
         RewrapInput();
         OnTextReplaced();
         UpdateCaretFromInputLine();
         NavigationLocked = false;
-        _historyIndex = _commandHistory.Count;
+        _navigationEntries = null;
         _historySearch = null;
         return true;
     }
@@ -1048,13 +1066,15 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         int startLine = ((EditableTextBrowser)this).EditableDocument.LineCount;
         int startColumn = 0;
+        _historySuggestion = null;
+        _suggestionDismissedFor = null;
         _inputLine = new InputLine(startLine, startColumn, _currentPrompt);
         ((EditableTextBrowser)this).EditableDocument.AppendLine(_currentPrompt);
         RewrapInput();
         OnTextReplaced();
         SetCaret(((EditableTextBrowser)this).EditableDocument.EndPosition);
         NavigationLocked = false;
-        _historyIndex = _commandHistory.Count;
+        _navigationEntries = null;
         _historySearch = null;
     }
 
@@ -1227,6 +1247,14 @@ public class SerialTerminalControl : TerminalEmulatorControl
             return;
         }
 
+        // The grey suggestion from the history (Right, End, Ctrl+Right at the end of the line).
+        if (TryAcceptHistorySuggestion(e))
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            return;
+        }
+
         // Handle completion (Tab)
         if (e.KeyCode == Keys.Tab && !e.Control && !e.Shift && !e.Alt && _inputLine != null)
         {
@@ -1287,6 +1315,15 @@ public class SerialTerminalControl : TerminalEmulatorControl
             if (_completionSession != null)
             {
                 CloseCompletion();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                return;
+            }
+            // Then the suggestion, until the line is changed.
+            if (_historySuggestion != null && _inputLine != null)
+            {
+                _suggestionDismissedFor = _inputLine.Text;
+                RefreshHistorySuggestion();
                 e.Handled = true;
                 e.SuppressKeyPress = true;
                 return;
@@ -1575,6 +1612,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
     }
 
+    // Up (forward == false) and Down. On a line with text only the commands that start with it are shown (unless that is
+    // turned off in the settings), as history-search-backward does in bash; Down past the newest one brings the typed
+    // line back.
     private void NavigateHistory(bool forward)
     {
         if (_inputLine == null || _commandHistory.Count == 0) return;
@@ -1585,48 +1625,168 @@ public class SerialTerminalControl : TerminalEmulatorControl
             _historySearch = null;
         }
 
-        if (!forward) // Up arrow - go back in history
+        bool older = !forward;
+        if (_navigationEntries == null)
         {
-            if (_historyIndex > 0)
+            if (!older)
             {
-                _historyIndex--;
-                _inputLine.SetText(_commandHistory[_historyIndex]);
-                RewrapInput();
-                UpdateCaretFromInputLine();
-                // Send the updated line to device for echo
-                if (_localEcho)
-                {
-                    SendLineToDevice();
-                }
+                // Down on the line being typed: there is nothing newer.
+                return;
+            }
+            _navigationEntries = BuildNavigationEntries(_inputLine.Text);
+            _navigationIndex = 0;
+        }
+        else if (_navigationIndex == 0)
+        {
+            // The typed line may have been edited since Down brought it back.
+            _navigationEntries[0] = _inputLine.Text;
+        }
+        string prefix = HistoryPrefixSearchEnabled ? _navigationEntries[0] : "";
+        int newIndex = HistorySuggestion.StepByPrefix(_navigationEntries, _navigationIndex, older, prefix);
+        if (newIndex < 0) return;
+        _navigationIndex = newIndex;
+        _inputLine.SetText(_navigationEntries[newIndex]);
+        RewrapInput();
+        UpdateCaretFromInputLine();
+        // Send the updated line to device for echo
+        if (_localEcho)
+        {
+            SendLineToDevice();
+        }
+    }
+
+    // The typed line, then every command of the history once, newest first.
+    private List<string> BuildNavigationEntries(string typed)
+    {
+        typed ??= "";
+        List<string> entries = new List<string> { typed };
+        HashSet<string> seen = new HashSet<string> { typed };
+        for (int i = _commandHistory.Count - 1; i >= 0; i--)
+        {
+            if (seen.Add(_commandHistory[i]))
+            {
+                entries.Add(_commandHistory[i]);
             }
         }
-        else // Down arrow - go forward in history
+        return entries;
+    }
+
+    private AutoCompletionTriggers? CompletionTriggers => AppSettings?.VirtualTerminal?.CompletionTriggers;
+
+    // The options are the ones of Settings -> Command Completion, shared with the Smart Terminal; on by default.
+    private bool HistorySuggestionsEnabled => CompletionTriggers?.HistorySuggestions ?? true;
+
+    private bool HistoryPrefixSearchEnabled => CompletionTriggers?.HistoryPrefixSearch ?? true;
+
+    // Newest first, built again only when the history has changed.
+    private List<string> GetSuggestionHistory()
+    {
+        if (_suggestionHistory == null || _suggestionHistoryVersion != _historyVersion)
         {
-            if (_historyIndex < _commandHistory.Count - 1)
-            {
-                _historyIndex++;
-                _inputLine.SetText(_commandHistory[_historyIndex]);
-                RewrapInput();
-                UpdateCaretFromInputLine();
-                // Send the updated line to device for echo
-                if (_localEcho)
-                {
-                    SendLineToDevice();
-                }
-            }
-            else if (_historyIndex == _commandHistory.Count - 1)
-            {
-                _historyIndex = _commandHistory.Count;
-                _inputLine.SetText("");
-                RewrapInput();
-                UpdateCaretFromInputLine();
-                // Send the updated line to device for echo
-                if (_localEcho)
-                {
-                    SendLineToDevice();
-                }
-            }
+            _suggestionHistory = Enumerable.Reverse(_commandHistory).ToList();
+            _suggestionHistoryVersion = _historyVersion;
         }
+        return _suggestionHistory;
+    }
+
+    private string? ComputeHistorySuggestion()
+    {
+        InputLine? inputLine = _inputLine;
+        // Nothing at "Password:": the suggestion would show other commands on the screen while a secret is typed.
+        if (inputLine == null || _inputLineDisabled || HasSelection || _visibleColumns <= 0 || !HistorySuggestionsEnabled
+            || LineInputText.LooksLikeSecretPrompt(inputLine.Prompt))
+        {
+            return null;
+        }
+        string text = inputLine.Text;
+        if (text.Length == 0 || text == _suggestionDismissedFor)
+        {
+            return null;
+        }
+        // The arrows move only the caret on the screen: the suggestion is shown while it is after the last typed character.
+        if (CaretPosition != GetCaretPositionFromInputIndex(text.Length))
+        {
+            return null;
+        }
+        return HistorySuggestion.Find(GetSuggestionHistory(), text);
+    }
+
+    /// <summary>Works out the grey suggestion for the line as it is now and repaints when it has changed.</summary>
+    private void RefreshHistorySuggestion()
+    {
+        string? suggestion;
+        try
+        {
+            suggestion = ComputeHistorySuggestion();
+        }
+        catch
+        {
+            // The caret is also moved while the input line is being redrawn; the next change works it out again.
+            suggestion = null;
+        }
+        if (suggestion != _historySuggestion)
+        {
+            _historySuggestion = suggestion;
+            Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// Right or End at the end of the line take the whole suggestion, Ctrl+Right its next word, as in the Smart Terminal.
+    /// False, leaving the key to its usual meaning, when no suggestion is shown.
+    /// </summary>
+    private bool TryAcceptHistorySuggestion(KeyEventArgs e)
+    {
+        InputLine? inputLine = _inputLine;
+        if (inputLine == null || e.Shift || e.Alt)
+        {
+            return false;
+        }
+        bool wholeCommand = !e.Control && (e.KeyCode == Keys.Right || e.KeyCode == Keys.End);
+        bool nextWord = e.Control && e.KeyCode == Keys.Right;
+        if (!wholeCommand && !nextWord)
+        {
+            return false;
+        }
+        RefreshHistorySuggestion();
+        string? suggestion = _historySuggestion;
+        if (suggestion == null)
+        {
+            return false;
+        }
+        string part = wholeCommand ? suggestion : HistorySuggestion.NextWord(suggestion);
+        if (part.Length == 0)
+        {
+            return false;
+        }
+        // The list was made for the word being typed, which the suggestion has just changed.
+        CloseCompletion();
+        _historySearch = null;
+        ReplaceInputLineText(inputLine.Text.Length, 0, part);
+        // As if the characters were typed.
+        if (_localEcho)
+        {
+            SendText(part, InputKind.Typed);
+        }
+        return true;
+    }
+
+    protected override void PaintLineOverlay(Graphics graphics, int line, string text, int firstColumn, int left, int top, int height)
+    {
+        base.PaintLineOverlay(graphics, line, text, firstColumn, left, top, height);
+        string? suggestion = _historySuggestion;
+        InputLine? inputLine = _inputLine;
+        if (suggestion == null || inputLine == null || HasSelection || _visibleColumns <= 0)
+        {
+            return;
+        }
+        // The prompt and the text are wrapped at the width of the window (RewrapInput): the suggestion starts where they end.
+        int fullIndex = inputLine.Prompt.Length + inputLine.Text.Length;
+        if (line != inputLine.StartLine + fullIndex / _visibleColumns)
+        {
+            return;
+        }
+        PaintHistorySuggestion(graphics, suggestion, fullIndex % _visibleColumns - firstColumn, left, top);
     }
 
     private void SendLineToDevice()
@@ -1711,6 +1871,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         if (_inputLine == null) return;
 
         _historySearch = null;
+        _navigationEntries = null;
         if (ContinuesDevicePrompt)
         {
             // The shell answers Ctrl+C itself with "^C" and a new prompt, which the input line then continues.
@@ -1790,6 +1951,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
             }
         }
         base.SetCaretCore(textPosition, selectionChangeSource, caretDirection);
+        // The suggestion is shown only while the caret is at the end of the line.
+        RefreshHistorySuggestion();
     }
 
     protected override void PlaceCaretAt(Point point)
@@ -1848,7 +2011,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         _inputLine = null;
         _remoteProgram.Reset();
         _historySearch = null;
-        _historyIndex = _commandHistory.Count;
+        _navigationEntries = null;
         NotifyInputLineState();
     }
 
