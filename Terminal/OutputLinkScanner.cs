@@ -275,6 +275,80 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         }
     }
 
+    /// <summary>
+    /// Tells where an address in the output ("https://example.com/a.html") is, character by character. The address has "." and "/"
+    /// in it, so its host and its path read as a relative file name, and the extension at its end is one that gets a link:
+    /// a click opened "&lt;directory&gt;/xample.com/a.html" in the editor on the remote machine. What follows a scheme and "://" is
+    /// no file name, up to a blank, a control character or a quote or bracket that does not belong to an address.
+    /// </summary>
+    private sealed class UrlTracker
+    {
+        // The characters of a scheme that have been read in a row (letters, digits, "+", "-", "."). A scheme has two or more of them:
+        // a single letter in front of ":" is a drive ("C://dir"), not a scheme.
+        private int _schemeLength;
+
+        // 0: nothing; 1: a scheme and ":" have been read; 2: and one "/" as well.
+        private int _stage;
+
+        public bool InUrl { get; private set; }
+
+        public void Reset()
+        {
+            _schemeLength = 0;
+            _stage = 0;
+            InUrl = false;
+        }
+
+        /// <summary>True when the character is part of an address (from the second "/" after the scheme on).</summary>
+        public bool Feed(char ch)
+        {
+            if (InUrl)
+            {
+                if (EndsUrl(ch))
+                {
+                    Reset();
+                    return false;
+                }
+                return true;
+            }
+            if (ch == ':' && _schemeLength >= 2)
+            {
+                _stage = 1;
+                _schemeLength = 0;
+                return false;
+            }
+            if (ch == '/' && _stage == 1)
+            {
+                _stage = 2;
+                return false;
+            }
+            if (ch == '/' && _stage == 2)
+            {
+                InUrl = true;
+                _stage = 0;
+                return true;
+            }
+            _stage = 0;
+            _schemeLength = IsSchemeChar(ch) ? Math.Min(_schemeLength + 1, 64) : 0;
+            return false;
+        }
+
+        // The characters that a scheme is made of (RFC 3986): letters, digits, "+", "-" and ".".
+        private static bool IsSchemeChar(char ch)
+        {
+            return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '+' || ch == '-' || ch == '.';
+        }
+
+        // No address holds a blank or a control character, and a quote or an angle bracket is not written in one either: it ends an address
+        // that was put in quotes or in "<...>". A closing ")" or "]" can be in an address, so it does not end it.
+        private static bool EndsUrl(char ch)
+        {
+            return char.IsWhiteSpace(ch) || char.IsControl(ch) || ch == '"' || ch == '\'' || ch == '<' || ch == '>' || ch == '`';
+        }
+    }
+
+    private readonly UrlTracker _url = new UrlTracker();
+
     private readonly IOutputLinkHost _host;
 
     private readonly string _startDirectory;
@@ -381,6 +455,12 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         TrackDirectories(ch);
         char prevChar = _previousChar;
         _previousChar = ch;
+        if (_url.Feed(ch))
+        {
+            // Inside an address: no file name is looked for in it (and the one that had begun is not a name).
+            _current = null;
+            return null;
+        }
         if (_current == null)
         {
             if (IsPathChar(ch) && prevChar != '/')
@@ -416,6 +496,11 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
     public TerminalEmulatorBase.LinkCell[] Scan(string text, int column)
     {
         TerminalEmulatorBase.LinkCell[] cells = new TerminalEmulatorBase.LinkCell[text.Length];
+        if (column == 0)
+        {
+            // A new line: an address that was not ended by a blank (the line was cut where the screen ends) does not go on in it.
+            _url.Reset();
+        }
         if (_links)
         {
             char[] charArray = text.ToArray();
