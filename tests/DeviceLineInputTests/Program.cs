@@ -45,6 +45,9 @@ internal static class Program
         CommandHistory loaded = CommandHistory.Parse(history.Serialize(), 3);
         Check(Same(loaded.Items, history.Items.ToArray()), "history: serialize/parse round trip");
         Check(CommandHistory.Parse("one\r\ntwo\r\n\r\n one\r\nthree", 10).Items.Count == 3, "history: parse handles CRLF, blanks and duplicates");
+        CommandHistory removing = CommandHistory.Parse("ls\nmake\nls -la\nmake test\n", 10);
+        Check(removing.Remove(new[] { "make", "ls -la", "not there" }) && Same(removing.Items, "ls", "make test"), "history: the commands deleted in the history window are removed");
+        Check(!removing.Remove(new[] { "not there" }) && !removing.Remove(new string[0]) && !removing.Remove(null), "history: nothing to remove changes nothing");
         history.Clear();
         Check(history.Count == 0, "history: clear");
 

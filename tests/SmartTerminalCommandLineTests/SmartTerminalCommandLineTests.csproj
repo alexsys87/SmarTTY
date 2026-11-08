@@ -10,6 +10,7 @@
     <Compile Include="../../Terminal/ShellCommandLine.cs" Link="ShellCommandLine.cs" />
     <Compile Include="../../Terminal/HistorySearch.cs" Link="HistorySearch.cs" />
     <Compile Include="../../Terminal/HistorySuggestion.cs" Link="HistorySuggestion.cs" />
+    <Compile Include="../../Terminal/CommandHistoryEditing.cs" Link="CommandHistoryEditing.cs" />
     <Compile Include="../../Terminal/CompletionSources.cs" Link="CompletionSources.cs" />
     <Compile Include="../../Terminal/ShellSelection.cs" Link="ShellSelection.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />

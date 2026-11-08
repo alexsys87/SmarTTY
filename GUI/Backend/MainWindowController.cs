@@ -1696,6 +1696,17 @@ public class MainWindowController : INotifyPropertyChanged
         ToolStripItem pasteLineByLineItem = pasteSpecialMenu.DropDownItems.Add("Paste line by line (wait for each command)", null, (object _, EventArgs e) => PasteSpecial(PasteMode.LineByLine));
         pasteLineByLineItem.ToolTipText = "Smart Terminal: runs the pasted commands one after another, each when the previous one has ended; stops at a failed command.";
         _TerminalContextMenu.Items.Add(pasteSpecialMenu);
+        ToolStripMenuItem commandHistoryItem = new ToolStripMenuItem("Command history...", Icons.Load("find"), (object _, EventArgs e) => ShowCommandHistory())
+        {
+            ToolTipText = "Search the commands of this tab and put one into the command line (Enter runs it); a Smart Terminal tab can also delete them"
+        };
+        _TerminalContextMenu.Items.Add(commandHistoryItem);
+        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) =>
+        {
+            TerminalEmulatorControl target = ContextMenuTerminal(out SessionWrapper targetSession);
+            // A classic tab reads the history file of the shell, which a Windows server does not have.
+            commandHistoryItem.Enabled = target is SshTerminalControl || (target != null && targetSession?.Session != null && !targetSession.IsWindowsHost);
+        };
         _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) =>
         {
             // Only the Smart Terminal knows when a command has ended.
@@ -1729,6 +1740,97 @@ public class MainWindowController : INotifyPropertyChanged
             FullScreenMode = commonGUIPreferences.FullScreen;
         }
         ApplyGlobalVisualSettings();
+    }
+
+    // The terminal the menu was opened on (or the one of the active tab) and its session.
+    private TerminalEmulatorControl ContextMenuTerminal(out SessionWrapper session)
+    {
+        TerminalEmulatorControl terminal = (_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+        session = ActiveSession?.Tabs.OfType<NormalTabContext>().Any((NormalTabContext page) => page.Terminal == terminal) == true
+            ? ActiveSession
+            : AllSessions.FirstOrDefault((SessionWrapper candidate) => candidate.Tabs.OfType<NormalTabContext>().Any((NormalTabContext page) => page.Terminal == terminal));
+        return terminal;
+    }
+
+    /// <summary>"Command history..." of the terminal menu: the window that searches, puts in and deletes commands.</summary>
+    private void ShowCommandHistory()
+    {
+        TerminalEmulatorControl terminal = ContextMenuTerminal(out SessionWrapper session);
+        CommandHistorySource source = CreateCommandHistorySource(terminal, session);
+        if (source == null)
+        {
+            return;
+        }
+        try
+        {
+            CommandHistoryWindow.Open(_Window, source);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    /// <summary>
+    /// A Smart Terminal tab shows the history of the session and can delete commands: from every Smart Terminal tab of
+    /// the session at once and from the history file on the server. A classic shell tab only reads that file, since the
+    /// shell keeps its own history, and only puts a command into the terminal.
+    /// </summary>
+    private CommandHistorySource CreateCommandHistorySource(TerminalEmulatorControl terminal, SessionWrapper session)
+    {
+        if (terminal == null || session == null)
+        {
+            return null;
+        }
+        if (terminal is SshTerminalControl smart)
+        {
+            List<string> commands = smart.GetCommandHistory();
+            ShellCompletionAnalyzer analyzer = smart.ShellAnalyzer;
+            string file = analyzer?.HistoryFileIfKnown ?? "the history file";
+            return new CommandHistorySource
+            {
+                Title = smart.Title,
+                Load = () => commands,
+                Delete = (IReadOnlyList<string> removed) =>
+                {
+                    analyzer?.RemoveFromHistory(removed, (bool written) =>
+                    {
+                        if (!written)
+                        {
+                            Dispatcher.BeginInvoke(new Action(() => MessageBoxes.Warning("The commands are gone from the history in SmarTTY, but " + file + " on the server could not be changed (no awk there, or no permission to write the file).")));
+                        }
+                    });
+                    foreach (SshTerminalControl tab in session.Tabs.OfType<NormalTabContext>().Select((NormalTabContext page) => page.Terminal).OfType<SshTerminalControl>())
+                    {
+                        tab.ForgetCommands(removed);
+                    }
+                },
+                DeleteWarning = "They are also removed from " + file + " on the server. A shell that runs there now (a classic terminal tab, another SSH login) keeps its own copy of the history and may write them back to the file when it exits.",
+                Insert = (string command) =>
+                {
+                    smart.PutCommand(command);
+                    smart.Focus();
+                }
+            };
+        }
+        if (session.Session == null || session.IsWindowsHost)
+        {
+            return null;
+        }
+        ShellCompletionAnalyzer shellAnalyzer = session.ProvideAnalyzer();
+        string historyFile = shellAnalyzer.HistoryFileIfKnown ?? "its history file";
+        return new CommandHistorySource
+        {
+            Title = terminal.Title,
+            // Enumerable.Reverse by name: with C# 14 array.Reverse() binds to the in-place MemoryExtensions.Reverse (void).
+            Load = () => CommandHistoryEditing.Distinct(Enumerable.Reverse(shellAnalyzer.GetHistory(TimeSpan.FromSeconds(15)))),
+            Note = "The shell of this tab keeps its own history. The list is read from " + historyFile + " on the server, which a running shell usually writes only when it exits, so its newest commands may be missing. Commands can be deleted in a Smart Terminal tab.",
+            Insert = (string command) =>
+            {
+                terminal.InsertCommand(command);
+                terminal.Focus();
+            }
+        };
     }
 
     // The "Quick commands" sub menu (and the separator after it) in the menu of the terminal, removed and added again each time it opens.

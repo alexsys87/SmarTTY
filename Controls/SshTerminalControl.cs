@@ -195,6 +195,13 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             return _terminal.BuildHistory();
         }
+
+        /// <summary>Up/Down start again from the current history (some commands were removed from it).</summary>
+        public void ResetHistory()
+        {
+            _history = null;
+            _historyIndex = 0;
+        }
     }
 
     private class CommandChannel : IDisposable
@@ -358,7 +365,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
     private ShellCompletionAnalyzer _suggestionAnalyzer;
 
-    private int _suggestionHistoryCount = -1;
+    private int _suggestionHistoryVersion = -1;
 
     private int _suggestionTypedCount = -1;
 
@@ -452,6 +459,54 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             }
         }
         return list;
+    }
+
+    /// <summary>The history of this tab for the "Command history" window: every command once, the newest first.</summary>
+    public List<string> GetCommandHistory()
+    {
+        return CommandHistoryEditing.Distinct(BuildHistory());
+    }
+
+    /// <summary>
+    /// Forgets <paramref name="commands"/> in this tab after they were removed from the history of the session
+    /// (ShellCompletionAnalyzer.RemoveFromHistory): the commands typed here, Up/Down and the grey suggestion.
+    /// </summary>
+    public void ForgetCommands(IEnumerable<string> commands)
+    {
+        HashSet<string> set = new HashSet<string>(commands ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
+        if (set.Count == 0)
+        {
+            return;
+        }
+        _typedCommands.RemoveAll(set.Contains);
+        _inputLine?.ResetHistory();
+        _suggestionHistory = null;
+        _suggestionQuery = null;
+        RefreshHistorySuggestion();
+    }
+
+    /// <summary>
+    /// Puts a command from the history window into the command line in place of what is typed there, ready to be run
+    /// with Enter or edited. While a program runs the text is typed into it, as a quick command.
+    /// </summary>
+    public void PutCommand(string command)
+    {
+        if (string.IsNullOrEmpty(command))
+        {
+            return;
+        }
+        if (_inputLine == null)
+        {
+            base.InsertCommand(command);
+            return;
+        }
+        if (_historySearch != null)
+        {
+            EndHistorySearch(accept: false);
+        }
+        CloseCompletion();
+        PrepareInputForEditing();
+        _inputLine.SetText(command);
     }
 
     public void RequestOpenFile(string text, int? line, int? column, SmarTTY.CodeEditing.ColumnUnit unit)
@@ -989,17 +1044,17 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         }
     }
 
-    // Newest first, as BuildHistory(), kept between keys: the history only grows (the file read in the background, a
-    // command typed in this or another tab of the session), so a changed count is enough to tell it has to be built again.
+    // Newest first, as BuildHistory(), kept between keys and built again when the history of the session (the file read in
+    // the background, a command typed in any tab, commands removed in the history window) or of this tab has changed.
     private List<string> GetSuggestionHistory()
     {
         ShellCompletionAnalyzer analyzer = ShellAnalyzer;
-        int historyCount = analyzer?.HistoryCount ?? 0;
-        if (_suggestionHistory == null || analyzer != _suggestionAnalyzer || historyCount != _suggestionHistoryCount || _typedCommands.Count != _suggestionTypedCount)
+        int historyVersion = analyzer?.HistoryVersion ?? 0;
+        if (_suggestionHistory == null || analyzer != _suggestionAnalyzer || historyVersion != _suggestionHistoryVersion || _typedCommands.Count != _suggestionTypedCount)
         {
             _suggestionHistory = BuildHistory();
             _suggestionAnalyzer = analyzer;
-            _suggestionHistoryCount = historyCount;
+            _suggestionHistoryVersion = historyVersion;
             _suggestionTypedCount = _typedCommands.Count;
         }
         return _suggestionHistory;
