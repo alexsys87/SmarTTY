@@ -16,6 +16,24 @@ public static class OpenWrtDetector
 
     public const string ApkMarker = "SMARTTY_PKG=apk";
 
+    /// <summary>Printed when the package manager configuration still has what the local repository server writes (see <see cref="OpkgFeedConfig"/>).</summary>
+    public const string LeftoverMarker = "SMARTTY_LOCALREPO=leftover";
+
+    /// <summary>
+    /// The files that the server changes on the device (the custom feed lists, the opkg configuration with the signature check, the lists
+    /// of the official feeds) are searched for its marker lines. They stay when SmarTTY ends while the server runs: a crash, a killed
+    /// process, a lost connection, a power cut; opkg then fails on the feeds of 127.0.0.1, with the signature check possibly still off.
+    /// </summary>
+    private const string LeftoverProbe =
+        "grep -qsE 'smartty-local-(begin|off)' /etc/opkg/customfeeds.conf /etc/opkg.conf /etc/opkg/distfeeds.conf " +
+        "/etc/apk/repositories.d/customfeeds.list /etc/apk/repositories.d/distfeeds.list && echo " + LeftoverMarker;
+
+    /// <summary>True when the output of <see cref="ProbeCommand"/> says that a server of SmarTTY left its changes on the device.</summary>
+    public static bool HasLeftover(IEnumerable<string> lines)
+    {
+        return lines != null && lines.Any(line => line?.Trim() == LeftoverMarker);
+    }
+
     /// <summary>
     /// Shell command that reports whether the host is OpenWrt (the release file, the custom opkg feed list or the
     /// custom apk repository list is present - not just the /etc/opkg directory, which Yocto-based systems have too, or /etc/os-release names OpenWrt as the system or its base, as derivatives
@@ -36,7 +54,8 @@ public static class OpenWrtDetector
         SmarTTY.Transport.RemoteBackup.TarProbeCommand + "; " +
         SmarTTY.Transport.MtdFlash.ProbeCommand + "; " +
         SmarTTY.Transport.DevMem.ProbeCommand + "; " +
-        SmarTTY.Ssh.RemoteOsDetector.KernelProbeCommand;
+        SmarTTY.Ssh.RemoteOsDetector.KernelProbeCommand + "; " +
+        LeftoverProbe + "; true";
 
     /// <summary>
     /// True when the host answered the probe at all (it printed "SMARTTY_OS=openwrt" or "SMARTTY_OS=other"). A host that did

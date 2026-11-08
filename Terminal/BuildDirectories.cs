@@ -93,7 +93,18 @@ internal static class BuildDirectories
             string program = ProgramName(words[index]);
             if (program == "cd")
             {
-                string target = index + 1 < words.Count ? words[index + 1] : null;
+                // "cd -P dir", "cd -L -- dir": the options are not the directory.
+                int targetIndex = index + 1;
+                while (targetIndex < words.Count && words[targetIndex].Length > 1 && words[targetIndex][0] == '-')
+                {
+                    if (words[targetIndex] == "--")
+                    {
+                        targetIndex++;
+                        break;
+                    }
+                    targetIndex++;
+                }
+                string target = targetIndex < words.Count ? words[targetIndex] : null;
                 if (!IsFollowable(target) || target == "-")
                 {
                     return null;
@@ -110,28 +121,31 @@ internal static class BuildDirectories
                     string word = words[i];
                     if (word == "-C" || word == "--directory")
                     {
-                        directory = i + 1 < words.Count ? words[i + 1] : null;
-                        if (!IsFollowable(directory))
+                        string next = i + 1 < words.Count ? words[i + 1] : null;
+                        if (!IsFollowable(next))
                         {
                             return null;
                         }
+                        directory = AddDirectoryOption(directory, next);
                         i++;
                     }
                     else if (word.StartsWith("--directory=", StringComparison.Ordinal))
                     {
-                        directory = word.Substring("--directory=".Length);
-                        if (!IsFollowable(directory))
+                        string next = word.Substring("--directory=".Length);
+                        if (!IsFollowable(next))
                         {
                             return null;
                         }
+                        directory = AddDirectoryOption(directory, next);
                     }
                     else if (word.Length > 2 && word.StartsWith("-C", StringComparison.Ordinal))
                     {
-                        directory = word.Substring(2);
-                        if (!IsFollowable(directory))
+                        string next = word.Substring(2);
+                        if (!IsFollowable(next))
                         {
                             return null;
                         }
+                        directory = AddDirectoryOption(directory, next);
                     }
                 }
                 if (directory != null)
@@ -177,6 +191,15 @@ internal static class BuildDirectories
             return directory;
         }
         return RemotePathUtils.Combine(directory, cleaned);
+    }
+
+    /// <summary>
+    /// Several -C options add up ("make -C a -C b" works in "a/b"; make takes a later relative directory as relative to the earlier
+    /// one, and an absolute one replaces it).
+    /// </summary>
+    private static string AddDirectoryOption(string previous, string next)
+    {
+        return previous == null ? next : RemotePathUtils.Combine(previous, next);
     }
 
     private static bool IsFollowable(string directory)

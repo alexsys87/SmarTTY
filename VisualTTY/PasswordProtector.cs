@@ -43,7 +43,13 @@ public class PasswordProtector
         {
             return null;
         }
-        RSACryptoServiceProvider rsaProvider = RsaSshKey.OpenContainer(containerName, 2048);
-        return Encoding.UTF8.GetString(rsaProvider.Decrypt(encryptedBytes, fOAEP: false));
+        // Only an existing container: a missing one (a new Windows profile) must not be created here, because the key that this would make
+        // is not the one that the saved passwords were encrypted with, and it would stay for the next Encrypt, silently ending the
+        // chance of ever reading the old ones.
+        using (RSACryptoServiceProvider rsaProvider = RsaSshKey.OpenContainer(containerName, 2048, create: false)
+            ?? throw new CryptographicException("The key container of the saved passwords does not exist on this computer."))
+        {
+            return Encoding.UTF8.GetString(rsaProvider.Decrypt(encryptedBytes, fOAEP: false));
+        }
     }
 }

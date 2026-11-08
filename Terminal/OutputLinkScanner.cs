@@ -79,7 +79,13 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
 
         private int? _column;
 
-        private string _numberBuffer;
+        // The digits of the number being read, as a value (no string is built, so a very long run of digits costs nothing): -1 when
+        // there is no number yet, and a number that does not fit an int is dropped as it always was.
+        private long _number = -1;
+
+        private bool _numberOverflow;
+
+        private bool HasNumber => _number >= 0;
 
         // An absolute name of an unknown kind that is a link only for the position after it: "/etc/passwd:3" is a link, and the
         // directory in "bash: /tmp: Is a directory" is not.
@@ -129,29 +135,43 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             };
         }
 
+        private void ResetNumber()
+        {
+            _number = -1;
+            _numberOverflow = false;
+        }
+
         private bool ParsePositionChar(char ch)
         {
             if (ch >= '0' && ch <= '9')
             {
-                _numberBuffer += ch;
+                if (!_numberOverflow)
+                {
+                    _number = Math.Max(_number, 0) * 10 + (ch - '0');
+                    _numberOverflow = _number > int.MaxValue;
+                }
                 return true;
             }
-            if (string.IsNullOrEmpty(_numberBuffer))
+            if (!HasNumber)
             {
                 return false;
             }
-            if (int.TryParse(_numberBuffer, out var parsedNumber))
+            if (!_numberOverflow)
             {
+                // Positions are counted from 1; a compiler that has no position prints 0 ("file.c:0:", "file.c:5:0"). That is the
+                // first line or column, not -1: a negative number is what marks an invalid TextPosition, and one such part would
+                // make the editor ignore the other part as well.
+                int parsedNumber = (int)Math.Max(0, _number - 1);
                 if (!_line.HasValue)
                 {
-                    _line = parsedNumber - 1;
+                    _line = parsedNumber;
                 }
                 else
                 {
-                    _column = parsedNumber - 1;
+                    _column = parsedNumber;
                 }
             }
-            _numberBuffer = null;
+            ResetNumber();
             return true;
         }
 
@@ -197,10 +217,10 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             {
                 // The name is complete and the position after it ends here (the end of the output, or the output was
                 // interrupted): the link stays. It used to be dropped, so the last link of an output had no underline.
-                if (!string.IsNullOrEmpty(_numberBuffer))
+                if (HasNumber)
                 {
                     ParsePositionChar('\0');
-                    _numberBuffer = null;
+                    ResetNumber();
                 }
                 if (_needsLine && !_line.HasValue)
                 {

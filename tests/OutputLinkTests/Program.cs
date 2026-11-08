@@ -113,6 +113,16 @@ internal static class Program
         Output lineOnly = new Output("/w", "cc", "foo.c:20: undefined reference to `bar'\n");
         Equal(lineOnly.Click(0), "/w/foo.c|19|-", "a line without a column");
 
+        // A compiler without a position prints 0: that is the first line / column, never a negative number (an invalid position).
+        Output zeroLine = new Output("/w", "cc", "foo.c:0: warning: x\n");
+        Equal(zeroLine.Click(0), "/w/foo.c|0|-", "a line 0 opens at the first line");
+        Output zeroColumn = new Output("/w", "cc", "foo.c:5:0: warning: x\n");
+        Equal(zeroColumn.Click(0), "/w/foo.c|4|0", "a column 0 does not drop the line");
+        Output zeroBoth = new Output("/w", "cc", "foo.c:0:0: warning: x\n");
+        Equal(zeroBoth.Click(0), "/w/foo.c|0|0", "line 0 and column 0");
+        Output huge = new Output("/w", "cc", "foo.c:" + new string('9', 5000) + ": x\n");
+        Equal(huge.Click(0), "/w/foo.c|-|-", "a number that is far too large is ignored, quickly");
+
         Output included = new Output("/w", "make", "In file included from main.c:3,\n", "                 from app.c:9:\n");
         Equal(included.Click(0), "/w/main.c|2|-", "'In file included from main.c:3,'");
         Equal(included.Click(1), "/w/app.c|8|-", "the 'from app.c:9:' continuation line");
@@ -320,6 +330,10 @@ internal static class Program
         Equal(BuildDirectories.FromCommand("cmake --build build", "/w"), "/w/build", "cmake --build build");
         Equal(BuildDirectories.FromCommand("cmake --build . --parallel", "/w"), "/w", "cmake --build . stays where it is");
         Equal(BuildDirectories.FromCommand("cd src && make", "/w"), "/w/src", "cd src && make");
+        Equal(BuildDirectories.FromCommand("cd -P src && make", "/w"), "/w/src", "cd -P src: the option is not the directory");
+        Equal(BuildDirectories.FromCommand("cd -L -- src && make", "/w"), "/w/src", "cd -L -- src");
+        Equal(BuildDirectories.FromCommand("make -C a -C b", "/w"), "/w/a/b", "several -C add up");
+        Equal(BuildDirectories.FromCommand("make -C a -C /abs", "/w"), "/abs", "an absolute -C replaces the earlier ones");
         Equal(BuildDirectories.FromCommand("cd /opt/app; make", "/w"), "/opt/app", "cd /opt/app; make");
         Equal(BuildDirectories.FromCommand("cd a && cd b && make", "/w"), "/w/a/b", "two cd in a row");
         Equal(BuildDirectories.FromCommand("sudo make -C sub install", "/w"), "/w/sub", "sudo in front");

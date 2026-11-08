@@ -108,6 +108,18 @@ internal class SyncPlan
 
         private RemoteFileSet _remoteFileSet;
 
+        // A second name that differs from an earlier one only in case ("Foo" and "foo" on the server) cannot be created next to it on
+        // Windows: it is left out, and said so instead of silently.
+        private bool IsDuplicateName(NameDeduplicator nameDeduplicator, LocalPath localPath, string name)
+        {
+            if (nameDeduplicator.TryAdd(name))
+            {
+                return false;
+            }
+            base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.SkippingUnsupportedPath, localPath.Combine(name).FullPath, 0), null);
+            return true;
+        }
+
         public DownloadPlanner(SyncSettings syncSettings, RemoteFileSet remoteFileSet)
         {
             _settings = syncSettings;
@@ -134,7 +146,7 @@ internal class SyncPlan
                 }
                 else
                 {
-                    if (!IsIncluded(fileEntry.Name, _settings.FileFilters) || !nameDeduplicator.TryAdd(fileEntry.Name))
+                    if (!IsIncluded(fileEntry.Name, _settings.FileFilters) || IsDuplicateName(nameDeduplicator, localPath, fileEntry.Name))
                     {
                         continue;
                     }
@@ -177,7 +189,7 @@ internal class SyncPlan
                 }
                 else
                 {
-                    if ((dirEntry.FullPath != null && !IsIncluded(dirEntry.FullPath.Replace('\\', '/'), _settings.DirectoryFilters)) || !nameDeduplicator.TryAdd(dirEntry.Name))
+                    if ((dirEntry.FullPath != null && !IsIncluded(dirEntry.FullPath.Replace('\\', '/'), _settings.DirectoryFilters)) || IsDuplicateName(nameDeduplicator, localPath, dirEntry.Name))
                     {
                         continue;
                     }
@@ -208,7 +220,7 @@ internal class SyncPlan
                 }
                 else
                 {
-                    if (!nameDeduplicator.TryAdd(symlinkEntry.Name))
+                    if (IsDuplicateName(nameDeduplicator, localPath, symlinkEntry.Name))
                     {
                         continue;
                     }
@@ -232,7 +244,7 @@ internal class SyncPlan
                             try
                             {
                                 KeyValuePair<string, bool> linkInfo = ReparsePoints.ReadReparsePoint(localPath.Combine(symlinkEntry.Name).FullPath);
-                                if (linkInfo.Key == symlinkEntry.Target && linkInfo.Value)
+                                if ((linkInfo.Key == symlinkEntry.Target || linkInfo.Key == symlinkEntry.Target.Replace('/', '\\')) && linkInfo.Value)
                                 {
                                     continue;
                                 }
@@ -247,6 +259,11 @@ internal class SyncPlan
             }
             if ((_settings.Options & SyncOptions.DeleteExtraneous) == 0)
             {
+                return;
+            }
+            if (remoteDirectory.ListingIncomplete)
+            {
+                // The list of this folder is not the whole content (it could not be read): what is not in it may still be there.
                 return;
             }
             foreach (KeyValuePair<string, LocalFileSystem.FindData> item in localEntries)
@@ -355,6 +372,9 @@ internal class SyncPlan
             public LocalEntry[] Entries;
 
             public bool IsIncluded;
+
+            /// <summary>The folder could not be read: the entries are not all of them, and the remote entries without a local one are not extraneous.</summary>
+            public bool ReadFailed;
         }
 
         private enum RemoteEntryKind
@@ -406,6 +426,7 @@ internal class SyncPlan
             _visited[localPath.FullPath] = new VisitedDirectory(relativeRemotePath, isIncluded);
             List<LocalEntry> entryList = new List<LocalEntry>();
             LocalFileSystem.FindData[] findDataArray;
+            bool readFailed = false;
             try
             {
                 findDataArray = LocalFileSystem.EnumerateDirectory(localPath, ignoreMissing: true).ToArray();
@@ -414,6 +435,7 @@ internal class SyncPlan
             {
                 base.ReportWarning(new QuickSyncWarning(QuickSyncWarningType.UnreadableLocalDirectory, localPath.FullPath, 0), exception);
                 findDataArray = new LocalFileSystem.FindData[0];
+                readFailed = true;
             }
             foreach (LocalFileSystem.FindData findData in findDataArray)
             {
@@ -447,7 +469,8 @@ internal class SyncPlan
             return new LocalDirectoryListing
             {
                 Entries = entryList.ToArray(),
-                IsIncluded = isIncluded
+                IsIncluded = isIncluded,
+                ReadFailed = readFailed
             };
         }
 
@@ -621,8 +644,9 @@ internal class SyncPlan
                     }
                 }
             }
-            if ((_settings.Options & SyncOptions.DeleteExtraneous) != SyncOptions.DeleteExtraneous || !localDirectoryListing.IsIncluded)
+            if ((_settings.Options & SyncOptions.DeleteExtraneous) != SyncOptions.DeleteExtraneous || !localDirectoryListing.IsIncluded || localDirectoryListing.ReadFailed)
             {
+                // A local folder that could not be read looks empty: the remote content of the folder is not extraneous (the warning is out).
                 return;
             }
             foreach (KeyValuePair<string, RemoteEntryRef> item in remoteEntries)

@@ -246,6 +246,28 @@ internal static class MoreClientsTests
 
         Check(LocalPackageFiles.BuildInstallLine(apt, one, quiet, isRoot: true) == "apt-get install -y '/tmp/htop_3.3.0_amd64.deb'; rm -f -- '/tmp/htop_3.3.0_amd64.deb'", "install line: root runs the command as it is, the file is removed after it");
         Check(LocalPackageFiles.BuildInstallLine(apt, two, asking, isRoot: false) == "sudo su -c \"apt-get install '/tmp/a.rpm' '/tmp/b.rpm'\"; rm -f -- '/tmp/a.rpm' '/tmp/b.rpm'", "install line: a user goes through sudo, rm is outside of it");
+        // Names from the output of the host go into a command that runs as root: only the usual package name characters pass.
+        foreach (string good in new[] { "htop", "libstdc++6", "lib32-glibc", "gcc:amd64", "kernel@5.10", "app=1.0-r1", "dev-lang/python", "pkg_1.2~rc1+git", "7zip" })
+        {
+            Check(PackageNames.IsSafe(good), "package name: " + good + " is fine");
+        }
+        foreach (string bad in new[] { "", null, "a b", "a\"b", "a$(id)", "a`id`", "a;b", "a|b", "a&b", "a>b", "-y", "--force", "a'b", "a\nb", "a\\b", "a*b", "a!b" })
+        {
+            Check(!PackageNames.IsSafe(bad), "package name: '" + (bad ?? "null").Replace("\n", "\\n") + "' is refused");
+        }
+        LinuxPackageInfo[] mixed = { Package("htop", LinuxPackageInfo.PackageState.Available), Package("evil$(reboot)", LinuxPackageInfo.PackageState.Available) };
+        LinuxPackageInfo[] safeOnes = PackageNames.Safe(mixed, out string[] refusedNames);
+        Check(safeOnes.Length == 1 && safeOnes[0].ID == "htop" && refusedNames.Length == 1 && refusedNames[0] == "evil$(reboot)", "package name: the unsafe one is left out and named");
+        Check(PackageNames.Safe(new[] { mixed[0] }, out string[] none).Length == 1 && none == null, "package name: nothing is refused when all are fine");
+
+        // Files in a directory of their own (mktemp -d): the directory goes after them.
+        string[] inOwnDirectory = { "/tmp/smartty-pkg.a1B2c3/htop.deb", "/tmp/smartty-pkg.a1B2c3/nano.deb" };
+        Check(LocalPackageFiles.UploadDirectoryOf(inOwnDirectory) == "/tmp/smartty-pkg.a1B2c3" && LocalPackageFiles.UploadDirectoryOf(one) == null, "upload directory: found from the paths, none for files in /tmp itself");
+        Check(LocalPackageFiles.BuildRemoveCommand(inOwnDirectory) == "rm -f -- '/tmp/smartty-pkg.a1B2c3/htop.deb' '/tmp/smartty-pkg.a1B2c3/nano.deb'; rmdir -- '/tmp/smartty-pkg.a1B2c3'", "upload directory: the files are removed, then the directory");
+        Check(LocalPackageFiles.BuildRemoveCommand(one) == "rm -f -- '/tmp/htop_3.3.0_amd64.deb'", "upload directory: nothing else is removed for files in /tmp");
+        Check(LocalPackageFiles.UploadDirectoryOf(new[] { "/tmp/smartty-pkg.x/../../etc/passwd" }) == null && LocalPackageFiles.UploadDirectoryOf(new[] { "/tmp/smartty-pkg.x/y/z.deb" }) == null, "upload directory: a path that goes anywhere else is not taken for one");
+        Check(LocalPackageFiles.ParseUploadDirectory(new[] { "", "/tmp/smartty-pkg.Zx9Q1w" }) == "/tmp/smartty-pkg.Zx9Q1w" && LocalPackageFiles.ParseUploadDirectory(new[] { "mktemp: not found" }) == null && LocalPackageFiles.ParseUploadDirectory(new[] { "/tmp/smartty-pkg.a b" }) == null, "upload directory: read from the output of mktemp");
+        Check(LocalPackageFiles.BuildInstallLine(apt, inOwnDirectory, quiet, isRoot: true).EndsWith("; rmdir -- '/tmp/smartty-pkg.a1B2c3'"), "install line: the directory of the upload is removed after the files");
         Check(LocalPackageFiles.BuildInstallLine(apt, new string[0], asking, isRoot: true) == null && LocalPackageFiles.BuildInstallLine(null, one, asking, isRoot: true) == null, "install line: nothing to install -> null");
         LocalPackageInstallRequest request = new LocalPackageInstallRequest(new[] { @"C:\pkgs\a.deb" }, apt, quiet, true);
         Check(request.LocalFiles.Length == 1 && request.Installer == apt && request.Options.NoPrompt && request.IsRoot, "request: keeps what the window chose");

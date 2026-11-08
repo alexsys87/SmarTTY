@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using SmarTTY.Ssh;
 using SmarTTY.Transport;
 using SmarTTY.Utilities;
@@ -43,6 +44,11 @@ internal static class Program
             CheckIpv6Hosts();
             CheckProxyParsing();
             CheckPortForwardsInProfile();
+            CheckRawProfilesAreNotDuplicated();
+            CheckSameUserAndHostAsksFirst();
+            CheckRenamedProfileReplacesTheOldOne();
+            CheckProfileFilesAreWrittenSafely();
+            CheckUnreadableProfileIsKept();
             Console.WriteLine($"All {_passed} checks passed.");
             return 0;
         }
@@ -259,12 +265,128 @@ internal static class Program
         Equal(store.Store.FindSshConnectionForArgument("root@2001:db8::7")?.HostName, "[2001:db8::7]:2222", "ipv6: the argument fallback finds it");
     }
 
+    private static VisualTTY.DeviceTerminal.RawConnectionSettings NewTcp(string host, int port)
+    {
+        return new VisualTTY.DeviceTerminal.RawConnectionSettings
+        {
+            Settings = new VisualTTY.DeviceTerminal.DeviceTerminalSettings { Connection = new VisualTTY.DeviceTerminal.DeviceTerminalSettings.ConnectionSettings.Tcp { Host = host, Port = port } }
+        };
+    }
+
+    // Telnet, TCP and Netconsole profiles were added to the list again at every reload, which the first SSH login of the session
+    // triggers (it touches the timestamp file), and a deleted profile came back from the second copy.
+    private static void CheckRawProfilesAreNotDuplicated()
+    {
+        using TempStore store = new TempStore();
+        store.Store.SaveRawConnection(NewTcp("10.1.1.1", 23));
+        store.Store.SaveRawConnection(NewTcp("10.1.1.2", 23));
+        Equal(store.Store.RawConnections.Count(), 2, "raw: two saved profiles are listed");
+        store.Add("root", "10.1.1.3", alias: null); // touches the timestamp: the next access reloads
+        System.Threading.Thread.Sleep(50);
+        SavedConnectionStore.TouchTimestamp(store.FolderPath);
+        Equal(store.Store.RawConnections.Count(), 2, "raw: a reload does not list the profiles twice");
+        Equal(store.Store.RawConnections.Count(), 2, "raw: ...and neither does the next one");
+        VisualTTY.DeviceTerminal.RawConnectionSettings first = store.Store.RawConnections.First();
+        store.Store.DeleteRawConnection(first);
+        Equal(store.Store.RawConnections.Count(), 1, "raw: a deleted profile is gone");
+        Check(!File.Exists(first.FileName), "raw: ...with its file");
+    }
+
+    // Profiles are stored as user@host: a second connection to the same user and host replaces the first, with its alias and password.
+    // The window asks first, and FindOverwrittenBy is what it asks.
+    private static void CheckSameUserAndHostAsksFirst()
+    {
+        using TempStore store = new TempStore();
+        store.Add("root", "192.168.1.1", alias: "router A");
+        SSHConnectionSettings other = new SSHConnectionSettings { UserName = "root", HostName = "192.168.1.1", ConnectionAlias = "router B" };
+        Equal(store.Store.FindOverwrittenBy(other)?.ConnectionAlias, "router A", "replace: a new connection with the same user and host would overwrite the saved one");
+        SSHConnectionSettings different = new SSHConnectionSettings { UserName = "root", HostName = "192.168.1.2" };
+        Equal(store.Store.FindOverwrittenBy(different), null, "replace: another host overwrites nothing");
+        SSHConnectionSettings saved = store.Store.FindSshConnection("192.168.1.1", "root");
+        SSHConnectionSettings edited = saved.CloneSlow();
+        edited.ConnectionAlias = "router A (edited)";
+        Equal(store.Store.FindOverwrittenBy(edited, saved), null, "replace: the connection that is being edited may replace itself");
+        Equal(store.Store.FindOverwrittenBy(edited)?.ConnectionAlias, "router A", "replace: ...but a new connection may not");
+    }
+
+    // The editor works on a copy; fixing a typo in the host used to leave the old profile (and its password) in the list.
+    private static void CheckRenamedProfileReplacesTheOldOne()
+    {
+        using TempStore store = new TempStore();
+        store.Add("root", "10.2.2.20", alias: "lab");
+        SSHConnectionSettings saved = store.Store.FindSshConnection("10.2.2.20", "root");
+        string oldFile = saved.FileName;
+        SSHConnectionSettings edited = saved.CloneSlow();
+        edited.HostName = "10.2.2.21";
+        store.Store.SaveSshConnection(edited, replaces: saved);
+        Equal(store.Store.SshConnections.Count(), 1, "rename: one profile is left after the host was changed");
+        Check(!File.Exists(oldFile), "rename: the file of the old profile is gone");
+        Equal(store.Store.FindSshConnection("10.2.2.21", "root")?.ConnectionAlias, "lab", "rename: the new profile has the alias");
+        SSHConnectionSettings again = store.Store.FindSshConnection("10.2.2.21", "root");
+        SSHConnectionSettings sameName = again.CloneSlow();
+        sameName.ConnectionAlias = "lab 2";
+        store.Store.SaveSshConnection(sameName, replaces: again);
+        Equal(store.Store.SshConnections.Count(), 1, "rename: editing only the alias keeps one profile");
+        Check(File.Exists(store.Store.FindSshConnection("10.2.2.21", "root").FileName), "rename: ...and its file");
+    }
+
+    // A save writes a temporary file first and keeps the previous version as .bak; nothing is left over.
+    private static void CheckProfileFilesAreWrittenSafely()
+    {
+        using TempStore store = new TempStore();
+        store.Add("root", "10.3.3.3", alias: "first");
+        SSHConnectionSettings saved = store.Store.FindSshConnection("10.3.3.3", "root");
+        saved.ConnectionAlias = "second";
+        saved.Save();
+        Check(File.Exists(saved.FileName + ".bak") && File.ReadAllText(saved.FileName + ".bak").Contains("first"), "safe write: the previous version is kept as .bak");
+        Check(File.ReadAllText(saved.FileName).Contains("second"), "safe write: the new version is in place");
+        Equal(Directory.GetFiles(store.FolderPath, "*.tmp").Length, 0, "safe write: no temporary file is left");
+        Equal(Directory.GetFiles(store.FolderPath, "*.sshconnection").Length, 1, "safe write: the .bak is not taken for a profile");
+        // A write that fails in the middle leaves the old file as it was.
+        string path = Path.Combine(store.FolderPath, "keep.txt");
+        File.WriteAllText(path, "whole");
+        try
+        {
+            XmlStorage.WriteAtomically(path, stream =>
+            {
+                stream.WriteByte((byte)'x');
+                throw new InvalidOperationException("serializer failed");
+            });
+            Check(false, "safe write: the failure is reported");
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        Equal(File.ReadAllText(path), "whole", "safe write: a failure in the middle leaves the old file untouched");
+        Equal(Directory.GetFiles(store.FolderPath, "*.tmp").Length, 0, "safe write: ...and no temporary file");
+    }
+
+    // A profile that cannot be read used to vanish from the list without a word, and the next save of the same user@host overwrote it.
+    private static void CheckUnreadableProfileIsKept()
+    {
+        using TempStore store = new TempStore();
+        store.Add("root", "10.4.4.4", alias: null);
+        string broken = Path.Combine(store.FolderPath, "admin@10.4.4.5.sshconnection");
+        File.WriteAllText(broken, "<SSHConnectionSettings><HostName>10.4.4.5");
+        string reported = null;
+        XmlStorage.ProblemNotice = message => reported = message;
+        SavedConnectionStore.TouchTimestamp(store.FolderPath);
+        System.Threading.Thread.Sleep(50);
+        SavedConnectionStore.TouchTimestamp(store.FolderPath);
+        Equal(store.Store.SshConnections.Count(), 1, "unreadable: the good profile is listed");
+        Check(reported != null && reported.Contains("admin@10.4.4.5.sshconnection"), "unreadable: the user is told which file");
+        Check(!File.Exists(broken) && File.Exists(broken + ".bad"), "unreadable: the file is kept as .bad");
+        XmlStorage.ProblemNotice = null;
+    }
+
     /// <summary>A saved-connection store backed by a directory of its own, thrown away with the instance.</summary>
     private sealed class TempStore : IDisposable
     {
         private readonly string _directory;
 
         public SavedConnectionStore Store { get; }
+
+        public string FolderPath => _directory;
 
         public TempStore()
         {

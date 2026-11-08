@@ -7,7 +7,8 @@ public static class WildcardParser
 {
     public static Regex WildcardToRegex(string pattern, bool ignoreCase = false, bool filenameOnly = false)
     {
-        string escapedChars = "\\/[]().{}-+";
+        // $ ^ and | are regular expression syntax too: "~$*" (Office temporary files) was "^(~$.*)$", where the $ in the middle is an anchor.
+        string escapedChars = "\\/[]().{}-+$^|";
         for (int i = 0; i < escapedChars.Length; i++)
         {
             pattern = pattern.Replace(escapedChars.Substring(i, 1), "\\" + escapedChars.Substring(i, 1));

@@ -216,6 +216,26 @@ internal static class Program
         string command = DevMem.BuildReadCommand(DevMemTool.DevMem2, new ulong[] { 0x43C00000 }, 16, useSudo: true);
         Check(command.StartsWith("sudo -n /bin/sh -c ") && command.Contains("devmem2 0x43C00000 h"), "read command: devmem2, 16 bits, sudo");
         Check(DevMem.BuildWriteCommand(DevMemTool.BusyBoxDevMem, 0x43C00000, 8, 0x5A, false).Contains("busybox devmem 0x43C00000 8 0x5A"), "write command: busybox devmem with the hex value");
+
+        // A list of registers read in one command was about 24 KB long, more than Dropbear takes (9000 bytes, dropped without an error).
+        foreach (bool sudo in new[] { false, true })
+        {
+            List<ulong> many = Enumerable.Range(0, 256).Select(i => 0x43C00000UL + (ulong)i * 4).ToList();
+            List<int> sizes = DevMem.SplitReads(DevMemTool.BusyBoxDevMem, many, 32, sudo);
+            Check(sizes.Count > 1 && sizes.Sum() == 256, "split: 256 registers need several commands (" + string.Join("+", sizes) + ")");
+            int start = 0;
+            bool allShort = true;
+            foreach (int size in sizes)
+            {
+                string part = DevMem.BuildReadCommand(DevMemTool.BusyBoxDevMem, many.Skip(start).Take(size), 32, sudo);
+                allShort &= part.Length <= DevMem.MaxCommandLength;
+                start += size;
+            }
+            Check(allShort, "split: every command is within " + DevMem.MaxCommandLength + " characters" + (sudo ? " (sudo)" : ""));
+        }
+        Check(DevMem.SplitReads(DevMemTool.DevMem, new ulong[] { 0x1000, 0x1004, 0x1008 }, 32, false).SequenceEqual(new[] { 3 }), "split: a short list stays one command");
+        Check(DevMem.SplitReads(DevMemTool.DevMem, new ulong[0], 32, false).Count == 0, "split: no address, no command");
+        Check(DevMem.SplitReads(DevMemTool.DevMem, Enumerable.Range(0, 10).Select(i => (ulong)i * 4).ToList(), 32, false, maxAddresses: 4).SequenceEqual(new[] { 4, 4, 2 }), "split: the number of addresses per command is limited, too");
         bool threw = false;
         try
         {

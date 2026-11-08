@@ -32,6 +32,7 @@ internal static class Program
         {
             CheckDirection();
             CheckOptions();
+            CheckStatParsing();
             CheckExclusionMasks();
             CheckRegexExclusions();
             CheckSelection();
@@ -89,6 +90,37 @@ internal static class Program
         return false;
     }
 
+    // The listing of the server: "stat -c" prints the name quoted for a shell, and a name may hold quotes and bars.
+    private static void CheckStatParsing()
+    {
+        Console.WriteLine("== Output of stat");
+        StatCommandBuilder builder = new StatCommandBuilder(StatCommandBuilder.StatFlavor.GnuLs);
+        StatCommandBuilder.StatEntry plain = builder.ParseEntry("StatEntryL:|'report.txt'|1700000000|2049|1234|81a4");
+        Equal("report.txt", plain.Name, "stat: a plain name");
+        Check(plain.Kind == StatCommandBuilder.StatEntryKind.File && plain.Size == 1234 && plain.ModifiedTime == 1700000000 && plain.DeviceId == 2049, "stat: the numbers of a file");
+        StatCommandBuilder.StatEntry dot = builder.ParseEntry("StatEntryL:|'./sub dir'|1700000000|2049|4096|41ed");
+        Equal("sub dir", dot.Name, "stat: a name with a blank and a leading ./");
+        Check(dot.Kind == StatCommandBuilder.StatEntryKind.Directory, "stat: a directory");
+        StatCommandBuilder.StatEntry apostrophe = builder.ParseEntry("StatEntryL:|'./it'\\''s a file.txt'|1700000000|2049|5|81a4");
+        Equal("it's a file.txt", apostrophe.Name, "stat: a name with an apostrophe is not cut");
+        StatCommandBuilder.StatEntry bar = builder.ParseEntry("StatEntryL:|'./a|b.txt'|1700000000|2049|5|81a4");
+        Equal("a|b.txt", bar.Name, "stat: a name with a | is kept (it used to vanish from the listing)");
+        StatCommandBuilder.StatEntry barAndApostrophe = builder.ParseEntry("StatEntryL:|'./x|it'\\''s'|1700000000|2049|5|81a4");
+        Equal("x|it's", barAndApostrophe.Name, "stat: a name with a | and an apostrophe");
+        StatCommandBuilder.StatEntry link = builder.ParseEntry("StatEntryL:|'./latest' -> 'releases/2024 q1'|1700000000|2049|18|a1ff");
+        Check(link.Kind == StatCommandBuilder.StatEntryKind.Symlink && link.Name == "latest" && link.LinkTarget == "releases/2024 q1", "stat: a symbolic link and its target");
+        StatCommandBuilder.StatEntry linkApostrophe = builder.ParseEntry("StatEntryL:|'./it'\\''s' -> '../o'\\''k'|1700000000|2049|18|a1ff");
+        Check(linkApostrophe.Name == "it's" && linkApostrophe.LinkTarget == "../o'k", "stat: apostrophes in the name and in the target of a link");
+        StatCommandBuilder.StatEntry newline = builder.ParseEntry("StatEntryL:|'./a'$'\\n''b'|1700000000|2049|5|81a4");
+        Equal("a\nb", newline.Name, "stat: a name with a line break in the $'...' form");
+        // Lines that are no entries must not stop the run.
+        Equal<string>(null, builder.ParseEntry("sh: 1: cd: can't cd to /x/y").Name, "stat: a message of the shell is no entry");
+        Equal<string>(null, builder.ParseEntry("a long line without any bars, as a shell may print it").Name, "stat: a long line without bars is no entry (it used to throw)");
+        Equal<string>(null, builder.ParseEntry("StatEntryL:|x|y").Name, "stat: a short entry is no entry");
+        // BusyBox does not escape: the old way of cutting the quotes is the fallback.
+        Equal("plain", new StatCommandBuilder(StatCommandBuilder.StatFlavor.GnuLs).ParseEntry("StatEntryL:|'./plain'|1|2|3|81a4").Name, "stat: busybox form of a plain name");
+    }
+
     private static void CheckExclusionMasks()
     {
         Console.WriteLine("== Exclusion masks");
@@ -105,6 +137,14 @@ internal static class Program
         // The last mask "build" has no wildcard, so it matches the name "build" alone; the "build" directory is
         // matched by the same masks through DirectoryFilters.
         Check(!IsIncluded("build", excluded.DirectoryFilters), "a plain name mask excludes that directory");
+
+        // $ ^ and | in a mask are characters of a name, not regular expression syntax.
+        SyncSettings special = SyncRequest.Create(false, "C:/local", "/remote", "~$*;$RECYCLE.BIN;a^b;c|d", false, false, false, QuickSyncOverwriteTrigger.Stat);
+        Check(!IsIncluded("~$report.docx", special.FileFilters), "a ~$* mask excludes the temporary file of Office");
+        Check(IsIncluded("~report.docx", special.FileFilters), "...and not a file without the $");
+        Check(!IsIncluded("$RECYCLE.BIN", special.DirectoryFilters), "a mask with a leading $ matches that name");
+        Check(!IsIncluded("a^b", special.FileFilters) && IsIncluded("a", special.FileFilters) && IsIncluded("b", special.FileFilters), "^ is a character of the name");
+        Check(!IsIncluded("c|d", special.FileFilters) && IsIncluded("c", special.FileFilters) && IsIncluded("d", special.FileFilters), "| is no alternative");
 
         SyncSettings caseInsensitive = SyncRequest.Create(false, "C:/local", "/remote", "*.LOG", false, false, false, QuickSyncOverwriteTrigger.Stat);
         Check(!IsIncluded("app.log", caseInsensitive.FileFilters), "masks match case-insensitively");

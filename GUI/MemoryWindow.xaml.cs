@@ -573,9 +573,18 @@ public partial class MemoryWindow : Window
                 foreach (IGrouping<int, MemoryRow> group in rows.GroupBy(r => r.Width))
                 {
                     List<MemoryRow> list = group.ToList();
-                    for (int start = 0; start < list.Count && failure == null && !_Closed; start += Batch)
+                    // A command is cut to what the server takes (Dropbear drops a command of more than 9000 bytes without a word), so a
+                    // long list is read in several commands, not in one that never answers.
+                    List<int> sizes = DevMem.SplitReads(_Tool, list.Select(r => r.Address).ToList(), group.Key, useSudo, Batch);
+                    int start = 0;
+                    foreach (int size in sizes)
                     {
-                        List<MemoryRow> part = list.Skip(start).Take(Batch).ToList();
+                        if (failure != null || _Closed)
+                        {
+                            break;
+                        }
+                        List<MemoryRow> part = list.Skip(start).Take(size).ToList();
+                        start += size;
                         List<string> lines = session.RunCommand(DevMem.BuildReadCommand(_Tool, part.Select(r => r.Address), group.Key, useSudo), out _, timeout: TimeSpan.FromSeconds(30 + part.Count / 10));
                         if (lines == null)
                         {

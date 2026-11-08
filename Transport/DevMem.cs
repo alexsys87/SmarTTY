@@ -154,16 +154,58 @@ public static class DevMem
         StringBuilder script = new StringBuilder();
         foreach (ulong address in addresses)
         {
-            string text = AddressText(address);
-            script.Append("echo '").Append(BeginMarker).Append(text).Append("'; ")
-                .Append(program).Append(' ').Append(text).Append(' ').Append(widthArgument).Append(" 2>&1; ")
-                .Append("echo \"").Append(EndMarker).Append(" $?\"; ");
+            script.Append(ReadFragment(program, widthArgument, address));
         }
         if (script.Length == 0)
         {
             throw new ArgumentException("No address to read.", nameof(addresses));
         }
         return Wrap(script.ToString(), useSudo);
+    }
+
+    private static string ReadFragment(string program, string widthArgument, ulong address)
+    {
+        string text = AddressText(address);
+        return "echo '" + BeginMarker + text + "'; " + program + " " + text + " " + widthArgument + " 2>&1; echo \"" + EndMarker + " $?\"; ";
+    }
+
+    /// <summary>
+    /// The longest command line that is sent to the server in one piece. Dropbear (the SSH server of OpenWrt) silently refuses a command
+    /// longer than its MAX_CMD_LEN, 9000 bytes: the request is dropped without an error, and the caller only sees that nothing came back.
+    /// </summary>
+    public const int MaxCommandLength = 8000;
+
+    /// <summary>
+    /// How many of the addresses, taken in order, go into each command of <see cref="BuildReadCommand"/> so that no command is longer than
+    /// <paramref name="maxLength"/> (the command line as it is sent, with its wrapper) and none reads more than <paramref name="maxAddresses"/>.
+    /// The sizes add up to the number of addresses.
+    /// </summary>
+    public static List<int> SplitReads(DevMemTool tool, IList<ulong> addresses, int width, bool useSudo, int maxAddresses = 256, int maxLength = MaxCommandLength)
+    {
+        string program = ToolName(tool) ?? throw new InvalidOperationException("The server has neither devmem nor devmem2.");
+        string widthArgument = WidthArgument(tool, width);
+        int overhead = Wrap("x", useSudo).Length - 1; // the wrapper around a script of one character
+        List<int> sizes = new List<int>();
+        int count = 0;
+        int length = overhead;
+        foreach (ulong address in addresses)
+        {
+            // The wrapper may quote the script (a quote becomes several characters): the size is measured, not counted.
+            int piece = Wrap(ReadFragment(program, widthArgument, address), useSudo).Length - overhead;
+            if (count > 0 && (count >= maxAddresses || length + piece > maxLength))
+            {
+                sizes.Add(count);
+                count = 0;
+                length = overhead;
+            }
+            count++;
+            length += piece;
+        }
+        if (count > 0)
+        {
+            sizes.Add(count);
+        }
+        return sizes;
     }
 
     /// <summary>

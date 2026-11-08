@@ -128,7 +128,8 @@ public static class PasteSanitizer
 
     private static bool IsInvisibleFormatting(char ch)
     {
-        return (ch >= '​' && ch <= '‏') || (ch >= '‪' && ch <= '‮') ||
+        // U+200C (ZWNJ) and U+200D (ZWJ) are not here: Persian, Hindi and the emoji sequences need them, and they hide nothing.
+        return ch == '\u200b' || (ch >= '\u200e' && ch <= '\u200f') || (ch >= '‪' && ch <= '‮') ||
             (ch >= '⁠' && ch <= '⁤') || (ch >= '⁦' && ch <= '⁩') || ch == '﻿';
     }
 
@@ -310,6 +311,44 @@ public static class PasteSanitizer
     }
 
     /// <summary>
+    /// The lines of the text, and then the lines as the shell reads them: a line that ends with a backslash goes on in the next one (both
+    /// are removed), and so does a line that ends with | or &amp;&amp; or ||. The text has LF line breaks.
+    /// </summary>
+    internal static List<string> LogicalLines(string text)
+    {
+        string[] lines = text.Split('\n');
+        List<string> result = new List<string>(lines);
+        StringBuilder joined = null;
+        foreach (string line in lines)
+        {
+            string current = joined == null ? line : joined.ToString() + " " + line.TrimStart();
+            string trimmed = current.TrimEnd();
+            int backslashes = 0;
+            for (int i = trimmed.Length - 1; i >= 0 && trimmed[i] == '\\'; i--)
+            {
+                backslashes++;
+            }
+            bool backslashContinued = backslashes % 2 == 1 && current.Length == trimmed.Length;
+            bool operatorContinued = trimmed.EndsWith("|", StringComparison.Ordinal) || trimmed.EndsWith("&&", StringComparison.Ordinal);
+            if (backslashContinued || operatorContinued)
+            {
+                joined = new StringBuilder(backslashContinued ? trimmed.Substring(0, trimmed.Length - 1) : trimmed);
+                continue;
+            }
+            if (joined != null)
+            {
+                result.Add(current);
+                joined = null;
+            }
+        }
+        if (joined != null)
+        {
+            result.Add(joined.ToString());
+        }
+        return result;
+    }
+
+    /// <summary>
     /// What is dangerous in text that would run at once (a description of each kind of danger, once): sudo, a script
     /// downloaded and piped into a shell, rm -rf, writes to disks, shutdown, firmware writes and control characters.
     /// </summary>
@@ -324,9 +363,12 @@ public static class PasteSanitizer
         {
             found.Add(ControlCharactersWarning);
         }
+        // The patterns look at one command line each: a command that is wrapped ("curl ... \\", then "| sh") is checked as the one line the
+        // shell makes of it, besides the lines as they are.
+        List<string> candidates = LogicalLines(text);
         foreach (DangerPattern pattern in DangerPatterns)
         {
-            foreach (string line in text.Split('\n'))
+            foreach (string line in candidates)
             {
                 bool matched;
                 try

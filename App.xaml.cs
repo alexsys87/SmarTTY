@@ -61,6 +61,9 @@ public partial class App : Application
         SshConnector.KeyboardInteractivePrompt = (settings, name, instruction, prompts) =>
             KeyboardInteractiveWindow.Prompt(WindowOwnership.ActiveWindow(), settings, name, instruction, prompts);
         SshConnector.KnownHostsProblemNotice = message => MessageBoxes.Warning(message);
+        // A settings or profile file that could not be read or saved (see XmlStorage); one that was met before this point is shown now.
+        // Saves can come from any thread.
+        SmarTTY.Utilities.XmlStorage.ProblemNotice = message => Dispatcher.BeginInvoke((Action)(() => MessageBoxes.Warning(message)));
         // The device terminal (COM/TCP/telnet) raises its dialogs from harness-compiled code as well.
         DeviceTerminalControl.LogReplayPrompt = (bytes, terminal) => LogReplayWindow.Replay(bytes, terminal);
         DeviceTerminalControl.SerialSettingsPrompt = (settings, portName) =>

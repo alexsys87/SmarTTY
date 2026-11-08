@@ -426,9 +426,33 @@ public class NewConnectionController : INotifyPropertyChanged
     /// <summary>True when the window was closed by "Save without connecting": there is no session, only <see cref="FinalSettings"/> to save.</summary>
     public bool SavedWithoutConnecting { get; private set; }
 
+    /// <summary>The path of a key file as typed or pasted: without the spaces around it and the quotes that "Copy as path" adds.</summary>
+    internal static string CleanKeyFilePath(string path)
+    {
+        string cleaned = path?.Trim();
+        if (cleaned != null && cleaned.Length >= 2 && cleaned[0] == '"' && cleaned[cleaned.Length - 1] == '"')
+        {
+            cleaned = cleaned.Substring(1, cleaned.Length - 2).Trim();
+        }
+        return cleaned;
+    }
+
     /// <summary>Checks the entered host, user name and key file; the same checks for connecting and for saving.</summary>
     private void ValidateOrThrow()
     {
+        // An address pasted from a chat or a terminal often carries a space or a line break at its end; it would fail the name lookup,
+        // not match "localhost", and be saved (and remembered as a host key) under a name with the space in it.
+        _Settings.HostName = _Settings.HostName?.Trim();
+        _Settings.UserName = _Settings.UserName?.Trim();
+        if (HasCustomSSHKeyFile)
+        {
+            // "Copy as path" of the Explorer puts the path in quotes.
+            string keyFile = CleanKeyFilePath(CustomSSHKeyFile);
+            if (keyFile != CustomSSHKeyFile)
+            {
+                CustomSSHKeyFile = keyFile;
+            }
+        }
         if (string.IsNullOrEmpty(_Settings.HostName))
         {
             throw new Exception("The host name cannot be empty!");
@@ -441,7 +465,8 @@ public class NewConnectionController : INotifyPropertyChanged
         {
             throw new Exception("The user name cannot be empty!");
         }
-        if (!string.IsNullOrEmpty(_Settings.ExplicitKeyFile) && !File.Exists(_Settings.ExplicitKeyFile))
+        if ((!string.IsNullOrEmpty(_Settings.ExplicitKeyFile) && !File.Exists(_Settings.ExplicitKeyFile))
+            || (HasCustomSSHKeyFile && !string.IsNullOrEmpty(CustomSSHKeyFile) && !File.Exists(CustomSSHKeyFile)))
         {
             throw new Exception("The specified OpenSSH key file does not exist!");
         }

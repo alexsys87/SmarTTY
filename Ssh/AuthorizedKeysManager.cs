@@ -131,7 +131,41 @@ internal static class AuthorizedKeysManager
         return files;
     }
 
-    public static void RemoveAuthorizedKey(SshSession sshSession, byte[] keyBlob)
+    /// <summary>
+    /// The key files (of a Unix host) that hold the key now: the one in the home directory and, for root on Dropbear, its own file. Tells
+    /// afterwards which files an installation added the key to, and so what taking it out again may touch.
+    /// </summary>
+    private static HashSet<string> FilesHoldingKey(SshSession sshSession, byte[] keyBlob)
+    {
+        HashSet<string> holding = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            string homeDir = AuthorizedKeysFile.PickHomeDirectory(sshSession.RunCommandChecked("pwd", requireSuccess: true));
+            if (homeDir != null && FileHoldsKey(sshSession, homeDir + "/.ssh/authorized_keys", keyBlob))
+            {
+                holding.Add(homeDir + "/.ssh/authorized_keys");
+            }
+            foreach (string path in GetDropbearRootKeyFiles(sshSession))
+            {
+                if (FileHoldsKey(sshSession, path, keyBlob))
+                {
+                    holding.Add(path);
+                }
+            }
+        }
+        catch (IOException) when (sshSession.IsConnectionClosed)
+        {
+            throw;
+        }
+        catch
+        {
+            sshSession.ThrowIfConnectionLost();
+        }
+        return holding;
+    }
+
+    /// <param name="keepFiles">Files (full paths) that the key stays in: where it was before it was installed.</param>
+    public static void RemoveAuthorizedKey(SshSession sshSession, byte[] keyBlob, ISet<string> keepFiles = null)
     {
         if (sshSession.RemoteOs == RemoteOsKind.Windows)
         {
@@ -144,9 +178,16 @@ internal static class AuthorizedKeysManager
         List<string> failures = new List<string>();
         foreach (string path in GetDropbearRootKeyFiles(sshSession))
         {
-            TryRemoveKeyFromFile(sshSession, path, keyBlob, failures);
+            if (keepFiles == null || !keepFiles.Contains(path))
+            {
+                TryRemoveKeyFromFile(sshSession, path, keyBlob, failures);
+            }
         }
-        if (sshSession.RunCommandChecked("test -d " + ScpChannelStream.QuotePath(homeDir + "/.ssh"), requireSuccess: true) == null)
+        if (keepFiles != null && keepFiles.Contains(homeDir + "/.ssh/authorized_keys"))
+        {
+            // The key was there before, only the other file lacked it: it stays.
+        }
+        else if (sshSession.RunCommandChecked("test -d " + ScpChannelStream.QuotePath(homeDir + "/.ssh"), requireSuccess: true) == null)
         {
             // No .ssh directory means there is no key to remove; a lost connection means the removal did not happen.
             sshSession.ThrowIfConnectionLost();
@@ -326,6 +367,9 @@ internal static class AuthorizedKeysManager
         byte[] keyBlob = AuthorizedKeysFile.ParseKeyBlob(keyString)
             ?? throw new ArgumentException("The line is not a public key", nameof(keyString));
         bool added = !IsKeyAuthorized(sshSession, keyBlob);
+        // On Dropbear the key counts as authorized only when both files hold it, so "added" can also mean that one of them had it already:
+        // taking the key out again must leave that one alone.
+        HashSet<string> keptFiles = added && sshSession.RemoteOs != RemoteOsKind.Windows ? FilesHoldingKey(sshSession, keyBlob) : null;
         if (added)
         {
             AppendAuthorizedKey(sshSession, keyString, confirmCleanup);
@@ -342,7 +386,7 @@ internal static class AuthorizedKeysManager
         {
             try
             {
-                RemoveAuthorizedKey(sshSession, keyBlob);
+                RemoveAuthorizedKey(sshSession, keyBlob, keptFiles);
                 note = Environment.NewLine + "The key was removed from the server again.";
             }
             catch (Exception exception)

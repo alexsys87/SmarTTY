@@ -1,3 +1,4 @@
+using SmarTTY.IO;
 using SmarTTY.Ssh;
 using System;
 using System.Collections.Generic;
@@ -58,11 +59,7 @@ internal static class SftpFolderPlan
     /// <summary>A file name of the host as a local file name: what Windows does not allow in one is replaced.</summary>
     public static string LocalName(string remoteName)
     {
-        foreach (char invalid in Path.GetInvalidFileNameChars())
-        {
-            remoteName = remoteName.Replace(invalid, '_');
-        }
-        return remoteName;
+        return PathUtils.ToLocalFileName(remoteName);
     }
 
     /// <summary>

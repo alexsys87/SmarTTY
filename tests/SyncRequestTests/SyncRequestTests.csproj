@@ -21,6 +21,7 @@
     <Compile Include="../../Ssh/QuickSync/WildcardParser.cs" Link="Ssh/QuickSync/WildcardParser.cs" />
     <Compile Include="../../Ssh/QuickSync/MaskSpec.cs" Link="Ssh/QuickSync/MaskSpec.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="IO/RemotePathUtils.cs" />
+    <Compile Include="../../Sync/StatCommandBuilder.cs" Link="Sync/StatCommandBuilder.cs" />
     <Compile Include="../../Utilities/DataExtensions.cs" Link="Utilities/DataExtensions.cs" />
   </ItemGroup>
 </Project>

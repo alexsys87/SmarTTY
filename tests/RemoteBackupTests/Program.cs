@@ -509,6 +509,12 @@ internal static partial class Program
         File.WriteAllBytes(partialArchive, partial);
         Check(TarArchiveChecker.CheckGzipFile(partialArchive).IsComplete, label + ": that archive is complete");
 
+        // Hundreds of checked paths: split into commands that a Dropbear server takes (it drops one of more than 9000 bytes).
+        List<string> manyPaths = Enumerable.Range(0, 600).Select(i => "/usr/share/some/long/directory/name/entry-number-" + i).ToList();
+        List<string> sizeCommands = RemoteBackup.BuildSizeCommands(manyPaths, false);
+        Check(sizeCommands.Count > 1 && sizeCommands.All(c => c.Length <= RemoteBackup.MaxCommandLength), "size commands: a long selection is divided so that every command is short enough");
+        Check(RemoteBackup.BuildSizeCommands(new[] { "/etc", "/usr" }, false).Count == 1, "size commands: a short selection stays one command");
+        Check(sizeCommands.Sum(c => c.Split(new[] { "entry-number-" }, StringSplitOptions.None).Length - 1) == 600, "size commands: every path is in exactly one command");
         string size = PointAt(RemoteBackup.BuildSizeCommand(new[] { "/etc", "/usr/lib/libbig.so" }, false), root);
         Run(shell, Unwrap(size), applets, out byte[] duOutput, out _);
         long? bytes = RemoteBackup.ParseSizeOutput(Lines(duOutput));

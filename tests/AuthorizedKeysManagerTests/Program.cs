@@ -296,6 +296,15 @@ internal static class Program
         Check(error is RemoteOperationException && session.Files[home] == line + "\n", "verify: a key that was there before is not removed when the login fails");
         Check(session.AppendedPaths.Count == 0 && !error.Message.Contains("removed"), "verify: a key that was there before is not appended again");
 
+        // Dropbear root: the key was in the home file already (put there by hand or an earlier version), only /etc/dropbear lacked it.
+        // A failed login takes out what this call added, not the key that was there.
+        session = new SshSession { IsDropbearRoot = true };
+        session.Files[home] = line + "\n";
+        session.Files[dropbear] = KeyLine(other) + "\n";
+        error = Catch(() => AuthorizedKeysManager.InstallKeyAndVerifyLogin(session, line, () => "the server rejected the key"));
+        Check(error is RemoteOperationException && error.Message.Contains("removed from the server again"), "verify, dropbear: a failed login is reported, the key it added is taken out");
+        Check(session.Files[home] == line + "\n" && session.Files[dropbear] == KeyLine(other) + "\n", "verify, dropbear: the key that was in the home file before stays there");
+
         session = new SshSession();
         session.Files[home] = KeyLine(other) + "\n";
         error = Catch(() => AuthorizedKeysManager.InstallKeyAndVerifyLogin(session, line, () =>

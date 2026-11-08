@@ -104,6 +104,179 @@ public class StatCommandBuilder
         return "stat" + symlinkFlag + " -c \"StatEntryL:|%N|%Y|%d|%s|%f\" " + SmarTTY.IO.RemotePathUtils.ShellQuote(path);
     }
 
+    private static void ParseGnuEntry(string line, string[] parts, ref StatEntry entry)
+    {
+        int count = parts.Length;
+        if (!long.TryParse(parts[count - 4], out long modified) || !int.TryParse(parts[count - 3], out int deviceId)
+            || !long.TryParse(parts[count - 2], out long size) || !int.TryParse(parts[count - 1], NumberStyles.HexNumber, null, out int modeHex))
+        {
+            return;
+        }
+        string quoted = string.Join("|", parts, 1, count - 5);
+        if (!TryReadNames(quoted, out string name, out string target))
+        {
+            return;
+        }
+        entry.ModifiedTime = modified;
+        entry.DeviceId = deviceId;
+        entry.Size = size;
+        switch ((modeHex >> 12) & 0xF)
+        {
+            case 8:
+                entry.Kind = StatEntryKind.File;
+                break;
+            case 4:
+                entry.Kind = StatEntryKind.Directory;
+                break;
+            case 10:
+                entry.Kind = StatEntryKind.Symlink;
+                break;
+        }
+        entry.Name = name != null && name.StartsWith("./") ? name.Substring(2) : name;
+        entry.LinkTarget = target;
+    }
+
+    /// <summary>
+    /// Reads what GNU stat prints for %N: the name quoted for a shell ('it'\''s', 'a'$'\n''b'), and for a symbolic link "-&gt; " and the
+    /// quoted target. False when the text is not in that form (the caller then falls back to cutting the quotes off).
+    /// </summary>
+    internal static bool TryReadNames(string text, out string name, out string target)
+    {
+        name = null;
+        target = null;
+        int position = 0;
+        if (!TryReadQuotedWord(text, ref position, out name))
+        {
+            return false;
+        }
+        while (position < text.Length && text[position] == ' ')
+        {
+            position++;
+        }
+        if (position == text.Length)
+        {
+            return true;
+        }
+        if (string.CompareOrdinal(text, position, "->", 0, 2) != 0)
+        {
+            return false;
+        }
+        position += 2;
+        while (position < text.Length && text[position] == ' ')
+        {
+            position++;
+        }
+        return TryReadQuotedWord(text, ref position, out target) && position == text.Length;
+    }
+
+    // One shell word made of 'single quoted' parts, \x escapes outside quotes and $'ANSI-C' parts, up to a blank outside quotes.
+    private static bool TryReadQuotedWord(string text, ref int position, out string word)
+    {
+        System.Text.StringBuilder result = new System.Text.StringBuilder();
+        word = null;
+        int i = position;
+        bool any = false;
+        while (i < text.Length && text[i] != ' ')
+        {
+            char ch = text[i];
+            if (ch == '\'')
+            {
+                int end = text.IndexOf('\'', i + 1);
+                if (end < 0)
+                {
+                    return false;
+                }
+                result.Append(text, i + 1, end - i - 1);
+                i = end + 1;
+            }
+            else if (ch == '$' && i + 1 < text.Length && text[i + 1] == '\'')
+            {
+                i += 2;
+                while (true)
+                {
+                    if (i >= text.Length)
+                    {
+                        return false;
+                    }
+                    char c = text[i];
+                    if (c == '\'')
+                    {
+                        i++;
+                        break;
+                    }
+                    if (c == '\\' && i + 1 < text.Length)
+                    {
+                        char e = text[i + 1];
+                        i += 2;
+                        switch (e)
+                        {
+                            case 'n': result.Append('\n'); break;
+                            case 't': result.Append('\t'); break;
+                            case 'r': result.Append('\r'); break;
+                            case 'a': result.Append('\a'); break;
+                            case 'b': result.Append('\b'); break;
+                            case 'f': result.Append('\f'); break;
+                            case 'v': result.Append('\v'); break;
+                            case 'e': result.Append('\u001b'); break;
+                            case '\\': result.Append('\\'); break;
+                            case '\'': result.Append('\''); break;
+                            case '"': result.Append('"'); break;
+                            case 'x':
+                            case '0':
+                            case '1':
+                            case '2':
+                            case '3':
+                            {
+                                // \xHH or \NNN: one byte. A run of bytes is not decoded here (a name with non-ASCII bytes is printed by
+                                // GNU stat as itself in a UTF-8 locale); the byte is taken as the character of that code.
+                                int numberBase = e == 'x' ? 16 : 8;
+                                int start = e == 'x' ? i : i - 1;
+                                int length = e == 'x' ? 2 : 3;
+                                if (start + length > text.Length)
+                                {
+                                    return false;
+                                }
+                                try
+                                {
+                                    result.Append((char)System.Convert.ToInt32(text.Substring(start, length), numberBase));
+                                }
+                                catch (System.FormatException)
+                                {
+                                    return false;
+                                }
+                                i = start + length;
+                                break;
+                            }
+                            default:
+                                result.Append('\\').Append(e);
+                                break;
+                        }
+                        continue;
+                    }
+                    result.Append(c);
+                    i++;
+                }
+            }
+            else if (ch == '\\' && i + 1 < text.Length)
+            {
+                result.Append(text[i + 1]);
+                i += 2;
+            }
+            else
+            {
+                return false; // an unquoted character: not the form of GNU stat
+            }
+            any = true;
+        }
+        if (!any)
+        {
+            return false;
+        }
+        position = i;
+        word = result.ToString();
+        return true;
+    }
+
     public StatEntry ParseEntry(string line)
     {
         StatEntry entry = default;
@@ -112,6 +285,17 @@ public class StatCommandBuilder
             return default;
         }
         string[] parts = line.Split('|');
+        if (line.StartsWith("StatEntryL:|", System.StringComparison.Ordinal) && parts.Length > 6)
+        {
+            // A '|' in a name: the four numbers are the last fields, whatever is between the tag and them is the quoted name.
+            ParseGnuEntry(line, parts, ref entry);
+            return entry;
+        }
+        if (parts.Length < 6)
+        {
+            // Not an entry of ours (a line of the shell, a message): an unusable line is no entry.
+            return default;
+        }
         if (!long.TryParse(parts[2], out entry.ModifiedTime))
         {
             return default;
@@ -147,7 +331,13 @@ public class StatCommandBuilder
                 return default;
             }
             int arrowIndex = parts[1].IndexOf("->");
-            if (arrowIndex == -1)
+            if (TryReadNames(parts[1], out string quotedName, out string quotedTarget))
+            {
+                // The quoting of GNU stat is undone (a name with an apostrophe is printed as 'it'\''s').
+                entry.Name = quotedName;
+                entry.LinkTarget = quotedTarget;
+            }
+            else if (arrowIndex == -1)
             {
                 entry.Name = parts[1].Trim(' ', '\'');
             }

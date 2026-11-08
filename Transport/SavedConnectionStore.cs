@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml.Serialization;
+using SmarTTY.Utilities;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
 
@@ -54,6 +55,9 @@ public class SavedConnectionStore
         try
         {
             _sshConnections.Clear();
+            // Cleared as well: the raw (Telnet, TCP, Netconsole) profiles were added again at every reload, which showed each of them twice
+            // after the first SSH login of the session (it touches the timestamp that makes the store reload).
+            _rawConnections.Clear();
             Directory.CreateDirectory(_directory);
             XmlSerializer xmlSerializer = new XmlSerializer(typeof(SSHConnectionSettings));
             XmlSerializer rawSettingsSerializer = new XmlSerializer(typeof(RawConnectionSettings));
@@ -67,8 +71,9 @@ public class SavedConnectionStore
                     sshSettings.FileName = file;
                     _sshConnections.Add(sshSettings);
                 }
-                catch
+                catch (Exception exception)
                 {
+                    NoticeUnreadable(file, exception);
                 }
             }
             files = Directory.GetFiles(_directory, "*.rawconnection");
@@ -81,8 +86,9 @@ public class SavedConnectionStore
                     rawConnectionSettings.FileName = file;
                     _rawConnections.Add(rawConnectionSettings);
                 }
-                catch
+                catch (Exception exception)
                 {
+                    NoticeUnreadable(file, exception);
                 }
             }
             _loadedAt = DateTime.Now;
@@ -90,6 +96,20 @@ public class SavedConnectionStore
         catch
         {
         }
+    }
+
+    // A profile that is there and cannot be read must not just vanish from the list (with its saved password and forwarded ports):
+    // it is set aside as ".bad", so that no later save overwrites it, and the user is told. A file that is merely locked
+    // right now is left alone and tried again at the next reload.
+    private static void NoticeUnreadable(string file, Exception exception)
+    {
+        if (exception is IOException && !(exception is FileNotFoundException) || exception is UnauthorizedAccessException)
+        {
+            return;
+        }
+        string kept = XmlStorage.SetAsideUnreadable(file);
+        XmlStorage.ReportProblem("The saved connection " + Path.GetFileName(file) + " could not be read (" + (exception.InnerException?.Message ?? exception.Message) + ")"
+            + (kept != null ? ". It is kept as " + kept + "." : "."));
     }
 
     private void ReloadIfChanged()
@@ -105,7 +125,14 @@ public class SavedConnectionStore
         else
         {
             Reload();
-            TouchTimestamp(_directory);
+            try
+            {
+                TouchTimestamp(_directory);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                // A read-only folder (a portable copy on a protected drive): the list still works, it is read again at the next access.
+            }
         }
     }
 
@@ -121,7 +148,7 @@ public class SavedConnectionStore
             return "";
         }
         char[] charArray = fileName.ToCharArray();
-        string invalidChars = "\\/<>:| ;&=";
+        string invalidChars = "\\/<>:| ;&=*?\"";
         for (int i = 0; i < charArray.Length; i++)
         {
             if (invalidChars.IndexOf(charArray[i]) != -1)
@@ -132,10 +159,46 @@ public class SavedConnectionStore
         return new string(charArray);
     }
 
-    public void SaveSshConnection(SSHConnectionSettings sshConnectionSettings, Action<string> progressCallback = null)
+    private string SshFileNameFor(SSHConnectionSettings sshConnectionSettings)
+    {
+        return Path.Combine(_directory, $"{SanitizeFileName(sshConnectionSettings.UserName)}@{SanitizeFileName(sshConnectionSettings.HostName)}.sshconnection");
+    }
+
+    /// <summary>
+    /// The saved connection that saving <paramref name="candidate"/> would overwrite without being the same one, or null. A profile is
+    /// stored as "user@host" and the alias is not part of that, so a new connection to the same user and host (two routers that both
+    /// have root@192.168.1.1) silently replaced the old one with its alias, saved password, key and forwarded ports.
+    /// <paramref name="editing"/> is the saved connection that is being edited: it may be replaced by its own new version.
+    /// </summary>
+    public SSHConnectionSettings FindOverwrittenBy(SSHConnectionSettings candidate, SSHConnectionSettings editing = null)
+    {
+        ReloadIfChanged();
+        string fileName = SshFileNameFor(candidate);
+        foreach (SSHConnectionSettings existing in _sshConnections)
+        {
+            if (ReferenceEquals(existing, candidate) || ReferenceEquals(existing, editing)
+                || StringComparer.InvariantCultureIgnoreCase.Compare(existing.FileName, fileName) != 0)
+            {
+                continue;
+            }
+            if (editing != null && !string.IsNullOrEmpty(editing.FileName)
+                && StringComparer.InvariantCultureIgnoreCase.Compare(existing.FileName, editing.FileName) == 0)
+            {
+                continue;
+            }
+            return existing;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Saves a connection. <paramref name="replaces"/> is the saved connection that was edited into this one: when the user or the host
+    /// changed, the profile has another file name, and the old file (with its password) is removed instead of staying as a second entry.
+    /// </summary>
+    public void SaveSshConnection(SSHConnectionSettings sshConnectionSettings, Action<string> progressCallback = null, SSHConnectionSettings replaces = null)
     {
         progressCallback?.Invoke("Saving connection settings...");
-        sshConnectionSettings.FileName = Path.Combine(_directory, $"{SanitizeFileName(sshConnectionSettings.UserName)}@{SanitizeFileName(sshConnectionSettings.HostName)}.sshconnection");
+        sshConnectionSettings.FileName = SshFileNameFor(sshConnectionSettings);
         progressCallback?.Invoke("Settings file name:" + sshConnectionSettings.FileName);
         for (int i = 0; i < _sshConnections.Count; i++)
         {
@@ -148,6 +211,11 @@ public class SavedConnectionStore
         _sshConnections.Add(sshConnectionSettings);
         progressCallback?.Invoke("Saving connection index to " + sshConnectionSettings.FileName + "...");
         sshConnectionSettings.Save();
+        if (replaces != null && !ReferenceEquals(replaces, sshConnectionSettings) && !string.IsNullOrEmpty(replaces.FileName)
+            && StringComparer.InvariantCultureIgnoreCase.Compare(replaces.FileName, sshConnectionSettings.FileName) != 0)
+        {
+            DeleteSshConnection(replaces);
+        }
     }
 
     public void DeleteSshConnection(SSHConnectionSettings sshConnectionSettings)
@@ -299,6 +367,7 @@ public class SavedConnectionStore
             try
             {
                 File.Delete(rawConnectionSettings.FileName);
+                TouchTimestamp(_directory);
             }
             catch
             {

@@ -615,11 +615,7 @@ public class FileTransferManager : IDisposable
             {
                 File.SetLastWriteTimeUtc(partPath, modifyTime);
             }
-            if (File.Exists(job.LocalPath))
-            {
-                File.Delete(job.LocalPath);
-            }
-            File.Move(partPath, job.LocalPath);
+            PutDownloadInPlace(partPath, job.LocalPath);
             keepPart = true;
         }
         catch (Exception exception)
@@ -669,6 +665,33 @@ public class FileTransferManager : IDisposable
         parent = slash < 0 ? "." : slash == 0 ? "/" : path.Substring(0, slash);
     }
 
+    /// <summary>
+    /// Makes the finished partial file the local file. An old file is replaced in one step: deleting it first would lose it when the
+    /// rename then fails (a virus scanner, a lock).
+    /// </summary>
+    private static void PutDownloadInPlace(string partPath, string localPath)
+    {
+        if (File.Exists(localPath))
+        {
+            try
+            {
+                File.Replace(partPath, localPath, null);
+                return;
+            }
+            catch (Exception ex) when (ex is PlatformNotSupportedException || ex is IOException || ex is UnauthorizedAccessException)
+            {
+                // The replace call is not available here (some file systems): the plain way below. It fails the same way when the
+                // file is locked, and the old file is then still there.
+                if (!File.Exists(partPath))
+                {
+                    throw;
+                }
+            }
+            File.Delete(localPath);
+        }
+        File.Move(partPath, localPath);
+    }
+
     private static void SplitArchivePath(string remoteDirectory)
     {
         SplitArchivePath(remoteDirectory, out _, out _);
@@ -696,11 +719,7 @@ public class FileTransferManager : IDisposable
             {
                 throw new IOException(failure);
             }
-            if (File.Exists(job.LocalPath))
-            {
-                File.Delete(job.LocalPath);
-            }
-            File.Move(partPath, job.LocalPath);
+            PutDownloadInPlace(partPath, job.LocalPath);
         }
         catch
         {
@@ -757,21 +776,43 @@ public class FileTransferManager : IDisposable
             }
             channel.WaitClosed();
             int exitStatus = channel.ExitStatus;
-            // 1 is GNU tar's "some files changed while they were read": the archive is complete enough to keep.
-            if (exitStatus == 0 || exitStatus == 1)
+            if (exitStatus == 0)
             {
-                if (exitStatus == 1)
-                {
-                    job.Checksum = "some files changed while they were read";
-                }
                 return null;
             }
-            string error = new StreamReader(channel.Error).ReadToEnd().Trim();
+            string error = ReadTarMessage(channel.Error);
+            // 1 is GNU tar's "some files changed while they were read": the archive is complete enough to keep. A BusyBox tar answers
+            // 1 to every error, though (an option it does not know, a file it cannot read), so the status alone says nothing: when no
+            // archive came out at all it is a failure (and the caller may try another way), and otherwise what tar said is shown.
+            if (exitStatus == 1 && received > 0)
+            {
+                job.Checksum = string.IsNullOrEmpty(error)
+                    ? "tar reported a problem (exit status 1): the archive may be incomplete"
+                    : "tar reported: " + error;
+                return null;
+            }
             return string.IsNullOrEmpty(error) ? "tar failed on the server (exit status " + exitStatus + ")." : error;
         }
         finally
         {
             Session.PtyGate.EndPlainHelper();
+        }
+    }
+
+    /// <summary>What tar printed to its error stream: the first lines, so that a tree full of unreadable files cannot fill the message.</summary>
+    private static string ReadTarMessage(Stream error)
+    {
+        const int MaxCharacters = 600;
+        try
+        {
+            char[] buffer = new char[MaxCharacters + 1];
+            int count = new StreamReader(error).ReadBlock(buffer, 0, buffer.Length);
+            string text = new string(buffer, 0, Math.Min(count, MaxCharacters)).Trim();
+            return count > MaxCharacters ? text + "..." : text;
+        }
+        catch (Exception)
+        {
+            return string.Empty;
         }
     }
 
@@ -854,6 +895,12 @@ public class FileTransferManager : IDisposable
             }
             keepRemote = false;
             Verify(job, writePath, job.LocalPath);
+            // What the remote scp said at the end of the data (it could not set the time of the file, for one): the content is there.
+            string scpWarning = (remote as ScpChannelStream)?.Warning;
+            if (!string.IsNullOrEmpty(scpWarning))
+            {
+                job.Checksum = string.IsNullOrEmpty(job.Checksum) ? "scp warning: " + scpWarning : job.Checksum + "; scp warning: " + scpWarning;
+            }
             if (useTemp)
             {
                 job.Phase = "Replacing";
@@ -861,7 +908,18 @@ public class FileTransferManager : IDisposable
                 {
                     RemoteFileTools.CopyAttributes(Session, targetInfo, tempPath);
                 }
-                RemoteFileTools.Replace(Session, tempPath, target);
+                try
+                {
+                    RemoteFileTools.Replace(Session, tempPath, target);
+                }
+                catch (RemoteOperationException) when (targetInfo.Exists && Session.RemoteOs != RemoteOsKind.Windows)
+                {
+                    // The rename is refused although the target is there (a sticky directory like /tmp with a file of another user that
+                    // we may write to, an immutable directory entry): the file itself can still be written. The data is checked by now,
+                    // so it is copied over the target on the server, which also keeps its permissions and owner.
+                    RemoteFileTools.Run(Session, "cat " + RemoteFileTools.Quote(tempPath) + " > " + RemoteFileTools.Quote(target), "write " + target);
+                    RemoteFileTools.Remove(Session, tempPath);
+                }
                 job.RemoteTempPath = null;
             }
         }
@@ -895,7 +953,11 @@ public class FileTransferManager : IDisposable
         FileChecksum remote = RemoteFileTools.ComputeRemoteChecksum(Session, remotePath);
         if (remote == null)
         {
-            job.Checksum = Session.RemoteOs == RemoteOsKind.Windows ? "not verified: certutil of the server did not give a checksum" : "not verified: the server has neither sha256sum nor md5sum";
+            job.Checksum = Session.RemoteOs == RemoteOsKind.Windows
+                ? "not verified: certutil of the server did not give a checksum"
+                : RemoteFileTools.HasChecksumTool(Session)
+                    ? "not verified: the server could not read the file to compute its checksum (no permission?)"
+                    : "not verified: the server has neither sha256sum nor md5sum";
             return;
         }
         FileChecksum local = RemoteFileTools.ComputeLocalChecksum(localPath, remote.Algorithm, () => CheckCancelled(job));

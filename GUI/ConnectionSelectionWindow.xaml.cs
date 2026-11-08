@@ -218,6 +218,22 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         void SetIcon(string icon);
     }
 
+    /// <summary>
+    /// False when saving <paramref name="fresh"/> would replace another saved connection to the same user and host and the user does not
+    /// want that (<paramref name="editing"/> is the one being edited, which may be replaced by its own new version).
+    /// </summary>
+    private static bool ConfirmReplacingSavedConnection(SavedConnectionStore store, SSHConnectionSettings fresh, SSHConnectionSettings editing = null)
+    {
+        SSHConnectionSettings existing = store.FindOverwrittenBy(fresh, editing);
+        if (existing == null)
+        {
+            return true;
+        }
+        string alias = string.IsNullOrEmpty(existing.ConnectionAlias) ? "" : " (\"" + existing.ConnectionAlias + "\")";
+        return MessageBoxes.AskWarn("A saved connection to " + existing.UserName + "@" + existing.HostName + alias + " already exists. Connections are saved by user and host, so "
+            + "saving this one replaces it, with its name, saved password, key settings and port forwards." + Environment.NewLine + Environment.NewLine + "Replace it?");
+    }
+
     private class SettingsWrappers
     {
         public class SSH : IConnectionSettingsWrapper, INotifyPropertyChanged
@@ -301,7 +317,18 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 newSSHConnectionWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
                 if (newSSHConnectionWindow.ShowDialog() == true && (newSSHConnectionWindow.Controller.SavedWithoutConnecting || newSSHConnectionWindow.Controller.CreatedSession != null))
                 {
-                    _Manager?.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
+                    try
+                    {
+                        if (_Manager != null && ConfirmReplacingSavedConnection(_Manager, newSSHConnectionWindow.Controller.FinalSettings, Connection))
+                        {
+                            // The old profile goes when the user or host was edited (it has another file name).
+                            _Manager.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings, replaces: Connection);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        MessageBoxes.Error("The connection settings could not be saved: " + exception.Message);
+                    }
                     newSSHConnectionWindow.Controller.CreatedSession?.Dispose();
                 }
             }
@@ -941,7 +968,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             RefreshAll();
             if (!suppressUpdateThread)
             {
-                new Thread(UpdateThreadBody).Start();
+                // A background thread: the window can fail to come up (a bad command line argument below), and a thread that is not one
+                // would keep the process alive without a window.
+                new Thread(UpdateThreadBody) { IsBackground = true }.Start();
             }
             // Without it the connector runs its callbacks (progress, error message boxes, credential prompts, the new session)
             // on its worker thread instead of the UI thread.
@@ -956,8 +985,16 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
             if (defaultItemName.StartsWith("/ssh:", StringComparison.InvariantCultureIgnoreCase))
             {
-                SSHConnectionSettings conn = XmlStorage.LoadFromFile<SSHConnectionSettings>(defaultItemName.Substring(5), new Type[0]);
-                ConnectWithSettings(new SettingsWrappers.SSH(_Connections, conn));
+                try
+                {
+                    SSHConnectionSettings conn = XmlStorage.LoadFromFile<SSHConnectionSettings>(defaultItemName.Substring(5), new Type[0]);
+                    ConnectWithSettings(new SettingsWrappers.SSH(_Connections, conn));
+                }
+                catch (Exception exception)
+                {
+                    // A missing or damaged file named on the command line: shown like the errors of the other arguments, and the list opens.
+                    MessageBoxes.Exception(exception);
+                }
                 return;
             }
             if (defaultItemName.StartsWith("/telnets:", StringComparison.InvariantCultureIgnoreCase))
@@ -1004,7 +1041,15 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
             if (defaultItemName.StartsWith("/job:", StringComparison.InvariantCultureIgnoreCase))
             {
-                ConnectWithSettings(new SettingsWrappers.SSH(conn: (Job = XmlStorage.LoadFromFile<SmarTTYJob>(defaultItemName.Substring(5), new Type[0])).Settings, mgr: _Connections));
+                try
+                {
+                    ConnectWithSettings(new SettingsWrappers.SSH(conn: (Job = XmlStorage.LoadFromFile<SmarTTYJob>(defaultItemName.Substring(5), new Type[0])).Settings, mgr: _Connections));
+                }
+                catch (Exception exception)
+                {
+                    Job = null;
+                    MessageBoxes.Exception(exception);
+                }
                 return;
             }
             IConnectionSettingsWrapper connectionSettingsWrapper = FindByCommandLine(defaultItemName);
@@ -1235,11 +1280,20 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 if (wrp is SettingsWrappers.Raw raw)
                 {
                     PendingRawConnectionSettings = raw.Settings.Settings;
-                    _Connections.SaveRawConnection(new RawConnectionSettings
+                    try
                     {
-                        Settings = PendingRawConnectionSettings
-                    });
-                    raw.Settings.UpdateLastUsedTime();
+                        _Connections.SaveRawConnection(new RawConnectionSettings
+                        {
+                            Settings = PendingRawConnectionSettings
+                        });
+                        raw.Settings.UpdateLastUsedTime();
+                    }
+                    catch (Exception exception)
+                    {
+                        // Only the profile and its "last used" mark are lost (a read-only or full disk, a virus scanner): the
+                        // connection itself does not depend on them.
+                        XmlStorage.ReportProblem("The connection was opened, but its profile could not be saved: " + exception.Message);
+                    }
                     SessionCreated?.Invoke();
                 }
             }
@@ -1292,8 +1346,18 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             if (accepted && newSSHConnectionWindow.Controller.SavedWithoutConnecting)
             {
                 // Saved to the list as entered: there is no session to open, so the list window stays.
-                _Connections.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
-                SavedWithoutConnecting = true;
+                try
+                {
+                    if (ConfirmReplacingSavedConnection(_Connections, newSSHConnectionWindow.Controller.FinalSettings))
+                    {
+                        _Connections.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
+                        SavedWithoutConnecting = true;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    MessageBoxes.Error("The connection settings could not be saved: " + exception.Message);
+                }
                 return false;
             }
             if (accepted && newSSHConnectionWindow.Controller.CreatedSession != null)
@@ -1302,7 +1366,11 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 {
                     try
                     {
-                        _Connections.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
+                        // Declined: the connection is opened all the same, only not saved over the other one.
+                        if (ConfirmReplacingSavedConnection(_Connections, newSSHConnectionWindow.Controller.FinalSettings))
+                        {
+                            _Connections.SaveSshConnection(newSSHConnectionWindow.Controller.FinalSettings);
+                        }
                     }
                     catch (Exception exception)
                     {

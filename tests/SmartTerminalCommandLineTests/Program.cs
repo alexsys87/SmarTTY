@@ -99,6 +99,8 @@ internal static class Program
         Equal(ShellCommandLine.EscapeWord("my file (1).txt"), "my\\ file\\ \\(1\\).txt", "escape: spaces and parentheses");
         Equal(ShellCommandLine.EscapeWord("it's$x&y;z"), "it\\'s\\$x\\&y\\;z", "escape: quote, $, & and ;");
         Equal(ShellCommandLine.EscapeWord("~/my dir/"), "~/my\\ dir/", "escape: a leading ~/ stays expandable");
+        Equal(ShellCommandLine.EscapeWord("a\nb"), "$'a\\nb'", "escape: a line break in a name is spelled out, not typed");
+        Equal(ShellCommandLine.EscapeWord("it's\tx\u0001"), "$'it\\'s\\tx\\x01'", "escape: other control characters and a quote in the $'...' form");
         Equal(ShellCommandLine.EscapeWord("~user"), "\\~user", "escape: ~name is a literal file name");
         Equal(ShellCommandLine.EscapeWord("plain-name_1.txt"), "plain-name_1.txt", "escape: nothing to escape");
         Equal(ShellCommandLine.EscapeInQuotes("a\"b$c", '"'), "a\\\"b\\$c", "escape inside double quotes");
@@ -155,6 +157,18 @@ internal static class Program
         Equal(ShellCommandLine.JoinAsOneLine("for f in *; do\necho $f\ndone", " && "), "for f in *; do echo $f; done", "one line: a loop is not broken by &&");
         Equal(ShellCommandLine.JoinAsOneLine("if a; then\nb\nelse\nc\nfi", " && "), "if a; then b; else c; fi", "one line: if/else");
         Equal(ShellCommandLine.JoinAsOneLine("", " "), "", "one line: empty");
+        // A comment at the end of a line would swallow the commands joined after it.
+        Equal(ShellCommandLine.JoinAsOneLine("make # build\nmake install", " && "), "make && make install", "one line: a trailing comment is cut");
+        Equal(ShellCommandLine.JoinAsOneLine("echo a#b\necho '# not a comment'\necho \"x # y\"", " && "), "echo a#b && echo '# not a comment' && echo \"x # y\"", "one line: a # inside a word or a quote stays");
+        Equal(ShellCommandLine.JoinAsOneLine("echo $#\necho ${#PATH}", " && "), "echo $# && echo ${#PATH}", "one line: $# and ${#x} stay");
+        Equal(ShellCommandLine.JoinAsOneLine("cut -d'\t' -f1 a\nls\t-l", " && "), "cut -d'\t' -f1 a && ls -l", "one line: a tab in quotes stays, other tabs become spaces");
+        // What cannot be joined without changing its meaning is left as the lines it is.
+        Equal(ShellCommandLine.JoinAsOneLine("cat <<EOF > f\nline1\nEOF", " && "), "cat <<EOF > f\nline1\nEOF", "one line: a here-document is not joined");
+        Equal(ShellCommandLine.JoinAsOneLine("echo \"a\nb\"", " && "), "echo \"a\nb\"", "one line: a string over two lines is not joined");
+        Equal(ShellCommandLine.JoinAsOneLine("echo 'it'\"'\"'s'\nls", " && "), "echo 'it'\"'\"'s' && ls", "one line: quotes that close on their line are joined");
+        Equal(ShellCommandLine.JoinAsOneLine("echo hi # don't\nls", " && "), "echo hi && ls", "one line: an apostrophe in the comment is no open quote");
+        Equal(ShellCommandLine.JoinAsOneLine("cat <<< \"x\"\nls", " && "), "cat <<< \"x\" && ls", "one line: a here-string is joined");
+        Check(ShellCommandLine.JoinPastedLines("cut -d'\t' -f1\n").Contains("'\t'"), "pasted lines: a tab in quotes stays");
         Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("ls\npwd\n")), "ls|pwd", "commands: one per line");
         Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("for f in *; do\necho $f\ndone\nls")), "for f in *; do echo $f; done|ls", "commands: a loop is one command");
         Equal(string.Join("|", ShellCommandLine.SplitPastedCommands("if true; then\necho 1\nelse\necho 2\nfi")), "if true; then echo 1; else echo 2; fi", "commands: if/else is one command");
@@ -338,6 +352,12 @@ internal static class Program
             "",
             "#1700000002",
         }) + "\n";
+        if (OperatingSystem.IsWindows())
+        {
+            // The rest runs real Unix shells on files with Unix permissions.
+            Console.WriteLine("SKIP: removing history lines needs a Unix shell");
+            return;
+        }
         string[] remove = { "mysql -pSecret", "echo 'it''s' \"$HOME\" \\n", "not in the file" };
         string work = Path.Combine(Path.GetTempPath(), "smartty-history-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);

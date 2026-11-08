@@ -1582,6 +1582,8 @@ public class KermitTransfer
         Stream target = null;
         long fileBytes = 0;
         long fileSize = -1;
+        bool fileSizeExact = false; // fileSize is in bytes (not the rounded kilobytes of the '!' attribute)
+        int sizeMismatches = 0; // files that ended with another size than announced: kept, and the user is told at the end
         DateTime? fileDate = null;
         int consecutiveErrors = 0;
         int consecutiveDamaged = 0;
@@ -1649,6 +1651,7 @@ public class KermitTransfer
                         string name = SanitizeFileName(DecodeText(packet.Data, session.ReceiveQctl));
                         fileBytes = 0;
                         fileSize = -1;
+                        fileSizeExact = false;
                         fileDate = null;
                         try
                         {
@@ -1667,10 +1670,11 @@ public class KermitTransfer
                         return true;
                     }
                 case TypeAttributes:
-                    ParseAttributes(packet.Data, out long size, out DateTime? date);
+                    ParseAttributes(packet.Data, out long size, out bool sizeIsExact, out DateTime? date);
                     if (size >= 0)
                     {
                         fileSize = size;
+                        fileSizeExact = sizeIsExact;
                     }
                     if (date.HasValue)
                     {
@@ -1716,12 +1720,20 @@ public class KermitTransfer
                             return Abort("Cannot write the file", "Cannot write " + name + ": " + ex.Message);
                         }
                         filesDone++;
+                        if (fileSizeExact && fileBytes != fileSize)
+                        {
+                            sizeMismatches++;
+                            Report(onProgress, fileBytes, fileSize, errors, "WARNING: " + name + " has " + fileBytes + " bytes, the sender announced "
+                                + fileSize + "; the file may be incomplete.");
+                        }
                         onFileReceived?.Invoke(name, fileDate);
                     }
                     return true;
                 case TypeBreak:
                     completed = true;
-                    Report(onProgress, received, 0, errors, filesDone == 1 ? "File received successfully." : filesDone + " files received successfully.");
+                    Report(onProgress, received, 0, errors, (filesDone == 1 ? "File received successfully." : filesDone + " files received successfully.")
+                        + (sizeMismatches == 0 ? string.Empty : " WARNING: " + sizeMismatches + (sizeMismatches == 1 ? " file has" : " files have")
+                            + " another size than the sender announced and may be incomplete."));
                     return false;
                 default:
                     return true; // 'X': text the sender wants shown; nothing to do with it here
@@ -1924,9 +1936,10 @@ public class KermitTransfer
     /// Reads an attribute packet: the size (tag '1' in bytes, tag '!' in kilobytes; -1 when absent) and the modification
     /// time (tag '#': [yy]yymmdd[ hh:mm[:ss]] in the sender's local time; returned as UTC).
     /// </summary>
-    private static void ParseAttributes(byte[] data, out long size, out DateTime? modifiedUtc)
+    private static void ParseAttributes(byte[] data, out long size, out bool sizeIsExact, out DateTime? modifiedUtc)
     {
         size = -1;
+        sizeIsExact = false; // '1' is the length in bytes, '!' only in kilobytes (rounded)
         modifiedUtc = null;
         int i = 0;
         while (i + 1 < data.Length)
@@ -1942,6 +1955,7 @@ public class KermitTransfer
                 && long.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long value))
             {
                 size = tag == (byte)'!' ? value * 1024 : value;
+                sizeIsExact = tag != (byte)'!';
             }
             else if (tag == (byte)'#')
             {

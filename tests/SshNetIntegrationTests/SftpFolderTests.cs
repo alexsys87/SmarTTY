@@ -1,3 +1,4 @@
+using SmarTTY.IO;
 using SmarTTY.Transport;
 using System;
 using System.Collections.Generic;
@@ -156,6 +157,13 @@ internal static class SftpFolderTests
         fileSystem.CreateDirectories(path);
         Test.Throws<RemoteOperationException>(() => SftpFolderPlan.PlanDownload(sftp, deep, Path.Combine(localDirectory, "deep")), "a folder nested deeper than the limit is refused", exception => Test.Check(exception.Message.Contains("junction"), "the message names the likely cause, a junction"));
         Test.Check(SftpFolderPlan.LocalName("a:b?c*d.txt") == "a_b_c_d.txt" || Path.DirectorySeparatorChar == '/', "characters that Windows does not allow in a file name are replaced when downloading");
+        Test.Equal("_nul", SftpFolderPlan.LocalName("nul"), "a DOS device name is not used as a file name");
+        Test.Equal("_nul.txt", SftpFolderPlan.LocalName("nul.txt"), "...with an extension, too");
+        Test.Equal("_COM1.log", SftpFolderPlan.LocalName("COM1.log"), "...whatever the case");
+        Test.Equal("console.txt", SftpFolderPlan.LocalName("console.txt"), "a name that only starts like a device name is left alone");
+        Test.Equal("report", SftpFolderPlan.LocalName("report. . "), "dots and spaces at the end (Windows drops them) go");
+        Test.Equal("_", SftpFolderPlan.LocalName("..."), "a name of dots only is not empty");
+        Test.Equal("_nul.tar.gz", PathUtils.ToLocalFileName("nul.tar.gz"), "the archive of a folder named nul");
     }
 
     private static byte[] ReadRemote(SftpChannel sftp, string path)

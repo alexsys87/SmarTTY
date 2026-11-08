@@ -478,6 +478,19 @@ public partial class PackageManagerWindow : Window
             List<string> list = new List<string>();
             LinuxPackageInfo[] items = _AllPackages.Where((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.Action == LinuxPackageInfo.PackageAction.Install).ToArray();
             LinuxPackageInfo[] entries = _AllPackages.Where((LinuxPackageInfo linuxPackageInfo) => linuxPackageInfo.Action == LinuxPackageInfo.PackageAction.Remove).ToArray();
+            if (!(_Client is WingetPackageManagerClient) && !(_Client is HomebrewPackageManagerClient))
+            {
+                // Those two check the names themselves. For the others a name that is not made of the usual package name characters is left
+                // out (it comes from the output of the host and ends up in a command that runs as root), and the user is told.
+                items = PackageNames.Safe(items, out string[] refusedInstall);
+                entries = PackageNames.Safe(entries, out string[] refusedRemove);
+                string[] refused = (refusedInstall ?? new string[0]).Concat(refusedRemove ?? new string[0]).ToArray();
+                if (refused.Length != 0)
+                {
+                    MessageBoxes.Warning("These packages have names with characters that are not allowed in a package name, and are left out of the command:\n\n"
+                        + string.Join("\n", refused.Take(10)) + (refused.Length > 10 ? "\n..." : ""));
+                }
+            }
             if (items.Length != 0)
             {
                 list.Add(_Client.GetCommandLineForPackageOperation(items, LinuxPackageInfo.PackageAction.Install, Options));

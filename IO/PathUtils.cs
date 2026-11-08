@@ -85,6 +85,44 @@ public class PathUtils
         }
     }
 
+    private static readonly string[] ReservedDeviceNames =
+    {
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
+
+    /// <summary>
+    /// A name of a file on a host as the name of a local file that can be created on Windows: the characters Windows does not allow
+    /// become '_', the dots and spaces at the end (which Windows drops) go, and a DOS device name (CON, NUL, COM1, with or without an
+    /// extension: "nul.txt") gets a '_' in front, because it would be written to the device instead of a file.
+    /// The name is one file name, not a path.
+    /// </summary>
+    public static string ToLocalFileName(string remoteName)
+    {
+        if (string.IsNullOrEmpty(remoteName))
+        {
+            return "_";
+        }
+        StringBuilder builder = new StringBuilder(remoteName.Length);
+        foreach (char ch in remoteName)
+        {
+            bool bad = ch < ' ' || "<>:\"/\\|?*".IndexOf(ch) >= 0 || Array.IndexOf(Path.GetInvalidFileNameChars(), ch) >= 0;
+            builder.Append(bad ? '_' : ch);
+        }
+        string result = builder.ToString().TrimEnd('.', ' ');
+        if (result.Length == 0)
+        {
+            return "_";
+        }
+        int dot = result.IndexOf('.');
+        string stem = (dot >= 0 ? result.Substring(0, dot) : result).TrimEnd(' ');
+        if (Array.IndexOf(ReservedDeviceNames, stem.ToUpperInvariant()) >= 0)
+        {
+            result = "_" + result;
+        }
+        return result;
+    }
+
     public static string SanitizeFileName(string fileName, FileNameSanitizeMode fileNameSanitizeMode = FileNameSanitizeMode.Default)
     {
         if (fileName == null)

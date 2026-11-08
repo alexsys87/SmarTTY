@@ -338,6 +338,23 @@ internal static class Program
                 run = RunSend(device, binary, target, Fast(overwrite: true));
                 Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "Overwrite replaces it", Describe(run));
             }
+            if (!OperatingSystem.IsWindows())
+            {
+                // Overwriting writes into the file that is there: a symbolic link stays one (the file behind it is changed), and the
+                // permissions of the file stay (a script does not lose its executable bit). Moving a new file over it would do neither.
+                string real = Path.Combine(remoteDir, "real-script.sh");
+                string link = Path.Combine(remoteDir, "link-script.sh");
+                File.WriteAllText(real, "#!/bin/sh\necho old\n");
+                File.SetUnixFileMode(real, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+                File.CreateSymbolicLink(link, "real-script.sh");
+                Run run = RunSend(device, text, link, Fast(overwrite: true));
+                Check(run.Error == null && run.Result && new FileInfo(link).LinkTarget == "real-script.sh" && File.ReadAllBytes(real).SequenceEqual(File.ReadAllBytes(text)),
+                    "Overwrite writes through a symbolic link and keeps it", Describe(run));
+                run = RunSend(device, binary, real, Fast(overwrite: true));
+                Check(run.Error == null && run.Result && (File.GetUnixFileMode(real) & UnixFileMode.UserExecute) != 0 && File.ReadAllBytes(real).SequenceEqual(File.ReadAllBytes(binary)),
+                    "Overwrite keeps the permissions of the file", Describe(run));
+                Check(!File.Exists(real + ".smtty~") && !File.Exists(link + ".smtty~"), "no unfinished file is left after an overwrite");
+            }
             {
                 Run run = RunSend(device, text, Path.Combine(remoteDir, "no-such-dir", "x.txt"), Fast());
                 Check(run.Error != null && run.Error.Message.Contains("cannot write"), "unwritable destination is reported", Describe(run));
