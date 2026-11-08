@@ -659,6 +659,7 @@
               <CheckBox Content="Each time '/' is typed" IsChecked="{Binding Slash}" />
               <CheckBox Content="Each time a space is typed" IsChecked="{Binding Space}" />
               <CheckBox Content="When a first character in a word is typed" IsChecked="{Binding FirstCharacterInWord}" />
+              <CheckBox Margin="5 8 2 0" Content="Suggest previously typed commands in grey while typing" IsChecked="{Binding HistorySuggestions}" ToolTip="Smart Terminal: the rest of the newest command in the history that starts with the typed text is shown in grey after the caret. Right arrow or End at the end of the line takes it, Ctrl+Right takes its next word, Esc hides it. Tab still opens the completion list." />
             </StackPanel>
           </GroupBox>
         </StackPanel>

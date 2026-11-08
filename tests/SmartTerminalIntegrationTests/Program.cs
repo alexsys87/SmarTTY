@@ -214,7 +214,7 @@ internal static class Program
 
         using (SshSession session = Connect(host, port, user, password))
         {
-            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySearchSteps, CompletionSteps }, serverName);
+            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySuggestionSteps, HistorySearchSteps, CompletionSteps }, serverName);
         }
 
         // The shell of the interactive wrapper chosen automatically: bash, or the BusyBox ash login shell (OpenWRT).
@@ -610,6 +610,142 @@ internal static class Program
             Name = "the line is cleared",
             Act = () => Key(terminal, Keys.Control | Keys.C),
             Done = () => InputText(terminal) == ""
+        };
+    }
+
+    private static string Suggestion(SshTerminalControl terminal)
+    {
+        return (string)typeof(SshTerminalControl).GetField("_historySuggestion", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(terminal);
+    }
+
+    private static Step Retype(SshTerminalControl terminal, string typed, string name, Func<bool> done)
+    {
+        return new Step
+        {
+            Name = name,
+            Act = () =>
+            {
+                Key(terminal, Keys.Control | Keys.C);
+                Type(terminal, typed);
+            },
+            Done = done,
+            TimeoutMs = 3000
+        };
+    }
+
+    // The grey rest of a previously typed command after the caret (Terminal/HistorySuggestion.cs). Runs after
+    // CommandSteps, whose commands are the newest in the history.
+    private static IEnumerable<Step> HistorySuggestionSteps(SshTerminalControl terminal, SessionContext context)
+    {
+        yield return Retype(terminal, "echo hello-sm", "the rest of a typed command is suggested", () => Suggestion(terminal) == "artty");
+        yield return new Step
+        {
+            Name = "Right at the end of the line takes the suggestion",
+            Act = () => Key(terminal, Keys.Right),
+            Done = () => InputText(terminal) == "echo hello-smartty" && Suggestion(terminal) == null,
+            TimeoutMs = 3000
+        };
+        yield return Retype(terminal, "echo hello-sm", "the suggestion comes back for the next line", () => Suggestion(terminal) == "artty");
+        yield return new Step
+        {
+            Name = "End takes the suggestion as well",
+            Act = () => Key(terminal, Keys.End),
+            Done = () => InputText(terminal) == "echo hello-smartty",
+            TimeoutMs = 3000
+        };
+        // The space after "-c" opens the completion list; Ctrl+Right still goes to the suggestion and closes the list.
+        yield return Retype(terminal, "sh -c", "the newest matching command is suggested", () => Suggestion(terminal) == " 'exit 4'; echo exit-code-off");
+        yield return new Step
+        {
+            Name = "Ctrl+Right takes the next word of the suggestion",
+            Act = () => Key(terminal, Keys.Control | Keys.Right),
+            Done = () => InputText(terminal) == "sh -c 'exit" && Suggestion(terminal) == " 4'; echo exit-code-off",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Right then takes the rest",
+            Act = () => Key(terminal, Keys.Right),
+            Done = () => InputText(terminal) == "sh -c 'exit 4'; echo exit-code-off",
+            TimeoutMs = 3000
+        };
+        yield return Retype(terminal, "echo hello-sm", "a suggestion to move away from", () => Suggestion(terminal) == "artty");
+        yield return new Step
+        {
+            Name = "no suggestion while the caret is not at the end of the line",
+            Act = () => Key(terminal, Keys.Left),
+            Done = () => Suggestion(terminal) == null,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Right then only moves the caret",
+            Act = () => Key(terminal, Keys.Right),
+            Done = () => InputText(terminal) == "echo hello-sm" && Suggestion(terminal) == "artty",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Esc hides the suggestion (after closing the completion list)",
+            Act = () =>
+            {
+                Key(terminal, Keys.Escape);
+                Key(terminal, Keys.Escape);
+            },
+            Done = () => Suggestion(terminal) == null,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Right does not take a hidden suggestion",
+            Act = () => Key(terminal, Keys.Right),
+            Done = () => InputText(terminal) == "echo hello-sm",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "typing brings the suggestion back",
+            Act = () => Type(terminal, "a"),
+            Done = () => Suggestion(terminal) == "rtty",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the history search shows no suggestion",
+            Act = () => Key(terminal, Keys.Control | Keys.R),
+            Done = () => InputPrompt(terminal).Contains("reverse-i-search") && Suggestion(terminal) == null,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "leaving the history search",
+            Act = () => Key(terminal, Keys.Escape),
+            Done = () => !InputPrompt(terminal).Contains("reverse-i-search"),
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the suggestions can be turned off",
+            Act = () =>
+            {
+                context.VTSettings.CompletionTriggers.HistorySuggestions = false;
+                Key(terminal, Keys.Control | Keys.C);
+                Type(terminal, "echo hello-sm");
+                Key(terminal, Keys.Right);
+            },
+            Done = () => Suggestion(terminal) == null && InputText(terminal) == "echo hello-sm",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the line is cleared and the suggestions are turned on again",
+            Act = () =>
+            {
+                context.VTSettings.CompletionTriggers.HistorySuggestions = true;
+                Key(terminal, Keys.Control | Keys.C);
+            },
+            Done = () => InputText(terminal) == "" && Suggestion(terminal) == null,
+            TimeoutMs = 3000
         };
     }
 

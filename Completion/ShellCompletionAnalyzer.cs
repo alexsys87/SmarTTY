@@ -281,6 +281,18 @@ public class ShellCompletionAnalyzer : IDisposable
         }
     }
 
+    /// <summary>The number of commands in the history: it changes when the file has been read or a command was typed in any tab.</summary>
+    public int HistoryCount
+    {
+        get
+        {
+            lock (_history)
+            {
+                return _history.Count;
+            }
+        }
+    }
+
     public string[] GetHistory()
     {
         lock (_history)
