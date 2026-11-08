@@ -1,5 +1,4 @@
-﻿using SmarTTY.Transport;
-using SmarTTY.Utilities;
+﻿using SmarTTY.Utilities;
 using System;
 using System.IO;
 using System.Xml.Serialization;
@@ -22,8 +21,8 @@ public class RawConnectionSettings
         XmlStorage.WriteAtomically(FileName, stream => xmlSerializer.Serialize(stream, this), FileName + ".bak");
         try
         {
-            // Other windows and instances notice the change by this file (see SavedConnectionStore).
-            SavedConnectionStore.TouchTimestamp(Path.GetDirectoryName(FileName));
+            // Other windows and instances notice the change by this file (SavedConnectionStore.TouchTimestamp writes the same).
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(FileName), "_update_timestamp.txt"), "The timestamp of this file indicates the last time some of the settings files here were changed");
         }
         catch
         {
