@@ -310,9 +310,8 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private bool _applicationCursorKeys;
 
-    private bool[] _privateModes = new bool[1100];
-
-    private bool[] _savedPrivateModes = new bool[1100];
+    // The numbers come from the output of the remote side, negative ones included: see PrivateModeTable.
+    private readonly PrivateModeTable _privateModes = new PrivateModeTable();
 
     private bool _keyMappingEnabled = true;
 
@@ -1150,9 +1149,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                         if (int.TryParse(sgrParameters[sgrParameterIndex], out var mode))
                         {
                             SetMode(mode, set, ch == 'h', escapeTrace);
-                            if (set && mode < _privateModes.Length)
+                            if (set)
                             {
-                                _privateModes[mode] = ch == 'h';
+                                _privateModes.Set(mode, ch == 'h');
                             }
                         }
                     }
@@ -1170,9 +1169,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     string[] modeParameters = items;
                     for (int modeParameterIndex = 0; modeParameterIndex < modeParameters.Length; modeParameterIndex++)
                     {
-                        if (int.TryParse(modeParameters[modeParameterIndex], out var modeValue) && modeValue < _privateModes.Length)
+                        if (int.TryParse(modeParameters[modeParameterIndex], out var modeValue))
                         {
-                            _savedPrivateModes[modeValue] = _privateModes[modeValue];
+                            _privateModes.Save(modeValue);
                         }
                     }
                 }
@@ -1184,10 +1183,10 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     string[] savedModeParameters = items;
                     for (int savedModeParameterIndex = 0; savedModeParameterIndex < savedModeParameters.Length; savedModeParameterIndex++)
                     {
-                        if (int.TryParse(savedModeParameters[savedModeParameterIndex], out var savedModeValue) && savedModeValue < _privateModes.Length)
+                        if (int.TryParse(savedModeParameters[savedModeParameterIndex], out var savedModeValue) && _privateModes.TryGetSaved(savedModeValue, out bool savedEnabled))
                         {
-                            SetMode(savedModeValue, set: true, _savedPrivateModes[savedModeValue], escapeTrace);
-                            _privateModes[savedModeValue] = _savedPrivateModes[savedModeValue];
+                            SetMode(savedModeValue, set: true, savedEnabled, escapeTrace);
+                            _privateModes.Set(savedModeValue, savedEnabled);
                         }
                     }
                 }
@@ -1717,8 +1716,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         _insertMode = false;
         HideCaret = false;
         MouseMode = MouseReportingMode.Off;
-        Array.Clear(_privateModes, 0, _privateModes.Length);
-        Array.Clear(_savedPrivateModes, 0, _savedPrivateModes.Length);
+        _privateModes.Clear();
         CurrentStyle = TerminalEmulatorBase.CellStyle.Default;
         _savedCursor = Point.Empty;
         _savedStyle = TerminalEmulatorBase.CellStyle.Default;
@@ -1960,7 +1958,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private bool IsPrivateModeSet(int mode)
     {
-        return mode < _privateModes.Length && _privateModes[mode];
+        return _privateModes.IsSet(mode);
     }
 
     // While a program has mouse reporting on, Shift+mouse still selects text locally, as in xterm.

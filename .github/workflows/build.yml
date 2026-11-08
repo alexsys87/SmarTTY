@@ -91,6 +91,9 @@ jobs:
       - name: Run bounded work checks (closing a session)
         run: dotnet run --project tests/BoundedWorkTests -c Release
 
+      - name: Run private mode table checks (CSI ? Pn h/l/s/r with any number)
+        run: dotnet run --project tests/PrivateModeTableTests -c Release
+
       - name: Run remote directory listing checks (file-by-file download; /bin/sh)
         run: dotnet run --project tests/RemoteDirectoryListingTests -c Release
 
