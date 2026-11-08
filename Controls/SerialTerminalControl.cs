@@ -948,6 +948,54 @@ public class SerialTerminalControl : TerminalEmulatorControl
         _historyVersion++;
     }
 
+    /// <summary>The history for the "Command history" window: every command once, the newest first.</summary>
+    public List<string> GetCommandHistory()
+    {
+        return CommandHistoryEditing.Distinct(Enumerable.Reverse(_commandHistory));
+    }
+
+    /// <summary>Removes <paramref name="commands"/> from the history (Up/Down, Ctrl+R and the grey suggestion).</summary>
+    public void RemoveFromHistory(IEnumerable<string> commands)
+    {
+        HashSet<string> set = new HashSet<string>(commands ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
+        if (set.Count == 0 || _commandHistory.RemoveAll(set.Contains) == 0)
+        {
+            return;
+        }
+        _navigationEntries = null;
+        _historySearch = null;
+        _historyVersion++;
+        RefreshHistorySuggestion();
+    }
+
+    /// <summary>
+    /// Puts a command from the history window into the input line in place of what is typed there, ready to be sent
+    /// with Enter or edited, as Up does. Without an input line the text goes to the device as typed.
+    /// </summary>
+    public void PutCommand(string command)
+    {
+        if (string.IsNullOrEmpty(command))
+        {
+            return;
+        }
+        if (_inputLine == null)
+        {
+            base.InsertCommand(command);
+            return;
+        }
+        _historySearch = null;
+        _navigationEntries = null;
+        CloseCompletion();
+        _inputLine.SetText(command);
+        RewrapInput();
+        UpdateCaretFromInputLine();
+        // As Up: with "Echo typed characters" the device gets the line.
+        if (_localEcho)
+        {
+            SendLineToDevice();
+        }
+    }
+
     public void AddToHistory(string command)
     {
         if (string.IsNullOrWhiteSpace(command))

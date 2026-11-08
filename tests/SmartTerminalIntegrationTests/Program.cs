@@ -215,7 +215,7 @@ internal static class Program
 
         using (SshSession session = Connect(host, port, user, password))
         {
-            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySuggestionSteps, HistorySearchSteps, CompletionSteps, SelectionSteps }, serverName);
+            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySuggestionSteps, HistorySearchSteps, CompletionSteps, SelectionSteps, HistoryWindowSteps }, serverName);
         }
 
         // The shell of the interactive wrapper chosen automatically: bash, or the BusyBox ash login shell (OpenWRT).
@@ -704,6 +704,68 @@ internal static class Program
             Name = "the terminal fills the window again",
             Act = () => terminal.Dock = DockStyle.Fill,
             Done = () => SelectedText(terminal) == selected
+        };
+    }
+
+    private static string HistoryFileText(SessionContext context, string file)
+    {
+        List<string> lines = context.Session.RunCommandChecked("cat " + file, requireSuccess: false);
+        return lines == null ? "" : string.Join("\n", lines);
+    }
+
+    // The "Command history" window of a Smart Terminal tab: deleting commands removes them from the history of the
+    // session and from the history file on the server (a time stamp of bash with them), and a command chosen there is put
+    // into the command line, ready for Enter.
+    private static IEnumerable<Step> HistoryWindowSteps(SshTerminalControl terminal, SessionContext context)
+    {
+        string file = null;
+        bool? written = null;
+        yield return Run(terminal, "echo forget-me-1", "forget-me-1", "a command to delete later");
+        yield return Run(terminal, "echo keep-me-1", "keep-me-1", "a command to keep");
+        yield return new Step
+        {
+            Name = "the commands reach the history file on the server",
+            Act = () => file = terminal.ShellAnalyzer.HistoryFileIfKnown,
+            Done = () => file != null && HistoryFileText(context, file).Contains("echo keep-me-1"),
+            TimeoutMs = 15000
+        };
+        yield return new Step
+        {
+            Name = "commands are deleted in the history window",
+            Act = () =>
+            {
+                // A command of another shell, with the time stamp bash writes before it (HISTTIMEFORMAT).
+                context.Session.RunCommand("printf '%s\\n' '#1700000000' 'echo forget-me-2' >> " + file, out _);
+                string[] removed = { "echo forget-me-1", "echo forget-me-2" };
+                terminal.ShellAnalyzer.RemoveFromHistory(removed, (bool ok) => written = ok);
+                terminal.ForgetCommands(removed);
+            },
+            Done = () => written == true,
+            TimeoutMs = 15000
+        };
+        yield return Check("the deleted commands and the time stamp are gone from the history file, the others stay", () =>
+        {
+            string text = HistoryFileText(context, file);
+            return !text.Contains("forget-me") && !text.Contains("#1700000000") && text.Contains("echo keep-me-1");
+        });
+        yield return Check("the deleted commands are gone from the history of the tab", () =>
+        {
+            List<string> history = terminal.GetCommandHistory();
+            return !history.Any((string command) => command.Contains("forget-me")) && history.Contains("echo keep-me-1");
+        });
+        yield return Retype(terminal, "echo forget-m", "a deleted command is not suggested any more", () => InputText(terminal) == "echo forget-m" && Suggestion(terminal) == null);
+        yield return new Step
+        {
+            Name = "a command chosen in the window replaces the typed line",
+            Act = () => terminal.PutCommand("echo keep-me-1"),
+            Done = () => InputText(terminal) == "echo keep-me-1",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "and runs with Enter",
+            Act = () => Key(terminal, Keys.Return),
+            Done = () => terminal.IsAtPrompt && CountLines(terminal, "keep-me-1") >= 2
         };
     }
 

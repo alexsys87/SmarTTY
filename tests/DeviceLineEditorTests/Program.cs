@@ -293,6 +293,40 @@ internal static class Program
             },
             new Step
             {
+                // "Command history..." of the terminal menu: the window lists the commands, the newest first.
+                Name = "the history window lists the commands sent to the device, the newest first",
+                Act = () => ClearLine(terminal),
+                Done = () => string.Join("|", control.CreateCommandHistorySource().Load()) == "passwd|ls -la /tmp|uptime|uname -a"
+            },
+            new Step
+            {
+                Name = "a command deleted in the history window is no longer suggested",
+                Act = () =>
+                {
+                    control.DeleteFromCommandHistory(new[] { "uptime" });
+                    Type(terminal, "u");
+                },
+                Done = () => Suggestion(terminal) == "name -a" && !control.CreateCommandHistorySource().Load().Contains("uptime")
+            },
+            new Step
+            {
+                Name = "it is gone from the saved history of the device as well",
+                Done = () => !SavedHistory(control).Contains("uptime") && SavedHistory(control).Contains("uname -a")
+            },
+            new Step
+            {
+                Name = "a command chosen in the history window replaces the typed line",
+                Act = () => control.CreateCommandHistorySource().Insert("ls -la /tmp"),
+                Done = () => InputText(terminal) == "ls -la /tmp"
+            },
+            new Step
+            {
+                Name = "the line is cleared",
+                Act = () => ClearLine(terminal),
+                Done = () => InputText(terminal) == ""
+            },
+            new Step
+            {
                 // Disconnect returns: closing the connection did not hang.
                 Name = "the connection is closed without hanging",
                 Act = () => control.Disconnect()
@@ -539,6 +573,13 @@ internal static class Program
     {
         object line = InputLine(terminal);
         return line == null ? "" : (string)line.GetType().GetField("Prompt").GetValue(line);
+    }
+
+    // What the device terminal keeps on disk for the next session.
+    private static IReadOnlyList<string> SavedHistory(DeviceTerminalControl control)
+    {
+        CommandHistory history = (CommandHistory)typeof(DeviceTerminalControl).GetField("_savedHistory", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(control);
+        return history.Items;
     }
 
     private static string Suggestion(SerialTerminalControl terminal)

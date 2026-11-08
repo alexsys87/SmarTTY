@@ -21,8 +21,28 @@ public class ShellCompletionAnalyzer : IDisposable
 
     private Dictionary<string, HashSet<string>> _executablesByDir = new Dictionary<string, HashSet<string>>();
 
-    // Commands waiting to be appended to the history file, written by one background thread at a time.
-    private Queue<string> _historyQueue = new Queue<string>();
+    // A change of the history file: a command to append, or commands to remove (the "Command history" window).
+    private sealed class HistoryFileJob
+    {
+        public string Append;
+
+        public List<string> Remove;
+
+        public Action<bool> Done;
+    }
+
+    // Changes waiting to be made to the history file, by one background thread at a time and in the order they were made.
+    private Queue<HistoryFileJob> _historyQueue = new Queue<HistoryFileJob>();
+
+    // Commands removed in this session (guarded by _history): the history file may still be being read, and the commands
+    // it had must not come back from it. A command that is typed again is taken off this list.
+    private readonly HashSet<string> _removedCommands = new HashSet<string>(StringComparer.Ordinal);
+
+    // Changes with every change of _history (guarded by it).
+    private int _historyVersion;
+
+    // Set once the history file has been read (or could not be read).
+    private readonly ManualResetEventSlim _historyLoaded = new ManualResetEventSlim(false);
 
     private volatile bool _disposed;
 
@@ -115,6 +135,9 @@ public class ShellCompletionAnalyzer : IDisposable
         return ShellSelection.GetHistoryFile(_context.VTSettings.CompletionTriggers.HistoryFileName, GetInteractiveShell(ShellProbeBackgroundWait));
     }
 
+    /// <summary>The history file of the shell, or null while the shell of the host is not known yet (it does not wait).</summary>
+    public string HistoryFileIfKnown => _shellProbed.IsSet ? GetHistoryFile() : null;
+
     private void ProbeShell()
     {
         try
@@ -143,13 +166,19 @@ public class ShellCompletionAnalyzer : IDisposable
                 List<string> commands = lines.Select(ShellCommandLine.ParseHistoryLine).Where((string line) => line != null).ToList();
                 lock (_history)
                 {
+                    commands.RemoveAll(_removedCommands.Contains);
                     // Commands typed while the file was being read come after it.
                     _history.InsertRange(0, commands);
+                    _historyVersion++;
                 }
             }
         }
         catch
         {
+        }
+        finally
+        {
+            _historyLoaded.Set();
         }
         try
         {
@@ -281,14 +310,16 @@ public class ShellCompletionAnalyzer : IDisposable
         }
     }
 
-    /// <summary>The number of commands in the history: it changes when the file has been read or a command was typed in any tab.</summary>
-    public int HistoryCount
+    /// <summary>
+    /// Changes whenever the history does: the file has been read, a command was typed in any tab, or commands were removed.
+    /// </summary>
+    public int HistoryVersion
     {
         get
         {
             lock (_history)
             {
-                return _history.Count;
+                return _historyVersion;
             }
         }
     }
@@ -298,6 +329,56 @@ public class ShellCompletionAnalyzer : IDisposable
         lock (_history)
         {
             return _history.ToArray();
+        }
+    }
+
+    /// <summary>The history, oldest first, once the history file has been read or <paramref name="wait"/> has passed.</summary>
+    public string[] GetHistory(TimeSpan wait)
+    {
+        _historyLoaded.Wait(wait);
+        return GetHistory();
+    }
+
+    /// <summary>
+    /// Removes <paramref name="commands"/> from the history of the session (every tab sees it at once) and, in the
+    /// background after the changes queued before, from the history file on the server. <paramref name="done"/> is
+    /// called on that background thread with whether the file was changed (true also when there was no file).
+    /// </summary>
+    public void RemoveFromHistory(IEnumerable<string> commands, Action<bool> done = null)
+    {
+        List<string> list = (commands ?? Enumerable.Empty<string>()).Where((string command) => !string.IsNullOrEmpty(command)).Distinct(StringComparer.Ordinal).ToList();
+        if (list.Count == 0)
+        {
+            done?.Invoke(true);
+            return;
+        }
+        HashSet<string> set = new HashSet<string>(list, StringComparer.Ordinal);
+        lock (_history)
+        {
+            _history.RemoveAll(set.Contains);
+            _removedCommands.UnionWith(set);
+            _historyVersion++;
+        }
+        QueueHistoryFileJob(new HistoryFileJob
+        {
+            Remove = list,
+            Done = done
+        });
+    }
+
+    private void QueueHistoryFileJob(HistoryFileJob job)
+    {
+        lock (_historyQueue)
+        {
+            _historyQueue.Enqueue(job);
+            if (!_historyWriterBusy)
+            {
+                _historyWriterBusy = true;
+                new Thread(ProcessHistoryQueue)
+                {
+                    IsBackground = true
+                }.Start();
+            }
         }
     }
 
@@ -311,19 +392,13 @@ public class ShellCompletionAnalyzer : IDisposable
         {
             // Other Smart Terminal tabs of the session see the command as well.
             _history.Add(text);
+            _removedCommands.Remove(text);
+            _historyVersion++;
         }
-        lock (_historyQueue)
+        QueueHistoryFileJob(new HistoryFileJob
         {
-            _historyQueue.Enqueue(text);
-            if (!_historyWriterBusy)
-            {
-                _historyWriterBusy = true;
-                new Thread(ProcessHistoryQueue)
-                {
-                    IsBackground = true
-                }.Start();
-            }
-        }
+            Append = text
+        });
     }
 
     private void ProcessHistoryQueue()
@@ -333,6 +408,7 @@ public class ShellCompletionAnalyzer : IDisposable
         while (true)
         {
             string command;
+            HistoryFileJob removal = null;
             lock (_historyQueue)
             {
                 if (_historyQueue.Count == 0 || _disposed)
@@ -340,16 +416,41 @@ public class ShellCompletionAnalyzer : IDisposable
                     _historyWriterBusy = false;
                     return;
                 }
-                // Everything queued so far is written by one command: a channel per history line was slow.
-                // printf rather than echo: echo may interpret backslashes or take "-n"/"-e" at the start of a command as options.
-                command = "printf '%s\\n' " + string.Join(" ", _historyQueue.Select(SmarTTY.IO.RemotePathUtils.ShellQuote).ToArray()) + " >> " + historyFile;
-                _historyQueue.Clear();
+                if (_historyQueue.Peek().Remove != null)
+                {
+                    removal = _historyQueue.Dequeue();
+                    command = CommandHistoryEditing.BuildRemoveCommand(historyFile, removal.Remove);
+                }
+                else
+                {
+                    // The lines queued before the next removal are written by one command: a channel per history line was slow.
+                    // printf rather than echo: echo may interpret backslashes or take "-n"/"-e" at the start of a command as options.
+                    List<string> lines = new List<string>();
+                    while (_historyQueue.Count > 0 && _historyQueue.Peek().Remove == null)
+                    {
+                        lines.Add(_historyQueue.Dequeue().Append);
+                    }
+                    command = "printf '%s\\n' " + string.Join(" ", lines.Select(SmarTTY.IO.RemotePathUtils.ShellQuote).ToArray()) + " >> " + historyFile;
+                }
                 _historyWriterBusy = true;
             }
             // RunCommand rather than a channel left running in the background: a helper command must not overlap
             // with the PTY channel of the command being started (see Ssh/PtySetupGate.cs), otherwise dropbear on
             // OpenWRT dropped that command's exec request and the Smart Terminal tab hung.
-            _sshSession.RunCommand(command, out _);
+            bool changed = true;
+            try
+            {
+                if (command != null)
+                {
+                    _sshSession.RunCommand(command, out int? exitStatus);
+                    changed = exitStatus == 0;
+                }
+            }
+            catch
+            {
+                changed = false;
+            }
+            removal?.Done?.Invoke(changed);
         }
     }
 
