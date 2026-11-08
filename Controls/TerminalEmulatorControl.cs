@@ -970,6 +970,8 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             // A count of 0 means 1, as an omitted one does.
             repeatCount = count;
         }
+        // The count is the remote side's to choose, up to int.MaxValue: it is cut to what the screen can use (see CsiRepeatLimit).
+        repeatCount = CsiRepeatLimit.Clamp(ch, repeatCount, _visibleRows, _visibleColumns);
         switch (ch)
         {
             case '@':

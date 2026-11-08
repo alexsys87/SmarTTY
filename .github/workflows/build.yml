@@ -97,6 +97,9 @@ jobs:
       - name: Run remote directory listing checks (file-by-file download; /bin/sh)
         run: dotnet run --project tests/RemoteDirectoryListingTests -c Release
 
+      - name: Run CSI repeat limit checks (counts from the remote side)
+        run: dotnet run --project tests/CsiRepeatLimitTests -c Release
+
       - name: Run local link policy checks (clicks on paths in device terminals)
         run: dotnet run --project tests/LocalLinkPolicyTests -c Release
 
