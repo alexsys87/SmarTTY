@@ -107,7 +107,7 @@ namespace SmarTTY.CodeEditing
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.PostgreSql, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
