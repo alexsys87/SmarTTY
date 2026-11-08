@@ -343,6 +343,34 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
     private string _searchOriginalText;
 
+    // The grey rest of a previously typed command drawn after the caret (see HistorySuggestion); null when none is shown.
+    private string _historySuggestion;
+
+    // Esc hides the suggestion until the line changes: the text it was hidden for.
+    private string _suggestionDismissedFor;
+
+    // BuildHistory() for the suggestions, built again only when the history of the session or of this tab has grown.
+    private List<string> _suggestionHistory;
+
+    private ShellCompletionAnalyzer _suggestionAnalyzer;
+
+    private int _suggestionHistoryCount = -1;
+
+    private int _suggestionTypedCount = -1;
+
+    // The last lookup: the caret moves on every key, and the history does not need to be searched again for the same text.
+    private string _suggestionQuery;
+
+    private string _suggestionResult;
+
+    private List<string> _suggestionQueryHistory;
+
+    private SolidBrush _suggestionBrush;
+
+    private Color _suggestionBrushFore;
+
+    private Color _suggestionBrushBack;
+
     private List<string> _typedCommands = new List<string>();
 
     // Variables set with "export" (a null value: "unset"), in the order they were set: a later value may refer to an
@@ -711,6 +739,8 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             ch = '#';
         }
+        _historySuggestion = null;
+        _suggestionDismissedFor = null;
         _inputLine = new InputLine(this, ((EditableTextBrowser)this).EditableDocument.LineCount, customPrompt ?? $"{PromptPrefix}{ch} ");
         ((EditableTextBrowser)this).EditableDocument.AppendLine(_inputLine.Prompt);
         RewrapInput();
@@ -841,6 +871,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
                 _completion.Dispose();
                 _completion = null;
             }
+            RefreshHistorySuggestion();
         }
         else
         {
@@ -951,7 +982,161 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         if (_inputLine != null)
         {
             SetSelectionEnd(textPosition);
+            // The suggestion is shown only while the caret is at the end of the line.
+            RefreshHistorySuggestion();
         }
+    }
+
+    // Newest first, as BuildHistory(), kept between keys: the history only grows (the file read in the background, a
+    // command typed in this or another tab of the session), so a changed count is enough to tell it has to be built again.
+    private List<string> GetSuggestionHistory()
+    {
+        ShellCompletionAnalyzer analyzer = ShellAnalyzer;
+        int historyCount = analyzer?.HistoryCount ?? 0;
+        if (_suggestionHistory == null || analyzer != _suggestionAnalyzer || historyCount != _suggestionHistoryCount || _typedCommands.Count != _suggestionTypedCount)
+        {
+            _suggestionHistory = BuildHistory();
+            _suggestionAnalyzer = analyzer;
+            _suggestionHistoryCount = historyCount;
+            _suggestionTypedCount = _typedCommands.Count;
+        }
+        return _suggestionHistory;
+    }
+
+    private string ComputeHistorySuggestion()
+    {
+        InputLine inputLine = _inputLine;
+        if (inputLine == null || _historySearch != null || HasSelection || !CompletionTriggers().HistorySuggestions)
+        {
+            return null;
+        }
+        string text = inputLine.Text ?? "";
+        if (text.Length == 0 || inputLine.Region.CaretIndex != text.Length || text == _suggestionDismissedFor)
+        {
+            return null;
+        }
+        List<string> history = GetSuggestionHistory();
+        if (text != _suggestionQuery || history != _suggestionQueryHistory)
+        {
+            _suggestionQuery = text;
+            _suggestionQueryHistory = history;
+            _suggestionResult = HistorySuggestion.Find(history, text);
+        }
+        return _suggestionResult;
+    }
+
+    /// <summary>Works out the grey suggestion for the line as it is now and repaints when it has changed.</summary>
+    private void RefreshHistorySuggestion()
+    {
+        string suggestion;
+        try
+        {
+            suggestion = ComputeHistorySuggestion();
+        }
+        catch
+        {
+            // The caret is also moved while the prompt line is being replaced, when the input region may not match the
+            // document for a moment; the next change works the suggestion out again.
+            suggestion = null;
+        }
+        if (suggestion != _historySuggestion)
+        {
+            _historySuggestion = suggestion;
+            Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// Right or End at the end of the line take the whole suggestion, Ctrl+Right its next word (as in fish). Returns false,
+    /// leaving the key to its usual meaning, when no suggestion is shown.
+    /// </summary>
+    private bool TryAcceptHistorySuggestion(KeyEventArgs e)
+    {
+        InputLine inputLine = _inputLine;
+        if (inputLine == null || e.Shift || e.Alt)
+        {
+            return false;
+        }
+        bool wholeCommand = !e.Control && (e.KeyCode == Keys.Right || e.KeyCode == Keys.End);
+        bool nextWord = e.Control && e.KeyCode == Keys.Right;
+        if (!wholeCommand && !nextWord)
+        {
+            return false;
+        }
+        RefreshHistorySuggestion();
+        string suggestion = _historySuggestion;
+        if (suggestion == null)
+        {
+            return false;
+        }
+        string part = wholeCommand ? suggestion : HistorySuggestion.NextWord(suggestion);
+        if (part.Length == 0)
+        {
+            return false;
+        }
+        string text = inputLine.Text ?? "";
+        // The list was made for the word being typed, which the suggestion has just changed.
+        CloseCompletion();
+        inputLine.SetText(text + part);
+        return true;
+    }
+
+    /// <summary>Esc hides the suggestion until the line is changed.</summary>
+    private void DismissHistorySuggestion()
+    {
+        if (_historySuggestion == null)
+        {
+            return;
+        }
+        _suggestionDismissedFor = _inputLine?.Text;
+        RefreshHistorySuggestion();
+    }
+
+    protected override void PaintLineOverlay(Graphics graphics, int line, string text, int firstColumn, int left, int top, int height)
+    {
+        base.PaintLineOverlay(graphics, line, text, firstColumn, left, top, height);
+        string suggestion = _historySuggestion;
+        if (suggestion == null || _inputLine == null || _historySearch != null || HasSelection || line != ((EditableTextBrowser)this).EditableDocument.LineCount - 1)
+        {
+            return;
+        }
+        // The input is the last line of the document (wrapped by RewrapInput), so the suggestion starts where it ends.
+        int column = 0;
+        foreach (char ch in text ?? "")
+        {
+            column += (ch == '\t') ? (TabSize - column % TabSize) : 1;
+        }
+        column -= firstColumn;
+        string visible = HistorySuggestion.FitToWidth(suggestion, column, _visibleColumns);
+        if (visible.Length == 0)
+        {
+            return;
+        }
+        Brush brush = GetSuggestionBrush();
+        float charWidth = CharSize.Width;
+        // One character per cell, as PaintLine places the typed text, so the suggestion stays on the same grid.
+        for (int i = 0; i < visible.Length; i++)
+        {
+            if (visible[i] != ' ')
+            {
+                graphics.DrawString(visible.Substring(i, 1), Font, brush, left + (column + i) * charWidth, top, _stringFormat);
+            }
+        }
+    }
+
+    // Halfway between the text and the background, so it reads as a hint in light and dark colour schemes alike.
+    private Brush GetSuggestionBrush()
+    {
+        Color fore = (_defaultColors[0].Foreground as SolidBrush)?.Color ?? ForeColor;
+        Color back = BackColor;
+        if (_suggestionBrush == null || fore != _suggestionBrushFore || back != _suggestionBrushBack)
+        {
+            _suggestionBrush?.Dispose();
+            _suggestionBrush = new SolidBrush(Color.FromArgb((fore.R + back.R) / 2, (fore.G + back.G) / 2, (fore.B + back.B) / 2));
+            _suggestionBrushFore = fore;
+            _suggestionBrushBack = back;
+        }
+        return _suggestionBrush;
     }
 
     protected override void SelectAll()
@@ -1171,6 +1356,9 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        // A key that ends the history search keeps the found command and moves the caret: it must not also take a
+        // suggestion that appears once the search is over.
+        bool wasSearching = _historySearch != null;
         if (_historySearch != null && _inputLine != null)
         {
             if (IsModifierKey(e.KeyCode))
@@ -1189,6 +1377,12 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
                 return;
             }
             EndHistorySearch(accept: true);
+        }
+        // Before the completion list: it leaves Right and End alone, so the suggestion can be taken while it is open.
+        if (!wasSearching && TryAcceptHistorySuggestion(e))
+        {
+            SuppressKey(e);
+            return;
         }
         CompletionSession completionSession = _completion;
         ICompletionPopup completionPopup = _popup;
@@ -1213,7 +1407,13 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             if (e.KeyCode == Keys.Escape)
             {
+                // The first Esc closes the completion list, the next one hides the suggestion.
+                bool listOpen = (_popup != null && _popup.IsOpen) || (_completion != null && _completion.IsOpen);
                 CloseCompletion();
+                if (!listOpen)
+                {
+                    DismissHistorySuggestion();
+                }
             }
             if (e.Control && !e.Alt)
             {
@@ -2040,6 +2240,8 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             catch
             {
             }
+            _suggestionBrush?.Dispose();
+            _suggestionBrush = null;
         }
         base.Dispose(disposing);
     }

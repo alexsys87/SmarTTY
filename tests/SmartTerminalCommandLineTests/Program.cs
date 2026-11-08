@@ -10,7 +10,7 @@ using SmarTTY.Terminal;
 //  * telling a command name from a path or a cd argument (completion target),
 //  * quoting completed paths and reading back what was typed,
 //  * joining pasted lines, export/unset parsing, history file lines, "~" in the prompt,
-//  * the bash-like history search (Ctrl+R), $variables and host names,
+//  * the bash-like history search (Ctrl+R), the grey suggestion from the history, $variables and host names,
 //  * parsing aliases, functions, variables and host files for completion,
 //  * choosing the shell of the interactive wrapper (bash, or BusyBox ash as on OpenWrt) and its history file; the probe
 //    and the wrapper are run by the system shells and by BusyBox when it is installed.
@@ -263,6 +263,30 @@ internal static class Program
         Check(none.Failed && none.Match == null, "an empty history");
     }
 
+    private static void HistorySuggestionChecks()
+    {
+        List<string> history = new List<string> { "git checkout main", "git status", "ls -la /tmp", "Make", "make test", "cat a\tb", "echo 1\necho 2" };
+        Equal(HistorySuggestion.Find(history, "git"), " checkout main", "the rest of the newest command that starts with the text");
+        Equal(HistorySuggestion.Find(history, "git s"), "tatus", "a longer text picks an older command");
+        Equal(HistorySuggestion.Find(history, "git status"), null, "a command typed in full has nothing left to suggest");
+        Equal(HistorySuggestion.Find(history, "ma"), "ke test", "case-sensitive, as in the shell");
+        Equal(HistorySuggestion.Find(history, "-la"), null, "only the beginning of a command matches");
+        Equal(HistorySuggestion.Find(history, ""), null, "nothing is suggested on an empty line");
+        Equal(HistorySuggestion.Find(history, "  "), null, "nothing is suggested for spaces only");
+        Equal(HistorySuggestion.Find(history, "cat"), null, "a command with a tab is not suggested");
+        Equal(HistorySuggestion.Find(history, "echo"), null, "a command of several lines is not suggested");
+        Equal(HistorySuggestion.Find(new List<string> { null, "pwd" }, "p"), "wd", "a missing entry is skipped");
+        Equal(HistorySuggestion.Find(null, "ls"), null, "no history yet");
+        Equal(HistorySuggestion.NextWord(" checkout main"), " checkout", "Ctrl+Right: the spaces and the next word");
+        Equal(HistorySuggestion.NextWord("eckout main"), "eckout", "Ctrl+Right: the rest of the word being typed");
+        Equal(HistorySuggestion.NextWord("  -la"), "  -la", "Ctrl+Right: the last word");
+        Equal(HistorySuggestion.NextWord(""), "", "Ctrl+Right: nothing to take");
+        Equal(HistorySuggestion.FitToWidth("abcdef", 76, 80), "abcd", "cut at the right edge of the window");
+        Equal(HistorySuggestion.FitToWidth("abc", 10, 80), "abc", "a suggestion that fits is drawn in full");
+        Equal(HistorySuggestion.FitToWidth("abc", 80, 80), "", "no room when the text ends at the edge");
+        Equal(HistorySuggestion.FitToWidth("abc", -3, 80), "", "nothing when the end of the text is scrolled out of view");
+    }
+
     private static void CompletionSourceChecks()
     {
         CompletionSources.ShellDefinitions definitions = CompletionSources.ParseShellDefinitions(new[]
@@ -488,6 +512,7 @@ internal static class Program
             ShellSelectionChecks();
             VariableAndHostChecks();
             HistorySearchChecks();
+            HistorySuggestionChecks();
             CompletionSourceChecks();
             TokenizeChecks();
             AnalyzeChecks();
