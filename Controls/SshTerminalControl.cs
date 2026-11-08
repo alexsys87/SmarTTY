@@ -976,7 +976,14 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         base.SetCaretCore(textPosition, selectionChangeSource, caretDirection);
         if (_inputLine != null)
         {
-            SetSelectionEnd(textPosition);
+            // The end of a selection follows the caret while text of the command line is selected (Shift+arrows). A
+            // selection of the output above it is left alone: the caret is also put back into the command line when the
+            // terminal is resized (the horizontal scroll bar comes in or goes away as the mouse passes the bottom edge),
+            // and that used to stretch the selection from the output down to the prompt, so the wrong text was copied.
+            if (!HasSelection || (IsInInputArea(SelectionStart) && IsInInputArea(SelectionEnd)))
+            {
+                SetSelectionEnd(textPosition);
+            }
             // The suggestion is shown only while the caret is at the end of the line.
             RefreshHistorySuggestion();
         }

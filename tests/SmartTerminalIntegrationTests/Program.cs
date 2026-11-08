@@ -4,6 +4,7 @@ using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -214,7 +215,7 @@ internal static class Program
 
         using (SshSession session = Connect(host, port, user, password))
         {
-            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySuggestionSteps, HistorySearchSteps, CompletionSteps }, serverName);
+            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySuggestionSteps, HistorySearchSteps, CompletionSteps, SelectionSteps }, serverName);
         }
 
         // The shell of the interactive wrapper chosen automatically: bash, or the BusyBox ash login shell (OpenWRT).
@@ -384,6 +385,8 @@ internal static class Program
         SshShellChannel channel = null;
         Utf8StreamDecoder decoder = new Utf8StreamDecoder();
         terminal.DataEntered += (object sender, byte[] input, TerminalEmulatorControl.InputKind kind) => channel?.Input.Write(input, 0, input.Length);
+        // As SessionWrapper.AttachChannelToControl: a new size of the control goes to the PTY of the shell.
+        terminal.TerminalSizeChanged += (TerminalEmulatorControl control, int columns, int rows) => channel?.ResizePty(columns, rows);
         string screenLine = null;
         DateTime catStarted = DateTime.MaxValue;
         List<Step> steps = new List<Step>
@@ -495,6 +498,16 @@ internal static class Program
                 Done = () => channel.TryWaitClosed()
             }
         };
+        // A selection of the shell's output survives the scroll bar coming in under the mouse, also when the shell gets
+        // the new size of the terminal.
+        List<Step> selection = SelectAndResizeSteps(terminal, "CCприЖет", "CCприЖет").ToList();
+        selection.Add(new Step
+        {
+            Name = "the selection is removed",
+            Act = terminal.ClearSelection,
+            Done = () => !terminal.HasSelection
+        });
+        steps.InsertRange(steps.FindIndex((Step step) => step.Name == "cat starts"), selection);
         ExecuteSteps(form, terminal, steps, label);
         if (screenLine != null && Environment.GetEnvironmentVariable("SMARTTY_TEST_TRACE") == "1")
         {
@@ -545,6 +558,152 @@ internal static class Program
         {
             Name = "exit codes are shown again",
             Act = () => context.VTSettings.ShowExitCodes = true
+        };
+    }
+
+    private static readonly MethodInfo PositionToPointMethod = typeof(ReadonlyTextBrowser).GetMethod("PositionToPoint", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    private static readonly MethodInfo OnMouseDownMethod = typeof(Control).GetMethod("OnMouseDown", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    private static readonly MethodInfo OnMouseMoveMethod = typeof(Control).GetMethod("OnMouseMove", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    private static readonly MethodInfo OnMouseUpMethod = typeof(Control).GetMethod("OnMouseUp", BindingFlags.Instance | BindingFlags.NonPublic);
+
+    // The point of a character of the document on the screen (inside its cell).
+    private static Point PointOf(TerminalEmulatorControl terminal, int column, int line)
+    {
+        PointF point = (PointF)PositionToPointMethod.Invoke(terminal, new object[] { column, line });
+        return new Point((int)point.X + 2, (int)point.Y + 4);
+    }
+
+    private static void Mouse(TerminalEmulatorControl terminal, MethodInfo method, MouseButtons buttons, Point point)
+    {
+        method.Invoke(terminal, new object[] { new MouseEventArgs(buttons, 1, point.X, point.Y, 0) });
+    }
+
+    private static int FindLine(TerminalEmulatorControl terminal, string text)
+    {
+        string[] lines = DocumentText(terminal).Split('\n');
+        for (int line = lines.Length - 1; line >= 0; line--)
+        {
+            if (lines[line].TrimEnd() == text)
+            {
+                return line;
+            }
+        }
+        return -1;
+    }
+
+    // The selected text, or null without a selection.
+    private static string SelectedText(TerminalEmulatorControl terminal)
+    {
+        if (!terminal.HasSelection)
+        {
+            return null;
+        }
+        TextDocument.TextPosition start = terminal.SelectionStart;
+        TextDocument.TextPosition end = terminal.SelectionEnd;
+        if (end < start)
+        {
+            TextDocument.TextPosition swap = start;
+            start = end;
+            end = swap;
+        }
+        string[] lines = DocumentText(terminal).Split('\n');
+        StringBuilder text = new StringBuilder();
+        for (int line = start.Line; line <= end.Line && line < lines.Length; line++)
+        {
+            string lineText = lines[line];
+            int from = line == start.Line ? Math.Min(start.Column, lineText.Length) : 0;
+            int to = line == end.Line ? Math.Min(end.Column, lineText.Length) : lineText.Length;
+            text.Append(lineText.Substring(from, Math.Max(0, to - from)));
+            if (line != end.Line)
+            {
+                text.Append('\n');
+            }
+        }
+        return text.ToString();
+    }
+
+    // A selection made with the mouse survives what happens to the window after the button is released: the horizontal
+    // scroll bar in Auto mode comes in when the mouse passes the bottom edge, which makes the terminal 12 pixels shorter.
+    private static IEnumerable<Step> SelectionSteps(SshTerminalControl terminal, SessionContext context)
+    {
+        yield return Run(terminal, "echo select-me-first; echo select-me-second", "select-me-second", "output to select");
+        foreach (Step step in SelectAndResizeSteps(terminal, "select-me-first", "select-me-second"))
+        {
+            yield return step;
+        }
+        yield return new Step
+        {
+            Name = "typing after a selection of the output still goes to the command line",
+            Act = () => Type(terminal, "echo typed"),
+            Done = () => InputText(terminal) == "echo typed",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the line is cleared",
+            Act = () => Key(terminal, Keys.Control | Keys.C),
+            Done = () => InputText(terminal) == "",
+            TimeoutMs = 3000
+        };
+    }
+
+    // Selects the lines from firstLine to lastLine (their text, the last ones on the screen) with the mouse, releases the
+    // button, makes the terminal 12 pixels shorter and taller again (as the horizontal scroll bar does), and checks after
+    // each change, once the terminal has had time to tell the server its new size, that the same text is still selected.
+    private static IEnumerable<Step> SelectAndResizeSteps(TerminalEmulatorControl terminal, string firstLine, string lastLine)
+    {
+        string selected = null;
+        DateTime resizedAt = DateTime.MaxValue;
+        yield return new Step
+        {
+            Name = "lines of output are selected with the mouse",
+            Act = () =>
+            {
+                int first = FindLine(terminal, firstLine);
+                int last = FindLine(terminal, lastLine);
+                Point from = PointOf(terminal, 0, first);
+                Point to = PointOf(terminal, lastLine.Length, last);
+                Mouse(terminal, OnMouseDownMethod, MouseButtons.Left, from);
+                Mouse(terminal, OnMouseMoveMethod, MouseButtons.Left, new Point(from.X + 20, from.Y));
+                Mouse(terminal, OnMouseMoveMethod, MouseButtons.Left, to);
+                Mouse(terminal, OnMouseUpMethod, MouseButtons.Left, to);
+                Mouse(terminal, OnMouseMoveMethod, MouseButtons.None, new Point(to.X, to.Y + 30));
+                selected = SelectedText(terminal);
+            },
+            Done = () => selected == (firstLine == lastLine ? firstLine : firstLine + "\n" + lastLine),
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the selection survives the terminal getting shorter (the horizontal scroll bar comes in)",
+            Act = () =>
+            {
+                terminal.Dock = DockStyle.None;
+                terminal.Height -= 12;
+                resizedAt = DateTime.UtcNow;
+            },
+            Done = () => (DateTime.UtcNow - resizedAt).TotalMilliseconds > 700 && SelectedText(terminal) == selected,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the selection survives the terminal getting taller again",
+            Act = () =>
+            {
+                terminal.Height += 12;
+                resizedAt = DateTime.UtcNow;
+            },
+            Done = () => (DateTime.UtcNow - resizedAt).TotalMilliseconds > 700 && SelectedText(terminal) == selected,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the terminal fills the window again",
+            Act = () => terminal.Dock = DockStyle.Fill,
+            Done = () => SelectedText(terminal) == selected
         };
     }
 
