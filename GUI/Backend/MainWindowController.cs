@@ -2284,6 +2284,14 @@ public class MainWindowController : INotifyPropertyChanged
 
     private void anyctl_MouseMove(object sender, MouseEventArgs e)
     {
+        // While a button is held (text is being selected by dragging) the layout stays as it is. The scroll bars in Auto
+        // mode and the headers of the minimalistic mode come and go at the edges of the terminal: a drag that reached the
+        // last lines brought the horizontal scroll bar in, the terminal got shorter under the mouse, scrolled to its end
+        // and (in a shell tab) was redrawn for the new size, so the selection was lost and nothing could be copied.
+        if (e.Button != System.Windows.Forms.MouseButtons.None)
+        {
+            return;
+        }
         ScreenEdgeUtils.EdgeFlags edgeFlags = ScreenEdgeUtils.GetNearEdges(sender as Control, e.Location, EdgeMargin);
         if (sender is TerminalEmulatorControl terminalEmulatorControl)
         {
@@ -2353,7 +2361,8 @@ public class MainWindowController : INotifyPropertyChanged
     {
         control.MouseMove += (sender, e) =>
         {
-            if (!(sender is Control source) || terminal.IsDisposed || source.IsDisposed)
+            // No layout change while text is being selected by dragging (see anyctl_MouseMove).
+            if (!(sender is Control source) || terminal.IsDisposed || source.IsDisposed || e.Button != System.Windows.Forms.MouseButtons.None)
             {
                 return;
             }

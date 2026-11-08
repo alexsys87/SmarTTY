@@ -453,8 +453,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private IScrollBar _horizontalScrollBar = new ScrollBarAdapter(new HScrollBar());
 
-    private int _bottomGapRows;
-
     private SizeF _charSize;
 
     protected int _visibleColumns;
@@ -1020,35 +1018,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
-    /// <summary>
-    /// Number of empty text rows kept free below the text while the horizontal scroll bar is visible. The scroll bar of
-    /// a hosted terminal is a separate WPF element right under the control, so a drag that selects the last lines
-    /// ended up on it. With the gap the mouse stays inside the control (which still drags and auto-scrolls the
-    /// selection) well before it reaches the scroll bar.
-    /// </summary>
-    [System.ComponentModel.Browsable(false)]
-    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
-    public int BottomGapRows
-    {
-        get
-        {
-            return _bottomGapRows;
-        }
-        set
-        {
-            value = Math.Max(0, value);
-            if (_bottomGapRows != value)
-            {
-                _bottomGapRows = value;
-                if (_document != null && IsHandleCreated)
-                {
-                    UpdateLayout();
-                    Redraw();
-                }
-            }
-        }
-    }
-
     public bool HideCaret
     {
         get
@@ -1277,12 +1246,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             }
             else
             {
-                int bottomGap = 0;
-                if (_bottomGapRows > 0 && _horizontalScrollBar.Visible)
-                {
-                    bottomGap = (int)Math.Round((double)_bottomGapRows * _charSize.Height);
-                }
-                int textAreaHeight = Math.Max(ClientRectangle.Height - scrollBarHeight - bottomGap, (int)_charSize.Height);
+                int textAreaHeight = Math.Max(ClientRectangle.Height - scrollBarHeight, (int)_charSize.Height);
                 _textArea = new Rectangle(ClientRectangle.Left + marginRight + leftPadding, ClientRectangle.Top, ClientRectangle.Width - (scrollBarWidth + marginRight + leftPadding), textAreaHeight);
             }
             int previousVisibleRows = _visibleRows;
