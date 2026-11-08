@@ -285,6 +285,9 @@ jobs:
       - name: Memory (devmem) (values in every form, bits and fields, the output of devmem and devmem2, bus errors, the read and write commands against stand-in tools; /bin/sh and BusyBox)
         run: dotnet run --project tests/DevMemTests -c Release
 
+      - name: Saving a file of the remote editor (free space, a write that fails half way is put back, read-back, restore copy; /bin/sh, bash and BusyBox, stand-in df and cat, the size limit of a process for a full disk)
+        run: dotnet run --project tests/RemoteSaveCommandTests -c Release
+
   sshnet:
     name: SSH.NET integration tests
     runs-on: ubuntu-24.04

@@ -1329,7 +1329,12 @@ public partial class RemoteFileEditor : CodeEditorPP
 
         public string TemporaryPath;
 
+        // A POSIX sh script (RemoteSaveCommand.BuildScript): run through PosixShell.Wrap, or through "sudo sh -c".
         public string ReplaceCommand;
+
+        // The replacement failed and the old content could not be put back: the uploaded text and the restore copy are all there
+        // is, so they are not deleted (RemoveTemporaryFile).
+        public bool KeepTemporaryFiles;
 
         // The text version being saved (EditableTextBrowser.CurrentVersion), or the hex version
         // (HexDocument.CurrentVersion) when HexMode is set.
@@ -1778,16 +1783,12 @@ public partial class RemoteFileEditor : CodeEditorPP
             bytes = exactBytes ? _hexBytesForTextSave : TextFileEncodings.Encode(value, FileEncoding);
         }
         string temporaryPath = _settings.Editor.TemporaryDirectory + "/" + Guid.NewGuid().ToString() + ".txt";
-        // Quote both paths: a file name with ", $ or ` must neither break the command nor expand.
-        string quotedTemporary = RemotePathUtils.ShellQuote(temporaryPath);
-        string quotedTarget = RemotePathUtils.ShellQuote(RemotePath);
-        string replaceCommand = "cat " + quotedTemporary + " > " + quotedTarget;
         bool backup = _settings.Editor.BackupBeforeSave && !IsNewFile && !_backupDone;
-        if (backup)
-        {
-            // A failed copy does not stop the save (cat decides the result), as with the "~" files of other editors.
-            replaceCommand = "[ ! -e " + quotedTarget + " ] || cp -p " + quotedTarget + " " + RemotePathUtils.ShellQuote(RemotePath + "~") + "; " + replaceCommand;
-        }
+        // The file is written in place, which keeps its owner, mode and links, and that truncates it first. So the old content is
+        // kept until the result has been read back, and the script puts it back when the space ran out or the write failed half
+        // way. A failed backup copy ("~", as with other editors) does not stop the save. The paths are quoted by the script: a
+        // file name with ", $ or ` must neither break the command nor expand.
+        string replaceCommand = RemoteSaveCommand.BuildScript(RemotePath, temporaryPath, bytes.Length, backup);
         // The check of the file runs on the text; the bytes of the hex view are saved as they are.
         ConfigValidator validator = null;
         if (!hexMode && !IsWindowsHost && !_skipValidation && !_settings.Editor.DisableConfigCheck)
@@ -1845,13 +1846,32 @@ public partial class RemoteFileEditor : CodeEditorPP
             // The user said at opening that this file is written with sudo: no failing plain attempt first.
             return false;
         }
-        if (_context.Session.RunCommandChecked(job.ReplaceCommand, requireSuccess: true) != null)
+        List<string> replaceOutput = _context.Session.RunCommand(PosixShell.Wrap(job.ReplaceCommand), out int? replaceStatus);
+        if (replaceStatus == 0)
         {
             job.NewSignature = FetchSignature();
             return true;
         }
+        if (replaceStatus.HasValue)
+        {
+            // The space ran out or the write failed: the file is as it was (or, when even that failed, the old content is kept
+            // next to the uploaded text). That is no refused write, so sudo is not offered for it.
+            string description = RemoteSaveCommand.Describe(replaceStatus.Value, replaceOutput, RemotePath, job.TemporaryPath);
+            if (description != null)
+            {
+                job.KeepTemporaryFiles = replaceStatus.Value == RemoteSaveCommand.ExitNotRestored;
+                throw new IOException(description);
+            }
+        }
         // A lost connection is not a refused write: do not offer sudo for it.
-        _context.Session.ThrowIfConnectionLost();
+        try
+        {
+            _context.Session.ThrowIfConnectionLost();
+        }
+        catch (IOException)
+        {
+            throw new IOException("The connection to the server was lost while " + RemotePath + " was being written. Check the file on the server before you save again: your text is still in the editor.");
+        }
         return false;
     }
 
@@ -1873,11 +1893,19 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             throw new OperationCanceledException();
         }
-        RunSudoCommand(job.ReplaceCommand);
+        RunSudoCommand(job.ReplaceCommand, status =>
+        {
+            // What the script printed is not captured here (it goes to the terminal of the prompt), so the message has no details.
+            job.KeepTemporaryFiles |= status == RemoteSaveCommand.ExitNotRestored;
+            return RemoteSaveCommand.Describe(status, null, RemotePath, job.TemporaryPath);
+        });
     }
 
-    /// <summary>Runs a command through sudo on a shell channel, with the password prompt of the editor (UI thread).</summary>
-    private void RunSudoCommand(string command)
+    /// <summary>
+    /// Runs a command through sudo on a shell channel, with the password prompt of the editor (UI thread).
+    /// <paramref name="describeFailure"/> may turn an exit status into the message of the exception (null: the usual one).
+    /// </summary>
+    private void RunSudoCommand(string command, Func<int, string> describeFailure = null)
     {
         string sudoCommand = "sudo sh -c " + RemotePathUtils.ShellQuote(command);
         SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(sudoCommand, "xterm");
@@ -1897,7 +1925,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
         if (sudoExitStatus != 0)
         {
-            throw new Exception("Sudo exited with code " + sudoExitStatus);
+            throw new Exception(describeFailure?.Invoke(sudoExitStatus) ?? "Sudo exited with code " + sudoExitStatus);
         }
     }
 
@@ -1944,9 +1972,14 @@ public partial class RemoteFileEditor : CodeEditorPP
             // Nothing was uploaded to a temporary file.
             return;
         }
+        if (job.KeepTemporaryFiles)
+        {
+            return;
+        }
         try
         {
-            _context.Session.RunCommandChecked("rm -f " + RemotePathUtils.ShellQuote(job.TemporaryPath), requireSuccess: true);
+            // The script removes its restore copy itself; this is for the case that it was cut short.
+            _context.Session.RunCommandChecked("rm -f " + RemotePathUtils.ShellQuote(job.TemporaryPath) + " " + RemotePathUtils.ShellQuote(RemoteSaveCommand.RestoreCopyPath(job.TemporaryPath)), requireSuccess: true);
         }
         catch
         {
