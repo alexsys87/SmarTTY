@@ -14,6 +14,10 @@ using SmarTTY.Utilities;
 // command says. Needs a Linux with /bin/sh, df, cp, cat, wc and head; bash, BusyBox, setpriv and the right to mount a tmpfs
 // (root) make more of the checks run, the rest is reported as skipped.
 // Run with: dotnet run --project tests/RemoteSaveCommandTests
+
+// The harness runs real Unix shells and sets Unix file modes: it does not run on Windows (Main says so), and the analyzer is told, too.
+[assembly: System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+
 internal static class Program
 {
     private static int _passed;
@@ -75,7 +79,7 @@ internal static class Program
 
     private static int Main()
     {
-        if (!File.Exists(BinSh) || !File.Exists("/bin/cat"))
+        if (OperatingSystem.IsWindows() || !File.Exists(BinSh) || !File.Exists("/bin/cat"))
         {
             Console.WriteLine("SKIP: this needs a Linux with /bin/sh");
             return 0;
