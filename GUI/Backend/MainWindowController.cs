@@ -1822,7 +1822,8 @@ public class MainWindowController : INotifyPropertyChanged
         return new CommandHistorySource
         {
             Title = terminal.Title,
-            Load = () => CommandHistoryEditing.Distinct(shellAnalyzer.GetHistory(TimeSpan.FromSeconds(15)).Reverse()),
+            // Enumerable.Reverse by name: with C# 14 array.Reverse() binds to the in-place MemoryExtensions.Reverse (void).
+            Load = () => CommandHistoryEditing.Distinct(Enumerable.Reverse(shellAnalyzer.GetHistory(TimeSpan.FromSeconds(15)))),
             Note = "The shell of this tab keeps its own history. The list is read from " + historyFile + " on the server, which a running shell usually writes only when it exits, so its newest commands may be missing. Commands can be deleted in a Smart Terminal tab.",
             Insert = (string command) =>
             {
