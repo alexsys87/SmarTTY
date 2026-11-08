@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../IO/RemoteSaveCommand.cs" Link="RemoteSaveCommand.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+    <Compile Include="../../Utilities/StringUtils.cs" Link="StringUtils.cs" />
+    <Compile Include="../../Utilities/PosixShell.cs" Link="PosixShell.cs" />
+  </ItemGroup>
+</Project>
