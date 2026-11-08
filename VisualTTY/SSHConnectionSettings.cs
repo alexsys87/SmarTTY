@@ -163,10 +163,10 @@ public class SSHConnectionSettings
     public void Save()
     {
         XmlSerializer xmlSerializer = new XmlSerializer(typeof(SSHConnectionSettings));
-        using (FileStream stream = File.Create(FileName))
-        {
-            xmlSerializer.Serialize(stream, this);
-        }
+        // Written to a temporary file and put in place in one step, the previous version is kept as ".bak": the profile is saved at
+        // every login by password, and a failure in the middle of a plain write would leave a truncated file that is skipped on
+        // loading, which takes the connection with its saved password, forwarded ports and alias out of the list.
+        XmlStorage.WriteAtomically(FileName, stream => xmlSerializer.Serialize(stream, this), FileName + ".bak");
         try
         {
             SavedConnectionStore.TouchTimestamp(Path.GetDirectoryName(FileName));

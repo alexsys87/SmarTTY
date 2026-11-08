@@ -237,11 +237,13 @@ public sealed class LocalRepoHost
         }
 
         bool tunnelStarted = false;
+        bool deviceTouched = false;
         int devicePort = server.Port;
         try
         {
             devicePort = OpenTunnel(session, server.Port);
             tunnelStarted = true;
+            deviceTouched = true;
             ConfigureDevice(session, manager, feeds, devicePort, isRoot, publicKey, allowUnsigned, disableOfficial);
         }
         catch
@@ -249,6 +251,12 @@ public sealed class LocalRepoHost
             if (tunnelStarted)
             {
                 TryStopTunnel(session);
+            }
+            if (deviceTouched)
+            {
+                // The enabling script is a chain of three changes (feed block, signature check, official feeds): when a later one failed,
+                // the earlier ones are in place, and nothing would take them out since the server is not marked as started.
+                RemoveFeeds(session, manager);
             }
             server.Stop();
             throw;

@@ -231,6 +231,14 @@ internal static class Program
         Check(IpkIndexBuilder.Build(longName).Count == 1, "an .ipk with a file name longer than 100 characters is indexed");
     }
 
+    private static string Sha256Of(string file)
+    {
+        using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+        {
+            return string.Concat(sha.ComputeHash(File.ReadAllBytes(file)).Select(b => b.ToString("x2")));
+        }
+    }
+
     private static void StaleTests()
     {
         string dir = Path.Combine(_work, "stale");
@@ -247,11 +255,18 @@ internal static class Program
         string touched = Path.Combine(_work, "touched");
         string first = MakeIpk(touched, "alpha", "1.0", "First");
         string second = MakeIpk(touched, "beta", "2.0", "Second");
-        string Entry(string file) => "Package: " + Path.GetFileNameWithoutExtension(file).Split('_')[0] + "\nFilename: " + Path.GetFileName(file) + "\nSize: " + new FileInfo(file).Length + "\nSHA256sum: 00\n\n";
+        string Entry(string file) => "Package: " + Path.GetFileNameWithoutExtension(file).Split('_')[0] + "\nFilename: " + Path.GetFileName(file) + "\nSize: " + new FileInfo(file).Length + "\nSHA256sum: " + Sha256Of(file) + "\n\n";
         string touchedIndex = Path.Combine(touched, "Packages");
         File.WriteAllText(touchedIndex, Entry(first) + Entry(second));
         File.SetLastWriteTimeUtc(touchedIndex, DateTime.UtcNow.AddHours(-2));
         Check(!IpkIndexBuilder.NeedsGeneratedIndex(touched), "files newer than the index that it still lists with the same sizes: the index of the build is kept");
+        // A package rebuilt to the same size has another sum: the old index would make opkg refuse the file.
+        string staleSums = Entry(first) + Entry(second).Replace(Sha256Of(second), new string('0', 64));
+        File.WriteAllText(touchedIndex, staleSums);
+        File.SetLastWriteTimeUtc(touchedIndex, DateTime.UtcNow.AddHours(-2));
+        Check(IpkIndexBuilder.NeedsGeneratedIndex(touched), "a package with the same size as in the index but another SHA-256: generated");
+        File.WriteAllText(touchedIndex, Entry(first) + Entry(second));
+        File.SetLastWriteTimeUtc(touchedIndex, DateTime.UtcNow.AddHours(-2));
         File.WriteAllText(touchedIndex, Entry(first) + Entry(second).Replace("Size: " + new FileInfo(second).Length, "Size: 1"));
         File.SetLastWriteTimeUtc(touchedIndex, DateTime.UtcNow.AddHours(-2));
         Check(IpkIndexBuilder.NeedsGeneratedIndex(touched), "a package of another size than the index says: generated");
@@ -1459,6 +1474,22 @@ internal static class Program
         bool thisHasMtd = File.Exists("/proc/mtd") && File.ReadAllLines("/proc/mtd").Any(line => line.StartsWith("mtd", StringComparison.Ordinal));
         Check(SmarTTY.Transport.MtdFlash.FromProbe(probeOutput.Split('\n')) == thisHasMtd, "Host probe: whether /proc/mtd lists partitions is reported too");
         Check(SmarTTY.Transport.DevMem.FromProbe(probeOutput.Split('\n')).HasValue, "Host probe: whether devmem or devmem2 exists is reported too");
+
+        // What a server that was not stopped properly leaves on the device is found by the same round trip (and nothing is claimed without it).
+        {
+            Check(!OpenWrtDetector.HasLeftover(probeOutput.Split('\n')) && !OpenWrtDetector.HasLeftover(null), "Leftover probe: a clean host reports none");
+            foreach ((string file, string line) in new[] { ("opkg/customfeeds.conf", OpkgFeedConfig.BeginMarker), ("opkg.conf", OpkgFeedConfig.SignatureOffMarker + "option check_signature"), ("opkg/distfeeds.conf", OpkgFeedConfig.OfficialOffMarker + "src/gz x http://x") })
+            {
+                string etc = Path.Combine(_work, "leftover-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(Path.Combine(etc, "opkg"));
+                File.WriteAllText(Path.Combine(etc, file), "src/gz a http://a\n" + line + "\n");
+                string fakeBin = Path.Combine(_work, "lobin-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(fakeBin);
+                LinkGrep(fakeBin);
+                RunArgs("sh", new[] { "-c", OpenWrtDetector.ProbeCommand.Replace("/etc/", etc + "/") }, out string leftOutput, out _, path: fakeBin);
+                Check(OpenWrtDetector.HasLeftover(leftOutput.Split('\n')), "Leftover probe: the marker in " + file + " is found");
+            }
+        }
 
         RemoteHostFacts Host(RemoteOsKind os, RemoteKernelKind kernel = RemoteKernelKind.Unknown, bool packageManager = false, bool localRepo = false, bool isDevice = false, bool tar = false, bool mtd = false, bool devmem = false)
         {

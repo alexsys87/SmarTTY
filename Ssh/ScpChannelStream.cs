@@ -70,10 +70,11 @@ public class ScpChannelStream : Stream
             ReadAck(channel);
             long time = (long)(modifyTime.ToUniversalTime() - SshSession.UnixEpoch).TotalSeconds;
             SendLine(channel, $"T{time} 0 {time} 0");
-            ReadAck(channel);
+            // A warning (status 1) here does not stop the transfer; the data is not sent yet, and the C line is answered next.
+            string timeWarning = ReadAckAllowingWarning(channel);
             SendLine(channel, "C" + Convert.ToString((mode ?? DefaultFileMode) & 0xFFF, 8).PadLeft(4, '0') + " " + length + " " + GetFileName(path));
             ReadAck(channel);
-            return new ScpChannelStream(channel, canRead: false, length);
+            return new ScpChannelStream(channel, canRead: false, length) { Warning = timeWarning };
         }
         catch
         {
@@ -125,8 +126,20 @@ public class ScpChannelStream : Stream
             return;
         }
         _channel.Input.Write(new byte[1], 0, 1);
-        ReadAck(_channel);
+        // The remote scp answers the end of the data with status 1 when it could not set the modification time that the T line announced
+        // (FAT, FUSE, a file of another owner): the content has arrived whole, so it is a warning, not a failure of the upload.
+        string finalWarning = ReadAckAllowingWarning(_channel);
+        if (finalWarning != null)
+        {
+            Warning = Warning == null ? finalWarning : Warning + "; " + finalWarning;
+        }
     }
+
+    /// <summary>
+    /// What the remote scp said, as a warning, after the data of an upload has been written (null when it said nothing). Read after the
+    /// stream has been closed: the final answer is only read then.
+    /// </summary>
+    public string Warning { get; private set; }
 
     protected override void Dispose(bool disposing)
     {
@@ -170,9 +183,12 @@ public class ScpChannelStream : Stream
         channel.Input.Write(new byte[1], 0, 1);
     }
 
+    [ThreadStatic]
+    private static byte[] _singleByte;
+
     internal static int ReadByte(SshShellChannel channel)
     {
-        byte[] buffer = new byte[1];
+        byte[] buffer = _singleByte ?? (_singleByte = new byte[1]);
         if (channel.Output.Read(buffer, 0, 1) != 1)
         {
             return -1;
@@ -180,15 +196,38 @@ public class ScpChannelStream : Stream
         return buffer[0];
     }
 
+    /// <summary>The longest line of the SCP protocol that is read (a file name is at most a few hundred bytes).</summary>
+    private const int MaxLineLength = 4096;
+
     internal static string ReadLine(SshShellChannel channel)
     {
         List<byte> bytes = new List<byte>();
         int value;
         while ((value = ReadByte(channel)) != -1 && value != '\n')
         {
+            if (bytes.Count >= MaxLineLength)
+            {
+                throw new IOException("Unexpected SCP reply: a line longer than " + MaxLineLength + " bytes.");
+            }
             bytes.Add((byte)value);
         }
         return Encoding.UTF8.GetString(bytes.ToArray());
+    }
+
+    /// <summary>
+    /// Like <see cref="ReadAck"/>, but a warning (status 1) is returned and not thrown: null for a plain acknowledgement. A fatal error
+    /// (status 2) and a broken connection still throw.
+    /// </summary>
+    internal static string ReadAckAllowingWarning(SshShellChannel channel)
+    {
+        int status = ReadByte(channel);
+        if (status == 1)
+        {
+            string message = ReadLine(channel).Trim();
+            return message.Length == 0 ? "the remote scp reported a warning" : message;
+        }
+        CheckAckStatus(channel, status);
+        return null;
     }
 
     /// <summary>
@@ -196,7 +235,11 @@ public class ScpChannelStream : Stream
     /// </summary>
     internal static void ReadAck(SshShellChannel channel)
     {
-        int status = ReadByte(channel);
+        CheckAckStatus(channel, ReadByte(channel));
+    }
+
+    private static void CheckAckStatus(SshShellChannel channel, int status)
+    {
         switch (status)
         {
             case 0:

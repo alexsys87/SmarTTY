@@ -947,11 +947,7 @@ public class FileExplorer : INotifyPropertyChanged, ICloseableElement, IDisposab
 
     private static string SafeLocalName(string name)
     {
-        foreach (char invalid in System.IO.Path.GetInvalidFileNameChars())
-        {
-            name = name.Replace(invalid, '_');
-        }
-        return name;
+        return PathUtils.ToLocalFileName(name);
     }
 
     private static void CleanOldDragDirectories(string root)

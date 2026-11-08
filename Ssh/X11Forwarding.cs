@@ -375,6 +375,23 @@ internal sealed class X11Channel
 
     private volatile bool _closed;
 
+    // What goes to the X server is written by a thread of the channel, not by the thread that receives for the whole SSH connection: an X
+    // server that is busy drawing, or paused, stops reading its socket, and a blocked Send on the receive thread would stop the output of
+    // every tab, the SFTP transfers and the keepalive answers with it. The queue is bounded by the window granted to the server (it sends no
+    // more than LocalWindowSize bytes that have not been written yet, because the window is topped up after the write).
+    private readonly BlockingCollection<WriteItem> _writeQueue = new BlockingCollection<WriteItem>();
+
+    // How long one write to the X server may block before the connection is given up (an X server that hangs does not come back).
+    private const int XServerSendTimeoutMs = 30000;
+
+    private struct WriteItem
+    {
+        public byte[] Data;
+
+        /// <summary>The bytes of the channel that this write accounts for (given back to the server's window once written).</summary>
+        public int Consumed;
+    }
+
     public readonly uint LocalChannel;
 
     public X11Channel(X11Forwarding owner, uint localChannel, uint remoteChannel, uint remoteWindow, uint remotePacketSize, Socket socket, byte[] cookie)
@@ -386,6 +403,16 @@ internal sealed class X11Channel
         _remotePacketSize = Math.Max(1u, remotePacketSize);
         _socket = socket;
         _setup = new X11ConnectionSetup(cookie);
+        try
+        {
+            _socket.SendTimeout = XServerSendTimeoutMs;
+            // Small requests of X come one after another: without this, Nagle's algorithm holds them back for the acknowledgement.
+            _socket.NoDelay = true;
+        }
+        catch (Exception)
+        {
+            // A socket that is closed already: the channel ends at the first write.
+        }
     }
 
     public void Start()
@@ -395,9 +422,14 @@ internal sealed class X11Channel
             IsBackground = true,
             Name = "X11 forwarding #" + LocalChannel
         }.Start();
+        new Thread(WriteToXServer)
+        {
+            IsBackground = true,
+            Name = "X11 forwarding #" + LocalChannel + " (writer)"
+        }.Start();
     }
 
-    // Remote program -> X server. Called on SSH.NET's receive thread, in the order of arrival.
+    // Remote program -> X server. Called on SSH.NET's receive thread, in the order of arrival: it only hands the bytes to the writer.
     public void OnData(byte[] data, int offset, int count)
     {
         if (_closed)
@@ -412,11 +444,13 @@ internal sealed class X11Channel
                 switch (_setup.Add(data, offset, count))
                 {
                     case X11ConnectionSetup.Result.NeedMoreData:
+                        // Nothing is written yet: the bytes are accounted for at once.
+                        Consume(count);
                         break;
                     case X11ConnectionSetup.Result.Accepted:
                         byte[] output = _setup.Output;
                         _setup = null;
-                        SendToXServer(output, 0, output.Length);
+                        _writeQueue.Add(new WriteItem { Data = output, Consumed = count });
                         break;
                     default:
                         // Wrong cookie: another user of the remote host tried to reach this display.
@@ -426,14 +460,21 @@ internal sealed class X11Channel
             }
             else
             {
-                SendToXServer(data, offset, count);
+                // A copy: the buffer belongs to the message that SSH.NET reuses once this call returns.
+                byte[] copy = new byte[count];
+                Buffer.BlockCopy(data, offset, copy, 0, count);
+                _writeQueue.Add(new WriteItem { Data = copy, Consumed = count });
             }
         }
         catch
         {
             Close();
-            return;
         }
+    }
+
+    // Gives the window back to the server once half of it has been passed on.
+    private void Consume(int count)
+    {
         long consumed = Interlocked.Add(ref _consumed, count);
         if (consumed >= LocalWindowSize / 2)
         {
@@ -448,13 +489,31 @@ internal sealed class X11Channel
         }
     }
 
-    private void SendToXServer(byte[] data, int offset, int count)
+    // The thread of the channel that writes to the X server; a write that fails or times out ends the channel.
+    private void WriteToXServer()
     {
-        while (count > 0)
+        try
         {
-            int sent = _socket.Send(data, offset, count, SocketFlags.None);
-            offset += sent;
-            count -= sent;
+            foreach (WriteItem item in _writeQueue.GetConsumingEnumerable())
+            {
+                if (_closed)
+                {
+                    break;
+                }
+                int offset = 0;
+                int remaining = item.Data.Length;
+                while (remaining > 0)
+                {
+                    int sent = _socket.Send(item.Data, offset, remaining, SocketFlags.None);
+                    offset += sent;
+                    remaining -= sent;
+                }
+                Consume(item.Consumed);
+            }
+        }
+        catch
+        {
+            Close();
         }
     }
 
@@ -548,6 +607,13 @@ internal sealed class X11Channel
     private void Close(bool sendEof)
     {
         _closed = true;
+        try
+        {
+            _writeQueue.CompleteAdding();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
         lock (_windowLock)
         {
             Monitor.PulseAll(_windowLock);

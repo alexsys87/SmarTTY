@@ -28,6 +28,25 @@ public class ScpDownloadStream : ScpChannelStream
         AccessTime = accessTime;
     }
 
+    /// <summary>A time of a "T" line (seconds since 1970) that fits a DateTime; false for a text that is not one.</summary>
+    private static bool TryReadTime(string text, out DateTime time)
+    {
+        time = SshSession.UnixEpoch;
+        if (!long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out long seconds))
+        {
+            return false;
+        }
+        try
+        {
+            time = SshSession.UnixEpoch.AddSeconds(seconds);
+            return true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
+        }
+    }
+
     internal static ScpDownloadStream Open(SshSession session, string path)
     {
         SshShellChannel channel = session.OpenShellChannel("scp -p -f " + QuotePath(path));
@@ -52,14 +71,20 @@ public class ScpDownloadStream : ScpChannelStream
                         throw new RemoteOperationException(line.Trim());
                     case 'T':
                         // T<mtime> 0 <atime> 0
-                        modifyTime = SshSession.UnixEpoch.AddSeconds(long.Parse(fields[0], CultureInfo.InvariantCulture));
-                        accessTime = SshSession.UnixEpoch.AddSeconds(long.Parse(fields[2], CultureInfo.InvariantCulture));
+                        if (fields.Length < 3 || !TryReadTime(fields[0], out modifyTime) || !TryReadTime(fields[2], out accessTime))
+                        {
+                            throw new IOException("Unexpected SCP header: " + ((char)type + line).Trim());
+                        }
                         SendAck(channel);
                         break;
                     case 'C':
-                        // C<mode> <size> <name>
+                        // C<mode> <size> <name>. A size that is not a number, or is negative, would end the download as an empty file.
+                        if (fields.Length < 3 || !long.TryParse(fields[1], NumberStyles.None, CultureInfo.InvariantCulture, out long size))
+                        {
+                            throw new IOException("Unexpected SCP header: " + ((char)type + line).Trim());
+                        }
                         SendAck(channel);
-                        return new ScpDownloadStream(channel, long.Parse(fields[1], CultureInfo.InvariantCulture), modifyTime, accessTime);
+                        return new ScpDownloadStream(channel, size, modifyTime, accessTime);
                     case 'D':
                         throw new RemoteOperationException(path + " is a directory");
                     default:

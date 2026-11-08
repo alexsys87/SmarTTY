@@ -471,8 +471,19 @@ public class GlobalSettings : INotifyPropertyChanged
             }
             return settings;
         }
+        catch (Exception exception) when (exception is System.Xml.XmlException || exception is InvalidOperationException)
+        {
+            // A file that is there and cannot be read (cut short by a crash, damaged by hand): the defaults are used, and the file is set
+            // aside first, because the next Save would overwrite it for good with settings that are not the user's.
+            string file = Path.Combine(DataDirectory, "Settings.xml");
+            string kept = XmlStorage.SetAsideUnreadable(file);
+            XmlStorage.ReportProblem("The settings file " + file + " could not be read (" + (exception.InnerException?.Message ?? exception.Message) + "). The default settings are used"
+                + (kept != null ? ", and the unreadable file is kept as " + kept + "." : "."));
+            return new GlobalSettings();
+        }
         catch
         {
+            // No file yet (the first start), or one that cannot be opened now: nothing is moved or overwritten here.
             return new GlobalSettings();
         }
     }
@@ -643,11 +654,16 @@ public class GlobalSettings : INotifyPropertyChanged
         {
             string dataDirectory = DataDirectory;
             Directory.CreateDirectory(dataDirectory);
-            using FileStream stream = File.Create(Path.Combine(dataDirectory, "Settings.xml"));
-            new XmlSerializer(typeof(GlobalSettings)).Serialize(stream, this);
+            string file = Path.Combine(dataDirectory, "Settings.xml");
+            XmlSerializer serializer = new XmlSerializer(typeof(GlobalSettings));
+            // Through a temporary file, the previous version stays as "Settings.xml.bak".
+            XmlStorage.WriteAtomically(file, stream => serializer.Serialize(stream, this), file + ".bak");
+            XmlStorage.ClearProblem();
         }
-        catch
+        catch (Exception exception)
         {
+            // Not silent any more: settings that are not saved are lost at the next start.
+            XmlStorage.ReportProblem("The settings could not be saved: " + exception.Message);
         }
     }
 

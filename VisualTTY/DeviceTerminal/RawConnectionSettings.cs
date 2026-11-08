@@ -1,4 +1,6 @@
-﻿using System;
+﻿using SmarTTY.Transport;
+using SmarTTY.Utilities;
+using System;
 using System.IO;
 using System.Xml.Serialization;
 
@@ -16,8 +18,16 @@ public class RawConnectionSettings
     public void Save()
     {
         XmlSerializer xmlSerializer = new XmlSerializer(typeof(RawConnectionSettings));
-        using FileStream stream = File.Create(FileName);
-        xmlSerializer.Serialize(stream, this);
+        // The same way as the SSH profiles: never a half-written file (the profile is saved at every connection).
+        XmlStorage.WriteAtomically(FileName, stream => xmlSerializer.Serialize(stream, this), FileName + ".bak");
+        try
+        {
+            // Other windows and instances notice the change by this file (see SavedConnectionStore).
+            SavedConnectionStore.TouchTimestamp(Path.GetDirectoryName(FileName));
+        }
+        catch
+        {
+        }
     }
 
     public void UpdateLastUsedTime()

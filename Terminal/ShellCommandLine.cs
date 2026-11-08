@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace SmarTTY.Terminal;
@@ -487,6 +488,33 @@ internal static class ShellCommandLine
         {
             return literal ?? "";
         }
+        if (literal.Any(ch => ch < ' ' || ch == '\u007f'))
+        {
+            // A line break or another control character in a file name cannot be escaped with a backslash (backslash and a line break
+            // are removed by the shell, and a typed line break would end the command): the ANSI-C form $'...' of bash and zsh spells them out.
+            StringBuilder quoted = new StringBuilder(literal.Length + 8).Append("$'");
+            foreach (char ch in literal)
+            {
+                switch (ch)
+                {
+                    case '\\': quoted.Append("\\\\"); break;
+                    case '\'': quoted.Append("\\'"); break;
+                    case '\n': quoted.Append("\\n"); break;
+                    case '\t': quoted.Append("\\t"); break;
+                    default:
+                        if (ch < ' ' || ch == '\u007f')
+                        {
+                            quoted.Append("\\x").Append(((int)ch).ToString("x2"));
+                        }
+                        else
+                        {
+                            quoted.Append(ch);
+                        }
+                        break;
+                }
+            }
+            return quoted.Append('\'').ToString();
+        }
         StringBuilder result = new StringBuilder(literal.Length + 8);
         int start = 0;
         if (literal[0] == '~' && (literal.Length == 1 || literal[1] == '/'))
@@ -553,7 +581,7 @@ internal static class ShellCommandLine
         {
             return text ?? "";
         }
-        string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\t', ' ').Split('\n');
+        string[] lines = ReplaceTabsOutsideQuotes(text.Replace("\r\n", "\n").Replace('\r', '\n')).Split('\n');
         StringBuilder result = new StringBuilder(text.Length);
         bool continued = false;
         // Indent of the line that started the command being built: a wrapped rest is indented deeper than that.
@@ -644,13 +672,25 @@ internal static class ShellCommandLine
             return text ?? "";
         }
         separator = string.IsNullOrEmpty(separator) ? " " : separator;
-        string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\t', ' ').Split('\n');
+        string normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
+        if (!CanJoinAsOneLine(normalized))
+        {
+            // A here-document or a string over several lines would be turned into other commands: the text stays as it is, and is pasted as lines.
+            return normalized;
+        }
+        string[] lines = ReplaceTabsOutsideQuotes(normalized).Split('\n');
         StringBuilder result = new StringBuilder(text.Length);
         bool continued = false;
         foreach (string rawLine in lines)
         {
             string line = rawLine.Trim();
             if (line.Length == 0 || (!continued && line[0] == '#'))
+            {
+                continue;
+            }
+            // "make # build" + "make install" must not become "make # build && make install", where the shell ignores the rest.
+            line = StripTrailingComment(line);
+            if (line.Length == 0)
             {
                 continue;
             }
@@ -678,6 +718,104 @@ internal static class ShellCommandLine
         return result.ToString().TrimEnd();
     }
 
+    /// <summary>
+    /// Tabs become spaces, except in quotes (<c>cut -d'&lt;TAB&gt;'</c> must stay what it was). The quote state runs through the whole text, so a
+    /// quoted string over several lines is kept as it is.
+    /// </summary>
+    internal static string ReplaceTabsOutsideQuotes(string text)
+    {
+        if (text.IndexOf('\t') < 0)
+        {
+            return text;
+        }
+        StringBuilder result = new StringBuilder(text.Length);
+        char quote = '\0';
+        for (int i = 0; i < text.Length; i++)
+        {
+            char ch = text[i];
+            if (ch == '\\' && quote != '\'' && i + 1 < text.Length)
+            {
+                result.Append(ch).Append(text[++i]);
+                continue;
+            }
+            if (quote == '\0' && (ch == '\'' || ch == '"'))
+            {
+                quote = ch;
+            }
+            else if (quote == ch)
+            {
+                quote = '\0';
+            }
+            result.Append(ch == '\t' && quote == '\0' ? ' ' : ch);
+        }
+        return result.ToString();
+    }
+
+    /// <summary>The line without a comment at its end: a # that starts a word outside quotes ("make # build" is "make"). A # inside a word stays.</summary>
+    internal static string StripTrailingComment(string line)
+    {
+        char quote = '\0';
+        for (int i = 0; i < line.Length; i++)
+        {
+            char ch = line[i];
+            if (ch == '\\' && quote != '\'')
+            {
+                i++;
+            }
+            else if (quote == '\0' && (ch == '\'' || ch == '"'))
+            {
+                quote = ch;
+            }
+            else if (quote == ch)
+            {
+                quote = '\0';
+            }
+            else if (ch == '#' && quote == '\0' && (i == 0 || char.IsWhiteSpace(line[i - 1])))
+            {
+                return line.Substring(0, i).TrimEnd();
+            }
+        }
+        return line;
+    }
+
+    /// <summary>
+    /// False for text that cannot be turned into one command line without changing what it means: a here-document (<c>&lt;&lt;EOF</c>, whose
+    /// body is not commands) and a quoted string that runs over several lines. Such a paste is left as the lines it is.
+    /// </summary>
+    internal static bool CanJoinAsOneLine(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return true;
+        }
+        List<string> code = new List<string>();
+        foreach (string line in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.Length != 0 && trimmed[0] != '#')
+            {
+                code.Add(line);
+            }
+        }
+        foreach (string line in code)
+        {
+            string commandPart = StripTrailingComment(line);
+            // A quoted string with a line break inside: the quote is still open at the end of the line.
+            if (HasOpenQuote(commandPart))
+            {
+                return false;
+            }
+            foreach (Token token in Tokenize(commandPart))
+            {
+                if (token.IsOperator && token.Text.Contains("<<") && !token.Text.Contains("<<<"))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private static bool StartsWithBlockWord(string line)
     {
         List<Token> tokens = Tokenize(line);
@@ -703,7 +841,7 @@ internal static class ShellCommandLine
         {
             return commands;
         }
-        string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Replace('\t', ' ').Split('\n');
+        string[] lines = ReplaceTabsOutsideQuotes(text.Replace("\r\n", "\n").Replace('\r', '\n')).Split('\n');
         StringBuilder raw = new StringBuilder();
         int firstIndent = 0;
         foreach (string line in lines)

@@ -171,13 +171,24 @@ public static class RemoteFileTools
             // No chmod or chown there: a file replaced through a temporary one keeps the access rights of its folder.
             return;
         }
-        Run(session, "chmod " + Convert.ToString(from.Permissions & 0xFFF, 8) + " " + Quote(path), "set the permissions of " + path);
         if (from.Owner != null && from.Group != null)
         {
             // Only root (or the owner, for the group) may do this; otherwise the new file belongs to the uploading user,
-            // as with any editor that saves through a temporary file.
-            session.RunCommand("chown " + from.Owner + ":" + from.Group + " " + Quote(path), out _);
+            // as with any editor that saves through a temporary file. It comes first: chown takes the setuid and setgid bits off a
+            // file (even when root does it), so the permissions are set after it.
+            session.RunCommand("chown " + Quote(from.Owner + ":" + from.Group) + " " + Quote(path), out _);
         }
+        Run(session, "chmod " + Convert.ToString(from.Permissions & 0xFFF, 8) + " " + Quote(path), "set the permissions of " + path);
+    }
+
+    /// <summary>
+    /// True when the server has sha256sum or md5sum. Tells "no such program" from "the program could not read the file" when
+    /// <see cref="ComputeRemoteChecksum"/> gave nothing. A server that does not answer counts as having none.
+    /// </summary>
+    public static bool HasChecksumTool(SshSession session)
+    {
+        List<string> output = session.RunCommand("command -v sha256sum >/dev/null 2>&1 || command -v md5sum >/dev/null 2>&1", out int? exitStatus);
+        return output != null && exitStatus == 0;
     }
 
     /// <summary>

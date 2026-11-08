@@ -340,13 +340,21 @@ public partial class BackupWindow : Window
         }
         EstimateButton.IsEnabled = false;
         EstimateText.Text = "counting (du)...";
-        string command = RemoteBackup.BuildSizeCommand(members, UseSudo);
+        // Several commands for a long selection: the SSH server of an OpenWrt device drops a command that is too long without an answer.
+        List<string> commands = RemoteBackup.BuildSizeCommands(members, UseSudo);
         Task.Run(() =>
         {
             long? bytes = null;
             try
             {
-                bytes = RemoteBackup.ParseSizeOutput(session.RunCommand(command, out _, timeout: TimeSpan.FromMinutes(10)));
+                foreach (string command in commands)
+                {
+                    long? part = RemoteBackup.ParseSizeOutput(session.RunCommand(command, out _, timeout: TimeSpan.FromMinutes(10)));
+                    if (part.HasValue)
+                    {
+                        bytes = (bytes ?? 0) + part.Value;
+                    }
+                }
             }
             catch
             {
@@ -496,7 +504,14 @@ public partial class BackupWindow : Window
             }
             Log("Archiving " + members.Count + (members.Count == 1 ? " entry" : " entries") + " of / : " + string.Join(" ", members.Take(12).Select(m => m.TrimStart('/'))) + (members.Count > 12 ? " ..." : ""));
 
-            ArchiveRun run = RunTar(session, RemoteBackup.BuildArchiveCommand(members, compressOnServer, useSudo), partPath, compressLocally: !compressOnServer);
+            string archiveCommand = RemoteBackup.BuildArchiveCommand(members, compressOnServer, useSudo);
+            if (archiveCommand.Length > RemoteBackup.MaxCommandLength)
+            {
+                // Dropbear would drop a command like this without an answer, and the window would only say that tar printed nothing.
+                throw new IOException("Too many items are checked for one tar command (" + archiveCommand.Length + " characters; an SSH server like Dropbear takes about "
+                    + RemoteBackup.MaxCommandLength + "). Check their parent folder instead of every item in it, or make several backups.");
+            }
+            ArchiveRun run = RunTar(session, archiveCommand, partPath, compressLocally: !compressOnServer);
             if (compressOnServer && !run.Cancelled && !run.ConnectionLost && run.Received == 0 && run.ExitStatus != 0 && RemoteBackup.LooksLikeMissingGzip(run.Messages))
             {
                 Log("tar on the server cannot compress (" + run.Messages.FirstOrDefault() + "): the archive is compressed on this computer instead.");

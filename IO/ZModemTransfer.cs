@@ -1731,6 +1731,10 @@ public static class ZModemTransfer
         private Stream _currentStream;
         private long _position;
         private int _filesReceived;
+
+        // Files that ended with another size than the sender announced (a sender that stopped early and still sent ZEOF). The file is kept:
+        // in a streamed send (sz -) the announced size is only an estimate. The user is told at the end.
+        private int _sizeMismatches;
         private int _dataErrors;                 // damaged or misplaced data in a row; reset by data that gets through
         private readonly Stopwatch _sinceRequest = new Stopwatch(); // since the last ZRPOS
         private byte[] _attention = new byte[0]; // the sender's Attn string from ZSINIT
@@ -1994,7 +1998,13 @@ public static class ZModemTransfer
                             string name = _current.RemoteName;
                             CloseCurrent(true);
                             _filesReceived++;
-                            Report(done, total, "Received " + name);
+                            string note = string.Empty;
+                            if (total > 0 && done != total)
+                            {
+                                _sizeMismatches++;
+                                note = " - WARNING: " + done + " bytes, the sender announced " + total + "; the file may be incomplete";
+                            }
+                            Report(done, total, "Received " + name + note);
                         }
                         SendZrinit();
                         break;
@@ -2009,7 +2019,9 @@ public static class ZModemTransfer
                             }
                         }
                         CloseCurrent(false);
-                        Report(0, 0, _filesReceived == 1 ? "Received 1 file." : "Received " + _filesReceived + " files.");
+                        Report(0, 0, (_filesReceived == 1 ? "Received 1 file." : "Received " + _filesReceived + " files.")
+                            + (_sizeMismatches == 0 ? string.Empty : " WARNING: " + _sizeMismatches + (_sizeMismatches == 1 ? " file has" : " files have")
+                                + " another size than the sender announced and may be incomplete."));
                         return true;
 
                     case ZABORT:

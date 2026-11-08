@@ -451,6 +451,38 @@ public static class RemoteBackup
         return WrapForUser(script, useSudo);
     }
 
+    /// <summary>The longest command line sent in one piece (Dropbear drops one of more than 9000 bytes; see DevMem.MaxCommandLength).</summary>
+    public const int MaxCommandLength = 8000;
+
+    /// <summary>
+    /// <see cref="BuildSizeCommand"/> for a selection of any size: the members are divided among as many commands as it takes to keep each
+    /// within <paramref name="maxLength"/> characters (Dropbear, the SSH server of OpenWrt, silently drops a command of more than 9000
+    /// bytes). The sizes of the commands add up.
+    /// </summary>
+    public static List<string> BuildSizeCommands(IEnumerable<string> paths, bool useSudo, int maxLength = MaxCommandLength)
+    {
+        List<string> members = (paths ?? Enumerable.Empty<string>()).ToList();
+        if (members.Count == 0)
+        {
+            throw new ArgumentException("Nothing is selected.", nameof(paths));
+        }
+        List<string> commands = new List<string>();
+        List<string> part = new List<string>();
+        foreach (string member in members)
+        {
+            part.Add(member);
+            if (part.Count > 1 && BuildSizeCommand(part, useSudo).Length > maxLength)
+            {
+                part.RemoveAt(part.Count - 1);
+                commands.Add(BuildSizeCommand(part, useSudo));
+                part.Clear();
+                part.Add(member);
+            }
+        }
+        commands.Add(BuildSizeCommand(part, useSudo));
+        return commands;
+    }
+
     private static string WrapForUser(string script, bool useSudo)
     {
         string command = SmarTTY.Utilities.PosixShell.Wrap(script, addAdminDirectoriesToPath: true);

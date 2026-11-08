@@ -34,6 +34,44 @@ public static class LocalPackageFiles
     /// <summary>The directory of the host that the package files are uploaded to: it exists on every Unix host and everyone can read it.</summary>
     public const string RemoteDirectory = "/tmp";
 
+    /// <summary>
+    /// The start of the name of the directory made for one upload (<c>mktemp -d /tmp/smartty-pkg.XXXXXX</c>). The files go into a directory of
+    /// their own instead of /tmp itself: a name that is predictable (/tmp/&lt;file name&gt;) lets another user on a shared machine put a file there
+    /// first, which is then installed as root, and two files of the same name from different folders would overwrite each other.
+    /// </summary>
+    public const string UploadDirectoryPrefix = RemoteDirectory + "/smartty-pkg.";
+
+    /// <summary>The command that makes the directory of an upload and prints its path (readable by all, writable by the user only).</summary>
+    public const string MakeUploadDirectoryCommand = "d=$(mktemp -d " + UploadDirectoryPrefix + "XXXXXX) && chmod 755 \"$d\" && echo \"$d\"";
+
+    /// <summary>The directory made by <see cref="MakeUploadDirectoryCommand"/> from its output, or null when the output is not such a path.</summary>
+    public static string ParseUploadDirectory(System.Collections.Generic.IEnumerable<string> lines)
+    {
+        string path = lines?.Select(line => line?.Trim()).FirstOrDefault(line => !string.IsNullOrEmpty(line) && line.StartsWith(UploadDirectoryPrefix, StringComparison.Ordinal));
+        return path != null && IsSafeFileName(path.Substring(RemoteDirectory.Length + 1)) ? path : null;
+    }
+
+    /// <summary>The upload directory that the files are in (to be removed after them), or null when they are not in one made for it.</summary>
+    public static string UploadDirectoryOf(string[] remotePaths)
+    {
+        string first = remotePaths?.FirstOrDefault(path => !string.IsNullOrEmpty(path));
+        if (first == null || !first.StartsWith(UploadDirectoryPrefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+        int slash = first.LastIndexOf('/');
+        string directory = first.Substring(0, slash);
+        return slash > RemoteDirectory.Length && directory.IndexOf('/', RemoteDirectory.Length + 1) < 0
+            && IsSafeFileName(directory.Substring(RemoteDirectory.Length + 1)) ? directory : null;
+    }
+
+    /// <summary>"rm" of the uploaded files and, when they were in a directory of their own, of the directory.</summary>
+    public static string BuildRemoveCommand(string[] remotePaths)
+    {
+        string directory = UploadDirectoryOf(remotePaths);
+        return "rm -f -- " + QuoteAll(remotePaths) + (directory == null ? "" : "; rmdir -- " + Quote(directory));
+    }
+
     // A name that needs no care in a shell, also inside the double quotes of "sudo su -c": no space, quote, $ or backtick.
     private static readonly Regex SafeFileNameRegex = new Regex(@"^[A-Za-z0-9._+~:@%,=][A-Za-z0-9._+~:@%,=\-]*$", RegexOptions.Compiled);
 
@@ -84,7 +122,7 @@ public static class LocalPackageFiles
         {
             return null;
         }
-        return PackageIndexUpdater.WrapForPrivileges(command, isRoot) + "; rm -f -- " + QuoteAll(remotePaths);
+        return PackageIndexUpdater.WrapForPrivileges(command, isRoot) + "; " + BuildRemoveCommand(remotePaths);
     }
 }
 

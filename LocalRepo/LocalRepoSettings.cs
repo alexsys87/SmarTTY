@@ -70,9 +70,11 @@ public class LocalRepoSettings
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
             XmlStorage.SaveToFile(this, FilePath);
+            XmlStorage.ClearProblem();
         }
-        catch
+        catch (Exception exception)
         {
+            XmlStorage.ReportProblem("The settings of the local package repository could not be saved to " + FilePath + ": " + exception.Message);
         }
     }
 }

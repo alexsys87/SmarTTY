@@ -54,6 +54,26 @@ public static class TransferQueueStore
     public class SavedQueue
     {
         public List<SavedTransfer> Transfers = new List<SavedTransfer>();
+
+        /// <summary>
+        /// The fingerprint of the host key of the server the queue belongs to. The file is named after user, host and port, which many
+        /// devices share (root@192.168.1.1): without it a queue saved for one router would start by itself on another one.
+        /// Empty in a file written by an earlier version.
+        /// </summary>
+        public string HostKey;
+    }
+
+    /// <summary>The text under which the queue file remembers a server, or null when the key is not known.</summary>
+    public static string HostKeyId(byte[] hostKeyBlob)
+    {
+        if (hostKeyBlob == null || hostKeyBlob.Length == 0)
+        {
+            return null;
+        }
+        using (System.Security.Cryptography.SHA256 hash = System.Security.Cryptography.SHA256.Create())
+        {
+            return Convert.ToBase64String(hash.ComputeHash(hostKeyBlob));
+        }
     }
 
     /// <summary>
@@ -69,9 +89,9 @@ public static class TransferQueueStore
         return Path.Combine(directory, name + ".xml");
     }
 
-    public static void Save(string path, IEnumerable<FileTransferManager.TransferJob> jobs)
+    public static void Save(string path, IEnumerable<FileTransferManager.TransferJob> jobs, string hostKey = null)
     {
-        SavedQueue queue = new SavedQueue();
+        SavedQueue queue = new SavedQueue { HostKey = hostKey };
         foreach (FileTransferManager.TransferJob job in jobs)
         {
             FileTransferManager.TransferState state = job.State;
@@ -115,8 +135,19 @@ public static class TransferQueueStore
         {
             new XmlSerializer(typeof(SavedQueue)).Serialize(stream, queue);
         }
+        // Replaced in one step: with a delete before the move, a crash between the two would leave only the temporary file, which
+        // Load does not read.
         if (File.Exists(path))
         {
+            try
+            {
+                File.Replace(temp, path, null);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException || ex is PlatformNotSupportedException || ex is UnauthorizedAccessException)
+            {
+                // A file system without the replace call: the plain way below.
+            }
             File.Delete(path);
         }
         File.Move(temp, path);
@@ -127,6 +158,16 @@ public static class TransferQueueStore
     /// in the Failed state. Returns an empty list if there is no (readable) file.
     /// </summary>
     public static List<FileTransferManager.TransferJob> Load(string path)
+    {
+        return Load(path, null);
+    }
+
+    /// <summary>
+    /// Like <see cref="Load(string)"/>, and when the queue was saved for a server with another host key than
+    /// <paramref name="currentHostKey"/> (see <see cref="HostKeyId"/>), none of its transfers is queued: they come back as failed ones,
+    /// to be started by hand, because the same user@host:port may be another device (an upload would replace its files).
+    /// </summary>
+    public static List<FileTransferManager.TransferJob> Load(string path, string currentHostKey)
     {
         if (!File.Exists(path))
         {
@@ -142,6 +183,7 @@ public static class TransferQueueStore
         {
             return new List<FileTransferManager.TransferJob>();
         }
+        bool otherServer = !string.IsNullOrEmpty(queue.HostKey) && !string.IsNullOrEmpty(currentHostKey) && queue.HostKey != currentHostKey;
         return queue.Transfers.Where((SavedTransfer saved) => !string.IsNullOrEmpty(saved.RemotePath) && !string.IsNullOrEmpty(saved.LocalPath)).Select((SavedTransfer saved) => new FileTransferManager.TransferJob
         {
             Id = saved.Id,
@@ -150,8 +192,10 @@ public static class TransferQueueStore
             LocalPath = saved.LocalPath,
             OpenFolderWhenDone = saved.OpenFolderWhenDone,
             IsArchive = saved.IsArchive,
-            State = saved.WasActive ? FileTransferManager.TransferState.Queued : FileTransferManager.TransferState.Failed,
-            ErrorMessage = saved.WasActive ? null : saved.ErrorMessage,
+            State = saved.WasActive && !otherServer ? FileTransferManager.TransferState.Queued : FileTransferManager.TransferState.Failed,
+            ErrorMessage = otherServer
+                ? "Not started: this transfer was saved for a server with another host key (a different device with the same address?). Retry it if it is meant for this one."
+                : saved.WasActive ? null : saved.ErrorMessage,
             TotalBytes = saved.TotalBytes,
             TransferredBytes = saved.TransferredBytes,
             RemoteSize = saved.RemoteSize,

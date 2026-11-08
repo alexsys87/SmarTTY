@@ -134,8 +134,134 @@ public class XmlStorage
     public static void SaveToFile(object item, string filePath, params Type[] items)
     {
         XmlSerializer xmlSerializer = GetSerializer(item.GetType(), items);
-        using FileStream stream = File.Create(filePath);
-        xmlSerializer.Serialize(stream, item);
+        WriteAtomically(filePath, stream => xmlSerializer.Serialize(stream, item));
+    }
+
+    /// <summary>
+    /// Writes a file through a temporary one next to it and puts it in place in one step. Creating the file itself empties it first, and a
+    /// failure in the middle (power loss, a full disk, a virus scanner, an exception of the serializer) would leave a truncated settings
+    /// file that is read as empty and then overwritten. The old file is kept as <paramref name="backupPath"/> when that is given.
+    /// </summary>
+    public static void WriteAtomically(string path, Action<Stream> write, string backupPath = null)
+    {
+        string temp = path + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp";
+        try
+        {
+            using (FileStream stream = File.Create(temp))
+            {
+                write(stream);
+            }
+            if (File.Exists(path))
+            {
+                try
+                {
+                    File.Replace(temp, path, backupPath);
+                    return;
+                }
+                catch (Exception ex) when (ex is IOException || ex is PlatformNotSupportedException || ex is UnauthorizedAccessException)
+                {
+                    // A file system without the replace call (or a lock that a plain copy will meet as well and report): the copy below.
+                }
+                File.Copy(temp, path, overwrite: true);
+                File.Delete(temp);
+            }
+            else
+            {
+                File.Move(temp, path);
+            }
+        }
+        catch
+        {
+            try
+            {
+                File.Delete(temp);
+            }
+            catch
+            {
+            }
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Moves a file that could not be read aside as "name.bad" (and never over an earlier one), so that the next save does not
+    /// overwrite the only copy of what the user had. Returns the new name, or null when it could not be moved.
+    /// </summary>
+    public static string SetAsideUnreadable(string path)
+    {
+        try
+        {
+            string target = path + ".bad";
+            for (int i = 2; File.Exists(target); i++)
+            {
+                target = path + ".bad" + i;
+            }
+            File.Move(path, target);
+            return target;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static readonly object ProblemSync = new object();
+
+    private static Action<string> _problemNotice;
+
+    private static string _pendingProblem;
+
+    private static string _lastProblem;
+
+    /// <summary>
+    /// Where problems with the user's files (a settings file that could not be saved or read) are shown. A problem that arrives before the
+    /// handler is set (the settings are read before the first window) is shown as soon as it is.
+    /// </summary>
+    public static Action<string> ProblemNotice
+    {
+        set
+        {
+            string pending;
+            lock (ProblemSync)
+            {
+                _problemNotice = value;
+                pending = _pendingProblem;
+                _pendingProblem = null;
+            }
+            if (pending != null && value != null)
+            {
+                value(pending);
+            }
+        }
+    }
+
+    /// <summary>Shows <paramref name="message"/> once: the same text again (every save fails the same way) is not repeated.</summary>
+    public static void ReportProblem(string message)
+    {
+        Action<string> notice;
+        lock (ProblemSync)
+        {
+            if (message == _lastProblem)
+            {
+                return;
+            }
+            _lastProblem = message;
+            notice = _problemNotice;
+            if (notice == null)
+            {
+                _pendingProblem = message;
+            }
+        }
+        notice?.Invoke(message);
+    }
+
+    /// <summary>A save worked: the next failure is a new problem again.</summary>
+    public static void ClearProblem()
+    {
+        lock (ProblemSync)
+        {
+            _lastProblem = null;
+        }
     }
 
     public static string Serialize(object sender, params Type[] items)

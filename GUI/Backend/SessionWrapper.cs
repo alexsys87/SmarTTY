@@ -801,6 +801,38 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
+    private bool _LocalRepoLeftoverAsked;
+
+    /// <summary>
+    /// The device still has the feeds (or the changed signature check) of a local repository server that was not stopped properly. Asked
+    /// once per session, and not while this session runs the server itself (then the marker lines are meant to be there).
+    /// </summary>
+    private void OfferLocalRepoCleanup(SshSession session, LocalRepoPackageManager manager)
+    {
+        if (_LocalRepoLeftoverAsked || LocalRepo.IsRunning)
+        {
+            return;
+        }
+        _LocalRepoLeftoverAsked = true;
+        if (!MessageBoxes.AskWarn("The device still has the settings of a local repository server from an earlier run of SmarTTY (feeds that point to 127.0.0.1, and possibly "
+            + "a switched-off signature check or commented-out official feeds). The package lists cannot be updated until they are removed." + Environment.NewLine + Environment.NewLine
+            + "Remove them now?"))
+        {
+            return;
+        }
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            string problem = LocalRepo.RemoveFeeds(session, manager);
+            _Controller.BeginInvoke(() =>
+            {
+                if (problem != null)
+                {
+                    MessageBoxes.Error(problem);
+                }
+            });
+        });
+    }
+
     /// <summary>
     /// Asks the host once per connection whether it is OpenWrt with opkg or apk (in the background, the session works meanwhile)
     /// and raises the visibility of the "Tools > Local OpenWrt repository server" item when it is. On any other host the
@@ -854,12 +886,17 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             bool? hasTar = isWindows ? false : SmarTTY.Transport.RemoteBackup.FromTarProbe(output);
             bool? hasMtd = isWindows ? false : SmarTTY.Transport.MtdFlash.FromProbe(output);
             DevMemTool? devMemTool = isWindows ? DevMemTool.None : DevMem.FromProbe(output);
+            bool leftover = !isWindows && manager != null && OpenWrtDetector.HasLeftover(output);
             _Controller.BeginInvoke(() =>
             {
                 // A reconnect may have replaced the connection while the probe ran: only the current one counts.
                 if (!ReferenceEquals(Session, session))
                 {
                     return;
+                }
+                if (leftover)
+                {
+                    OfferLocalRepoCleanup(session, manager.Value);
                 }
                 if (isWindows)
                 {
@@ -1446,10 +1483,23 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         try
         {
             // With the option off, an old saved queue is removed so that it does not come back later.
-            TransferQueueStore.Save(file, _Controller.Settings.SaveTransferQueue ? SCPController.Jobs : new FileTransferManager.TransferJob[0]);
+            TransferQueueStore.Save(file, _Controller.Settings.SaveTransferQueue ? SCPController.Jobs : new FileTransferManager.TransferJob[0], CurrentHostKeyId());
         }
         catch
         {
+        }
+    }
+
+    // Identifies the server of this session in the saved transfer queue (null when the key is not known).
+    private string CurrentHostKeyId()
+    {
+        try
+        {
+            return TransferQueueStore.HostKeyId(Session?.GetHostKey()?.KeyData);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
         }
     }
 
@@ -1460,7 +1510,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             return;
         }
-        List<FileTransferManager.TransferJob> jobs = TransferQueueStore.Load(file);
+        List<FileTransferManager.TransferJob> jobs = TransferQueueStore.Load(file, CurrentHostKeyId());
         if (jobs.Count == 0)
         {
             return;
@@ -1596,7 +1646,25 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             MessageBoxes.Error("The package files were not found on this computer.");
             return;
         }
-        List<FileTransferManager.TransferJob> jobs = UploadFilesToDirectory(files, LocalPackageFiles.RemoteDirectory);
+        // Two files with the same name (from different folders) would overwrite each other in the one directory, and the wrong package
+        // would be installed.
+        string duplicate = files.GroupBy(file => Path.GetFileName(file), StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1)?.Key;
+        if (duplicate != null)
+        {
+            MessageBoxes.Error("More than one of the chosen files is named " + duplicate + ". Choose them one at a time, or rename one of them.");
+            return;
+        }
+        // A directory of its own with an unpredictable name (see LocalPackageFiles.UploadDirectoryPrefix); without mktemp the old place is used.
+        string uploadDirectory = LocalPackageFiles.RemoteDirectory;
+        try
+        {
+            uploadDirectory = LocalPackageFiles.ParseUploadDirectory(Session.RunCommandChecked(LocalPackageFiles.MakeUploadDirectoryCommand, requireSuccess: true)) ?? uploadDirectory;
+        }
+        catch (Exception)
+        {
+            // The upload below reports a lost connection.
+        }
+        List<FileTransferManager.TransferJob> jobs = UploadFilesToDirectory(files, uploadDirectory);
         if (jobs.Count == 0)
         {
             return;
@@ -1644,7 +1712,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             return;
         }
-        string command = PosixShell.Wrap("rm -f -- " + LocalPackageFiles.QuoteAll(remotePaths), addAdminDirectoriesToPath: true);
+        string command = PosixShell.Wrap(LocalPackageFiles.BuildRemoveCommand(remotePaths), addAdminDirectoriesToPath: true);
         ThreadPool.QueueUserWorkItem(delegate
         {
             try
@@ -2277,11 +2345,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     {
         LastDownloadDir = RemotePathUtils.GetDirectoryName(file);
         // The remote name may contain characters that Windows does not allow in file names (':', '?', '*', ...).
-        string fileName = RemotePathUtils.GetFileName(file);
-        foreach (char invalid in Path.GetInvalidFileNameChars())
-        {
-            fileName = fileName.Replace(invalid, '_');
-        }
+        string fileName = PathUtils.ToLocalFileName(RemotePathUtils.GetFileName(file));
         string text = Path.Combine(localDir, fileName);
         if (Directory.Exists(text))
         {
@@ -2315,12 +2379,9 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             return;
         }
         // The remote name may contain characters that Windows does not allow in file names (':', '?', '*', ...).
-        string fileName = RemotePathUtils.GetFileName(remoteDir.TrimEnd('/'));
-        foreach (char invalid in Path.GetInvalidFileNameChars())
-        {
-            fileName = fileName.Replace(invalid, '_');
-        }
-        string text = Path.Combine(localDir, fileName + ".tar.gz");
+        // The whole name is checked, not the folder name alone: "nul.tar.gz" is a device name, too.
+        string fileName = PathUtils.ToLocalFileName(RemotePathUtils.GetFileName(remoteDir.TrimEnd('/')) + ".tar.gz");
+        string text = Path.Combine(localDir, fileName);
         if (Directory.Exists(text))
         {
             MessageBoxes.Error("Cannot download " + remoteDir + ": " + text + " is a directory.");

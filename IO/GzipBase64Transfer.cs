@@ -937,7 +937,11 @@ public static class GzipBase64Transfer
         /// </summary>
         private string EndFunctionScript(Prepared prepared, string sumTool, string trim)
         {
-            return "_smtty_end() { s=$(" + sumTool + " <\"$p\");" + trim + " if [ $r -eq 0 ] && [ \"$s\" = " + ShellQuote(prepared.Checksum) + " ]; then mv -f \"$p\" \"$d\" && printf "
+            return "_smtty_end() { s=$(" + sumTool + " <\"$p\");" + trim + " if [ $r -eq 0 ] && [ \"$s\" = " + ShellQuote(prepared.Checksum) + " ]"
+                // A file that is there (a symbolic link to one too) is written through, not replaced: mv would put a new file with the
+                // default permissions and owner in its place (a script would lose its executable bit) and would turn a link into a plain
+                // file. The data is checked by now, and the copy is the only step that can still fail (the status is then "write").
+                + " && { if [ -f \"$d\" ]; then cat \"$p\" >\"$d\" && rm -f \"$p\"; else mv -f \"$p\" \"$d\"; fi || { r=write; false; }; }; then printf "
                 + Say("OK:%s") + " \"$s\"; else z=$(wc -c <\"$p\" 2>/dev/null); rm -f \"$p\"; printf " + Say("FAIL:%s:%s:%s") + " \"$r\" \"$s\" \"$z\"; fi; }";
         }
 
@@ -961,6 +965,10 @@ public static class GzipBase64Transfer
                 string unpacked = parts.Length > 3 ? parts[3].Trim() : string.Empty;
                 string size = unpacked.Length > 0 ? " It unpacked " + unpacked + " bytes; the original has " + prepared.OriginalLength + "." : string.Empty;
                 Trace("The device refused the data: gunzip status " + code + ", checksum " + deviceSum + ", unpacked " + unpacked + " bytes");
+                if (code == "write")
+                {
+                    return "The data arrived intact, but the device could not write it to the destination (out of space, or no permission).";
+                }
                 if (code == "0")
                 {
                     return "Checksum mismatch: the device has " + deviceSum + ", expected " + prepared.Checksum + "." + size;

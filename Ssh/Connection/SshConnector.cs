@@ -1,5 +1,6 @@
 using Renci.SshNet.Common;
 using SmarTTY.Controls;
+using SmarTTY.Utilities;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -424,6 +425,10 @@ public partial class SshConnector : Component
                                 throw new OperationCanceledException();
                             }
                             sshConnectionSettings.AuthenticationType = AuthType.Password;
+                            // "password" holds the passphrase of the key here: the account password is something else, and the passphrase
+                            // must not be sent to the server as one (it counts towards MaxAuthTries and fail2ban, and the server never
+                            // got to see the key's secret before). The saved password, or a question, comes next.
+                            password = null;
                         }
                         break;
                     }
@@ -454,8 +459,17 @@ public partial class SshConnector : Component
                     {
                         if (passwordConfirmed && sshConnectionSettings.EncryptedSavedPassword != null && password != null)
                         {
-                            sshConnectionSettings.EncryptedSavedPassword = PasswordProtector.Encrypt(password, "com.sysprogs.smartty.passwords");
-                            sshConnectionSettings.Save();
+                            try
+                            {
+                                sshConnectionSettings.EncryptedSavedPassword = PasswordProtector.Encrypt(password, "com.sysprogs.smartty.passwords");
+                                sshConnectionSettings.Save();
+                            }
+                            catch (Exception exception)
+                            {
+                                // The login has worked: failing to remember the password (longer than 200 bytes, a damaged key container,
+                                // a profile file that is locked or read-only, a full disk) must not turn it into a failed connection.
+                                XmlStorage.ReportProblem("The password was accepted, but it could not be saved: " + exception.Message);
+                            }
                         }
                         return;
                     }
@@ -525,7 +539,7 @@ public partial class SshConnector : Component
         try
         {
             // "host", "host:port", "[ipv6]" and "[ipv6]:port": a bare IPv6 address has colons of its own and no port.
-            string hostName = SSHConnectionSettings.SplitHostPort(sshConnectionSettings.HostName, out int? parsedPort);
+            string hostName = SSHConnectionSettings.SplitHostPort(sshConnectionSettings.HostName?.Trim(), out int? parsedPort);
             int port = parsedPort ?? 22;
             ReportStatus(connectionAttempt, "Connecting...");
             KnownHostKeyStore knownHostKeyStore = new KnownHostKeyStore();

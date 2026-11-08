@@ -136,7 +136,8 @@ public static class IpkIndexBuilder
 
     /// <summary>
     /// True when the index of the build in the directory ("Packages", or "Packages.gz" without it) lists exactly the given
-    /// .ipk files, each with the size it has: the index is still right although the files are newer than it.
+    /// .ipk files, each with the size it has (and the SHA-256 sum, when the index has one): the index is still right although the files
+    /// are newer than it. A package rebuilt to the same size has another sum, and the old index would make opkg refuse it.
     /// </summary>
     internal static bool IndexDescribesFiles(string directory, string[] files)
     {
@@ -163,8 +164,10 @@ public static class IpkIndexBuilder
             return false;
         }
         Dictionary<string, long> listed = new Dictionary<string, long>(StringComparer.Ordinal);
+        Dictionary<string, string> listedSums = new Dictionary<string, string>(StringComparer.Ordinal);
         string fileName = null;
         long? size = null;
+        string sum = null;
         foreach (string rawLine in (text + "\n").Split('\n'))
         {
             string line = rawLine.TrimEnd('\r');
@@ -173,6 +176,10 @@ public static class IpkIndexBuilder
                 if (fileName != null && size.HasValue)
                 {
                     listed[fileName] = size.Value;
+                    if (sum != null)
+                    {
+                        listedSums[fileName] = sum;
+                    }
                 }
                 else if (fileName != null || size.HasValue)
                 {
@@ -181,6 +188,11 @@ public static class IpkIndexBuilder
                 }
                 fileName = null;
                 size = null;
+                sum = null;
+            }
+            else if (line.StartsWith("SHA256sum:", StringComparison.Ordinal))
+            {
+                sum = line.Substring("SHA256sum:".Length).Trim().ToLowerInvariant();
             }
             else if (line.StartsWith("Filename:", StringComparison.Ordinal))
             {
@@ -200,6 +212,22 @@ public static class IpkIndexBuilder
             if (!listed.TryGetValue(Path.GetFileName(file), out long listedSize) || listedSize != new FileInfo(file).Length)
             {
                 return false;
+            }
+            if (listedSums.TryGetValue(Path.GetFileName(file), out string listedSum))
+            {
+                // The same size does not make it the same package. The sum of a file is cached by its size and time, so this reads a file
+                // only once.
+                try
+                {
+                    if (!string.Equals(ReadFileInfo(file).Sha256, listedSum, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+                }
+                catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException)
+                {
+                    return false;
+                }
             }
         }
         return true;

@@ -219,6 +219,19 @@ internal static class FileTransferManagerTests
         Test.Check(loaded[0].Id == jobs[0].Id && loaded[0].IsDownload && loaded[0].State == FileTransferManager.TransferState.Queued && loaded[0].TransferredBytes == 4 && loaded[0].RemoteModifyTime == remoteTime && loaded[0].OpenFolderWhenDone, "a running transfer comes back queued, with what it needs to resume");
         Test.Check(loaded[0].IsArchive && !loaded[1].IsArchive, "a folder archive download stays one after the queue is saved");
         Test.Check(loaded[1].State == FileTransferManager.TransferState.Failed && loaded[1].ErrorMessage == "boom" && loaded[1].LocalModifyTime == localTime && loaded[1].RemoteTempPath == "/r/.b.smartty-part", "a failed transfer comes back failed, with its temporary file");
+        // The same user@host:port can be another device: a queue saved for one server does not start by itself on a server with another host key.
+        string keyA = TransferQueueStore.HostKeyId(new byte[] { 1, 2, 3 });
+        string keyB = TransferQueueStore.HostKeyId(new byte[] { 4, 5, 6 });
+        TransferQueueStore.Save(path, jobs, keyA);
+        loaded = TransferQueueStore.Load(path, keyA);
+        Test.Check(loaded[0].State == FileTransferManager.TransferState.Queued, "a queue comes back queued on the server it was saved for");
+        loaded = TransferQueueStore.Load(path, keyB);
+        Test.Check(loaded.Count == 2 && loaded.All(j => j.State == FileTransferManager.TransferState.Failed) && loaded[0].ErrorMessage.Contains("another host key"),
+            "on a server with another host key nothing is started by itself");
+        loaded = TransferQueueStore.Load(path, null);
+        Test.Check(loaded[0].State == FileTransferManager.TransferState.Queued, "an unknown host key does not block the queue");
+        TransferQueueStore.Save(path, jobs, keyA); // replaces the file that is there
+        Test.Check(!File.Exists(path + ".tmp") && TransferQueueStore.Load(path, keyA).Count == 2, "saving over an existing queue file leaves no temporary file");
         TransferQueueStore.Save(path, new FileTransferManager.TransferJob[0]);
         Test.Check(!File.Exists(path), "an empty queue removes the file");
         Test.Equal(0, TransferQueueStore.Load(path).Count, "loading a missing file gives an empty queue");
