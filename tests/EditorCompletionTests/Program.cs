@@ -132,6 +132,8 @@ internal static class Program
         Check(Names(L.Udev, "", "").Contains("db_persist"), "the udev value 'db_persist' is offered");
         Check(Names(L.Nftables, "", "").Contains("masquerade"), "the nftables statement 'masquerade' is offered");
         Check(Names(L.Nftables, "", "").Contains("established"), "the nftables state 'established' is offered");
+        Check(Names(L.Modprobe, "", "").Contains("softdep"), "the modprobe directive 'softdep' is offered");
+        Check(Names(L.Modprobe, "", "").Contains("pre"), "the modprobe value 'pre' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");

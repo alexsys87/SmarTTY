@@ -1529,6 +1529,43 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Nftables).Toggle(new[] { "flush ruleset" })), "# flush ruleset", "nftables comment");
     }
 
+    private static void ModprobeChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/modprobe.d/blacklist.conf"), L.Modprobe, "a local modprobe.d file");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/modprobe.d/systemd.conf"), L.Modprobe, "a file of the distribution");
+        Equal(SyntaxHighlighting.DetectLanguage("/lib/modprobe.d/aliases.conf"), L.Modprobe, "a file of the merged /lib");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/modprobe.d/local.conf"), L.Modprobe, "a generated file");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/modprobe.conf"), L.Modprobe, "the legacy modprobe.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/modprobe.conf"), L.Modprobe, "a modprobe.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/blacklist.conf"), L.Config, "an ordinary .conf is not modprobe.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/modules-load.d/local.conf"), L.Config, "modules-load.d is not modprobe.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/modprobe.d/README"), L.Plain, "the README of modprobe.d is prose");
+
+        Highlighted net = new Highlighted(L.Modprobe,
+            "# module options\nblacklist nouveau\noptions nouveau modeset=0\n" +
+            "alias net-pf-10 off\n" +
+            "install snd_hda_intel /sbin/modprobe --ignore-install snd_hda_intel $CMDLINE_OPTS\n" +
+            "remove snd_hda_intel /sbin/modprobe -r snd_hda_intel\n" +
+            "softdep nf_conntrack pre: nf_defrag_ipv4 post: nf_conntrack_netlink\n" +
+            "include /etc/modprobe.d/extra.conf\nunknown-directive foo");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# module options", "modprobe: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeKeyword)), "blacklist", "modprobe: blacklist");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "options", "modprobe: options");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeNumber)), "0", "modprobe: an option value");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "alias|off", "modprobe: an alias turned off");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "install", "modprobe: install");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeVariable)), "$CMDLINE_OPTS", "modprobe: the install command variables");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeKeyword)), "remove", "modprobe: remove");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "softdep|pre|post", "modprobe: a soft dependency");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "include", "modprobe: include");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "", "modprobe: an unknown directive is not a keyword");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeVariable)), "unknown-directive", "modprobe: ...it is a plain key");
+        Check(SyntaxHighlighting.GetKeywords(L.Modprobe).Contains("softdep"), "modprobe keywords contain 'softdep'");
+        Check(SyntaxHighlighting.GetKeywords(L.Modprobe).Contains("blacklist"), "modprobe keywords contain 'blacklist'");
+        Check(SyntaxHighlighting.GetKeywords(L.Modprobe).Contains("pre"), "modprobe keywords contain 'pre'");
+        Equal(Join(CommentStyle.ForLanguage(L.Modprobe).Toggle(new[] { "blacklist nouveau" })), "# blacklist nouveau", "modprobe comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2235,6 +2272,7 @@ internal static class Program
         WireguardChecks();
         UdevChecks();
         NftablesChecks();
+        ModprobeChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
