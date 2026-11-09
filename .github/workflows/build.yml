@@ -142,6 +142,9 @@ jobs:
       - name: Run TAR extractor security checks
         run: dotnet run --project tests/TarExtractorSecurityTests -c Release
 
+      - name: Replies of the SysprogsSync helper (records that arrive in pieces, garbage in the output, the cost of a long batch)
+        run: dotnet run --project tests/SysprogsReplyReaderTests -c Release
+
       - name: Run TAR writer checks
         run: dotnet run --project tests/TarWriterTests -c Release
 

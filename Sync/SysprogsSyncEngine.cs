@@ -35,13 +35,6 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
         End
     }
 
-    private enum RemoteReply
-    {
-        Unknown,
-        ActionFailed,
-        ActionDone
-    }
-
     [Flags]
     private enum SessionFlags
     {
@@ -276,7 +269,8 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 
         private LineSplitter _lineSplitter = new LineSplitter();
 
-        private List<byte> _pending = new List<byte>();
+        // Cuts the output into replies; a record that arrives in two pieces is put together there.
+        private SysprogsReplyReader _replies = new SysprogsReplyReader();
 
         private bool _corrupted;
 
@@ -290,6 +284,12 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 
         public SysprogsSyncOutputParser(SshShellChannel sshShellChannel)
         {
+            _replies.ActionFailed += (int actionIndex, int errorCode) => ActionFailedReceived?.Invoke(actionIndex, errorCode);
+            _replies.Corrupt += () =>
+            {
+                _corrupted = true;
+                OutputCorrupt?.Invoke();
+            };
             sshShellChannel.DataReceived += OnDataReceived;
             sshShellChannel.Finished += OnFinished;
             sshShellChannel.PollingEnabled = true;
@@ -316,39 +316,7 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
                 {
                     return;
                 }
-                for (int i = 0; i < count; i++)
-                {
-                    _pending.Add(buffer[offset + i]);
-                }
-                int idx = 0;
-                while (idx < _pending.Count && !_corrupted)
-                {
-                    byte[] data = _pending.ToArray();
-                    switch ((RemoteReply)_pending[idx])
-                    {
-                        case RemoteReply.ActionDone:
-                            idx += 4;
-                            break;
-                        case RemoteReply.ActionFailed:
-                            idx += 12;
-                            if (idx <= _pending.Count)
-                            {
-                                int actionIndex = BitConverter.ToInt32(data, idx - 8);
-                                int errorCode = BitConverter.ToInt32(data, idx - 4);
-                                ActionFailedReceived?.Invoke(actionIndex, errorCode);
-                            }
-                            break;
-                        default:
-                            _corrupted = true;
-                            OutputCorrupt?.Invoke();
-                            idx++;
-                            break;
-                    }
-                }
-                if (idx > 0)
-                {
-                    _pending.RemoveRange(0, idx);
-                }
+                _replies.Feed(buffer, offset, count);
             }
             catch (Exception exception)
             {
