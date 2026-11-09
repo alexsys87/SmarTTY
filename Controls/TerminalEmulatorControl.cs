@@ -778,11 +778,15 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 return ParseControlString(text, position, out _, escapeTrace);
             case '[':
                 {
-                    int csiEnd = AnsiEscapeUtils.FindCsiEnd(text, position + 2);
-                    if (csiEnd == -1)
+                    switch (AnsiEscapeUtils.ScanCsi(text, position + 2, out int csiEnd))
                     {
-                        escapeTrace?.SetWarning("Invalid CSI");
-                        return KeepIncompleteEscape(text, position, escapeTrace);
+                        case CsiScanResult.Incomplete:
+                            escapeTrace?.SetWarning("Invalid CSI");
+                            return KeepIncompleteEscape(text, position, escapeTrace);
+                        case CsiScanResult.Cancelled:
+                            // Cut short by ESC or a control character: that one is dealt with as the next thing in the stream.
+                            escapeTrace?.SetWarning("CSI cancelled");
+                            return csiEnd - position;
                     }
                     ExecuteCsiSequence(text[csiEnd], text.Substring(position + 2, csiEnd - position - 2), escapeTrace);
                     return csiEnd - position + 1;
@@ -798,6 +802,12 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 {
                     _incompleteEscape = text.Substring(position);
                     return _incompleteEscape.Length;
+                }
+                if (AnsiEscapeUtils.InterruptsEscape(text[position + 2]))
+                {
+                    // ESC ( cut short by ESC or a control character: that one is no final character, it is not swallowed.
+                    escapeTrace?.SetWarning("Escape sequence cut short");
+                    return 2;
                 }
                 if (text[position + 1] == '(' || text[position + 1] == ')')
                 {
@@ -857,6 +867,12 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 MoveCursorBy(-base.CursorPosition.X, 1, scroll: true);
                 return 2;
             default:
+                if (AnsiEscapeUtils.InterruptsEscape(text[position + 1]))
+                {
+                    // ESC ESC starts the next sequence, ESC CR is an ESC and a CR: only this ESC goes.
+                    escapeTrace?.SetWarning("Lone ESC");
+                    return 1;
+                }
                 return 2;
         }
     }

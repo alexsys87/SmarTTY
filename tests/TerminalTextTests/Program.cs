@@ -5,7 +5,8 @@ using SmarTTY.Terminal;
 // Regression harness for how the SSH terminal turns remote bytes into text:
 //  * DEC Special Graphics (ESC ( 0 line drawing used by mc & co. without a UTF-8 locale),
 //  * UTF-8 stream decoding with characters split between reads and a non-zero buffer offset,
-//  * byte-oriented line editing (BusyBox ash without Unicode support), see ByteColumnChecks.cs.
+//  * byte-oriented line editing (BusyBox ash without Unicode support), see ByteColumnChecks.cs,
+//  * where a CSI sequence ends when it is cut short by ESC or a control character, see AnsiEscapeChecks.cs.
 // Run with: dotnet run --project tests/TerminalTextTests
 internal static class Program
 {
@@ -160,6 +161,7 @@ internal static class Program
         ShiftChecks();
         Utf8DecoderChecks();
         ByteColumnChecks.Run();
+        AnsiEscapeChecks.Run();
         Console.WriteLine($"All {_passed} checks passed.");
         return 0;
     }
