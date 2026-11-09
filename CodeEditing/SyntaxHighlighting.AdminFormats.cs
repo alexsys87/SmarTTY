@@ -969,6 +969,24 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(NftablesKeywords, startState, text, sink, out endState, valueKeywords: NftablesKeywords);
     }
 
+    // --------------------------------------------------------------- modprobe
+
+    private static readonly HashSet<string> ModprobeDirectives = Words(StringComparer.Ordinal,
+        @"alias blacklist options install remove softdep weakdep include");
+
+    private static readonly HashSet<string> ModprobeValues = Words(StringComparer.Ordinal,
+        // the stages of a soft dependency and the value that disables an alias
+        @"pre post off");
+
+    /// <summary>
+    /// modprobe.d: the colours of Config with the directives of the module loader known; the pre/post stages of softdep
+    /// and the off of an alias are coloured as keywords.
+    /// </summary>
+    private static bool TokenizeModprobe(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(ModprobeDirectives, startState, text, sink, out endState, valueKeywords: ModprobeValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

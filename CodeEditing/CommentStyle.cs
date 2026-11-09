@@ -45,6 +45,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Wireguard:
                 case SyntaxHighlighting.Language.Udev:
                 case SyntaxHighlighting.Language.Nftables:
+                case SyntaxHighlighting.Language.Modprobe:
                 case SyntaxHighlighting.Language.Kubernetes:
                 case SyntaxHighlighting.Language.DockerCompose:
                 case SyntaxHighlighting.Language.Ansible:
