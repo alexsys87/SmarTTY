@@ -196,8 +196,10 @@ internal static class WindowsAuthorizedKeys
     /// Adds the key line to the file (creating it) unless the key is already in it. Returns whether the file was written.
     /// The other lines and their line ending stay as they are.
     /// </summary>
-    internal static bool AddKeyToFile(SftpChannel sftp, string path, string keyLine, byte[] keyBlob)
+    internal static bool AddKeyToFile(SftpChannel sftp, string path, string keyLine, byte[] keyBlob, Action<string> prepareNewFile = null)
     {
+        // A replacement that was cut off between its two renames has left the old keys in the copy; reading "no file" here would drop them.
+        KeyFileReplacer.RecoverInterrupted(new SftpReplaceableFiles(sftp), path);
         byte[] content = ReadFile(sftp, path) ?? new byte[0];
         if (SplitLines(content).Any(line => AuthorizedKeysFile.LineHoldsKey(line, keyBlob)))
         {
@@ -210,13 +212,14 @@ internal static class WindowsAuthorizedKeys
             data.AddRange(Encoding.ASCII.GetBytes(eol));
         }
         data.AddRange(new UTF8Encoding(false).GetBytes(keyLine + eol));
-        ReplaceFile(sftp, path, data.ToArray());
+        ReplaceFile(sftp, path, data.ToArray(), prepareNewFile);
         return true;
     }
 
     /// <summary>Removes the lines of this key (and nothing else) from the file. Returns whether the file was written.</summary>
-    internal static bool RemoveKeyFromFile(SftpChannel sftp, string path, byte[] keyBlob)
+    internal static bool RemoveKeyFromFile(SftpChannel sftp, string path, byte[] keyBlob, Action<string> prepareNewFile = null)
     {
+        KeyFileReplacer.RecoverInterrupted(new SftpReplaceableFiles(sftp), path);
         byte[] content = ReadFile(sftp, path);
         if (content == null)
         {
@@ -233,7 +236,7 @@ internal static class WindowsAuthorizedKeys
         {
             text.Append(line).Append(eol);
         }
-        ReplaceFile(sftp, path, new UTF8Encoding(false).GetBytes(text.ToString()));
+        ReplaceFile(sftp, path, new UTF8Encoding(false).GetBytes(text.ToString()), prepareNewFile);
         return true;
     }
 
@@ -250,33 +253,58 @@ internal static class WindowsAuthorizedKeys
     }
 
     /// <summary>
-    /// Replaces the content of a file without a moment in which it is half written: the new content goes to a file beside
-    /// it, and only when that is complete the old one is removed (SFTP version 3 does not rename over an existing file) and
-    /// the new one takes its name. A write that fails (no space on the disk) leaves the old file alone.
+    /// Replaces the content of a file without a moment in which it is half written, and with as little time as possible in which it is
+    /// missing (see <see cref="KeyFileReplacer"/>). <paramref name="prepareNewFile"/> is called with the path of the new file before it takes
+    /// the place of the old one. A write that fails (no space on the disk) leaves the old file alone.
     /// </summary>
-    internal static void ReplaceFile(SftpChannel sftp, string path, byte[] content)
+    internal static void ReplaceFile(SftpChannel sftp, string path, byte[] content, Action<string> prepareNewFile = null)
     {
-        string temporary = path + ".smartty";
-        using (Stream stream = sftp.OpenWrite(temporary, 0, truncate: true, mode: Convert.ToInt32("600", 8)))
+        KeyFileReplacer.Replace(new SftpReplaceableFiles(sftp), path, content, prepareNewFile);
+    }
+
+    /// <summary>The files of the server as <see cref="KeyFileReplacer"/> uses them.</summary>
+    private sealed class SftpReplaceableFiles : IReplaceableFiles
+    {
+        private readonly SftpChannel _sftp;
+
+        public SftpReplaceableFiles(SftpChannel sftp)
         {
-            stream.Write(content, 0, content.Length);
+            _sftp = sftp;
         }
-        long? size = sftp.Stat(temporary)?.Size;
-        if (size != content.Length)
+
+        public bool SupportsAtomicReplace => _sftp.SupportsPosixRename;
+
+        public void Write(string path, byte[] content)
         {
-            throw new RemoteOperationException("Only " + (size ?? 0) + " of " + content.Length + " bytes of " + path + " were written; the file was not changed.");
+            using (Stream stream = _sftp.OpenWrite(path, 0, truncate: true, mode: Convert.ToInt32("600", 8)))
+            {
+                stream.Write(content, 0, content.Length);
+            }
         }
-        if (sftp.Stat(path) != null)
+
+        public long? SizeOf(string path)
         {
-            sftp.Remove(path);
+            return _sftp.Stat(path)?.Size;
         }
-        try
+
+        public bool Exists(string path)
         {
-            sftp.Rename(temporary, path);
+            return _sftp.Stat(path) != null;
         }
-        catch (Exception exception) when (!(exception is IOException))
+
+        public void Remove(string path)
         {
-            throw new RemoteOperationException("Cannot put the new " + path + " in place: " + exception.Message + " The new content is in " + temporary + ".");
+            _sftp.Remove(path);
+        }
+
+        public void Rename(string from, string to)
+        {
+            _sftp.Rename(from, to);
+        }
+
+        public void ReplaceByRename(string from, string to)
+        {
+            _sftp.PosixRename(from, to);
         }
     }
 
@@ -344,19 +372,17 @@ internal static class WindowsAuthorizedKeys
     }
 
     /// <summary>
-    /// Puts the key into each of the files (creating the directory of a file when needed), calls <paramref name="restrictAccess"/>
-    /// for a file that was written and has to be closed to everybody but the administrators, and reads every file back.
+    /// Puts the key into each of the files (creating the directory of a file when needed) and reads every file back.
+    /// <paramref name="restrictAccess"/> is called, for a file that is written and has to be closed to everybody but the
+    /// administrators, with the path of the NEW file before it takes the place of the old one: the access rights go with the file
+    /// when it is renamed, so sshd never finds the name with rights it refuses, and a failure of icacls leaves the old file as it was.
     /// </summary>
     internal static void AppendToFiles(SftpChannel sftp, List<KeyFile> files, string keyLine, byte[] keyBlob, Action<string> restrictAccess)
     {
         foreach (KeyFile file in files)
         {
             EnsureDirectory(sftp, WindowsSftpPath.Parent(file.Path));
-            bool written = AddKeyToFile(sftp, file.Path, keyLine, keyBlob);
-            if (written && file.RestrictAccess)
-            {
-                restrictAccess(file.Path);
-            }
+            AddKeyToFile(sftp, file.Path, keyLine, keyBlob, file.RestrictAccess ? restrictAccess : null);
         }
         // Only reading it back tells whether the server will find the key.
         foreach (KeyFile file in files)
@@ -372,10 +398,7 @@ internal static class WindowsAuthorizedKeys
     {
         foreach (KeyFile file in files)
         {
-            if (RemoveKeyFromFile(sftp, file.Path, keyBlob) && file.RestrictAccess)
-            {
-                restrictAccess(file.Path);
-            }
+            RemoveKeyFromFile(sftp, file.Path, keyBlob, file.RestrictAccess ? restrictAccess : null);
         }
     }
 
@@ -417,7 +440,7 @@ internal static class WindowsAuthorizedKeys
         if (output == null)
         {
             session.ThrowIfConnectionLost();
-            throw new RemoteOperationException("Cannot restrict the access to " + path + " (icacls failed); sshd would ignore the keys in it.");
+            throw new RemoteOperationException("Cannot restrict the access to " + path + " (icacls failed); the key file was not changed, because sshd would ignore the keys in a file that others can reach.");
         }
     }
 
