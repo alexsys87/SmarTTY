@@ -893,6 +893,100 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(HostapdDirectives, startState, text, sink, out endState, valueKeywords: HostapdValues);
     }
 
+    // -------------------------------------------------------------- WireGuard
+
+    private static readonly HashSet<string> WireguardDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // [Interface] and [Peer]
+        @"Address ListenPort PrivateKey DNS MTU FwMark Table
+          PreUp PostUp PreDown PostDown SaveConfig
+          PublicKey PresharedKey AllowedIPs Endpoint PersistentKeepalive",
+        // AmneziaWG, a WireGuard fork with obfuscation parameters
+        @"Jc Jmin Jmax S1 S2 H1 H2 H3 H4 I1 I2 I3 I4 I5");
+
+    private static readonly HashSet<string> WireguardValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"Interface Peer auto main default off");
+
+    /// <summary>
+    /// WireGuard: the colours of Config with the [Interface] and [Peer] keys known; the values of Table (auto, main,
+    /// default, off) are keywords too, and the keys match in any case, as wg-quick reads them.
+    /// </summary>
+    private static bool TokenizeWireguard(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(WireguardDirectives, startState, text, sink, out endState, valueKeywords: WireguardValues);
+    }
+
+    // ------------------------------------------------------------------- udev
+
+    private static readonly HashSet<string> UdevKeywords = Words(StringComparer.Ordinal,
+        // the keys of the rules
+        @"ACTION SUBSYSTEM SUBSYSTEMS KERNEL KERNELS DEVPATH DEVPATH_OLD DRIVER DRIVERS
+          ATTR ATTRS SYSFS ENV TAG TAGS NAME SYMLINK OWNER GROUP MODE
+          PROGRAM RESULT IMPORT WAIT_FOR WAIT_FOR_SYSFS OPTIONS TEST LABEL GOTO RUN SECLABEL CONST PRODUCT NETLINK
+          udev_log",
+        // the usual unquoted values of ACTION, OPTIONS and udev.conf
+        @"add remove change move online offline bind unbind
+          db_persist nowatch watch last_rule string_escape none replace err info debug");
+
+    /// <summary>
+    /// udev: the colours of Config with the keys of the rules known wherever they stand, since a rule is a list of
+    /// "KEY==value" pairs separated by commas; the usual unquoted values are keywords too.
+    /// </summary>
+    private static bool TokenizeUdev(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(UdevKeywords, startState, text, sink, out endState, valueKeywords: UdevKeywords);
+    }
+
+    // --------------------------------------------------------------- nftables
+
+    private static readonly HashSet<string> NftablesKeywords = Words(StringComparer.Ordinal,
+        // commands and the objects they act on
+        @"flush table chain rule set map element define include add create delete list monitor describe export import get reset
+          rename replace destroy",
+        // statements, actions, protocols and match keys
+        @"accept drop reject queue continue return jump goto counter log limit quota snat dnat masquerade redirect tproxy
+          dup fwd notrack meta ct ip ip6 tcp udp sctp dccp icmp icmpv6 arp ether vlan bridge inet netdev route socket
+          fib osf xdp numgen jhash symhash mark tos dscp ecn ttl hoplimit flowlabel length frag hdrlength checksum seq
+          ack window flags option version type code mtu protocol priority policy devices hook device state status
+          saddr daddr sport dport iif oif iifname oifname iiftype oiftype cgroup cpu pkttype skuid skgid nfproto l4proto
+          ipsec rt bh count packets bytes over until timeout size auto-merge dynamic interval elem gc-interval expires
+          evaluation vmap prefix nexthop via dev weight persistent secret name value host ifname id num label zone
+          domain interface dei pcp cfi sequence gateway classid nexthdr hlimit frag-off mh-type mh hbh rt0 rt1 rt2 rt4 sr
+          dstopts ah esp comp level",
+        // the usual values: families, hooks, chain types, set types and log levels
+        @"ruleset handle position comment
+          new established related invalid untracked
+          input output forward prerouting postrouting ingress
+          filter nat mangle raw security
+          src dst srcnat dstnat ipv4_addr ipv6_addr ether_addr inet_service
+          emerg alert crit err warning notice info debug");
+
+    /// <summary>
+    /// nftables: the colours of Config with the commands, statements and match keys of nft known wherever they stand;
+    /// strings, variables and the addresses keep the colours of Config. Comments are '#'.
+    /// </summary>
+    private static bool TokenizeNftables(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(NftablesKeywords, startState, text, sink, out endState, valueKeywords: NftablesKeywords);
+    }
+
+    // --------------------------------------------------------------- modprobe
+
+    private static readonly HashSet<string> ModprobeDirectives = Words(StringComparer.Ordinal,
+        @"alias blacklist options install remove softdep weakdep include");
+
+    private static readonly HashSet<string> ModprobeValues = Words(StringComparer.Ordinal,
+        // the stages of a soft dependency and the value that disables an alias
+        @"pre post off");
+
+    /// <summary>
+    /// modprobe.d: the colours of Config with the directives of the module loader known; the pre/post stages of softdep
+    /// and the off of an alias are coloured as keywords.
+    /// </summary>
+    private static bool TokenizeModprobe(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(ModprobeDirectives, startState, text, sink, out endState, valueKeywords: ModprobeValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

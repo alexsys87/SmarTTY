@@ -1390,6 +1390,182 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Hostapd).Toggle(new[] { "ssid=My Network" })), "# ssid=My Network", "hostapd comment");
     }
 
+    private static void WireguardChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/wireguard/wg0.conf"), L.Wireguard, "a tunnel of /etc/wireguard");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/wireguard/home.conf"), L.Wireguard, "a tunnel with a custom name");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg0.conf"), L.Wireguard, "a wg0.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg12.conf"), L.Wireguard, "a numbered interface");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg-home.conf"), L.Wireguard, "an interface with a dashed name");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg.conf"), L.Wireguard, "the bare wg.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wget.conf"), L.Config, "wget.conf is not WireGuard");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/wireguard/privatekey"), L.Plain, "a key file is not the configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/wireguard/wg0.conf.bak"), L.Plain, "a backup is not the configuration");
+
+        Highlighted net = new Highlighted(L.Wireguard,
+            "# WireGuard tunnel\n[Interface]\nAddress = 10.0.0.2/24\nListenPort = 51820\n" +
+            "PrivateKey = abc=\nDNS = 1.1.1.1\nMTU = 1420\nTable = auto\n" +
+            "PostUp = iptables -A FORWARD -i wg0 -j ACCEPT\nSaveConfig = true\n\n" +
+            "[Peer]\nPublicKey = def=\nPresharedKey = ghi=\n" +
+            "AllowedIPs = 10.0.0.0/24\nEndpoint = vpn.example.com:51820\n" +
+            "PersistentKeepalive = 25\nUnknownKey = 1\nendpoint = vpn2.example.com:51821");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# WireGuard tunnel", "WireGuard: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeSection)), "[Interface]", "WireGuard: the Interface section");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "Address", "WireGuard: Address");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeNumber)), "10.0.0.2|24", "WireGuard: the tunnel address");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "ListenPort", "WireGuard: ListenPort");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeNumber)), "51820", "WireGuard: the listen port");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "PrivateKey", "WireGuard: PrivateKey");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeNumber)), "1.1.1.1", "WireGuard: the DNS server");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "Table|auto", "WireGuard: the routing table");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "PostUp", "WireGuard: PostUp");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeKeyword)), "SaveConfig|true", "WireGuard: SaveConfig and its value");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeSection)), "[Peer]", "WireGuard: the Peer section");
+        Equal(Join(net.Tokens(12, SyntaxHighlighting.TypeKeyword)), "PublicKey", "WireGuard: PublicKey");
+        Equal(Join(net.Tokens(13, SyntaxHighlighting.TypeKeyword)), "PresharedKey", "WireGuard: PresharedKey");
+        Equal(Join(net.Tokens(14, SyntaxHighlighting.TypeKeyword)), "AllowedIPs", "WireGuard: AllowedIPs");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeKeyword)), "Endpoint", "WireGuard: Endpoint");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeNumber)), "51820", "WireGuard: the endpoint port");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeKeyword)), "PersistentKeepalive", "WireGuard: PersistentKeepalive");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeNumber)), "25", "WireGuard: the keepalive interval");
+        Equal(Join(net.Tokens(17, SyntaxHighlighting.TypeKeyword)), "", "WireGuard: an unknown key is not a keyword");
+        Equal(Join(net.Tokens(17, SyntaxHighlighting.TypeVariable)), "UnknownKey", "WireGuard: ...it is a plain key");
+        Equal(Join(net.Tokens(18, SyntaxHighlighting.TypeKeyword)), "endpoint", "WireGuard: the keys match in any case");
+        Check(SyntaxHighlighting.GetKeywords(L.Wireguard).Contains("AllowedIPs"), "WireGuard keywords contain 'AllowedIPs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Wireguard).Contains("PersistentKeepalive"), "WireGuard keywords contain 'PersistentKeepalive'");
+        Check(SyntaxHighlighting.GetKeywords(L.Wireguard).Contains("auto"), "WireGuard keywords contain 'auto'");
+        Equal(Join(CommentStyle.ForLanguage(L.Wireguard).Toggle(new[] { "ListenPort = 51820" })), "# ListenPort = 51820", "WireGuard comment");
+    }
+
+    private static void UdevChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/udev/rules.d/99-local.rules"), L.Udev, "a local udev rule");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/udev/rules.d/60-persistent-storage.rules"), L.Udev, "a rule of the distribution");
+        Equal(SyntaxHighlighting.DetectLanguage("/lib/udev/rules.d/50-udev-default.rules"), L.Udev, "a rule of the merged /lib");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/udev/rules.d/10-dynamic.rules"), L.Udev, "a generated rule");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/udev/udev.conf"), L.Udev, "the main udev.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/udev.conf"), L.Udev, "a udev.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/share/polkit-1/rules.d/50-default.rules"), L.Config, "a polkit rule is not udev");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/99-test.rules"), L.Config, "a .rules file outside udev");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/udev/rules.d/README"), L.Plain, "the README of rules.d is prose");
+
+        Highlighted net = new Highlighted(L.Udev,
+            "# udev rules\nACTION==\"add\", SUBSYSTEM==\"net\", KERNEL==\"eth*\", NAME=\"lan0\"\n" +
+            "SUBSYSTEM==\"block\", ENV{ID_FS_TYPE}==\"ext4\", SYMLINK+=\"disk/by-label/data\"\n" +
+            "ATTR{address}==\"aa:bb:cc:dd:ee:ff\", ATTR{mtu}==\"1500\", TAG+=\"systemd\"\n" +
+            "KERNEL==\"sd*\", PROGRAM=\"/bin/sh -c 'echo %k'\", RESULT==\"sda\", RUN+=\"/usr/bin/logger\"\n" +
+            "MODE=\"0660\", OWNER=\"root\", GROUP=\"disk\"\n" +
+            "OPTIONS+=db_persist\nKERNEL==\"ttyUSB*\", OPTIONS+=\"last_rule\"\n" +
+            "UNKNOWN_KEY==\"x\"");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# udev rules", "udev: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeKeyword)), "ACTION|SUBSYSTEM|KERNEL|NAME", "udev: the first rule");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeString)), "\"add\"|\"net\"|\"eth*\"|\"lan0\"", "udev: the values of the first rule");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "SUBSYSTEM|ENV|SYMLINK", "udev: a filesystem rule");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "ATTR|ATTR|TAG", "udev: the attributes and a tag");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "KERNEL|PROGRAM|RESULT|RUN", "udev: a program and its result");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeKeyword)), "MODE|OWNER|GROUP", "udev: owner and mode");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "OPTIONS|db_persist", "udev: an unquoted option");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "KERNEL|OPTIONS", "udev: last_rule");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "", "udev: an unknown key is not a keyword");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeVariable)), "UNKNOWN_KEY", "udev: ...it is a plain key");
+        Check(SyntaxHighlighting.GetKeywords(L.Udev).Contains("SUBSYSTEM"), "udev keywords contain 'SUBSYSTEM'");
+        Check(SyntaxHighlighting.GetKeywords(L.Udev).Contains("RUN"), "udev keywords contain 'RUN'");
+        Check(SyntaxHighlighting.GetKeywords(L.Udev).Contains("db_persist"), "udev keywords contain 'db_persist'");
+        Equal(Join(CommentStyle.ForLanguage(L.Udev).Toggle(new[] { "ACTION==\"add\"" })), "# ACTION==\"add\"", "udev comment");
+    }
+
+    private static void NftablesChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nftables.conf"), L.Nftables, "the main nftables ruleset");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysconfig/nftables.conf"), L.Nftables, "the Fedora ruleset");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nftables.d/10-filter.conf"), L.Nftables, "a drop-in of nftables.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nftables.d/10-filter.nft"), L.Nftables, "an .nft drop-in");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/firewall.nft"), L.Nftables, "an .nft file anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/nftables.conf"), L.Nftables, "a nftables.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/rules.conf"), L.Config, "an ordinary .conf is not nftables");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nftables.d/README"), L.Plain, "the README of nftables.d is prose");
+
+        Highlighted net = new Highlighted(L.Nftables,
+            "#!/usr/sbin/nft -f\n# firewall\nflush ruleset\n\n" +
+            "table inet filter {\n    chain input {\n" +
+            "        type filter hook input priority filter; policy drop;\n" +
+            "        ct state established,related accept\n" +
+            "        iifname \"lo\" accept\n" +
+            "        tcp dport { ssh, http, https } accept\n" +
+            "        ip saddr 192.168.1.0/24 accept\n" +
+            "        counter drop\n" +
+            "        log prefix \"nft: \" level info\n    }\n" +
+            "    chain forward {\n" +
+            "        type filter hook forward priority 0; policy drop;\n" +
+            "        my-command foo\n    }\n}\n" +
+            "table ip nat {\n    chain postrouting {\n" +
+            "        type nat hook postrouting priority srcnat; policy accept;\n" +
+            "        masquerade\n    }\n}");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "#!/usr/sbin/nft -f", "nftables: the shebang is a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeComment)), "# firewall", "nftables: a comment");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "flush|ruleset", "nftables: flush ruleset");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "table|inet|filter", "nftables: a table");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeKeyword)), "chain|input", "nftables: a chain");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "type|filter|hook|input|priority|filter|policy|drop", "nftables: the chain declaration");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "ct|state|established|related|accept", "nftables: connection tracking");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "iifname|accept", "nftables: an input interface");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeString)), "\"lo\"", "nftables: the interface name");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeKeyword)), "tcp|dport|accept", "nftables: a port set");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeKeyword)), "ip|saddr|accept", "nftables: a source address");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeNumber)), "192.168.1.0|24", "nftables: the network and its prefix");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeKeyword)), "counter|drop", "nftables: a counter and drop");
+        Equal(Join(net.Tokens(12, SyntaxHighlighting.TypeKeyword)), "log|prefix|level|info", "nftables: logging");
+        Equal(Join(net.Tokens(14, SyntaxHighlighting.TypeKeyword)), "chain|forward", "nftables: the forward chain");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeKeyword)), "type|filter|hook|forward|priority|policy|drop", "nftables: the forward policy");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeNumber)), "0", "nftables: the priority number");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeKeyword)), "", "nftables: an unknown command is not a keyword");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeVariable)), "my-command", "nftables: ...it is a plain key");
+        Equal(Join(net.Tokens(19, SyntaxHighlighting.TypeKeyword)), "table|ip|nat", "nftables: the NAT table");
+        Equal(Join(net.Tokens(21, SyntaxHighlighting.TypeKeyword)), "type|nat|hook|postrouting|priority|srcnat|policy|accept", "nftables: the postrouting declaration");
+        Equal(Join(net.Tokens(22, SyntaxHighlighting.TypeKeyword)), "masquerade", "nftables: masquerade");
+        Check(SyntaxHighlighting.GetKeywords(L.Nftables).Contains("masquerade"), "nftables keywords contain 'masquerade'");
+        Check(SyntaxHighlighting.GetKeywords(L.Nftables).Contains("established"), "nftables keywords contain 'established'");
+        Check(SyntaxHighlighting.GetKeywords(L.Nftables).Contains("dport"), "nftables keywords contain 'dport'");
+        Equal(Join(CommentStyle.ForLanguage(L.Nftables).Toggle(new[] { "flush ruleset" })), "# flush ruleset", "nftables comment");
+    }
+
+    private static void ModprobeChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/modprobe.d/blacklist.conf"), L.Modprobe, "a local modprobe.d file");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/modprobe.d/systemd.conf"), L.Modprobe, "a file of the distribution");
+        Equal(SyntaxHighlighting.DetectLanguage("/lib/modprobe.d/aliases.conf"), L.Modprobe, "a file of the merged /lib");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/modprobe.d/local.conf"), L.Modprobe, "a generated file");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/modprobe.conf"), L.Modprobe, "the legacy modprobe.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/modprobe.conf"), L.Modprobe, "a modprobe.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/blacklist.conf"), L.Config, "an ordinary .conf is not modprobe.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/modules-load.d/local.conf"), L.Config, "modules-load.d is not modprobe.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/modprobe.d/README"), L.Plain, "the README of modprobe.d is prose");
+
+        Highlighted net = new Highlighted(L.Modprobe,
+            "# module options\nblacklist nouveau\noptions nouveau modeset=0\n" +
+            "alias net-pf-10 off\n" +
+            "install snd_hda_intel /sbin/modprobe --ignore-install snd_hda_intel $CMDLINE_OPTS\n" +
+            "remove snd_hda_intel /sbin/modprobe -r snd_hda_intel\n" +
+            "softdep nf_conntrack pre: nf_defrag_ipv4 post: nf_conntrack_netlink\n" +
+            "include /etc/modprobe.d/extra.conf\nunknown-directive foo");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# module options", "modprobe: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeKeyword)), "blacklist", "modprobe: blacklist");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "options", "modprobe: options");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeNumber)), "0", "modprobe: an option value");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "alias|off", "modprobe: an alias turned off");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "install", "modprobe: install");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeVariable)), "$CMDLINE_OPTS", "modprobe: the install command variables");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeKeyword)), "remove", "modprobe: remove");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "softdep|pre|post", "modprobe: a soft dependency");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "include", "modprobe: include");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "", "modprobe: an unknown directive is not a keyword");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeVariable)), "unknown-directive", "modprobe: ...it is a plain key");
+        Check(SyntaxHighlighting.GetKeywords(L.Modprobe).Contains("softdep"), "modprobe keywords contain 'softdep'");
+        Check(SyntaxHighlighting.GetKeywords(L.Modprobe).Contains("blacklist"), "modprobe keywords contain 'blacklist'");
+        Check(SyntaxHighlighting.GetKeywords(L.Modprobe).Contains("pre"), "modprobe keywords contain 'pre'");
+        Equal(Join(CommentStyle.ForLanguage(L.Modprobe).Toggle(new[] { "blacklist nouveau" })), "# blacklist nouveau", "modprobe comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2093,6 +2269,10 @@ internal static class Program
         IfupdownChecks();
         DnsmasqChecks();
         HostapdChecks();
+        WireguardChecks();
+        UdevChecks();
+        NftablesChecks();
+        ModprobeChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

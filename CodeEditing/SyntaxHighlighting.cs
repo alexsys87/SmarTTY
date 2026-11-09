@@ -104,14 +104,18 @@ namespace SmarTTY.CodeEditing
             Toml, // TOML: tables, arrays, inline tables, dates and multi-line strings, foldable [ ] and { } blocks
             Ifupdown, // /etc/network/interfaces: the colors of Config with the ifupdown stanzas and options known
             Dnsmasq, // dnsmasq.conf, dnsmasq.d: the colors of Config with the dnsmasq options known
-            Hostapd // hostapd.conf: the colors of Config with the hostapd options known
+            Hostapd, // hostapd.conf: the colors of Config with the hostapd options known
+            Wireguard, // /etc/wireguard/*.conf: the colors of Config with the [Interface] and [Peer] keys known
+            Udev, // /etc/udev/rules.d/*.rules, udev.conf: the colors of Config with the udev rule keys known
+            Nftables, // nftables.conf, *.nft: the colors of Config with the commands and expressions of nft known
+            Modprobe // /etc/modprobe.d/*.conf, modprobe.conf: the colors of Config with the module loader directives
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -152,6 +156,10 @@ namespace SmarTTY.CodeEditing
                 case Language.Ifupdown: return "ifupdown (/etc/network/interfaces)";
                 case Language.Dnsmasq: return "dnsmasq";
                 case Language.Hostapd: return "hostapd";
+                case Language.Wireguard: return "WireGuard";
+                case Language.Udev: return "udev rules";
+                case Language.Nftables: return "nftables";
+                case Language.Modprobe: return "modprobe.d";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -346,6 +354,32 @@ namespace SmarTTY.CodeEditing
                 name.EndsWith(".conf", StringComparison.Ordinal))
             {
                 return Language.Hostapd;
+            }
+            // WireGuard: the wg-quick files of /etc/wireguard and the customary wg0.conf / wg-home.conf.
+            bool wireguardName = name.EndsWith(".conf", StringComparison.Ordinal) &&
+                (name == "wg.conf" || name.StartsWith("wg-", StringComparison.Ordinal) ||
+                 (name.Length > 5 && name.StartsWith("wg", StringComparison.Ordinal) && char.IsDigit(name[2])));
+            if (wireguardName || (lowerCasePath.Contains("/wireguard/") && name.EndsWith(".conf", StringComparison.Ordinal)))
+            {
+                return Language.Wireguard;
+            }
+            // udev: the rule files of rules.d and the main udev.conf; a .rules file elsewhere may be a polkit rule.
+            if ((lowerCasePath.Contains("/udev/rules.d/") && name.EndsWith(".rules", StringComparison.Ordinal)) ||
+                name == "udev.conf")
+            {
+                return Language.Udev;
+            }
+            // nftables: the main ruleset of the distributions and the .nft files they load.
+            if (name == "nftables.conf" || name.EndsWith(".nft", StringComparison.Ordinal) ||
+                (lowerCasePath.Contains("/nftables.d/") && name.EndsWith(".conf", StringComparison.Ordinal)))
+            {
+                return Language.Nftables;
+            }
+            // modprobe.d: the configuration of the module loader and the legacy modprobe.conf.
+            if ((lowerCasePath.Contains("/modprobe.d/") && name.EndsWith(".conf", StringComparison.Ordinal)) ||
+                name == "modprobe.conf")
+            {
+                return Language.Modprobe;
             }
             // Docker Compose: the conventional names, including the override and the per-file variants.
             bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
@@ -1056,6 +1090,10 @@ namespace SmarTTY.CodeEditing
                 case Language.Ifupdown: return TokenizeIfupdown;
                 case Language.Dnsmasq: return TokenizeDnsmasq;
                 case Language.Hostapd: return TokenizeHostapd;
+                case Language.Wireguard: return TokenizeWireguard;
+                case Language.Udev: return TokenizeUdev;
+                case Language.Nftables: return TokenizeNftables;
+                case Language.Modprobe: return TokenizeModprobe;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1196,6 +1234,14 @@ namespace SmarTTY.CodeEditing
                     return Combine(DnsmasqDirectives, DnsmasqValues);
                 case Language.Hostapd:
                     return Combine(HostapdDirectives, HostapdValues);
+                case Language.Wireguard:
+                    return Combine(WireguardDirectives, WireguardValues);
+                case Language.Udev:
+                    return Combine(UdevKeywords);
+                case Language.Nftables:
+                    return Combine(NftablesKeywords);
+                case Language.Modprobe:
+                    return Combine(ModprobeDirectives, ModprobeValues);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
