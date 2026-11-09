@@ -1293,6 +1293,57 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Ifupdown).Toggle(new[] { "iface eth0 inet static" })), "# iface eth0 inet static", "ifupdown comment");
     }
 
+    private static void DnsmasqChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/dnsmasq.conf"), L.Dnsmasq, "the main dnsmasq configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/dnsmasq.d/lan.conf"), L.Dnsmasq, "a drop-in of dnsmasq.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/dnsmasq.d/01-lan"), L.Dnsmasq, "a drop-in without an extension");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/NetworkManager/dnsmasq.d/nm.conf"), L.Dnsmasq, "the dnsmasq drop-ins of NetworkManager");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/dnsmasq.conf"), L.Dnsmasq, "a dnsmasq.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/dnsmasq.d/README"), L.Plain, "the README of dnsmasq.d is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/dnsmasq.d/notes.txt"), L.Plain, "another text file of dnsmasq.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/dnsmasq.d-available/lan.conf"), L.Config, "dnsmasq.d-available is not read by dnsmasq");
+
+        Highlighted net = new Highlighted(L.Dnsmasq,
+            "# dnsmasq configuration\ndomain-needed\nbogus-priv\nserver=8.8.8.8\nserver=/example.com/1.1.1.1\n" +
+            "interface=eth0\nbind-interfaces\ncache-size=1000\n" +
+            "dhcp-range=192.168.1.50,192.168.1.150,12h\n" +
+            "dhcp-range=192.168.2.50,192.168.2.150,static\n" +
+            "dhcp-option=6,192.168.1.1\n" +
+            "dhcp-host=aa:bb:cc:dd:ee:ff,192.168.1.20,printer\n" +
+            "log-queries\nlog-facility=/var/log/dnsmasq.log\n" +
+            "conf-dir=/etc/dnsmasq.d/,*.conf\nunknown-option=1\n" +
+            "cache-size=2000 # entries");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# dnsmasq configuration", "dnsmasq: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeKeyword)), "domain-needed", "dnsmasq: a flag without a value");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "bogus-priv", "dnsmasq: another flag without a value");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "server", "dnsmasq: server");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeNumber)), "8.8.8.8", "dnsmasq: an upstream address");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "server", "dnsmasq: a server for a domain");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeNumber)), "1.1.1.1", "dnsmasq: the address after the domain");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "bind-interfaces", "dnsmasq: bind-interfaces");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "cache-size", "dnsmasq: cache-size");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeNumber)), "1000", "dnsmasq: the cache size");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "dhcp-range", "dnsmasq: dhcp-range");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeNumber)), "192.168.1.50|192.168.1.150", "dnsmasq: the range");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeKeyword)), "dhcp-range|static", "dnsmasq: a static range");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeKeyword)), "dhcp-option", "dnsmasq: dhcp-option");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeNumber)), "6|192.168.1.1", "dnsmasq: the option and its value");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeKeyword)), "dhcp-host", "dnsmasq: dhcp-host");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeNumber)), "192.168.1.20", "dnsmasq: the reserved address");
+        Equal(Join(net.Tokens(12, SyntaxHighlighting.TypeKeyword)), "log-queries", "dnsmasq: log-queries");
+        Equal(Join(net.Tokens(13, SyntaxHighlighting.TypeKeyword)), "log-facility", "dnsmasq: log-facility");
+        Equal(Join(net.Tokens(14, SyntaxHighlighting.TypeKeyword)), "conf-dir", "dnsmasq: conf-dir");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeKeyword)), "", "dnsmasq: an unknown option is not a keyword");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeVariable)), "unknown-option", "dnsmasq: ...it is a plain key");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeNumber)), "2000", "dnsmasq: a value before a comment");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeComment)), "# entries", "dnsmasq: a trailing comment");
+        Check(SyntaxHighlighting.GetKeywords(L.Dnsmasq).Contains("dhcp-range"), "dnsmasq keywords contain 'dhcp-range'");
+        Check(SyntaxHighlighting.GetKeywords(L.Dnsmasq).Contains("dnssec"), "dnsmasq keywords contain 'dnssec'");
+        Check(SyntaxHighlighting.GetKeywords(L.Dnsmasq).Contains("ra-names"), "dnsmasq keywords contain 'ra-names'");
+        Equal(Join(CommentStyle.ForLanguage(L.Dnsmasq).Toggle(new[] { "server=8.8.8.8" })), "# server=8.8.8.8", "dnsmasq comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -1994,6 +2045,7 @@ internal static class Program
         ApacheChecks();
         SystemdNetworkdChecks();
         IfupdownChecks();
+        DnsmasqChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
