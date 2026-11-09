@@ -384,8 +384,21 @@ internal sealed class X11Channel
     // How long one write to the X server may block before the connection is given up (an X server that hangs does not come back).
     private const int XServerSendTimeoutMs = 30000;
 
+    private enum WriteKind
+    {
+        Data,
+
+        /// <summary>The remote program sent EOF: the X server sees the end of its input, after everything that was queued before.</summary>
+        ShutdownSend,
+
+        /// <summary>The server closed the channel: it is closed here, after everything that was queued before has been written.</summary>
+        CloseChannel
+    }
+
     private struct WriteItem
     {
+        public WriteKind Kind;
+
         public byte[] Data;
 
         /// <summary>The bytes of the channel that this write accounts for (given back to the server's window once written).</summary>
@@ -500,6 +513,16 @@ internal sealed class X11Channel
                 {
                     break;
                 }
+                if (item.Kind == WriteKind.ShutdownSend)
+                {
+                    ShutdownSend();
+                    continue;
+                }
+                if (item.Kind == WriteKind.CloseChannel)
+                {
+                    Close(sendEof: false);
+                    break;
+                }
                 int offset = 0;
                 int remaining = item.Data.Length;
                 while (remaining > 0)
@@ -575,7 +598,43 @@ internal sealed class X11Channel
     }
 
     // The remote program will send nothing more: let the X server see the end of its input.
+    // The data of the remote program is still in the queue of the writer when this arrives: the end of the input comes after it, not before
+    // (a shutdown ahead of the queue cut the data off and the X server never got the rest).
     public void OnRemoteEof()
+    {
+        if (!TryQueue(new WriteItem { Kind = WriteKind.ShutdownSend }))
+        {
+            ShutdownSend();
+        }
+    }
+
+    public void OnRemoteClose()
+    {
+        // The channel is gone on the server; answer with our own close (once) and release the connection, once the queue has been written.
+        if (!TryQueue(new WriteItem { Kind = WriteKind.CloseChannel }))
+        {
+            Close(sendEof: false);
+        }
+    }
+
+    private bool TryQueue(WriteItem item)
+    {
+        if (_closed)
+        {
+            return false;
+        }
+        try
+        {
+            _writeQueue.Add(item);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false; // the queue is complete: the channel is closing
+        }
+    }
+
+    private void ShutdownSend()
     {
         try
         {
@@ -584,12 +643,6 @@ internal sealed class X11Channel
         catch
         {
         }
-    }
-
-    public void OnRemoteClose()
-    {
-        // The channel is gone on the server; answer with our own close (once) and release the connection.
-        Close(sendEof: false);
     }
 
     public void OnConnectionClosed()
