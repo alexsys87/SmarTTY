@@ -125,6 +125,12 @@ public sealed class SftpChannel : IDisposable
 
     public int ServerVersion { get; private set; }
 
+    /// <summary>The extensions the server announced in its version reply (name and data), such as posix-rename@openssh.com.</summary>
+    public Dictionary<string, string> ServerExtensions { get; private set; } = new Dictionary<string, string>();
+
+    /// <summary>The server can rename over an existing file in one step (<see cref="PosixRename"/>).</summary>
+    public bool SupportsPosixRename => ServerExtensions.ContainsKey(SftpExtensions.PosixRename);
+
     private SftpChannel(SshShellChannel channel)
     {
         _channel = channel;
@@ -180,6 +186,7 @@ public sealed class SftpChannel : IDisposable
         {
             throw new RemoteOperationException("The SFTP server speaks version " + ServerVersion + "; version 3 is required.");
         }
+        ServerExtensions = SftpExtensions.ParseVersionExtensions(reply);
     }
 
     #region File operations
@@ -319,6 +326,16 @@ public sealed class SftpChannel : IDisposable
         ExpectOk(request, oldPath);
     }
 
+    /// <summary>
+    /// Renames a file and replaces the target if there is one, in one step: nobody can find the name without a file. Only when
+    /// <see cref="SupportsPosixRename"/>; the old path is left alone when it fails.
+    /// </summary>
+    public void PosixRename(string oldPath, string newPath)
+    {
+        uint id = Send(requestId => SftpExtensions.BuildExtendedRequest(requestId, SftpExtensions.PosixRename, oldPath, newPath));
+        CheckStatusReply(id, oldPath);
+    }
+
     public string RealPath(string path)
     {
         PacketWriter request = new PacketWriter(FxpRealpath);
@@ -361,6 +378,14 @@ public sealed class SftpChannel : IDisposable
     {
         uint id = _nextRequestId++;
         byte[] bytes = packet.ToArray(id);
+        _channel.Input.Write(bytes, 0, bytes.Length);
+        return id;
+    }
+
+    private uint Send(Func<uint, byte[]> build)
+    {
+        uint id = _nextRequestId++;
+        byte[] bytes = build(id);
         _channel.Input.Write(bytes, 0, bytes.Length);
         return id;
     }

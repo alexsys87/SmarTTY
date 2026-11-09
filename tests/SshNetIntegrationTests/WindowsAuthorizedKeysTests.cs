@@ -160,9 +160,23 @@ internal static class WindowsAuthorizedKeysTests
 
         WindowsAuthorizedKeys.AppendToFiles(sftp, files, key, blob, restricted.Add);
         Test.Equal(key + "\n", Text(sftp, path), "the key is written to the file of the administrators");
-        Test.Check(restricted.SequenceEqual(new[] { path }), "and the access to that file is restricted after it was written");
+        Test.Check(restricted.SequenceEqual(new[] { path + KeyFileReplacer.TemporarySuffix }), "and the access is restricted on the new file before it takes the name (the rights go with the file when it is renamed)");
         WindowsAuthorizedKeys.AppendToFiles(sftp, files, key, blob, restricted.Add);
         Test.Check(restricted.Count == 1, "a key that is already there writes nothing and restricts nothing again");
+
+        // A second key replaces a file that exists: in one step where the server has posix-rename, with the old file kept until then otherwise.
+        string second = Line("ssh-rsa", 4, "admin2@pc");
+        WindowsAuthorizedKeys.AppendToFiles(sftp, files, second, Blob("ssh-rsa", 4), restricted.Add);
+        Test.Equal(key + "\n" + second + "\n", Text(sftp, path), "a second key replaces the file with one that holds both keys");
+        Test.Check(restricted.SequenceEqual(new[] { path + KeyFileReplacer.TemporarySuffix, path + KeyFileReplacer.TemporarySuffix }), "and the access is restricted on the new file again");
+        Test.Check(!fileSystem.List(programData + "/ssh").Any(entry => entry.Name.EndsWith(KeyFileReplacer.TemporarySuffix) || entry.Name.EndsWith(KeyFileReplacer.BackupSuffix)), "no temporary file and no copy of the old file are left beside the key file");
+
+        // A replacement that the connection cut off between its two renames left the old keys in the copy: the next run puts them back first.
+        string interrupted = programData + "/ssh/interrupted_keys";
+        Put(sftp, interrupted + KeyFileReplacer.BackupSuffix, key + "\n");
+        WindowsAuthorizedKeys.AppendToFiles(sftp, new List<WindowsAuthorizedKeys.KeyFile> { new WindowsAuthorizedKeys.KeyFile { Path = interrupted } }, second, Blob("ssh-rsa", 4), restricted.Add);
+        Test.Equal(key + "\n" + second + "\n", Text(sftp, interrupted), "the keys of an interrupted replacement are put back before the new key is added: none is lost");
+        Test.Check(WindowsAuthorizedKeys.ReadFile(sftp, interrupted + KeyFileReplacer.BackupSuffix) == null, "and the copy is gone");
         Test.Throws<SftpStatusException>(() => WindowsAuthorizedKeys.AppendToFiles(sftp, new List<WindowsAuthorizedKeys.KeyFile> { new WindowsAuthorizedKeys.KeyFile { Path = programData + "/no-ssh-dir/sub/keys" } }, key, blob, restricted.Add), "a file in a directory that cannot be created is an error, not a silent success");
     }
 
@@ -180,7 +194,7 @@ internal static class WindowsAuthorizedKeysTests
         Put(sftp, keys, "# keys\r\n" + mine + "\r\n" + theirs + "\r\n\r\n");
         WindowsAuthorizedKeys.RemoveFromFiles(sftp, files, mineBlob, restricted.Add);
         Test.Equal("# keys\r\n" + theirs + "\r\n\r\n", Text(sftp, keys), "only the lines of that key are removed; comments, other keys and blank lines stay, and so does CRLF");
-        Test.Check(restricted.SequenceEqual(new[] { keys }), "the access is restricted again after the file was rewritten");
+        Test.Check(restricted.SequenceEqual(new[] { keys + KeyFileReplacer.TemporarySuffix }), "the access is restricted again, on the rewritten file, before it takes the place of the old one");
         WindowsAuthorizedKeys.RemoveFromFiles(sftp, files, mineBlob, restricted.Add);
         Test.Check(restricted.Count == 1 && Text(sftp, keys) == "# keys\r\n" + theirs + "\r\n\r\n", "removing a key that is not there changes nothing and restricts nothing");
         WindowsAuthorizedKeys.RemoveFromFiles(sftp, new List<WindowsAuthorizedKeys.KeyFile> { new WindowsAuthorizedKeys.KeyFile { Path = path + "/never-existed" } }, mineBlob, restricted.Add);
