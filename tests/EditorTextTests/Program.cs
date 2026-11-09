@@ -1437,6 +1437,43 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Wireguard).Toggle(new[] { "ListenPort = 51820" })), "# ListenPort = 51820", "WireGuard comment");
     }
 
+    private static void UdevChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/udev/rules.d/99-local.rules"), L.Udev, "a local udev rule");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/udev/rules.d/60-persistent-storage.rules"), L.Udev, "a rule of the distribution");
+        Equal(SyntaxHighlighting.DetectLanguage("/lib/udev/rules.d/50-udev-default.rules"), L.Udev, "a rule of the merged /lib");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/udev/rules.d/10-dynamic.rules"), L.Udev, "a generated rule");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/udev/udev.conf"), L.Udev, "the main udev.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/udev.conf"), L.Udev, "a udev.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/share/polkit-1/rules.d/50-default.rules"), L.Config, "a polkit rule is not udev");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/99-test.rules"), L.Config, "a .rules file outside udev");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/udev/rules.d/README"), L.Plain, "the README of rules.d is prose");
+
+        Highlighted net = new Highlighted(L.Udev,
+            "# udev rules\nACTION==\"add\", SUBSYSTEM==\"net\", KERNEL==\"eth*\", NAME=\"lan0\"\n" +
+            "SUBSYSTEM==\"block\", ENV{ID_FS_TYPE}==\"ext4\", SYMLINK+=\"disk/by-label/data\"\n" +
+            "ATTR{address}==\"aa:bb:cc:dd:ee:ff\", ATTR{mtu}==\"1500\", TAG+=\"systemd\"\n" +
+            "KERNEL==\"sd*\", PROGRAM=\"/bin/sh -c 'echo %k'\", RESULT==\"sda\", RUN+=\"/usr/bin/logger\"\n" +
+            "MODE=\"0660\", OWNER=\"root\", GROUP=\"disk\"\n" +
+            "OPTIONS+=db_persist\nKERNEL==\"ttyUSB*\", OPTIONS+=\"last_rule\"\n" +
+            "UNKNOWN_KEY==\"x\"");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# udev rules", "udev: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeKeyword)), "ACTION|SUBSYSTEM|KERNEL|NAME", "udev: the first rule");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeString)), "\"add\"|\"net\"|\"eth*\"|\"lan0\"", "udev: the values of the first rule");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "SUBSYSTEM|ENV|SYMLINK", "udev: a filesystem rule");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "ATTR|ATTR|TAG", "udev: the attributes and a tag");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "KERNEL|PROGRAM|RESULT|RUN", "udev: a program and its result");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeKeyword)), "MODE|OWNER|GROUP", "udev: owner and mode");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "OPTIONS|db_persist", "udev: an unquoted option");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "KERNEL|OPTIONS", "udev: last_rule");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "", "udev: an unknown key is not a keyword");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeVariable)), "UNKNOWN_KEY", "udev: ...it is a plain key");
+        Check(SyntaxHighlighting.GetKeywords(L.Udev).Contains("SUBSYSTEM"), "udev keywords contain 'SUBSYSTEM'");
+        Check(SyntaxHighlighting.GetKeywords(L.Udev).Contains("RUN"), "udev keywords contain 'RUN'");
+        Check(SyntaxHighlighting.GetKeywords(L.Udev).Contains("db_persist"), "udev keywords contain 'db_persist'");
+        Equal(Join(CommentStyle.ForLanguage(L.Udev).Toggle(new[] { "ACTION==\"add\"" })), "# ACTION==\"add\"", "udev comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2141,6 +2178,7 @@ internal static class Program
         DnsmasqChecks();
         HostapdChecks();
         WireguardChecks();
+        UdevChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

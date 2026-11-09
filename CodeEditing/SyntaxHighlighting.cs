@@ -105,14 +105,15 @@ namespace SmarTTY.CodeEditing
             Ifupdown, // /etc/network/interfaces: the colors of Config with the ifupdown stanzas and options known
             Dnsmasq, // dnsmasq.conf, dnsmasq.d: the colors of Config with the dnsmasq options known
             Hostapd, // hostapd.conf: the colors of Config with the hostapd options known
-            Wireguard // /etc/wireguard/*.conf: the colors of Config with the [Interface] and [Peer] keys known
+            Wireguard, // /etc/wireguard/*.conf: the colors of Config with the [Interface] and [Peer] keys known
+            Udev // /etc/udev/rules.d/*.rules, udev.conf: the colors of Config with the udev rule keys known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -154,6 +155,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Dnsmasq: return "dnsmasq";
                 case Language.Hostapd: return "hostapd";
                 case Language.Wireguard: return "WireGuard";
+                case Language.Udev: return "udev rules";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -356,6 +358,12 @@ namespace SmarTTY.CodeEditing
             if (wireguardName || (lowerCasePath.Contains("/wireguard/") && name.EndsWith(".conf", StringComparison.Ordinal)))
             {
                 return Language.Wireguard;
+            }
+            // udev: the rule files of rules.d and the main udev.conf; a .rules file elsewhere may be a polkit rule.
+            if ((lowerCasePath.Contains("/udev/rules.d/") && name.EndsWith(".rules", StringComparison.Ordinal)) ||
+                name == "udev.conf")
+            {
+                return Language.Udev;
             }
             // Docker Compose: the conventional names, including the override and the per-file variants.
             bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
@@ -1067,6 +1075,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Dnsmasq: return TokenizeDnsmasq;
                 case Language.Hostapd: return TokenizeHostapd;
                 case Language.Wireguard: return TokenizeWireguard;
+                case Language.Udev: return TokenizeUdev;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1209,6 +1218,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(HostapdDirectives, HostapdValues);
                 case Language.Wireguard:
                     return Combine(WireguardDirectives, WireguardValues);
+                case Language.Udev:
+                    return Combine(UdevKeywords);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:

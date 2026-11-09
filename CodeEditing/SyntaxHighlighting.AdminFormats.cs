@@ -915,6 +915,27 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(WireguardDirectives, startState, text, sink, out endState, valueKeywords: WireguardValues);
     }
 
+    // ------------------------------------------------------------------- udev
+
+    private static readonly HashSet<string> UdevKeywords = Words(StringComparer.Ordinal,
+        // the keys of the rules
+        @"ACTION SUBSYSTEM SUBSYSTEMS KERNEL KERNELS DEVPATH DEVPATH_OLD DRIVER DRIVERS
+          ATTR ATTRS SYSFS ENV TAG TAGS NAME SYMLINK OWNER GROUP MODE
+          PROGRAM RESULT IMPORT WAIT_FOR WAIT_FOR_SYSFS OPTIONS TEST LABEL GOTO RUN SECLABEL CONST PRODUCT NETLINK
+          udev_log",
+        // the usual unquoted values of ACTION, OPTIONS and udev.conf
+        @"add remove change move online offline bind unbind
+          db_persist nowatch watch last_rule string_escape none replace err info debug");
+
+    /// <summary>
+    /// udev: the colours of Config with the keys of the rules known wherever they stand, since a rule is a list of
+    /// "KEY==value" pairs separated by commas; the usual unquoted values are keywords too.
+    /// </summary>
+    private static bool TokenizeUdev(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(UdevKeywords, startState, text, sink, out endState, valueKeywords: UdevKeywords);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
