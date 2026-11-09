@@ -734,6 +734,44 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(SystemdNetworkdDirectives, startState, text, sink, out endState, valueKeywords: SystemdNetworkdValues);
     }
 
+    // ---------------------------------------------------------------- ifupdown
+
+    private static readonly HashSet<string> IfupdownDirectives = Words(StringComparer.Ordinal,
+        // stanzas and includes
+        @"auto iface allow-hotplug allow-auto source source-directory mapping
+          no-auto-down no-scripts rename template
+          address netmask gateway broadcast network metric mtu hwaddress pointopoint scope
+          pre-up up post-up pre-down down post-down
+          dns-nameservers dns-search dns-domain dns-sortlist
+          bridge_ports bridge_stp bridge_fd bridge_maxwait bridge_maxage bridge_hello bridge_priority
+          bridge_ageing bridge_bridgeprio bridge_gcint bridge_hw bridge_pathcost bridge_portcost bridge_waitport
+          bond-slaves bond-mode bond-miimon bond-downdelay bond-updelay bond-lacp-rate bond-xmit-hash-policy
+          bond-primary bond-primary-reselect
+          vlan-raw-device vlan_id
+          wpa-ssid wpa-psk wpa-conf wpa-driver wpa-key-mgmt wpa-ap-scan wpa-proto wpa-pairwise wpa-group
+          wpa-eap wpa-identity wpa-password wpa-phase2 wpa-ca-cert wpa-client-cert wpa-private-key
+          wpa-private-key-password
+          accept_ra autoconf privext dhcp request
+          tunnel-mode tunnel-local tunnel-remote tunnel-ttl tunnel-mtu
+          preferred-lifetime valid-lifetime");
+
+    private static readonly HashSet<string> IfupdownValues = Words(StringComparer.Ordinal,
+        // address families, methods and the usual values of the options
+        @"inet inet6 ipx can ppp loopback static manual dhcp bootp wvdial tunnel v4tunnel 6to4 ipv6auto ipv6dhcp
+          yes no on off true false
+          ether
+          noauth open shared key
+          wep wpa wpa2 wpa3");
+
+    /// <summary>
+    /// Debian/OpenWrt ifupdown: the colours of Config with the stanzas (auto, iface, source) and the options of
+    /// /etc/network/interfaces known; the address families and methods are coloured wherever they stand.
+    /// </summary>
+    private static bool TokenizeIfupdown(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(IfupdownDirectives, startState, text, sink, out endState, valueKeywords: IfupdownValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

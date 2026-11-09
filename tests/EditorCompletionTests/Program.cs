@@ -120,6 +120,8 @@ internal static class Program
         Check(Names(L.ApacheHttpd, "", "").Contains("FollowSymLinks"), "the Apache option 'FollowSymLinks' is offered");
         Check(Names(L.SystemdNetworkd, "", "").Contains("DHCP"), "the systemd-networkd key 'DHCP' is offered");
         Check(Names(L.SystemdNetworkd, "", "").Contains("LinkLocalAddressing"), "the systemd-networkd key 'LinkLocalAddressing' is offered");
+        Check(Names(L.Ifupdown, "", "").Contains("iface"), "the ifupdown stanza 'iface' is offered");
+        Check(Names(L.Ifupdown, "", "").Contains("bridge_ports"), "the ifupdown option 'bridge_ports' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");

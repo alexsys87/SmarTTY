@@ -1257,6 +1257,42 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.SystemdNetworkd).Toggle(new[] { "DHCP=ipv4" })), "# DHCP=ipv4", "networkd comment");
     }
 
+    private static void IfupdownChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/network/interfaces"), L.Ifupdown, "/etc/network/interfaces");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/network/interfaces.d/eth0"), L.Ifupdown, "a drop-in of interfaces.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/network/interfaces.d/br0"), L.Ifupdown, "another drop-in");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/network/if-up.d/up"), L.Plain, "if-up.d is a script, not the configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/network/if-pre-up.d/x"), L.Plain, "if-pre-up.d is a script too");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/interfaces"), L.Plain, "interfaces elsewhere is not ifupdown");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/network/routes"), L.Plain, "another file of /etc/network is not ifupdown");
+
+        Highlighted net = new Highlighted(L.Ifupdown,
+            "# Debian networking\nauto lo eth0\niface lo inet loopback\niface eth0 inet static\n    address 192.168.1.10\n    netmask 255.255.255.0\n    gateway 192.168.1.1\n    dns-nameservers 8.8.8.8 1.1.1.1\n    pre-up ip link set eth0 up\n    post-up iptables -A INPUT -j ACCEPT\n    my-option value\niface eth0 inet6 dhcp\n    accept_ra 2\nsource /etc/network/interfaces.d/*\nallow-hotplug eth1");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# Debian networking", "ifupdown: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeKeyword)), "auto", "ifupdown: auto");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "iface|inet|loopback", "ifupdown: an interface and its family and method");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "iface|inet|static", "ifupdown: a static interface");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "address", "ifupdown: address");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeNumber)), "192.168.1.10", "ifupdown: an address");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeKeyword)), "netmask", "ifupdown: netmask");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeNumber)), "255.255.255.0", "ifupdown: a netmask");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "dns-nameservers", "ifupdown: dns-nameservers");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeNumber)), "8.8.8.8|1.1.1.1", "ifupdown: the name servers");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "pre-up", "ifupdown: pre-up");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeKeyword)), "post-up", "ifupdown: post-up");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeKeyword)), "", "ifupdown: an unknown option is not a keyword");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeVariable)), "my-option", "ifupdown: ...it is a plain key");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeKeyword)), "iface|inet6|dhcp", "ifupdown: an IPv6 interface with DHCP");
+        Equal(Join(net.Tokens(12, SyntaxHighlighting.TypeKeyword)), "accept_ra", "ifupdown: accept_ra");
+        Equal(Join(net.Tokens(13, SyntaxHighlighting.TypeKeyword)), "source", "ifupdown: source");
+        Equal(Join(net.Tokens(14, SyntaxHighlighting.TypeKeyword)), "allow-hotplug", "ifupdown: allow-hotplug");
+        Check(SyntaxHighlighting.GetKeywords(L.Ifupdown).Contains("iface"), "ifupdown keywords contain 'iface'");
+        Check(SyntaxHighlighting.GetKeywords(L.Ifupdown).Contains("bridge_ports"), "ifupdown keywords contain 'bridge_ports'");
+        Check(SyntaxHighlighting.GetKeywords(L.Ifupdown).Contains("dhcp"), "ifupdown keywords contain 'dhcp'");
+        Equal(Join(CommentStyle.ForLanguage(L.Ifupdown).Toggle(new[] { "iface eth0 inet static" })), "# iface eth0 inet static", "ifupdown comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -1957,6 +1993,7 @@ internal static class Program
         HAProxyChecks();
         ApacheChecks();
         SystemdNetworkdChecks();
+        IfupdownChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
