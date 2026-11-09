@@ -834,6 +834,65 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(DnsmasqDirectives, startState, text, sink, out endState, valueKeywords: DnsmasqValues);
     }
 
+    // ---------------------------------------------------------------- hostapd
+
+    private static readonly HashSet<string> HostapdDirectives = Words(StringComparer.Ordinal,
+        // interface, radio and network
+        @"interface driver ctrl_interface ctrl_interface_group bridge bridge_hairpin ssid ssid2 bssid
+          bssid_blacklist bssid_whitelist macaddr_acl accept_mac_file deny_mac_file own_ip_addr nas_identifier
+          hw_mode channel beacon_int dtim_period max_num_sta rts_threshold fragm_threshold
+          country_code ieee80211d ieee80211h ieee80211n ieee80211ac ieee80211ax ieee80211be
+          wmm_enabled wmm_ac_bk_cwmin wmm_ac_bk_cwmax wmm_ac_bk_aifs wmm_ac_bk_txop_limit wmm_ac_bk_acm
+          wmm_ac_be_cwmin wmm_ac_be_cwmax wmm_ac_be_aifs wmm_ac_be_txop_limit wmm_ac_be_acm
+          wmm_ac_vi_cwmin wmm_ac_vi_cwmax wmm_ac_vi_aifs wmm_ac_vi_txop_limit wmm_ac_vi_acm
+          wmm_ac_vo_cwmin wmm_ac_vo_cwmax wmm_ac_vo_aifs wmm_ac_vo_txop_limit wmm_ac_vo_acm
+          ap_isolate disassoc_low_ack skip_inactivity_poll proxy_arp",
+        // WEP, WPA/WPA2/WPA3, SAE, OWE and FT
+        @"auth_algs wep_key0 wep_key1 wep_key2 wep_key3 wep_default_key wep_key_len_broadcast wep_key_len_unicast
+          wep_rekey_period wep_rekey_rate
+          wpa wpa_key_mgmt wpa_pairwise rsn_pairwise wpa_group_rekey wpa_strict_rekey wpa_gmk_rekey wpa_ptk_rekey
+          wpa_deny_ptk0_rekey wpa_ppk wpa_ppk_only wpa_psk_radius wpa_psk_file wpa_passphrase wpa_psk
+          sae_password sae_pwe sae_require_mfp sae_groups sae_anti_clogging_threshold sae_sync
+          owe_groups owe_transition_bssid owe_transition_ssid owe_transition_ifname owe_ptk_workaround
+          ft_psk_generate_local ft_eap_generate_local ft_over_ds ft_pmk_cache r0kh r1kh pmk_r1_name
+          group_cipher rsn_preauth rsn_preauth_interfaces",
+        // RADIUS and EAP
+        @"radius_server_addr radius_server_port radius_server_secret radius_client_addr radius_client_port
+          radius_acct_server_addr radius_acct_server_port radius_acct_server_secret
+          radius_acct_interim_interval radius_retry_primary_interval radius_das_port radius_das_client radius_das_secret
+          acct_server_addr acct_server_port acct_server_secret auth_server_addr auth_server_port auth_server_shared_secret
+          eap_server eap_user_file eap_message eap_sim_db eap_reauth_period eapol_key_index_workaround
+          ca_cert server_cert private_key private_key_passwd dh_file cert_type",
+        // WPS
+        @"wps_state ap_setup_locked config_methods uuid device_name manufacturer model_name model_number serial_number
+          device_type os_version wps_pin wps_pbc wps_cred_processing wps_rf_bands wps_pri_dev_type wps_sec_dev_type_list
+          wps_ap_pin wps_cred_add_sae wps_skip_ads",
+        // Hotspot 2.0, MBO, logging, vendor elements and P2P
+        @"interworking internet access_network_type network_auth_type venue_group venue_type hessid domain_name
+          roaming_consortium venue_name venue_url mbo mbo_cell_capa mbo_oce
+          logger_syslog logger_syslog_level logger_stdout logger_stdout_level dump_file
+          vendor_elements assocresp_elements multi_ap
+          p2p_device_addr p2p_interface_addr p2p_listen_reg_class p2p_listen_channel p2p_oper_reg_class p2p_oper_channel");
+
+    private static readonly HashSet<string> HostapdValues = Words(StringComparer.Ordinal,
+        // hw_mode, WPA key management and pairwise ciphers
+        @"a b g ad
+          WPA-PSK WPA-EAP WPA-PSK-SHA256 WPA-EAP-SHA256 SAE FT-PSK FT-EAP FT-EAP-SHA256 FT-SAE
+          FILS-SHA256 FILS-SHA384 SAE-EXT-KEY OWE DPP
+          CCMP TKIP GCMP CCMP-256 GCMP-256
+          PSK EAP 802.1X
+          label display push_button keypad virtual_display physical_display virtual_push_button physical_push_button
+          none radius mac open shared");
+
+    /// <summary>
+    /// hostapd: the colours of Config with the options of hostapd.conf known; the hw_mode letters, the WPA key
+    /// management suites and the pairwise ciphers are keywords too.
+    /// </summary>
+    private static bool TokenizeHostapd(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(HostapdDirectives, startState, text, sink, out endState, valueKeywords: HostapdValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

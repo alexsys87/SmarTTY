@@ -1344,6 +1344,52 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Dnsmasq).Toggle(new[] { "server=8.8.8.8" })), "# server=8.8.8.8", "dnsmasq comment");
     }
 
+    private static void HostapdChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/hostapd/hostapd.conf"), L.Hostapd, "the main hostapd configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/hostapd/wlan1.conf"), L.Hostapd, "a per-interface file of /etc/hostapd");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/run/hostapd-phy0.conf"), L.Hostapd, "the runtime file of OpenWrt");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/hostapd.conf"), L.Hostapd, "a hostapd.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/hostapd-phy0.conf"), L.Hostapd, "a runtime file outside /var/run");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/hostapd/hostapd.eap_user"), L.Plain, "the EAP user file is not the configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/hostapd/hostapd.conf.bak"), L.Plain, "a backup is not the configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/wpa_supplicant/wpa_supplicant.conf"), L.Config, "wpa_supplicant is not hostapd");
+
+        Highlighted net = new Highlighted(L.Hostapd,
+            "# hostapd configuration\ninterface=wlan0\ndriver=nl80211\n" +
+            "ctrl_interface=/var/run/hostapd\nssid=My Network\nhw_mode=g\nchannel=6\n" +
+            "ieee80211n=1\nwmm_enabled=1\nmacaddr_acl=0\nauth_algs=1\nwpa=2\n" +
+            "wpa_key_mgmt=WPA-PSK SAE\nwpa_pairwise=CCMP\nrsn_pairwise=CCMP\n" +
+            "wpa_passphrase=secret123\ncountry_code=US\nbeacon_int=100\ndtim_period=2\n" +
+            "unknown-option=1");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# hostapd configuration", "hostapd: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeKeyword)), "interface", "hostapd: interface");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "driver", "hostapd: driver");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "ctrl_interface", "hostapd: ctrl_interface");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "ssid", "hostapd: ssid");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeKeyword)), "hw_mode|g", "hostapd: hw_mode and its letter");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "channel", "hostapd: channel");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeNumber)), "6", "hostapd: the channel number");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "ieee80211n", "hostapd: ieee80211n");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeNumber)), "1", "hostapd: 802.11n is on");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeKeyword)), "macaddr_acl", "hostapd: macaddr_acl");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeKeyword)), "wpa", "hostapd: wpa");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeNumber)), "2", "hostapd: WPA2");
+        Equal(Join(net.Tokens(12, SyntaxHighlighting.TypeKeyword)), "wpa_key_mgmt|WPA-PSK|SAE", "hostapd: the key management suites");
+        Equal(Join(net.Tokens(13, SyntaxHighlighting.TypeKeyword)), "wpa_pairwise|CCMP", "hostapd: the pairwise cipher");
+        Equal(Join(net.Tokens(14, SyntaxHighlighting.TypeKeyword)), "rsn_pairwise|CCMP", "hostapd: the RSN cipher");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeKeyword)), "wpa_passphrase", "hostapd: wpa_passphrase");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeKeyword)), "country_code", "hostapd: country_code");
+        Equal(Join(net.Tokens(17, SyntaxHighlighting.TypeNumber)), "100", "hostapd: the beacon interval");
+        Equal(Join(net.Tokens(18, SyntaxHighlighting.TypeNumber)), "2", "hostapd: the DTIM period");
+        Equal(Join(net.Tokens(19, SyntaxHighlighting.TypeKeyword)), "", "hostapd: an unknown option is not a keyword");
+        Equal(Join(net.Tokens(19, SyntaxHighlighting.TypeVariable)), "unknown-option", "hostapd: ...it is a plain key");
+        Check(SyntaxHighlighting.GetKeywords(L.Hostapd).Contains("wpa_key_mgmt"), "hostapd keywords contain 'wpa_key_mgmt'");
+        Check(SyntaxHighlighting.GetKeywords(L.Hostapd).Contains("ieee80211ax"), "hostapd keywords contain 'ieee80211ax'");
+        Check(SyntaxHighlighting.GetKeywords(L.Hostapd).Contains("SAE"), "hostapd keywords contain 'SAE'");
+        Equal(Join(CommentStyle.ForLanguage(L.Hostapd).Toggle(new[] { "ssid=My Network" })), "# ssid=My Network", "hostapd comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2046,6 +2092,7 @@ internal static class Program
         SystemdNetworkdChecks();
         IfupdownChecks();
         DnsmasqChecks();
+        HostapdChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
