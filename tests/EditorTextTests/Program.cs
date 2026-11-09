@@ -1390,6 +1390,53 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Hostapd).Toggle(new[] { "ssid=My Network" })), "# ssid=My Network", "hostapd comment");
     }
 
+    private static void WireguardChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/wireguard/wg0.conf"), L.Wireguard, "a tunnel of /etc/wireguard");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/wireguard/home.conf"), L.Wireguard, "a tunnel with a custom name");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg0.conf"), L.Wireguard, "a wg0.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg12.conf"), L.Wireguard, "a numbered interface");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg-home.conf"), L.Wireguard, "an interface with a dashed name");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wg.conf"), L.Wireguard, "the bare wg.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/wget.conf"), L.Config, "wget.conf is not WireGuard");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/wireguard/privatekey"), L.Plain, "a key file is not the configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/wireguard/wg0.conf.bak"), L.Plain, "a backup is not the configuration");
+
+        Highlighted net = new Highlighted(L.Wireguard,
+            "# WireGuard tunnel\n[Interface]\nAddress = 10.0.0.2/24\nListenPort = 51820\n" +
+            "PrivateKey = abc=\nDNS = 1.1.1.1\nMTU = 1420\nTable = auto\n" +
+            "PostUp = iptables -A FORWARD -i wg0 -j ACCEPT\nSaveConfig = true\n\n" +
+            "[Peer]\nPublicKey = def=\nPresharedKey = ghi=\n" +
+            "AllowedIPs = 10.0.0.0/24\nEndpoint = vpn.example.com:51820\n" +
+            "PersistentKeepalive = 25\nUnknownKey = 1\nendpoint = vpn2.example.com:51821");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# WireGuard tunnel", "WireGuard: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeSection)), "[Interface]", "WireGuard: the Interface section");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "Address", "WireGuard: Address");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeNumber)), "10.0.0.2|24", "WireGuard: the tunnel address");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "ListenPort", "WireGuard: ListenPort");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeNumber)), "51820", "WireGuard: the listen port");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "PrivateKey", "WireGuard: PrivateKey");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeNumber)), "1.1.1.1", "WireGuard: the DNS server");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "Table|auto", "WireGuard: the routing table");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "PostUp", "WireGuard: PostUp");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeKeyword)), "SaveConfig|true", "WireGuard: SaveConfig and its value");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeSection)), "[Peer]", "WireGuard: the Peer section");
+        Equal(Join(net.Tokens(12, SyntaxHighlighting.TypeKeyword)), "PublicKey", "WireGuard: PublicKey");
+        Equal(Join(net.Tokens(13, SyntaxHighlighting.TypeKeyword)), "PresharedKey", "WireGuard: PresharedKey");
+        Equal(Join(net.Tokens(14, SyntaxHighlighting.TypeKeyword)), "AllowedIPs", "WireGuard: AllowedIPs");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeKeyword)), "Endpoint", "WireGuard: Endpoint");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeNumber)), "51820", "WireGuard: the endpoint port");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeKeyword)), "PersistentKeepalive", "WireGuard: PersistentKeepalive");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeNumber)), "25", "WireGuard: the keepalive interval");
+        Equal(Join(net.Tokens(17, SyntaxHighlighting.TypeKeyword)), "", "WireGuard: an unknown key is not a keyword");
+        Equal(Join(net.Tokens(17, SyntaxHighlighting.TypeVariable)), "UnknownKey", "WireGuard: ...it is a plain key");
+        Equal(Join(net.Tokens(18, SyntaxHighlighting.TypeKeyword)), "endpoint", "WireGuard: the keys match in any case");
+        Check(SyntaxHighlighting.GetKeywords(L.Wireguard).Contains("AllowedIPs"), "WireGuard keywords contain 'AllowedIPs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Wireguard).Contains("PersistentKeepalive"), "WireGuard keywords contain 'PersistentKeepalive'");
+        Check(SyntaxHighlighting.GetKeywords(L.Wireguard).Contains("auto"), "WireGuard keywords contain 'auto'");
+        Equal(Join(CommentStyle.ForLanguage(L.Wireguard).Toggle(new[] { "ListenPort = 51820" })), "# ListenPort = 51820", "WireGuard comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2093,6 +2140,7 @@ internal static class Program
         IfupdownChecks();
         DnsmasqChecks();
         HostapdChecks();
+        WireguardChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

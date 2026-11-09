@@ -126,6 +126,8 @@ internal static class Program
         Check(Names(L.Dnsmasq, "", "").Contains("ra-names"), "the dnsmasq value 'ra-names' is offered");
         Check(Names(L.Hostapd, "", "").Contains("wpa_key_mgmt"), "the hostapd option 'wpa_key_mgmt' is offered");
         Check(Names(L.Hostapd, "", "").Contains("SAE"), "the hostapd value 'SAE' is offered");
+        Check(Names(L.Wireguard, "", "").Contains("AllowedIPs"), "the WireGuard key 'AllowedIPs' is offered");
+        Check(Names(L.Wireguard, "", "").Contains("auto"), "the WireGuard value 'auto' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");

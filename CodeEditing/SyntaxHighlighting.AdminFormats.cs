@@ -893,6 +893,28 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(HostapdDirectives, startState, text, sink, out endState, valueKeywords: HostapdValues);
     }
 
+    // -------------------------------------------------------------- WireGuard
+
+    private static readonly HashSet<string> WireguardDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // [Interface] and [Peer]
+        @"Address ListenPort PrivateKey DNS MTU FwMark Table
+          PreUp PostUp PreDown PostDown SaveConfig
+          PublicKey PresharedKey AllowedIPs Endpoint PersistentKeepalive",
+        // AmneziaWG, a WireGuard fork with obfuscation parameters
+        @"Jc Jmin Jmax S1 S2 H1 H2 H3 H4 I1 I2 I3 I4 I5");
+
+    private static readonly HashSet<string> WireguardValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"Interface Peer auto main default off");
+
+    /// <summary>
+    /// WireGuard: the colours of Config with the [Interface] and [Peer] keys known; the values of Table (auto, main,
+    /// default, off) are keywords too, and the keys match in any case, as wg-quick reads them.
+    /// </summary>
+    private static bool TokenizeWireguard(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(WireguardDirectives, startState, text, sink, out endState, valueKeywords: WireguardValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

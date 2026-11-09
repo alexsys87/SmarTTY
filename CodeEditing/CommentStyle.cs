@@ -42,6 +42,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Ifupdown:
                 case SyntaxHighlighting.Language.Dnsmasq:
                 case SyntaxHighlighting.Language.Hostapd:
+                case SyntaxHighlighting.Language.Wireguard:
                 case SyntaxHighlighting.Language.Kubernetes:
                 case SyntaxHighlighting.Language.DockerCompose:
                 case SyntaxHighlighting.Language.Ansible:
