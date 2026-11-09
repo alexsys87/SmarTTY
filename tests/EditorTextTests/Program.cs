@@ -1474,6 +1474,61 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Udev).Toggle(new[] { "ACTION==\"add\"" })), "# ACTION==\"add\"", "udev comment");
     }
 
+    private static void NftablesChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nftables.conf"), L.Nftables, "the main nftables ruleset");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysconfig/nftables.conf"), L.Nftables, "the Fedora ruleset");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nftables.d/10-filter.conf"), L.Nftables, "a drop-in of nftables.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nftables.d/10-filter.nft"), L.Nftables, "an .nft drop-in");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/firewall.nft"), L.Nftables, "an .nft file anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/nftables.conf"), L.Nftables, "a nftables.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/rules.conf"), L.Config, "an ordinary .conf is not nftables");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nftables.d/README"), L.Plain, "the README of nftables.d is prose");
+
+        Highlighted net = new Highlighted(L.Nftables,
+            "#!/usr/sbin/nft -f\n# firewall\nflush ruleset\n\n" +
+            "table inet filter {\n    chain input {\n" +
+            "        type filter hook input priority filter; policy drop;\n" +
+            "        ct state established,related accept\n" +
+            "        iifname \"lo\" accept\n" +
+            "        tcp dport { ssh, http, https } accept\n" +
+            "        ip saddr 192.168.1.0/24 accept\n" +
+            "        counter drop\n" +
+            "        log prefix \"nft: \" level info\n    }\n" +
+            "    chain forward {\n" +
+            "        type filter hook forward priority 0; policy drop;\n" +
+            "        my-command foo\n    }\n}\n" +
+            "table ip nat {\n    chain postrouting {\n" +
+            "        type nat hook postrouting priority srcnat; policy accept;\n" +
+            "        masquerade\n    }\n}");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "#!/usr/sbin/nft -f", "nftables: the shebang is a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeComment)), "# firewall", "nftables: a comment");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "flush|ruleset", "nftables: flush ruleset");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "table|inet|filter", "nftables: a table");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeKeyword)), "chain|input", "nftables: a chain");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "type|filter|hook|input|priority|filter|policy|drop", "nftables: the chain declaration");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "ct|state|established|related|accept", "nftables: connection tracking");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeKeyword)), "iifname|accept", "nftables: an input interface");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeString)), "\"lo\"", "nftables: the interface name");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeKeyword)), "tcp|dport|accept", "nftables: a port set");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeKeyword)), "ip|saddr|accept", "nftables: a source address");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeNumber)), "192.168.1.0|24", "nftables: the network and its prefix");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeKeyword)), "counter|drop", "nftables: a counter and drop");
+        Equal(Join(net.Tokens(12, SyntaxHighlighting.TypeKeyword)), "log|prefix|level|info", "nftables: logging");
+        Equal(Join(net.Tokens(14, SyntaxHighlighting.TypeKeyword)), "chain|forward", "nftables: the forward chain");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeKeyword)), "type|filter|hook|forward|priority|policy|drop", "nftables: the forward policy");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeNumber)), "0", "nftables: the priority number");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeKeyword)), "", "nftables: an unknown command is not a keyword");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeVariable)), "my-command", "nftables: ...it is a plain key");
+        Equal(Join(net.Tokens(19, SyntaxHighlighting.TypeKeyword)), "table|ip|nat", "nftables: the NAT table");
+        Equal(Join(net.Tokens(21, SyntaxHighlighting.TypeKeyword)), "type|nat|hook|postrouting|priority|srcnat|policy|accept", "nftables: the postrouting declaration");
+        Equal(Join(net.Tokens(22, SyntaxHighlighting.TypeKeyword)), "masquerade", "nftables: masquerade");
+        Check(SyntaxHighlighting.GetKeywords(L.Nftables).Contains("masquerade"), "nftables keywords contain 'masquerade'");
+        Check(SyntaxHighlighting.GetKeywords(L.Nftables).Contains("established"), "nftables keywords contain 'established'");
+        Check(SyntaxHighlighting.GetKeywords(L.Nftables).Contains("dport"), "nftables keywords contain 'dport'");
+        Equal(Join(CommentStyle.ForLanguage(L.Nftables).Toggle(new[] { "flush ruleset" })), "# flush ruleset", "nftables comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2179,6 +2234,7 @@ internal static class Program
         HostapdChecks();
         WireguardChecks();
         UdevChecks();
+        NftablesChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

@@ -936,6 +936,39 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(UdevKeywords, startState, text, sink, out endState, valueKeywords: UdevKeywords);
     }
 
+    // --------------------------------------------------------------- nftables
+
+    private static readonly HashSet<string> NftablesKeywords = Words(StringComparer.Ordinal,
+        // commands and the objects they act on
+        @"flush table chain rule set map element define include add create delete list monitor describe export import get reset
+          rename replace destroy",
+        // statements, actions, protocols and match keys
+        @"accept drop reject queue continue return jump goto counter log limit quota snat dnat masquerade redirect tproxy
+          dup fwd notrack meta ct ip ip6 tcp udp sctp dccp icmp icmpv6 arp ether vlan bridge inet netdev route socket
+          fib osf xdp numgen jhash symhash mark tos dscp ecn ttl hoplimit flowlabel length frag hdrlength checksum seq
+          ack window flags option version type code mtu protocol priority policy devices hook device state status
+          saddr daddr sport dport iif oif iifname oifname iiftype oiftype cgroup cpu pkttype skuid skgid nfproto l4proto
+          ipsec rt bh count packets bytes over until timeout size auto-merge dynamic interval elem gc-interval expires
+          evaluation vmap prefix nexthop via dev weight persistent secret name value host ifname id num label zone
+          domain interface dei pcp cfi sequence gateway classid nexthdr hlimit frag-off mh-type mh hbh rt0 rt1 rt2 rt4 sr
+          dstopts ah esp comp level",
+        // the usual values: families, hooks, chain types, set types and log levels
+        @"ruleset handle position comment
+          new established related invalid untracked
+          input output forward prerouting postrouting ingress
+          filter nat mangle raw security
+          src dst srcnat dstnat ipv4_addr ipv6_addr ether_addr inet_service
+          emerg alert crit err warning notice info debug");
+
+    /// <summary>
+    /// nftables: the colours of Config with the commands, statements and match keys of nft known wherever they stand;
+    /// strings, variables and the addresses keep the colours of Config. Comments are '#'.
+    /// </summary>
+    private static bool TokenizeNftables(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(NftablesKeywords, startState, text, sink, out endState, valueKeywords: NftablesKeywords);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
