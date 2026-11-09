@@ -772,6 +772,68 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(IfupdownDirectives, startState, text, sink, out endState, valueKeywords: IfupdownValues);
     }
 
+    // ---------------------------------------------------------------- dnsmasq
+
+    private static readonly HashSet<string> DnsmasqDirectives = Words(StringComparer.Ordinal,
+        // files, daemon and logging
+        @"conf-file conf-dir conf-script
+          no-daemon daemon user group pid-file chroot
+          log-queries log-debug log-async log-facility log-dhcp
+          no-hosts addn-hosts hostsdir no-resolv resolv-file servers-file no-poll clear-on-reload
+          localise-queries local-service bogus-priv filterwin2k domain-needed
+          interface except-interface listen-address bind-interfaces bind-dynamic ignore-address
+          no-dhcp-interface no-dhcp6-interface",
+        // DNS
+        @"port edns-packet-max dns-forward-max cache-size cache-rr no-negcache no-round-robin
+          dnssec dnssec-check-unsigned dnssec-no-timecheck dnssec-timestamp dnssec-debug trust-anchor dns-rr
+          max-cache-ttl min-cache-ttl max-ttl local-ttl neg-ttl auth-ttl
+          enable-ra ra-param
+          domain local expand-hosts
+          server rev-server address ipset nftset
+          stop-dns-rebind rebind-localhost-ok rebind-domain-ok
+          synth-domain add-mac add-cpe-id add-subnet umbrella
+          connmark-allowlist-enable connmark-allowlist
+          host-record cname ptr-record txt-record srv-host mx-host naptr-record alias interface-name",
+        // DHCP, RA and PXE
+        @"dhcp-range dhcp-host dhcp-option dhcp-option-force dhcp-option-vendor dhcp-option-class
+          dhcp-boot dhcp-sequential-ip dhcp-lease-max dhcp-leasefile leasefile-ro
+          dhcp-authoritative dhcp-no-override dhcp-script dhcp-scriptuser dhcp-luascript
+          dhcp-match dhcp-vendorclass dhcp-userclass dhcp-mac dhcp-circuitid dhcp-remoteid dhcp-subscrid
+          dhcp-proxy dhcp-relay dhcp-ignore dhcp-ignore-names dhcp-rapid-commit dhcp-alternate-port
+          dhcp-client-update dhcp-fqdn dhcp-name-match dhcp-generate-names dhcp-broadcast
+          dhcp-reply-delay dhcp-pxe-vendor dhcp-ttl
+          quiet-dhcp quiet-dhcp6 quiet-ra
+          bridge-interface shared-network tag-if",
+        // TFTP and debugging
+        @"enable-tftp tftp-root tftp-no-fail tftp-secure tftp-lowercase tftp-unique-root tftp-max
+          tftp-port-range tftp-single-port pxe-service pxe-prompt
+          dumpfile dumpmask no-ping no-ident script-arp use-stale-cache fast-dns-retry");
+
+    private static readonly HashSet<string> DnsmasqValues = Words(StringComparer.Ordinal,
+        // the flags written without a value, and the choices of the options
+        @"bogus-priv filterwin2k domain-needed no-resolv no-poll no-hosts clear-on-reload localise-queries
+          local-service expand-hosts bind-interfaces bind-dynamic
+          dnssec dnssec-check-unsigned dnssec-no-timecheck dnssec-debug
+          stop-dns-rebind rebind-localhost-ok no-negcache no-round-robin dhcp-authoritative dhcp-no-override
+          dhcp-sequential-ip dhcp-rapid-commit dhcp-client-update dhcp-fqdn dhcp-generate-names dhcp-broadcast
+          dhcp-proxy dhcp-ignore-names leasefile-ro enable-ra log-dhcp log-queries log-debug quiet-dhcp
+          quiet-dhcp6 quiet-ra enable-tftp tftp-no-fail tftp-secure tftp-lowercase tftp-single-port script-arp
+          no-ping no-ident no-daemon daemon use-stale-cache fast-dns-retry connmark-allowlist-enable
+          static net host tag set vendor user circuit remote subscr bootp proxy
+          ra-only ra-names ra-stateless ra-advrouter off-link slaac
+          dhcp dhcp6 router dns domain local both ipv4 ipv6
+          base64 text ip mac");
+
+    /// <summary>
+    /// dnsmasq: the colours of Config with the options of dnsmasq.conf and dnsmasq.d known; the options written without
+    /// a value (bogus-priv, no-resolv, dhcp-authoritative) are keywords too, and so are the usual values (static, tag,
+    /// ra-names, ...).
+    /// </summary>
+    private static bool TokenizeDnsmasq(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(DnsmasqDirectives, startState, text, sink, out endState, valueKeywords: DnsmasqValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

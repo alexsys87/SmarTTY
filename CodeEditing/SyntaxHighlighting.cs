@@ -102,14 +102,15 @@ namespace SmarTTY.CodeEditing
             Ansible, // playbooks, roles and tasks: the colors of YAML with the keys and modules of Ansible known
             PostgreSql, // postgresql.conf, pg_hba.conf: the colors of Config with the PostgreSQL settings and keywords
             Toml, // TOML: tables, arrays, inline tables, dates and multi-line strings, foldable [ ] and { } blocks
-            Ifupdown // /etc/network/interfaces: the colors of Config with the ifupdown stanzas and options known
+            Ifupdown, // /etc/network/interfaces: the colors of Config with the ifupdown stanzas and options known
+            Dnsmasq // dnsmasq.conf, dnsmasq.d: the colors of Config with the dnsmasq options known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -148,6 +149,7 @@ namespace SmarTTY.CodeEditing
                 case Language.ApacheHttpd: return "Apache httpd config";
                 case Language.SystemdNetworkd: return "systemd-networkd";
                 case Language.Ifupdown: return "ifupdown (/etc/network/interfaces)";
+                case Language.Dnsmasq: return "dnsmasq";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -330,6 +332,13 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.Ifupdown;
             }
+            // dnsmasq: the drop-ins of dnsmasq.d, including the ones NetworkManager writes. The main file is told by its name.
+            if (lowerCasePath.Contains("/dnsmasq.d/") &&
+                (name.EndsWith(".conf", StringComparison.Ordinal) || name.IndexOf('.') < 0) &&
+                !name.StartsWith("readme", StringComparison.Ordinal))
+            {
+                return Language.Dnsmasq;
+            }
             // Docker Compose: the conventional names, including the override and the per-file variants.
             bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
             if (yamlFile && (name.StartsWith("docker-compose.", StringComparison.Ordinal) ||
@@ -506,6 +515,9 @@ namespace SmarTTY.CodeEditing
                 case "sentinel.conf":
                 case "redis-sentinel.conf":
                     return Language.Redis;
+
+                case "dnsmasq.conf":
+                    return Language.Dnsmasq;
 
                 case "haproxy.cfg":
                 case "haproxy.conf":
@@ -1030,6 +1042,7 @@ namespace SmarTTY.CodeEditing
                 case Language.ApacheHttpd: return TokenizeApache;
                 case Language.SystemdNetworkd: return TokenizeSystemdNetworkd;
                 case Language.Ifupdown: return TokenizeIfupdown;
+                case Language.Dnsmasq: return TokenizeDnsmasq;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1166,6 +1179,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(SystemdNetworkdDirectives, SystemdNetworkdValues);
                 case Language.Ifupdown:
                     return Combine(IfupdownDirectives, IfupdownValues);
+                case Language.Dnsmasq:
+                    return Combine(DnsmasqDirectives, DnsmasqValues);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
