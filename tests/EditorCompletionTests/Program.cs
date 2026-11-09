@@ -128,6 +128,10 @@ internal static class Program
         Check(Names(L.Hostapd, "", "").Contains("SAE"), "the hostapd value 'SAE' is offered");
         Check(Names(L.Wireguard, "", "").Contains("AllowedIPs"), "the WireGuard key 'AllowedIPs' is offered");
         Check(Names(L.Wireguard, "", "").Contains("auto"), "the WireGuard value 'auto' is offered");
+        Check(Names(L.Udev, "", "").Contains("SUBSYSTEM"), "the udev key 'SUBSYSTEM' is offered");
+        Check(Names(L.Udev, "", "").Contains("db_persist"), "the udev value 'db_persist' is offered");
+        Check(Names(L.Nftables, "", "").Contains("masquerade"), "the nftables statement 'masquerade' is offered");
+        Check(Names(L.Nftables, "", "").Contains("established"), "the nftables state 'established' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
