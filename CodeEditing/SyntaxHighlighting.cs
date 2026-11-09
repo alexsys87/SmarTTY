@@ -101,14 +101,15 @@ namespace SmarTTY.CodeEditing
             DockerCompose, // docker-compose.yml, compose.yaml: the colors of YAML with the keys of Compose known
             Ansible, // playbooks, roles and tasks: the colors of YAML with the keys and modules of Ansible known
             PostgreSql, // postgresql.conf, pg_hba.conf: the colors of Config with the PostgreSQL settings and keywords
-            Toml // TOML: tables, arrays, inline tables, dates and multi-line strings, foldable [ ] and { } blocks
+            Toml, // TOML: tables, arrays, inline tables, dates and multi-line strings, foldable [ ] and { } blocks
+            Ifupdown // /etc/network/interfaces: the colors of Config with the ifupdown stanzas and options known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -146,6 +147,7 @@ namespace SmarTTY.CodeEditing
                 case Language.HAProxy: return "HAProxy config";
                 case Language.ApacheHttpd: return "Apache httpd config";
                 case Language.SystemdNetworkd: return "systemd-networkd";
+                case Language.Ifupdown: return "ifupdown (/etc/network/interfaces)";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -321,6 +323,12 @@ namespace SmarTTY.CodeEditing
             if (lowerCasePath.Contains("/systemd/network/"))
             {
                 return Language.SystemdNetworkd;
+            }
+            // Debian/OpenWrt ifupdown: the interfaces file and its drop-ins.
+            if (lowerCasePath.Contains("/etc/network/interfaces.d/") ||
+                (lowerCasePath.Contains("/etc/network/") && name == "interfaces"))
+            {
+                return Language.Ifupdown;
             }
             // Docker Compose: the conventional names, including the override and the per-file variants.
             bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
@@ -1021,6 +1029,7 @@ namespace SmarTTY.CodeEditing
                 case Language.HAProxy: return TokenizeHAProxy;
                 case Language.ApacheHttpd: return TokenizeApache;
                 case Language.SystemdNetworkd: return TokenizeSystemdNetworkd;
+                case Language.Ifupdown: return TokenizeIfupdown;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1155,6 +1164,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(ApacheDirectives, ApacheValues);
                 case Language.SystemdNetworkd:
                     return Combine(SystemdNetworkdDirectives, SystemdNetworkdValues);
+                case Language.Ifupdown:
+                    return Combine(IfupdownDirectives, IfupdownValues);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
