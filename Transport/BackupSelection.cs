@@ -171,6 +171,41 @@ public sealed class BackupNode : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Sets this entry and everything under it as the whole-system selection wants it: checked, except for the entries that are skipped by
+    /// default (and what is inside them). The folders above such an entry end up partly checked.
+    /// </summary>
+    private void SetDownAsDefault(bool on)
+    {
+        if (IsLocked || IsPlaceholder)
+        {
+            return;
+        }
+        bool mine = on && DefaultRole == BackupMountRole.Ordinary;
+        SetState(mine);
+        foreach (BackupNode child in Children)
+        {
+            child.SetDownAsDefault(mine);
+        }
+        if (Children.Any(child => !child.IsPlaceholder && !child.IsLocked) && Children.Any(child => child._IsChecked != mine && !child.IsPlaceholder && !child.IsLocked))
+        {
+            UpdateFromChildren();
+        }
+    }
+
+    /// <summary>
+    /// Whether this entry is checked the way the whole-system selection checks it: as a whole, or with nothing but entries that are
+    /// skipped by default (or locked) left out.
+    /// </summary>
+    private bool IsDefaultSelected()
+    {
+        if (IsPlaceholder || IsLocked || DefaultRole != BackupMountRole.Ordinary)
+        {
+            return true;
+        }
+        return _IsChecked == true || (_IsChecked == null && Children.All(child => child.IsDefaultSelected()));
+    }
+
     private void SetState(bool? value)
     {
         if (_IsChecked == value)
@@ -226,7 +261,9 @@ public sealed class BackupNode : INotifyPropertyChanged
         foreach (ChildSpec spec in children ?? Enumerable.Empty<ChildSpec>())
         {
             bool locked = spec.Role == BackupMountRole.NeverArchived;
-            bool isChecked = _IsChecked == false ? false : _IsChecked == true && !IsRoot ? true : spec.Role == BackupMountRole.Ordinary;
+            // A mount that is skipped by default (a snap image, an NFS or sshfs share, a tmpfs) is not checked just because the folder above it is:
+            // it would be archived as a part of that folder, with gigabytes of other data, or hang the backup (a dead NFS share).
+            bool isChecked = _IsChecked == false ? false : spec.Role == BackupMountRole.SkippedByDefault ? false : _IsChecked == true && !IsRoot ? true : spec.Role == BackupMountRole.Ordinary;
             BackupNode child = new BackupNode(spec.Entry.Name, RemoteBackup.Combine(FullPath, spec.Entry.Name), spec.Entry.Kind, this, locked, false, isChecked)
             {
                 _Note = spec.Note,
@@ -360,7 +397,7 @@ public sealed class BackupNode : INotifyPropertyChanged
         {
             if (!child.IsPlaceholder && !child.IsLocked)
             {
-                child.SetDown(child.DefaultRole == BackupMountRole.Ordinary);
+                child.SetDownAsDefault(true);
             }
         }
         UpdateFromChildren();
@@ -374,7 +411,7 @@ public sealed class BackupNode : INotifyPropertyChanged
     public bool IsWholeSystemSelected()
     {
         List<BackupNode> system = Children.Where(child => !child.IsPlaceholder && !child.IsLocked && child.DefaultRole == BackupMountRole.Ordinary).ToList();
-        return system.Count > 0 && system.All(child => child._IsChecked == true);
+        return system.Count > 0 && system.All(child => child.IsDefaultSelected() && child._IsChecked != false);
     }
 
     private void Raise(string property)

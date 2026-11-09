@@ -219,6 +219,38 @@ internal static class Program
         SettingsArchive.Import(archiveWithPwd, data2, local2, null);
         Check(Read(data2, "SavedConnections/root@192.168.1.1.sshconnection").Contains("SECRETPWD") && !Read(data2, "SavedConnections/root@192.168.1.1.sshconnection").Contains("LOCALPWD"), "a password carried by the archive replaces the local one");
 
+        // ---- the saved password stays only with a profile for the same server
+        string otherSrc = NewDir("other-src"), otherSrcLocal = NewDir("other-src-local");
+        Put(otherSrc, "SavedConnections/root@192.168.1.1.sshconnection", Ssh("evil.example.com", null));
+        string otherArchive = Path.Combine(NewDir("out"), "other-host.tar.gz");
+        SettingsArchive.Export(otherArchive, otherSrc, otherSrcLocal, false);
+        string dataOther = NewDir("other-data"), localOther = NewDir("other-local");
+        Put(dataOther, "SavedConnections/root@192.168.1.1.sshconnection", Ssh("192.168.1.1", "LOCALPWD"));
+        SettingsArchive.Import(otherArchive, dataOther, localOther, null);
+        string importedOther = Read(dataOther, "SavedConnections/root@192.168.1.1.sshconnection");
+        Check(importedOther.Contains("evil.example.com") && !importedOther.Contains("LOCALPWD"), "the password of the local profile does not go into an imported profile for another host");
+        Check(SettingsArchive.SameConnection(XDocument.Parse(Ssh("a", "x")), XDocument.Parse(Ssh("A", null))) && !SettingsArchive.SameConnection(XDocument.Parse(Ssh("a", null)), XDocument.Parse(Ssh("b", null))), "profiles are the same connection by host and user (case aside)");
+
+        // ---- the TFTP settings that an import replaces are in the backup
+        string tftpSrcData = NewDir("tftp-b-srcdata"), tftpSrcLocal = NewDir("tftp-b-srclocal");
+        Put(tftpSrcLocal, "TftpFirmware.xml", TftpXml);
+        string tftpArchive = Path.Combine(NewDir("tftp-b-out"), "t.tar.gz");
+        SettingsArchive.Export(tftpArchive, MakeLocations(tftpSrcData, tftpSrcLocal, null, null, null), SettingsParts.TftpFirmware);
+        string tftpData = NewDir("tftp-b-data"), tftpLocal = NewDir("tftp-b-local");
+        Put(tftpLocal, "TftpFirmware.xml", TftpXml.Replace("192.168.1.10", "10.9.9.9"));
+        string tftpBackup = Path.Combine(tftpData, "Backups", "t.tar.gz");
+        var tftpImport = SettingsArchive.Import(tftpArchive, MakeLocations(tftpData, tftpLocal, null, null, null), SettingsParts.TftpFirmware, tftpBackup);
+        Check(tftpImport.TftpFirmwareImported && File.Exists(tftpBackup) && ReadArchive(tftpBackup).Any(e => e.Name.Contains("TftpFirmware") && Encoding.UTF8.GetString(e.Data).Contains("10.9.9.9")),
+            "the TFTP settings that the import replaces are in the backup");
+        Check(Read(tftpLocal, "TftpFirmware.xml") == TftpXml, "...and the imported ones are in place");
+
+        // ---- exporting over an existing archive replaces it in one step (nothing is left over)
+        string replaced2 = Path.Combine(NewDir("replace-out"), "a.tar.gz");
+        SettingsArchive.Export(replaced2, srcData, srcLocal, false);
+        long firstSize = new FileInfo(replaced2).Length;
+        SettingsArchive.Export(replaced2, srcData, srcLocal, true);
+        Check(File.Exists(replaced2) && Directory.GetFiles(Path.GetDirectoryName(replaced2), "*.tmp").Length == 0 && new FileInfo(replaced2).Length != firstSize, "an export over an existing archive replaces it and leaves no temporary file");
+
         // ---- long names (GNU @LongLink)
         string longName = new string('a', 130) + "@host.sshconnection";
         string longArchive = Path.Combine(NewDir("out"), "long.tar.gz");

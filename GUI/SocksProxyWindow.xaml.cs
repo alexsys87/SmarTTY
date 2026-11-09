@@ -121,7 +121,9 @@ public partial class SocksProxyWindow : Window
         address = null;
         keepAlive = 0;
         port = 0;
-        if (!IPAddress.TryParse(AddressBox.Text.Trim(), out IPAddress ip))
+        string addressText = AddressBox.Text.Trim();
+        // TryParse takes "1" for 0.0.0.1: a dotted address needs all four parts.
+        if (!IPAddress.TryParse(addressText, out IPAddress ip) || (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && addressText.Split('.').Length != 4))
         {
             MessageBoxes.Error("Enter the local address as an IP address, e.g. 127.0.0.1.");
             AddressBox.Focus();

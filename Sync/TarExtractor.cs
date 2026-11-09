@@ -374,6 +374,15 @@ public class TarExtractor
             throw new Exception("Invalid file name in a TAR record");
         }
         entryName = entryName.TrimStart('/', '\\');
+        // "./name" is how tar names the members of "tar -c .": the same as "name", and "./" itself is the root folder.
+        while (entryName.StartsWith("./", StringComparison.Ordinal) || entryName.StartsWith(".\\", StringComparison.Ordinal))
+        {
+            entryName = entryName.Substring(2).TrimStart('/', '\\');
+        }
+        if (entryName == ".")
+        {
+            entryName = "";
+        }
         if (stripFirstDirectory)
         {
             int slashIndex = entryName.IndexOf('/');
@@ -398,6 +407,8 @@ public class TarExtractor
         }
         if (IsCaseCollision(fullPath))
         {
+            // "A.txt" and "a.txt" are one file on Windows: the second one is left out, and said so.
+            Log?.Invoke(this, "Skipped " + fullPath + ": a file whose name differs only in case is there already");
             fullPath = null;
         }
         Progress?.Invoke(isSymlink: false, fullPath, (long)entrySize, 0L, _statistics.TotalFiles, _statistics.TotalBytes);

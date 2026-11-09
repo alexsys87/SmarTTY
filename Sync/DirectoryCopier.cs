@@ -17,14 +17,22 @@ public class DirectoryCopier
     {
         public static string GetExtractCommand(string dir, bool preserveTimestamps)
         {
+            // -o: the files belong to the user who unpacks them, not to the owner 500:544 of the archive (tar run by root restores the owner
+            // of the archive, and a key file of that owner is refused by Dropbear). GNU and BusyBox tar both know it when extracting.
             if (preserveTimestamps)
             {
-                return $"cd {SmarTTY.IO.RemotePathUtils.ShellQuote(dir)} && tar -xmf -";
+                return $"cd {SmarTTY.IO.RemotePathUtils.ShellQuote(dir)} && tar -xmof -";
             }
-            return $"cd {SmarTTY.IO.RemotePathUtils.ShellQuote(dir)} && tar -xf -";
+            return $"cd {SmarTTY.IO.RemotePathUtils.ShellQuote(dir)} && tar -xof -";
         }
 
-        public static string GetCreateCommand(string dir, bool followSymlinks, string filePattern = "*", string[] excludeItems = null)
+        /// <summary>
+        /// The command that writes the folder as a tar stream. The whole folder is archived (".", the default of <paramref name="filePattern"/>):
+        /// the shell does not expand "*" to the names that start with a dot (.git, .ssh, .profile were left out without a word), leaves it
+        /// as it is in an empty folder ("Cannot stat"), and puts the names of the folder on the command line, where a file named
+        /// "--checkpoint-action=exec=sh x.sh" is an option of tar and runs on the server.
+        /// </summary>
+        public static string GetCreateCommand(string dir, bool followSymlinks, string filePattern = ".", string[] excludeItems = null)
         {
             string flagStr = (followSymlinks ? "h" : "");
             StringBuilder stringBuilder = new StringBuilder();
@@ -33,6 +41,11 @@ public class DirectoryCopier
                 foreach (string arg in excludeItems)
                 {
                     stringBuilder.AppendFormat(" --exclude={0}", SmarTTY.IO.RemotePathUtils.ShellQuote(arg));
+                    if (filePattern == "." && !arg.StartsWith("*", StringComparison.Ordinal) && !arg.StartsWith("/", StringComparison.Ordinal) && !arg.StartsWith("./", StringComparison.Ordinal))
+                    {
+                        // The members are named "./name" now: a tar that matches the whole name (BusyBox) needs the pattern with the prefix, too.
+                        stringBuilder.AppendFormat(" --exclude={0}", SmarTTY.IO.RemotePathUtils.ShellQuote("./" + arg));
+                    }
                 }
             }
             return $"cd {SmarTTY.IO.RemotePathUtils.ShellQuote(dir)} && tar{stringBuilder} -c{flagStr}f - {filePattern}";
@@ -209,7 +222,7 @@ public class DirectoryCopier
         });
     }
 
-    public void DownloadViaTar(string remotePath, string localPath, string statsFilePath, string[] excludeItems, bool preserveTimestamps = false, string filePattern = "*")
+    public void DownloadViaTar(string remotePath, string localPath, string statsFilePath, string[] excludeItems, bool preserveTimestamps = false, string filePattern = ".")
     {
         OutputCollector outputCollector = new OutputCollector();
         string command = TarCommands.GetCreateCommand(remotePath, FollowSymlinks, filePattern, excludeItems);
@@ -254,7 +267,25 @@ public class DirectoryCopier
                     using ScpChannelStream scpChannelStream = this._session.OpenUpload(tempListFile, memoryStream.Length);
                     scpChannelStream.Write(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
                 }
-                command = TarCommands.GetCreateFromListCommand(remotePath, followSymlinks: true, tempListFile, excludeItems);
+                // "tar -h" follows a link to a folder, too: "data -> /mnt/usb" or "-> /" would pull a whole volume (or the root file system with
+                // /proc and /sys) without a question. Links to folders are taken out of the list, links to files are followed as before.
+                string fileLinksList = tempListFile + ".files";
+                List<string> skippedFolders = this._session.RunCommandChecked(
+                    "cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(remotePath) + " && : > " + SmarTTY.IO.RemotePathUtils.ShellQuote(fileLinksList)
+                    + " && while IFS= read -r n; do if [ -d \"$n\" ]; then echo \"$n\"; else printf '%s\\n' \"$n\" >> " + SmarTTY.IO.RemotePathUtils.ShellQuote(fileLinksList)
+                    + "; fi; done < " + SmarTTY.IO.RemotePathUtils.ShellQuote(tempListFile), requireSuccess: true);
+                if (skippedFolders == null)
+                {
+                    Log?.Invoke(this, "The symbolic links that point outside of " + remotePath + " were not followed: the server could not tell the folders among them.");
+                    this._session.RunCommandChecked("rm " + SmarTTY.IO.RemotePathUtils.ShellQuote(tempListFile) + " " + SmarTTY.IO.RemotePathUtils.ShellQuote(fileLinksList), requireSuccess: false);
+                    tempListFile = null;
+                    break;
+                }
+                foreach (string folderLink in skippedFolders.Where(line => !string.IsNullOrWhiteSpace(line)))
+                {
+                    Log?.Invoke(this, "Not followed: " + folderLink + " is a link to a folder outside of the copied folder (its content is not copied).");
+                }
+                command = TarCommands.GetCreateFromListCommand(remotePath, followSymlinks: true, fileLinksList, excludeItems);
                 using (SshShellChannel shellChannel = this._session.OpenShellChannel(command))
                 {
                     shellChannel.DataReceived += outputCollector.OnDataReceived;
@@ -274,7 +305,10 @@ public class DirectoryCopier
                     break;
                 }
             }
-            this._session.RunCommandChecked("rm " + SmarTTY.IO.RemotePathUtils.ShellQuote(tempListFile), requireSuccess: false);
+            if (tempListFile != null)
+            {
+                this._session.RunCommandChecked("rm " + SmarTTY.IO.RemotePathUtils.ShellQuote(tempListFile) + " " + SmarTTY.IO.RemotePathUtils.ShellQuote(tempListFile + ".files"), requireSuccess: false);
+            }
         }
         if (!string.IsNullOrEmpty(statsFilePath) && directoryStatistics != null)
         {
@@ -305,6 +339,12 @@ public class DirectoryCopier
         Directory.CreateDirectory(localDir);
         foreach (string fileName in fileList)
         {
+            if (!IsSafeLocalName(fileName))
+            {
+                // The name comes from the server: "..\x.dll" or "C:\Users\x" is a legal name on Linux, and on this computer it leads out of the folder.
+                Log?.Invoke(this, "Skipped " + fileName + " in " + remoteDir + ": the name cannot be used as a local file name");
+                continue;
+            }
             string localFilePath = Path.Combine(localDir, fileName);
             if (IsExcluded(fileName, excludeRegexes))
             {
@@ -328,8 +368,24 @@ public class DirectoryCopier
         }
         foreach (string subDir in dirList)
         {
+            if (!IsSafeLocalName(subDir))
+            {
+                Log?.Invoke(this, "Skipped the folder " + subDir + " in " + remoteDir + ": the name cannot be used as a local folder name");
+                continue;
+            }
             DownloadFileByFile(remoteDir + "/" + subDir, localDir + "\\" + subDir, ref filesDone, ref bytesDone, excludeRegexes);
         }
+    }
+
+    /// <summary>
+    /// True for a name from the listing of the server that is one plain file name here: no slash or backslash (a name with one is a path
+    /// on Windows), no ".." and no characters that Windows does not allow (':' opens an alternate data stream or a drive path).
+    /// The checks of <see cref="TarExtractor"/> for the names in an archive, applied to the names of the file-by-file mode, too.
+    /// </summary>
+    internal static bool IsSafeLocalName(string name)
+    {
+        return !string.IsNullOrEmpty(name) && name != "." && name != ".." && name.IndexOfAny(new[] { '/', '\\' }) < 0
+            && !TarExtractor.IsTraversalEntryName(name) && !TarExtractor.HasInvalidLocalNameCharacters(name);
     }
 
     public void CountFiles(string remotePath, ref int filesDone, ref long bytesDone, string localPath)
@@ -530,6 +586,16 @@ public class DirectoryCopier
         }
     }
 
+    /// <summary>
+    /// True when tar said something and all of it is about attributes that could not be set (owner, time stamp, mode): the data is there,
+    /// as for an upload. A copy between hosts used to fail on a chown the other tar was not allowed to do.
+    /// </summary>
+    private static bool OnlyHarmlessMessages(OutputCollector outputCollector)
+    {
+        List<string> messages = outputCollector.GetLines();
+        return messages.Count > 0 && messages.All(IsHarmlessTarMessage);
+    }
+
     /// <summary>A tar message about file attributes that could not be set (owner, time stamp, mode), not about missing data.</summary>
     private static bool IsHarmlessTarMessage(string message)
     {
@@ -586,7 +652,11 @@ public class DirectoryCopier
                 {
                     if ((findData.Attributes & FileAttributes.Directory) != 0)
                     {
-                        subDirs.Add(findData.FileName);
+                        // A junction or a symbolic link to a folder is not followed (a link to a folder above leads round and round).
+                        if (!IsLinkToFolder(findData))
+                        {
+                            subDirs.Add(findData.FileName);
+                        }
                     }
                     else if (filter == null || filter(Path.Combine(localPath, findData.FileName)))
                     {
@@ -666,7 +736,14 @@ public class DirectoryCopier
                 }
                 if ((findData.Attributes & FileAttributes.Directory) != 0)
                 {
-                    subDirs.Add(findData.FileName);
+                    if (!IsLinkToFolder(findData))
+                    {
+                        subDirs.Add(findData.FileName);
+                    }
+                    else
+                    {
+                        Log?.Invoke(this, "Skipped " + Path.Combine(localPath, findData.FileName) + ": a link to a folder is not followed");
+                    }
                     continue;
                 }
                 string localFilePath = Path.Combine(localPath, findData.FileName);
@@ -787,6 +864,11 @@ public class DirectoryCopier
                 }
                 if ((findData.Attributes & FileAttributes.Directory) != 0)
                 {
+                    if (IsLinkToFolder(findData))
+                    {
+                        Log?.Invoke(this, "Skipped " + Path.Combine(localDirPath, findData.FileName) + ": a link to a folder is not followed");
+                        continue;
+                    }
                     subDirs.Add(new DirectoryEntry
                     {
                         Name = findData.FileName,
@@ -811,7 +893,9 @@ public class DirectoryCopier
                     tarEntryPath += findData.FileName;
                     DateTime modifiedTime = DateTime.FromFileTimeUtc(LocalFileSystem.MakeLong(findData.LastWriteTime.dwHighDateTime, findData.LastWriteTime.dwLowDateTime));
                     long length = fileStream.Length;
-                    byte[] headerBytes = tarWriter.CreateHeader(tarEntryPath, isDirectory: false, length, modifiedTime, out paddingBytes);
+                    // Windows has no executable bit: a script or a program is recognised by what it starts with (otherwise a script is
+                    // 0644 on the device, an /etc/init.d/foo that was overwritten stops starting).
+                    byte[] headerBytes = tarWriter.CreateHeader(tarEntryPath, isDirectory: false, length, modifiedTime, out paddingBytes, isLongLink: false, LooksExecutable(fileStream, findData.FileName) ? Convert.ToInt32("755", 8) : (int?)null);
                     destinationStream.Write(headerBytes, 0, headerBytes.Length);
                     headerWritten = true;
                     CopyStream(fileStream, destinationStream, ref filesDone, ref bytesDone, localFilePath, length);
@@ -850,6 +934,36 @@ public class DirectoryCopier
         }
     }
 
+    private static bool IsLinkToFolder(LocalFileSystem.FindData findData)
+    {
+        return (findData.Attributes & FileAttributes.Directory) != 0 && (findData.Attributes & FileAttributes.ReparsePoint) != 0;
+    }
+
+    private static readonly string[] ScriptExtensions = { ".sh", ".bash", ".py", ".pl", ".rb", ".lua", ".awk" };
+
+    /// <summary>True for a file that is a script ("#!" or a well-known extension) or an ELF program; the position of the stream is left at 0.</summary>
+    internal static bool LooksExecutable(Stream stream, string fileName)
+    {
+        foreach (string extension in ScriptExtensions)
+        {
+            if (fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        try
+        {
+            byte[] start = new byte[4];
+            int read = stream.Read(start, 0, 4);
+            stream.Seek(0, SeekOrigin.Begin);
+            return (read >= 2 && start[0] == (byte)'#' && start[1] == (byte)'!') || (read == 4 && start[0] == 0x7F && start[1] == (byte)'E' && start[2] == (byte)'L' && start[3] == (byte)'F');
+        }
+        catch (Exception exception) when (exception is IOException || exception is NotSupportedException)
+        {
+            return false;
+        }
+    }
+
     public static long CopyBetweenHosts(SshSession sourceSession, string sourcePath, SshSession destinationSession, string destinationPath, Action<object, string> logCallback)
     {
         string createCommand = TarCommands.GetCreateCommand(sourcePath, followSymlinks: false);
@@ -884,11 +998,11 @@ public class DirectoryCopier
                 // Let the extracting tar finish and look at how it ended; dropping the channel right after the EOF
                 // would also drop its result (a lost connection, a failed extraction).
                 destChannel.WaitEof();
-                hasError |= destChannel.ClosedByConnectionLoss || destChannel.ExitStatus != 0;
+                hasError |= destChannel.ClosedByConnectionLoss || (destChannel.ExitStatus != 0 && !OnlyHarmlessMessages(outputCollector));
             }
             // A source lost with the connection reads as the end of the tar stream (the data is cut short), but its
             // exit status is not 0 then.
-            hasError |= sourceChannel.ClosedByConnectionLoss || sourceChannel.ExitStatus != 0;
+            hasError |= sourceChannel.ClosedByConnectionLoss || (sourceChannel.ExitStatus != 0 && !OnlyHarmlessMessages(outputCollector));
         }
         if (logCallback != null)
         {

@@ -349,7 +349,16 @@ public static class VcxsrvSetup
         {
             throw new InvalidDataException("Unexpected VcXsrv installer name: " + release.FileName);
         }
-        string directory = Path.Combine(Path.GetTempPath(), "SmarTTY");
+        if (string.IsNullOrEmpty(release.Sha256))
+        {
+            // The fallback through the release page (the API of GitHub is rate-limited) knows no checksum, and an installer that is
+            // started with administrator rights must be one that was checked.
+            throw new InvalidDataException("GitHub did not publish a SHA-256 for the VcXsrv installer, so it cannot be checked and is not started. "
+                + "Try again later (the API of GitHub limits anonymous requests), or download the installer from " + ReleasesPage + " and run it yourself.");
+        }
+        // A folder of its own with a name nobody can guess: a file with a fixed name in %TEMP% could be replaced between the download and
+        // the start (the start asks for administrator rights).
+        string directory = Path.Combine(Path.GetTempPath(), "SmarTTY", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, fileName);
         string partial = path + ".part";

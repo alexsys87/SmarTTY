@@ -212,6 +212,14 @@ internal static class Program
         Check(error == null && Directory.GetFiles(root).Length == 0, "archive: a name with ':' creates nothing");
         Directory.Delete(root, true);
 
+        // --- "tar -c ." names every member "./name" (the whole folder is archived, so that .git and the like are in) ---
+        root = Extract(Archive((Header("./", 0, (byte)'5', true), ""), (Header("./.hidden", 3, (byte)'0', true), "abc"), (Header("./plain.txt", 2, (byte)'0', true), "ok")), out error);
+        Check(error == null, "dot archive: the entry of the folder itself and ./ names are no error (" + error?.Message + ")");
+        Check(File.Exists(Path.Combine(root, ".hidden")) && File.ReadAllText(Path.Combine(root, ".hidden")) == "abc", "dot archive: a hidden file arrives under its name");
+        Check(File.Exists(Path.Combine(root, "plain.txt")), "dot archive: ./name is name");
+        Check(Directory.GetFileSystemEntries(root).Length == 2, "dot archive: nothing else was created (" + string.Join(",", Directory.GetFileSystemEntries(root).Select(Path.GetFileName)) + ")");
+        Directory.Delete(root, true);
+
         // --- header formats ---
         root = Extract(Archive((Header("gnu.txt", 5, (byte)'0', posixMagic: false, junkAt345: true), "hello")), out error);
         Check(error == null && File.Exists(Path.Combine(root, "gnu.txt")), "gnu format: bytes at 345 are not a name prefix");

@@ -431,11 +431,16 @@ public static class SettingsArchive
                     TarWriter.Finish(gzip);
                 }
             }
+            // In one step: with a delete first, a move that fails (a virus scanner, a lock) loses the old archive, and the catch below
+            // loses the new one with it.
             if (File.Exists(fullPath))
             {
-                File.Delete(fullPath);
+                File.Replace(temp, fullPath, null);
             }
-            File.Move(temp, fullPath);
+            else
+            {
+                File.Move(temp, fullPath);
+            }
         }
         catch
         {
@@ -769,7 +774,7 @@ public static class SettingsArchive
             }
             if (item.Target.Part == SettingsParts.SshKey || item.Target.Part == SettingsParts.PasswordKey ||
                 item.Target.Part == SettingsParts.OpenSshKeys || item.Target.Part == SettingsParts.CommandCompletions ||
-                item.Target.Part == SettingsParts.QuickCommands)
+                item.Target.Part == SettingsParts.QuickCommands || item.Target.Part == SettingsParts.TftpFirmware)
             {
                 backupParts |= item.Target.Part;
             }
@@ -789,7 +794,10 @@ public static class SettingsArchive
             }
             foreach (string skipped in backup.Skipped)
             {
-                if (skipped.StartsWith(KeysPrefix, StringComparison.Ordinal))
+                // What the import is going to replace and the backup could not take (an OpenSSH key that does not pass the check, a key of
+                // the key store) would be lost: nothing is imported then.
+                if (skipped.StartsWith(KeysPrefix, StringComparison.Ordinal) || skipped.StartsWith(OpenSshPrefix, StringComparison.Ordinal)
+                    || planned.Any(p => string.Equals(p.EntryName, skipped, StringComparison.Ordinal)))
                 {
                     TryDelete(backupPath);
                     throw new IOException("The current key '" + skipped + "' cannot be read, so it cannot be backed up before it is replaced.");
@@ -1014,7 +1022,8 @@ public static class SettingsArchive
         bool valid;
         if (fileName.EndsWith(".pub", StringComparison.Ordinal))
         {
-            valid = text.StartsWith("ssh-", StringComparison.Ordinal) || text.StartsWith("ecdsa-", StringComparison.Ordinal);
+            valid = text.StartsWith("ssh-", StringComparison.Ordinal) || text.StartsWith("ecdsa-", StringComparison.Ordinal)
+                || text.StartsWith("sk-ssh-", StringComparison.Ordinal) || text.StartsWith("sk-ecdsa-", StringComparison.Ordinal); // keys of FIDO devices
         }
         else
         {
@@ -1131,6 +1140,23 @@ public static class SettingsArchive
         return false;
     }
 
+    // What names the server a profile connects to. The saved secrets are carried over only between profiles that agree on all of it.
+    private static readonly string[] ConnectionIdentityElements = { "HostName", "UserName", "Host", "Port", "ComPortName", "LocalPort", "ProxyServer", "ProxyPort" };
+
+    internal static bool SameConnection(XDocument first, XDocument second)
+    {
+        foreach (string name in ConnectionIdentityElements)
+        {
+            string a = first.Root?.Descendants(name).FirstOrDefault()?.Value?.Trim();
+            string b = second.Root?.Descendants(name).FirstOrDefault()?.Value?.Trim();
+            if (!string.Equals(string.IsNullOrEmpty(a) ? null : a, string.IsNullOrEmpty(b) ? null : b, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // The saved password and the proxy credentials of the profile that is replaced stay with it, one after the other.
     private static byte[] KeepExistingPassword(XDocument incoming, byte[] raw, string existingPath)
     {
@@ -1154,6 +1180,11 @@ public static class SettingsArchive
             XElement existingPassword = FindPassword(existing, elementName);
             if (existingPassword == null || string.IsNullOrWhiteSpace(existingPassword.Value))
             {
+                return raw;
+            }
+            if (!SameConnection(incoming, existing))
+            {
+                // A profile with the same file name but another host or user: the password of the first one must not go to the second.
                 return raw;
             }
             // The password goes back where the profile keeps it: the parent it had in the existing file, found by
@@ -1470,7 +1501,23 @@ public static class SettingsArchive
         private static long ParseOctal(byte[] header, int offset, int length)
         {
             string text = Encoding.ASCII.GetString(header, offset, length).Trim('\0', ' ');
-            return text.Length == 0 ? 0 : Convert.ToInt64(text, 8);
+            if (text.Length == 0)
+            {
+                return 0;
+            }
+            try
+            {
+                long value = Convert.ToInt64(text, 8);
+                if (value < 0)
+                {
+                    throw new InvalidDataException("The archive has a negative number in a header");
+                }
+                return value;
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is FormatException || ex is OverflowException)
+            {
+                throw new InvalidDataException("The archive has an invalid number in a header", ex);
+            }
         }
 
         private static string ReadName(byte[] header)
