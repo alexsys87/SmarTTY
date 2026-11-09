@@ -118,6 +118,19 @@ internal static class Program
         Check(!background.IsModified, "undo back to the bytes that were written is clean");
         EqualBytes(background.ToArray(), hello, "the saved bytes are remembered");
 
+        // The second digit typed while a save is on its way is a step of its own: the save describes the first digit only.
+        HexDocument typedDuringSave = new HexDocument(new byte[] { 1 });
+        typedDuringSave.Insert(1, new byte[] { 0xA0 });
+        object versionBeingSaved = typedDuringSave.CurrentVersion;
+        byte[] bytesBeingSaved = typedDuringSave.ToArray();
+        typedDuringSave.ReplaceByteIntoLastStep(1, 0xAB);
+        typedDuringSave.MarkSaved(versionBeingSaved, bytesBeingSaved);
+        Check(typedDuringSave.IsModified, "a byte completed while a save runs is not taken for saved");
+        EqualBytes(typedDuringSave.ToArray(), new byte[] { 1, 0xAB }, "...and keeps the digit that was typed");
+        typedDuringSave.Undo();
+        EqualBytes(typedDuringSave.ToArray(), new byte[] { 1, 0xA0 }, "...one undo goes back to what was saved");
+        Check(!typedDuringSave.IsModified, "...which is clean");
+
         // A restored draft is modified without a step that would make it clean.
         HexDocument restored = new HexDocument(new byte[] { 1, 2, 3 }, new byte[] { 1, 2 });
         Check(restored.IsModified && restored.IsByteChanged(2), "a restored draft is modified");

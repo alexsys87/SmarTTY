@@ -483,6 +483,8 @@ public partial class BackupWindow : Window
             // The virtual file systems mounted deeper inside a checked folder (/sys/fs/cgroup is under /sys, but a container or a
             // chroot may have /proc mounted anywhere) only show up as locked entries once the folders above them are read.
             List<string> locked = RemoteBackup.NeverArchivedPaths(_HostInfo);
+            // The mounts that are skipped by default (snap images, network shares) are read out the same way, to be unchecked nodes.
+            locked.AddRange(RemoteBackup.SkippedByDefaultPaths(_HostInfo).Where(path => !locked.Contains(path)));
             for (int round = 0; round < 64; round++)
             {
                 List<BackupNode> folders = Dispatcher.Invoke(() => _Root.FoldersToReadBeforeArchiving(locked));
@@ -556,11 +558,26 @@ public partial class BackupWindow : Window
                     throw new IOException("The archive is not complete: " + check.Problem + "." + Environment.NewLine + "It was left as " + partPath + ".");
                 }
             }
-            if (File.Exists(target))
+            // The finished archive may be hours of work: if it cannot be put in place (the old file is open in 7-Zip or a virus scanner),
+            // it stays as the .part file, and the message says where. The old file is replaced in one step, not deleted first.
+            keepPart = true;
+            try
             {
-                File.Delete(target);
+                if (File.Exists(target))
+                {
+                    File.Replace(partPath, target, null);
+                }
+                else
+                {
+                    File.Move(partPath, target);
+                }
             }
-            File.Move(partPath, target);
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                throw new IOException("The backup is complete, but " + target + " could not be replaced (" + exception.Message + "). The new archive was left as " + partPath
+                    + ": rename it when the file is free.", exception);
+            }
+            keepPart = false;
             _SavedFile = target;
             success = true;
             long size = new FileInfo(target).Length;

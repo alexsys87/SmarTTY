@@ -308,6 +308,23 @@ public static class RemoteBackup
         return BackupMountRole.Ordinary;
     }
 
+    /// <summary>
+    /// The mount points that are not archived unless selected by hand (images, memory, network): their folders are read before the backup
+    /// like those of <see cref="NeverArchivedPaths"/>, so that a mount deeper inside a checked folder is a node of its own that is not checked.
+    /// </summary>
+    public static List<string> SkippedByDefaultPaths(RemoteBackupHostInfo info)
+    {
+        List<string> paths = new List<string>();
+        foreach (RemoteMount mount in info?.Mounts ?? new List<RemoteMount>())
+        {
+            if (mount.Path != "/" && ClassifyMountType(mount.Type) == BackupMountRole.SkippedByDefault && !paths.Contains(mount.Path))
+            {
+                paths.Add(mount.Path);
+            }
+        }
+        return paths;
+    }
+
     /// <summary>The mount points of the virtual file systems of the kernel, which the archive must leave out.</summary>
     public static List<string> NeverArchivedPaths(RemoteBackupHostInfo info)
     {

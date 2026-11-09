@@ -117,7 +117,18 @@ public sealed class HexDocument
     public bool IsModified => !ReferenceEquals(CurrentStep, _savedStep);
 
     /// <summary>Identifies the current content for <see cref="MarkSaved()"/>, like the text editor's version.</summary>
-    public object CurrentVersion => CurrentStep;
+    public object CurrentVersion
+    {
+        get
+        {
+            // A save that starts now describes this step: the second digit of a byte being typed must not be joined to it afterwards
+            // (the saved mark would then sit on a content that was never saved).
+            _sealedStep = CurrentStep;
+            return _sealedStep;
+        }
+    }
+
+    private object _sealedStep;
 
     private object CurrentStep => (_undo.Count > 0) ? _undo.Peek() : null;
 
@@ -173,7 +184,7 @@ public sealed class HexDocument
     /// </summary>
     public void ReplaceByteIntoLastStep(int offset, byte value)
     {
-        if (_undo.Count > 0 && _redo.Count == 0 && !ReferenceEquals(_undo.Peek(), _savedStep))
+        if (_undo.Count > 0 && _redo.Count == 0 && !ReferenceEquals(_undo.Peek(), _savedStep) && !ReferenceEquals(_undo.Peek(), _sealedStep))
         {
             Edit last = _undo.Peek();
             // A step that was saved must keep its bytes: the saved mark would otherwise stay on changed content.

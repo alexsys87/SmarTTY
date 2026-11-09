@@ -323,6 +323,47 @@ internal static partial class Program
         root.Find("/var/log").IsChecked = true;
         Equal(root.Find("/var").IsChecked, (bool?)true, "tree: checking it again checks the folder");
 
+        // A mount that is skipped by default deeper inside a checked folder (a snap image, a network share) is not checked with it.
+        RemoteBackupHostInfo nestedInfo = RemoteBackup.ParseHostInfo(new[]
+        {
+            "SMARTTY_MOUNT / ext4", "SMARTTY_MOUNT /snap/core20/1974 squashfs", "SMARTTY_MOUNT /home/u/share nfs4"
+        });
+        Check(RemoteBackup.SkippedByDefaultPaths(nestedInfo).SequenceEqual(new[] { "/snap/core20/1974", "/home/u/share" }), "nested mounts: the mounts skipped by default are found");
+        BackupNode nested = BackupNode.CreateRoot();
+        nested.ApplyChildren(Specs("/", nestedInfo, "etc/", "home/", "snap/"));
+        List<string> toReadNested = RemoteBackup.NeverArchivedPaths(nestedInfo).Concat(RemoteBackup.SkippedByDefaultPaths(nestedInfo)).ToList();
+        for (int round = 0; round < 10; round++)
+        {
+            List<BackupNode> folders = nested.FoldersToReadBeforeArchiving(toReadNested);
+            if (folders.Count == 0)
+            {
+                break;
+            }
+            foreach (BackupNode folder in folders)
+            {
+                switch (folder.FullPath)
+                {
+                    case "/snap": folder.ApplyChildren(Specs("/snap", nestedInfo, "core20/", "bin/")); break;
+                    case "/snap/core20": folder.ApplyChildren(Specs("/snap/core20", nestedInfo, "1974/", "current@")); break;
+                    case "/home": folder.ApplyChildren(Specs("/home", nestedInfo, "u/")); break;
+                    case "/home/u": folder.ApplyChildren(Specs("/home/u", nestedInfo, "share/", "docs/", ".bashrc")); break;
+                    default: folder.ApplyChildren(Specs(folder.FullPath, nestedInfo)); break;
+                }
+            }
+        }
+        Check(nested.Find("/snap/core20/1974") != null && nested.Find("/snap/core20/1974").IsChecked == false, "nested mounts: the squashfs mount inside a checked folder is a node and is not checked");
+        Check(nested.Find("/home/u/share").IsChecked == false && nested.Find("/home/u/docs").IsChecked == true, "nested mounts: a network share is unchecked, its neighbours are checked");
+        List<string> nestedMembers = nested.CollectMembers();
+        Check(nestedMembers.Contains("/etc") && nestedMembers.Contains("/home/u/docs") && nestedMembers.Contains("/home/u/.bashrc") && nestedMembers.Contains("/snap/bin") && nestedMembers.Contains("/snap/core20/current")
+            && !nestedMembers.Any(m => m == "/snap" || m == "/home" || m.StartsWith("/snap/core20/1974") || m.StartsWith("/home/u/share")),
+            "nested mounts: the archive leaves out what is mounted and keeps the rest of the folder (" + string.Join(" ", nestedMembers) + ")");
+        Check(nested.IsWholeSystemSelected(), "nested mounts: that is still the whole system");
+        nested.SetChecked(false);
+        nested.SelectWholeSystem();
+        Check(nested.Find("/snap/core20/1974").IsChecked == false && nested.Find("/home/u/docs").IsChecked == true && nested.IsWholeSystemSelected(), "nested mounts: the whole-system selection keeps them unchecked");
+        nested.Find("/snap/core20/1974").IsChecked = true;
+        Check(nested.CollectMembers().Any(m => "/snap/core20/1974" == m || "/snap/core20/1974".StartsWith(m + "/")), "nested mounts: checked by hand, the mount is archived (inside the folder that is whole again)");
+
         // An unchecked folder on the way ends the walk: nothing under it is archived.
         root.Find("/var").IsChecked = false;
         Check(root.Find("/var/lib/dpkg").IsChecked == false, "tree: unchecking a folder unchecks everything inside");

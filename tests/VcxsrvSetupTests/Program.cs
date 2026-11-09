@@ -52,6 +52,7 @@ internal static class Program
         {
             ReleaseSelection();
             ReleasePageFallback();
+            UncheckableInstallerIsRefused();
             Installation();
             if (Environment.GetEnvironmentVariable("SMARTTY_VCXSRV_ONLINE") == "1")
             {
@@ -97,6 +98,27 @@ internal static class Program
         Equal(null, VcxsrvSetup.VersionFromReleaseUrl("https://github.com/marchaesen/vcxsrv/releases"), "a redirect without a tag gives no version");
         Equal(null, VcxsrvSetup.VersionFromReleaseUrl("https://github.com/marchaesen/vcxsrv/releases/tag/..%2F..%2Fevil"), "a tag that is not a version number is ignored");
         Equal(null, VcxsrvSetup.VersionFromReleaseUrl(null), "no redirect gives no version");
+    }
+
+    // The installer is started with administrator rights: one without a published SHA-256 (the fallback through the release page) is not downloaded.
+    private static void UncheckableInstallerIsRefused()
+    {
+        VcxsrvSetup.Release unverified = new VcxsrvSetup.Release
+        {
+            Version = "1.2.3.4",
+            FileName = "vcxsrv-64.1.2.3.4.installer.exe",
+            DownloadUrl = "https://127.0.0.1:9/never-requested.exe"
+        };
+        InvalidDataException refusal = null;
+        try
+        {
+            VcxsrvSetup.Download(unverified, null, CancellationToken.None);
+        }
+        catch (InvalidDataException exception)
+        {
+            refusal = exception;
+        }
+        Check(refusal != null && refusal.Message.Contains("SHA-256") && refusal.Message.Contains(VcxsrvSetup.ReleasesPage), "an installer without a published SHA-256 is refused before anything is downloaded");
     }
 
     private static void Installation()

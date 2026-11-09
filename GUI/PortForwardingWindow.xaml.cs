@@ -213,6 +213,7 @@ public partial class PortForwardingWindow : Window
         Row row = Selected;
         bool idle = !_Busy;
         bool connected = _Session.Session != null && !_Session.Session.IsConnectionClosed;
+        AddButton.IsEnabled = idle;
         EditButton.IsEnabled = row != null && idle;
         RemoveButton.IsEnabled = row != null && idle;
         StartButton.IsEnabled = row != null && idle && connected && !row.Entry.Wanted;
@@ -294,7 +295,11 @@ public partial class PortForwardingWindow : Window
             return;
         }
         bool wasRunning = row.Entry.Wanted;
-        await RunAsync(() => _Host.Replace(row.Entry, rule));
+        if (!await RunAsync(() => _Host.Replace(row.Entry, rule)))
+        {
+            // Not replaced: the old rule stays as it was, nothing is saved or restarted for the new one.
+            return;
+        }
         Save();
         if (wasRunning)
         {
@@ -372,17 +377,19 @@ public partial class PortForwardingWindow : Window
     }
 
     // Runs a blocking operation of the host off the UI thread (stopping waits for the forwarded connections to close).
-    private async Task RunAsync(Action action, bool showErrors = true)
+    private async Task<bool> RunAsync(Action action, bool showErrors = true)
     {
         _Busy = true;
         UpdateButtons();
         try
         {
             await Task.Run(action);
+            return true;
         }
         catch (Exception exception) when (showErrors)
         {
             MessageBoxes.Exception(exception);
+            return false;
         }
         finally
         {
