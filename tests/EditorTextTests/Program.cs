@@ -867,7 +867,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -1987,6 +1987,90 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.CloudInit).Toggle(new[] { "hostname: web-01" })), "# hostname: web-01", "cloud-init comment");
     }
 
+    private static void PrometheusChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/prometheus/prometheus.yml"), L.Prometheus, "the main Prometheus configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/prometheus/rules/node.rules.yml"), L.Prometheus, "a rule file of /etc/prometheus");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/monitoring/prometheus.yml"), L.Prometheus, "prometheus.yml anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/monitoring/prometheus.yaml"), L.Prometheus, "prometheus.yaml anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/monitoring/prometheus.yml.bak"), L.Plain, "a backup of the configuration is not Prometheus");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/prometheus/README"), L.Plain, "the README of /etc/prometheus is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/rules.yml"), L.Yaml, "a rules.yml outside the Prometheus tree stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.yml"), L.Yaml, "an ordinary .yml stays YAML");
+
+        Highlighted prom = new Highlighted(L.Prometheus,
+            "# Prometheus configuration\nglobal:\n  scrape_interval: 15s\n  evaluation_interval: 15s\n" +
+            "  external_labels:\n    monitor: prod\nrule_files:\n  - /etc/prometheus/rules/*.yml\n" +
+            "scrape_configs:\n  - job_name: prometheus\n    static_configs:\n" +
+            "      - targets: ['localhost:9090']\n  - job_name: node\n    scrape_interval: 30s\n" +
+            "    metrics_path: /metrics\n    scheme: https\n    basic_auth:\n      username: monitor\n" +
+            "      password: secret\n    static_configs:\n      - targets: ['node1:9100', 'node2:9100']\n" +
+            "        labels:\n          env: prod\n    relabel_configs:\n      - source_labels: [__address__]\n" +
+            "        target_label: instance\n        regex: '(.*):9100'\n        replacement: '$1'\n" +
+            "alerting:\n  alertmanagers:\n    - static_configs:\n        - targets: ['localhost:9093']\n" +
+            "remote_write:\n  - url: https://prometheus.example.com/api/v1/write\n    queue_config:\n" +
+            "      max_samples_per_send: 10000\n    tls_config:\n      insecure_skip_verify: false\n" +
+            "    authorization:\n      type: Bearer\n      credentials: token\nunknown_field: 1\n");
+        Equal(Join(prom.Tokens(0, SyntaxHighlighting.TypeComment)), "# Prometheus configuration", "Prometheus: a comment");
+        Equal(Join(prom.Tokens(1, SyntaxHighlighting.TypeKeyword)), "global", "Prometheus: the global block");
+        Equal(Join(prom.Tokens(2, SyntaxHighlighting.TypeKeyword)), "scrape_interval", "Prometheus: the scrape interval");
+        Equal(Join(prom.Tokens(3, SyntaxHighlighting.TypeKeyword)), "evaluation_interval", "Prometheus: the evaluation interval");
+        Equal(Join(prom.Tokens(4, SyntaxHighlighting.TypeKeyword)), "external_labels", "Prometheus: the external labels");
+        Equal(Join(prom.Tokens(5, SyntaxHighlighting.TypeVariable)), "monitor", "Prometheus: a label name stays an ordinary key");
+        Equal(Join(prom.Tokens(6, SyntaxHighlighting.TypeKeyword)), "rule_files", "Prometheus: the rule files");
+        Equal(Join(prom.Tokens(8, SyntaxHighlighting.TypeKeyword)), "scrape_configs", "Prometheus: the scrape configurations");
+        Equal(Join(prom.Tokens(9, SyntaxHighlighting.TypeKeyword)), "job_name", "Prometheus: the name of a job");
+        Equal(Join(prom.Tokens(10, SyntaxHighlighting.TypeKeyword)), "static_configs", "Prometheus: static targets");
+        Equal(Join(prom.Tokens(11, SyntaxHighlighting.TypeKeyword)), "targets", "Prometheus: the targets");
+        Equal(Join(prom.Tokens(12, SyntaxHighlighting.TypeKeyword)), "job_name", "Prometheus: the node job");
+        Equal(Join(prom.Tokens(15, SyntaxHighlighting.TypeKeyword)), "scheme|https", "Prometheus: the scheme");
+        Equal(Join(prom.Tokens(16, SyntaxHighlighting.TypeKeyword)), "basic_auth", "Prometheus: basic authentication");
+        Equal(Join(prom.Tokens(17, SyntaxHighlighting.TypeKeyword)), "username", "Prometheus: the user name");
+        Equal(Join(prom.Tokens(18, SyntaxHighlighting.TypeKeyword)), "password", "Prometheus: the password");
+        Equal(Join(prom.Tokens(20, SyntaxHighlighting.TypeKeyword)), "targets", "Prometheus: the node targets");
+        Equal(Join(prom.Tokens(21, SyntaxHighlighting.TypeKeyword)), "labels", "Prometheus: the labels of a target");
+        Equal(Join(prom.Tokens(22, SyntaxHighlighting.TypeVariable)), "env", "Prometheus: a label of a target stays an ordinary key");
+        Equal(Join(prom.Tokens(23, SyntaxHighlighting.TypeKeyword)), "relabel_configs", "Prometheus: the relabeling rules");
+        Equal(Join(prom.Tokens(24, SyntaxHighlighting.TypeKeyword)), "source_labels", "Prometheus: source_labels");
+        Equal(Join(prom.Tokens(25, SyntaxHighlighting.TypeKeyword)), "target_label", "Prometheus: target_label");
+        Equal(Join(prom.Tokens(26, SyntaxHighlighting.TypeKeyword)), "regex", "Prometheus: the regular expression");
+        Equal(Join(prom.Tokens(27, SyntaxHighlighting.TypeKeyword)), "replacement", "Prometheus: the replacement");
+        Equal(Join(prom.Tokens(28, SyntaxHighlighting.TypeKeyword)), "alerting", "Prometheus: the alerting block");
+        Equal(Join(prom.Tokens(29, SyntaxHighlighting.TypeKeyword)), "alertmanagers", "Prometheus: the alert managers");
+        Equal(Join(prom.Tokens(32, SyntaxHighlighting.TypeKeyword)), "remote_write", "Prometheus: the remote write");
+        Equal(Join(prom.Tokens(33, SyntaxHighlighting.TypeKeyword)), "url|https", "Prometheus: the remote write URL");
+        Equal(Join(prom.Tokens(34, SyntaxHighlighting.TypeKeyword)), "queue_config", "Prometheus: the queue configuration");
+        Equal(Join(prom.Tokens(35, SyntaxHighlighting.TypeKeyword)), "max_samples_per_send", "Prometheus: the batch size");
+        Equal(Join(prom.Tokens(35, SyntaxHighlighting.TypeNumber)), "10000", "Prometheus: the batch size value");
+        Equal(Join(prom.Tokens(36, SyntaxHighlighting.TypeKeyword)), "tls_config", "Prometheus: the TLS configuration");
+        Equal(Join(prom.Tokens(37, SyntaxHighlighting.TypeKeyword)), "insecure_skip_verify|false", "Prometheus: the certificate check");
+        Equal(Join(prom.Tokens(38, SyntaxHighlighting.TypeKeyword)), "authorization", "Prometheus: the authorization");
+        Equal(Join(prom.Tokens(39, SyntaxHighlighting.TypeKeyword)), "type|Bearer", "Prometheus: the authorization type");
+        Equal(Join(prom.Tokens(41, SyntaxHighlighting.TypeKeyword)), "", "Prometheus: an unknown field is not a keyword");
+        Equal(Join(prom.Tokens(41, SyntaxHighlighting.TypeVariable)), "unknown_field", "Prometheus: ...it is a plain key");
+        Check(Folds(prom).Length > 0, "Prometheus blocks fold");
+
+        Highlighted rules = new Highlighted(L.Prometheus,
+            "groups:\n  - name: node\n    rules:\n      - alert: InstanceDown\n        expr: up == 0\n" +
+            "        for: 5m\n        labels:\n          severity: critical\n        annotations:\n" +
+            "          summary: \"Instance is down\"\n          runbook_url: https://example.com/runbook\n");
+        Equal(Join(rules.Tokens(0, SyntaxHighlighting.TypeKeyword)), "groups", "Prometheus rules: groups");
+        Equal(Join(rules.Tokens(1, SyntaxHighlighting.TypeKeyword)), "name", "Prometheus rules: the name of a group");
+        Equal(Join(rules.Tokens(2, SyntaxHighlighting.TypeKeyword)), "rules", "Prometheus rules: the rules");
+        Equal(Join(rules.Tokens(3, SyntaxHighlighting.TypeKeyword)), "alert", "Prometheus rules: an alert");
+        Equal(Join(rules.Tokens(4, SyntaxHighlighting.TypeKeyword)), "expr", "Prometheus rules: the expression");
+        Equal(Join(rules.Tokens(5, SyntaxHighlighting.TypeKeyword)), "for", "Prometheus rules: the duration");
+        Equal(Join(rules.Tokens(6, SyntaxHighlighting.TypeKeyword)), "labels", "Prometheus rules: the labels");
+        Equal(Join(rules.Tokens(8, SyntaxHighlighting.TypeKeyword)), "annotations", "Prometheus rules: the annotations");
+        Equal(Join(rules.Tokens(9, SyntaxHighlighting.TypeKeyword)), "summary", "Prometheus rules: the summary");
+        Equal(Join(rules.Tokens(9, SyntaxHighlighting.TypeString)), "\"Instance is down\"", "Prometheus rules: the text of the annotation");
+        Equal(Join(rules.Tokens(10, SyntaxHighlighting.TypeKeyword)), "runbook_url|https", "Prometheus rules: the runbook");
+        Check(SyntaxHighlighting.GetKeywords(L.Prometheus).Contains("scrape_configs"), "Prometheus keywords contain 'scrape_configs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Prometheus).Contains("relabel_configs"), "Prometheus keywords contain 'relabel_configs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Prometheus).Contains("https"), "Prometheus keywords contain 'https'");
+        Equal(Join(CommentStyle.ForLanguage(L.Prometheus).Toggle(new[] { "  scrape_interval: 15s" })), "  # scrape_interval: 15s", "Prometheus comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2702,6 +2786,7 @@ internal static class Program
         OpenVpnChecks();
         NetplanChecks();
         CloudInitChecks();
+        PrometheusChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

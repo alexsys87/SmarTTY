@@ -1648,6 +1648,64 @@ public static partial class SyntaxHighlighting
         return TokenizeYamlCore(CloudInitKeywords, CloudInitValues, startState, text, sink, out endState);
     }
 
+    // ------------------------------------------------------------- Prometheus
+
+    private static readonly HashSet<string> PrometheusKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope and the global settings
+        @"
+          global rule_files scrape_configs scrape_config_files alerting remote_write remote_read storage tracing
+          scrape_interval scrape_timeout evaluation_interval external_labels query_log_file
+          body_size_limit sample_limit target_limit label_limit label_name_length_limit label_value_length_limit
+          keep_dropped_targets",
+        // the scrape configurations and the service discovery
+        @"
+          job_name metrics_path scheme params basic_auth authorization oauth2 bearer_token bearer_token_file
+          tls_config proxy_url no_proxy follow_redirects enable_http2 static_configs targets labels
+          file_sd_configs files refresh_interval http_sd_configs dns_sd_configs names type port
+          kubernetes_sd_configs role api_server kubeconfig_file namespaces selectors
+          consul_sd_configs ec2_sd_configs azure_sd_configs gce_sd_configs openstack_sd_configs docker_sd_configs
+          dockerswarm_sd_configs marathon_sd_configs nerve_sd_configs serverset_sd_configs triton_sd_configs
+          digitalocean_sd_configs hetzner_sd_configs ionos_sd_configs linode_sd_configs nomad_sd_configs
+          ovhcloud_sd_configs puppetdb_sd_configs scaleway_sd_configs vultr_sd_configs eureka_sd_configs",
+        // the relabeling of the targets and the metrics
+        @"
+          relabel_configs metric_relabel_configs source_labels separator target_label regex modulus replacement action",
+        // the alert managers and the rules
+        @"
+          alertmanagers timeout api_version path_prefix http_headers groups name rules alert expr for record
+          keep_firing_for limit annotations summary description runbook_url",
+        // the remote storage and its queue
+        @"
+          url remote_timeout write_relabel_configs queue_config capacity max_shards min_shards max_samples_per_send
+          batch_send_deadline min_backoff max_backoff retry_on_http_429 sample_age_limit metadata_config send
+          send_exemplars send_native_histograms protobuf_message sigv4 azuread google_iam round_robin read_recent",
+        // the TLS, the authentication and the headers
+        @"
+          ca_file cert_file key_file server_name insecure_skip_verify min_version max_version ca cert key
+          username password credentials headers",
+        // the local storage and the tracing
+        @"
+          tsdb out_of_order_time_window retention wal_compression block_ranges no_lockfile
+          endpoint client_type sampling_fraction insecure compression otlp promote_resource_attributes
+          translation_strategy");
+
+    private static readonly HashSet<string> PrometheusValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the schemes and the authentication type
+        @"http https Bearer",
+        // the relabeling actions
+        @"replace keep drop hashmod labelmap labeldrop labelkeep lowercase uppercase keepequal dropequal",
+        // the roles of the service discovery
+        @"pod service endpoints endpointslice ingress");
+
+    /// <summary>
+    /// Prometheus: the colours and the folds of YAML with the settings of prometheus.yml and of the rule files known;
+    /// the schemes, the relabeling actions and the service discovery roles are values.
+    /// </summary>
+    private static bool TokenizePrometheus(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(PrometheusKeywords, PrometheusValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
