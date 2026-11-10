@@ -169,7 +169,11 @@ internal class KnownHostKeyStore
                 // Another window may swap the file while it is read (Save does that): let it.
                 using (FileStream stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 {
-                    keys = (List<KnownHostKey>)xmlSerializer.Deserialize(stream) ?? new List<KnownHostKey>();
+                    // No DTD: the file is only ever written by this program, so one that declares a DTD is not a host key file.
+                    using (System.Xml.XmlReader reader = System.Xml.XmlReader.Create(stream, new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Prohibit, XmlResolver = null }))
+                    {
+                        keys = (List<KnownHostKey>)xmlSerializer.Deserialize(reader) ?? new List<KnownHostKey>();
+                    }
                 }
                 return ReadOutcome.Read;
             }

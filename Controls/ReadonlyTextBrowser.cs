@@ -3257,6 +3257,18 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         int lastLine = scoped ? Math.Min(scopeEnd.Line, _document.LineCount - 1) : (_document.LineCount - 1);
         int direction = ((!searchBackward) ? 1 : (-1));
         int startColumn = textPosition.Column;
+        // A caret that is outside the lines to search (after a failed search it stands behind the last line): the search goes on from
+        // the edge of the range, in its direction, instead of finding nothing without a wrap-around.
+        if (textPosition.Line > lastLine && searchBackward)
+        {
+            textPosition.Line = lastLine;
+            startColumn = -1;
+        }
+        else if (textPosition.Line < firstLine && !searchBackward)
+        {
+            textPosition.Line = firstLine;
+            startColumn = -1;
+        }
         for (int pass = 0; pass < 2; pass++)
         {
             for (int line = textPosition.Line; line >= firstLine && line <= lastLine; line += direction)

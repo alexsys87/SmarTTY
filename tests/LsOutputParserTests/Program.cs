@@ -38,6 +38,15 @@ internal static class Program
         LsOutputParser.LsEntry bbParent = LsOutputParser.LsParser.ParseLine("drwxr-xr-x    3 root     root          4096 2026-10-19 19:30:28 +0000 ../");
         Check(bbParent.Name == "..", "BusyBox parent entry");
 
+        // A device node has "major, minor" where the size is: the line used to be dropped, and /dev showed no devices.
+        LsOutputParser.LsEntry gnuDevice = LsOutputParser.LsParser.ParseLine("crw-rw-rw- 1 root root 1, 3 2026-11-10 07:24:30.470363882 +0000 null");
+        Check(gnuDevice.Name == "null" && gnuDevice.Mode == "crw-rw-rw-" && !gnuDevice.IsDirectory, "GNU device node");
+        LsOutputParser.LsEntry bbDevice = LsOutputParser.LsParser.ParseLine("crw-rw----    1 root     tty        4,  64 2026-10-19 19:30:28 +0000 ttyS0");
+        Check(bbDevice.Name == "ttyS0" && bbDevice.Size == 64, "BusyBox device node");
+
+        LsOutputParser.LsEntry zeroDate = LsOutputParser.LsParser.ParseLine("-rw-r--r-- 1 root root 5 0000-00-00 00:00:00.000000000 +0000 broken.txt");
+        Check(zeroDate.Name == "broken.txt" && zeroDate.Size == 5, "a line with an impossible date is still a listing entry");
+
         LsOutputParser.LsEntry bbLink = LsOutputParser.LsParser.ParseLine("lrwxrwxrwx    1 root     root             5 2026-10-19 19:30:28 +0000 lnk -> a.txt*");
         Check(bbLink.Name == "lnk", "BusyBox symlink without -L");
 

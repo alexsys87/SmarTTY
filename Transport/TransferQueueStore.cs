@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Xml;
 using System.Xml.Serialization;
 
 namespace SmarTTY.Transport;
@@ -177,7 +178,8 @@ public static class TransferQueueStore
         try
         {
             using FileStream stream = File.OpenRead(path);
-            queue = (SavedQueue)new XmlSerializer(typeof(SavedQueue)).Deserialize(stream);
+            using XmlReader reader = XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
+            queue = (SavedQueue)new XmlSerializer(typeof(SavedQueue)).Deserialize(reader);
         }
         catch
         {

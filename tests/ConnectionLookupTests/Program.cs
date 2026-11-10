@@ -32,10 +32,29 @@ internal static class Program
         Check(equal, name + (equal ? "" : $" (expected '{expected}', got '{actual}')"));
     }
 
+    // The settings files are read without DTD processing: an entity that expands without end must not reach the parser.
+    private static void CheckNoDtd()
+    {
+        string plain = "<?xml version=\"1.0\"?><ArrayOfString><string>a</string></ArrayOfString>";
+        Equal(XmlStorage.Deserialize<List<string>>(plain)[0], "a", "xml: a plain document is read");
+        string bomb = "<?xml version=\"1.0\"?><!DOCTYPE x [<!ENTITY a \"aaaaaaaaaa\"><!ENTITY b \"&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;\">]><ArrayOfString><string>&b;</string></ArrayOfString>";
+        bool refused = false;
+        try
+        {
+            XmlStorage.Deserialize<List<string>>(bomb);
+        }
+        catch (Exception)
+        {
+            refused = true;
+        }
+        Check(refused, "xml: a document with a DTD is refused");
+    }
+
     private static int Main()
     {
         try
         {
+            CheckNoDtd();
             CheckSplitting();
             CheckLookup();
             CheckHostOnlyFallback();
