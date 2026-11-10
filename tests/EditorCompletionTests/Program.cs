@@ -140,6 +140,8 @@ internal static class Program
         Check(Names(L.Sysctl, "", "").Contains("fq_codel"), "the sysctl value 'fq_codel' is offered");
         Check(Names(L.Pam, "", "").Contains("requisite"), "the PAM control 'requisite' is offered");
         Check(Names(L.Pam, "", "").Contains("try_first_pass"), "the PAM argument 'try_first_pass' is offered");
+        Check(Names(L.Samba, "", "").Contains("workgroup"), "the Samba parameter 'workgroup' is offered");
+        Check(Names(L.Samba, "", "").Contains("tdbsam"), "the Samba value 'tdbsam' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
