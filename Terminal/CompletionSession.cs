@@ -550,7 +550,13 @@ internal class CompletionSession : IDisposable
             {
                 return -1;
             }
-            return 1;
+            if (second.Icon == VirtualTerminalPopupItemIcon.Directory)
+            {
+                return 1;
+            }
+            // Neither is a folder: the order of the kinds, the same whichever is asked first (a comparer that says "greater" both ways
+            // makes List.Sort fail or order the list at random).
+            return first.Icon.CompareTo(second.Icon);
         }
         if ((first.Text == ".." || second.Text == "..") && first.Text != second.Text)
         {
