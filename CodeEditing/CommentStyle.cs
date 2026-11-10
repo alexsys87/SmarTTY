@@ -50,6 +50,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Sysctl:
                 case SyntaxHighlighting.Language.Pam:
                 case SyntaxHighlighting.Language.Samba:
+                case SyntaxHighlighting.Language.Postfix:
                 case SyntaxHighlighting.Language.Kubernetes:
                 case SyntaxHighlighting.Language.DockerCompose:
                 case SyntaxHighlighting.Language.Ansible:

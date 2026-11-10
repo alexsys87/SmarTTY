@@ -1364,6 +1364,98 @@ public static partial class SyntaxHighlighting
             valueKeywords: SambaValues, phraseDirectives: SambaDirectives, valueKeywordsInValue: true);
     }
 
+    // ---------------------------------------------------------------- Postfix
+
+    private static readonly HashSet<string> PostfixDirectives = Words(StringComparer.Ordinal,
+        // main.cf: identity, interfaces and routing
+        @"myhostname mydomain myorigin mydestination mynetworks mynetworks_style inet_interfaces inet_protocols
+          relayhost relay_domains relay_recipient_maps relay_transport transport_maps
+          smtpd_banner mail_name readme_directory compatibility_level
+          biff append_dot_mydomain append_at_myorigin mail_spool_directory home_mailbox
+          message_size_limit mailbox_size_limit recipient_delimiter duplicate_filter_limit
+          unknown_local_recipient_reject_code strict_rfc821_envelopes disable_vrfy_command
+          luser_relay masquerade_domains masquerade_exceptions owner_request_special
+          soft_bounce import_environment export_environment syslog_facility syslog_name
+          debug_peer_level debug_peer_list debugger_command",
+        // main.cf: maps and aliases
+        @"alias_maps alias_database local_recipient_maps local_transport canonical_maps
+          sender_canonical_maps recipient_canonical_maps relocated_maps
+          virtual_alias_maps virtual_alias_domains virtual_mailbox_domains virtual_mailbox_maps
+          virtual_mailbox_base virtual_uid_maps virtual_gid_maps virtual_transport virtual_minimum_uid
+          header_checks body_checks mime_header_checks nested_header_checks smtp_header_checks
+          smtp_mime_header_checks smtp_body_checks content_filter receive_override_options
+          transport_destination_concurrency_limit relay_destination_concurrency_limit
+          local_destination_concurrency_limit smtp_destination_concurrency_limit
+          smtps_destination_concurrency_limit lmtp_destination_concurrency_limit
+          virtual_destination_concurrency_limit error_destination_concurrency_limit
+          default_destination_concurrency_limit default_destination_recipient_limit
+          default_destination_rate_delay default_process_limit
+          qmgr_message_active_limit qmgr_message_recipient_limit qmgr_message_recipient_minimum
+          maximal_queue_lifetime bounce_queue_lifetime queue_run_delay minimal_backoff_time maximal_backoff_time
+          notify_classes delay_warning_time confirm_delay_cleared bounce_notice_recipient
+          error_notice_recipient delay_notice_recipient postmaster_address
+          mail_owner default_privs setgid_group",
+        // main.cf: TLS, SASL and the SMTP server
+        @"smtpd_tls_cert_file smtpd_tls_key_file smtpd_tls_CAfile smtpd_tls_CApath
+          smtpd_tls_dcert_file smtpd_tls_dkey_file smtpd_tls_dh1024_param_file smtpd_tls_dh512_param_file
+          smtpd_tls_eccert_file smtpd_tls_eckey_file smtpd_tls_security_level smtpd_tls_auth_only
+          smtpd_tls_loglevel smtpd_tls_received_header smtpd_tls_session_cache_database
+          smtpd_use_tls smtp_tls_security_level smtp_tls_CAfile smtp_tls_CApath smtp_tls_cert_file
+          smtp_tls_key_file smtp_tls_dcert_file smtp_tls_dkey_file smtp_tls_eccert_file smtp_tls_eckey_file
+          smtp_tls_loglevel smtp_tls_session_cache_database smtp_tls_wrappermode smtp_use_tls
+          smtp_sasl_auth_enable smtp_sasl_password_maps smtp_sasl_security_options
+          smtp_sasl_tls_security_options smtp_sasl_mechanism_filter
+          smtpd_sasl_auth_enable smtpd_sasl_type smtpd_sasl_path smtpd_sasl_security_options
+          smtpd_sasl_local_domain smtpd_sasl_tls_security_options smtpd_sasl_mechanism_filter
+          smtpd_sasl_exceptions_networks smtpd_sasl_authenticated_header
+          smtpd_relay_restrictions smtpd_recipient_restrictions smtpd_sender_restrictions
+          smtpd_client_restrictions smtpd_helo_restrictions smtpd_etrn_restrictions
+          smtpd_delay_reject smtpd_error_sleep_time smtpd_soft_error_limit smtpd_hard_error_limit
+          smtpd_junk_command_limit smtpd_client_connection_count_limit smtpd_client_connection_rate_limit
+          smtpd_client_message_rate_limit smtpd_client_recipient_rate_limit
+          smtpd_client_new_tls_session_rate_limit smtpd_client_auth_rate_limit anvil_rate_time_unit
+          smtpd_command_filter smtpd_forbidden_commands smtpd_proxy_filter smtpd_proxy_timeout
+          smtpd_proxy_options smtpd_peername_lookup qmqpd_authorized_clients qmqpd_error_delay qmqpd_timeout",
+        // main.cf: directories of the installation
+        @"config_directory daemon_directory command_directory queue_directory data_directory
+          meta_directory shlib_directory mailq_path sendmail_path newaliases_path
+          alternate_config_directories multi_instance_name multi_instance_group
+          multi_instance_directories multi_instance_wrapper process_id_directory
+          default_dbtype berkeley_db_create_buffer_size berkeley_db_read_buffer_size smtputf8_enable
+          allow_percent_hack allow_mail_to_commands allow_mail_to_files propagate_unmatched_extensions
+          trace_service_name",
+        // master.cf: the services of the Postfix system
+        @"smtp smtps submission submissions pickup cleanup qmgr trivial-rewrite bounce defer trace verify
+          flush proxymap proxywrite showq error retry discard local virtual lmtp anvil scache proxy relay");
+
+    private static readonly HashSet<string> PostfixValues = Words(StringComparer.Ordinal,
+        // protocol families, service types, map types and service commands
+        @"all ipv4 ipv6 inet unix fifo hash lmdb btree dbm cdb static proxy
+          smtpd qmgr pickup cleanup trivial-rewrite bounce defer trace verify flush showq error retry discard
+          local virtual lmtp anvil scache relay
+          y n",
+        // TLS levels and the restriction expressions of smtpd
+        @"may encrypt none dane fingerprint secure plaintext anonymous
+          permit defer reject discard hold warning
+          permit_mynetworks permit_sasl_authenticated permit_tls_clientcerts permit_tls_all_clientcerts
+          reject_unauth_destination reject_unauth_pipelining reject_invalid_helo_hostname
+          reject_non_fqdn_helo_hostname reject_non_fqdn_sender reject_non_fqdn_recipient
+          reject_unknown_sender_domain reject_unknown_recipient_domain reject_unknown_helo_hostname
+          reject_unknown_reverse_client_hostname reject_unknown_client_hostname
+          reject_rbl_client reject_rhsbl_client reject_rhsbl_sender reject_rhsbl_helo reject_rhsbl_reverse_client
+          check_client_access check_sender_access check_recipient_access check_helo_access
+          check_policy_service check_sasl_access defer_if_permit defer_if_reject");
+
+    /// <summary>
+    /// Postfix: the colours of Config with the parameters of main.cf and the services of master.cf known; the service
+    /// types (inet, unix), map types (hash, lmdb), TLS levels (may, encrypt) and restriction expressions are keywords
+    /// too, so the columns of master.cf are readable. Comments are '#'.
+    /// </summary>
+    private static bool TokenizePostfix(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(PostfixDirectives, startState, text, sink, out endState, valueKeywords: PostfixValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
