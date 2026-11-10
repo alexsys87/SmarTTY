@@ -1566,6 +1566,59 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Modprobe).Toggle(new[] { "blacklist nouveau" })), "# blacklist nouveau", "modprobe comment");
     }
 
+    private static void LogrotateChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.conf"), L.Logrotate, "the main logrotate configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d/nginx"), L.Logrotate, "a drop-in without an extension");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d/app.conf"), L.Logrotate, "a drop-in with an extension");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/etc/logrotate.d/app"), L.Logrotate, "a drop-in of a custom prefix");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/logrotate.conf"), L.Logrotate, "a logrotate.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d/README"), L.Plain, "the README of logrotate.d is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d/README.md"), L.Plain, "a Markdown README of logrotate.d is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d/notes.ini"), L.Config, "an ini file of logrotate.d is not logrotate");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d-available/app"), L.Plain, "logrotate.d-available is not read by logrotate");
+
+        Highlighted lr = new Highlighted(L.Logrotate,
+            "# logrotate configuration\nweekly\nrotate 4\ncreate 0640 root adm\ninclude /etc/logrotate.d\n\n" +
+            "/var/log/syslog {\n    daily\n    missingok\n    rotate 7\n    compress\n    delaycompress\n" +
+            "    notifempty\n    create 0640 root adm\n    sharedscripts\n    postrotate\n" +
+            "        /usr/lib/rsyslog/rsyslog-rotate\n    endscript\n}\n" +
+            "/var/log/nginx/*.log {\n    weekly\n    rotate 52\n    maxsize 100M\n    su www-data adm\n" +
+            "    olddir /var/log/nginx/old\n    dateext\n    dateformat -%Y%m%d\n    compress\n" +
+            "    unknown-directive foo\n}\n");
+        Equal(Join(lr.Tokens(0, SyntaxHighlighting.TypeComment)), "# logrotate configuration", "logrotate: a comment");
+        Equal(Join(lr.Tokens(1, SyntaxHighlighting.TypeKeyword)), "weekly", "logrotate: a standalone directive");
+        Equal(Join(lr.Tokens(2, SyntaxHighlighting.TypeKeyword)), "rotate", "logrotate: rotate");
+        Equal(Join(lr.Tokens(2, SyntaxHighlighting.TypeNumber)), "4", "logrotate: the rotation count");
+        Equal(Join(lr.Tokens(3, SyntaxHighlighting.TypeKeyword)), "create", "logrotate: create");
+        Equal(Join(lr.Tokens(3, SyntaxHighlighting.TypeNumber)), "0640", "logrotate: the mode of the new file");
+        Equal(Join(lr.Tokens(4, SyntaxHighlighting.TypeKeyword)), "include", "logrotate: include");
+        Equal(Join(lr.Tokens(7, SyntaxHighlighting.TypeKeyword)), "daily", "logrotate: daily inside a block");
+        Equal(Join(lr.Tokens(8, SyntaxHighlighting.TypeKeyword)), "missingok", "logrotate: missingok");
+        Equal(Join(lr.Tokens(10, SyntaxHighlighting.TypeKeyword)), "compress", "logrotate: compress");
+        Equal(Join(lr.Tokens(11, SyntaxHighlighting.TypeKeyword)), "delaycompress", "logrotate: delaycompress");
+        Equal(Join(lr.Tokens(12, SyntaxHighlighting.TypeKeyword)), "notifempty", "logrotate: notifempty");
+        Equal(Join(lr.Tokens(14, SyntaxHighlighting.TypeKeyword)), "sharedscripts", "logrotate: sharedscripts");
+        Equal(Join(lr.Tokens(15, SyntaxHighlighting.TypeKeyword)), "postrotate", "logrotate: postrotate");
+        Equal(Join(lr.Tokens(17, SyntaxHighlighting.TypeKeyword)), "endscript", "logrotate: endscript");
+        Equal(Join(lr.Tokens(20, SyntaxHighlighting.TypeKeyword)), "weekly", "logrotate: weekly in the second block");
+        Equal(Join(lr.Tokens(21, SyntaxHighlighting.TypeKeyword)), "rotate", "logrotate: rotate in the second block");
+        Equal(Join(lr.Tokens(21, SyntaxHighlighting.TypeNumber)), "52", "logrotate: its rotation count");
+        Equal(Join(lr.Tokens(22, SyntaxHighlighting.TypeKeyword)), "maxsize", "logrotate: maxsize");
+        Equal(Join(lr.Tokens(23, SyntaxHighlighting.TypeKeyword)), "su", "logrotate: su");
+        Equal(Join(lr.Tokens(24, SyntaxHighlighting.TypeKeyword)), "olddir", "logrotate: olddir");
+        Equal(Join(lr.Tokens(25, SyntaxHighlighting.TypeKeyword)), "dateext", "logrotate: dateext");
+        Equal(Join(lr.Tokens(26, SyntaxHighlighting.TypeKeyword)), "dateformat", "logrotate: dateformat");
+        Equal(Join(lr.Tokens(28, SyntaxHighlighting.TypeKeyword)), "", "logrotate: an unknown directive is not a keyword");
+        Equal(Join(lr.Tokens(28, SyntaxHighlighting.TypeVariable)), "unknown-directive", "logrotate: ...it is a plain key");
+        Equal(Folds(lr), "6:18,19:29", "logrotate: the rule blocks fold on their braces");
+        Equal(lr.At(6, 16).Partner?.LineNumber, 18, "the { of the first rule pairs with its }");
+        Check(SyntaxHighlighting.GetKeywords(L.Logrotate).Contains("postrotate"), "logrotate keywords contain 'postrotate'");
+        Check(SyntaxHighlighting.GetKeywords(L.Logrotate).Contains("dateext"), "logrotate keywords contain 'dateext'");
+        Check(SyntaxHighlighting.GetKeywords(L.Logrotate).Contains("missingok"), "logrotate keywords contain 'missingok'");
+        Equal(Join(CommentStyle.ForLanguage(L.Logrotate).Toggle(new[] { "rotate 4" })), "# rotate 4", "logrotate comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2273,6 +2326,7 @@ internal static class Program
         UdevChecks();
         NftablesChecks();
         ModprobeChecks();
+        LogrotateChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
