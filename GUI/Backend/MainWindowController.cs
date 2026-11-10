@@ -481,6 +481,11 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 return;
             }
+            if (!editor.CanSave)
+            {
+                // Still loading or reloading: the save would be ignored, and the script would wait for it for good.
+                return;
+            }
             // The save runs in the background: the file is run once it is on the server. When it ends without having saved
             // (a conflict, a refused write, a problem the check found) nothing is run; F5 starts again.
             EventHandler runWhenSaved = null;

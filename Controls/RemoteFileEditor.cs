@@ -150,6 +150,9 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// </summary>
     public bool IsReadOnlyMode { get; private set; }
 
+    /// <summary>The file has been loaded completely and is not being loaded again: only then the text can be saved.</summary>
+    public bool CanSave => !IsReadOnlyMode && _loaded && !_reloading;
+
     /// <summary>Only the first <see cref="EditorFilePolicy.PreviewBytes"/> of a file that is too big to edit are shown.</summary>
     public bool IsPreview { get; private set; }
 
@@ -661,6 +664,66 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
     }
 
+    /// <summary>
+    /// Runs <paramref name="action"/> on the UI thread from a worker thread. When the tab has been closed meanwhile
+    /// the action is dropped: BeginInvoke on a disposed control throws, and an exception that leaves a worker thread ends the program.
+    /// </summary>
+    private bool PostToUi(Action action)
+    {
+        // The worker can be faster than the creation of the window handle of a tab that has just been opened.
+        for (int attempt = 0; attempt < 600; attempt++)
+        {
+            try
+            {
+                if (IsDisposed || Disposing)
+                {
+                    return false;
+                }
+                if (IsHandleCreated)
+                {
+                    BeginInvoke((ThreadStart)(() =>
+                    {
+                        if (!IsDisposed)
+                        {
+                            action();
+                        }
+                    }));
+                    return true;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // The handle was destroyed between the check and the call (ObjectDisposedException is one of these too): the tab is closing.
+                return false;
+            }
+            Thread.Sleep(50);
+        }
+        return false;
+    }
+
+    /// <summary>Shows a loading error; a failed reload keeps the tab with the text of the user.</summary>
+    private void HandleLoadError(Exception exception)
+    {
+        try
+        {
+            ReportError(exception);
+            if (_reloading)
+            {
+                // The text on screen is still the user's: keep the tab.
+                _reloading = false;
+                ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
+                FormatChanged?.Invoke(this, EventArgs.Empty);
+            }
+            else
+            {
+                LoadFailed?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        catch
+        {
+        }
+    }
+
     private void LoadFile()
     {
         try
@@ -675,7 +738,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                 }
                 CheckWriteAccess(string.IsNullOrEmpty(directory) ? "/" : directory, forNewFile: true);
                 IsNewFile = true;
-                BeginInvoke((ThreadStart)(() => FinishLoading(null, null)));
+                PostToUi(() => FinishLoading(null, null));
                 return;
             }
             IsNewFile = false;
@@ -700,6 +763,11 @@ public partial class RemoteFileEditor : CodeEditorPP
                 DateTime lastPreview = DateTime.Now;
                 while (true)
                 {
+                    if (IsDisposed)
+                    {
+                        // The tab was closed: nothing is waiting for the file any more.
+                        return;
+                    }
                     int value = scpDownloadStream.Read(bytes, 0, bytes.Length);
                     if (value <= 0)
                     {
@@ -729,7 +797,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                     {
                         lastPreview = DateTime.Now;
                         string preview = content.ToString().TrimStart('\uFEFF');
-                        BeginInvoke((ThreadStart)(() =>
+                        PostToUi(() =>
                         {
                             try
                             {
@@ -743,47 +811,22 @@ public partial class RemoteFileEditor : CodeEditorPP
                             catch
                             {
                             }
-                        }));
+                        });
                     }
                 }
             }
             byte[] file = downloaded.ToArray();
-            BeginInvoke((ThreadStart)(() => FinishLoading(file, signature)));
+            PostToUi(() => FinishLoading(file, signature));
         }
         catch (OperationCanceledException)
         {
             // The user chose not to open the file: the tab closes without an error message.
-            try
-            {
-                BeginInvoke((ThreadStart)(() => LoadFailed?.Invoke(this, EventArgs.Empty)));
-            }
-            catch
-            {
-            }
+            PostToUi(() => LoadFailed?.Invoke(this, EventArgs.Empty));
         }
         catch (Exception exception)
         {
-            BeginInvoke((ThreadStart)(() =>
-            {
-                try
-                {
-                    ReportError(exception);
-                    if (_reloading)
-                    {
-                        // The text on screen is still the user's: keep the tab.
-                        _reloading = false;
-                        ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
-                        FormatChanged?.Invoke(this, EventArgs.Empty);
-                    }
-                    else
-                    {
-                        LoadFailed?.Invoke(this, EventArgs.Empty);
-                    }
-                }
-                catch
-                {
-                }
-            }));
+            // A closed tab needs no message about the file it was loading.
+            PostToUi(() => HandleLoadError(exception));
         }
     }
 
@@ -1008,8 +1051,10 @@ public partial class RemoteFileEditor : CodeEditorPP
             {
             }
         }
-        catch
+        catch (Exception exception)
         {
+            // Not silent: the tab would stay empty and read-only with no word about why.
+            HandleLoadError(exception);
         }
     }
 
@@ -1306,6 +1351,11 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     public bool TrySave()
     {
+        if (!_loaded && !_reloading)
+        {
+            // The file never arrived: there is nothing of the user's to save.
+            return true;
+        }
         try
         {
             Save();
@@ -1391,6 +1441,15 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             return;
         }
+        if (_reloading)
+        {
+            // The text on screen may be a preview or an older copy of the file: saving it would overwrite the file on the server.
+            throw new InvalidOperationException("The file " + RemotePath + " is being reloaded. Try again when it has been loaded.");
+        }
+        if (!_loaded)
+        {
+            return;
+        }
         // A background save of an older version must not overwrite this one afterwards. If it does not end, the save of the closing
         // tab is not started over it: the error is shown, the tab stays open, and closing it again either finds the file saved by then
         // or lets the user give the changes up.
@@ -1428,8 +1487,10 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// </summary>
     public void SaveInBackground()
     {
-        if (IsReadOnlyMode)
+        if (!CanSave)
         {
+            // While the file is loading (or a preview is shown) the text is empty or partial: saving it would overwrite the
+            // file on the server with it.
             return;
         }
         if (IsSaving)
