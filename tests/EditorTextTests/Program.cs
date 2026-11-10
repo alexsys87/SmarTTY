@@ -867,7 +867,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -1694,6 +1694,117 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Pam).Toggle(new[] { "auth required pam_env.so" })), "# auth required pam_env.so", "PAM comment");
     }
 
+    private static void SambaChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/samba/smb.conf"), L.Samba, "the Samba configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/smb.conf"), L.Samba, "a smb.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/samba/lmhosts"), L.Plain, "lmhosts is not smb.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/samba/smbusers"), L.Plain, "smbusers is not smb.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/samba/smb.conf.example"), L.Plain, "the example is not the configuration");
+
+        Highlighted smb = new Highlighted(L.Samba,
+            "# Samba configuration\n[global]\n   workgroup = WORKGROUP\n   server string = Samba Server\n" +
+            "   security = user\n   map to guest = bad user\n   log level = 1\n   passdb backend = tdbsam\n" +
+            "   server min protocol = SMB2\n   hosts allow = 192.168.1. 127.0.0.1\n   load printers = yes\n\n" +
+            "[share]\n   comment = Shared folder\n   path = /srv/share\n   browseable = yes\n   read only = no\n" +
+            "   guest ok = yes\n   valid users = alice, bob\n   create mask = 0664\n   directory mask = 0775\n" +
+            "   force group = users\n   vfs objects = recycle\n   unknown option = 1\n");
+        Equal(Join(smb.Tokens(0, SyntaxHighlighting.TypeComment)), "# Samba configuration", "Samba: a comment");
+        Equal(Join(smb.Tokens(1, SyntaxHighlighting.TypeSection)), "[global]", "Samba: the global section");
+        Equal(Join(smb.Tokens(2, SyntaxHighlighting.TypeKeyword)), "workgroup", "Samba: workgroup");
+        Equal(Join(smb.Tokens(3, SyntaxHighlighting.TypeKeyword)), "server string", "Samba: a two-word directive");
+        Equal(Join(smb.Tokens(4, SyntaxHighlighting.TypeKeyword)), "security|user", "Samba: the security model");
+        Equal(Join(smb.Tokens(5, SyntaxHighlighting.TypeKeyword)), "map to guest|bad|user", "Samba: a three-word directive and its values");
+        Equal(Join(smb.Tokens(6, SyntaxHighlighting.TypeKeyword)), "log level", "Samba: log level");
+        Equal(Join(smb.Tokens(6, SyntaxHighlighting.TypeNumber)), "1", "Samba: the log level number");
+        Equal(Join(smb.Tokens(7, SyntaxHighlighting.TypeKeyword)), "passdb backend|tdbsam", "Samba: the password backend");
+        Equal(Join(smb.Tokens(8, SyntaxHighlighting.TypeKeyword)), "server min protocol|SMB2", "Samba: the minimum protocol");
+        Equal(Join(smb.Tokens(9, SyntaxHighlighting.TypeKeyword)), "hosts allow", "Samba: hosts allow");
+        Equal(Join(smb.Tokens(9, SyntaxHighlighting.TypeNumber)), "192.168.1.|127.0.0.1", "Samba: the allowed networks");
+        Equal(Join(smb.Tokens(10, SyntaxHighlighting.TypeKeyword)), "load printers|yes", "Samba: load printers");
+        Equal(Join(smb.Tokens(12, SyntaxHighlighting.TypeSection)), "[share]", "Samba: the share section");
+        Equal(Join(smb.Tokens(13, SyntaxHighlighting.TypeKeyword)), "comment", "Samba: comment");
+        Equal(Join(smb.Tokens(14, SyntaxHighlighting.TypeKeyword)), "path", "Samba: path");
+        Equal(Join(smb.Tokens(15, SyntaxHighlighting.TypeKeyword)), "browseable|yes", "Samba: browseable");
+        Equal(Join(smb.Tokens(16, SyntaxHighlighting.TypeKeyword)), "read only|no", "Samba: read only");
+        Equal(Join(smb.Tokens(17, SyntaxHighlighting.TypeKeyword)), "guest ok|yes", "Samba: guest ok");
+        Equal(Join(smb.Tokens(18, SyntaxHighlighting.TypeKeyword)), "valid users", "Samba: valid users");
+        Equal(Join(smb.Tokens(19, SyntaxHighlighting.TypeKeyword)), "create mask", "Samba: the create mask");
+        Equal(Join(smb.Tokens(19, SyntaxHighlighting.TypeNumber)), "0664", "Samba: the file mode");
+        Equal(Join(smb.Tokens(20, SyntaxHighlighting.TypeKeyword)), "directory mask", "Samba: the directory mask");
+        Equal(Join(smb.Tokens(20, SyntaxHighlighting.TypeNumber)), "0775", "Samba: the directory mode");
+        Equal(Join(smb.Tokens(21, SyntaxHighlighting.TypeKeyword)), "force group", "Samba: force group");
+        Equal(Join(smb.Tokens(22, SyntaxHighlighting.TypeKeyword)), "vfs objects|recycle", "Samba: the VFS objects");
+        Equal(Join(smb.Tokens(23, SyntaxHighlighting.TypeKeyword)), "", "Samba: an unknown directive is not a keyword");
+        Equal(Join(smb.Tokens(23, SyntaxHighlighting.TypeVariable)), "unknown", "Samba: ...it is a plain key");
+        Equal(Folds(smb), "", "Samba parameters do not fold");
+        Check(SyntaxHighlighting.GetKeywords(L.Samba).Contains("map to guest"), "Samba keywords contain the phrase 'map to guest'");
+        Check(SyntaxHighlighting.GetKeywords(L.Samba).Contains("workgroup"), "Samba keywords contain 'workgroup'");
+        Check(SyntaxHighlighting.GetKeywords(L.Samba).Contains("tdbsam"), "Samba keywords contain 'tdbsam'");
+        Equal(Join(CommentStyle.ForLanguage(L.Samba).Toggle(new[] { "workgroup = WORKGROUP" })), "# workgroup = WORKGROUP", "Samba comment");
+    }
+
+    private static void PostfixChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/main.cf"), L.Postfix, "the main Postfix configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/master.cf"), L.Postfix, "the service map of Postfix");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/dynamicmaps.cf"), L.Postfix, "a drop-in of /etc/postfix");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/main.cf"), L.Postfix, "a main.cf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/master.cf"), L.Postfix, "a master.cf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/header_checks"), L.Plain, "a lookup table of Postfix is not a .cf file");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/sasl/smtpd.conf"), L.Config, "the Cyrus SASL configuration is not Postfix");
+
+        Highlighted main = new Highlighted(L.Postfix,
+            "# Postfix main configuration\nmyhostname = mail.example.com\nmydomain = example.com\n" +
+            "myorigin = $mydomain\ninet_interfaces = all\ninet_protocols = ipv4\n" +
+            "mydestination = $myhostname, localhost.$mydomain, localhost\n" +
+            "mynetworks = 127.0.0.0/8, 192.168.1.0/24\nrelayhost = [smtp.example.com]:587\n" +
+            "smtpd_banner = $myhostname ESMTP $mail_name\nsmtpd_tls_security_level = may\n" +
+            "smtpd_tls_cert_file = /etc/ssl/certs/mail.pem\nsmtpd_sasl_auth_enable = yes\n" +
+            "smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination\n" +
+            "message_size_limit = 10240000\nmailbox_size_limit = 0\nhome_mailbox = Maildir/\n" +
+            "compatibility_level = 3.6\nunknown_parameter = 1\n");
+        Equal(Join(main.Tokens(0, SyntaxHighlighting.TypeComment)), "# Postfix main configuration", "Postfix: a comment");
+        Equal(Join(main.Tokens(1, SyntaxHighlighting.TypeKeyword)), "myhostname", "Postfix: myhostname");
+        Equal(Join(main.Tokens(3, SyntaxHighlighting.TypeKeyword)), "myorigin", "Postfix: myorigin");
+        Equal(Join(main.Tokens(3, SyntaxHighlighting.TypeVariable)), "$mydomain", "Postfix: a variable value");
+        Equal(Join(main.Tokens(4, SyntaxHighlighting.TypeKeyword)), "inet_interfaces|all", "Postfix: the interfaces");
+        Equal(Join(main.Tokens(5, SyntaxHighlighting.TypeKeyword)), "inet_protocols|ipv4", "Postfix: the protocols");
+        Equal(Join(main.Tokens(6, SyntaxHighlighting.TypeKeyword)), "mydestination", "Postfix: mydestination");
+        Equal(Join(main.Tokens(6, SyntaxHighlighting.TypeVariable)), "$myhostname|$mydomain", "Postfix: the destination variables");
+        Equal(Join(main.Tokens(7, SyntaxHighlighting.TypeKeyword)), "mynetworks", "Postfix: mynetworks");
+        Equal(Join(main.Tokens(7, SyntaxHighlighting.TypeNumber)), "127.0.0.0|8|192.168.1.0|24", "Postfix: the trusted networks");
+        Equal(Join(main.Tokens(8, SyntaxHighlighting.TypeKeyword)), "relayhost", "Postfix: the relay host");
+        Equal(Join(main.Tokens(8, SyntaxHighlighting.TypeNumber)), "587", "Postfix: the relay port");
+        Equal(Join(main.Tokens(10, SyntaxHighlighting.TypeKeyword)), "smtpd_tls_security_level|may", "Postfix: the TLS level");
+        Equal(Join(main.Tokens(12, SyntaxHighlighting.TypeKeyword)), "smtpd_sasl_auth_enable|yes", "Postfix: SASL authentication");
+        Equal(Join(main.Tokens(13, SyntaxHighlighting.TypeKeyword)), "smtpd_relay_restrictions|permit_mynetworks|permit_sasl_authenticated|reject_unauth_destination", "Postfix: the relay restrictions");
+        Equal(Join(main.Tokens(14, SyntaxHighlighting.TypeNumber)), "10240000", "Postfix: the message size limit");
+        Equal(Join(main.Tokens(17, SyntaxHighlighting.TypeNumber)), "3.6", "Postfix: the compatibility level");
+        Equal(Join(main.Tokens(18, SyntaxHighlighting.TypeKeyword)), "", "Postfix: an unknown parameter is not a keyword");
+        Equal(Join(main.Tokens(18, SyntaxHighlighting.TypeVariable)), "unknown_parameter", "Postfix: ...it is a plain key");
+
+        Highlighted master = new Highlighted(L.Postfix,
+            "# Postfix master configuration\n" +
+            "smtp      inet  n       -       y       -       -       smtpd\n" +
+            "smtps     inet  n       -       y       -       -       smtpd -o smtpd_tls_wrappermode=yes\n" +
+            "submission inet n       -       y       -       -       smtpd -o smtpd_tls_security_level=may\n" +
+            "pickup    unix  n       -       y       60      1       pickup\n" +
+            "cleanup   unix  n       -       y       -       0       cleanup\n" +
+            "qmgr      unix  n       -       n       300     1       qmgr\n");
+        Equal(Join(master.Tokens(1, SyntaxHighlighting.TypeKeyword)), "smtp|inet|n|y|smtpd", "Postfix: an smtp service");
+        Equal(Join(master.Tokens(2, SyntaxHighlighting.TypeKeyword)), "smtps|inet|n|y|smtpd|yes", "Postfix: smtps with an override");
+        Equal(Join(master.Tokens(3, SyntaxHighlighting.TypeKeyword)), "submission|inet|n|y|smtpd|may", "Postfix: the submission service");
+        Equal(Join(master.Tokens(4, SyntaxHighlighting.TypeKeyword)), "pickup|unix|n|y|pickup", "Postfix: the pickup service");
+        Equal(Join(master.Tokens(4, SyntaxHighlighting.TypeNumber)), "60|1", "Postfix: the wakeup and process limits");
+        Equal(Join(master.Tokens(6, SyntaxHighlighting.TypeKeyword)), "qmgr|unix|n|n|qmgr", "Postfix: the qmgr service");
+        Equal(Join(master.Tokens(6, SyntaxHighlighting.TypeNumber)), "300|1", "Postfix: the qmgr limits");
+        Check(SyntaxHighlighting.GetKeywords(L.Postfix).Contains("myhostname"), "Postfix keywords contain 'myhostname'");
+        Check(SyntaxHighlighting.GetKeywords(L.Postfix).Contains("smtpd_relay_restrictions"), "Postfix keywords contain 'smtpd_relay_restrictions'");
+        Check(SyntaxHighlighting.GetKeywords(L.Postfix).Contains("permit_mynetworks"), "Postfix keywords contain 'permit_mynetworks'");
+        Equal(Join(CommentStyle.ForLanguage(L.Postfix).Toggle(new[] { "myhostname = mail.example.com" })), "# myhostname = mail.example.com", "Postfix comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2404,6 +2515,8 @@ internal static class Program
         LogrotateChecks();
         SysctlChecks();
         PamChecks();
+        SambaChecks();
+        PostfixChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

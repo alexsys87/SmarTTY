@@ -111,14 +111,16 @@ namespace SmarTTY.CodeEditing
             Modprobe, // /etc/modprobe.d/*.conf, modprobe.conf: the colors of Config with the module loader directives
             Logrotate, // /etc/logrotate.conf, /etc/logrotate.d/*: the colors of Config with the logrotate directives
             Sysctl, // /etc/sysctl.conf, /etc/sysctl.d/*.conf: the colors of Config with the kernel tunables known
-            Pam // /etc/pam.conf, /etc/pam.d/*: the colors of Config with the PAM types, controls and modules known
+            Pam, // /etc/pam.conf, /etc/pam.d/*: the colors of Config with the PAM types, controls and modules known
+            Samba, // smb.conf: the colors of Config with the [global] and [share] parameters known
+            Postfix // main.cf, master.cf: the colors of Config with the Postfix parameters and services known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Pam, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Pam, Language.Samba, Language.Postfix, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -166,6 +168,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Logrotate: return "logrotate";
                 case Language.Sysctl: return "sysctl";
                 case Language.Pam: return "PAM";
+                case Language.Samba: return "Samba (smb.conf)";
+                case Language.Postfix: return "Postfix";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -406,6 +410,17 @@ namespace SmarTTY.CodeEditing
                  !name.StartsWith("readme", StringComparison.Ordinal)))
             {
                 return Language.Pam;
+            }
+            // Samba: the one conventional name of its configuration file.
+            if (name == "smb.conf")
+            {
+                return Language.Samba;
+            }
+            // Postfix: main.cf and master.cf, and the other .cf files of its configuration directory.
+            if (name == "main.cf" || name == "master.cf" ||
+                (lowerCasePath.Contains("/postfix/") && name.EndsWith(".cf", StringComparison.Ordinal)))
+            {
+                return Language.Postfix;
             }
             // Docker Compose: the conventional names, including the override and the per-file variants.
             bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
@@ -1123,6 +1138,8 @@ namespace SmarTTY.CodeEditing
                 case Language.Logrotate: return TokenizeLogrotate;
                 case Language.Sysctl: return TokenizeSysctl;
                 case Language.Pam: return TokenizePam;
+                case Language.Samba: return TokenizeSamba;
+                case Language.Postfix: return TokenizePostfix;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1277,6 +1294,10 @@ namespace SmarTTY.CodeEditing
                     return Combine(SysctlDirectives, SysctlValues);
                 case Language.Pam:
                     return Combine(PamDirectives, PamValues);
+                case Language.Samba:
+                    return Combine(SambaDirectives, SambaValues);
+                case Language.Postfix:
+                    return Combine(PostfixDirectives, PostfixValues);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
@@ -2089,6 +2110,51 @@ namespace SmarTTY.CodeEditing
             return IsIdChar(c) || c == '.' || c == '-';
         }
 
+        /// <summary>
+        /// The end of the longest known directive phrase at the start of a line, or <paramref name="start"/> when none
+        /// matches. A phrase consists of whole words separated by blanks ("map to guest", "server min protocol").
+        /// </summary>
+        private static int MatchDirectivePhrase(string text, int start, int len, HashSet<string> phrases)
+        {
+            int end = start;
+            int best = start;
+            while (end < len && IsConfigKeyChar(text[end]))
+            {
+                end++;
+            }
+            if (end == start)
+            {
+                return start;
+            }
+            if (phrases.Contains(text.Substring(start, end - start)))
+            {
+                best = end;
+            }
+            while (true)
+            {
+                int next = end;
+                while (next < len && IsBlank(text[next]))
+                {
+                    next++;
+                }
+                if (next == end || next >= len || !IsIdStart(text[next]))
+                {
+                    break;
+                }
+                int wordEnd = next;
+                while (wordEnd < len && IsConfigKeyChar(text[wordEnd]))
+                {
+                    wordEnd++;
+                }
+                end = wordEnd;
+                if (phrases.Contains(text.Substring(start, end - start)))
+                {
+                    best = end;
+                }
+            }
+            return best;
+        }
+
         private static bool TokenizeConfig(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
             return TokenizeConfigCore(null, startState, text, sink, out endState);
@@ -2099,13 +2165,17 @@ namespace SmarTTY.CodeEditing
         /// keyword when it is one of them, and stays a plain key otherwise. With <paramref name="foldBraces"/> (nginx) the { } of the
         /// blocks are paired brackets that fold: "server {...}". With <paramref name="dollarParentheses"/> (Kconfig) a reference
         /// written as "$(NAME)" is a variable too, and <paramref name="valueKeywords"/> (Kconfig's y, m, n) are the words that are
-        /// coloured wherever they stand.
+        /// coloured wherever they stand. With <paramref name="phraseDirectives"/> (Samba) a directive may consist of several words
+        /// ("map to guest", "server min protocol"): the longest known phrase at the start of a line is coloured as one keyword.
+        /// With <paramref name="valueKeywordsInValue"/> (Samba) the value keywords are coloured only in the value part of a line,
+        /// so a directory called "share" inside a path is not mistaken for a value.
         /// </summary>
-        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false, bool dollarParentheses = false, HashSet<string> valueKeywords = null)
+        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false, bool dollarParentheses = false, HashSet<string> valueKeywords = null, HashSet<string> phraseDirectives = null, bool valueKeywordsInValue = false)
         {
             int len = text.Length;
             int last = 0;
             int i = SkipBlanks(text, 0);
+            int valueStart = -1;
             endState = 0;
 
             if (i < len)
@@ -2142,32 +2212,44 @@ namespace SmarTTY.CodeEditing
                 }
                 else
                 {
-                    // The first word of a line is a key when a value follows: "key = value",
-                    // "key: value", "- key: value" (YAML list item) or "Key value" (sshd_config, nginx).
-                    int keyStart = i;
-                    if (first == '-' && i + 1 < len && text[i + 1] == ' ')
+                    // A directive of several words (Samba's "map to guest") is taken as a whole before the first-word key.
+                    int phraseEnd = (phraseDirectives != null) ? MatchDirectivePhrase(text, i, len, phraseDirectives) : i;
+                    if (phraseEnd > i)
                     {
-                        keyStart = SkipBlanks(text, i + 1);
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(TypeKeyword, i, phraseEnd);
+                        i = phraseEnd;
+                        last = i;
                     }
-                    int keyEnd = keyStart;
-                    if (keyStart < len && IsIdStart(text[keyStart]))
+                    else
                     {
-                        while (keyEnd < len && IsConfigKeyChar(text[keyEnd]))
+                        // The first word of a line is a key when a value follows: "key = value",
+                        // "key: value", "- key: value" (YAML list item) or "Key value" (sshd_config, nginx).
+                        int keyStart = i;
+                        if (first == '-' && i + 1 < len && text[i + 1] == ' ')
                         {
-                            keyEnd++;
+                            keyStart = SkipBlanks(text, i + 1);
                         }
-                    }
-                    if (keyEnd > keyStart)
-                    {
-                        int probe = SkipBlanks(text, keyEnd);
-                        bool isKey = probe < len && (text[probe] == '=' || text[probe] == ':' || (probe > keyEnd && text[probe] != '#'));
-                        if (isKey)
+                        int keyEnd = keyStart;
+                        if (keyStart < len && IsIdStart(text[keyStart]))
                         {
-                            Normal(ref last, last, keyStart, sink);
-                            bool known = directives != null && directives.Contains(text.Substring(keyStart, keyEnd - keyStart));
-                            sink.AddToken(known ? TypeKeyword : TypeVariable, keyStart, keyEnd);
-                            i = keyEnd;
-                            last = i;
+                            while (keyEnd < len && IsConfigKeyChar(text[keyEnd]))
+                            {
+                                keyEnd++;
+                            }
+                        }
+                        if (keyEnd > keyStart)
+                        {
+                            int probe = SkipBlanks(text, keyEnd);
+                            bool isKey = probe < len && (text[probe] == '=' || text[probe] == ':' || (probe > keyEnd && text[probe] != '#'));
+                            if (isKey)
+                            {
+                                Normal(ref last, last, keyStart, sink);
+                                bool known = directives != null && directives.Contains(text.Substring(keyStart, keyEnd - keyStart));
+                                sink.AddToken(known ? TypeKeyword : TypeVariable, keyStart, keyEnd);
+                                i = keyEnd;
+                                last = i;
+                            }
                         }
                     }
                 }
@@ -2183,6 +2265,17 @@ namespace SmarTTY.CodeEditing
                     Normal(ref last, last, i, sink);
                     sink.AddToken(TypeComment, i, len);
                     return true;
+                }
+
+                // The separator of a key and its value; the value words of some formats are coloured only after it.
+                if (valueKeywordsInValue && (c == '=' || c == ':'))
+                {
+                    if (valueStart < 0)
+                    {
+                        valueStart = SkipBlanks(text, i + 1);
+                    }
+                    i++;
+                    continue;
                 }
 
                 // Quoted strings.
@@ -2264,7 +2357,10 @@ namespace SmarTTY.CodeEditing
                         i++;
                     }
                     string word = text.Substring(s, i - s);
-                    if (ConfigConstants.Contains(word) || (valueKeywords != null && valueKeywords.Contains(word)))
+                    bool inValue = !valueKeywordsInValue ||
+                        (valueStart >= 0 && s >= valueStart && (s == valueStart || IsBlank(text[s - 1])));
+                    if (ConfigConstants.Contains(word) ||
+                        (valueKeywords != null && valueKeywords.Contains(word) && inValue))
                     {
                         Normal(ref last, last, s, sink);
                         sink.AddToken(TypeKeyword, s, i);
