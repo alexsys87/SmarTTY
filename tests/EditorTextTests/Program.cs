@@ -1920,6 +1920,73 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Netplan).Toggle(new[] { "  dhcp4: true" })), "  # dhcp4: true", "Netplan comment");
     }
 
+    private static void CloudInitChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/cloud/cloud.cfg"), L.CloudInit, "the cloud-init configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/cloud/cloud.cfg.d/99-fixes.cfg"), L.CloudInit, "a drop-in of cloud.cfg.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/cloud/cloud.cfg.d/05-logging.cfg"), L.CloudInit, "a vendor drop-in");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/cloud/cloud-config"), L.CloudInit, "a cloud-config seed");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/cloud.cfg"), L.CloudInit, "cloud.cfg anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/cloud/user-data"), L.CloudInit, "a user-data file under /cloud/");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/user-data"), L.Plain, "a user-data outside /cloud/ without a marker is plain");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/user-data", "#cloud-config"), L.CloudInit, "the #cloud-config marker");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/notes.yaml", "#cloud-config"), L.CloudInit, "the marker wins over the YAML name");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/notes.yaml", "# just a comment"), L.Yaml, "another comment leaves YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/cloud/README"), L.Plain, "the README of /etc/cloud is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/cloud.cfg.bak"), L.Plain, "a backup of cloud.cfg is not cloud-init");
+
+        Highlighted init = new Highlighted(L.CloudInit,
+            "#cloud-config\nversion: 1\nhostname: web-01\nfqdn: web-01.example.com\nmanage_etc_hosts: true\n" +
+            "users:\n  - name: deploy\n    gecos: Deploy user\n    groups: [sudo, docker]\n    shell: /bin/bash\n" +
+            "    sudo: [\"ALL=(ALL) NOPASSWD:ALL\"]\n    ssh_authorized_keys:\n      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample\n" +
+            "ssh_pwauth: false\ndisable_root: true\nchpasswd:\n  expire: false\n  list: |\n    root:linux\n" +
+            "package_update: true\npackages:\n  - nginx\n  - curl\nwrite_files:\n  - path: /etc/motd\n" +
+            "    content: |\n      Welcome to the server\n    owner: root:root\n    permissions: '0644'\n" +
+            "runcmd:\n  - [systemctl, enable, --now, nginx]\n  - echo done > /tmp/done\n" +
+            "power_state:\n  mode: reboot\n  timeout: 30\n  condition: test -f /var/run/reboot-required\n" +
+            "unknown_module: 1\n");
+        Equal(Join(init.Tokens(0, SyntaxHighlighting.TypeComment)), "#cloud-config", "cloud-init: the marker");
+        Equal(Join(init.Tokens(1, SyntaxHighlighting.TypeKeyword)), "version", "cloud-init: the version");
+        Equal(Join(init.Tokens(1, SyntaxHighlighting.TypeNumber)), "1", "cloud-init: the version number");
+        Equal(Join(init.Tokens(2, SyntaxHighlighting.TypeKeyword)), "hostname", "cloud-init: the hostname");
+        Equal(Join(init.Tokens(3, SyntaxHighlighting.TypeKeyword)), "fqdn", "cloud-init: the FQDN");
+        Equal(Join(init.Tokens(4, SyntaxHighlighting.TypeKeyword)), "manage_etc_hosts|true", "cloud-init: /etc/hosts");
+        Equal(Join(init.Tokens(5, SyntaxHighlighting.TypeKeyword)), "users", "cloud-init: the users");
+        Equal(Join(init.Tokens(6, SyntaxHighlighting.TypeKeyword)), "name", "cloud-init: the name of a user");
+        Equal(Join(init.Tokens(7, SyntaxHighlighting.TypeKeyword)), "gecos", "cloud-init: gecos");
+        Equal(Join(init.Tokens(8, SyntaxHighlighting.TypeKeyword)), "groups", "cloud-init: the groups of a user");
+        Equal(Join(init.Tokens(9, SyntaxHighlighting.TypeKeyword)), "shell", "cloud-init: the shell of a user");
+        Equal(Join(init.Tokens(11, SyntaxHighlighting.TypeKeyword)), "ssh_authorized_keys", "cloud-init: the authorized keys");
+        Equal(Join(init.Tokens(13, SyntaxHighlighting.TypeKeyword)), "ssh_pwauth|false", "cloud-init: password authentication");
+        Equal(Join(init.Tokens(14, SyntaxHighlighting.TypeKeyword)), "disable_root|true", "cloud-init: the root account");
+        Equal(Join(init.Tokens(15, SyntaxHighlighting.TypeKeyword)), "chpasswd", "cloud-init: the passwords");
+        Equal(Join(init.Tokens(16, SyntaxHighlighting.TypeKeyword)), "expire|false", "cloud-init: the password expiry");
+        Equal(Join(init.Tokens(17, SyntaxHighlighting.TypeKeyword)), "list", "cloud-init: the password list");
+        Equal(Join(init.Tokens(18, SyntaxHighlighting.TypeString)), "root:linux", "cloud-init: the text of the block scalar");
+        Equal(Join(init.Tokens(19, SyntaxHighlighting.TypeKeyword)), "package_update|true", "cloud-init: the package update");
+        Equal(Join(init.Tokens(20, SyntaxHighlighting.TypeKeyword)), "packages", "cloud-init: the package list");
+        Equal(Join(init.Tokens(23, SyntaxHighlighting.TypeKeyword)), "write_files", "cloud-init: the files to write");
+        Equal(Join(init.Tokens(24, SyntaxHighlighting.TypeKeyword)), "path", "cloud-init: the path of a file");
+        Equal(Join(init.Tokens(25, SyntaxHighlighting.TypeKeyword)), "content", "cloud-init: the content of a file");
+        Equal(Join(init.Tokens(26, SyntaxHighlighting.TypeString)), "Welcome to the server", "cloud-init: the content block");
+        Equal(Join(init.Tokens(27, SyntaxHighlighting.TypeKeyword)), "owner", "cloud-init: the owner of a file");
+        Equal(Join(init.Tokens(28, SyntaxHighlighting.TypeKeyword)), "permissions", "cloud-init: the permissions of a file");
+        Equal(Join(init.Tokens(28, SyntaxHighlighting.TypeString)), "'0644'", "cloud-init: the mode of a file");
+        Equal(Join(init.Tokens(29, SyntaxHighlighting.TypeKeyword)), "runcmd", "cloud-init: the commands");
+        Equal(Join(init.Tokens(32, SyntaxHighlighting.TypeKeyword)), "power_state", "cloud-init: the power state");
+        Equal(Join(init.Tokens(33, SyntaxHighlighting.TypeKeyword)), "mode|reboot", "cloud-init: the reboot mode");
+        Equal(Join(init.Tokens(34, SyntaxHighlighting.TypeKeyword)), "timeout", "cloud-init: the power timeout");
+        Equal(Join(init.Tokens(34, SyntaxHighlighting.TypeNumber)), "30", "cloud-init: the timeout value");
+        Equal(Join(init.Tokens(35, SyntaxHighlighting.TypeKeyword)), "condition", "cloud-init: the power condition");
+        Equal(Join(init.Tokens(36, SyntaxHighlighting.TypeKeyword)), "", "cloud-init: an unknown module is not a keyword");
+        Equal(Join(init.Tokens(36, SyntaxHighlighting.TypeVariable)), "unknown_module", "cloud-init: ...it is a plain key");
+        Check(Folds(init).Length > 0, "cloud-init blocks fold");
+        Check(SyntaxHighlighting.GetKeywords(L.CloudInit).Contains("write_files"), "cloud-init keywords contain 'write_files'");
+        Check(SyntaxHighlighting.GetKeywords(L.CloudInit).Contains("runcmd"), "cloud-init keywords contain 'runcmd'");
+        Check(SyntaxHighlighting.GetKeywords(L.CloudInit).Contains("reboot"), "cloud-init keywords contain 'reboot'");
+        Equal(Join(CommentStyle.ForLanguage(L.CloudInit).Toggle(new[] { "hostname: web-01" })), "# hostname: web-01", "cloud-init comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2634,6 +2701,7 @@ internal static class Program
         PostfixChecks();
         OpenVpnChecks();
         NetplanChecks();
+        CloudInitChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
