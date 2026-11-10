@@ -867,7 +867,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -1744,6 +1744,67 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Samba).Toggle(new[] { "workgroup = WORKGROUP" })), "# workgroup = WORKGROUP", "Samba comment");
     }
 
+    private static void PostfixChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/main.cf"), L.Postfix, "the main Postfix configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/master.cf"), L.Postfix, "the service map of Postfix");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/dynamicmaps.cf"), L.Postfix, "a drop-in of /etc/postfix");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/main.cf"), L.Postfix, "a main.cf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/master.cf"), L.Postfix, "a master.cf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/header_checks"), L.Plain, "a lookup table of Postfix is not a .cf file");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/postfix/sasl/smtpd.conf"), L.Config, "the Cyrus SASL configuration is not Postfix");
+
+        Highlighted main = new Highlighted(L.Postfix,
+            "# Postfix main configuration\nmyhostname = mail.example.com\nmydomain = example.com\n" +
+            "myorigin = $mydomain\ninet_interfaces = all\ninet_protocols = ipv4\n" +
+            "mydestination = $myhostname, localhost.$mydomain, localhost\n" +
+            "mynetworks = 127.0.0.0/8, 192.168.1.0/24\nrelayhost = [smtp.example.com]:587\n" +
+            "smtpd_banner = $myhostname ESMTP $mail_name\nsmtpd_tls_security_level = may\n" +
+            "smtpd_tls_cert_file = /etc/ssl/certs/mail.pem\nsmtpd_sasl_auth_enable = yes\n" +
+            "smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination\n" +
+            "message_size_limit = 10240000\nmailbox_size_limit = 0\nhome_mailbox = Maildir/\n" +
+            "compatibility_level = 3.6\nunknown_parameter = 1\n");
+        Equal(Join(main.Tokens(0, SyntaxHighlighting.TypeComment)), "# Postfix main configuration", "Postfix: a comment");
+        Equal(Join(main.Tokens(1, SyntaxHighlighting.TypeKeyword)), "myhostname", "Postfix: myhostname");
+        Equal(Join(main.Tokens(3, SyntaxHighlighting.TypeKeyword)), "myorigin", "Postfix: myorigin");
+        Equal(Join(main.Tokens(3, SyntaxHighlighting.TypeVariable)), "$mydomain", "Postfix: a variable value");
+        Equal(Join(main.Tokens(4, SyntaxHighlighting.TypeKeyword)), "inet_interfaces|all", "Postfix: the interfaces");
+        Equal(Join(main.Tokens(5, SyntaxHighlighting.TypeKeyword)), "inet_protocols|ipv4", "Postfix: the protocols");
+        Equal(Join(main.Tokens(6, SyntaxHighlighting.TypeKeyword)), "mydestination", "Postfix: mydestination");
+        Equal(Join(main.Tokens(6, SyntaxHighlighting.TypeVariable)), "$myhostname|$mydomain", "Postfix: the destination variables");
+        Equal(Join(main.Tokens(7, SyntaxHighlighting.TypeKeyword)), "mynetworks", "Postfix: mynetworks");
+        Equal(Join(main.Tokens(7, SyntaxHighlighting.TypeNumber)), "127.0.0.0|8|192.168.1.0|24", "Postfix: the trusted networks");
+        Equal(Join(main.Tokens(8, SyntaxHighlighting.TypeKeyword)), "relayhost", "Postfix: the relay host");
+        Equal(Join(main.Tokens(8, SyntaxHighlighting.TypeNumber)), "587", "Postfix: the relay port");
+        Equal(Join(main.Tokens(10, SyntaxHighlighting.TypeKeyword)), "smtpd_tls_security_level|may", "Postfix: the TLS level");
+        Equal(Join(main.Tokens(12, SyntaxHighlighting.TypeKeyword)), "smtpd_sasl_auth_enable|yes", "Postfix: SASL authentication");
+        Equal(Join(main.Tokens(13, SyntaxHighlighting.TypeKeyword)), "smtpd_relay_restrictions|permit_mynetworks|permit_sasl_authenticated|reject_unauth_destination", "Postfix: the relay restrictions");
+        Equal(Join(main.Tokens(14, SyntaxHighlighting.TypeNumber)), "10240000", "Postfix: the message size limit");
+        Equal(Join(main.Tokens(17, SyntaxHighlighting.TypeNumber)), "3.6", "Postfix: the compatibility level");
+        Equal(Join(main.Tokens(18, SyntaxHighlighting.TypeKeyword)), "", "Postfix: an unknown parameter is not a keyword");
+        Equal(Join(main.Tokens(18, SyntaxHighlighting.TypeVariable)), "unknown_parameter", "Postfix: ...it is a plain key");
+
+        Highlighted master = new Highlighted(L.Postfix,
+            "# Postfix master configuration\n" +
+            "smtp      inet  n       -       y       -       -       smtpd\n" +
+            "smtps     inet  n       -       y       -       -       smtpd -o smtpd_tls_wrappermode=yes\n" +
+            "submission inet n       -       y       -       -       smtpd -o smtpd_tls_security_level=may\n" +
+            "pickup    unix  n       -       y       60      1       pickup\n" +
+            "cleanup   unix  n       -       y       -       0       cleanup\n" +
+            "qmgr      unix  n       -       n       300     1       qmgr\n");
+        Equal(Join(master.Tokens(1, SyntaxHighlighting.TypeKeyword)), "smtp|inet|n|y|smtpd", "Postfix: an smtp service");
+        Equal(Join(master.Tokens(2, SyntaxHighlighting.TypeKeyword)), "smtps|inet|n|y|smtpd|yes", "Postfix: smtps with an override");
+        Equal(Join(master.Tokens(3, SyntaxHighlighting.TypeKeyword)), "submission|inet|n|y|smtpd|may", "Postfix: the submission service");
+        Equal(Join(master.Tokens(4, SyntaxHighlighting.TypeKeyword)), "pickup|unix|n|y|pickup", "Postfix: the pickup service");
+        Equal(Join(master.Tokens(4, SyntaxHighlighting.TypeNumber)), "60|1", "Postfix: the wakeup and process limits");
+        Equal(Join(master.Tokens(6, SyntaxHighlighting.TypeKeyword)), "qmgr|unix|n|n|qmgr", "Postfix: the qmgr service");
+        Equal(Join(master.Tokens(6, SyntaxHighlighting.TypeNumber)), "300|1", "Postfix: the qmgr limits");
+        Check(SyntaxHighlighting.GetKeywords(L.Postfix).Contains("myhostname"), "Postfix keywords contain 'myhostname'");
+        Check(SyntaxHighlighting.GetKeywords(L.Postfix).Contains("smtpd_relay_restrictions"), "Postfix keywords contain 'smtpd_relay_restrictions'");
+        Check(SyntaxHighlighting.GetKeywords(L.Postfix).Contains("permit_mynetworks"), "Postfix keywords contain 'permit_mynetworks'");
+        Equal(Join(CommentStyle.ForLanguage(L.Postfix).Toggle(new[] { "myhostname = mail.example.com" })), "# myhostname = mail.example.com", "Postfix comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2455,6 +2516,7 @@ internal static class Program
         SysctlChecks();
         PamChecks();
         SambaChecks();
+        PostfixChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
