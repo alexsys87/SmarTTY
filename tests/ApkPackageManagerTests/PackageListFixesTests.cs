@@ -51,7 +51,7 @@ internal static class PackageListFixesTests
     {
         AptPackageManagerClient client = new AptPackageManagerClient();
         FakeRunner runner = new FakeRunner();
-        runner.Responses["LC_ALL=C apt list"] = new[]
+        runner.Responses[AptPackageManagerClient.ListCommand(false)] = new[]
         {
             "WARNING: apt does not have a stable CLI interface. Use with caution in scripts.",
             "",
@@ -62,7 +62,8 @@ internal static class PackageListFixesTests
             "libc6/noble-updates,now 2.39-0ubuntu8.4 amd64 [installed,automatic]",
             "nano/noble-updates,now 7.2-2ubuntu0.1 amd64 [installed,upgradable to: 7.2-2ubuntu0.2]",
             "oldpkg/now 1.0-1 amd64 [installed,local]",
-            "removed/noble 2.0-1 amd64 [residual-config]"
+            "removed/noble 2.0-1 amd64 [residual-config]",
+            AptPackageManagerClient.ExitMarker + "0"
         };
         LinuxPackageInfo[] packages = client.QueryAllPackages(runner, false);
         Check(packages.Length == 7, "apt: the warning and 'Listing...' are skipped (" + packages.Length + ")");
@@ -87,7 +88,75 @@ internal static class PackageListFixesTests
             failed = true;
         }
         Check(failed, "apt: QueryAllPackages throws when 'apt list' fails");
+
+        DoAptFailureChecks(client);
         Check(client.GetCommandLineForPackageOperation(null, LinuxPackageInfo.PackageAction.Install, null) == null, "apt: no packages -> null");
+    }
+
+    // Debian 12 before "apt update": "apt list" failed, and the window closed with "Failed to list packages with apt" before Refresh
+    // could be pressed, without what apt said.
+    private static void DoAptFailureChecks(AptPackageManagerClient client)
+    {
+        Check(AptPackageManagerClient.ListCommand(false) == "LC_ALL=C apt list 2>&1; echo \"" + AptPackageManagerClient.ExitMarker + "$?\"", "apt: the list keeps the messages and the exit status of apt");
+        Check(AptPackageManagerClient.ListCommand(true).StartsWith("LC_ALL=C apt list -a 2>&1;", StringComparison.Ordinal), "apt: all versions with -a");
+
+        List<string> split = AptPackageManagerClient.SplitExitStatus(new[] { "Listing...", "E: x", AptPackageManagerClient.ExitMarker + "100" }, out int? status);
+        Check(status == 100 && split.Count == 2 && split[1] == "E: x", "apt: the exit status line is read and taken off");
+        Check(AptPackageManagerClient.SplitExitStatus(new[] { "Listing..." }, out status) != null && status == null, "apt: no exit status line -> unknown status");
+        Check(AptPackageManagerClient.SplitExitStatus(null, out status) == null && status == null, "apt: the command did not run -> null");
+
+        string[] aptError =
+        {
+            "WARNING: apt does not have a stable CLI interface. Use with caution in scripts.",
+            "",
+            "Listing...",
+            "E: Could not open file /var/lib/apt/lists/deb.debian.org_debian_dists_bookworm_main_binary-amd64_Packages - open (2: No such file or directory)",
+            AptPackageManagerClient.ExitMarker + "100"
+        };
+        string[] dpkg =
+        {
+            "bash\t5.2.15-2+b7\tamd64\tii ",
+            "libc6\t2.36-9+deb12u9\tamd64\tii ",
+            "libc6\t2.36-9+deb12u9\ti386\tii ",
+            "openssh-server\t1:9.2p1-2+deb12u5\tamd64\thi ",
+            "oldconf\t1.0-1\tall\trc ",
+            "halfdone\t2.0\tall\tiU ",
+            "garbage line"
+        };
+        FakeRunner debian = new FakeRunner();
+        debian.Responses[AptPackageManagerClient.ListCommand(false)] = aptError;
+        debian.Responses[AptPackageManagerClient.InstalledQueryCommand] = dpkg;
+        LinuxPackageInfo[] installed = client.QueryAllPackages(debian, false);
+        Check(installed.Select(p => p.ID).SequenceEqual(new[] { "bash", "libc6", "openssh-server" }), "apt failed: the installed packages come from dpkg (" + string.Join(" ", installed.Select(p => p.ID)) + ")");
+        Check(installed.All(p => p.State == LinuxPackageInfo.PackageState.Installed) && Find(installed, "libc6").Version == "2.36-9+deb12u9", "apt failed: dpkg packages are installed, with their versions; one row for two architectures");
+
+        FakeRunner partial = new FakeRunner();
+        partial.Responses[AptPackageManagerClient.ListCommand(false)] = new[]
+        {
+            "Listing...",
+            "bash/now 5.2.15-2+b7 amd64 [installed,local]",
+            "E: Could not open file /var/lib/apt/lists/x_Packages - open (2: No such file or directory)",
+            AptPackageManagerClient.ExitMarker + "100"
+        };
+        LinuxPackageInfo[] listed = client.QueryAllPackages(partial, false);
+        Check(listed.Length == 1 && listed[0].ID == "bash", "apt failed but listed packages: they are shown, dpkg is not asked");
+
+        FakeRunner empty = new FakeRunner();
+        empty.Responses[AptPackageManagerClient.ListCommand(false)] = new[] { "Listing...", AptPackageManagerClient.ExitMarker + "0" };
+        Check(client.QueryAllPackages(empty, false).Length == 0, "apt succeeded with no packages: an empty list, no error");
+
+        FakeRunner nothing = new FakeRunner();
+        nothing.Responses[AptPackageManagerClient.ListCommand(false)] = new[] { "E: Malformed entry 1 in list file /etc/apt/sources.list (Suite)", "E: The list of sources could not be read.", AptPackageManagerClient.ExitMarker + "100" };
+        string message = null;
+        try
+        {
+            client.QueryAllPackages(nothing, false);
+        }
+        catch (Exception exception)
+        {
+            message = exception.Message;
+        }
+        Check(message != null && message.Contains("E: Malformed entry 1 in list file /etc/apt/sources.list (Suite)") && message.Contains("exited with 100") && message.Contains("apt-get update"), "apt and dpkg failed: the error says what apt said and what to do");
     }
 
     private static void DoYumChecks()
