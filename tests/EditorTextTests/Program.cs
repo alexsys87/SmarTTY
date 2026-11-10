@@ -1694,6 +1694,56 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Pam).Toggle(new[] { "auth required pam_env.so" })), "# auth required pam_env.so", "PAM comment");
     }
 
+    private static void SambaChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/samba/smb.conf"), L.Samba, "the Samba configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/smb.conf"), L.Samba, "a smb.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/samba/lmhosts"), L.Plain, "lmhosts is not smb.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/samba/smbusers"), L.Plain, "smbusers is not smb.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/samba/smb.conf.example"), L.Plain, "the example is not the configuration");
+
+        Highlighted smb = new Highlighted(L.Samba,
+            "# Samba configuration\n[global]\n   workgroup = WORKGROUP\n   server string = Samba Server\n" +
+            "   security = user\n   map to guest = bad user\n   log level = 1\n   passdb backend = tdbsam\n" +
+            "   server min protocol = SMB2\n   hosts allow = 192.168.1. 127.0.0.1\n   load printers = yes\n\n" +
+            "[share]\n   comment = Shared folder\n   path = /srv/share\n   browseable = yes\n   read only = no\n" +
+            "   guest ok = yes\n   valid users = alice, bob\n   create mask = 0664\n   directory mask = 0775\n" +
+            "   force group = users\n   vfs objects = recycle\n   unknown option = 1\n");
+        Equal(Join(smb.Tokens(0, SyntaxHighlighting.TypeComment)), "# Samba configuration", "Samba: a comment");
+        Equal(Join(smb.Tokens(1, SyntaxHighlighting.TypeSection)), "[global]", "Samba: the global section");
+        Equal(Join(smb.Tokens(2, SyntaxHighlighting.TypeKeyword)), "workgroup", "Samba: workgroup");
+        Equal(Join(smb.Tokens(3, SyntaxHighlighting.TypeKeyword)), "server string", "Samba: a two-word directive");
+        Equal(Join(smb.Tokens(4, SyntaxHighlighting.TypeKeyword)), "security|user", "Samba: the security model");
+        Equal(Join(smb.Tokens(5, SyntaxHighlighting.TypeKeyword)), "map to guest|bad|user", "Samba: a three-word directive and its values");
+        Equal(Join(smb.Tokens(6, SyntaxHighlighting.TypeKeyword)), "log level", "Samba: log level");
+        Equal(Join(smb.Tokens(6, SyntaxHighlighting.TypeNumber)), "1", "Samba: the log level number");
+        Equal(Join(smb.Tokens(7, SyntaxHighlighting.TypeKeyword)), "passdb backend|tdbsam", "Samba: the password backend");
+        Equal(Join(smb.Tokens(8, SyntaxHighlighting.TypeKeyword)), "server min protocol|SMB2", "Samba: the minimum protocol");
+        Equal(Join(smb.Tokens(9, SyntaxHighlighting.TypeKeyword)), "hosts allow", "Samba: hosts allow");
+        Equal(Join(smb.Tokens(9, SyntaxHighlighting.TypeNumber)), "192.168.1.|127.0.0.1", "Samba: the allowed networks");
+        Equal(Join(smb.Tokens(10, SyntaxHighlighting.TypeKeyword)), "load printers|yes", "Samba: load printers");
+        Equal(Join(smb.Tokens(12, SyntaxHighlighting.TypeSection)), "[share]", "Samba: the share section");
+        Equal(Join(smb.Tokens(13, SyntaxHighlighting.TypeKeyword)), "comment", "Samba: comment");
+        Equal(Join(smb.Tokens(14, SyntaxHighlighting.TypeKeyword)), "path", "Samba: path");
+        Equal(Join(smb.Tokens(15, SyntaxHighlighting.TypeKeyword)), "browseable|yes", "Samba: browseable");
+        Equal(Join(smb.Tokens(16, SyntaxHighlighting.TypeKeyword)), "read only|no", "Samba: read only");
+        Equal(Join(smb.Tokens(17, SyntaxHighlighting.TypeKeyword)), "guest ok|yes", "Samba: guest ok");
+        Equal(Join(smb.Tokens(18, SyntaxHighlighting.TypeKeyword)), "valid users", "Samba: valid users");
+        Equal(Join(smb.Tokens(19, SyntaxHighlighting.TypeKeyword)), "create mask", "Samba: the create mask");
+        Equal(Join(smb.Tokens(19, SyntaxHighlighting.TypeNumber)), "0664", "Samba: the file mode");
+        Equal(Join(smb.Tokens(20, SyntaxHighlighting.TypeKeyword)), "directory mask", "Samba: the directory mask");
+        Equal(Join(smb.Tokens(20, SyntaxHighlighting.TypeNumber)), "0775", "Samba: the directory mode");
+        Equal(Join(smb.Tokens(21, SyntaxHighlighting.TypeKeyword)), "force group", "Samba: force group");
+        Equal(Join(smb.Tokens(22, SyntaxHighlighting.TypeKeyword)), "vfs objects|recycle", "Samba: the VFS objects");
+        Equal(Join(smb.Tokens(23, SyntaxHighlighting.TypeKeyword)), "", "Samba: an unknown directive is not a keyword");
+        Equal(Join(smb.Tokens(23, SyntaxHighlighting.TypeVariable)), "unknown", "Samba: ...it is a plain key");
+        Equal(Folds(smb), "", "Samba parameters do not fold");
+        Check(SyntaxHighlighting.GetKeywords(L.Samba).Contains("map to guest"), "Samba keywords contain the phrase 'map to guest'");
+        Check(SyntaxHighlighting.GetKeywords(L.Samba).Contains("workgroup"), "Samba keywords contain 'workgroup'");
+        Check(SyntaxHighlighting.GetKeywords(L.Samba).Contains("tdbsam"), "Samba keywords contain 'tdbsam'");
+        Equal(Join(CommentStyle.ForLanguage(L.Samba).Toggle(new[] { "workgroup = WORKGROUP" })), "# workgroup = WORKGROUP", "Samba comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2404,6 +2454,7 @@ internal static class Program
         LogrotateChecks();
         SysctlChecks();
         PamChecks();
+        SambaChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

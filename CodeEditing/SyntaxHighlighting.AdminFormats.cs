@@ -8,6 +8,21 @@ namespace SmarTTY.CodeEditing;
 // editor offers them as completions); logs get the colours of their timestamps and levels.
 public static partial class SyntaxHighlighting
 {
+    /// <summary>A set of whole directives, some of which consist of several words ("map to guest").</summary>
+    private static HashSet<string> Phrases(StringComparer comparer, string phrases)
+    {
+        HashSet<string> result = new HashSet<string>(comparer);
+        foreach (string line in phrases.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string phrase = line.Trim();
+            if (phrase.Length != 0)
+            {
+                result.Add(phrase);
+            }
+        }
+        return result;
+    }
+
     private static HashSet<string> Words(StringComparer comparer, params string[] groups)
     {
         HashSet<string> result = new HashSet<string>(comparer);
@@ -1125,6 +1140,228 @@ public static partial class SyntaxHighlighting
     private static bool TokenizePam(int startState, string text, TokenCache.ITokenSink sink, out int endState)
     {
         return TokenizeConfigCore(PamDirectives, startState, text, sink, out endState, valueKeywords: PamValues);
+    }
+
+    // ------------------------------------------------------------------ Samba
+
+    private static readonly HashSet<string> SambaDirectives = Phrases(StringComparer.OrdinalIgnoreCase,
+        // global: identity, security and name resolution
+        @"workgroup
+          netbios name
+          server string
+          server role
+          security
+          map to guest
+          guest account
+          log level
+          max log size
+          passdb backend
+          obey pam restrictions
+          pam password change
+          unix password sync
+          ldap ssl
+          ldap suffix
+          ldap admin dn
+          ldap user suffix
+          ldap group suffix
+          ldap machine suffix
+          idmap config
+          idmap uid
+          idmap gid
+          winbind use default domain
+          winbind enum users
+          winbind enum groups
+          winbind separator
+          winbind offline logon
+          winbind refresh tickets
+          template shell
+          template homedir
+          realm
+          password server
+          dns proxy
+          name resolve order
+          wins support
+          wins server
+          domain master
+          local master
+          preferred master
+          domain logons
+          logon path
+          logon drive
+          logon script
+          os level
+          announce as
+          announce version
+          hosts allow
+          hosts deny
+          interfaces
+          bind interfaces only
+          smb ports
+          socket options
+          deadtime
+          keepalive
+          max smbd processes
+          min receivefile size
+          use sendfile
+          aio read size
+          aio write size
+          read raw
+          write raw
+          strict sync
+          sync always
+          large readwrite
+          server min protocol
+          server max protocol
+          client min protocol
+          client max protocol
+          server signing
+          client signing
+          smb encrypt
+          ntlm auth
+          client ntlmv2 auth
+          lanman auth
+          raw NTLMv2 auth
+          restrict anonymous
+          map archive
+          map hidden
+          map system
+          map readonly
+          store dos attributes
+          ea support
+          unix extensions
+          wide links
+          follow symlinks
+          allow insecure wide links
+          load printers
+          printing
+          printcap name
+          disable spoolss
+          cups options
+          cups server
+          delete readonly
+          dos filemode
+          dos filetimes
+          dos filetime resolution
+          fake directory create times
+          change notify
+          kernel change notify
+          change notify timeout
+          getwd cache
+          host msdfs
+          msdfs root
+          msdfs proxy
+          usershare allow guests
+          usershare max shares
+          usershare path
+          usershare template share
+          include
+          config backend
+          registry shares
+          preload
+          panic action
+          lock directory
+          state directory
+          cache directory
+          pid directory
+          private dir
+          ncalrpc dir
+          winbindd socket directory
+          server services
+          rpc server dynamic port range
+          rpc server port
+          ctdbd socket
+          clustering
+          kernel oplocks
+          oplocks
+          level2 oplocks
+          posix locking
+          strict locking
+          locking
+          blocking locks
+          share modes
+          smbd profiling level
+          comment
+          path
+          browseable
+          read only
+          writable
+          writeable
+          write ok
+          guest ok
+          public
+          guest only
+          only guest
+          valid users
+          invalid users
+          admin users
+          read list
+          write list
+          force user
+          force group
+          group
+          create mask
+          force create mode
+          directory mask
+          force directory mode
+          inherit permissions
+          inherit acls
+          inherit owner
+          inherit smbcacls
+          acl allow execute always
+          acl group control
+          acl map full control
+          acl check execute
+          nt acl support
+          printable
+          print ok
+          printer name
+          printer
+          print command
+          lpq command
+          lprm command
+          lppause command
+          lpresume command
+          queuepause command
+          queueresume command
+          hide dot files
+          hide files
+          hide unreadable
+          hide unwriteable files
+          veto files
+          delete veto files
+          veto oplock files
+          mangled names
+          mangling method
+          case sensitive
+          default case
+          preserve case
+          short preserve case
+          csc policy
+          volume
+          available
+          dfree command
+          dfree cache time
+          map acl inherit
+          fake oplocks
+          directory name cache size
+          vfs objects");
+
+    private static readonly HashSet<string> SambaValues = Words(StringComparer.OrdinalIgnoreCase,
+        // roles, backends, protocol levels and the usual choices of the parameters
+        @"user share domain ads standalone member classic
+          tdbsam smbpasswd ldapsam rid autorid ad nss rfc2307 sfu sfu20 hash bad plaintext
+          NT1 SMB2 SMB3 SMB2_02 SMB2_10 SMB2_22 SMB2_24 SMB3_00 SMB3_02 SMB3_10 SMB3_11
+          mandatory desired auto off none full disk printer printers cups bsd sysv lprng
+          recycle full_audit acl_xattr streams_xattr fruit catia time_audit extd_audit shadow_copy2 crossrename");
+
+    /// <summary>
+    /// Samba: the colours of Config with the [global] and [share] parameters known; the names match in any case, as
+    /// Samba reads them. The usual values (user, tdbsam, SMB3, recycle, ...) are keywords too. Comments are '#'.
+    /// </summary>
+    private static bool TokenizeSamba(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(SambaDirectives, startState, text, sink, out endState,
+            valueKeywords: SambaValues, phraseDirectives: SambaDirectives, valueKeywordsInValue: true);
     }
 
     // -------------------------------------------------------------- Kubernetes
