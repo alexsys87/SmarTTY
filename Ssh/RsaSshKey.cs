@@ -118,7 +118,12 @@ public class RsaSshKey : SshKeyEncoding, ISshKeyPair
 
     public void ImportPrivateKey(FileStream fileStream)
     {
-        RSAParameters parameters = (RSAParameters)new XmlSerializer(typeof(RSAParameters)).Deserialize(fileStream);
+        // A key file comes from the user and may come from anywhere: no DTD.
+        RSAParameters parameters;
+        using (System.Xml.XmlReader reader = System.Xml.XmlReader.Create(fileStream, new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Prohibit, XmlResolver = null }))
+        {
+            parameters = (RSAParameters)new XmlSerializer(typeof(RSAParameters)).Deserialize(reader);
+        }
         _csp.ImportParameters(parameters);
     }
 

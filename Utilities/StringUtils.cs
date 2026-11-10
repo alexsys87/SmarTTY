@@ -68,12 +68,14 @@ public static class StringUtils
         StringBuilder stringBuilder = new StringBuilder();
         for (int i = 0; i < format.Length; i++)
         {
-            if (format[i] == '}' && i < format.Length - 1 && format[i + 1] == '}')
+            // "{{" and "}}" are literal braces outside a placeholder only: inside one, "}}" closes two levels ("{a:{b}}"), and taking it for an
+            // escaped brace lost the whole placeholder.
+            if (braceDepth == 0 && format[i] == '}' && i < format.Length - 1 && format[i + 1] == '}')
             {
                 stringBuilder.Append(format[i]);
                 i++;
             }
-            else if (format[i] == '{' && i < format.Length - 1 && format[i + 1] == '{')
+            else if (braceDepth == 0 && format[i] == '{' && i < format.Length - 1 && format[i + 1] == '{')
             {
                 stringBuilder.Append(format[i]);
                 i++;

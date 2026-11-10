@@ -308,6 +308,11 @@ public partial class TerminalEmulatorBase : TextEditorControl
             LineInfo lineInfo = this._lines[textPosition.Line];
             lineInfo.IsDimmed = false;
             lineInfo.IsWrapped = false;
+            if (lineInfo.Cells == null)
+            {
+                // A line that was only marked (wrapped or dimmed) has no cell styles yet: there is nothing to shift.
+                return;
+            }
             for (int column = textPosition.Column; column < lineInfo.Cells.Length; column++)
             {
                 int targetColumn = column + count;
@@ -1019,7 +1024,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
         CellStyle cellStyle = default;
         LineInfo lineInfo = ActiveBuffer.Lines.GetLine(textPosition.Line);
-        if (lineInfo != null && textPosition.Column < lineInfo.Cells.Length)
+        if (lineInfo?.Cells != null && textPosition.Column < lineInfo.Cells.Length)
         {
             cellStyle = lineInfo.Cells[textPosition.Column];
         }
@@ -1141,12 +1146,14 @@ public partial class TerminalEmulatorBase : TextEditorControl
             int availableColumns = _visibleColumns - point.X;
             if (text.Length > availableColumns)
             {
-                point = WriteAt(point, text.Substring(0, availableColumns), cellStyle);
+                // The parts keep the way of writing: in the insert mode every part is inserted (the text behind it moves right, and what
+                // leaves the screen is lost), not written over the text that was there.
+                point = WriteAt(point, text.Substring(0, availableColumns), cellStyle, scroll, insert);
                 int chunkLength;
                 for (int chunkOffset = availableColumns; chunkOffset < text.Length; chunkOffset += chunkLength)
                 {
                     chunkLength = Math.Min(text.Length - chunkOffset, _visibleColumns);
-                    point = WriteAt(point, text.Substring(chunkOffset, chunkLength), cellStyle);
+                    point = WriteAt(point, text.Substring(chunkOffset, chunkLength), cellStyle, scroll, insert);
                 }
                 return point;
             }

@@ -66,20 +66,43 @@ public sealed class ParameterSignature : ISignatureInfo
     /// </summary>
     public static string[] SplitParameters(string inner)
     {
+        return SplitParameters(inner, angleBrackets: false, apostropheQuotes: true);
+    }
+
+    /// <summary>
+    /// <paramref name="angleBrackets"/>: a "&lt;" right after an identifier opens a type argument list ("Map&lt;String, int&gt; m"), so its commas
+    /// stay in their parameter. <paramref name="apostropheQuotes"/> is false where an apostrophe is not a quote (Rust lifetimes: "&amp;'a str").
+    /// </summary>
+    public static string[] SplitParameters(string inner, bool angleBrackets, bool apostropheQuotes)
+    {
         List<string> parts = new List<string>();
         if (inner == null)
         {
             return parts.ToArray();
         }
         int depth = 0;
+        int angle = 0;
         int start = 0;
         for (int i = 0; i < inner.Length; i++)
         {
             char c = inner[i];
-            if (c == '\'' || c == '"')
+            if (c == '"' || (c == '\'' && apostropheQuotes))
             {
                 i = SkipString(inner, i) - 1;
                 continue;
+            }
+            if (angleBrackets)
+            {
+                if (c == '<' && i > 0 && (char.IsLetterOrDigit(inner[i - 1]) || inner[i - 1] == '_'))
+                {
+                    angle++;
+                    continue;
+                }
+                if (c == '>' && angle > 0 && inner[i - 1] != '-' && inner[i - 1] != '=')
+                {
+                    angle--;
+                    continue;
+                }
             }
             if (c == '(' || c == '[' || c == '{')
             {
@@ -92,7 +115,7 @@ public sealed class ParameterSignature : ISignatureInfo
                     depth--;
                 }
             }
-            else if (c == ',' && depth == 0)
+            else if (c == ',' && depth == 0 && angle == 0)
             {
                 AddParameter(parts, inner.Substring(start, i - start));
                 start = i + 1;
@@ -109,7 +132,8 @@ public sealed class ParameterSignature : ISignatureInfo
 
     private static void AddParameter(List<string> parts, string text)
     {
-        string trimmed = text.Trim();
+        // A parameter that was written over several lines is one line in the hint.
+        string trimmed = System.Text.RegularExpressions.Regex.Replace(text.Trim(), @"\s*[\r\n]+\s*", " ");
         if (trimmed.Length > 0)
         {
             parts.Add(trimmed);

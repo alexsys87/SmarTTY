@@ -195,6 +195,13 @@ internal static class Program
         CheckDoubleQuoteEscaping();
 
         // --- sizes ---
+        // Placeholders: a literal brace is doubled, and "}}" inside a placeholder closes two levels.
+        StringUtils.PlaceholderResolver show = (name, option) => "[" + name + "|" + option + "]";
+        Equal("[a|]", StringUtils.ExpandPlaceholders("{a}", show), "placeholder: plain");
+        Equal("{[a|]}", StringUtils.ExpandPlaceholders("{{{a}}}", show), "placeholder: escaped braces around one");
+        Equal("[a|]}", StringUtils.ExpandPlaceholders("{a}}}", show), "placeholder: an escaped brace after one");
+        Equal("[a|{b}]", StringUtils.ExpandPlaceholders("{a:{b}}", show), "placeholder: closing two levels at once is no escaped brace");
+        Equal("{lit} [b|]", StringUtils.ExpandPlaceholders("{{lit}} {b}", show), "placeholder: literal braces");
         Equal("512", StringUtils.FormatSize(512), "size: small");
         Equal("20K", StringUtils.FormatSize(20 * 1024), "size: kilobytes");
         Equal("50M", StringUtils.FormatSize(50L * 1024 * 1024), "size: megabytes");

@@ -1020,7 +1020,8 @@ namespace SmarTTY.CodeEditing
                 program = "";
                 for (int i = 1; i < words.Length; i++)
                 {
-                    if (!words[i].StartsWith("-", StringComparison.Ordinal))
+                    // "env LANG=C python3": an assignment in front of the interpreter is not the interpreter.
+                    if (!words[i].StartsWith("-", StringComparison.Ordinal) && !(words[i].IndexOf('=') > 0 && words[i].IndexOf('/') < 0))
                     {
                         program = ProgramName(words[i]);
                         break;

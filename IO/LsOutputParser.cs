@@ -34,7 +34,7 @@ public static class LsOutputParser
 
     public static class LsParser
     {
-        private static readonly Regex _lineRegex = new Regex("^(?<mode>[^ ]+) +[^ ]+ +[^ ]+ +[^ ]+ +([0-9]+) +([0-9]{4})-([0-9]{2})-([0-9]{2}) +([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.[0-9]+)? +([0-9+\\-]+) +([^ ].*)$");
+        private static readonly Regex _lineRegex = new Regex("^(?<mode>[^ ]+) +[^ ]+ +[^ ]+ +[^ ]+ +(?:[0-9]+, +)?([0-9]+) +([0-9]{4})-([0-9]{2})-([0-9]{2}) +([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.[0-9]+)? +([0-9+\\-]+) +([^ ].*)$");
 
         public static LsEntry ParseLine(string line)
         {
@@ -80,7 +80,17 @@ public static class LsOutputParser
             {
                 lsEntryFlags |= LsOutputParser.LsEntryFlags.Executable;
             }
-            DateTime dateTime = new DateTime(int.Parse(match.Groups[2].Value), int.Parse(match.Groups[3].Value), int.Parse(match.Groups[4].Value), int.Parse(match.Groups[5].Value), int.Parse(match.Groups[6].Value), int.Parse(match.Groups[7].Value));
+            DateTime dateTime;
+            try
+            {
+                dateTime = new DateTime(int.Parse(match.Groups[2].Value), int.Parse(match.Groups[3].Value), int.Parse(match.Groups[4].Value), int.Parse(match.Groups[5].Value), int.Parse(match.Groups[6].Value), int.Parse(match.Groups[7].Value));
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                // A file system with a zero or damaged time ("0000-00-00", a minute of 61) prints a date that is none: that must not
+                // make the whole listing of the folder fail.
+                dateTime = DateTime.MinValue;
+            }
             int arrowIndex = fileName.IndexOf(" -> ");
             if (arrowIndex != -1)
             {
@@ -89,7 +99,7 @@ public static class LsOutputParser
             return new LsEntry
             {
                 Name = fileName,
-                Size = long.Parse(match.Groups[1].Value),
+                Size = long.TryParse(match.Groups[1].Value, out long size) ? size : 0,
                 Flags = lsEntryFlags,
                 Mode = match.Groups["mode"].Value,
                 ModifiedTime = dateTime

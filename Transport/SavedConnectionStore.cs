@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Xml;
 using System.Xml.Serialization;
 using SmarTTY.Utilities;
 using VisualTTY;
@@ -11,6 +12,12 @@ namespace SmarTTY.Transport;
 
 public class SavedConnectionStore
 {
+    // A connection file that declares a DTD is refused (an entity that expands to gigabytes would stop the program on start).
+    private static XmlReader SafeReader(Stream stream)
+    {
+        return XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
+    }
+
     private DateTime _loadedAt;
 
     private List<SSHConnectionSettings> _sshConnections = new List<SSHConnectionSettings>();
@@ -67,7 +74,8 @@ public class SavedConnectionStore
                 try
                 {
                     using FileStream stream = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    SSHConnectionSettings sshSettings = (SSHConnectionSettings)xmlSerializer.Deserialize(stream);
+                    using XmlReader sshReader = SafeReader(stream);
+                    SSHConnectionSettings sshSettings = (SSHConnectionSettings)xmlSerializer.Deserialize(sshReader);
                     sshSettings.FileName = file;
                     _sshConnections.Add(sshSettings);
                 }
@@ -82,7 +90,8 @@ public class SavedConnectionStore
                 try
                 {
                     using FileStream item = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    RawConnectionSettings rawConnectionSettings = (RawConnectionSettings)rawSettingsSerializer.Deserialize(item);
+                    using XmlReader rawReader = SafeReader(item);
+                    RawConnectionSettings rawConnectionSettings = (RawConnectionSettings)rawSettingsSerializer.Deserialize(rawReader);
                     rawConnectionSettings.FileName = file;
                     _rawConnections.Add(rawConnectionSettings);
                 }

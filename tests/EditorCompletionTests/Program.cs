@@ -183,6 +183,10 @@ internal static class Program
         Equal(all.Count(x => x == "counter"), 1, "a word appears only once");
         Check(all.IndexOf("if") < all.IndexOf("counter"), "keywords come before the document words");
 
+        // Words that differ only in case come in a fixed order, whatever the order in the document.
+        Equal(string.Join("|", Names(L.Plain, "foo Foo foo FOO", "f")), "FOO|Foo|foo", "case variants are ordered the same way every time");
+        Equal(string.Join("|", Names(L.Plain, "FOO foo Foo", "f")), "FOO|Foo|foo", "and independently of the order of the text");
+
         // The prefix filter is case insensitive.
         List<string> prefixed = Names(L.Python, "def doWork():\n    done = 1\n", "do");
         Check(prefixed.Contains("doWork"), "the prefix filter keeps 'doWork'");

@@ -109,13 +109,14 @@ public class Win32Clipboard
     public static string GetText(IntPtr hWnd)
     {
         IntPtr lockedPtr = IntPtr.Zero;
+        IntPtr clipboardData = IntPtr.Zero;
         if (!OpenClipboardWithRetry(hWnd))
         {
             return null;
         }
         try
         {
-            IntPtr clipboardData = GetClipboardData(13u);
+            clipboardData = GetClipboardData(13u);
             if (clipboardData == IntPtr.Zero)
             {
                 return null;
@@ -127,7 +128,9 @@ public class Win32Clipboard
         {
             if (lockedPtr != IntPtr.Zero)
             {
-                GlobalUnlock(lockedPtr);
+                // GlobalUnlock takes the handle of the memory, not the address that GlobalLock gave: with the address the unlock failed
+                // for the movable memory of the clipboard, and every paste left one lock on the data of the program that owns it.
+                GlobalUnlock(clipboardData);
             }
             CloseClipboard();
         }
@@ -153,7 +156,7 @@ public class Win32Clipboard
             if (SetClipboardData(13u, hglobal) == IntPtr.Zero)
             {
                 Marshal.FreeHGlobal(hglobal);
-                throw new InvalidOperationException("Cannot set clipboard data, error" + Marshal.GetLastWin32Error());
+                throw new InvalidOperationException("Cannot set clipboard data, error " + Marshal.GetLastWin32Error());
             }
         }
         finally

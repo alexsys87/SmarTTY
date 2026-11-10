@@ -91,6 +91,18 @@ public class XmlStorage
         }
     }
 
+    // A file that declares a DTD (an entity that expands to gigabytes, an external entity) is refused: XmlSerializer.Deserialize(Stream)
+    // reads with the DTD processing of an XmlTextReader on, and the settings files are also read from archives that come from elsewhere.
+    private static XmlReader CreateSafeReader(Stream stream)
+    {
+        return XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
+    }
+
+    private static XmlReader CreateSafeReader(TextReader reader)
+    {
+        return XmlReader.Create(reader, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
+    }
+
     public static _Ty LoadFromFile<_Ty>(string filePath, params Type[] items)
     {
         XmlSerializer xmlSerializer = GetSerializer(typeof(_Ty), items);
@@ -100,7 +112,8 @@ public class XmlStorage
             {
                 try
                 {
-                    return (_Ty)xmlSerializer.Deserialize(fileStream);
+                    using XmlReader reader = CreateSafeReader(fileStream);
+                    return (_Ty)xmlSerializer.Deserialize(reader);
                 }
                 catch (XmlException xmlEx)
                 {
@@ -120,7 +133,8 @@ public class XmlStorage
                 using GZipStream gzipStream = new GZipStream(gzFileStream, CompressionMode.Decompress);
                 try
                 {
-                    return (_Ty)xmlSerializer.Deserialize(gzipStream);
+                    using XmlReader reader = CreateSafeReader(gzipStream);
+                    return (_Ty)xmlSerializer.Deserialize(reader);
                 }
                 catch (XmlException gzXmlEx)
                 {
@@ -284,6 +298,7 @@ public class XmlStorage
         }
         XmlSerializer xmlSerializer = GetSerializer(typeof(_Ty), items);
         using StringReader textReader = new StringReader(xmlString);
-        return (_Ty)xmlSerializer.Deserialize(textReader);
+        using XmlReader reader = CreateSafeReader(textReader);
+        return (_Ty)xmlSerializer.Deserialize(reader);
     }
 }

@@ -117,24 +117,67 @@ internal static class Program
         Check(!Definitions(L.Plain, "def f(a)\n").Any(), "plain text: no definitions");
     }
 
+    private static void Main2Checks()
+    {
+        // C: the brace on a line of its own, and a parameter list over several lines.
+        Equal(string.Join("|", Definitions(L.CLike, "int main(int argc, char **argv)\n{\n    return 0;\n}\n")), "main(int argc, char **argv)", "c-like: the brace on the next line");
+        Equal(string.Join("|", Definitions(L.CLike, "int add(int a,\n        int b)\n{\n    return a + b;\n}\n")), "add(int a, int b)", "c-like: the parameters over two lines");
+        Equal(string.Join("|", Definitions(L.CLike, "int add(int a, /* first */ int b) // tail\n{\n}\n")), "add(int a, int b)", "c-like: comments between the parameters are not parameters");
+        Equal(string.Join("|", Definitions(L.Cpp, "int size() const {\n    return 1;\n}\n")), "size()", "c++: a const method");
+        Equal(string.Join("|", Definitions(L.Java, "void read(int a) throws IOException {\n}\n")), "read(int a)", "java: a throws clause");
+        Check(!Definitions(L.CLike, "x = foo(1,\n    2);\n").Any(), "c-like: a call over two lines is not a definition");
+        Check(!Definitions(L.CLike, "foo(1)\n    ;\n").Any(), "c-like: a call without a return type is not a definition");
+
+        // Arrays and nullable types as return types.
+        Equal(string.Join("|", Definitions(L.Java, "public byte[] read(int n) {\n}\n")), "read(int n)", "java: an array return type");
+        Equal(string.Join("|", Definitions(L.CSharp, "public string? Find(string key) {\n}\n")), "Find(string key)", "c#: a nullable return type");
+
+        // Type arguments keep their commas.
+        Equal(string.Join("|", Definitions(L.Java, "void put(Map<String, Integer> m, int b) {\n}\n")), "put(Map<String, Integer> m, int b)", "java: a comma inside type arguments");
+        Equal(string.Join("|", Definitions(L.Rust, "fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n}\n")), "longest(x: &'a str, y: &'a str)", "rust: generics and lifetimes");
+        Equal(string.Join("|", Definitions(L.Rust, "fn pick(x: &'a str) -> &'a str {\n}\n")), "pick(x: &'a str)", "rust: a lone lifetime is not a string");
+        Equal(string.Join("|", Definitions(L.TypeScript, "function wrap<T>(value: T, n: number): T {\n}\n")), "wrap(value: T, n: number)", "typescript: type parameters after the name");
+        Equal(string.Join("|", Definitions(L.Kotlin, "fun <T> first(items: List<T>, n: Int): T {\n}\n")), "first(items: List<T>, n: Int)", "kotlin: type parameters before the name");
+        Equal(string.Join("|", Definitions(L.Go, "func (s *Server) Handle(path string, code int) error {\n}\n")), "Handle(path string, code int)", "go: a method with a receiver");
+
+        // Python: a comment with an apostrophe between the parameters.
+        Equal(string.Join("|", Definitions(L.Python, "def f(a,  # don't\n      b):\n    pass\n\ndef g(x):\n    pass\n")), "f(a, b)|g(x)", "python: an apostrophe in a comment does not open a string");
+
+        // A method call does not pass the receiver.
+        string cls = "class A:\n    def m(self, a, b):\n        pass\n\n";
+        Equal(Signature(L.Python, cls + "obj.m(1, ", 4, 9), "m(a, b)@1", "python: obj.m( does not count self");
+        Equal(Signature(L.Python, cls + "m(1, ", 4, 5), "m(self, a, b)@1", "python: a plain call keeps self");
+        string rustImpl = "impl A {\n    fn m(&self, a: i32, b: i32) {\n    }\n}\n";
+        Equal(Signature(L.Rust, rustImpl + "a.m(1, ", 4, 7), "m(a: i32, b: i32)@1", "rust: a.m( does not count &self");
+
+        // Type arguments in a call.
+        string java = "void f(int a, int b) {\n}\n";
+        Equal(Signature(L.Java, java + "f(new HashMap<String, Integer>(), ", 2, 35), "f(int a, int b)@1", "java: the comma inside type arguments of an argument is not counted");
+        Equal(Signature(L.Rust, "fn parse(s: &str, n: i32) {}\nparse::<i32>(\"1\", ", 1, 18), "parse(s: &str, n: i32)@1", "rust: a call with a turbofish");
+
+        // A caret column past the end of the line does not read outside the text.
+        Equal(Signature(L.Python, "f(", 0, 50), null, "a column past the end of the text is not an error");
+    }
+
     private static void SignatureChecks()
     {
+        Main2Checks();
         // The caret is right after the opening parenthesis.
         string py = "def add(a, b):\n    return a + b\n\nadd(\n";
         Equal(Signature(L.Python, py, 3, 4), "add(a, b)@0", "python: the call shows its signature, first parameter");
 
         // After one comma the second parameter is active.
-        Equal(Signature(L.Python, py + "1, ", 3, 7), "add(a, b)@1", "python: the second parameter is active after a comma");
+        Equal(Signature(L.Python, py + "1, ", 4, 3), "add(a, b)@1", "python: the second parameter is active after a comma");
 
         // A nested call does not add a parameter to the outer one.
         string nested = "def outer(a, b):\n    pass\n\ndef inner(x):\n    pass\n\nouter(inner(1), \n";
         Equal(Signature(L.Python, nested, 6, 15), "outer(a, b)@1", "python: a comma inside a nested call is not counted");
 
         // A comma inside a string is not a separator.
-        Equal(Signature(L.Python, py + "\"a, b\", ", 3, 12), "add(a, b)@1", "python: a comma inside a string does not count");
+        Equal(Signature(L.Python, py + "\"a, b\", ", 4, 8), "add(a, b)@1", "python: a comma inside a string does not count");
 
         // A comma inside a nested pair of brackets is not a separator.
-        Equal(Signature(L.Python, py + "[1, 2], ", 3, 12), "add(a, b)@1", "python: a comma inside [] does not count");
+        Equal(Signature(L.Python, py + "[1, 2], ", 4, 8), "add(a, b)@1", "python: a comma inside [] does not count");
 
         // The caret outside any call has no signature.
         Equal(Signature(L.Python, py, 0, 3), null, "python: outside a call there is no signature");
@@ -153,10 +196,10 @@ internal static class Program
         Equal(Signature(L.Rust, rust, 4, 7), "add(a: i32, b: i32)@1", "rust: the call shows its signature, second parameter");
 
         // The active parameter never runs past the last one.
-        Equal(Signature(L.Python, py + "1, 2, 3, ", 3, 13), "add(a, b)@1", "python: the active parameter is clamped to the last one");
+        Equal(Signature(L.Python, py + "1, 2, 3, ", 4, 9), "add(a, b)@1", "python: the active parameter is clamped to the last one");
 
         // The caret on the closing parenthesis still belongs to the call.
-        Equal(Signature(L.Python, py + "1, 2)", 3, 8), "add(a, b)@1", "python: the caret just before ')' is still inside the call");
+        Equal(Signature(L.Python, py + "1, 2)", 4, 4), "add(a, b)@1", "python: the caret just before ')' is still inside the call");
 
         // AWK function definitions feed the hint of a call in an action block.
         string awk = "function add(a, b) {\n    return a + b\n}\n\nBEGIN { add(1, \n}\n";
