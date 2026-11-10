@@ -1023,6 +1023,73 @@ public static partial class SyntaxHighlighting
             foldBraces: true, valueKeywords: LogrotateValues);
     }
 
+    // ----------------------------------------------------------------- sysctl
+
+    private static readonly HashSet<string> SysctlDirectives = Words(StringComparer.Ordinal,
+        // kernel
+        @"kernel.sysrq kernel.panic kernel.panic_on_oops kernel.panic_on_warn kernel.core_pattern kernel.core_uses_pid
+          kernel.dmesg_restrict kernel.kptr_restrict kernel.perf_event_paranoid kernel.unprivileged_bpf_disabled
+          kernel.unprivileged_userns_clone kernel.yama.ptrace_scope kernel.pid_max kernel.printk kernel.printk_ratelimit
+          kernel.shmmax kernel.shmall kernel.shmmni kernel.msgmax kernel.msgmnb kernel.msgmni kernel.sem
+          kernel.randomize_va_space kernel.modules_disabled kernel.kexec_load_disabled kernel.io_uring_disabled
+          kernel.softlockup_panic kernel.hung_task_timeout_secs kernel.nmi_watchdog kernel.watchdog kernel.watchdog_thresh
+          kernel.sched_rt_runtime_us kernel.sched_autogroup_enabled kernel.numa_balancing kernel.random.boot_id
+          kernel.core_pipe_limit kernel.threads-max kernel.cad_pid",
+        // virtual memory
+        @"vm.swappiness vm.dirty_ratio vm.dirty_background_ratio vm.dirty_expire_centisecs vm.dirty_writeback_centisecs
+          vm.vfs_cache_pressure vm.min_free_kbytes vm.max_map_count vm.overcommit_memory vm.overcommit_ratio
+          vm.panic_on_oom vm.oom_kill_allocating_task vm.nr_hugepages vm.nr_overcommit_hugepages vm.hugetlb_shm_group
+          vm.stat_interval vm.laptop_mode vm.zone_reclaim_mode vm.mmap_min_addr vm.mmap_rnd_bits vm.mmap_rnd_compat_bits
+          vm.unprivileged_userfaultfd vm.compaction_proactiveness vm.watermark_boost_factor vm.watermark_scale_factor",
+        // file systems and pipes
+        @"fs.file-max fs.nr_open fs.inotify.max_user_watches fs.inotify.max_user_instances fs.inotify.max_queued_events
+          fs.protected_hardlinks fs.protected_symlinks fs.protected_fifos fs.protected_regular fs.suid_dumpable
+          fs.pipe-max-size fs.aio-max-nr fs.epoll.max_user_watches",
+        // networking: queues, buffers and congestion
+        @"net.core.somaxconn net.core.netdev_max_backlog net.core.rmem_default net.core.rmem_max net.core.wmem_default
+          net.core.wmem_max net.core.optmem_max net.core.message_cost net.core.message_burst net.core.hot_list_length
+          net.core.dev_weight net.core.bpf_jit_enable net.core.bpf_jit_harden net.core.default_qdisc net.core.busy_poll
+          net.core.busy_read",
+        // IPv4
+        @"net.ipv4.ip_forward net.ipv4.conf.all.forwarding net.ipv4.conf.default.forwarding
+          net.ipv4.conf.all.rp_filter net.ipv4.conf.default.rp_filter
+          net.ipv4.conf.all.accept_redirects net.ipv4.conf.default.accept_redirects
+          net.ipv4.conf.all.send_redirects net.ipv4.conf.default.send_redirects
+          net.ipv4.conf.all.accept_source_route net.ipv4.conf.default.accept_source_route
+          net.ipv4.conf.all.log_martians net.ipv4.conf.default.log_martians
+          net.ipv4.conf.all.arp_ignore net.ipv4.conf.all.arp_announce net.ipv4.conf.all.arp_filter
+          net.ipv4.icmp_echo_ignore_all net.ipv4.icmp_echo_ignore_broadcasts net.ipv4.icmp_ignore_bogus_error_responses
+          net.ipv4.icmp_ratelimit net.ipv4.icmp_ratemask
+          net.ipv4.tcp_syncookies net.ipv4.tcp_max_syn_backlog net.ipv4.tcp_synack_retries net.ipv4.tcp_syn_retries
+          net.ipv4.tcp_retries1 net.ipv4.tcp_retries2 net.ipv4.tcp_tw_reuse net.ipv4.tcp_fin_timeout
+          net.ipv4.tcp_keepalive_time net.ipv4.tcp_keepalive_intvl net.ipv4.tcp_keepalive_probes
+          net.ipv4.tcp_rmem net.ipv4.tcp_wmem net.ipv4.tcp_mtu_probing net.ipv4.tcp_congestion_control
+          net.ipv4.tcp_fastopen net.ipv4.tcp_slow_start_after_idle net.ipv4.tcp_notsent_lowat
+          net.ipv4.tcp_max_tw_buckets net.ipv4.ip_local_port_range net.ipv4.ip_local_reserved_ports
+          net.ipv4.ip_nonlocal_bind net.ipv4.ip_unprivileged_port_start net.ipv4.ping_group_range
+          net.ipv4.neigh.default.gc_stale_time net.ipv4.neigh.default.gc_thresh1 net.ipv4.neigh.default.gc_thresh2
+          net.ipv4.neigh.default.gc_thresh3",
+        // IPv6, netfilter and bridges
+        @"net.ipv6.conf.all.forwarding net.ipv6.conf.default.forwarding net.ipv6.conf.all.accept_ra
+          net.ipv6.conf.default.accept_ra net.ipv6.conf.all.disable_ipv6 net.ipv6.conf.default.disable_ipv6
+          net.ipv6.conf.all.use_tempaddr net.ipv6.conf.default.use_tempaddr net.ipv6.bindv6only
+          net.netfilter.nf_conntrack_max net.netfilter.nf_conntrack_tcp_timeout_established net.netfilter.nf_conntrack_buckets
+          net.bridge.bridge-nf-call-iptables net.bridge.bridge-nf-call-ip6tables net.bridge.bridge-nf-call-arptables");
+
+    private static readonly HashSet<string> SysctlValues = Words(StringComparer.Ordinal,
+        // the usual string values of the tunables
+        @"default all bbr cubic fq_codel fq pfifo_fast noqueue reno vegas westwood yeah illinois htcp
+          never always");
+
+    /// <summary>
+    /// sysctl: the colours of Config with the kernel tunables of sysctl.conf and sysctl.d known; a tunable written
+    /// without a value (or with one) is a keyword, and a typo stays an ordinary key. Comments are '#'.
+    /// </summary>
+    private static bool TokenizeSysctl(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(SysctlDirectives, startState, text, sink, out endState, valueKeywords: SysctlValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

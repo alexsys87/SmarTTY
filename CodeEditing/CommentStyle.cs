@@ -47,6 +47,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Nftables:
                 case SyntaxHighlighting.Language.Modprobe:
                 case SyntaxHighlighting.Language.Logrotate:
+                case SyntaxHighlighting.Language.Sysctl:
                 case SyntaxHighlighting.Language.Kubernetes:
                 case SyntaxHighlighting.Language.DockerCompose:
                 case SyntaxHighlighting.Language.Ansible:
