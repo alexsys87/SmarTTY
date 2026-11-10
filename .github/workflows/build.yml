@@ -103,7 +103,7 @@ jobs:
       - name: Run CSI repeat limit checks (counts from the remote side)
         run: dotnet run --project tests/CsiRepeatLimitTests -c Release
 
-      - name: Run device terminal link checks (only addresses; paths of the device never open local folders)
+      - name: Run local link policy checks (clicks on paths in device terminals)
         run: dotnet run --project tests/LocalLinkPolicyTests -c Release
 
       - name: Run remote file signature checks (editor conflict detection; stat, md5sum)
@@ -126,6 +126,9 @@ jobs:
 
       - name: Run COM/TCP terminal state checks (prompt and full-screen program in the status bar)
         run: dotnet run --project tests/DeviceTerminalStateTests -c Release
+
+      - name: Run device terminal link checks (network paths are no links, painting never waits for the disk)
+        run: dotnet run --project tests/LocalLinkTests -c Release
 
       - name: Run transport write failure checks
         run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
