@@ -1619,6 +1619,81 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Logrotate).Toggle(new[] { "rotate 4" })), "# rotate 4", "logrotate comment");
     }
 
+    private static void SysctlChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.conf"), L.Sysctl, "the main sysctl configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.d/99-sysctl.conf"), L.Sysctl, "a drop-in of sysctl.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/sysctl.d/50-default.conf"), L.Sysctl, "a drop-in of the distribution");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/sysctl.d/90-local.conf"), L.Sysctl, "a generated drop-in");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/sysctl.conf"), L.Sysctl, "a sysctl.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.d/README"), L.Plain, "the README of sysctl.d is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.d/notes.ini"), L.Config, "an ini file of sysctl.d is not sysctl");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.d-available/99-local.conf"), L.Config, "sysctl.d-available is not read by sysctl");
+
+        Highlighted sc = new Highlighted(L.Sysctl,
+            "# kernel settings\nnet.ipv4.ip_forward = 1\nnet.ipv4.conf.all.rp_filter = 1\nvm.swappiness=10\n" +
+            "kernel.sysrq = 1\nfs.file-max = 2097152\nnet.core.somaxconn = 4096\n" +
+            "net.ipv4.tcp_congestion_control = bbr\nnet.ipv4.ip_local_port_range = 1024 65535\n" +
+            "unknown.tunable = 1\nnet.ipv4.ip_forward = 1 # routed\n");
+        Equal(Join(sc.Tokens(0, SyntaxHighlighting.TypeComment)), "# kernel settings", "sysctl: a comment");
+        Equal(Join(sc.Tokens(1, SyntaxHighlighting.TypeKeyword)), "net.ipv4.ip_forward", "sysctl: ip_forward");
+        Equal(Join(sc.Tokens(1, SyntaxHighlighting.TypeNumber)), "1", "sysctl: its value");
+        Equal(Join(sc.Tokens(2, SyntaxHighlighting.TypeKeyword)), "net.ipv4.conf.all.rp_filter", "sysctl: rp_filter");
+        Equal(Join(sc.Tokens(3, SyntaxHighlighting.TypeKeyword)), "vm.swappiness", "sysctl: a key written without spaces");
+        Equal(Join(sc.Tokens(3, SyntaxHighlighting.TypeNumber)), "10", "sysctl: the swappiness value");
+        Equal(Join(sc.Tokens(4, SyntaxHighlighting.TypeKeyword)), "kernel.sysrq", "sysctl: sysrq");
+        Equal(Join(sc.Tokens(5, SyntaxHighlighting.TypeKeyword)), "fs.file-max", "sysctl: file-max");
+        Equal(Join(sc.Tokens(6, SyntaxHighlighting.TypeKeyword)), "net.core.somaxconn", "sysctl: somaxconn");
+        Equal(Join(sc.Tokens(7, SyntaxHighlighting.TypeKeyword)), "net.ipv4.tcp_congestion_control|bbr", "sysctl: the congestion control algorithm");
+        Equal(Join(sc.Tokens(8, SyntaxHighlighting.TypeKeyword)), "net.ipv4.ip_local_port_range", "sysctl: the port range");
+        Equal(Join(sc.Tokens(8, SyntaxHighlighting.TypeNumber)), "1024|65535", "sysctl: the two ports");
+        Equal(Join(sc.Tokens(9, SyntaxHighlighting.TypeKeyword)), "", "sysctl: an unknown tunable is not a keyword");
+        Equal(Join(sc.Tokens(9, SyntaxHighlighting.TypeVariable)), "unknown.tunable", "sysctl: ...it is a plain key");
+        Equal(Join(sc.Tokens(10, SyntaxHighlighting.TypeComment)), "# routed", "sysctl: a trailing comment");
+        Check(SyntaxHighlighting.GetKeywords(L.Sysctl).Contains("net.ipv4.ip_forward"), "sysctl keywords contain 'net.ipv4.ip_forward'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sysctl).Contains("vm.swappiness"), "sysctl keywords contain 'vm.swappiness'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sysctl).Contains("bbr"), "sysctl keywords contain 'bbr'");
+        Equal(Join(CommentStyle.ForLanguage(L.Sysctl).Toggle(new[] { "vm.swappiness = 10" })), "# vm.swappiness = 10", "sysctl comment");
+    }
+
+    private static void PamChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.conf"), L.Pam, "the single pam.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/sshd"), L.Pam, "a service of pam.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/common-auth"), L.Pam, "a common PAM stack");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/pam.d/system-auth"), L.Pam, "a vendor stack of pam.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pam.conf"), L.Pam, "a pam.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/README"), L.Plain, "the README of pam.d is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/notes.txt"), L.Plain, "another text file of pam.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d-available/sshd"), L.Plain, "pam.d-available is not read by PAM");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/sshd.conf"), L.Config, "a .conf file of pam.d is not a service");
+
+        Highlighted pam = new Highlighted(L.Pam,
+            "#%PAM-1.0\nauth required pam_env.so\n" +
+            "auth [success=1 default=ignore] pam_unix.so nullok try_first_pass\n" +
+            "account required pam_unix.so\npassword requisite pam_pwquality.so retry=3\n" +
+            "session optional pam_systemd.so\nsession include system-auth\n@include common-auth\n" +
+            "-auth optional pam_echo.so\nauth required unknown_module.so\n");
+        Equal(Join(pam.Tokens(0, SyntaxHighlighting.TypeComment)), "#%PAM-1.0", "PAM: the version comment");
+        Equal(Join(pam.Tokens(1, SyntaxHighlighting.TypeKeyword)), "auth|required|pam_env.so", "PAM: a simple rule");
+        Equal(Join(pam.Tokens(2, SyntaxHighlighting.TypeKeyword)), "auth|success|default|ignore|pam_unix.so|nullok|try_first_pass", "PAM: a bracketed control and the module arguments");
+        Equal(Join(pam.Tokens(2, SyntaxHighlighting.TypeNumber)), "1", "PAM: the success count");
+        Equal(Join(pam.Tokens(3, SyntaxHighlighting.TypeKeyword)), "account|required|pam_unix.so", "PAM: the account stack");
+        Equal(Join(pam.Tokens(4, SyntaxHighlighting.TypeKeyword)), "password|requisite|pam_pwquality.so|retry", "PAM: the password stack");
+        Equal(Join(pam.Tokens(4, SyntaxHighlighting.TypeNumber)), "3", "PAM: the retry count");
+        Equal(Join(pam.Tokens(5, SyntaxHighlighting.TypeKeyword)), "session|optional|pam_systemd.so", "PAM: the session stack");
+        Equal(Join(pam.Tokens(6, SyntaxHighlighting.TypeKeyword)), "session|include", "PAM: an include control");
+        Equal(Join(pam.Tokens(7, SyntaxHighlighting.TypeKeyword)), "include", "PAM: the @include of Debian");
+        Equal(Join(pam.Tokens(8, SyntaxHighlighting.TypeKeyword)), "auth|optional|pam_echo.so", "PAM: a type written with a dash");
+        Equal(Join(pam.Tokens(9, SyntaxHighlighting.TypeKeyword)), "auth|required", "PAM: an unknown module is not a keyword");
+        Equal(Join(pam.Tokens(9, SyntaxHighlighting.TypeVariable)), "", "PAM: ...it stays an ordinary word");
+        Equal(Folds(pam), "", "PAM rules do not fold");
+        Check(SyntaxHighlighting.GetKeywords(L.Pam).Contains("pam_unix.so"), "PAM keywords contain 'pam_unix.so'");
+        Check(SyntaxHighlighting.GetKeywords(L.Pam).Contains("requisite"), "PAM keywords contain 'requisite'");
+        Check(SyntaxHighlighting.GetKeywords(L.Pam).Contains("try_first_pass"), "PAM keywords contain 'try_first_pass'");
+        Equal(Join(CommentStyle.ForLanguage(L.Pam).Toggle(new[] { "auth required pam_env.so" })), "# auth required pam_env.so", "PAM comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2327,6 +2402,8 @@ internal static class Program
         NftablesChecks();
         ModprobeChecks();
         LogrotateChecks();
+        SysctlChecks();
+        PamChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

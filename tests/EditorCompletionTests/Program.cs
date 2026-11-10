@@ -136,6 +136,10 @@ internal static class Program
         Check(Names(L.Modprobe, "", "").Contains("pre"), "the modprobe value 'pre' is offered");
         Check(Names(L.Logrotate, "", "").Contains("postrotate"), "the logrotate directive 'postrotate' is offered");
         Check(Names(L.Logrotate, "", "").Contains("weekly"), "the logrotate value 'weekly' is offered");
+        Check(Names(L.Sysctl, "", "").Contains("bbr"), "the sysctl value 'bbr' is offered");
+        Check(Names(L.Sysctl, "", "").Contains("fq_codel"), "the sysctl value 'fq_codel' is offered");
+        Check(Names(L.Pam, "", "").Contains("requisite"), "the PAM control 'requisite' is offered");
+        Check(Names(L.Pam, "", "").Contains("try_first_pass"), "the PAM argument 'try_first_pass' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
