@@ -716,6 +716,7 @@ public sealed class HexEditorControl : Control
             return;
         }
         _document.Undo();
+        _nibble = 0;
         AfterContentChange();
     }
 
@@ -726,6 +727,7 @@ public sealed class HexEditorControl : Control
             return;
         }
         _document.Redo();
+        _nibble = 0;
         AfterContentChange();
     }
 
@@ -889,16 +891,35 @@ public sealed class HexEditorControl : Control
         OnStateChanged();
     }
 
+    /// <summary>
+    /// Makes room for a typed byte at a selection. Typing over a selection in the insert mode replaces it. In the overwrite mode
+    /// the length of the file must not change: the selection is only dropped, and the typed byte overwrites the first byte of it
+    /// (deleting the selection would shorten the file and shift the bytes after it, which is not what overwriting means).
+    /// </summary>
+    private void ReplaceSelectionForTyping()
+    {
+        if (!HasSelection)
+        {
+            return;
+        }
+        if (_overwrite)
+        {
+            _caretOffset = SelectionStart;
+            _anchor = -1;
+            _nibble = 0;
+            _secondNibblePending = false;
+            return;
+        }
+        DeleteCurrentSelectionOrByte();
+    }
+
     private void EnterHexDigit(int digit)
     {
         if (_readOnly)
         {
             return;
         }
-        if (HasSelection)
-        {
-            DeleteCurrentSelectionOrByte();
-        }
+        ReplaceSelectionForTyping();
         if (_nibble == 0)
         {
             byte value = (byte)(digit << 4);
@@ -951,10 +972,7 @@ public sealed class HexEditorControl : Control
             return;
         }
         _secondNibblePending = false;
-        if (HasSelection)
-        {
-            DeleteCurrentSelectionOrByte();
-        }
+        ReplaceSelectionForTyping();
         if (_overwrite && _caretOffset < _document.Length)
         {
             _document.ReplaceByte(_caretOffset, value);

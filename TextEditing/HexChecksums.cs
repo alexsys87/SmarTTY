@@ -40,13 +40,26 @@ public static class HexChecksums
             new HexChecksum("CRC-16/XMODEM", Crc16Ccitt(bytes, 0x0000).ToString("X4", CultureInfo.InvariantCulture)),
             new HexChecksum("CRC-32", Crc32(bytes).ToString("X8", CultureInfo.InvariantCulture))
         };
-        using (MD5 md5 = MD5.Create())
+        // Windows in the FIPS mode refuses to create MD5 (and the managed SHA-1): the other checksums are still shown.
+        try
         {
-            result.Add(new HexChecksum("MD5", ToHex(md5.ComputeHash(bytes))));
+            using (MD5 md5 = MD5.Create())
+            {
+                result.Add(new HexChecksum("MD5", ToHex(md5.ComputeHash(bytes))));
+            }
         }
-        using (SHA1 sha1 = SHA1.Create())
+        catch (Exception exception) when (exception is InvalidOperationException || exception is CryptographicException)
         {
-            result.Add(new HexChecksum("SHA-1", ToHex(sha1.ComputeHash(bytes))));
+        }
+        try
+        {
+            using (SHA1 sha1 = SHA1.Create())
+            {
+                result.Add(new HexChecksum("SHA-1", ToHex(sha1.ComputeHash(bytes))));
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException || exception is CryptographicException)
+        {
         }
         using (SHA256 sha256 = SHA256.Create())
         {

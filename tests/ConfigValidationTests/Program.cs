@@ -119,6 +119,16 @@ internal static class Program
         Equal(Parse("nginx: [alert] could not open error log file: open() \"/var/log/nginx/error.log\" failed (13: Permission denied)").Count, 0, "nginx: a permission error is not a problem of the file");
         Equal(Parse("nginx: [emerg] unknown directive \"x\" in /etc/nginx/conf.d/other.conf:3").Count, 0, "nginx: a problem in another file is not this file's");
 
+        // B-81: warnings and environment failures are not syntax errors
+        Equal(Parse("nginx: [warn] the \"user\" directive makes sense only if the master process runs with super-user privileges, ignored in " + Temp + ":3").Count, 0, "nginx: a [warn] line with a location is not an error");
+        Equal(Parse("nginx: [alert] could not open error log file: open() \"/var/log/nginx/error.log\" failed (13: Permission denied) in " + Temp + ":2").Count, 0, "nginx: an [alert] line is not an error");
+        Equal(Parse("nginx: [emerg] open() \"/etc/nginx/secret.conf\" failed (13: Permission denied) in " + Temp + ":9").Count, 0, "nginx: a permission error of an include is not a problem of the syntax");
+        Equal(Parse("nginx: [emerg] mkdir() \"/var/lib/nginx/tmp\" failed (13: Permission denied)").Count, 0, "nginx: a mkdir failure is not a problem of the syntax");
+        Equal(Parse("nginx: [emerg] open() \"/tmp/mime.types\" failed (2: No such file or directory) in " + Temp + ":12").Count, 0, "nginx: a relative include looked for next to the temporary file is not an error");
+        List<ValidationIssue> mixed = Parse("nginx: [warn] something in " + Temp + ":1\nnginx: [emerg] open() \"/tmp/mime.types\" failed (2: No such file or directory) in " + Temp + ":2\nnginx: [emerg] unknown directive \"foo\" in " + Temp + ":14");
+        Equal(mixed.Count, 1, "nginx: only the real error is kept next to the noise");
+        Equal(mixed[0].Line, 14, "nginx: the real error line");
+
         // visudo
         List<ValidationIssue> visudo = Parse(Temp + ":3:12: syntax error\nRoot ALL=(ALL) ALL\n           ^");
         Equal(visudo.Count, 1, "visudo: a problem");
@@ -174,6 +184,7 @@ internal static class Program
         Equal(bash.Interpret(null, 1, Temp).Outcome, ValidationOutcome.Unavailable, "no output (not run): Unavailable");
         Equal(bash.Interpret(new[] { "permission denied" }, 1, Temp).Outcome, ValidationOutcome.Inconclusive, "exit 1 without a line: Inconclusive, does not block");
         Equal(bash.Interpret(new string[0], 1, Temp).Outcome, ValidationOutcome.Inconclusive, "exit 1 without output: Inconclusive");
+        Equal(bash.Interpret(new[] { "nginx: [warn] x in " + Temp + ":3", "nginx: [emerg] open() \"/tmp/mime.types\" failed (2: No such file or directory) in " + Temp + ":4" }, 1, Temp).Outcome, ValidationOutcome.Inconclusive, "only warnings and environment failures: Inconclusive, not Failed");
         Equal(bash.Interpret(bad, 2, Temp).Issues.Count, 1, "the issues are returned");
     }
 

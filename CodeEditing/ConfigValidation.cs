@@ -140,6 +140,14 @@ public static class ConfigValidators
     // nginx: [emerg] unknown directive "x" in <file>:5
     private static readonly Regex TrailingLocation = new Regex(@"^(?<msg>.*?)\s+in\s+<file>:(?<line>\d+)\s*$", RegexOptions.CultureInvariant);
 
+    // nginx prints a warning or an alert with the location of the directive too ("[warn] ... in <file>:3"), but neither is a
+    // fault of the file: the test still passes with them.
+    private static readonly Regex NginxNonError = new Regex(@"\[(warn|alert|notice|info)\]", RegexOptions.CultureInvariant);
+
+    // open() "/x" failed (13: Permission denied), mkdir() "/x" failed (2: ...): the user of the check lacks a right, or a file that
+    // an "include" with a relative path names is looked for in the folder of the temporary file. It says nothing about the syntax.
+    private static readonly Regex SystemCallFailure = new Regex(@"\b(open|mkdir|stat|lstat|opendir|unlink|rename)\(\)\s.*\bfailed\s*\(\d+:", RegexOptions.CultureInvariant);
+
     // The forms of "<file>" with a line number that the common checks print, from the most to the least specific.
     private static readonly Regex[] LinePatterns =
     {
@@ -371,6 +379,10 @@ public static class ConfigValidators
             foreach (string raw in output)
             {
                 if (string.IsNullOrWhiteSpace(raw))
+                {
+                    continue;
+                }
+                if (NginxNonError.IsMatch(raw) || SystemCallFailure.IsMatch(raw))
                 {
                     continue;
                 }
