@@ -1590,6 +1590,64 @@ public static partial class SyntaxHighlighting
         return TokenizeYamlCore(NetplanKeywords, NetplanValues, startState, text, sink, out endState);
     }
 
+    // -------------------------------------------------------------- cloud-init
+
+    private static readonly HashSet<string> CloudInitKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope of a user-data file
+        @"
+          version hostname fqdn manage_etc_hosts preserve_hostname timezone locale locale_configfile keyboard",
+        // the users and their keys
+        @"
+          users groups ssh_authorized_keys ssh_keys ssh_pwauth ssh_import_id ssh_redirect_user disable_root
+          chpasswd password expire list lock_passwd sudo shell gecos homedir primary_group no_create_home system
+          inactive selinux_user snapuser doas",
+        // the packages and the commands
+        @"
+          package_update package_upgrade package_reboot_if_required packages apt yum_repos dnf zypper apk_repos
+          snap snappy puppet chef salt_minion ansible runcmd bootcmd scripts_per_boot scripts_per_instance
+          scripts_per_once scripts_user script",
+        // the files, the mounts and the disks
+        @"
+          write_files path content owner permissions encoding append defer mkdir delete
+          mounts device fstype options dump passno swap filename maxsize ephemeral create migrate
+          disk_setup layout overwrite table_type partition size type fs label replace_fs extra_opts",
+        // the datasources and the network of a seed
+        @"
+          datasource datasource_list datasource_pkg_list vendor_data user_data metadata network config search dns
+          nameserver match mac name address netmask gateway routes id subnets broadcast dns_nameservers dns_search
+          mtu wakeonlan dhcp4 dhcp6 addresses renderer",
+        // the modules of /etc/cloud/cloud.cfg
+        @"
+          cloud_config_modules cloud_init_modules cloud_final_modules system_info default_user distro paths
+          package_mirrors apt_mirror security ntpservers",
+        // the power state, the phone home and the random seed
+        @"
+          power_state mode message timeout condition delay phone_home url post tries retries
+          random_seed file data command",
+        // the certificates, the merges and the system adjustments
+        @"
+          ca_certs remove_defaults trusted rsyslog configs remotes remote filter merge_how merge_type
+          byobu byobu_by_default growpart devices ignore_growroot_disabled resize_rootfs update_etc_hosts hosts
+          ubuntu_drivers install_drivers drivers");
+
+    private static readonly HashSet<string> CloudInitValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the power states, the schedules and the file systems
+        @"reboot poweroff halt shutdown
+          always once per-boot per-instance per-once
+          ext4 xfs btrfs vfat ntfs swap zfs
+          auto none dhcp static
+          cloud-init cloud-config");
+
+    /// <summary>
+    /// cloud-init: the colours and the folds of YAML with the modules of a user-data file and of /etc/cloud/cloud.cfg
+    /// known; the power states, the schedules, the file systems and the modes are values. The "#cloud-config" line is
+    /// the marker the detector recognizes even when the file has another name.
+    /// </summary>
+    private static bool TokenizeCloudInit(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(CloudInitKeywords, CloudInitValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
