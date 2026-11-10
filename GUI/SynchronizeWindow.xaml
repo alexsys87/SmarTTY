@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.SynchronizeWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Synchronize folders" Width="600" MinWidth="480" MaxWidth="2000" SizeToContent="Height" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+<Window x:Class="SmarTTY.GUI.SynchronizeWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Synchronize folders" Width="640" MinWidth="520" MaxWidth="2000" SizeToContent="Height" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Grid Margin="12">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -13,53 +8,91 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Image Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Name="SyncImage" Width="52" Height="47" VerticalAlignment="Top" Margin="0 0 8 0" />
-        <StackPanel Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
-            <RadioButton Name="DownloadRadio" Content="Download (server to this computer)" IsChecked="True" Margin="0 0 16 0" Checked="Direction_Changed" />
-            <RadioButton Name="UploadRadio" Content="Upload (this computer to server)" Checked="Direction_Changed" />
-        </StackPanel>
-        <TextBlock Grid.Row="1" Grid.Column="0" Name="LocalLabel" Text="Local folder:" VerticalAlignment="Center" Margin="0,0,8,0" />
-        <TextBox Grid.Row="1" Grid.Column="1" Name="LocalBox" MinWidth="220" TextChanged="LocalBox_TextChanged" />
-        <Button Grid.Row="1" Grid.Column="2" Name="LocalBrowseButton" Margin="6,0,0,0" Padding="6 2" ToolTip="Browse the local folders" Click="LocalBrowse_Click">
-            <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
-        </Button>
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="Remote folder:" VerticalAlignment="Center" Margin="0,6,8,0" />
-        <TextBox Grid.Row="2" Grid.Column="1" Name="RemoteBox" MinWidth="220" Margin="0,6,0,0" />
-        <Button Grid.Row="2" Grid.Column="2" Name="RemoteBrowseButton" Margin="6,6,0,0" Padding="6 2" ToolTip="Browse the folders on the remote host" Click="RemoteBrowse_Click">
-            <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
-        </Button>
-        <TextBlock Grid.Row="3" Grid.Column="0" Text="Replace files:" VerticalAlignment="Center" Margin="0,8,8,0" />
-        <ComboBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Name="OverwriteBox" Margin="0,8,0,0" SelectedIndex="1">
-            <ComboBoxItem Content="Always (copy every file)" />
-            <ComboBoxItem Content="By size and time (copy only changed files)" />
-            <ComboBoxItem Content="Only when the file is missing" />
-        </ComboBox>
-        <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,8,0,0">
-            <CheckBox Name="DeleteExtraneousBox" Content="Delete files that are not in the source" Margin="0 0 16 0" />
-            <CheckBox Name="SkipSymlinksBox" Content="Skip symbolic links" Margin="0 0 16 0" />
-            <CheckBox Name="SkipHardlinksBox" Content="Skip hard links" />
-        </StackPanel>
-        <TextBlock Grid.Row="5" Grid.Column="0" Text="Exclude:" VerticalAlignment="Center" Margin="0,8,8,0" ToolTip="Masks separated by semicolons, for example: *.log;build" />
-        <TextBox Grid.Row="5" Grid.Column="1" Name="ExcludeBox" MinWidth="220" Margin="0,8,0,0" ToolTip="Files and folders to leave out, separated by semicolons, for example: *.log;build" />
-        <CheckBox Grid.Row="5" Grid.Column="2" Name="ExcludeRegexBox" Content="Regular expression" Margin="6,8,0,0" VerticalAlignment="Center" ToolTip="Treat the Exclude box as one regular expression instead of a semicolon-separated mask list" />
-        <TextBlock Grid.Row="6" Grid.Column="0" Text="Only these folders:" VerticalAlignment="Center" Margin="0,8,8,0" ToolTip="Synchronize only the picked subfolders of the local folder (and their contents)" />
-        <TextBox Grid.Row="6" Grid.Column="1" Name="SelectionBox" MinWidth="220" Margin="0,8,0,0" IsReadOnly="True" ToolTip="The subfolders to synchronize; empty means the whole folder" />
-        <Button Grid.Row="6" Grid.Column="2" Name="SelectionBrowseButton" Margin="6,8,0,0" Padding="6 2" ToolTip="Pick the subfolders to synchronize" Click="SelectionBrowse_Click">
-            <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
-        </Button>
-        <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" Name="StatusText" Text="Inactive" TextTrimming="CharacterEllipsis" Margin="0,10,0,0" />
-        <TextBlock Grid.Row="7" Grid.Column="2" Name="StatsText" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" Margin="0,10,0,0" />
-        <TextBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3" Name="LogBox" Height="96" Margin="0,4,0,0" IsReadOnly="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" TextWrapping="NoWrap" />
-        <ProgressBar Grid.Row="9" Grid.Column="0" Grid.ColumnSpan="3" Name="TransferProgress" Height="22" Margin="0,6,0,0" Minimum="0" Maximum="1000" Visibility="Collapsed" />
-        <StackPanel Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button Name="StartButton" Content="_Synchronize" MinWidth="90" Margin="0 0 5 0" Click="Start_Click" />
-            <Button Name="CancelButton" Content="Cancel" IsCancel="True" MinWidth="75" Click="Cancel_Click" />
+
+        <!-- Header: icon + transfer direction -->
+        <Grid Grid.Row="0" Margin="0 0 0 12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Image Grid.Column="0" Name="SyncImage" Width="16" Height="16" Stretch="None" VerticalAlignment="Center" Margin="0 0 12 0" />
+            <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <RadioButton Name="DownloadRadio" Content="Download (server to this computer)" IsChecked="True" Margin="0 0 20 4" VerticalContentAlignment="Center" Checked="Direction_Changed" />
+                <RadioButton Name="UploadRadio" Content="Upload (this computer to server)" Margin="0 0 0 4" VerticalContentAlignment="Center" Checked="Direction_Changed" />
+            </WrapPanel>
+        </Grid>
+
+        <!-- Folders and filters: label | field | browse button, all rows share the same metrics -->
+        <Grid Grid.Row="1" Grid.IsSharedSizeScope="True">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="LabelColumn" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Name="LocalLabel" Text="Local folder (target):" VerticalAlignment="Center" Margin="0 0 12 8" />
+            <TextBox Grid.Row="0" Grid.Column="1" Name="LocalBox" Height="26" VerticalContentAlignment="Center" Margin="0 0 0 8" TextChanged="LocalBox_TextChanged" />
+            <Button Grid.Row="0" Grid.Column="2" Name="LocalBrowseButton" Width="30" Height="26" Margin="6 0 0 8" Padding="0" ToolTip="Browse the local folders" Click="LocalBrowse_Click">
+                <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
+            </Button>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Remote folder:" VerticalAlignment="Center" Margin="0 0 12 8" />
+            <TextBox Grid.Row="1" Grid.Column="1" Name="RemoteBox" Height="26" VerticalContentAlignment="Center" Margin="0 0 0 8" />
+            <Button Grid.Row="1" Grid.Column="2" Name="RemoteBrowseButton" Width="30" Height="26" Margin="6 0 0 8" Padding="0" ToolTip="Browse the folders on the remote host" Click="RemoteBrowse_Click">
+                <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
+            </Button>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Replace files:" VerticalAlignment="Center" Margin="0 0 12 8" />
+            <ComboBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Name="OverwriteBox" Height="26" VerticalContentAlignment="Center" Margin="0 0 0 8" SelectedIndex="1">
+                <ComboBoxItem Content="Always (copy every file)" />
+                <ComboBoxItem Content="By size and time (copy only changed files)" />
+                <ComboBoxItem Content="Only when the file is missing" />
+            </ComboBox>
+
+            <WrapPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0 0 0 4">
+                <CheckBox Name="DeleteExtraneousBox" Content="Delete files that are not in the source" Margin="0 0 20 4" VerticalContentAlignment="Center" />
+                <CheckBox Name="SkipSymlinksBox" Content="Skip symbolic links" Margin="0 0 20 4" VerticalContentAlignment="Center" />
+                <CheckBox Name="SkipHardlinksBox" Content="Skip hard links" Margin="0 0 0 4" VerticalContentAlignment="Center" />
+            </WrapPanel>
+
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Exclude:" VerticalAlignment="Top" Margin="0 5 12 8" ToolTip="Masks separated by semicolons, for example: *.log;build" />
+            <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Margin="0 0 0 8">
+                <TextBox Name="ExcludeBox" Height="26" VerticalContentAlignment="Center" ToolTip="Files and folders to leave out, separated by semicolons, for example: *.log;build" />
+                <CheckBox Name="ExcludeRegexBox" Content="Regular expression" Margin="0 6 0 0" VerticalContentAlignment="Center" ToolTip="Treat the Exclude box as one regular expression instead of a semicolon-separated mask list" />
+            </StackPanel>
+
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="Only these folders:" VerticalAlignment="Center" Margin="0 0 12 0" ToolTip="Synchronize only the picked subfolders of the local folder (and their contents)" />
+            <TextBox Grid.Row="5" Grid.Column="1" Name="SelectionBox" Height="26" VerticalContentAlignment="Center" IsReadOnly="True" ToolTip="The subfolders to synchronize; empty means the whole folder" />
+            <Button Grid.Row="5" Grid.Column="2" Name="SelectionBrowseButton" Width="30" Height="26" Margin="6 0 0 0" Padding="0" ToolTip="Pick the subfolders to synchronize" Click="SelectionBrowse_Click">
+                <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
+            </Button>
+        </Grid>
+
+        <!-- Status line -->
+        <Grid Grid.Row="2" Margin="0 14 0 0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Name="StatusText" Text="Inactive" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Name="StatsText" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12 0 0 0" />
+        </Grid>
+
+        <TextBox Grid.Row="3" Name="LogBox" Height="110" Margin="0 6 0 0" IsReadOnly="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" TextWrapping="NoWrap" />
+        <ProgressBar Grid.Row="4" Name="TransferProgress" Height="20" Margin="0 8 0 0" Minimum="0" Maximum="1000" Visibility="Collapsed" />
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 12 0 0">
+            <Button Name="StartButton" Content="_Synchronize" Width="100" Height="26" Margin="0 0 8 0" Click="Start_Click" />
+            <Button Name="CancelButton" Content="Cancel" IsCancel="True" Width="100" Height="26" Click="Cancel_Click" />
         </StackPanel>
     </Grid>
 </Window>
