@@ -117,14 +117,15 @@ namespace SmarTTY.CodeEditing
             OpenVpn, // *.ovpn, /etc/openvpn/*.conf: the colors of Config with the OpenVPN options known
             Netplan, // /etc/netplan/*.yaml: the colors of YAML with the keys of the Netplan configuration known
             CloudInit, // cloud-config, /etc/cloud/*.cfg: the colors of YAML with the cloud-init modules known
-            Prometheus // prometheus.yml, /etc/prometheus/*.yml: the colors of YAML with the Prometheus settings known
+            Prometheus, // prometheus.yml, /etc/prometheus/*.yml: the colors of YAML with the Prometheus settings known
+            Alertmanager // alertmanager.yml, /etc/alertmanager/*.yml: the colors of YAML with the Alertmanager settings known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Pam, Language.Samba, Language.Postfix, Language.OpenVpn, Language.Netplan, Language.CloudInit, Language.Prometheus, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Pam, Language.Samba, Language.Postfix, Language.OpenVpn, Language.Netplan, Language.CloudInit, Language.Prometheus, Language.Alertmanager, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -178,6 +179,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Netplan: return "Netplan";
                 case Language.CloudInit: return "cloud-init";
                 case Language.Prometheus: return "Prometheus";
+                case Language.Alertmanager: return "Alertmanager";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -461,6 +463,12 @@ namespace SmarTTY.CodeEditing
                 lowerCasePath.Contains("/prometheus/")))
             {
                 return Language.Prometheus;
+            }
+            // Alertmanager: its own configuration and the YAML of /etc/alertmanager.
+            if (prometheusYaml && (name == "alertmanager.yml" || name == "alertmanager.yaml" ||
+                lowerCasePath.Contains("/alertmanager/")))
+            {
+                return Language.Alertmanager;
             }
             // Docker Compose: the conventional names, including the override and the per-file variants.
             bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
@@ -1184,6 +1192,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Netplan: return TokenizeNetplan;
                 case Language.CloudInit: return TokenizeCloudInit;
                 case Language.Prometheus: return TokenizePrometheus;
+                case Language.Alertmanager: return TokenizeAlertmanager;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1350,6 +1359,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(CloudInitKeywords, CloudInitValues);
                 case Language.Prometheus:
                     return Combine(PrometheusKeywords, PrometheusValues);
+                case Language.Alertmanager:
+                    return Combine(AlertmanagerKeywords, AlertmanagerValues);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:

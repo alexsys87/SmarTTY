@@ -152,6 +152,8 @@ internal static class Program
         Check(Names(L.CloudInit, "", "").Contains("reboot"), "the cloud-init power state 'reboot' is offered");
         Check(Names(L.Prometheus, "", "").Contains("scrape_configs"), "the Prometheus setting 'scrape_configs' is offered");
         Check(Names(L.Prometheus, "", "").Contains("relabel_configs"), "the Prometheus setting 'relabel_configs' is offered");
+        Check(Names(L.Alertmanager, "", "").Contains("receivers"), "the Alertmanager setting 'receivers' is offered");
+        Check(Names(L.Alertmanager, "", "").Contains("saturday"), "the Alertmanager weekday 'saturday' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");

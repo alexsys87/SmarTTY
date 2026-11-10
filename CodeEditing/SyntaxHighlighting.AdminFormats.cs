@@ -1706,6 +1706,54 @@ public static partial class SyntaxHighlighting
         return TokenizeYamlCore(PrometheusKeywords, PrometheusValues, startState, text, sink, out endState);
     }
 
+    // ------------------------------------------------------------ Alertmanager
+
+    private static readonly HashSet<string> AlertmanagerKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope and the global settings
+        @"
+          global route receivers inhibit_rules templates mute_time_intervals time_intervals resolve_timeout
+          smtp_smarthost smtp_from smtp_hello smtp_auth_username smtp_auth_password smtp_auth_identity
+          smtp_auth_secret smtp_require_tls smtp_tls_config slack_api_url slack_api_url_file victorops_api_key
+          victorops_api_url pagerduty_url opsgenie_api_key opsgenie_api_key_file opsgenie_api_url wechat_api_url
+          wechat_api_secret wechat_api_corp_id telegram_api_url webex_api_url http_config proxy_url",
+        // the routing tree
+        @"
+          receiver group_by group_wait group_interval repeat_interval match match_re matchers continue routes
+          mute_time_intervals active_time_intervals",
+        // the receivers and the integrations
+        @"
+          name email_configs pagerduty_configs pushover_configs slack_configs opsgenie_configs webhook_configs
+          victorops_configs wechat_configs webex_configs msteams_configs sns_configs telegram_configs
+          discord_configs",
+        // the fields of the integrations
+        @"
+          to from smarthost hello auth_username auth_password auth_identity auth_secret require_tls tls_config
+          send_resolved headers html text title body url url_file service_key routing_key api_url api_key channel
+          api_key_file corp_id agent_id secret chat_id message message_thread_id parse_mode entity_id user_key
+          token room_id color fields short_fields monospace attachments max_alerts timeout insecure_skip_verify
+          ca_file cert_file key_file server_name min_version max_version basic_auth username password
+          password_file authorization type credentials credentials_file bearer_token bearer_token_file oauth2
+          client_id client_secret client_secret_file scopes endpoint_params",
+        // the inhibition and the time intervals
+        @"
+          source_match source_match_re source_matchers target_match target_match_re target_matchers equal
+          weekdays days_of_month months years location start_time end_time");
+
+    private static readonly HashSet<string> AlertmanagerValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the schemes, the authorization type and the message formats
+        @"http https Bearer HTML Markdown MarkdownV2",
+        // the weekdays of a time interval
+        @"monday tuesday wednesday thursday friday saturday sunday");
+
+    /// <summary>
+    /// Alertmanager: the colours and the folds of YAML with the routing tree, the receivers and the inhibition rules
+    /// known; the schemes, the authorization type, the message formats and the weekdays are values.
+    /// </summary>
+    private static bool TokenizeAlertmanager(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(AlertmanagerKeywords, AlertmanagerValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
