@@ -987,6 +987,42 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(ModprobeDirectives, startState, text, sink, out endState, valueKeywords: ModprobeValues);
     }
 
+    // -------------------------------------------------------------- logrotate
+
+    private static readonly HashSet<string> LogrotateDirectives = Words(StringComparer.Ordinal,
+        // the file itself and the included drop-ins
+        @"include tabooext taboopat
+          hourly daily weekly monthly yearly
+          rotate size maxsize minsize maxage minage start
+          create nocreate createolddir nocreateolddir copy nocopy renamecopy copytruncate
+          compress nocompress delaycompress nodelaycompress compresscmd uncompresscmd compressext compressoptions
+          notifempty ifempty missingok nomissingok olddir noolddir
+          dateext nodateext dateformat dateyesterday datehourago
+          sharedscripts nosharedscripts prerotate postrotate firstaction lastaction endscript
+          mail nomail mailfirst maillast su extension addextension errors
+          shred noshred shredcycles allowhardlink noallowhardlink merge nomerge");
+
+    private static readonly HashSet<string> LogrotateValues = Words(StringComparer.Ordinal,
+        // the directives that are written without a value, and the values of the script stages
+        @"hourly daily weekly monthly yearly
+          compress nocompress delaycompress nodelaycompress
+          copy copytruncate nocopy nocreate nocreateolddir noshred noolddir
+          notifempty ifempty missingok nomissingok
+          sharedscripts nosharedscripts prerotate postrotate firstaction lastaction endscript
+          dateext nodateext dateyesterday datehourago
+          nomail mailfirst maillast allowhardlink noallowhardlink merge nomerge");
+
+    /// <summary>
+    /// logrotate: the colours and the folds of Config with the directives of /etc/logrotate.conf and logrotate.d known.
+    /// The braces that enclose the rules of one log file are foldable; the directives written without a value (weekly,
+    /// compress, sharedscripts) are coloured wherever they stand; comments are '#'.
+    /// </summary>
+    private static bool TokenizeLogrotate(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(LogrotateDirectives, startState, text, sink, out endState,
+            foldBraces: true, valueKeywords: LogrotateValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
