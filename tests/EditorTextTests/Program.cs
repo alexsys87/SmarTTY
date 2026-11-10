@@ -867,7 +867,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -1866,6 +1866,60 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.OpenVpn).Toggle(new[] { "port 1194" })), "# port 1194", "OpenVPN comment");
     }
 
+    private static void NetplanChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/01-netcfg.yaml"), L.Netplan, "a Netplan configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/50-cloud-init.yml"), L.Netplan, "a Netplan file with .yml");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/netplan/10-netplan.yaml"), L.Netplan, "a generated Netplan file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/netplan.yaml"), L.Netplan, "netplan.yaml by its name");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/README"), L.Plain, "the README of /etc/netplan is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/notes.txt"), L.Plain, "a text file is not Netplan");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/backup.yaml.bak"), L.Plain, "a backup is not Netplan");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/network.yaml"), L.Yaml, "an ordinary network.yaml stays YAML");
+
+        Highlighted net = new Highlighted(L.Netplan,
+            "# Netplan configuration\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets:\n    enp3s0:\n" +
+            "      dhcp4: true\n      addresses:\n        - 192.168.1.10/24\n      gateway4: 192.168.1.1\n" +
+            "      nameservers:\n        addresses: [9.9.9.9, 149.112.112.112]\n        search: [example.com]\n" +
+            "  wifis:\n    wl0:\n      dhcp4: no\n      access-points:\n        \"home\":\n" +
+            "          password: \"secret\"\n      routes:\n        - to: default\n          via: 192.168.1.1\n" +
+            "          metric: 100\n      unknown-setting: 1\n");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# Netplan configuration", "Netplan: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeKeyword)), "network", "Netplan: the network block");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "version", "Netplan: the version");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeNumber)), "2", "Netplan: the version number");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "renderer|networkd", "Netplan: the renderer");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "ethernets", "Netplan: the ethernet devices");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeVariable)), "enp3s0", "Netplan: an interface name stays an ordinary key");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "dhcp4|true", "Netplan: DHCP");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "addresses", "Netplan: the addresses");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeNumber)), "192.168.1.10|24", "Netplan: an address with its prefix");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeKeyword)), "gateway4", "Netplan: the gateway");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeNumber)), "192.168.1.1", "Netplan: the gateway address");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeKeyword)), "nameservers", "Netplan: the name servers");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeKeyword)), "addresses", "Netplan: the DNS addresses");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeNumber)), "9.9.9.9|149.112.112.112", "Netplan: the DNS servers");
+        Equal(Join(net.Tokens(12, SyntaxHighlighting.TypeKeyword)), "search", "Netplan: the search domains");
+        Equal(Join(net.Tokens(13, SyntaxHighlighting.TypeKeyword)), "wifis", "Netplan: the Wi-Fi devices");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeKeyword)), "dhcp4|no", "Netplan: DHCP off");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeKeyword)), "access-points", "Netplan: the access points");
+        Equal(Join(net.Tokens(17, SyntaxHighlighting.TypeString)), "\"home\"", "Netplan: the SSID");
+        Equal(Join(net.Tokens(18, SyntaxHighlighting.TypeKeyword)), "password", "Netplan: the password");
+        Equal(Join(net.Tokens(18, SyntaxHighlighting.TypeString)), "\"secret\"", "Netplan: the quoted password");
+        Equal(Join(net.Tokens(19, SyntaxHighlighting.TypeKeyword)), "routes", "Netplan: the routes");
+        Equal(Join(net.Tokens(20, SyntaxHighlighting.TypeKeyword)), "to|default", "Netplan: the default route");
+        Equal(Join(net.Tokens(21, SyntaxHighlighting.TypeKeyword)), "via", "Netplan: the route gateway");
+        Equal(Join(net.Tokens(22, SyntaxHighlighting.TypeKeyword)), "metric", "Netplan: the route metric");
+        Equal(Join(net.Tokens(22, SyntaxHighlighting.TypeNumber)), "100", "Netplan: the metric value");
+        Equal(Join(net.Tokens(23, SyntaxHighlighting.TypeKeyword)), "", "Netplan: an unknown setting is not a keyword");
+        Equal(Join(net.Tokens(23, SyntaxHighlighting.TypeVariable)), "unknown-setting", "Netplan: ...it is a plain key");
+        Check(Folds(net).Length > 0, "Netplan blocks fold");
+        Check(SyntaxHighlighting.GetKeywords(L.Netplan).Contains("renderer"), "Netplan keywords contain 'renderer'");
+        Check(SyntaxHighlighting.GetKeywords(L.Netplan).Contains("access-points"), "Netplan keywords contain 'access-points'");
+        Check(SyntaxHighlighting.GetKeywords(L.Netplan).Contains("networkd"), "Netplan keywords contain 'networkd'");
+        Equal(Join(CommentStyle.ForLanguage(L.Netplan).Toggle(new[] { "  dhcp4: true" })), "  # dhcp4: true", "Netplan comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2579,6 +2633,7 @@ internal static class Program
         SambaChecks();
         PostfixChecks();
         OpenVpnChecks();
+        NetplanChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
