@@ -109,9 +109,12 @@ public class SerialTerminalControl : TerminalEmulatorControl
     private bool _autoDetectPrompt = true;
     private bool _localEcho = true;
 
-    /// <summary>Raised when the user clicks a path or an URL shown in the terminal text. Device terminals run on this
-    /// machine, so the path is a local file; the controller opens an address, a folder or a document with the program it belongs to
-    /// and anything else as text (see LocalLinkPolicy): the path is what the device printed, and a file must not be run for it.</summary>
+    /// <summary>
+    /// Raised when the user clicks an address (http, https, ftp) shown in the terminal text; the controller opens it in the browser.
+    /// Paths are no links here: everything in this terminal is what the device on the other end printed (or a log of it), so a path
+    /// is one of that device. "/tmp" of a Linux host would be C:\tmp of this computer, and "C:\Users" printed by a Windows host
+    /// would open the folder of this computer in Explorer.
+    /// </summary>
     public event EventHandler<OpenFileEventArgs> OpenFileRequested;
 
     public void RequestOpenFile(string path, int? line = null, int? column = null)
@@ -122,60 +125,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
             Line = line,
             Column = column
         });
-    }
-
-    private SmarTTY.Utilities.PathExistenceCache _pathExistence;
-
-    private int _pathRedrawQueued;
-
-    /// <summary>
-    /// Whether the paths in the text exist, for painting and hovering: it answers at once and checks in the background
-    /// (File.Exists on a network drive that does not answer, or on a sleeping disk, would freeze the window). The check has
-    /// a thread of its own, so a drive that hangs does not hold a thread of the pool.
-    /// </summary>
-    private SmarTTY.Utilities.PathExistenceCache PathExistence
-    {
-        get
-        {
-            if (_pathExistence == null)
-            {
-                _pathExistence = new SmarTTY.Utilities.PathExistenceCache(
-                    path => File.Exists(path) || Directory.Exists(path),
-                    work => new System.Threading.Thread(() => work()) { IsBackground = true, Name = "Local link path check" }.Start(),
-                    OnPathExistenceChanged);
-            }
-            return _pathExistence;
-        }
-    }
-
-    // Called on the thread of the check when a path turned out to exist or not (the underline of a link depends on it).
-    private void OnPathExistenceChanged()
-    {
-        if (IsDisposed || !IsHandleCreated)
-        {
-            return;
-        }
-        // One request is enough for a burst of results.
-        if (System.Threading.Interlocked.Exchange(ref _pathRedrawQueued, 1) != 0)
-        {
-            return;
-        }
-        try
-        {
-            BeginInvoke((Action)(() =>
-            {
-                System.Threading.Interlocked.Exchange(ref _pathRedrawQueued, 0);
-                if (!IsDisposed)
-                {
-                    Redraw();
-                }
-            }));
-        }
-        catch (Exception ex) when (ex is InvalidOperationException || ex is ObjectDisposedException)
-        {
-            // The window went away in the meantime.
-            System.Threading.Interlocked.Exchange(ref _pathRedrawQueued, 0);
-        }
     }
 
     // Completion infrastructure
@@ -2338,7 +2287,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     private class LocalLinkCandidate : ILinkTarget
     {
-        // ':' and '\\' are valid here too: drive-letter paths (C:\...) and URLs with ports stay in one candidate.
+        // ':' is valid here too: URLs with ports stay in one candidate. '\\' is, so that "C:\x" or "\\host\x" is one word (and no link).
         internal static readonly string PathCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-/:\\";
 
         public LinkCandidateState State;
@@ -2354,92 +2303,14 @@ public class SerialTerminalControl : TerminalEmulatorControl
             State = LinkCandidateState.Word;
         }
 
-        public bool IsActive
-        {
-            get
-            {
-                if (State != LinkCandidateState.Position)
-                {
-                    return false;
-                }
-                string path = TargetPath;
-                if (path == null)
-                {
-                    return false;
-                }
-                if (IsUrl(path))
-                {
-                    return true;
-                }
-                // This is asked for every piece of the line each time it is painted, and when the mouse moves over it: it must
-                // not wait for the disk. The answer is the last one that is known, the check runs in the background and the
-                // terminal is painted again when it finds a different one.
-                return _terminal.PathExistence.Exists(path);
-            }
-        }
+        // Only an address is a link; it is complete when the word has ended.
+        public bool IsActive => State == LinkCandidateState.Position;
 
         public void Activate()
         {
-            string path = TargetPath;
-            if (path != null)
+            if (State == LinkCandidateState.Position)
             {
-                _terminal.RequestOpenFile(path);
-            }
-        }
-
-        private static bool IsUrl(string path)
-        {
-            return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private string _targetPath;
-
-        private bool _hasTargetPath;
-
-        // The path does not change once the candidate is complete, so it is worked out once, not at every paint.
-        private string TargetPath
-        {
-            get
-            {
-                if (_hasTargetPath)
-                {
-                    return _targetPath;
-                }
-                string path = ComputeTargetPath();
-                if (State == LinkCandidateState.Position)
-                {
-                    _targetPath = path;
-                    _hasTargetPath = true;
-                }
-                return path;
-            }
-        }
-
-        private string ComputeTargetPath()
-        {
-            try
-            {
-                string path = _path.ToString();
-                if (IsUrl(path))
-                {
-                    return path;
-                }
-                // The text comes from the device: only a path with a drive letter names this machine (see LocalLinkRules.IsLocalPath).
-                // "/tmp" of a Linux host would be C:\tmp here, and a network path would make Windows connect to its host and offer
-                // the credentials of the user as soon as it is asked whether the path exists: neither is looked at.
-                if (!SmarTTY.Utilities.LocalLinkRules.IsLocalPath(path))
-                {
-                    return null;
-                }
-                string fullPath = Path.GetFullPath(path);
-                // "C:\a\..\..\x" stays on C:, but check the result as well.
-                return SmarTTY.Utilities.LocalLinkRules.IsLocalPath(fullPath) ? fullPath : null;
-            }
-            catch
-            {
-                return null;
+                _terminal.RequestOpenFile(_path.ToString());
             }
         }
 
@@ -2464,10 +2335,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
             {
                 return;
             }
-            // An address, or a path of this machine with a drive letter. A Unix path ("/tmp", "/var/log/syslog") and a bare
-            // name ("build.log") are those of the device on the other end of the line, not files of this computer.
-            string path = _path.ToString();
-            State = (IsUrl(path) || SmarTTY.Utilities.LocalLinkRules.IsLocalPath(path)) ? LinkCandidateState.Position : LinkCandidateState.Rejected;
+            // Only an address. A path ("/tmp", "C:\\Users", "build.log") is one of the device on the other end of the line, not a file
+            // or folder of this computer (see OpenFileRequested), and the disks here are not even asked about it.
+            State = SmarTTY.Utilities.LocalLinkPolicy.IsUrl(_path.ToString()) ? LinkCandidateState.Position : LinkCandidateState.Rejected;
         }
     }
 
