@@ -734,6 +734,259 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(SystemdNetworkdDirectives, startState, text, sink, out endState, valueKeywords: SystemdNetworkdValues);
     }
 
+    // ---------------------------------------------------------------- ifupdown
+
+    private static readonly HashSet<string> IfupdownDirectives = Words(StringComparer.Ordinal,
+        // stanzas and includes
+        @"auto iface allow-hotplug allow-auto source source-directory mapping
+          no-auto-down no-scripts rename template
+          address netmask gateway broadcast network metric mtu hwaddress pointopoint scope
+          pre-up up post-up pre-down down post-down
+          dns-nameservers dns-search dns-domain dns-sortlist
+          bridge_ports bridge_stp bridge_fd bridge_maxwait bridge_maxage bridge_hello bridge_priority
+          bridge_ageing bridge_bridgeprio bridge_gcint bridge_hw bridge_pathcost bridge_portcost bridge_waitport
+          bond-slaves bond-mode bond-miimon bond-downdelay bond-updelay bond-lacp-rate bond-xmit-hash-policy
+          bond-primary bond-primary-reselect
+          vlan-raw-device vlan_id
+          wpa-ssid wpa-psk wpa-conf wpa-driver wpa-key-mgmt wpa-ap-scan wpa-proto wpa-pairwise wpa-group
+          wpa-eap wpa-identity wpa-password wpa-phase2 wpa-ca-cert wpa-client-cert wpa-private-key
+          wpa-private-key-password
+          accept_ra autoconf privext dhcp request
+          tunnel-mode tunnel-local tunnel-remote tunnel-ttl tunnel-mtu
+          preferred-lifetime valid-lifetime");
+
+    private static readonly HashSet<string> IfupdownValues = Words(StringComparer.Ordinal,
+        // address families, methods and the usual values of the options
+        @"inet inet6 ipx can ppp loopback static manual dhcp bootp wvdial tunnel v4tunnel 6to4 ipv6auto ipv6dhcp
+          yes no on off true false
+          ether
+          noauth open shared key
+          wep wpa wpa2 wpa3");
+
+    /// <summary>
+    /// Debian/OpenWrt ifupdown: the colours of Config with the stanzas (auto, iface, source) and the options of
+    /// /etc/network/interfaces known; the address families and methods are coloured wherever they stand.
+    /// </summary>
+    private static bool TokenizeIfupdown(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(IfupdownDirectives, startState, text, sink, out endState, valueKeywords: IfupdownValues);
+    }
+
+    // ---------------------------------------------------------------- dnsmasq
+
+    private static readonly HashSet<string> DnsmasqDirectives = Words(StringComparer.Ordinal,
+        // files, daemon and logging
+        @"conf-file conf-dir conf-script
+          no-daemon daemon user group pid-file chroot
+          log-queries log-debug log-async log-facility log-dhcp
+          no-hosts addn-hosts hostsdir no-resolv resolv-file servers-file no-poll clear-on-reload
+          localise-queries local-service bogus-priv filterwin2k domain-needed
+          interface except-interface listen-address bind-interfaces bind-dynamic ignore-address
+          no-dhcp-interface no-dhcp6-interface",
+        // DNS
+        @"port edns-packet-max dns-forward-max cache-size cache-rr no-negcache no-round-robin
+          dnssec dnssec-check-unsigned dnssec-no-timecheck dnssec-timestamp dnssec-debug trust-anchor dns-rr
+          max-cache-ttl min-cache-ttl max-ttl local-ttl neg-ttl auth-ttl
+          enable-ra ra-param
+          domain local expand-hosts
+          server rev-server address ipset nftset
+          stop-dns-rebind rebind-localhost-ok rebind-domain-ok
+          synth-domain add-mac add-cpe-id add-subnet umbrella
+          connmark-allowlist-enable connmark-allowlist
+          host-record cname ptr-record txt-record srv-host mx-host naptr-record alias interface-name",
+        // DHCP, RA and PXE
+        @"dhcp-range dhcp-host dhcp-option dhcp-option-force dhcp-option-vendor dhcp-option-class
+          dhcp-boot dhcp-sequential-ip dhcp-lease-max dhcp-leasefile leasefile-ro
+          dhcp-authoritative dhcp-no-override dhcp-script dhcp-scriptuser dhcp-luascript
+          dhcp-match dhcp-vendorclass dhcp-userclass dhcp-mac dhcp-circuitid dhcp-remoteid dhcp-subscrid
+          dhcp-proxy dhcp-relay dhcp-ignore dhcp-ignore-names dhcp-rapid-commit dhcp-alternate-port
+          dhcp-client-update dhcp-fqdn dhcp-name-match dhcp-generate-names dhcp-broadcast
+          dhcp-reply-delay dhcp-pxe-vendor dhcp-ttl
+          quiet-dhcp quiet-dhcp6 quiet-ra
+          bridge-interface shared-network tag-if",
+        // TFTP and debugging
+        @"enable-tftp tftp-root tftp-no-fail tftp-secure tftp-lowercase tftp-unique-root tftp-max
+          tftp-port-range tftp-single-port pxe-service pxe-prompt
+          dumpfile dumpmask no-ping no-ident script-arp use-stale-cache fast-dns-retry");
+
+    private static readonly HashSet<string> DnsmasqValues = Words(StringComparer.Ordinal,
+        // the flags written without a value, and the choices of the options
+        @"bogus-priv filterwin2k domain-needed no-resolv no-poll no-hosts clear-on-reload localise-queries
+          local-service expand-hosts bind-interfaces bind-dynamic
+          dnssec dnssec-check-unsigned dnssec-no-timecheck dnssec-debug
+          stop-dns-rebind rebind-localhost-ok no-negcache no-round-robin dhcp-authoritative dhcp-no-override
+          dhcp-sequential-ip dhcp-rapid-commit dhcp-client-update dhcp-fqdn dhcp-generate-names dhcp-broadcast
+          dhcp-proxy dhcp-ignore-names leasefile-ro enable-ra log-dhcp log-queries log-debug quiet-dhcp
+          quiet-dhcp6 quiet-ra enable-tftp tftp-no-fail tftp-secure tftp-lowercase tftp-single-port script-arp
+          no-ping no-ident no-daemon daemon use-stale-cache fast-dns-retry connmark-allowlist-enable
+          static net host tag set vendor user circuit remote subscr bootp proxy
+          ra-only ra-names ra-stateless ra-advrouter off-link slaac
+          dhcp dhcp6 router dns domain local both ipv4 ipv6
+          base64 text ip mac");
+
+    /// <summary>
+    /// dnsmasq: the colours of Config with the options of dnsmasq.conf and dnsmasq.d known; the options written without
+    /// a value (bogus-priv, no-resolv, dhcp-authoritative) are keywords too, and so are the usual values (static, tag,
+    /// ra-names, ...).
+    /// </summary>
+    private static bool TokenizeDnsmasq(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(DnsmasqDirectives, startState, text, sink, out endState, valueKeywords: DnsmasqValues);
+    }
+
+    // ---------------------------------------------------------------- hostapd
+
+    private static readonly HashSet<string> HostapdDirectives = Words(StringComparer.Ordinal,
+        // interface, radio and network
+        @"interface driver ctrl_interface ctrl_interface_group bridge bridge_hairpin ssid ssid2 bssid
+          bssid_blacklist bssid_whitelist macaddr_acl accept_mac_file deny_mac_file own_ip_addr nas_identifier
+          hw_mode channel beacon_int dtim_period max_num_sta rts_threshold fragm_threshold
+          country_code ieee80211d ieee80211h ieee80211n ieee80211ac ieee80211ax ieee80211be
+          wmm_enabled wmm_ac_bk_cwmin wmm_ac_bk_cwmax wmm_ac_bk_aifs wmm_ac_bk_txop_limit wmm_ac_bk_acm
+          wmm_ac_be_cwmin wmm_ac_be_cwmax wmm_ac_be_aifs wmm_ac_be_txop_limit wmm_ac_be_acm
+          wmm_ac_vi_cwmin wmm_ac_vi_cwmax wmm_ac_vi_aifs wmm_ac_vi_txop_limit wmm_ac_vi_acm
+          wmm_ac_vo_cwmin wmm_ac_vo_cwmax wmm_ac_vo_aifs wmm_ac_vo_txop_limit wmm_ac_vo_acm
+          ap_isolate disassoc_low_ack skip_inactivity_poll proxy_arp",
+        // WEP, WPA/WPA2/WPA3, SAE, OWE and FT
+        @"auth_algs wep_key0 wep_key1 wep_key2 wep_key3 wep_default_key wep_key_len_broadcast wep_key_len_unicast
+          wep_rekey_period wep_rekey_rate
+          wpa wpa_key_mgmt wpa_pairwise rsn_pairwise wpa_group_rekey wpa_strict_rekey wpa_gmk_rekey wpa_ptk_rekey
+          wpa_deny_ptk0_rekey wpa_ppk wpa_ppk_only wpa_psk_radius wpa_psk_file wpa_passphrase wpa_psk
+          sae_password sae_pwe sae_require_mfp sae_groups sae_anti_clogging_threshold sae_sync
+          owe_groups owe_transition_bssid owe_transition_ssid owe_transition_ifname owe_ptk_workaround
+          ft_psk_generate_local ft_eap_generate_local ft_over_ds ft_pmk_cache r0kh r1kh pmk_r1_name
+          group_cipher rsn_preauth rsn_preauth_interfaces",
+        // RADIUS and EAP
+        @"radius_server_addr radius_server_port radius_server_secret radius_client_addr radius_client_port
+          radius_acct_server_addr radius_acct_server_port radius_acct_server_secret
+          radius_acct_interim_interval radius_retry_primary_interval radius_das_port radius_das_client radius_das_secret
+          acct_server_addr acct_server_port acct_server_secret auth_server_addr auth_server_port auth_server_shared_secret
+          eap_server eap_user_file eap_message eap_sim_db eap_reauth_period eapol_key_index_workaround
+          ca_cert server_cert private_key private_key_passwd dh_file cert_type",
+        // WPS
+        @"wps_state ap_setup_locked config_methods uuid device_name manufacturer model_name model_number serial_number
+          device_type os_version wps_pin wps_pbc wps_cred_processing wps_rf_bands wps_pri_dev_type wps_sec_dev_type_list
+          wps_ap_pin wps_cred_add_sae wps_skip_ads",
+        // Hotspot 2.0, MBO, logging, vendor elements and P2P
+        @"interworking internet access_network_type network_auth_type venue_group venue_type hessid domain_name
+          roaming_consortium venue_name venue_url mbo mbo_cell_capa mbo_oce
+          logger_syslog logger_syslog_level logger_stdout logger_stdout_level dump_file
+          vendor_elements assocresp_elements multi_ap
+          p2p_device_addr p2p_interface_addr p2p_listen_reg_class p2p_listen_channel p2p_oper_reg_class p2p_oper_channel");
+
+    private static readonly HashSet<string> HostapdValues = Words(StringComparer.Ordinal,
+        // hw_mode, WPA key management and pairwise ciphers
+        @"a b g ad
+          WPA-PSK WPA-EAP WPA-PSK-SHA256 WPA-EAP-SHA256 SAE FT-PSK FT-EAP FT-EAP-SHA256 FT-SAE
+          FILS-SHA256 FILS-SHA384 SAE-EXT-KEY OWE DPP
+          CCMP TKIP GCMP CCMP-256 GCMP-256
+          PSK EAP 802.1X
+          label display push_button keypad virtual_display physical_display virtual_push_button physical_push_button
+          none radius mac open shared");
+
+    /// <summary>
+    /// hostapd: the colours of Config with the options of hostapd.conf known; the hw_mode letters, the WPA key
+    /// management suites and the pairwise ciphers are keywords too.
+    /// </summary>
+    private static bool TokenizeHostapd(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(HostapdDirectives, startState, text, sink, out endState, valueKeywords: HostapdValues);
+    }
+
+    // -------------------------------------------------------------- WireGuard
+
+    private static readonly HashSet<string> WireguardDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // [Interface] and [Peer]
+        @"Address ListenPort PrivateKey DNS MTU FwMark Table
+          PreUp PostUp PreDown PostDown SaveConfig
+          PublicKey PresharedKey AllowedIPs Endpoint PersistentKeepalive",
+        // AmneziaWG, a WireGuard fork with obfuscation parameters
+        @"Jc Jmin Jmax S1 S2 H1 H2 H3 H4 I1 I2 I3 I4 I5");
+
+    private static readonly HashSet<string> WireguardValues = Words(StringComparer.OrdinalIgnoreCase,
+        @"Interface Peer auto main default off");
+
+    /// <summary>
+    /// WireGuard: the colours of Config with the [Interface] and [Peer] keys known; the values of Table (auto, main,
+    /// default, off) are keywords too, and the keys match in any case, as wg-quick reads them.
+    /// </summary>
+    private static bool TokenizeWireguard(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(WireguardDirectives, startState, text, sink, out endState, valueKeywords: WireguardValues);
+    }
+
+    // ------------------------------------------------------------------- udev
+
+    private static readonly HashSet<string> UdevKeywords = Words(StringComparer.Ordinal,
+        // the keys of the rules
+        @"ACTION SUBSYSTEM SUBSYSTEMS KERNEL KERNELS DEVPATH DEVPATH_OLD DRIVER DRIVERS
+          ATTR ATTRS SYSFS ENV TAG TAGS NAME SYMLINK OWNER GROUP MODE
+          PROGRAM RESULT IMPORT WAIT_FOR WAIT_FOR_SYSFS OPTIONS TEST LABEL GOTO RUN SECLABEL CONST PRODUCT NETLINK
+          udev_log",
+        // the usual unquoted values of ACTION, OPTIONS and udev.conf
+        @"add remove change move online offline bind unbind
+          db_persist nowatch watch last_rule string_escape none replace err info debug");
+
+    /// <summary>
+    /// udev: the colours of Config with the keys of the rules known wherever they stand, since a rule is a list of
+    /// "KEY==value" pairs separated by commas; the usual unquoted values are keywords too.
+    /// </summary>
+    private static bool TokenizeUdev(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(UdevKeywords, startState, text, sink, out endState, valueKeywords: UdevKeywords);
+    }
+
+    // --------------------------------------------------------------- nftables
+
+    private static readonly HashSet<string> NftablesKeywords = Words(StringComparer.Ordinal,
+        // commands and the objects they act on
+        @"flush table chain rule set map element define include add create delete list monitor describe export import get reset
+          rename replace destroy",
+        // statements, actions, protocols and match keys
+        @"accept drop reject queue continue return jump goto counter log limit quota snat dnat masquerade redirect tproxy
+          dup fwd notrack meta ct ip ip6 tcp udp sctp dccp icmp icmpv6 arp ether vlan bridge inet netdev route socket
+          fib osf xdp numgen jhash symhash mark tos dscp ecn ttl hoplimit flowlabel length frag hdrlength checksum seq
+          ack window flags option version type code mtu protocol priority policy devices hook device state status
+          saddr daddr sport dport iif oif iifname oifname iiftype oiftype cgroup cpu pkttype skuid skgid nfproto l4proto
+          ipsec rt bh count packets bytes over until timeout size auto-merge dynamic interval elem gc-interval expires
+          evaluation vmap prefix nexthop via dev weight persistent secret name value host ifname id num label zone
+          domain interface dei pcp cfi sequence gateway classid nexthdr hlimit frag-off mh-type mh hbh rt0 rt1 rt2 rt4 sr
+          dstopts ah esp comp level",
+        // the usual values: families, hooks, chain types, set types and log levels
+        @"ruleset handle position comment
+          new established related invalid untracked
+          input output forward prerouting postrouting ingress
+          filter nat mangle raw security
+          src dst srcnat dstnat ipv4_addr ipv6_addr ether_addr inet_service
+          emerg alert crit err warning notice info debug");
+
+    /// <summary>
+    /// nftables: the colours of Config with the commands, statements and match keys of nft known wherever they stand;
+    /// strings, variables and the addresses keep the colours of Config. Comments are '#'.
+    /// </summary>
+    private static bool TokenizeNftables(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(NftablesKeywords, startState, text, sink, out endState, valueKeywords: NftablesKeywords);
+    }
+
+    // --------------------------------------------------------------- modprobe
+
+    private static readonly HashSet<string> ModprobeDirectives = Words(StringComparer.Ordinal,
+        @"alias blacklist options install remove softdep weakdep include");
+
+    private static readonly HashSet<string> ModprobeValues = Words(StringComparer.Ordinal,
+        // the stages of a soft dependency and the value that disables an alias
+        @"pre post off");
+
+    /// <summary>
+    /// modprobe.d: the colours of Config with the directives of the module loader known; the pre/post stages of softdep
+    /// and the off of an alias are coloured as keywords.
+    /// </summary>
+    private static bool TokenizeModprobe(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(ModprobeDirectives, startState, text, sink, out endState, valueKeywords: ModprobeValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

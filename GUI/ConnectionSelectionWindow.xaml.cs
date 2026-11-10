@@ -9,9 +9,11 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -209,6 +211,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         long LastUseTime { get; }
 
+        /// <summary>A computer found by the network scan: it is not saved, and is marked with a badge in the list.</summary>
+        bool IsDiscovered { get; }
+
         bool MatchesFilter(string filter);
 
         void Delete();
@@ -288,6 +293,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             public bool HasBaudRate => false;
 
             public int BaudRate { get; set; }
+
+            public bool IsDiscovered => false;
 
             public event PropertyChangedEventHandler PropertyChanged;
 
@@ -466,6 +473,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public bool HasBaudRate => true;
 
+            public bool IsDiscovered => false;
+
             public int BaudRate
             {
                 get
@@ -553,6 +562,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public long LastUseTime => Settings.Settings.LastConnectionTime;
 
+            public bool IsDiscovered => false;
+
             public RawTcp(SavedConnectionStore mgr, RawConnectionSettings settings)
                 : base(mgr, settings)
             {
@@ -595,6 +606,114 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             public Netconsole(SavedConnectionStore mgr, RawConnectionSettings settings)
                 : base(mgr, settings)
             {
+            }
+        }
+
+        /// <summary>
+        /// A computer found by the network scan with an open SSH or telnet port. It lives as long as the window only and is
+        /// never saved by itself: connecting opens the connection dialog with "save" switched off, and "Edit" saves it on
+        /// request. It is counted and filtered with the SSH or the telnet connections, and marked with a badge.
+        /// </summary>
+        public class Discovered : IConnectionSettingsWrapper, INotifyPropertyChanged
+        {
+            private readonly ControllerImpl _Controller;
+
+            public readonly IPAddress Address;
+
+            /// <summary>The name of the address (reverse DNS), or null.</summary>
+            public readonly string HostName;
+
+            public readonly int Port;
+
+            public readonly bool IsTelnet;
+
+            public Discovered(ControllerImpl controller, IPAddress address, string hostName, int port, bool isTelnet)
+            {
+                _Controller = controller;
+                Address = address;
+                HostName = hostName;
+                Port = port;
+                IsTelnet = isTelnet;
+            }
+
+            /// <summary>The address to connect to: the IP address, with the port when it is not the default one.</summary>
+            public string Endpoint
+            {
+                get
+                {
+                    int defaultPort = IsTelnet ? LocalNetworkScanner.TelnetPort : LocalNetworkScanner.SshPort;
+                    return Port == defaultPort ? Address.ToString() : Address + ":" + Port;
+                }
+            }
+
+            public Uri Image => MakeIconURI(IsTelnet ? "terminal.png" : "computer.png");
+
+            public SubtypeImage TypeImage => IsTelnet ? SubtypeImage.Terminal : SubtypeImage.Lock;
+
+            public string Title => HostName == null ? Endpoint : HostName + " (" + Endpoint + ")";
+
+            public string Detail1 => IsTelnet ? "telnet, found on the network" : "SSH, found on the network";
+
+            public string Detail2 => "Not saved";
+
+            // Just found: it answered a moment ago, so it is never shown as unreachable.
+            public bool IsInactive
+            {
+                get
+                {
+                    return false;
+                }
+                set
+                {
+                }
+            }
+
+            public bool HasBaudRate => false;
+
+            public int BaudRate { get; set; }
+
+            public long LastUseTime => 0L;
+
+            public bool IsDiscovered => true;
+
+            // Nothing of a found computer ever changes, so the event is never raised. The interface stays: WPF keeps a
+            // binding to an object without INotifyPropertyChanged alive through PropertyDescriptor (a memory leak).
+            // Empty accessors instead of a field-like event, which the compiler reports as never used (CS0067).
+            public event PropertyChangedEventHandler PropertyChanged
+            {
+                add
+                {
+                }
+                remove
+                {
+                }
+            }
+
+            public bool MatchesFilter(string filter)
+            {
+                return Title.IndexOf(filter, StringComparison.InvariantCultureIgnoreCase) != -1;
+            }
+
+            /// <summary>Removes it from the list; the next scan finds it again.</summary>
+            public void Delete()
+            {
+                _Controller.RemoveDiscovered(this);
+            }
+
+            /// <summary>Saves it to the connections list: the explicit way to keep a found computer.</summary>
+            public void Edit(Window wnd)
+            {
+                _Controller.SaveDiscovered(wnd, this);
+            }
+
+            public void SetIcon(string icon)
+            {
+                // Nothing to keep an icon in: the item is not saved (the icon picker is hidden for it).
+            }
+
+            public bool IsSameAs(Discovered other)
+            {
+                return other != null && other.IsTelnet == IsTelnet && other.Port == Port && other.Address.Equals(Address);
             }
         }
     }
@@ -681,6 +800,19 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private BitmapImage[] _CachedIcons;
 
+        // The computers found by the network scan; kept apart from the saved connections and never written anywhere.
+        private readonly List<SettingsWrappers.Discovered> _DiscoveredItems = new List<SettingsWrappers.Discovered>();
+
+        // "host:port" of the saved SSH, telnet and raw TCP connections: a found computer that is already saved is not listed twice.
+        private readonly HashSet<string> _SavedEndpoints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Set while a network scan runs; cancelling it stops the scan.
+        private CancellationTokenSource _ScanCancellation;
+
+        private string _ScanStatusText;
+
+        private bool _Disposed;
+
         public readonly SmarTTYJob Job;
 
         public List<IConnectionSettingsWrapper> FilteredSettings { get; private set; } = new List<IConnectionSettingsWrapper>();
@@ -715,6 +847,24 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         }
 
         public string OverlayText { get; private set; }
+
+        public bool IsScanning => _ScanCancellation != null;
+
+        public string ScanButtonText => IsScanning ? "Stop _local network scan" : "Scan _local network...";
+
+        /// <summary>What the network scan is doing or what it found; null before the first scan.</summary>
+        public string ScanStatusText
+        {
+            get
+            {
+                return _ScanStatusText;
+            }
+            private set
+            {
+                _ScanStatusText = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ScanStatusText"));
+            }
+        }
 
         public DeviceTerminalSettings PendingRawConnectionSettings { get; private set; }
 
@@ -1134,9 +1284,20 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         private void UpdateFilteredItems()
         {
             ConnectionCountInfo connectionCounts = default;
-            foreach (IConnectionSettingsWrapper item in _StaticItems.Concat(_DynamicItems))
+            foreach (IConnectionSettingsWrapper item in AllItems())
             {
-                if (item is SettingsWrappers.SSH)
+                if (item is SettingsWrappers.Discovered discovered)
+                {
+                    if (discovered.IsTelnet)
+                    {
+                        connectionCounts.Telnet++;
+                    }
+                    else
+                    {
+                        connectionCounts.SSH++;
+                    }
+                }
+                else if (item is SettingsWrappers.SSH)
                 {
                     connectionCounts.SSH++;
                 }
@@ -1159,7 +1320,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
             ConnectionCounts = connectionCounts;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ConnectionCounts"));
-            List<IConnectionSettingsWrapper> list = (from connectionSettingsWrapper in _StaticItems.Concat(_DynamicItems).Where(ShouldShowThisType)
+            List<IConnectionSettingsWrapper> list = (from connectionSettingsWrapper in AllItems().Where(ShouldShowThisType)
                                                      where string.IsNullOrEmpty(_Filter) || connectionSettingsWrapper.MatchesFilter(_Filter)
                                                      select connectionSettingsWrapper).ToList();
             if (ProbeConnections)
@@ -1194,15 +1355,55 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("FilteredSettings"));
         }
 
+        /// <summary>The saved connections, the COM ports and the computers found by the network scan that are not saved yet.</summary>
+        private IEnumerable<IConnectionSettingsWrapper> AllItems()
+        {
+            return _StaticItems.Concat(_DynamicItems).Concat(_DiscoveredItems.Where(discovered => !IsSaved(discovered)));
+        }
+
+        private bool IsSaved(SettingsWrappers.Discovered discovered)
+        {
+            if (_SavedEndpoints.Contains(discovered.Address + ":" + discovered.Port))
+            {
+                return true;
+            }
+            if (discovered.HostName == null)
+            {
+                return false;
+            }
+            // Saved by its name: the full one ("pi.lan") or the short one ("pi").
+            int dot = discovered.HostName.IndexOf('.');
+            return _SavedEndpoints.Contains(discovered.HostName + ":" + discovered.Port)
+                || (dot > 0 && _SavedEndpoints.Contains(discovered.HostName.Substring(0, dot) + ":" + discovered.Port));
+        }
+
+        // Reachable saved connections first, then the computers found by the scan, then the saved ones that do not answer.
+        private static int SortGroup(IConnectionSettingsWrapper item)
+        {
+            if (item.IsInactive)
+            {
+                return 2;
+            }
+            return item.IsDiscovered ? 1 : 0;
+        }
+
         private int CompareConnections(IConnectionSettingsWrapper x, IConnectionSettingsWrapper y)
         {
-            if (x.IsInactive != y.IsInactive)
+            int groupX = SortGroup(x);
+            int groupY = SortGroup(y);
+            if (groupX != groupY)
             {
-                if (x.IsInactive)
+                return groupX.CompareTo(groupY);
+            }
+            if (x is SettingsWrappers.Discovered discoveredX && y is SettingsWrappers.Discovered discoveredY)
+            {
+                // By address, as a scanner lists them (192.168.1.2 before 192.168.1.10), SSH before telnet.
+                int byAddress = LocalNetworkScanner.CompareAddresses(discoveredX.Address, discoveredY.Address);
+                if (byAddress != 0)
                 {
-                    return 1;
+                    return byAddress;
                 }
-                return -1;
+                return discoveredX.IsTelnet.CompareTo(discoveredY.IsTelnet);
             }
             ConnectionSortMode currentSortMode = CurrentSortMode;
             if (currentSortMode != ConnectionSortMode.Name && currentSortMode == ConnectionSortMode.LastUse)
@@ -1214,6 +1415,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private bool ShouldShowThisType(IConnectionSettingsWrapper item)
         {
+            if (item is SettingsWrappers.Discovered discovered)
+            {
+                return discovered.IsTelnet ? ShowTelnet : ShowSSH;
+            }
             if (item is SettingsWrappers.SSH)
             {
                 return ShowSSH;
@@ -1240,9 +1445,11 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         internal void RefreshAll()
         {
             _StaticItems.Clear();
+            _SavedEndpoints.Clear();
             foreach (SSHConnectionSettings item in _Connections.SshConnections)
             {
                 _StaticItems.Add(new SettingsWrappers.SSH(_Connections, item));
+                AddSavedEndpoint(SSHConnectionSettings.SplitHostPort(item.HostName?.Trim(), out int? sshPort), sshPort ?? LocalNetworkScanner.SshPort);
             }
             if (_ShowRawConnections)
             {
@@ -1254,13 +1461,15 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     {
                         knownSettings[new SerialPortKey(serConn)] = entry;
                     }
-                    else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet)
+                    else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet telnet)
                     {
                         _StaticItems.Add(new SettingsWrappers.Telnet(_Connections, entry));
+                        AddSavedEndpoint(telnet.Host?.Trim(), telnet.Port);
                     }
-                    else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp)
+                    else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
                     {
                         _StaticItems.Add(new SettingsWrappers.RawTcp(_Connections, entry));
+                        AddSavedEndpoint(tcp.Host?.Trim(), tcp.Port);
                     }
                     else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Netconsole)
                     {
@@ -1273,8 +1482,277 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             UpdateFilteredItems();
         }
 
-        public void ConnectWithSettings(IConnectionSettingsWrapper wrp)
+        private void AddSavedEndpoint(string host, int port)
         {
+            if (string.IsNullOrEmpty(host))
+            {
+                return;
+            }
+            if (host.StartsWith("[", StringComparison.Ordinal) && host.EndsWith("]", StringComparison.Ordinal))
+            {
+                host = host.Substring(1, host.Length - 2);
+            }
+            _SavedEndpoints.Add(host + ":" + port);
+        }
+
+        /// <summary>
+        /// Starts scanning the local IPv4 networks for computers with an open SSH (22) or telnet (23) port, or stops the
+        /// scan that runs. What is found is added to the list as it comes in, marked as found and not saved; the results
+        /// of an earlier scan are replaced, so a computer that went away does not stay.
+        /// </summary>
+        public void ToggleNetworkScan()
+        {
+            if (_ScanCancellation != null)
+            {
+                CancellationTokenSource running = _ScanCancellation;
+                _ScanCancellation = null;
+                running.Cancel();
+                ScanStatusText = "Network scan stopped: " + FormatFoundCount() + ".";
+                OnScanStateChanged();
+                return;
+            }
+            List<LocalNetworkScanner.ScanRange> ranges;
+            try
+            {
+                ranges = LocalNetworkScanner.GetLocalRanges();
+            }
+            catch (Exception exception)
+            {
+                ScanStatusText = "The local networks could not be listed: " + exception.Message;
+                return;
+            }
+            if (ranges.Count == 0)
+            {
+                ScanStatusText = "No local network to scan: no network adapter is connected with an IPv4 address.";
+                return;
+            }
+            _DiscoveredItems.Clear();
+            UpdateFilteredItems();
+            List<IPAddress> hosts = ranges.SelectMany(range => range.Hosts).ToList();
+            // A telnet item could not be opened from a list that has no COM/TCP connections (the reconnect list of a session).
+            int[] ports = _ShowRawConnections ? new[] { LocalNetworkScanner.SshPort, LocalNetworkScanner.TelnetPort } : new[] { LocalNetworkScanner.SshPort };
+            string networks = string.Join(", ", ranges.Select(range => range.IsNarrowed ? range + " (part of a larger network)" : range.ToString()));
+            CancellationTokenSource cancellation = new CancellationTokenSource();
+            _ScanCancellation = cancellation;
+            ScanStatusText = "Scanning " + networks + "...";
+            OnScanStateChanged();
+
+            LocalNetworkScanner scanner = new LocalNetworkScanner();
+            scanner.HostFound += host =>
+            {
+                _Dispatcher.BeginInvoke((Delegate)(Action)(() => AddDiscoveredHost(cancellation, host)), new object[0]);
+            };
+            // Progress comes from many threads at once: the UI is updated with the latest numbers, one update at a time.
+            int latestChecked = 0;
+            int updatePosted = 0;
+            scanner.ProgressChanged += (checkedCount, total) =>
+            {
+                int previous;
+                while ((previous = Volatile.Read(ref latestChecked)) < checkedCount && Interlocked.CompareExchange(ref latestChecked, checkedCount, previous) != previous)
+                {
+                }
+                if (Interlocked.Exchange(ref updatePosted, 1) == 0)
+                {
+                    _Dispatcher.BeginInvoke((Delegate)(Action)(() =>
+                    {
+                        Volatile.Write(ref updatePosted, 0);
+                        if (cancellation == _ScanCancellation)
+                        {
+                            ScanStatusText = $"Scanning {networks}: {Volatile.Read(ref latestChecked)} of {total} addresses checked, {FormatFoundCount()}...";
+                        }
+                    }), new object[0]);
+                }
+            };
+            Task.Run(() => scanner.ScanAsync(hosts, ports, cancellation.Token)).ContinueWith(task =>
+            {
+                Exception error = task.Exception?.GetBaseException();
+                _Dispatcher.BeginInvoke((Delegate)(Action)(() => FinishNetworkScan(cancellation, networks, error)), new object[0]);
+            }, TaskScheduler.Default);
+        }
+
+        private void AddDiscoveredHost(CancellationTokenSource scan, LocalNetworkScanner.FoundHost host)
+        {
+            if (_Disposed || scan != _ScanCancellation)
+            {
+                return;
+            }
+            List<SettingsWrappers.Discovered> found = new List<SettingsWrappers.Discovered>();
+            if (host.HasPort(LocalNetworkScanner.SshPort))
+            {
+                found.Add(new SettingsWrappers.Discovered(this, host.Address, host.HostName, LocalNetworkScanner.SshPort, isTelnet: false));
+            }
+            if (_ShowRawConnections && host.HasPort(LocalNetworkScanner.TelnetPort))
+            {
+                found.Add(new SettingsWrappers.Discovered(this, host.Address, host.HostName, LocalNetworkScanner.TelnetPort, isTelnet: true));
+            }
+            foreach (SettingsWrappers.Discovered item in found)
+            {
+                if (!_DiscoveredItems.Any(existing => existing.IsSameAs(item)))
+                {
+                    _DiscoveredItems.Add(item);
+                }
+            }
+            UpdateFilteredItems();
+        }
+
+        private void FinishNetworkScan(CancellationTokenSource scan, string networks, Exception error)
+        {
+            scan.Dispose();
+            if (_Disposed || scan != _ScanCancellation)
+            {
+                // Stopped by the user (the message is already shown) or the window is gone.
+                return;
+            }
+            _ScanCancellation = null;
+            if (error != null)
+            {
+                ScanStatusText = "Network scan failed: " + error.Message;
+            }
+            else
+            {
+                ScanStatusText = "Network scan of " + networks + " finished: " + FormatFoundCount() + ".";
+            }
+            OnScanStateChanged();
+        }
+
+        private string FormatFoundCount()
+        {
+            int computers = _DiscoveredItems.Select(item => item.Address).Distinct().Count();
+            int alreadySaved = _DiscoveredItems.Where(IsSaved).Select(item => item.Address).Distinct().Count();
+            string text = computers switch
+            {
+                0 => "no computers with SSH or telnet found",
+                1 => "1 computer with SSH or telnet found",
+                _ => computers + " computers with SSH or telnet found",
+            };
+            if (alreadySaved > 0)
+            {
+                // Those are not listed twice: the saved connection stands for them.
+                text += ", " + alreadySaved + " of them already saved";
+            }
+            return text;
+        }
+
+        private void OnScanStateChanged()
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsScanning"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ScanButtonText"));
+        }
+
+        // The interface type: SettingsWrappers is private to the window, the controller is not.
+        internal void RemoveDiscovered(IConnectionSettingsWrapper wrapper)
+        {
+            if (!(wrapper is SettingsWrappers.Discovered discovered))
+            {
+                return;
+            }
+            _DiscoveredItems.RemoveAll(item => item.IsSameAs(discovered));
+            UpdateFilteredItems();
+        }
+
+        /// <summary>
+        /// Opens a found computer: the usual dialog of a new SSH or telnet connection, filled in with its address and with
+        /// "save this connection" switched off, so nothing is saved unless the user ticks it.
+        /// </summary>
+        private void ConnectToDiscovered(SettingsWrappers.Discovered discovered, Window owner)
+        {
+            if (discovered.IsTelnet)
+            {
+                DeviceTerminalSettings settings = NewTelnetSettings(new DeviceTerminalSettings.ConnectionSettings.Telnet
+                {
+                    Host = discovered.Address.ToString(),
+                    Port = discovered.Port,
+                    TerminalSpeed = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalSpeed
+                });
+                if (CreateNewTcpConnection(owner, settings, saveByDefault: false))
+                {
+                    SessionCreated?.Invoke();
+                }
+                return;
+            }
+            SSHConnectionSettings initial = new SSHConnectionSettings
+            {
+                HostName = discovered.Endpoint,
+                AuthenticationType = AuthType.Password
+            };
+            if (CreateNewSSHConnection(owner, initial, saveByDefault: false))
+            {
+                SessionCreated?.Invoke();
+            }
+            else if (SavedWithoutConnecting)
+            {
+                RefreshAll();
+            }
+        }
+
+        /// <summary>Saves a found computer to the connections list after the user completed its settings ("Edit" of the item).</summary>
+        internal void SaveDiscovered(Window wnd, IConnectionSettingsWrapper wrapper)
+        {
+            if (!(wrapper is SettingsWrappers.Discovered discovered))
+            {
+                return;
+            }
+            if (discovered.IsTelnet)
+            {
+                DeviceTerminalSettings settings = NewTelnetSettings(new DeviceTerminalSettings.ConnectionSettings.Telnet
+                {
+                    Host = discovered.Address.ToString(),
+                    Port = discovered.Port,
+                    TerminalSpeed = DeviceTerminalSettings.ConnectionSettings.Telnet.DefaultTerminalSpeed
+                });
+                RawConnectionSettingsWindow rawWindow = new RawConnectionSettingsWindow(settings, testOnOK: false, showSaveCheckbox: false);
+                rawWindow.Owner = wnd;
+                if (rawWindow.ShowDialog() == true)
+                {
+                    _Connections.SaveRawConnection(new RawConnectionSettings
+                    {
+                        Settings = rawWindow.Settings
+                    });
+                }
+                return;
+            }
+            NewConnectionController.WindowCustomization customization = new NewConnectionController.WindowCustomization
+            {
+                Caption = "Save a Found SSH Connection",
+                ShowAliasField = true,
+                HeaderText = "SSH Connection Settings",
+                ConnectButtonText = "Save",
+                ShowSaveOnlyButton = true,
+                SaveCheckboxVisible = false
+            };
+            NewSSHConnectionWindow sshWindow = new NewSSHConnectionWindow(new SSHConnectionSettings
+            {
+                HostName = discovered.Endpoint,
+                AuthenticationType = AuthType.Password
+            }, customization);
+            sshWindow.Owner = wnd;
+            sshWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            if (sshWindow.ShowDialog() == true && (sshWindow.Controller.SavedWithoutConnecting || sshWindow.Controller.CreatedSession != null))
+            {
+                try
+                {
+                    if (ConfirmReplacingSavedConnection(_Connections, sshWindow.Controller.FinalSettings))
+                    {
+                        _Connections.SaveSshConnection(sshWindow.Controller.FinalSettings);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    MessageBoxes.Error("The connection settings could not be saved: " + exception.Message);
+                }
+                // "Save" checks the settings by connecting; that test connection is not kept.
+                sshWindow.Controller.CreatedSession?.Dispose();
+            }
+        }
+
+        /// <param name="owner">The window of the dialog a found computer opens (it needs a user name, and is not saved by itself).</param>
+        public void ConnectWithSettings(IConnectionSettingsWrapper wrp, Window owner = null)
+        {
+            if (wrp is SettingsWrappers.Discovered discovered)
+            {
+                ConnectToDiscovered(discovered, owner ?? WindowOwnership.ActiveWindow());
+                return;
+            }
             if (!(wrp is SettingsWrappers.SSH sSH))
             {
                 if (wrp is SettingsWrappers.Raw raw)
@@ -1331,15 +1809,18 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         /// <summary>Whether the last <see cref="CreateNewSSHConnection"/> only saved the connection to the list.</summary>
         public bool SavedWithoutConnecting { get; private set; }
 
-        public bool CreateNewSSHConnection(Window wnd)
+        /// <param name="initialSettings">What the dialog starts with (the address of a found computer); null for an empty form.</param>
+        /// <param name="saveByDefault">The initial state of "Save this connection to connections list".</param>
+        public bool CreateNewSSHConnection(Window wnd, SSHConnectionSettings initialSettings = null, bool saveByDefault = true)
         {
             NewConnectionController.WindowCustomization customization = new NewConnectionController.WindowCustomization
             {
                 ShowAliasField = true,
-                ShowSaveOnlyButton = true
+                ShowSaveOnlyButton = true,
+                SaveSettingsByDefault = saveByDefault
             };
             SavedWithoutConnecting = false;
-            NewSSHConnectionWindow newSSHConnectionWindow = new NewSSHConnectionWindow(null, customization);
+            NewSSHConnectionWindow newSSHConnectionWindow = new NewSSHConnectionWindow(initialSettings, customization);
             newSSHConnectionWindow.Owner = wnd;
             newSSHConnectionWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             bool accepted = newSSHConnectionWindow.ShowDialog() == true;
@@ -1387,6 +1868,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         public void Dispose()
         {
+            _Disposed = true;
+            // The scan ends on its own once cancelled; nothing it finds afterwards is added.
+            _ScanCancellation?.Cancel();
+            _ScanCancellation = null;
             _ShutdownEvent.Set();
             _ConnectionTester.Dispose();
         }
@@ -1437,9 +1922,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             };
         }
 
-        private bool CreateNewTcpConnection(Window wnd, DeviceTerminalSettings initialSettings)
+        private bool CreateNewTcpConnection(Window wnd, DeviceTerminalSettings initialSettings, bool saveByDefault = true)
         {
-            RawConnectionSettingsWindow rawConnectionSettingsWindow = new RawConnectionSettingsWindow(initialSettings, testOnOK: true, showSaveCheckbox: true);
+            RawConnectionSettingsWindow rawConnectionSettingsWindow = new RawConnectionSettingsWindow(initialSettings, testOnOK: true, showSaveCheckbox: true, saveByDefault: saveByDefault);
             rawConnectionSettingsWindow.Owner = wnd;
             RawConnectionSettingsWindow rawConnectionSettingsWindow2 = rawConnectionSettingsWindow;
             if (rawConnectionSettingsWindow2.ShowDialog() != true)
@@ -1581,7 +2066,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         {
             try
             {
-                Controller.ConnectWithSettings(wrp);
+                Controller.ConnectWithSettings(wrp, this);
             }
             catch (Exception exception)
             {
@@ -1613,7 +2098,12 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
         object buttonElement = ((sender is Button) ? sender : null);
-        if (!(((buttonElement != null) ? ((FrameworkElement)buttonElement).DataContext : null) is IConnectionSettingsWrapper connectionSettingsWrapper) || ((Control.ModifierKeys & Keys.Shift) != Keys.Shift && !MessageBoxes.Ask("Delete " + connectionSettingsWrapper.Title + "?\nTip: hold 'shift' to suppress this message.")))
+        if (!(((buttonElement != null) ? ((FrameworkElement)buttonElement).DataContext : null) is IConnectionSettingsWrapper connectionSettingsWrapper))
+        {
+            return;
+        }
+        // A found computer is not saved: it is only taken off the list, and needs no confirmation.
+        if (!connectionSettingsWrapper.IsDiscovered && (Control.ModifierKeys & Keys.Shift) != Keys.Shift && !MessageBoxes.Ask("Delete " + connectionSettingsWrapper.Title + "?\nTip: hold 'shift' to suppress this message."))
         {
             return;
         }
@@ -1681,7 +2171,15 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     {
         if (((Selector)connectionList).SelectedItem is IConnectionSettingsWrapper wrp)
         {
-            Controller.ConnectWithSettings(wrp);
+            try
+            {
+                Controller.ConnectWithSettings(wrp, this);
+            }
+            catch (Exception exception)
+            {
+                // Saving a found computer from its dialog can fail (a settings folder that cannot be written).
+                MessageBoxes.Exception(exception);
+            }
         }
     }
 
@@ -1880,5 +2378,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     private void QuickTelnet_Click(object sender, RoutedEventArgs e)
     {
         Controller.CreateQuickTelnetConnection((Window)this);
+    }
+
+    private void ScanNetwork_Click(object sender, RoutedEventArgs e)
+    {
+        Controller.ToggleNetworkScan();
     }
 }
